@@ -177,7 +177,6 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
   </section>;
 }
 function OwnerApp() {
-  const [mapUnitId, setMapUnitId] = useState('');
   const [registerUnitName,setRegisterUnitName]=useState('');
   const [heliosUnit,setHeliosUnit]=useState(1);
   // Keep old layout bookmarks compatible with the single responsive workspace.
@@ -365,7 +364,7 @@ function OwnerApp() {
         :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?(fleetOnly?<section className='panel module'><h2>IT Tech Checks</h2><button onClick={()=>openLegacy('it')}>Return to my IT Tech Checks</button></section>:<TechChecksWorkspace/>)
         :active==='Camera Health'?<CameraHealthWorkspace initialUnitId={route.unitId} backToMap={returnToMap} createTicket={fleetOnly?undefined:createTicket} canEditPlacement={session?.features?.fleetPlacementEdit===true} canEditConnection={session?.features?.fleetConnectionEdit===true} canReviewIdentity={session?.features?.ownerIdentityReview===true}/>
-        :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Fleet Dashboard');}}/>
+        :active==='InHand Routers'?<RouterWorkspace openMap={unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId})}/>
         :active==='Victron VRM'?<VrmWorkspace canDiscover={!fleetOnly} initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true)}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}
     </main>

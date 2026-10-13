@@ -8,8 +8,8 @@ import {cameraTimestamp} from './cameraEvidence';
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
-export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean};
-export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'operational',retired:false};
+export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
+export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'operational',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
 export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,routers:RouterRow[]|null,vrm:any,now=Date.now()):FleetDashboardRow[]{
  const power=vrm&&Array.isArray(vrm.items)&&Array.isArray(vrm.power)?safeVrmPower(vrm.power,vrm.items,now):[];
@@ -39,12 +39,15 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){
- const q=filters.query.trim().toLowerCase();
+ const q=filters.query.trim().toLowerCase(),nearby=rows.find(r=>r.id===filters.nearbyId&&r.placement==='field'&&r.locationVerified);
+ const miles=(r:FleetDashboardRow)=>{const rad=(v:number)=>v*Math.PI/180,a=rad(Number(nearby!.unit.latitude)),b=rad(Number(r.unit.latitude)),d=a-b,l=rad(Number(nearby!.unit.longitude)-Number(r.unit.longitude));return 3958.7613*2*Math.asin(Math.sqrt(Math.min(1,Math.sin(d/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(l/2)**2)));};
  return rows.filter(r=>{
   const state=r.support?'support':r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
   return (filters.retired||!r.retired)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||r.family===filters.family)&&(filters.provider==='all'||r.provider===filters.provider)
    &&(!q||[r.name,r.family,r.provider,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
    &&(filters.status==='all'||filters.status==='operational'&&['online','offline','support'].includes(state)||filters.status===state)
+   &&(!nearby||r.placement==='field'&&r.locationVerified&&miles(r)<=(filters.radius||10))
+   &&(!filters.installationStatus||filters.installationStatus==='all'||filters.installationStatus==='tracker'&&r.unit.readOnly===true||filters.installationStatus==='missing'&&r.locationNeedsReview||filters.installationStatus===r.unit.status)
    &&(view!=='verify'||r.locationNeedsReview);
  });
 }

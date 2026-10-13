@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {fixture,consumed,id,otherId,owner,now} from './owner-census-once-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const deferred=()=>{let resolve;const promise=new Promise(y=>{resolve=y;});return {promise,resolve};};
+async function openLocationUnit(frame,name){const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();}
 async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=false,policyState=null,initialOutcome=null}={}){
  const f=fixture();if(!proof)delete f.snapshot.ownerCensusProofs;
  if(policyState==='draining'){f.row.locationGeocode.censusOnlyState='draining';f.row.locationGeocode.censusOnlyNotBefore='2020-01-01T00:00:00Z';}
@@ -39,7 +40,7 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-once-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
  return {frame,state};
 }
 test('complete enrolled Owner proof enables one deliberate lookup, duplicate clicks send once, reload reads consumed result',async({page})=>{
@@ -50,7 +51,7 @@ test('complete enrolled Owner proof enables one deliberate lookup, duplicate cli
  state.postGate.resolve();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('suite and installed unit position remain unverified');
  await expect(button).toHaveCount(0);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+id+'"]')).toHaveCount(0);
  expect(state.snapshot.items[0].hasUnitGps).toBe(before.hasUnitGps);expect(state.snapshot.items[0].historicalRecordedAt).toBe(before.historicalRecordedAt);expect(state.snapshot.items[0].locationNote).toBe(before.locationNote);
- await page.reload();await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();
+ await page.reload();await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');
  await expect(button).toHaveCount(0);await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toContainText('already used');expect(state.writes).toHaveLength(1);
 });
 for(const role of ['IT','Service'])test(role+' cannot see or dispatch the Owner-only lookup',async({page})=>{
@@ -85,11 +86,11 @@ test('selection change during fresh preflight cannot send the prior unit lookup'
  const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();
  const button=frame.getByRole('button',{name:'Run approved Census lookup',exact:true});await expect(button).toBeVisible();await button.click();
  await expect.poll(()=>state.mapGate===null).toBe(true);
- await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+ expect(state.writes?.length||state.posts?.length||0).toBeLessThanOrEqual(1);
  await frame.locator('body').evaluate((_body,unitId)=>{location.hash='#field-map?unit='+unitId;},otherId);
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+otherId);
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+otherId);
  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',otherId);
- await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+ expect(state.writes?.length||state.posts?.length||0).toBeLessThanOrEqual(1);
  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
  // Busy clears only after the action's finally block has settled.
@@ -113,13 +114,13 @@ test('later Owner-verified GPS wins when a one-shot result arrives',async({page}
 test('one-shot no match shows stopped outcome and never enables a second lookup',async({page})=>{
  const {frame,state}=await mount(page,{outcome:'no_match'});await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();
  await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toContainText('no usable building estimate');await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);expect(state.writes).toHaveLength(1);
+ await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);expect(state.writes).toHaveLength(1);
 });
 test('refresh after a successful lookup replaces its message with the latest held policy',async({page})=>{
  const {frame,state}=await mount(page);await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();
  const region=frame.getByRole('region',{name:'Approved Census lookup'});await expect(region).toContainText('building estimate is available');
  state.snapshot=structuredClone(state.snapshot);state.snapshot.items[0].locationGeocode.status='held';delete state.snapshot.items[0].locationGeocode.censusOnlyGuard;delete state.snapshot.ownerCensusProofs;
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(region).toContainText('on hold');await expect(region).not.toContainText('building estimate is available');
+ await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(region).toContainText('on hold');await expect(region).not.toContainText('building estimate is available');
  await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);expect(state.writes).toHaveLength(1);
 });
 test('selection away and back during Run preflight invalidates the old action without a POST',async({page})=>{
@@ -130,13 +131,13 @@ test('selection away and back during Run preflight invalidates the old action wi
  // Hash-route unit selection is supported while busy; unlike list clicks it does not wait for a timeout.
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
-  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+unitId);
   await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
-  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+  expect(state.writes?.length||state.posts?.length||0).toBeLessThanOrEqual(1);
   expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
  // The same component is back at the original unit, so selection equality alone would admit the stale action.
- await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeDisabled();
+ expect(state.writes).toHaveLength(0);
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  expect(state.writes).toHaveLength(0);

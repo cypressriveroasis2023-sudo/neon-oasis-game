@@ -128,7 +128,7 @@ test('saved-data reload repaints identity status without changing expanded map p
  await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);await frame.locator('.leaflet-popup-close-button').click();
  const before=await viewport();
  state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);
  await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
@@ -138,7 +138,7 @@ test('saved-data reload repaints identity status without changing expanded map p
  await expect(frame.locator('.field-cluster-summary')).toBeVisible();
  await expect(frame.locator('.leaflet-pan-anim')).toHaveCount(0);
  const popupView=await viewport();
- state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 0 offline · 1 unknown · 1 support');
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);
  await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:popupView.center,zoom:popupView.zoom});
@@ -157,7 +157,7 @@ for(const mutation of ['partial resource set','extra resource in source group','
  if(mutation==='explicit identity warning')state.warnings=[{unitId:ids.owner,reason:'Saved unit identity needs review.'}];
  if(mutation==='duplicate resource ownership')state.identities.push({...state.identities[0],unitId:ids.unlinked,unitNumber:labels.unlinked,kind:'native_provider'});
  if(mutation==='duplicate equipment proof')state.identities.push({...state.identities[0]});
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  await navigate(page,'camera-health?unit='+ids.owner);await expect(frame.locator('.camera-unit-state')).not.toContainText('ONLINE');await expect(frame.locator('.camera-device-cards article')).toHaveCount(0);
@@ -168,7 +168,7 @@ for(const mutation of ['partial resource set','extra resource in source group','
 for(const failure of ['summary failure','expired authorization'])test(failure+' clears previously green identity evidence',async({page})=>{
  const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Camera Health unavailable':'session is unavailable'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
  if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}
@@ -212,7 +212,7 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  const {frame,state}=await mount(page);await expand(frame);
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  state.rows=state.rows.map((row,index)=>index===3?{...row,evidence:undefined}:row);
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);

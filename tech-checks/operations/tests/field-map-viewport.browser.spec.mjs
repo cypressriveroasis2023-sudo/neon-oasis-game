@@ -74,7 +74,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(1);
   await frame.locator('.cos-fleet-unit-list > button').click();
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-001');
-  await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
+  await frame.getByRole('button', { name: 'Fit pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await expect(frame.locator('.leaflet-marker-icon')).toHaveCount(1);
   await expect.poll(async () => frame.locator('.leaflet-marker-icon').evaluate(marker => {
@@ -88,7 +88,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
   await frame.getByLabel('Search units, customers, sites or addresses').fill('');
   await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(815);
-  await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
+  await frame.getByRole('button', { name: 'Fit pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
   await openWorkspace(frame, 'Today');

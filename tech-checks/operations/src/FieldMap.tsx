@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { locationLink } from './visionAreas';
 import { locationTag, locationExplanation, installationAddressLink, locationVerificationNote, locationHistoryNote, isCurrentFieldPin, historicalFieldCoordinates, parseLocationCoordinates } from './fieldLocations';
-import { checkedAddressEstimate, addressEstimateHumanNote, addressEstimateLabel, addressEstimateTimestamp, reviewedDifferenceExplanation, type AddressEstimate } from './fieldAddressEstimates';
+import { checkedAddressEstimate, addressEstimateHumanNote, addressEstimateLabel, addressEstimateTimestamp, type AddressEstimate } from './fieldAddressEstimates';
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useFieldMapDisplay } from './fieldMapDisplay';
 import { useCameraHealth } from './useCameraHealth';
@@ -18,6 +18,7 @@ import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime } fr
 import {type FieldRecorderAuthority} from './fieldRecorderObservation';
 import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
+import {AddressEstimateDetails} from './LocationEstimatePreview';
 import { RouterBadge, routerTime } from './RouterWorkspace';
 import { routerLabels, routerStatus } from '../../supabase/functions/cos-operations-pages/routers';
 import L from 'leaflet';
@@ -75,7 +76,7 @@ type Snapshot = {
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean;detailsOnly?:boolean;onPickLocation?:(receive:(point:[number,number]|null)=>void)=>void;onUpdated?:()=>void };
+type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean;detailsOnly?:boolean;onPickLocation?:(receive:(point:[number,number]|null)=>void)=>void;onUpdated?:()=>void;onBusyChange?:(busy:boolean)=>void };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const recordedPoint=(point:AddressEstimate|null)=>point?.confidence==='source_recorded_unverified';
@@ -83,7 +84,7 @@ const pointTitle=(point:AddressEstimate)=>recordedPoint(point)?'Tracker-recorded
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false,detailsOnly=false,onPickLocation,onUpdated}:Props){
+export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false,detailsOnly=false,onPickLocation,onUpdated,onBusyChange}:Props){
   const [mapRevision,setMapRevision]=useState(0);
   const [filtersOpen,setFiltersOpen]=useState(false);
   const workspaceNode=useRef<HTMLElement|null>(null);
@@ -128,6 +129,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const pickingRef=useRef(false);
   useEffect(()=>{if(!locationWritesEnabled){pickingRef.current=false;setPickingPin(false);setConfirmedLocation(false);}},[locationWritesEnabled]);
   const [busy,setBusy]=useState(false);
+  useEffect(()=>{onBusyChange?.(busy);return()=>onBusyChange?.(false);},[busy,onBusyChange]);
   const [refreshRequired,setRefreshRequired]=useState(false);
   const [history,setHistory]=useState<any[]>([]);
   const [historyError,setHistoryError]=useState('');
@@ -520,7 +522,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     working.current=true;setBusy(true);setCensusReady(null);setCensusMessage({snapshot,unitId,text:'Checking the approved one-use Census lookup…'});
     try{
       const result=await censusAction.current.run(binding,current);
-      if(current()){setData(result.snapshot as Snapshot);setCensusMessage({snapshot:result.snapshot as Snapshot,unitId,text:result.message});cameras.updateClock();}
+      if(current()){setData(result.snapshot as Snapshot);setCensusMessage({snapshot:result.snapshot as Snapshot,unitId,text:result.message});cameras.updateClock();onUpdated?.();}
     }catch(cause){
       if(current())setCensusMessage({snapshot,unitId,text:cause instanceof Error?cause.message:'The approved lookup could not be confirmed. Refresh to inspect its saved state.'});
     }finally{working.current=false;if(censusMounted.current)setBusy(false);}
@@ -653,11 +655,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {visibleCensusMessage?<p role='status'>{visibleCensusMessage}</p>:censusPolicyMessage?<p role='status'>{censusPolicyMessage}</p>:null}
           </section>}
           {selected.locationSourceRecordedConflict&&<section className='field-map-location-conflict' aria-label='Tracker point conflict'><h3>Tracker point needs review</h3><p>The unverified tracker point conflicts with {selected.locationSourceRecordedConflict.kind==='current_address_disagreement'?'the current address estimate':'another point for this installation'} by {selected.locationSourceRecordedConflict.distanceKm} km. Its original coordinates are retained: {selected.locationSourceRecordedConflict.recordedLatitude}, {selected.locationSourceRecordedConflict.recordedLongitude}.</p><p>The conflicting source point is withheld. Any address estimate shown is still approximate.</p></section>}
-          {selectedEstimate&&<section className='field-map-estimate-detail' aria-label={recordedPoint(selectedEstimate)?'Tracker-recorded coordinates':'Address estimate'}><h3>{pointTitle(selectedEstimate)}</h3>
-            {'secondaryUnit' in selectedEstimate&&selectedEstimate.secondaryUnit?<p>Original installation address: {selectedEstimate.originalAddress}. {selectedEstimate.secondaryUnit.sourceText} is retained in the saved address. This estimate locates the building address; the suite and installed unit position remain unverified.</p>:null}
-            {'inferredComponents' in selectedEstimate&&selectedEstimate.inferredComponents?.length? <p>Source address: {selectedEstimate.originalAddress}. Provider supplied missing {selectedEstimate.inferredComponents.join(' and ')}; source data is unchanged.</p>:null}
-            {selectedEstimate.confidence==='mhelp_service_unverified'?<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude}</p><p>{selectedEstimate.coordinateSource} · Read {routerTime(selectedEstimate.sourceObservedAt)}</p><p>Current service-location evidence. The installed camera point still needs verification; excluded from nearby distances.</p></>:selectedEstimate.confidence==='source_recorded_unverified'?<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude}</p><p>Literal coordinates from tracker cell {selectedEstimate.coordinateCell}. Source observed {routerTime(selectedEstimate.sourceObservedAt)}.</p><p>Coordinate measurement time is unknown. This is not a verified installation pin or live GPS; excluded from nearby distances.</p></>:selectedEstimate.confidence==='approximate_property_location'?<><p>Original address: {selectedEstimate.originalAddress}</p><p>Provider-normalized address: {selectedEstimate.matchedAddress}</p><p>{reviewedDifferenceExplanation(selectedEstimate)}</p><p>Geocodio · {selectedEstimate.providerDataSource} · Provider accuracy {selectedEstimate.providerAccuracy} · {selectedEstimate.providerAccuracyType}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.retrievedAt)}</p><p>This is an approximate property point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:selectedEstimate.confidence==='automatic_address_estimate'?<><p>{selectedEstimate.matchedAddress}</p><p>Geocodio · {selectedEstimate.accuracyType} · Provider accuracy {selectedEstimate.accuracy}{selectedEstimate.matchType?' · '+selectedEstimate.matchType:''}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an approximate address point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></>}
-          </section>}
+          {selectedEstimate&&<AddressEstimateDetails point={selectedEstimate}/>}
           {!selected.readOnly&&selected.locationNote?.startsWith('COS_ADDRESS_ESTIMATE_')&&addressEstimateHumanNote(selected.locationNote)&&<p role='alert'>{addressEstimateHumanNote(selected.locationNote)}</p>}
           {!selectedEstimate&&historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}
           <div className='field-map-coordinate-form'>

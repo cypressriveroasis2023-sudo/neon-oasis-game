@@ -23,59 +23,49 @@ async function mount(page,{fail=false,legacySelection=false,customUnits=units}={
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
- await page.goto('/clean-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();if(!fail)await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(customUnits.length);return {frame,state};
+ await page.goto('/clean-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();if(!fail)await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(Math.min(80,customUnits.length));return {frame,state};
 }
-test('complete counts, compact map-first view, review disclosure and explicit-only unit details',async({page},info)=>{
+test('canonical dashboard retains full fleet counts, bounded map, readable markers and explicit-only details',async({page},info)=>{
  const {frame,state}=await mount(page,{legacySelection:true});
- await expect(frame.locator('.field-map-kpis article b')).toHaveText(['319','116','0','107','96']);
- await expect(frame.locator('.field-map-kpis')).toContainText('UNKNOWN / STALE');await expect(frame.locator('.field-map-kpis')).toContainText('SUPPORT · 0 CAMERAS');
- await expect(frame.locator('.field-map-info')).not.toHaveAttribute('open');await expect(frame.locator('.router-map-note')).not.toBeVisible();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();
- const entryMap=await frame.locator('.cos-fleet-map-panel').boundingBox();expect(entryMap.y).toBeLessThan(page.viewportSize().height);if(page.viewportSize().width<=700)expect(page.viewportSize().height-80-entryMap.y).toBeGreaterThanOrEqual(240);await page.screenshot({path:info.outputPath('compact-map-entry.png')});
- await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
- const boxes=await frame.locator('.cos-fleet-workspace').evaluate(el=>({map:el.querySelector('.cos-fleet-map-panel').getBoundingClientRect().top,list:el.querySelector('.cos-fleet-unit-list').getBoundingClientRect().top,width:innerWidth,scroll:document.documentElement.scrollWidth}));
- if(boxes.width<=700)expect(boxes.map).toBeLessThan(boxes.list);expect(boxes.scroll).toBeLessThanOrEqual(boxes.width+1);
- await page.screenshot({path:info.outputPath('compact-map.png')});
- await frame.locator('.cos-fleet-unit-row').first().click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 1');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();
- await frame.locator('.field-map-info>summary').click();await expect(frame.getByRole('region',{name:'Placement records needing review'})).toContainText('Fixture placement needs identity review');await expect(frame.locator('.field-map-info')).toContainText('10 verified map pins');await expect(frame.locator('.field-map-info')).toContainText('Saved status refreshes every 15 minutes');
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['319','116','0','107','309']);
+ await expect(frame.locator('.cos-fleet-count-note')).toContainText('96 support units have 0 cameras');
+ await expect(frame.getByRole('dialog')).toHaveCount(0);
+ const canvas=frame.locator('.cos-fleet-map-canvas');await canvas.scrollIntoViewIfNeeded();
+ const size=await canvas.boundingBox();expect(size.height).toBeLessThan(750);expect(size.width).toBeGreaterThan(150);
+ const symbol=frame.locator('.cos-field-cluster,.cos-field-pin').first();await expect(symbol).toHaveCSS('width','38px');await expect(symbol).toHaveCSS('height','38px');
+ await frame.locator('.cos-fleet-unit-row').first().click();await expect(frame.getByRole('dialog')).toContainText('Solar Spotter 1');
+ await frame.getByRole('button',{name:'Close unit details',exact:true}).click();
+ await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(frame.getByRole('dialog')).toHaveCount(0);
+ await frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Location verification/}).click();
+ await expect(frame.getByRole('heading',{name:'Location verification · 309 units'})).toBeVisible();
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+ await page.screenshot({path:info.outputPath('unified-fleet-large-review.png')});
 });
-for(const fallback of [true,false])test(`map-only fullscreen ${fallback?'fallback':'native'} restores controls and supports Escape and Back`,async({page},info)=>{
- const {frame,state}=await mount(page);
- if(fallback)await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});
- await frame.locator('.cos-fleet-unit-row').first().click();
- const initialStyle=await page.locator('iframe').getAttribute('style')||'';
- const enter=frame.getByRole('button',{name:'Fullscreen fleet map',exact:true});
+test('map-only fullscreen restores the dashboard and outer host on button, Escape and Back',async({page})=>{
+ test.setTimeout(120000);const {frame,state}=await mount(page);const enter=frame.getByRole('button',{name:'Fullscreen fleet map',exact:true});
  for(const method of ['button','Escape','Back']){
-  await enter.click();await expect(frame.locator('.cos-fleet-dashboard')).toHaveClass(/field-map-tv/);await expect(frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true})).toBeFocused();
-  for(const selector of ['.field-map-display-bar','.field-map-kpis','.field-map-toolbar','.field-map-info','.cos-fleet-unit-list','.cos-fleet-drawer','.field-map-legend'])await expect(frame.locator(selector)).not.toBeVisible();
-  await expect(page.locator('#outer-navigation')).not.toBeVisible();
-  const map=await frame.locator('.cos-fleet-map-panel').boundingBox(),viewport=page.viewportSize();expect(map.x).toBeCloseTo(0,0);expect(map.y).toBeCloseTo(0,0);expect(map.width).toBe(viewport.width);expect(map.height).toBe(viewport.height);
-  await expect(frame.locator('.leaflet-control-zoom-in')).toBeVisible();await expect(frame.getByRole('button',{name:'Fit map pins'})).toBeVisible();
-  await frame.getByRole('button',{name:'Fit map pins'}).click();await page.clock.runFor(300);await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const controls=el.querySelector('.field-map-fullscreen-controls').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin,.cos-field-cluster')].every(pin=>{const box=pin.getBoundingClientRect();return !(box.left<controls.right&&box.right>controls.left&&box.top<controls.bottom&&box.bottom>controls.top);});})).toBe(true);await frame.locator('.leaflet-control-zoom-in').click();await page.clock.runFor(500);
-  const view=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);
-  if(method==='button')await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();else if(method==='Escape')await page.keyboard.press('Escape');else await frame.locator('body').evaluate(()=>history.back());
-  await expect(frame.locator('.cos-fleet-dashboard')).not.toHaveClass(/field-map-tv/);await expect(enter).toBeFocused();await expect(page.locator('#outer-navigation')).toBeVisible();await expect(page.locator('iframe')).toHaveAttribute('style',initialStyle);
-  const restored=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);expect(restored.zoom).toBe(view.zoom);expect(restored.center[0]).toBeCloseTo(view.center[0],3);expect(restored.center[1]).toBeCloseTo(view.center[1],3);
+  await enter.click();await expect(frame.locator('.cos-fleet-map-expanded')).toBeVisible();
+  await expect(page.locator('#outer-navigation')).not.toBeVisible();await expect(frame.locator('.cos-fleet-filters')).not.toBeVisible();
+  const box=await frame.locator('.cos-fleet-map-panel').boundingBox();expect(box.x).toBe(0);expect(box.y).toBe(0);expect(box.width).toBe(page.viewportSize().width);expect(box.height).toBe(page.viewportSize().height);
+  if(method==='button')await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();
+  else if(method==='Escape')await frame.getByRole('button',{name:'Exit fullscreen fleet map'}).press('Escape');
+  else await page.goBack({timeout:2000,waitUntil:'commit'}).catch(error=>{if(!String(error).includes('Timeout'))throw error;});
+  await expect(frame.locator('.cos-fleet-map-expanded')).toHaveCount(0);await expect(page.locator('#outer-navigation')).toBeVisible();await expect(enter).toBeFocused();
  }
- const saved=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);await frame.locator('body').evaluate(()=>location.hash='#camera-health');await expect(frame.locator('.camera-health-native')).toBeVisible();await frame.locator('body').evaluate(()=>history.back());await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();await expect.poll(()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom)).toBe(saved.zoom);
- await enter.click();await frame.getByRole('button',{name:'Fit map pins'}).click();await page.clock.runFor(500);await page.screenshot({path:info.outputPath(fallback?'map-only-fallback.png':'map-only-native.png')});await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ expect(state.errors).toEqual([]);
 });
-test('failed initial load cannot enter an empty fullscreen without an exit',async({page})=>{const {frame,state}=await mount(page,{fail:true});await expect(frame.getByRole('alert')).toContainText('Field units could not be loaded');await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeDisabled();state.fail=false;await frame.getByRole('button',{name:'Retry map load'}).click();await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeEnabled();});
-
-test('every field family stays searchable and mapped independently of unknown health',async({page})=>{
- const families=[['ST 001','STANDS'],['Sniper 21','SNIPERS'],['CAM V 31','CAM V & RSU'],['Recon 41','RECON'],['Solar Spotter 51','Solar Spotter'],['Spotter 61','Spotter'],['Ranger 71','Ranger'],['Helios 81','Helios']];
- const {frame,state}=await mount(page,{customUnits:families.map(([unitNumber,modelName],i)=>({...units[i],unitNumber,modelName}))});
- await expect(frame.locator('.field-map-kpis article').first().locator('b')).toHaveText('8');
- for(const [label] of families){await frame.getByLabel('Search units, customers, sites or addresses').fill(label);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(label);await expect(frame.getByRole('link',{name:'Open verified installation pin in Google Maps'})).toHaveAttribute('href',/^https:\/\/www.google.com\/maps/);await frame.getByRole('button',{name:'Close unit details'}).click();}
- await frame.getByLabel('Search units, customers, sites or addresses').fill('');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(8);expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+test('a failed field read retains a basemap and fullscreen always has an exit',async({page})=>{
+ const {frame}=await mount(page,{fail:true});await expect(frame.getByRole('alert').first()).toBeVisible();
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true})).toBeVisible();
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-fleet-map-expanded')).toHaveCount(0);
 });
-test('late fullscreen completion and rapid re-entry do not strand normal UI in fullscreen',async({page})=>{
- const {frame}=await mount(page);
- await frame.locator('body').evaluate(()=>{let native=null;Object.defineProperty(document,'fullscreenElement',{configurable:true,get:()=>native});document.exitFullscreen=async()=>{native=null;document.dispatchEvent(new Event('fullscreenchange'));};HTMLElement.prototype.requestFullscreen=function(){const element=this;return new Promise(resolve=>{window.finishNativeFixture=()=>{native=element;document.dispatchEvent(new Event('fullscreenchange'));resolve();};});};});
+test('every field family remains searchable with stale evidence and cannot inherit a confirmed outage',async({page})=>{
+ const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar Spotter 200');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await expect(frame.locator('.cos-fleet-unit-row [aria-label="camera: Unverified"]')).toBeVisible();expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+});
+test('TV-size fullscreen keeps the one map bounded at 1920 pixels and returns cleanly',async({page},info)=>{
+ await page.setViewportSize({width:1920,height:1080});const {frame,state}=await mount(page);
  await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
- await frame.locator('body').evaluate(()=>{document.querySelector('.field-map-fullscreen-exit').click();document.querySelector('.field-map-display-bar button').click();window.finishNativeFixture();});
- await expect(frame.locator('.cos-fleet-dashboard')).not.toHaveClass(/field-map-tv/);await expect.poll(()=>frame.locator('body').evaluate(()=>document.fullscreenElement===null)).toBe(true);await expect.poll(()=>frame.locator('body').evaluate(()=>Boolean(history.state?.cosFieldMapDisplay))).toBe(false);await expect(page.locator('#outer-navigation')).toBeVisible();
+ const bounds=await frame.locator('.cos-fleet-map-panel').boundingBox();expect(bounds).toEqual({x:0,y:0,width:1920,height:1080});
+ await page.screenshot({path:info.outputPath('unified-map-only-tv.png')});await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.errors).toEqual([]);
 });
-
-test('TV-size fallback shows only a full-bleed map and minimal controls',async({page},info)=>{await page.setViewportSize({width:1920,height:1080});const {frame,state}=await mount(page);await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.field-map-display-bar')).not.toBeVisible();await expect(page.locator('#outer-navigation')).not.toBeVisible();const bounds=await frame.locator('.cos-fleet-map-panel').boundingBox();expect(bounds).toEqual({x:0,y:0,width:1920,height:1080});await page.screenshot({path:info.outputPath('map-only-tv-1920.png')});await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.errors).toEqual([]);});

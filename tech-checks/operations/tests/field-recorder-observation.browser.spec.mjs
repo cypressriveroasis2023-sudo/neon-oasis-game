@@ -38,14 +38,14 @@ test('Field cards and selected troubleshooting retain recorder wording and separ
 });
 test('new Owner hold removes eligibility while preserving the old map row and source observation',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','1','2','0','0']);
- state.guards=state.guards.slice(1);await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','2','1','0']);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');expect(state.rows[0].evidence.status).toBe('online');expect(state.rows[0].activationState).toBe('deactivated');expect(state.writes).toEqual([]);
+ state.guards=state.guards.slice(1);await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','2','1','0']);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');expect(state.rows[0].evidence.status).toBe('online');expect(state.rows[0].activationState).toBe('deactivated');expect(state.writes).toEqual([]);
 });
 test('stale recorder observations remain unknown despite current installation and guard',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','1','2','0','0']);
- state.rows.slice(0,2).forEach(r=>r.evidence.observedAt='2026-10-09T06:19:59Z');await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','1','2','0']);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText('RECORDER UNVERIFIED');expect(state.writes).toEqual([]);
+ state.rows.slice(0,2).forEach(r=>r.evidence.observedAt='2026-10-09T06:19:59Z');await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','1','2','0']);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText('RECORDER UNVERIFIED');expect(state.writes).toEqual([]);
 });
 test('failed provider sync withdraws both cached ONLINE and OFFLINE admissions without deleting observations',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','1','2','0','0']);
- state.guards=[];await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','1','2','0']);
+ state.guards=[];await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.field-map-kpis article b')).toHaveText(['3','0','1','2','0']);
  await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText('RECORDER UNVERIFIED');expect(state.rows.slice(0,2).map(r=>r.evidence.status)).toEqual(['online','offline']);expect(state.rows.slice(0,2).map(r=>r.evidence.observedAt)).toEqual([fresh,fresh]);expect(state.writes).toEqual([]);
 });

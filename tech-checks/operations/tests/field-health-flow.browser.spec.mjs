@@ -59,13 +59,13 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');
+ await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
 test('staleness and unavailable health fail gray without moving map or writing',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','online');
  await frame.locator('.leaflet-control-zoom-in').click();const transform=await frame.locator('.leaflet-map-pane').getAttribute('style');await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','unknown');expect(await frame.locator('.leaflet-map-pane').getAttribute('style')).toBe(transform);
- state.fail=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.getByRole('alert')).toContainText('Camera Health unavailable');expect(state.writes).toHaveLength(0);
+ state.fail=true;await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.getByRole('alert')).toContainText('Camera Health unavailable');expect(state.writes).toHaveLength(0);
 });
 test('historical coordinates are opt-in OLD-tagged review only, never nearby or falsely current',async({page})=>{
  const {frame,state}=await mount(page,{historical:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(2);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+id+'"]')).toHaveCount(0);
@@ -78,7 +78,7 @@ test('pasted address pin is an unsaved candidate; moving it clears confirmation'
 });
 
 test('Back and Forward retain map filters, nearby center and selected unit',async({page})=>{
- const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 test('native Camera Health shows units and individual cameras separately with filter and accessible drill-down',async({page},testInfo)=>{
@@ -152,7 +152,7 @@ test('imported tracker families stay visible and colored without inventing map c
  const {frame,state}=await mount(page,{trackerCase:true});
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-unit-row').filter({hasText:'Sniper 2 344'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.cos-fleet-unit-row').filter({hasText:'CAMV 010'})).toContainText('IP / PORT OFFLINE');
- await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('all');
+ await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('all');
  const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>location.hash='camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(3);
  await frame.getByLabel('Camera Health equipment family').selectOption('sniper');await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await frame.locator('.camera-overview-card').filter({hasText:'Sniper 334'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('IP / PORT UNKNOWN');await expect(detail.getByRole('link',{name:'Find unit in Camera Health diagnostics'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20334');expect(state.writes).toHaveLength(0);
@@ -189,7 +189,7 @@ test('compact clusters expose every colocated unit and support equipment has no 
  await frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'}).click();
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('100 Fixture Road');
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Stand 72 044');
- await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('support');
+ await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('support');
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Camera status unverified');
@@ -293,7 +293,7 @@ test('filtering away an open cluster discards its old popup-pan snapshot',async(
  const {frame,state}=await mount(page,{crowded:true});
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await expect(frame.locator('.field-cluster-list')).toBeVisible();
- await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('support');await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
+ await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('support');await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
  const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
  const before=await center();await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.leaflet-popup')).toBeVisible();
  await frame.locator('.leaflet-popup-close-button').click();await expect.poll(async()=>{const after=await center();const zoom=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom),scale=256*2**zoom;const y=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))*scale/(2*Math.PI);return Math.max(Math.abs(after[1]-before[1])*scale/360,Math.abs(y(after[0])-y(before[0])));}).toBeLessThan(1.1);expect(state.writes).toHaveLength(0);
@@ -331,5 +331,5 @@ test('ordinary ST stands stay blue and outside camera-health totals alongside co
 });
 
 test('changing the health filter excludes a previously selected unit with another status',async({page})=>{
- const {frame,state}=await mount(page);await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 52'}).click();await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-row')).toContainText('Solar Spotter 51');await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);expect(state.writes).toEqual([]);
+ const {frame,state}=await mount(page);await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 52'}).click();await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-row')).toContainText('Solar Spotter 51');await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);expect(state.writes).toEqual([]);
 });

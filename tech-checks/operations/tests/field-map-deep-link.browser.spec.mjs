@@ -196,7 +196,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await frame.locator('.cos-field-pin').click();
   await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
   await frame.getByRole('button', {
-    name: 'Back to Field Map',
+    name: 'Back to Fleet Dashboard',
     exact: true
   }).click();
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
@@ -223,7 +223,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   const {
     frame
   } = await mount(page, 'RII-022');
-  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('offline');
+  await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
@@ -250,18 +250,18 @@ test('initial map failure shows unavailable state and retry restores units',asyn
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.router-map-note')).not.toContainText('0 support units');
  await expect(frame.getByLabel('Review unverified historical locations').locator('..')).not.toContainText('(0)');
- state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
+ state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 });
 test('failed map refresh retains last good units and labels stale map data',async({page})=>{
  const {frame,state}=await mount(page,'Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);state.mapFailure=true;
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
- state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
+ state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.field-map-error')).toHaveCount(0);
 });
 
@@ -276,5 +276,5 @@ test('hardware-suffixed field pin shows its number and unit cards keep dark high
 });
 
 test('closing a deep-linked unit remains closed through manual and automatic refresh',async({page})=>{
- const {frame,state}=await mount(page,'Ranger 022');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.cos-fleet-unit-row').first()).toBeFocused();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,'Ranger 022');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.cos-fleet-unit-row').first()).toBeFocused();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();expect(state.writes).toHaveLength(0);
 });
