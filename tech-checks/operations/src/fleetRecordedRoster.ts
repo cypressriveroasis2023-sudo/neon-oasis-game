@@ -1,3 +1,4 @@
+import {recordedAddressText} from './fleetDisplayAddress';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import type {DashboardUnit,FleetFilters} from './fleetDashboardModel';
 import {inventoryPlacement} from './fleetSnapshot';
@@ -36,7 +37,7 @@ export const recordedSourceLabel=(r:RecordedEquipment)=>({owner_supplied_mhelp_e
 /** Non-UUID source rows stay outside camera classification, map pins and write actions. */
 export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map'){
  const q=filters.query.trim().toLowerCase();
- return items.filter(r=>r.kind!=='unit'&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')
-  &&(!q||[r.unitNumber,r.displayUnitNumber,r.customer,r.category,...r.productIds].filter(Boolean).join(' ').toLowerCase().includes(q))
+ return items.filter(r=>r.kind!=='unit'&&(view!=='setup'||r.active&&r.placement==='field')&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')
+  &&(!q||[r.unitNumber,r.displayUnitNumber,r.customer,recordedAddressText(r.sourceAddress),r.category,...r.productIds].filter(Boolean).join(' ').toLowerCase().includes(q))
   &&['all','unknown'].includes(filters.status)&&!filters.nearbyId&&(!filters.installationStatus||filters.installationStatus==='all')&&view!=='verify');
 }

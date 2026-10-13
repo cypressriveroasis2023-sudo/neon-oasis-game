@@ -10,8 +10,8 @@ import CameraHealthOverview,{CameraCardActions,CameraResourceObservations,UnitEv
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 import {cameraOverview} from './cameraHealthCounts';
 export { validateCameraHealth } from './fieldCameraHealth';
-type Props={embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
-export default function CameraHealthWorkspace({embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
+type Props={powerReadEnabled?:boolean;embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
+export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
   const {data:health,error,loading,refresh,now,fleet}=useCameraHealth();
   const units=(fleet?((fleet.fieldMap as any).inventoryItems||fleet.fieldMap.items):null) as FieldHealthUnit[]|null;
   const unitError=error;const loadUnits=()=>refresh();
@@ -31,16 +31,16 @@ export default function CameraHealthWorkspace({embedded=false,initialUnitId='',b
         <UnitEvidenceDetails classification={detail?.classification||null}/><ReconProviderAreaDetails identity={detail?.association} rows={rows} now={now}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
         {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         {group&&<CameraCardActions group={group} now={now} onDetails={()=>openLegacy('camera-health')} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection}/>}
-        {!embedded&&<HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>}
+        {!embedded&&powerReadEnabled&&<HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>}
         <MhelpUnitRefresh key={'mhelp-location-'+selected.id} unit={selected} onUpdated={()=>void refresh(true)}/>
         <UnitDiagnosticReport key={'unit-report-'+selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}
       </>}
     </section>}
     {!health&&!error?<p role='status'>Loading Camera Health…</p>:health&&<>
-      {!initialUnitId&&<CameraHealthOverview health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
+      {!initialUnitId&&<CameraHealthOverview powerReadEnabled={powerReadEnabled} health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
       {initialUnitId&&<>
-      <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 15 minutes while visible</p>
+      <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 4 minutes while visible</p>
       <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2} fieldRecorderObservation={detail?.classification?.fieldRecorderVerified?detail.observation:undefined}/>
       </>}
       {initialUnitId&&selected&&!rows.length&&<p>No matching saved camera record is available for this field unit. {unitDiagnosticsPath(selected,rows)&&<a href={unitDiagnosticsPath(selected,rows)!} target='_blank' rel='noopener noreferrer'>Find this unit in Camera Health diagnostics ↗</a>}</p>}

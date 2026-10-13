@@ -323,3 +323,24 @@ test('typed imported SHOP overrides only old inferred FIELD for blank deployment
  const native=await importedEnvelope('SHOP'),fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'FIELD'}),organization:'Old provider site'});await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await page.locator('#moveShopBtn').click();const form=await ready(page);
  await expect(form.address).toHaveValue('');await expect(form.site).toHaveValue('');await form.cancel.click();await assertNoWrites(page,fixture);
 });
+
+for(const phase of ['initial','preflight'])test('Shop pending '+phase+' verification retries in place and still requires a fresh confirmation',async({page})=>{
+ const fixture=await mount(page);
+ if(phase==='preflight'){
+  await page.locator('#moveShopBtn').click();await ready(page);await inputs(page).reason.fill('Synthetic return to Shop');await inputs(page).confirmed.check();
+ }
+ await page.evaluate(()=>{const timeout=AbortSignal.timeout.bind(AbortSignal);AbortSignal.timeout=ms=>timeout(Math.min(ms,500));fixtureHoldRead=true;});
+ if(phase==='initial')await page.locator('#moveShopBtn').click();else await inputs(page).save.click();
+ await expect(inputs(page).save).toBeDisabled();
+ await expect(page.locator('.placement-feedback')).toContainText(/timed out.*saved placement/);
+ const retry=page.getByRole('button',{name:'Retry verification',exact:true});await expect(retry).toBeEnabled();await expect(inputs(page).cancel).toBeEnabled();
+ expect(await mutations(page)).toEqual([]);const before=await legacyReads(page);
+ await page.evaluate(()=>{fixtureHoldRead=false;});await retry.click();const form=await ready(page);
+ await expect(page.locator('.cos-placement-dialog')).toHaveCount(1);await expect(form.confirmed).not.toBeChecked();await expect(form.site).not.toBeVisible();await expect(form.address).not.toBeVisible();
+ await expect(page.locator('.placement-feedback')).toContainText('No new installation address or live vendor lookup');
+ await expect.poll(()=>legacyReads(page)).toBe(before+1);
+ await page.evaluate(()=>fixtureReleaseRead());await expect(form.save).toBeEnabled();await expect(page.locator('.placement-feedback')).toContainText('Saved unit identity and placement verified');
+ await form.reason.fill('Synthetic return to Shop');await form.save.click();await assertNoWrites(page,fixture);
+ await form.confirmed.check();await form.save.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+ expect(await mutations(page)).toHaveLength(1);expect((await mutations(page))[0].args).toMatchObject({p_unit_key:'RANGER 001',p_placement:'SHOP',p_site_label:'',p_street_address:'',p_expected_audit_id:null});expect(fixture.geocodes).toEqual([]);expect(fixture.unexpected).toEqual([]);expect(fixture.pageErrors).toEqual([]);
+});

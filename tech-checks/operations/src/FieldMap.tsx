@@ -77,7 +77,7 @@ type Snapshot = {
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean;detailsOnly?:boolean;onPickLocation?:(receive:(point:[number,number]|null)=>void)=>void;onUpdated?:()=>void;onBusyChange?:(busy:boolean)=>void };
+type Props = { powerReadEnabled?:boolean;show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean;detailsOnly?:boolean;onPickLocation?:(receive:(point:[number,number]|null)=>void)=>void;onUpdated?:()=>void;onBusyChange?:(busy:boolean)=>void };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const recordedPoint=(point:AddressEstimate|null)=>point?.confidence==='source_recorded_unverified';
@@ -85,7 +85,7 @@ const pointTitle=(point:AddressEstimate)=>recordedPoint(point)?'Tracker-recorded
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false,detailsOnly=false,onPickLocation,onUpdated,onBusyChange}:Props){
+export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false,detailsOnly=false,onPickLocation,onUpdated,onBusyChange}:Props){
   const [mapRevision,setMapRevision]=useState(0);
   const [filtersOpen,setFiltersOpen]=useState(false);
   const workspaceNode=useRef<HTMLElement|null>(null);
@@ -642,7 +642,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
           </dl>
 
           {canonicalCameraUnit(selected.unitNumber)?.startsWith('RECON2|')&&selectedHealth?.identity==='matched'&&<section aria-label='Recon II detector batteries'><h3>Recon II battery evidence</h3>{selectedHealth.rows.filter(row=>row.evidence?.source==='Reconeyez').map(row=><div key={row.id}><strong>{row.name}</strong><ReconBatteryDetails battery={row.batteryEvidence} now={cameras.now}/></div>)}</section>}
-          <HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>
+          {powerReadEnabled&&<HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>}
           <MhelpUnitRefresh key={selected.id} unit={selected} onUpdated={()=>{void load(true);onUpdated?.();}}/>
           <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3><p>Router checks do not supply live locations.</p>{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}

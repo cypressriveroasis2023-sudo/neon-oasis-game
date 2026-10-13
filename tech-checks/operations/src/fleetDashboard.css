@@ -38,16 +38,16 @@
 #root#root .cos-fleet-map-canvas .cos-dashboard-marker{background:transparent!important;border:0!important;padding:0!important;min-width:0;min-height:0;line-height:1;}
 #root#root .cos-fleet-map-canvas :is(.cos-field-pin,.cos-field-cluster){position:relative;display:grid;place-items:center;box-sizing:border-box;width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;max-height:38px!important;margin:3px;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;transform:none!important;scale:1!important;left:auto;box-shadow:none!important;}
 #root#root .cos-fleet-map-canvas .cos-field-pin>.cos-reticle-artwork{position:absolute;inset:0;width:38px!important;height:38px!important;max-width:38px!important;max-height:38px!important;aspect-ratio:1;overflow:visible;color:var(--pin);}
-#root#root .cos-fleet-map-canvas .cos-field-pin>b.cos-pin-unit-number{position:absolute;top:31px;left:50%;transform:translateX(-50%);display:block;box-sizing:border-box;width:max-content;min-width:24px;max-width:44px;margin:0;padding:1px 3px;background:#080b12;border:1px solid var(--pin);border-radius:4px;color:#fff;font:10px/12px Arial,sans-serif;text-align:center;white-space:nowrap;}
+#root#root .cos-fleet-map-canvas .cos-field-pin>b.cos-pin-unit-number{position:relative;top:auto;left:auto;transform:none;display:block;box-sizing:border-box;width:max-content;min-width:0;max-width:30px;margin:0;padding:0;background:none;border:0;border-radius:0;color:#071421;font:800 12px/16px Arial,sans-serif;text-align:center;text-shadow:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #root#root .cos-fleet-map-canvas .cos-field-pin>b.cos-reticle-long-id{font-size:9px;letter-spacing:0;}
-#root#root .cos-fleet-map-canvas .cos-field-cluster>b{position:relative;display:block;margin:0;padding:0;font:700 13px/1 Arial,sans-serif;color:#fff;z-index:2;}
-#root#root .cos-fleet-map-canvas .cos-reticle-ring{position:absolute;inset:3px;border:2px solid var(--pin);border-radius:50%!important;background:#071421!important;}
-#root#root .cos-fleet-map-canvas .cos-field-cluster:before{width:38px;height:1px;left:0;top:18.5px;}
-#root#root .cos-fleet-map-canvas .cos-field-cluster:after{height:38px;width:1px;top:0;left:18.5px;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster>b{position:relative;display:block;margin:0;padding:0;font:800 13px/1 Arial,sans-serif;color:#071421;text-shadow:none;z-index:2;}
+#root#root .cos-fleet-map-canvas .cos-reticle-ring{position:absolute;inset:2px;border:2px solid #071421;border-radius:50%!important;background:var(--pin)!important;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster:before{display:none;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster:after{display:none;}
 #root#root .cos-fleet-map-canvas :is(.cos-pin-location-tag,.cos-cluster-location){font:7px/10px Arial,sans-serif;top:-8px;left:50%;right:auto;transform:translateX(-50%);width:max-content;padding:0 3px;color:#ffd38b;}
 #root#root .cos-fleet-map-canvas .cos-cluster-caption{font:7px/9px Arial,sans-serif;top:34px;left:50%;transform:translateX(-50%);padding:0 3px;}
 #root#root .cos-fleet-map-canvas .cos-cluster-support{top:-4px;right:-15px;height:20px;padding:1px 3px;display:flex;align-items:center;gap:2px;}
-#root#root .cos-fleet-map-canvas .cos-cluster-support svg{width:12px!important;height:14px!important;flex:none;}
+#root#root .cos-fleet-map-canvas .cos-cluster-support-dot{width:8px;height:8px;flex:none;}
 #root#root .cos-fleet-map-canvas .cos-cluster-support small{display:inline;font:700 9px/1 Arial,sans-serif;}
 .cos-fleet-count-note{color:var(--cos-muted);font-size:11px;line-height:1.6;margin-bottom:16px!important;}
 .cos-fleet-picking .leaflet-container{cursor:crosshair;}
@@ -107,3 +107,9 @@
 .cos-fleet-source-group-grid>button{justify-self:start}
 @media(max-width:1100px){.cos-fleet-source-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:750px){.cos-fleet-source-group-grid{grid-template-columns:1fr;gap:12px}.cos-fleet-source-record{padding:12px}.cos-fleet-source-record summary{min-height:44px}}
+
+/* The Fleet drawer is the single scroll surface, including its installation editor. */
+#root#root .cos-fleet-drawer{height:100dvh;max-height:100dvh;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;}
+#root#root .cos-fleet-drawer .field-map-location-editor .field-map-detail{max-height:none!important;overflow:visible!important;overscroll-behavior:auto;}
+
+.cos-fleet-recorded-address{white-space:pre-line;overflow-wrap:anywhere;line-height:1.6}.cos-fleet-drawer>section.cos-fleet-recorded-address{margin:12px 0;padding:12px;border:1px solid var(--cos-border);border-radius:7px}.cos-fleet-drawer>section.cos-fleet-recorded-address h3{margin:0 0 7px;}

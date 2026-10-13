@@ -201,6 +201,7 @@ test('existing Owner Tools restore their legacy layout and return to full-width 
 
 test('approved Today workspace uses the available screen width at normal browser zoom', async ({ page }, testInfo) => {
   const { frame } = await mount(page);
+  await openWorkspace(frame,'Today');
   await responsiveLayout(page, frame);
   await expect(frame.locator('.owner-command-home')).toHaveAttribute('aria-busy','false');
   const layout=await frame.locator('.workspace-overview').evaluate(today=>({

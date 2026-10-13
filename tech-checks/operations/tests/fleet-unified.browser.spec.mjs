@@ -32,7 +32,7 @@ test('legacy unit labels resolve uniquely, including Shop / ROOT without adding 
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(0);
 });
 
-test('mobile-size clusters and solar symbols remain square and expand to separately selectable units',async({page},info)=>{
+test('plain colored circles stay compact and clusters expand to accessible selectable units',async({page},info)=>{
  const catalog=structuredClone(units);
  for(const unit of catalog.slice(0,3))Object.assign(unit,{latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:fresh,gpsRecordedAt:fresh});
  catalog.push({...catalog[0],id:'00000000-0000-4000-8000-000000000007',unitNumber:'ST 007',modelName:'Solar Stand'});
@@ -47,6 +47,18 @@ test('mobile-size clusters and solar symbols remain square and expand to separat
  await expect(solar).toHaveCSS('color','rgb(21, 168, 255)');
  const shape=await solar.evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
  expect(shape.w).toBe(38);expect(shape.h).toBe(38);
+ await expect(app.locator('.cos-fleet-map-canvas [data-cos-eye],.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas .cos-reticle-solar-panel')).toHaveCount(0);
+ await expect(app.locator('#cos-fleet-eye-artwork')).toHaveCount(0);
+ await expect(app.locator('.cos-dashboard-peer .cos-map-status-dot')).toHaveCount(4);
+ for(const [id,label,status,color] of [[catalog[0].id,'Helios 1','online','rgb(43, 255, 53)'],[catalog[1].id,'Spotter 1','offline','rgb(255, 39, 52)'],[catalog[2].id,'Spotter 2','unknown','rgb(148, 163, 184)'],[catalog[4].id,'ST 007','support','rgb(21, 168, 255)']]){
+  const marker=app.locator('.cos-dashboard-peer[data-unit-id="'+id+'"]');
+  await expect(marker).toHaveAttribute('aria-label',new RegExp(label));
+  await expect(marker.locator('.cos-field-pin')).toHaveAttribute('data-health',status);
+  await expect(marker.locator('circle')).toHaveCSS('fill',color);
+  await expect(marker.locator('.cos-pin-unit-number')).toHaveCSS('color','rgb(7, 20, 33)');
+  const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-map-status-dot').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&Math.abs(circle.y+circle.height/2-label.y-label.height/2)<1;});
+  expect(centered).toBe(true);
+ }
  await page.screenshot({path:info.outputPath('compact-expanded-fleet-markers.png'),fullPage:true});
  await app.locator('.cos-dashboard-peer[data-unit-id="'+units[1].id+'"]').click();
  await expect(app.getByRole('dialog',{name:'Spotter 1 unit intelligence'})).toBeVisible();

@@ -154,6 +154,19 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - name: Verify exact TV outage rotation before dashboard regressions
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage"
+      - name: Verify Fleet usability fixes and placement retry
+        run: npm run test:browser -- tests/fleet-usability.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/responsive-host.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/vrm.browser.spec.mjs --grep "Field setup keeps|MHelp recorded addresses|missing locations|unit drawer scrolls|unverified combined roster|plain colored circles|Shop pending|approved Today workspace|leaving Tech Checks|IT with.*Victron capability"
+      - name: Verify saved-camera refresh timing and visibility
+        run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs
+      - name: Fleet usability pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-usability-visuals
+          path: tech-checks/operations/test-results/**/*.png
+          if-no-files-found: ignore
       - name: Verify integrated Fleet Dashboard for Owner and IT
         run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs tests/fleet-unit-cards.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/company-platform.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/owner-watchful-shortcut.browser.spec.mjs tests/routers.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/finance.browser.spec.mjs
       - name: Fleet candidate visual review images
