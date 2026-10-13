@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {webcrypto} from 'node:crypto';
 import {setImmediate as flush} from 'node:timers/promises';
 import {checkedOwnerCensusOnceBinding,createOwnerCensusOnceAction,ownerCensusSessionAllowed,ownerCensusPolicyMessage} from '../src/ownerCensusOnce.ts';
@@ -110,6 +111,12 @@ test('session invalidation aborts in-flight POST and late response cannot publis
 test('selection invalidation during preflight survives a return to the original selection and sends zero POSTs',async()=>{
  const f=fixture(),binding=await checkedOwnerCensusOnceBinding(f.snapshot,id),pending=deferred();let current=true;
  const a=adapter(f.snapshot,{get:async path=>({data:path==='/api/session'?owner:await pending.promise})});
- const action=a.action.run(binding,()=>current);await flush();current=false;a.action.invalidate();current=true;
- pending.resolve(f.snapshot);await assert.rejects(action,/no lookup was sent/);assert.equal(a.calls.filter(c=>c.method==='POST').length,0);
+ // Exercise the actual FieldMap selection-effect wiring, not a hand-written invalidate call.
+ const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');
+ const effect=/useEffect\(\(\)=>\{([^\n]*?)\},\[selectedId\]\);/.exec(source);assert.ok(effect,'FieldMap selection effect is present');
+ const select=new Function('censusAction','censusPreparation','setCensusMessage','setPreparationMessage',effect[1]);
+ const changed=()=>select({current:a.action},{current:{invalidate(){}}},()=>{},()=>{});
+ const action=a.action.run(binding,()=>current);await flush();current=false;changed();current=true;changed();
+ pending.resolve(f.snapshot);let failure;await action.catch(error=>{failure=error;});
+ assert.equal(a.calls.filter(c=>c.method==='POST').length,0);assert.match(failure?.message||'',/no lookup was sent/);
 });

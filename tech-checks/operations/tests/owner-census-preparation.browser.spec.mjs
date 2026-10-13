@@ -7,7 +7,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
  const f=fixture();if(!marker)delete f.row.locationGeocode.censusPreparation;
  f.snapshot.items.push({id:otherId,unitNumber:'SYNTHETIC OTHER 901',status:'field',currentLocationType:'field',readOnly:false,address:'300 Other Fixture Road, Testville, TX 77003',latitude:32,longitude:-97,coordinateSource:'manual',locationVerification:'owner_verified',gpsRecordedAt:'2026-10-11T00:00:00Z',locationVerifiedAt:'2026-10-11T00:00:00Z'});
  Object.assign(f.snapshot.summary,{fieldUnits:2,mappedUnits:1,missingGps:1});
- const state={snapshot:f.snapshot,session:role==='Owner'?preparationOwner:{...preparationOwner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},posts:[],postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,holdPost,response};
+ const state={snapshot:f.snapshot,session:role==='Owner'?preparationOwner:{...preparationOwner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},posts:[],postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,heldMapFinished:0,holdPost,response};
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const url=route.request().url();
@@ -25,12 +25,14 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
    state.afterPost?.(state.snapshot);state.postResponses++;
    return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(state.response)}).catch(()=>{/* Invalidating the session or selection aborts this synthetic request. */});
   }
-  if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;await gate.promise;}
+  let heldMap=false;
+  if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;heldMap=true;await gate.promise;}
   const data=request.path==='/api/session'?state.session:request.path==='/api/field-map'?state.snapshot
    :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:f.snapshot.generatedAt}
    :request.path==='/api/camera-health/summary-v3'?{evidenceVersion:2,rows:[],totalDevices:0,refreshedAt:f.snapshot.generatedAt}
    :request.path==='/api/equipment'?{items:[],models:[],trackerUnits:state.snapshot.items}:{items:[]};
-  return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
+  await route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
+  if(heldMap)state.heldMapFinished++;
  });
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
  if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
@@ -72,10 +74,31 @@ test('later source change rejects a proof receipt and does not start a lookup',a
  state.afterPost=snapshot=>{snapshot.items[0].locationNote='Synthetic new manual history note';};state.postGate.resolve();
  await expect(frame.getByRole('region',{name:'Approved lookup preparation'})).toContainText('changed during preparation');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
+test('selection away and back during preparation preflight sends zero preparation requests',async({page})=>{
+ const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
+ await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.field-map-workspace').elementHandle();
+ await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
+ for(const unitId of [otherId,id]){
+  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
+  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+ }
+ await expect(prepare(frame)).toBeDisabled();gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toBeEnabled();
+});
 test('selection away and back during preparation cannot admit a late receipt',async({page})=>{
- const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC OTHER 901'}).click();await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();
- state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ const {frame,state}=await mount(page,{holdPost:true});await page.clock.pauseAt(new Date(now+60000));
+ const workspace=await frame.locator('.field-map-workspace').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ for(const unitId of [otherId,id]){
+  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+ }
+ state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 test('session-role invalidation clears preparation and rejects a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);

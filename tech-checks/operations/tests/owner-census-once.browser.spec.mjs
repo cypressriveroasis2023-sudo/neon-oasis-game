@@ -8,7 +8,7 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
  if(policyState==='held'){f.row.locationGeocode.status='held';delete f.row.locationGeocode.censusOnlyGuard;}
  const other={id:otherId,unitNumber:'SYNTHETIC OTHER 901',status:'field',currentLocationType:'field',readOnly:false,address:'300 Other Fixture Road, Testville, TX 77003',latitude:32,longitude:-97,coordinateSource:'manual',locationVerification:'owner_verified',gpsRecordedAt:'2026-10-11T00:00:00Z',locationVerifiedAt:'2026-10-11T00:00:00Z'};
  f.snapshot.items.push(other);Object.assign(f.snapshot.summary,{fieldUnits:2,mappedUnits:1,missingGps:1});
- const state={snapshot:initialOutcome?consumed(f.snapshot,initialOutcome):f.snapshot,session:role==='Owner'?owner:{...owner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},writes:[],postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,outcome,holdPost};
+ const state={snapshot:initialOutcome?consumed(f.snapshot,initialOutcome):f.snapshot,session:role==='Owner'?owner:{...owner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},writes:[],postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,heldMapFinished:0,outcome,holdPost};
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const url=route.request().url();
@@ -27,12 +27,14 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
    state.afterPost?.(state.snapshot);state.postResponses++;
    return route.fulfill({headers,contentType:'application/json',body:JSON.stringify({ok:true,results:[{auditId:'9001',status:state.outcome,censusOnly:true,allowance:'consumed'}],censusOnly:true,allowance:'consumed'})}).catch(()=>{/* Session invalidation may already have aborted this synthetic request. */});
   }
-  if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;await gate.promise;}
+  let heldMap=false;
+  if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;heldMap=true;await gate.promise;}
   const data=request.path==='/api/session'?state.session:request.path==='/api/field-map'?state.snapshot
    :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:f.snapshot.generatedAt}
    :request.path==='/api/camera-health/summary-v3'?{evidenceVersion:2,rows:[],totalDevices:0,refreshedAt:f.snapshot.generatedAt}
    :request.path==='/api/equipment'?{items:[],models:[],trackerUnits:state.snapshot.items}:{items:[]};
-  return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
+  await route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
+  if(heldMap)state.heldMapFinished++;
  });
  await page.goto('/owner-once-fixture');const frame=page.frameLocator('iframe');
  if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
@@ -76,10 +78,20 @@ test('fresh changed suite preflight sends no lookup and requires review',async({
 });
 test('selection change during fresh preflight cannot send the prior unit lookup',async({page})=>{
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
+ // Keep the API deadline frozen: disabled list clicks must not wait out the preflight.
+ await page.clock.pauseAt(new Date(now+60000));
+ const workspace=await frame.locator('.field-map-workspace').elementHandle();
  const button=frame.getByRole('button',{name:'Run approved Census lookup',exact:true});await expect(button).toBeVisible();await button.click();
  await expect.poll(()=>state.mapGate===null).toBe(true);
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC OTHER 901'}).click();gate.resolve();
- await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toHaveCount(0);expect(state.writes).toHaveLength(0);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ await frame.locator('body').evaluate(unitId=>{location.hash='#field-map?unit='+unitId;},otherId);
+ await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',otherId);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+ gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
+ // Busy clears only after the action's finally block has settled.
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ expect(state.writes).toHaveLength(0);await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toHaveCount(0);
 });
 test('session-role change clears pending action and rejects a late response',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();await expect.poll(()=>state.writes.length).toBe(1);
@@ -109,7 +121,20 @@ test('refresh after a successful lookup replaces its message with the latest hel
 });
 test('selection away and back during Run preflight invalidates the old action without a POST',async({page})=>{
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
+ await page.clock.pauseAt(new Date(now+60000));
+ const workspace=await frame.locator('.field-map-workspace').elementHandle();
  await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();await expect.poll(()=>state.mapGate===null).toBe(true);
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC OTHER 901'}).click();await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();gate.resolve();
- await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toContainText('no lookup was sent');expect(state.writes).toHaveLength(0);
+ // Hash-route unit selection is supported while busy; unlike list clicks it does not wait for a timeout.
+ for(const unitId of [otherId,id]){
+  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
+  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+ }
+ // The same component is back at the original unit, so selection equality alone would admit the stale action.
+ await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeDisabled();
+ gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
+ await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ expect(state.writes).toHaveLength(0);
+ await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeEnabled();
 });
