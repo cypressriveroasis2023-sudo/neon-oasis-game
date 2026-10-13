@@ -23,7 +23,8 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   if(key?.startsWith('HELIOS|')){
    batteryState='unknown';
    if(p&&!p.errorCode){const recent=p.measurements.filter(m=>cameraTimestamp(m.observedAt,now).fresh),soc=recent.filter(m=>m.metric==='battery_soc');
-    batteryPercent=soc.length===1?soc[0].value:null;
+    // Multiple battery and system instances are normal in Victron. Surface the lowest recent charge.
+    batteryPercent=soc.length?Math.min(...soc.map(m=>m.value)):null;
     batteryState=recent.some(m=>m.unit==='state'&&m.value>0)||batteryPercent!==null&&batteryPercent<20?'offline':batteryPercent!==null?'online':'unknown';}
   }else if(key?.startsWith('RECON2|')){
    const readings=camera.identity==='matched'?camera.rows.filter(r=>r.evidence?.source==='Reconeyez').map(r=>r.batteryEvidence).filter(Boolean):[];
