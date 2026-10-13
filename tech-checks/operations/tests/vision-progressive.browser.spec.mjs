@@ -102,6 +102,8 @@ test('fast fleet cards, company sources and equipment render while independent s
   await expect(card(dashboard, 'Field View')).toContainText('Checking connected records…');
   state.release(paths.field);
   await expect(card(dashboard, 'Field View')).toContainText('1 field units · 0 mapped · 1 with addresses');
+  await expect(card(dashboard, 'Camera Health')).toContainText('Field units: 0 online · 0 offline · 1 need review');
+  await expect(overview).toContainText('Field units: 0 online · 0 offline · 1 need review');
   await expect(dashboard.getByRole('button', { name: 'Refresh fleet', exact: true })).toBeEnabled();
   for (const path of [paths.camera, paths.routers]) expect(state.requests.filter(request => request.path === path)).toHaveLength(1);
   expect(state.errors).toEqual([]);

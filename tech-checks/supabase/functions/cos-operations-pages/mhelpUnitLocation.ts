@@ -1,4 +1,5 @@
-/** Owner-only, read-only location preview. Credentials and raw vendor records never leave this module. */
+import {mhelpUnitIdentity} from '../../../operations/shared/mhelpUnitIdentity.ts';
+/** Read-only service-location preview for the existing verified fleet roles. Credentials and raw vendor records never leave this module. */
 import {MhelpPartnerError,projectPartnerEquipment} from './mhelpPartner.ts';
 import {censusAddress} from '../camera-field-geocode/censusAddress.ts';
 const API='https://connect.mhelpdesk.com/api/v1.0';
@@ -11,18 +12,21 @@ const id=(v:unknown):string=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?S
 const text=(v:unknown,max=160):string=>typeof v==='string'&&v.trim()&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v)?v.trim():fail('mHelpDesk returned an incomplete location label.');
 export function heliosNumber(v:unknown):number|null{const m=typeof v==='string'?/^HELIOS\s*(\d{1,3})$/i.exec(v.trim()):null;return m&&Number(m[1])>0?Number(m[1]):null;}
 function page(v:unknown,max=200):Row[]{const p=object(v),hasData=Object.hasOwn(p,'data'),hasResults=Object.hasOwn(p,'results');if(hasData===hasResults||!Number.isSafeInteger(p.totalRows)||Number(p.totalRows)>max)fail('The mHelpDesk location lookup is incomplete. Narrow the lookup in COS.');const rows=hasData?p.data:p.results;if(!Array.isArray(rows)||rows.length!==p.totalRows)fail('mHelpDesk returned an incomplete location page.');return (rows as unknown[]).map(object);}
-export function projectServiceLocation(row:Row,portal:string,serviceId:string){
- if(id(row.customerId)!==serviceId||id(row.portalId)!==portal||row.isActive===false||row.countryId!=null&&!['US','USA'].includes(String(row.countryId)))fail('The service location identity or availability changed.');
+export function projectServiceLocation(row:Row,portal:string,serviceId:string,parentCustomerId?:string){
+ const correctIdentity=row.serviceLocationId!=null?id(row.serviceLocationId)===serviceId&&parentCustomerId!=null&&id(row.customerId)===parentCustomerId:id(row.customerId)===serviceId;
+ if(!correctIdentity||id(row.portalId)!==portal||row.isActive===false||row.countryId!=null&&!['US','USA'].includes(String(row.countryId)))fail('The service location identity or availability changed.');
  const states=Object.fromEntries('AL:ALABAMA|AK:ALASKA|AZ:ARIZONA|AR:ARKANSAS|CA:CALIFORNIA|CO:COLORADO|CT:CONNECTICUT|DE:DELAWARE|DC:DISTRICT OF COLUMBIA|FL:FLORIDA|GA:GEORGIA|HI:HAWAII|ID:IDAHO|IL:ILLINOIS|IN:INDIANA|IA:IOWA|KS:KANSAS|KY:KENTUCKY|LA:LOUISIANA|ME:MAINE|MD:MARYLAND|MA:MASSACHUSETTS|MI:MICHIGAN|MN:MINNESOTA|MS:MISSISSIPPI|MO:MISSOURI|MT:MONTANA|NE:NEBRASKA|NV:NEVADA|NH:NEW HAMPSHIRE|NJ:NEW JERSEY|NM:NEW MEXICO|NY:NEW YORK|NC:NORTH CAROLINA|ND:NORTH DAKOTA|OH:OHIO|OK:OKLAHOMA|OR:OREGON|PA:PENNSYLVANIA|RI:RHODE ISLAND|SC:SOUTH CAROLINA|SD:SOUTH DAKOTA|TN:TENNESSEE|TX:TEXAS|UT:UTAH|VT:VERMONT|VA:VIRGINIA|WA:WASHINGTON|WV:WEST VIRGINIA|WI:WISCONSIN|WY:WYOMING'.split('|').map(v=>{const [code,name]=v.split(':');return[name,code];}));
+ if([row.address1,row.address2,row.city,row.name].some(v=>typeof v==='string'&&/\b(?:password|passwd|token|secret|credentials?|gate[ -]*code|access[ -]*code|pin)\b\s*[:=]/i.test(v)))fail('This service location needs address review before it can be displayed.');
  const street=text(row.address1,200),city=text(row.city,100),givenState=text(row.state,40).toUpperCase(),state=states[givenState]||givenState,zip=typeof row.zip==='number'&&Number.isSafeInteger(row.zip)&&row.zip>0?String(row.zip).padStart(5,'0'):String(row.zip??'');
- if(!/^[A-Z]{2}$/.test(state)||!/^\d{5}(?:-\d{4})?$/.test(zip)||row.address2!=null&&String(row.address2).trim())fail('This service location needs address review before a map pin can be imported.');
+ if(!/^[A-Z]{2}$/.test(state)||!/^\d{5}(?:-\d{4})?$/.test(zip))fail('This service location needs address review before a map pin can be imported.');
  const latitude=row.latitude,longitude=row.longitude,point=typeof latitude==='number'&&Number.isFinite(latitude)&&latitude!==0&&Math.abs(latitude)<=90&&typeof longitude==='number'&&Number.isFinite(longitude)&&longitude!==0&&Math.abs(longitude)<=180?[latitude,longitude]:null;
- return{site:text(row.name),address:street+', '+city+', '+state+' '+zip,point};
+ const suite=row.address2!=null&&String(row.address2).trim()?text(row.address2,120):'';
+ return{site:text(row.name),address:street+(suite?' '+suite:'')+', '+city+', '+state+' '+zip,point};
 }
 export function createMhelpUnitLocationReader(options:Options){return async(input:unknown)=>{
- const request=object(input);if(Object.keys(request).some(k=>!['unitName','ticketNumber'].includes(k))||heliosNumber(request.unitName)===null||request.ticketNumber!=null&&(typeof request.ticketNumber!=='string'||!/^\d{1,15}$/.test(request.ticketNumber)))fail('Enter a Helios unit and optional mHelpDesk job number.',400);
+ const request=object(input);if(Object.keys(request).some(k=>!['unitName','ticketNumber'].includes(k))||mhelpUnitIdentity(request.unitName)===null||request.ticketNumber!=null&&(typeof request.ticketNumber!=='string'||!/^\d{1,15}$/.test(request.ticketNumber)))fail('Enter a numbered unit and optional mHelpDesk job number.',400);
  const deadline=AbortSignal.timeout(24000),boundedFetch:typeof fetch=(target,init={})=>options.fetch(target,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
- const requestedNumber=heliosNumber(request.unitName)!,now=options.now||(()=>new Date().toISOString());let config=await options.getConfig(),renewed=false;
+ const requestedIdentity=mhelpUnitIdentity(request.unitName)!,now=options.now||(()=>new Date().toISOString());let config=await options.getConfig(),renewed=false;
  if(!config.accessToken||config.accessToken.length>16384||/\s/.test(config.accessToken))fail('The existing mHelpDesk connection is unavailable.');
  const read=async(path:string,max=262144):Promise<unknown>=>{
   const response=await boundedFetch(API+path,{method:'GET',headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(12000)});
@@ -31,8 +35,16 @@ export function createMhelpUnitLocationReader(options:Options){return async(inpu
   const reader=response.body!.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let raw='',bytes=0;try{for(;;){const r=await reader.read();if(r.done)break;bytes+=r.value.byteLength;if(bytes>max)fail('mHelpDesk returned an oversized location response.');raw+=decoder.decode(r.value,{stream:true});}return JSON.parse(raw+decoder.decode());}finally{void reader.cancel().catch(()=>{});}
  };
  const account=object(await read('/users/me',16384)),portal=id(account.portalId);if(portal!=='224643'||config.portalId&&config.portalId!==portal)fail('The mHelpDesk connection belongs to a different company.');
- const prefix='/portal/'+portal,inventory=page(await read(prefix+'/equipment?Name=Helios&pageSize=200&rowIndex=0&Fields=equipmentId,portalId,name,model,equipmentTypeId,customerId,serviceLocationId,IsActive,lastUpdateUTC'));
- const candidates=inventory.map(r=>projectPartnerEquipment(r,portal)).filter(r=>heliosNumber(r.name)===requestedNumber&&r.active!==false);if(candidates.length!==1)fail(candidates.length?'More than one mHelpDesk unit matches. Resolve its identity before importing.':'No active mHelpDesk equipment record matches this Helios unit.',409);
+ const prefix='/portal/'+portal;
+ const readPages=async(path:string,max=5000)=>{const all:Row[]=[];let total:number|null=null;for(let index=0;index<Math.ceil(max/200);index++){
+  const value=object(await read(path+'&pageSize=200&rowIndex='+index*200)),rows=value.data??value.results;
+  if(!Array.isArray(rows)||!Number.isSafeInteger(value.totalRows)||Number(value.totalRows)>max||Number(value.totalRows)<0||total!==null&&total!==value.totalRows)fail('The mHelpDesk location lookup is incomplete.');total=Number(value.totalRows);
+  if(rows.length!==Math.min(200,total-all.length))fail('mHelpDesk returned an incomplete location page.');all.push(...rows.map(object));if(all.length===total)return all;
+ }return fail('The mHelpDesk location lookup is incomplete.');};
+ const family=({CAMV:'CAM V',SOLARPOLE:'Solar Pole',SOLARSPOTTER:'Solar Spotter',SSHYBRID:'SS Hybrid'} as Record<string,string>)[requestedIdentity.family]||requestedIdentity.family.replace(/2$|4$/,'');
+ const inventory=await readPages(prefix+'/equipment?Name='+encodeURIComponent(family)+'&Fields=equipmentId,portalId,name,model,equipmentTypeId,customerId,serviceLocationId,IsActive,lastUpdateUTC');
+ if(new Set(inventory.map(r=>String(r.equipmentId))).size!==inventory.length)fail('Duplicate equipment identities were returned.');
+ const candidates=inventory.map(r=>projectPartnerEquipment(r,portal)).filter(r=>mhelpUnitIdentity(r.name)?.key===requestedIdentity.key&&r.active!==false);if(candidates.length!==1)fail(candidates.length?'More than one mHelpDesk unit matches. Resolve its identity before importing.':'No active mHelpDesk equipment record matches this unit.',409);
  const equipment=candidates[0];let customerId=equipment.customerId,locationId=equipment.serviceLocationId,ticketNumber:string|null=null,ticketId:string|null=null;
  if(request.ticketNumber){const tickets=page(await read(prefix+'/Equipment/'+equipment.equipmentId+'/Tickets?pageSize=200&rowIndex=0&Fields=ticketId,ticketNumber,portalId,customerId,serviceLocationId,deleted'),200);const matches=tickets.filter(t=>String(t.ticketNumber)===request.ticketNumber&&t.deleted===false);if(matches.length!==1)fail('That job could not be uniquely confirmed for this equipment. Use the assigned unit location or review the job in mHelpDesk.',409);const ticket=matches[0];if(id(ticket.portalId)!==portal)fail('The ticket belongs to a different portal.');ticketNumber=id(ticket.ticketNumber);ticketId=id(ticket.ticketId);customerId=id(ticket.customerId);locationId=id(ticket.serviceLocationId);}
  if(!customerId)fail('This mHelpDesk unit has no verified customer assignment.',409);
@@ -41,11 +53,11 @@ export function createMhelpUnitLocationReader(options:Options){return async(inpu
  if(!shop){if(!locationId)fail('This assignment has no service location. A billing address will not be used.',409);
   let service:Row|undefined;
   if(customer.isServiceLocation===true&&customerId===locationId)service=object(await read(prefix+'/customers/'+locationId+'?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,address2,city,state,zip,countryId,latitude,longitude'));
-  else{const services=page(await read(prefix+'/customers/'+customerId+'/servicelocations?pageSize=200&rowIndex=0&Fields=customerId,portalId,name,isActive,address1,address2,city,state,zip,countryId,latitude,longitude')).filter(s=>String(s.customerId)===locationId);if(services.length===1)service=services[0];}
-  if(!service)fail('The job or equipment service location was not confirmed under its customer.',409);location=projectServiceLocation(service,portal,locationId);coordinateSource=location.point?'mHelpDesk service location':null;
+  else{const services=(await readPages(prefix+'/customers/'+customerId+'/servicelocations?Fields=serviceLocationId,customerId,portalId,name,isActive,address1,address2,city,state,zip,countryId,latitude,longitude')).filter(s=>String(s.serviceLocationId??s.customerId)===locationId&&(s.serviceLocationId==null||String(s.customerId)===customerId));if(services.length===1)service=services[0];}
+  if(!service)fail('The job or equipment service location was not confirmed under its customer.',409);location=projectServiceLocation(service,portal,locationId,customerId);coordinateSource=location.point?'mHelpDesk service location':null;
   if(!location.point){const geo=await censusAddress(location.address,boundedFetch,now);if(geo.status==='success'){location.point=[geo.latitude!,geo.longitude!];coordinateSource='Census address estimate';}}
  }
  const fresh=projectPartnerEquipment(await read(prefix+'/equipment/'+equipment.equipmentId+'?Fields=equipmentId,portalId,name,model,equipmentTypeId,customerId,serviceLocationId,IsActive,lastUpdateUTC'),portal);if(fresh.name!==equipment.name||fresh.model!==equipment.model||fresh.customerId!==equipment.customerId||fresh.serviceLocationId!==equipment.serviceLocationId||fresh.active===false)fail('The unit assignment changed during lookup. Refresh before importing.',409);
  if(ticketId){const freshTicket=object(await read(prefix+'/Tickets/'+ticketId+'?Fields=ticketId,ticketNumber,portalId,customerId,serviceLocationId,deleted'));if(id(freshTicket.ticketId)!==ticketId||id(freshTicket.ticketNumber)!==ticketNumber||id(freshTicket.portalId)!==portal||id(freshTicket.customerId)!==customerId||id(freshTicket.serviceLocationId)!==locationId||freshTicket.deleted!==false)fail('The job service location changed during lookup. Refresh before importing.',409);}
- return{contract:'COS_MHELP_UNIT_LOCATION_V1',unitName:'Helios '+String(requestedNumber).padStart(3,'0'),equipmentId:equipment.equipmentId,equipmentLabel:equipment.name,ticketNumber,placement:shop?'SHOP':'FIELD',customer:customerName,...location,coordinateSource,locationVerified:false,readAt:now(),reviewRequired:true};
+ return{contract:'COS_MHELP_UNIT_LOCATION_V1',unitName:String(request.unitName).trim(),equipmentId:equipment.equipmentId,equipmentLabel:equipment.name,ticketNumber,placement:shop?'SHOP':'FIELD',customer:customerName,...location,coordinateSource,locationVerified:false,readAt:now(),reviewRequired:true};
  };}

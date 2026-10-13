@@ -1,3 +1,4 @@
+// 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
 // 2026-10-12 reviewed source-separated direct diagnostic wording; current daily four-view markers preserved.
 // 2026-10-08 reviewed read-only effective placement adapter; exact identity, stale read and actual-entry browser coverage.
 // 2026-10-08 reviewed SHOP/new-installation and incomplete-field repair cache tag; isolated regressions cover the flows.
@@ -27,7 +28,7 @@ const scriptHashes = {
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "51a4a0d2fb522938fbc844d7f79b25aa585e4acc604f7aa0e6365e1ec196cce4",
+  "camera-health": "3b4fdd5d96f0ea613e2acc2560b031588f39a7a7bb2706a0c8b11e5f0ab42a7b",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"

@@ -22,6 +22,7 @@ test('distant tracker point yields approximate fallback and selected-only review
   const data=request.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}:request.path==='/api/field-map'?{...f.snapshot,items:state.rows,inventoryItems:state.rows,generatedAt:new Date(now).toISOString()}:request.path==='/api/camera-health/summary-v3'?cameraSnapshot([]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(now).toISOString()}:request.path==='/api/equipment'?{items:[],models:[],trackerUnits:state.rows}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:new Date(now).toISOString()}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/source-conflict-fixture');const frame=page.frameLocator('iframe');
  await expect(frame.locator('.cos-pin-location-tag')).toHaveText('EST');await expect(frame.locator('.cos-field-pin-recorded')).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Tracker point conflict'})).toHaveCount(0);

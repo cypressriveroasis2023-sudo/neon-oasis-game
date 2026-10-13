@@ -1,4 +1,7 @@
 import {IT_DAILY_ONLY} from '../../it-feature-availability';
+import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
+import {validateCameraHealth} from './fieldCameraHealth';
+import {checkedFieldMap} from './gpsPersistence';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -17,6 +20,15 @@ const sharedReadPaths = new Set([
   '/api/field-map', '/api/routers', '/api/camera-health/summary-v3', '/api/vrm-portal', '/api/vrm-fleet',
 ]);
 const pendingReads = new Map<string, Promise<ApiResponse>>();
+const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
+type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
+const pendingFleetSnapshots=new Map<string,FleetReads>();
+let fleetRevision=0;
+function clearSharedReads(){pendingReads.clear();fleetSnapshots.clear();pendingFleetSnapshots.clear();fleetRevision++;}
+if(typeof window!=='undefined'){
+ window.addEventListener?.('cos-private-data-invalidated',clearSharedReads);
+ window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')clearSharedReads();});
+}
 let tokenRequest: Promise<ParentSession> | null = null;
 let lastVerifiedSession: ParentSession | null = null;
 function requestParentToken(): Promise<ParentSession> {
@@ -39,7 +51,7 @@ function requestParentToken(): Promise<ParentSession> {
       } else {
         const session = { token: message.accessToken, role: message.role };
         if (lastVerifiedSession && (lastVerifiedSession.token !== session.token || lastVerifiedSession.role !== session.role)) {
-          pendingReads.clear();
+          clearSharedReads();
           window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
         }
         lastVerifiedSession = session;
@@ -79,9 +91,9 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
-    pendingReads.clear();
+    clearSharedReads();
     try { return await sendRequest<T>(method, path, session.token, body, options?.signal); }
-    finally { pendingReads.clear(); }
+    finally { clearSharedReads(); }
   }
   if (!sharedReadPaths.has(path)) return sendRequest<T>(method, path, session.token, body);
   const key = JSON.stringify([session.token, session.role, mode, path]);
@@ -120,9 +132,36 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     return { data };
   } finally { window.clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
 }
+/** Dashboard sources can settle separately; complete views still require the pair.
+ * Every source completion carries the same actor and invalidation checks. */
+async function readFleet(force=false):Promise<FleetReads>{
+    const mode=new URLSearchParams(location.search).get('mode');
+    if(mode==='production-assignments')throw new OperationsApiError('Open Camera Health from your fleet dashboard.',403);
+    // Re-authorize the parent before using even a cached snapshot.
+    let session:ParentSession;try{session=await requestParentToken();}catch(cause){clearSharedReads();window.dispatchEvent?.(new Event('cos-private-data-invalidated'));throw cause;}
+    if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
+    const key=JSON.stringify([session.token,session.role,mode]);
+    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
+    const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<15*60*1000)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
+    const revision=fleetRevision;
+    const current=()=>{
+      if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
+    };
+    const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
+    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
+    const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
+      current();const value=reconcileFleetSnapshot(health,map);fleetSnapshots.set(key,{value,at:Date.now()});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
+    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;}).finally(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);})};
+    // A source-only caller must not leave the optional pair's rejection unhandled.
+    void read.paired.catch(()=>{});
+    pendingFleetSnapshots.set(key,read);return read;
+}
 export const api = {
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
+  fleet: async(force=false):Promise<FleetSnapshot>=>(await readFleet(force)).paired,
+  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);
 export function openLegacy(route: string) {

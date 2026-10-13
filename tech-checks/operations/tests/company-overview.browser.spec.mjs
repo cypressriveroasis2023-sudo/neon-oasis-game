@@ -27,7 +27,8 @@ async function mount(page,{cameraData=camera}={}) {
     state.requests.push(request);
     if (request.method !== 'GET') throw new Error('Overview made an unexpected write');
     if (state.failures.has(request.path)) return route.fulfill({ status: 503, headers, contentType: 'application/json', body: JSON.stringify({ error: 'Fixture unavailable' }) });
-    const data = request.path === '/api/session' ? { authorized: true, name: 'Fixture Owner', role: 'Owner' }
+    const fieldUnits=[1,2,3].map(n=>({id:'80000000-0000-4000-8000-'+String(n).padStart(12,'0'),unitNumber:'Helios '+n,modelName:'Helios',status:'field',currentLocationType:'field',address:'Synthetic '+n+' Main St'}));
+    const data = request.path === '/api/field-map'?{items:fieldUnits,inventoryItems:fieldUnits,summary:{fieldUnits:3,mappedUnits:0,unitGps:0,missingGps:3},generatedAt:stamp}:request.path === '/api/session' ? { authorized: true, name: 'Fixture Owner', role: 'Owner' }
       : request.path === '/api/jobs' ? { items: jobs }
       : request.path === '/api/camera-health/summary-v3' ? state.camera
       : request.path === '/api/routers' ? { items: [router], generatedAt: stamp, source: 'camera_health', gpsAvailable: false }
@@ -45,7 +46,7 @@ test('company overview orders real health sources before the eight-stage custome
   const { frame, state } = await mount(page);
   const overview = frame.getByRole('region', { name: 'Company overview', exact: true });
   expect(await overview.locator('.company-health-card h2').allTextContents()).toEqual(['Camera Health', 'InHand Routers', 'Victron power']);
-  await expect(overview.getByText('2 provider systems need review', { exact: true })).toBeVisible();
+  await expect(overview.getByText('2 field units need review', { exact: true })).toBeVisible();
   await expect(overview.getByText('1 stored router record', { exact: true })).toBeVisible();
   await expect(overview.getByText('Live GPS setup pending', { exact: true })).toBeVisible();
   await expect(overview.getByText('POWER STATUS NOT AVAILABLE IN THIS VIEW', { exact: true })).toBeVisible();
@@ -84,7 +85,7 @@ test('refresh replaces failed sources with unavailable values and recovers verif
   await expect(frame.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
   state.failures.clear();
   await frame.getByRole('button', { name: 'Retry dashboard', exact: true }).click();
-  await expect(frame.getByText('2 provider systems need review', { exact: true })).toBeVisible();
+  await expect(frame.getByText('2 field units need review', { exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'IT Prep: 0 jobs', exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
@@ -244,9 +245,9 @@ test('enlarged eye never overlaps sidebar labels at short desktop heights',async
 test('dashboard cards and native Camera Health share source-separated unit totals',async({page})=>{
  const {frame,state}=await mount(page);
  const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
- const systems='3 active / unresolved units · Provider systems: 1 online · 1 offline · 1 review';
+ const systems='Field units: 1 online · 1 offline · 1 need review';
  await expect(company).toContainText(systems);await expect(area).toContainText(systems);await expect(company).toContainText('Camera/detector evidence by unit: 1 online · 1 offline · 1 mixed/unverified · 0 channel status unavailable');await expect(company).toContainText('3 confirmed-field units · 0 location review');
- await area.click();await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
+ await area.click();await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 test('legacy health stays unavailable on both dashboards while other metrics remain useful',async({page})=>{
@@ -257,7 +258,7 @@ test('legacy health stays unavailable on both dashboards while other metrics rem
 
 test('dashboard provider counts age without issuing fresh reads or inferring offline status',async({page})=>{
  const {frame,state}=await mount(page);
- const area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});await expect(area).toContainText('Provider systems: 1 online · 1 offline · 1 review');const reads=state.requests.length;
+ const area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});await expect(area).toContainText('Field units: 1 online · 1 offline · 1 need review');const reads=state.requests.length;
  await page.clock.setFixedTime(new Date(now+16*60000));await frame.locator('body').evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- await expect(area).toContainText('Provider systems: 0 online · 0 offline · 3 review');await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toContainText('3 provider systems need review');expect(state.requests.length).toBe(reads);
+ await expect(area).toContainText('Field units: 0 online · 0 offline · 3 need review');await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toContainText('3 field units need review');expect(state.requests.length).toBe(reads);
 });

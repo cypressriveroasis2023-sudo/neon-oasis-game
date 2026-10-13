@@ -1,3 +1,4 @@
+import {showAllFieldHealth} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 
@@ -47,8 +48,10 @@ async function mount(page,{sourceCases=false,overview=false}={}){
    :{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(result)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/verified-health-identity-fixture');
  const frame=page.frameLocator('iframe');
+ if(overview)await frame.getByLabel('Camera Health unit filter').selectOption('all');
  await expect(frame.locator(overview?'.camera-overview-card':'.field-map-list>button')).toHaveCount(overview?(sourceCases?5:1):state.units.length);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBeGreaterThan(0);
  return {frame,state};
@@ -86,7 +89,7 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.camera-device-cards .camera-resource-access')).toHaveCount(4);
  for(const [index,id] of ownerIds.entries())await expect(frame.locator('.camera-device-cards .camera-resource-access').nth(index)).toHaveAttribute('href','../../camera-detail.html?id='+id);
  await noOverflow(frame);
- await navigate(page,'camera-health');
+ await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner).toHaveCount(1);await expect(owner.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
  await expect(owner.getByRole('link',{name:'Field View',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.owner));
@@ -111,7 +114,7 @@ test('native HDC proof, recorder proof and bound service proof retain separate s
  const service=frame.locator('.camera-overview-card').filter({hasText:'Synthetic bound service'});
  await expect(service.locator('.camera-status-pill')).toHaveText('IP / PORT ONLINE');await expect(service).toContainText('Camera channel status unavailable');
  await noOverflow(frame);await page.screenshot({path:info.outputPath('source-separated-identity-overview.png'),fullPage:true});
- await navigate(page,'field-map');await expect(frame.locator('.field-map-list>button')).toHaveCount(7);
+ await navigate(page,'field-map');await showAllFieldHealth(frame);await expect(frame.locator('.field-map-list>button')).toHaveCount(7);
  await expect(listUnit(frame,labels.native)).toContainText('CAMERA RECORDS ONLINE');await expect(listUnit(frame,labels.recorder)).toContainText('RECORDER ONLINE');await expect(listUnit(frame,labels.service)).toContainText('IP / PORT ONLINE');
  await expect(listUnit(frame,labels.unbound)).not.toContainText('IP / PORT ONLINE');await expect(listUnit(frame,labels.unbound)).toContainText('unverified');
  await listUnit(frame,labels.recorder).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');
@@ -218,12 +221,12 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  await expect(selectedHealth).toBeVisible();
  await expect(selectedHealth).toContainText('CAMERA RECORDS MIXED / PARTLY VERIFIED');
  await expect(selectedHealth).not.toContainText('SYSTEM ONLINE');
- await navigate(page,'camera-health');
+ await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner.locator('.camera-status-pill')).not.toContainText('ONLINE');
  await expect(owner).toContainText('3 camera/detector records online · 0 offline · 1 unverified');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Provider systems online$/})}).locator('b')).toHaveText('0');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Provider review$/})}).locator('b')).toHaveText('1');
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Field units online$/})}).locator('b')).toHaveText('0');
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Health \/ placement review$/})}).locator('b')).toHaveText('1');
  await owner.locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
  await expect(detail.locator('.camera-device-cards article')).toHaveCount(4);
