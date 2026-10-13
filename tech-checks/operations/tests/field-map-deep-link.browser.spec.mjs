@@ -159,7 +159,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     state,
     errors
   } = await mount(page, 'RII-022');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
   await expect(frame.locator('.cos-field-pin-wrap')).toHaveAttribute('title',/Recon II 022/);
   expect(state.writes).toHaveLength(0);
@@ -169,7 +169,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RANGER 999');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveCount(0);
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
   await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-message')).toContainText('not in the current inventory');
   expect(state.writes).toHaveLength(0);
@@ -185,7 +185,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RANGER 022', units);
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveCount(0);
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-message')).toContainText('conflicting identities');
   expect(state.writes).toHaveLength(0);
 }], ['Back and Forward from native same-unit health preserve label match', async page => {
@@ -197,7 +197,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();
   await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toContain('#fleet-dashboard?unitId=');
   expect(state.writes).toHaveLength(0);
 }], ['Explicit deep link clears stale nearby filter that hides target pin', async page => {
@@ -213,7 +213,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
       radius: 5
     }
   });
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 }], ['Different label route resets old health filter', async page => {
   const {
@@ -222,7 +222,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await frame.getByRole('button',{name:'Close unit details'}).click();
   await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 }]];
 for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-map deep link ' + width + ': ' + name, async ({
@@ -247,7 +247,7 @@ test('initial map failure shows unavailable state and retry restores units',asyn
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['—','—','—','—','—']);
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 });
 test('failed map refresh retains last good units and labels stale map data',async({page})=>{
@@ -256,7 +256,7 @@ test('failed map refresh retains last good units and labels stale map data',asyn
  await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Showing the last successfully loaded units');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
- await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-fleet-message')).toHaveCount(0);
 });

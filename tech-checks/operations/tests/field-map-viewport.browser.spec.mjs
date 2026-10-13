@@ -63,7 +63,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await frame.locator('.cos-fleet-unit-list').evaluate(list => { list.scrollTop = list.scrollHeight; });
   expect((await map.boundingBox()).y).toBeCloseTo(before.y, 0);
   const last=frame.locator('.cos-fleet-unit-row').last();await last.click();
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-080');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIELD-FIX-080');
   await page.keyboard.press('Shift+Tab');
   await expect(frame.locator('.cos-fleet-drawer').getByRole('button').last()).toBeFocused();
   await frame.getByRole('button',{name:'Close unit details'}).click();
@@ -74,7 +74,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
   await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
   await frame.locator('.cos-fleet-unit-row').click();
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-001');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIELD-FIX-001');
   await frame.getByRole('button',{name:'Close unit details'}).click();
   await frame.getByRole('button', { name: 'Fit pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();

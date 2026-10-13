@@ -228,7 +228,7 @@ test('Owner suite estimate preserves the complete address, discloses building pr
  await expect(frame.locator('.cos-fleet-drawer')).toContainText('ADDRESS CHANGED');
  state.units[0]={...state.units[0],address:original,locationVerification:'owner_verified',latitude:30.5,longitude:-95.5,coordinateSource:'manual',gpsRecordedAt:fresh,locationVerifiedAt:fresh};
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(estimate).toHaveCount(0);await expect(frame.locator('.cos-fleet-drawer')).toContainText('VERIFIED PIN');
+ await expect(estimate).toHaveCount(0);await expect(frame.locator('.cos-fleet-drawer')).toContainText('Verified installation');
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(1);
  expect(state.units[0].address).toBe(original);expect(state.writes).toHaveLength(0);
 });

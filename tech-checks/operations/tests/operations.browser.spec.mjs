@@ -260,9 +260,9 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   await expect(frame.locator('.cos-fleet-map-canvas .leaflet-container, .cos-fleet-map-canvas.leaflet-container')).toBeVisible();
   await noOverflow(page);
   await selectLocation(frame,'FIX-RG-002');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIX-RG-002');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIX-RG-002');
   await selectLocation(frame,'FIX-SN-001');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIX-SN-001');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIX-SN-001');
   await selectLocation(frame,'FIX-RG-002');
   await frame.getByLabel('Latitude', { exact: true }).fill('91');
   await frame.getByLabel('Longitude', { exact: true }).fill('-95.400000');

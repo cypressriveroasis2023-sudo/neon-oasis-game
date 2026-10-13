@@ -32,8 +32,8 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
         {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         {group&&<CameraCardActions group={group} now={now} onDetails={()=>openLegacy('camera-health')} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection}/>}
         <HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>
-        <MhelpUnitRefresh key={selected.id} unit={selected} onUpdated={()=>void refresh(true)}/>
-        <UnitDiagnosticReport key={selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
+        <MhelpUnitRefresh key={'mhelp-location-'+selected.id} unit={selected} onUpdated={()=>void refresh(true)}/>
+        <UnitDiagnosticReport key={'unit-report-'+selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}
       </>}
     </section>}
