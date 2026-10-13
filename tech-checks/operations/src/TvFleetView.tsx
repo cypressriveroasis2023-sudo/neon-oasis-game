@@ -26,6 +26,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     try{
       const current=()=>alive.current&&request===generation.current;
       const errors=await loadTvFleetFeeds(api,{
+        healthUnavailable:()=>{if(current())setData(previous=>({...previous,health:null}));},
+        routersUnavailable:()=>{if(current())setData(previous=>({...previous,routers:null}));},
         field:async field=>{
           const units=field.items as Unit[];
           const points=await Promise.all(units.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)})));

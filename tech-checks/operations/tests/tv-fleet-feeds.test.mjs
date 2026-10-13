@@ -39,3 +39,9 @@ test('a malformed camera summary cannot be accepted as healthy or remove the map
  assert.equal(accepted.field,field);assert.equal(accepted.health,undefined);assert.ok(accepted.routers);
  assert.equal(errors.length,1);assert.match(errors[0],/^Camera Health: Camera Health returned an incomplete summary/);
 });
+
+test('a failed health refresh clears cached health while retaining verified field locations',async()=>{
+ const accepted={field,health};
+ const errors=await loadTvFleetFeeds({get:async path=>{if(path==='/api/camera-health/summary-v3')throw Error('Saved source unavailable');return {data:values[path]};}}, {...callbacks(accepted),healthUnavailable:()=>{accepted.health=null;}});
+ assert.equal(accepted.field,field);assert.equal(accepted.health,null);assert.ok(accepted.routers);assert.deepEqual(errors,['Camera Health: Saved source unavailable']);
+});
