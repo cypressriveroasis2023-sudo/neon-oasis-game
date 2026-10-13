@@ -1,3 +1,7 @@
+import {ReconBatteryDetails} from './CameraHealthOverview';
+import {canonicalCameraUnit} from './fieldCameraHealth';
+import HeliosPowerDetails from './HeliosPowerDetails';
+import MhelpUnitRefresh from './MhelpUnitRefresh';
 import {itDailyCameraUrl} from '../../it-feature-availability';
 import {clusterMapPoints,mapReticleMarkup,clusterReticleMarkup,expandedGroupOffsets,fieldReticleColors as cameraColors} from './fieldMapMarkers';
 import {fieldMapLabelMatches} from './fieldMapNavigation';
@@ -27,6 +31,7 @@ import { checkedOwnerCensusOnceBinding, createOwnerCensusOnceAction, ownerCensus
 import { checkedOwnerCensusPreparationBinding, createOwnerCensusPreparation, type OwnerCensusPreparationBinding, type OwnerCensusPreparationReceipt } from './ownerCensusPreparation';
 
 type FieldUnit = {
+  mhelpLocation?:Record<string,any>;mhelpLocationReviewReason?:string|null;
   id:string;
   addressEstimateTrackerId?:string|null; addressEstimateUnitNumber?:string|null;
   addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
@@ -101,6 +106,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     });
     return()=>{current=false;};
   },[data]);
+  useEffect(()=>{if(cameras.fleet)setData(cameras.fleet.fieldMap as unknown as Snapshot);},[cameras.fleet]);
   const [search,setSearch]=useState(restored.current.search||'');
   const [status,setStatus]=useState(restored.current.status||'field');
   const dismissedDeepLink=useRef('');
@@ -113,7 +119,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const [source,setSource]=useState('manual');
   const [note,setNote]=useState('');
   const [confirmedLocation,setConfirmedLocation]=useState(false);
-  const [health,setHealth]=useState(restored.current.health||'all');
+  const [health,setHealth]=useState(restored.current.health||'operational');
   const [nearbyId,setNearbyId]=useState(restored.current.nearbyId||'');
   const [showHistorical,setShowHistorical]=useState(restored.current.showHistorical||false);
   const [radius,setRadius]=useState(restored.current.radius||10);
@@ -177,7 +183,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const clusterButtons=useRef(new Map<string,HTMLButtonElement>());
   const markersRef=useRef(new Map<string,L.Marker>());
 
-  const load=async()=>{
+  const load=async(force=false)=>{
     if (working.current) return;
     working.current = true;
     lastAttemptAt.current = Date.now();
@@ -185,11 +191,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     setError('');
     setCensusMessage(null);setPreparationReceipt(null);setPreparationMessage(null);
     try{
-      const response=await api.get('/api/field-map');
-      const snapshot = checkedFieldMap(response.data) as unknown as Snapshot;
+      const snapshot = await api.fleetSource('fieldMap',force) as unknown as Snapshot;
       setData(snapshot);
       setCensusSessionInvalid(false);
-      cameras.updateClock();
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
       const matches = initialUnitLabel ? fieldMapLabelMatches(snapshot.items,initialUnitLabel) : [];
@@ -197,6 +201,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       if(initialUnitLabel && matches.length!==1)show(matches.length>1?'This unit has conflicting field records. Select the verified installation.':'This unit is not currently in the field map. Shop units stay off the installed field map.');
       if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
       setSelectedId(current => !data&&dismissedDeepLink.current!==deepLinkKey&&(initialUnitId||initialUnitLabel)?first?.id||'':snapshot.items.some(unit => unit.id === current) ? current : '');
+      if(initialUnitId&&(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId)){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}
       if(initialUnitLabel){setSearch(first?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');}
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
@@ -214,7 +219,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};
   },[]);
 
-  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
+  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');if(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
 
   useEffect(()=>{if(data)saveFieldMapView({search,status,health,selectedId,selectionExplicit:Boolean(selectedId),nearbyId,radius,showHistorical});},[search,status,health,selectedId,nearbyId,radius,showHistorical,Boolean(data)]);
 
@@ -226,7 +231,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const preparationBinding=ownerCensusEnabled&&!censusSessionInvalid&&preparationReady?.snapshot===data&&preparationReady.unitId===selectedId?preparationReady.binding:null;
   const visiblePreparation=ownerCensusEnabled&&!censusSessionInvalid&&preparationReceipt?.snapshot===data&&preparationReceipt.unitId===selectedId?preparationReceipt.receipt:null;
   const visiblePreparationMessage=preparationMessage?.snapshot===data&&preparationMessage.unitId===selectedId?preparationMessage.text:null;
-  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
+  const currentCameraData=error?null:cameras.data;
+  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,currentCameraData,cameras.now)])),[items,currentCameraData,cameras.now]);
+  const previousHealthById=useMemo(()=>error||cameras.error?new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.fleet?.health||null,cameras.now)])):healthById,[items,error,cameras.error,cameras.fleet,cameras.now,healthById]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
   for(const observation of healthById.values()){if(observation.state==='online')onlineBasis[observation.basis||'provider']++;if(observation.state==='offline')offlineBasis[observation.basis||'provider']++;}
@@ -243,11 +250,11 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return items.filter(unit=>{
       const text=[unit.unitNumber,unit.modelName,unit.customer,unit.site,unit.activeJobNumber,unit.address].filter(Boolean).join(' ').toLowerCase();
       const statusOk=status==='all'||(status==='field'&&['field','assigned','in_transit','installed','returning'].includes(unit.status))||status==='tracker'&&unit.readOnly===true||status===unit.status||status==='missing'&&!hasCoords(unit);
-      const healthOk=health==='all'||healthById.get(unit.id)?.state===health;
+      const healthOk=health==='all'||(health==='operational'?['online','offline','support'].includes(previousHealthById.get(unit.id)?.state||'unknown'):healthById.get(unit.id)?.state===health);
       const miles=distance(unit);
       return statusOk&&healthOk&&(!nearby||miles!==null&&miles<=radius)&&(!q||text.includes(q));
     });
-  },[items,search,status,health,health==='all'?null:healthById,nearbyId,radius]);
+  },[items,search,status,health,health==='all'?null:healthById,previousHealthById,nearbyId,radius]);
 
   useEffect(()=>{
     if(!selected)return;
@@ -490,7 +497,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const payload = gpsWrite({ latitude: lat, longitude: lon, accuracyM: accuracy, source, note:verificationNote }, 'owner', true);
       const saved = await gpsSaver.current.owner(selected.id, payload);
       setData(saved as unknown as Snapshot);
-      cameras.updateClock();
+      void cameras.refresh();
       const message = selected.unitNumber + ' location saved and read back successfully.';
       setGpsMessage(message);
       show(message);
@@ -546,7 +553,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     <div className='field-map-toolbar'>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search unit, customer, site, job…' aria-label='Search field units'/>
       <button className='secondary' aria-expanded={filtersOpen} aria-controls='field-map-filters' onClick={()=>setFiltersOpen(value=>!value)}>Filters{status!=='field'||health!=='all'||nearbyId||showHistorical?' · active':''}</button>
-      <button className='secondary' disabled={busy} onClick={()=>{void load();void routers.refresh();void cameras.refresh()}}>Refresh</button>
+      <button className='secondary' disabled={busy} onClick={()=>{void load(true);void routers.refresh()}}>Refresh</button>
       <button className='secondary' aria-label={estimates.size?'Show all map pins':'Show all verified pins'} disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations}>Fit pins</button>
     </div>
 
@@ -561,7 +568,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
         <option value='returning'>Returning</option>
         <option value='missing'>Coordinates pending</option>
       </select>
-      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='all'>All connection / camera states</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option><option value='support'>Support equipment · 0 cameras</option></select>
+      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='operational'>Field online / offline</option><option value='all'>All health / review</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option><option value='support'>Support equipment · 0 cameras</option></select>
     <div className='field-map-nearby'>
       <label>Nearby a job / unit<select aria-label='Nearby unit center' value={nearbyId} onChange={e=>{setNearbyId(e.target.value);setFocusSelected(false)}}><option value=''>Entire field fleet</option>{items.filter(hasCoords).map(unit=><option key={unit.id} value={unit.id}>{unit.activeJobNumber?unit.activeJobNumber+' · ':''}{unit.unitNumber} · {unit.site||unit.address}</option>)}</select></label>
       <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations{data?' ('+items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length+')':''}</label>
@@ -579,8 +586,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} unverified map points available outside nearby mode. EST marks an address estimate; SRC marks literal tracker-recorded coordinates with unknown measurement time. Each point needs verification. Address estimates may share a site point. Tracker coordinates retain each recorded point. Connection colors are independent; tracker coordinates and address estimates are excluded from nearby distances.</p>}
     <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector or recorder observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{data&&cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     </details>
-    {cameras.error&&<p className='field-map-error' role='alert'>Camera Health unavailable: {cameras.error}</p>}
-    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error}</span> <button className='secondary' disabled={busy} onClick={()=>void load()}>Retry map load</button></div>}
+    {cameras.error&&!error&&<p className='field-map-error' role='alert'>Camera Health unavailable: {cameras.error}</p>}
+    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error} Camera Health unavailable until the shared snapshot is verified.</span> <button className='secondary' disabled={busy} onClick={()=>void load(true)}>Retry map load</button></div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
     <div className={'field-map-layout'+(selected?' has-selection':'')}>
@@ -621,6 +628,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {selected.readOnly && <div><dt>Placement verified</dt><dd>{selected.sourceVerifiedAt?new Date(selected.sourceVerifiedAt).toLocaleString():'Not recorded'}</dd></div>}
           </dl>
 
+          {canonicalCameraUnit(selected.unitNumber)?.startsWith('RECON2|')&&selectedHealth?.identity==='matched'&&<section aria-label='Recon II detector batteries'><h3>Recon II battery evidence</h3>{selectedHealth.rows.filter(row=>row.evidence?.source==='Reconeyez').map(row=><div key={row.id}><strong>{row.name}</strong><ReconBatteryDetails battery={row.batteryEvidence} now={cameras.now}/></div>)}</section>}
+          <HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>
+          <MhelpUnitRefresh key={selected.id} unit={selected} onUpdated={()=>void load(true)}/>
           <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3><p>Router checks do not supply live locations.</p>{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
@@ -644,7 +654,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
           {selectedEstimate&&<section className='field-map-estimate-detail' aria-label={recordedPoint(selectedEstimate)?'Tracker-recorded coordinates':'Address estimate'}><h3>{pointTitle(selectedEstimate)}</h3>
             {'secondaryUnit' in selectedEstimate&&selectedEstimate.secondaryUnit?<p>Original installation address: {selectedEstimate.originalAddress}. {selectedEstimate.secondaryUnit.sourceText} is retained in the saved address. This estimate locates the building address; the suite and installed unit position remain unverified.</p>:null}
             {'inferredComponents' in selectedEstimate&&selectedEstimate.inferredComponents?.length? <p>Source address: {selectedEstimate.originalAddress}. Provider supplied missing {selectedEstimate.inferredComponents.join(' and ')}; source data is unchanged.</p>:null}
-            {selectedEstimate.confidence==='source_recorded_unverified'?<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude}</p><p>Literal coordinates from tracker cell {selectedEstimate.coordinateCell}. Source observed {routerTime(selectedEstimate.sourceObservedAt)}.</p><p>Coordinate measurement time is unknown. This is not a verified installation pin or live GPS; excluded from nearby distances.</p></>:selectedEstimate.confidence==='approximate_property_location'?<><p>Original address: {selectedEstimate.originalAddress}</p><p>Provider-normalized address: {selectedEstimate.matchedAddress}</p><p>{reviewedDifferenceExplanation(selectedEstimate)}</p><p>Geocodio · {selectedEstimate.providerDataSource} · Provider accuracy {selectedEstimate.providerAccuracy} · {selectedEstimate.providerAccuracyType}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.retrievedAt)}</p><p>This is an approximate property point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:selectedEstimate.confidence==='automatic_address_estimate'?<><p>{selectedEstimate.matchedAddress}</p><p>Geocodio · {selectedEstimate.accuracyType} · Provider accuracy {selectedEstimate.accuracy}{selectedEstimate.matchType?' · '+selectedEstimate.matchType:''}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an approximate address point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></>}
+            {selectedEstimate.confidence==='mhelp_service_unverified'?<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude}</p><p>{selectedEstimate.coordinateSource} · Read {routerTime(selectedEstimate.sourceObservedAt)}</p><p>Current service-location evidence. The installed camera point still needs verification; excluded from nearby distances.</p></>:selectedEstimate.confidence==='source_recorded_unverified'?<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude}</p><p>Literal coordinates from tracker cell {selectedEstimate.coordinateCell}. Source observed {routerTime(selectedEstimate.sourceObservedAt)}.</p><p>Coordinate measurement time is unknown. This is not a verified installation pin or live GPS; excluded from nearby distances.</p></>:selectedEstimate.confidence==='approximate_property_location'?<><p>Original address: {selectedEstimate.originalAddress}</p><p>Provider-normalized address: {selectedEstimate.matchedAddress}</p><p>{reviewedDifferenceExplanation(selectedEstimate)}</p><p>Geocodio · {selectedEstimate.providerDataSource} · Provider accuracy {selectedEstimate.providerAccuracy} · {selectedEstimate.providerAccuracyType}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.retrievedAt)}</p><p>This is an approximate property point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:selectedEstimate.confidence==='automatic_address_estimate'?<><p>{selectedEstimate.matchedAddress}</p><p>Geocodio · {selectedEstimate.accuracyType} · Provider accuracy {selectedEstimate.accuracy}{selectedEstimate.matchType?' · '+selectedEstimate.matchType:''}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an approximate address point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></>}
           </section>}
           {!selected.readOnly&&selected.locationNote?.startsWith('COS_ADDRESS_ESTIMATE_')&&addressEstimateHumanNote(selected.locationNote)&&<p role='alert'>{addressEstimateHumanNote(selected.locationNote)}</p>}
           {!selectedEstimate&&historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}

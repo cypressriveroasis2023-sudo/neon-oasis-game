@@ -1,3 +1,4 @@
+import {showAllFieldHealth} from './field-map-controls.mjs';
 import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 
@@ -98,12 +99,13 @@ async function fixturePage(page,{locationWritesEnabled=true}={}) {
   });
   // Chromium may send the preflight through routing; Playwright fulfills the
   // intercepted cross-origin fetch directly, so no backend request is emitted.
+  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
   await page.goto('/harness');
   const frame = page.frameLocator('#operations');
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   return { state, frame };
 }
-async function open(frame, name) { await openWorkspace(frame, name);
+async function open(frame, name) { await openWorkspace(frame, name);if(name==='Field Map')await showAllFieldHealth(frame);
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());

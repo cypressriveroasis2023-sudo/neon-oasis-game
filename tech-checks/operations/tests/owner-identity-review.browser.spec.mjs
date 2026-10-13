@@ -26,7 +26,7 @@ async function mount(page,{owner=true,fail=false,existing=false}={}){
   else data={items:[]};
   return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
  });
- await page.goto('/owner-identity-fixture');const frame=page.frameLocator('iframe');await frame.locator('.camera-card-main').first().click();return {frame,state};
+ await page.goto('/owner-identity-fixture');const frame=page.frameLocator('iframe');await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.locator('.camera-card-main').first().click();return {frame,state};
 }
 async function open(frame){await frame.getByRole('button',{name:'Review equipment identity',exact:true}).click();await expect(frame.getByLabel('Exact registered equipment')).toBeVisible();}
 async function preview(frame){await open(frame);await expect(frame.getByLabel('Exact registered equipment')).toHaveValue('');await frame.getByLabel('Exact registered equipment').selectOption(unitId);await frame.getByRole('button',{name:'Review exact association',exact:true}).click();await expect(frame.getByRole('checkbox',{name:/same physical equipment/})).toBeVisible();}

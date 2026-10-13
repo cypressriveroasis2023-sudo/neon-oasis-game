@@ -37,6 +37,7 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
    :request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:now}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/address-estimate-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(4);return {frame,state};
 }
 // Expanded markers represent their units; only collapsed summaries add member identities.

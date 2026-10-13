@@ -1,3 +1,4 @@
+import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
@@ -179,7 +180,7 @@ export function createOperationsHandler(options) {
   const rpc = (name, payload, signal = undefined) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload), ...(signal ? {signal} : {}),
   }, 'COS workflow could not be completed. Please retry.');
-  const readMhelpPlacements=async(actorPayload,signal=undefined)=>options.mhelpPlacementEnabled===true?rpc('cos_mhelp_placement_snapshot',actorPayload,signal):null;
+  const readMhelpPlacements=async(actorPayload,signal=undefined)=>{if(options.mhelpPlacementEnabled!==true)return null;const receipt=await rpc('cos_mhelp_placement_snapshot',actorPayload,signal);try{return {...receipt,fleetLocations:await rpc('cos_mhelp_location_snapshot',actorPayload,signal)};}catch{return receipt;}};
   const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
@@ -650,12 +651,19 @@ export function createOperationsHandler(options) {
         catch(cause){const error=cause instanceof MhelpReconnectError?cause:new MhelpReconnectError();return json({error:error.message},error.status);}
       }
       if (path.startsWith('/api/mhelpdesk/partner/')) {
-        // This owner-only review does not expand the verified IT route allowlist.
-        if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
+        // Only the service-location read is available to the existing verified IT fleet identities.
+        if (!context.legacyOwner && !(path==='/api/mhelpdesk/partner/unit-location'&&verifiedFleetIt)) fail('An active COS Owner account is required.', 403);
         if (method === 'POST' && body === null) body = await requestBody(request);
         if(path==='/api/mhelpdesk/partner/unit-location'){
           if(method!=='POST')fail('Method not supported.',405);
-          return json(await mhelpUnitLocation(body));
+          if(body?.unitId===undefined)return json(await mhelpUnitLocation(body));
+          allowedFields(body,['unitId','unitName'],'Unit location refresh');
+          const unitId=idValue(body.unitId,'Unit');
+          const target=await rpc('cos_mhelp_location_target',{...actorPayload,p_unit_id:unitId});
+          if(target.unitNumber!==body.unitName||target.inactive)fail('The current unit identity must be reviewed before refreshing its service location.',409);
+          const preview=await mhelpUnitLocation({unitName:target.unitNumber});
+          await rpc('cos_mhelp_location_record',{...actorPayload,p_unit_id:unitId,p_guard:target.guard,p_observation:{state:'confirmed',equipmentId:preview.equipmentId,placement:preview.placement,customer:preview.customer,site:preview.site,address:preview.address||null,point:preview.point,coordinateSource:preview.coordinateSource}});
+          return json({...preview,locationEvidenceUpdated:true});
         }
         if(path==='/api/mhelpdesk/partner/tickets/preview') {
           if(method!=='POST')fail('Method not supported.',405);
@@ -864,7 +872,7 @@ export function createOperationsHandler(options) {
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
           projected=await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity);
-          return json(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity):projected);
+          return json(projectMhelpFleetLocations(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity):projected,mhelpReceipt?.fleetLocations));
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {

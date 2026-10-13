@@ -24,7 +24,7 @@ async function present(){if(window.COS_IT_DAILY_ONLY)return;const c=context();if
   button?.remove();trackerButton?.remove();dashboardButton?.remove();
   // The six source cards must not wait for the older all-source IT Home loader.
   const home=document.getElementById('wlItHome');
-  if(home?.getClientRects().length&&!deepLinkOpened){deepLinkOpened=true;const q=new URLSearchParams(location.search);if(q.get('fieldView')==='1'||q.has('fieldUnit'))open();else if(q.get('itHome')!=='checks')open('it-dashboard',null);}
+  if(home?.getClientRects().length&&!deepLinkOpened){deepLinkOpened=true;const q=new URLSearchParams(location.search);if(q.get('cameraView')==='1')open('camera-health');else if(q.get('fieldView')==='1'||q.has('fieldUnit'))open();else if(q.get('itHome')!=='checks')open('it-dashboard',null);}
   return;
  }
  const target=head.parentElement;
@@ -35,7 +35,7 @@ async function present(){if(window.COS_IT_DAILY_ONLY)return;const c=context();if
  if(button.parentElement!==target)dashboardButton.after(button);
  if(!trackerChecked&&!trackerPending){trackerPending=true;const revision=epoch;void verifyTracker().then(ok=>{if(revision!==epoch)return;trackerPending=false;trackerChecked=true;trackerAllowed=ok;void present();});}
  if(trackerAllowed){if(!trackerButton){trackerButton=document.createElement('button');trackerButton.type='button';trackerButton.className='btn mini wl-red';trackerButton.dataset.cosUnitTracker='';trackerButton.textContent='Unit Tracker';trackerButton.style.cssText=button.style.cssText;trackerButton.onclick=()=>open('unit-tracker',trackerButton);}if(trackerButton.parentElement!==target)button.after(trackerButton);}
- if(!deepLinkOpened&&document.getElementById('wlItHome')?.getClientRects().length){deepLinkOpened=true;const q=new URLSearchParams(location.search);if(q.get('fieldView')==='1'||q.has('fieldUnit'))open();else if(q.get('itHome')!=='checks')open('it-dashboard',dashboardButton);}
+ if(!deepLinkOpened&&document.getElementById('wlItHome')?.getClientRects().length){deepLinkOpened=true;const q=new URLSearchParams(location.search);if(q.get('cameraView')==='1')open('camera-health');else if(q.get('fieldView')==='1'||q.has('fieldUnit'))open();else if(q.get('itHome')!=='checks')open('it-dashboard',dashboardButton);}
 }
 window.addEventListener('message',async event=>{if(event.origin!==location.origin||event.source!==frame?.contentWindow||!allowed||active()!==subject)return;const d=event.data;if(!d||typeof d!=='object')return;
  if(d.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof d.active==='boolean'){setFieldMapDisplay(frame,d.active);return;}

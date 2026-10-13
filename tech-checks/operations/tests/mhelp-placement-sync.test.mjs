@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {collectPlacementObservations,createPlacementSyncHandler} from '../../supabase/functions/cos-mhelp-placement-sync/index.ts';
+import {collectFleetLocations} from '../../supabase/functions/cos-mhelp-placement-sync/fleetLocations.ts';
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement,checkedMhelpPlacements} from '../../supabase/functions/cos-operations-pages/mhelpPlacementProjection.ts';
 const native='11111111-1111-4111-8111-111111111111',tracker='22222222-2222-4222-8222-222222222222';
 const now=Date.parse('2026-10-12T18:00:00Z');
@@ -86,4 +87,23 @@ test('aggregate read diagnostics appear only in an authenticated completed run',
  assert.deepEqual((await (await h(request('run'))).json()).customerReads,diagnostics);assert.equal(snapshots,1);
  const denied=createPlacementSyncHandler({authenticate:async()=>false,rpc:async()=>{throw Error();},equipment:async()=>[],customer:read,readDiagnostics:()=>{snapshots++;return diagnostics;}});
  assert.equal((await denied(request('run'))).status,403);assert.equal(snapshots,1);
+});
+
+
+test('optional all-unit service-location failure preserves its prior cache and completes verified legacy placement reads',async()=>{
+ const calls=[];const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async(name,body)=>{calls.push({name,body});return name.endsWith('begin')?{leaseId:'synthetic-lease',links:[link]}:name.endsWith('finish')?{committed:true,confirmed:1,held:0}:{};},equipment:async()=>[equipment],customer:read,locations:async()=>{throw Error('Synthetic bounded address failure; source details must remain private');}});
+ const response=await h(new Request('https://synthetic.example/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'run'})}));const body=await response.json();
+ assert.equal(response.status,200);assert.equal(body.state,'current');assert.equal(body.locationError,'service_location_refresh_unavailable');assert(!JSON.stringify(body).includes('source details'));
+ const finish=calls.find(c=>c.name==='cos_mhelp_placement_finish');assert(finish);assert.equal(finish.body.p_observations.length,1);assert.equal(finish.body.p_observations[0].state,'confirmed');assert.equal('p_locations' in finish.body,false);
+ assert(!calls.some(c=>['cos_mhelp_fleet_finish','cos_mhelp_placement_fail'].includes(c.name)),'a failed optional address read cannot overwrite location receipts or stop working placement evidence');
+});
+
+test('bounded location reads commit every candidate with verified successes and explicit per-unit holds',async()=>{
+ const candidates=[10,11,12].map(n=>({kind:'equipment_unit',unitId:String(n),unitNumber:'Helios '+n,guard:'a'.repeat(64)}));
+ const fleet=candidates.map((r,i)=>({equipmentId:String(900+i),name:r.unitNumber,active:true})),calls=[];
+ const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async(name,body)=>{calls.push({name,body});return name.endsWith('begin')?{leaseId:'synthetic-lease',links:[link]}:name.endsWith('finish')?{committed:true,confirmed:1,held:0}:{};},equipment:async()=>[equipment,...fleet],customer:read,locations:rows=>collectFleetLocations(candidates,rows,async r=>{if(r.equipmentId!=='900')throw Error('Private source deadline detail');return {placement:'SHOP',customer:'Cameras Onsite',site:'Shop / ROOT',address:null,point:null,coordinateSource:null};})});
+ const response=await h(new Request('https://synthetic.example/',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"action":"run"}'})),body=await response.json();
+ assert.equal(response.status,200);assert.deepEqual(body.locationReads,{confirmed:1,held:2});assert.doesNotMatch(JSON.stringify(body),/Private/);
+ const finish=calls.find(c=>c.name==='cos_mhelp_fleet_finish');assert(finish);assert.equal(finish.body.p_locations.length,3);assert.equal(finish.body.p_observations[0].state,'confirmed');
+ assert.equal(finish.body.p_locations[0].state,'confirmed');assert(finish.body.p_locations.slice(1).every(r=>r.state==='held'&&r.reason==='mhelp_location_read_unavailable'));
 });

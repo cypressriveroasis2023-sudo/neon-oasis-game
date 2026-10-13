@@ -29,11 +29,13 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
   if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;heldMap=true;await gate.promise;}
   const data=request.path==='/api/session'?state.session:request.path==='/api/field-map'?state.snapshot
    :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:f.snapshot.generatedAt}
-   :request.path==='/api/camera-health/summary-v3'?{evidenceVersion:2,rows:[],totalDevices:0,refreshedAt:f.snapshot.generatedAt}
+   :request.path==='/api/camera-health/summary-v3'?{evidenceVersion:2,rows:[],totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:f.snapshot.generatedAt,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}}
    :request.path==='/api/equipment'?{items:[],models:[],trackerUnits:state.snapshot.items}:{items:[]};
   await route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
   if(heldMap)state.heldMapFinished++;
  });
+ // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
  if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
  return {frame,state};

@@ -1,3 +1,4 @@
+import {safeVrmPower} from './vrmSafePower.ts';
 import { collectHeliosPower } from './vrmPower.ts';
 import { heliosVrmUnits, validInstallationId, validVrmName, VRM_MAX_INSTALLATIONS, vrmPortalConfig, type VrmFleetConfig, type VrmInstallation, type VrmSync } from './vrm.ts';
 
@@ -23,7 +24,7 @@ export type VrmDiscoveryOptions = {
   embeds?: string; now?: () => number; collectPower?: boolean;
 };
 type Snapshot = {
-  items: VrmInstallation[]; lastAttemptAt: string | null; lastSuccessAt: string | null;
+  items: VrmInstallation[]; power?:unknown; lastAttemptAt: string | null; lastSuccessAt: string | null;
   errorCode: ErrorCode | null; retryAfterAt: string | null; syncing: boolean; scheduleActive: boolean;
 };
 const time = (v: unknown): v is string | null => v === null || typeof v === 'string' && Number.isFinite(Date.parse(v));
@@ -86,7 +87,7 @@ export async function discoverVrmInstallations(token: string, fetcher: typeof fe
 export function createVrmFleetReader(options: VrmDiscoveryOptions) {
   const now = options.now || Date.now;
   const read = async () => readSnapshot(await options.rpc('cos_vrm_fleet_snapshot', {}));
-  const present = (snapshot: Snapshot, configured: boolean): VrmFleetConfig => {
+  const present = (snapshot: Snapshot, configured: boolean): VrmFleetConfig & {power?:ReturnType<typeof safeVrmPower>} => {
     const old = !snapshot.lastSuccessAt || now() - Date.parse(snapshot.lastSuccessAt) > 2 * VRM_SYNC_INTERVAL_MS;
     const sync: VrmSync = {
       state: !configured ? 'not_configured' : snapshot.syncing ? 'syncing' : snapshot.errorCode ? (snapshot.lastSuccessAt ? 'stale' : 'error') : old ? (snapshot.lastSuccessAt ? 'stale' : 'idle') : 'current',
@@ -94,7 +95,7 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
       nextSyncAt: snapshot.scheduleActive && configured ? new Date(Math.ceil(Math.max(now() + 1, snapshot.retryAfterAt ? Date.parse(snapshot.retryAfterAt) : 0) / VRM_SYNC_INTERVAL_MS) * VRM_SYNC_INTERVAL_MS).toISOString() : null,
       scheduleActive: snapshot.scheduleActive, connectionConfigured: configured,
     };
-    return vrmPortalConfig(options.embeds,!snapshot.lastSuccessAt && !snapshot.items.length ? heliosVrmUnits : snapshot.items,sync);
+    return {...vrmPortalConfig(options.embeds,!snapshot.lastSuccessAt && !snapshot.items.length ? heliosVrmUnits : snapshot.items,sync),...(snapshot.power===undefined?{}:{power:safeVrmPower(snapshot.power,snapshot.items,now())})};
   };
   return async (refresh = false): Promise<VrmFleetConfig> => {
     const token = options.getAccessToken();

@@ -1,6 +1,7 @@
 import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { routerStatus, type RouterRow, type RouterStatus } from '../../supabase/functions/cos-operations-pages/routers';
 export type FieldLocation = {
+  mhelpLocation?:Record<string,any>;mhelpLocationReviewReason?:string|null;
   id: string; unitNumber: string; placementAuditId?:string; placementUnitKey?:string; placementUpdatedAt?:string|null; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>; locationSourceRecorded?:Record<string,any>;
   addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
   installedSiteId?:string|null; placementSource?:string; placementStatus?:string; placement?:string;

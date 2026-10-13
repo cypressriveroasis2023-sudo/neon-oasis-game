@@ -22,6 +22,7 @@ async function mount(page,{fail=false,legacySelection=false,customUnits=units}={
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner'}:request.path==='/api/field-map'?{items:customUnits,summary:{fieldUnits:customUnits.length,mappedUnits:customUnits.filter(u=>u.latitude!==null).length,unitGps:0,missingGps:customUnits.filter(u=>u.latitude===null).length},generatedAt:new Date(now).toISOString(),placementReviews:[{unitNumber:'SOLARSPOTTER REVIEW',reason:'Fixture placement needs identity review',placementAuditId:null}]}:request.path==='/api/camera-health/summary-v3'?snapshot(customUnits.slice(0,116).map((u,i)=>resource(i+1,u.unitNumber))):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(now).toISOString()}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/clean-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-workspace')).toBeVisible();if(!fail)await expect(frame.locator('.field-map-list>button')).toHaveCount(customUnits.length);return {frame,state};
 }
 test('complete counts, compact map-first view, review disclosure and explicit-only unit details',async({page},info)=>{

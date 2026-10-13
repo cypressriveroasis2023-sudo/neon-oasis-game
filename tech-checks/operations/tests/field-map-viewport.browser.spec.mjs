@@ -1,3 +1,4 @@
+import {showAllFieldHealth} from './field-map-controls.mjs';
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
 
@@ -32,10 +33,11 @@ async function mount(page) {
       : request.path === '/api/daily-board' ? { jobs: [], tasks: [], readiness: [], asOf: stamp } : { items: [] };
     return route.fulfill({ headers, contentType: 'application/json', body: JSON.stringify(data) });
   });
-  await page.goto('/field-map-viewport-fixture');
+  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
+ await page.goto('/field-map-viewport-fixture');
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
-  await openWorkspace(frame, 'Field Map');
+  await openWorkspace(frame, 'Field Map');await showAllFieldHealth(frame);
   await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
   return { frame, requests };
 }
@@ -90,7 +92,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await map.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
   await openWorkspace(frame, 'Today');
-  await openWorkspace(frame, 'Field Map');
+  await openWorkspace(frame, 'Field Map');await showAllFieldHealth(frame);
   await bounded(frame);
   expect(requests.every(request => request.method === 'GET')).toBe(true);
 });
