@@ -38,7 +38,7 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   const {frame,requests}=await mount(page);
   const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
   await expect(dashboard.locator('.vision-area-card')).toHaveCount(6);
-  await expect(dashboard.getByRole('button',{name:/Camera Health/})).toContainText('2 active / unresolved units · Provider systems: 1 online · 1 offline · 0 review');
+  await expect(dashboard.getByRole('button',{name:/Camera Health/})).toContainText('Field units: 0 online · 0 offline · 2 need review');
   await expect(dashboard).toContainText('1 confirmed on hand');
   await expect(dashboard).toContainText('1 placement not recorded');
   await dashboard.getByRole('button',{name:/Camera Health/}).click();

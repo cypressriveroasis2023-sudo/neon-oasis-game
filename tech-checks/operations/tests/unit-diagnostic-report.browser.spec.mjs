@@ -37,6 +37,7 @@ async function mount(page,{selected=false,oldApi=false,hostile=false}={}){
  });
  await page.goto(origin+'/native-report-fixture');const frame=page.frameLocator('iframe'),child=page.frames().find(child=>child.parentFrame());
  await expect(frame.getByRole('heading',{name:'Camera Health',exact:true,level:2})).toBeVisible();
+ if(!selected)await frame.getByLabel('Camera Health unit filter').selectOption('all');
  if(selected)await expect(frame.getByRole('region',{name:'Unit diagnostic report'})).toBeVisible();else await expect(frame.locator('.camera-overview-card')).toHaveCount(oldApi?2:3);
  return {frame,child,state};
 }

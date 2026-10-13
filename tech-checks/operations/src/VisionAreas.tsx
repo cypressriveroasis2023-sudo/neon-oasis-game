@@ -4,7 +4,7 @@ import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { getVrmFleet } from './vrmFleetApi';
 import './visionAreas.css';
 
-type Api = { fleet?:(force?:boolean)=>Promise<{health:any;fieldMap:any}>;get(path: string): Promise<{ data: any }> };
+type Api = { fleet?:(force?:boolean)=>Promise<{health:any;fieldMap:any}>;fleetSource?:(source:'health'|'fieldMap',force?:boolean)=>Promise<any>;get(path: string): Promise<{ data: any }> };
 export function AreaIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
@@ -61,13 +61,17 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
     const request = ++revision.current;
     setValues({});
     setHealthNow(Date.now());
-    await Promise.all(visionAreas.map(async area => {
+    const cards=visionAreas.map(async area => {
       let value: unknown = null;
-      try { const data=api.fleet&&['Camera Health','Field Map'].includes(area.workspace)?(await api.fleet(force))[area.workspace==='Camera Health'?'health':'fieldMap']:(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
+      try { const source=area.workspace==='Camera Health'?'health':'fieldMap';const data=['Camera Health','Field Map'].includes(area.workspace)&&api.fleetSource?await api.fleetSource(source,force):api.fleet&&['Camera Health','Field Map'].includes(area.workspace)?(await api.fleet(force))[source]:(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
       catch { /* Keep this card unavailable without hiding other settled sources. */ }
       if (request !== revision.current) return;
       setValues(previous => request === revision.current ? { ...previous, [area.workspace]: value } : previous);
-    }));
+    });
+    // Publish each validated source immediately, then use the complete shared
+    // snapshot for placement-aware counts when both reads finish successfully.
+    const paired=api.fleetSource&&api.fleet?api.fleet(force).then(data=>{if(request===revision.current)setValues(previous=>({...previous,'Camera Health':data.health,'Field Map':data.fieldMap}));}).catch(()=>{}):Promise.resolve();
+    await Promise.all([...cards,paired]);
     if (request === revision.current) running.current = false;
   }, [api]);
   useEffect(() => { void refresh(); return () => { revision.current += 1; running.current = false; }; }, [refresh]);

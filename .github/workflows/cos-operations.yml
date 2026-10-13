@@ -155,7 +155,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Verify shared fleet review and GPS compatibility before the full browser suite
-        run: npm run test:browser -- tests/operations.browser.spec.mjs tests/owner-identity-review.browser.spec.mjs tests/field-health-flow.browser.spec.mjs tests/field-map-viewport.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/recon-provider-area.browser.spec.mjs tests/recorder-evaluation-clock.browser.spec.mjs tests/routers.browser.spec.mjs tests/verified-health-identity.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs --project=mobile-390
+        run: npm run test:browser -- tests/operations.browser.spec.mjs tests/owner-identity-review.browser.spec.mjs tests/field-health-flow.browser.spec.mjs tests/field-map-viewport.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/recon-provider-area.browser.spec.mjs tests/recorder-evaluation-clock.browser.spec.mjs tests/routers.browser.spec.mjs tests/verified-health-identity.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/vision-progressive.browser.spec.mjs tests/vision-dashboard.browser.spec.mjs tests/unit-diagnostic-report.browser.spec.mjs --project=mobile-390 --max-failures=5
       - name: Verify Tech Check TV and IT daily navigation and camera scope
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite

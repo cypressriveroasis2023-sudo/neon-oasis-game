@@ -114,7 +114,7 @@ test('failed and malformed cards settle independently without turning unknown da
   });
   await expect(card(dashboard, 'Team')).toContainText('1 active team members');
   for (const label of ['InHand Routers', 'Victron Power', 'Units On Hand']) await expect(card(dashboard, label)).toContainText('Status unavailable · open to check');
-  await expect(card(dashboard, 'Camera Health')).toContainText('Health unavailable · source-separated inventory not verified');
+  await expect(card(dashboard, 'Camera Health')).toContainText('Status unavailable · open to check');
   await expect(overview.getByText('Health unavailable', { exact: true })).toBeVisible();
   await expect(overview.getByText('Router count unavailable', { exact: true })).toBeVisible();
   await expect(card(dashboard, 'Field View')).toContainText('Checking connected records…');
