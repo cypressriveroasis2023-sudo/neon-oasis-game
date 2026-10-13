@@ -141,7 +141,17 @@ test('native recorder, service-only, and old Recon observations keep separate st
  await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 53'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('DETECTOR NOT VERIFIED');await expect(detail).toContainText('Last reported detector state: OFFLINE');await expect(detail).toContainText('2 hr ago');await expect(detail).toContainText('older observation; current status unverified');await detail.getByRole('button',{name:'Back to units',exact:true}).click();
  const child=page.frames().find(child=>child.parentFrame());await child.evaluate(()=>{location.hash='field-map';});await showAllFieldHealth(frame);await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toBeVisible();const group=frame.locator('.cos-field-cluster-wrap');if(await group.count()){await expect(group).toHaveCount(1);await group.click();}await expect(frame.locator('.cos-field-pin')).toHaveCount(3);for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveAttribute('data-health','unknown');
- await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 51'}).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');expect(state.writes).toHaveLength(0);
+ await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 51'}).click();
+ const unitSummary=frame.getByRole('region',{name:'Selected unit camera health',exact:true});
+ await expect(unitSummary).toContainText('Camera status unverified');
+ await expect(unitSummary).toContainText('Camera channel status unavailable. Recorder and service observations remain separate.');
+ await expect(unitSummary.locator('.cos-signal-online')).toHaveCount(0);
+ const recorderObservation=frame.locator('.camera-health-native .camera-device-cards article').filter({hasText:'Fixture recorder'});
+ await expect(recorderObservation).toHaveCount(1);
+ await expect(recorderObservation.getByText('RECORDER ONLINE',{exact:true})).toBeVisible();
+ await expect(recorderObservation).toContainText('Star4Live · Last reported recorder state: ONLINE');
+ await expect(recorderObservation).toContainText('Camera channel status unavailable from this recorder observation.');
+ expect(state.writes).toHaveLength(0);
 });
 
 test('native location review stays visible while shop and inactive scopes reconcile separately',async({page})=>{

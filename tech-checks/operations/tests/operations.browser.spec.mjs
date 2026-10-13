@@ -296,7 +296,8 @@ test('Field Map blocks another GPS write until a successful manual refresh', asy
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Field Map');
   await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
-  const save = frame.getByRole('button', { name: 'Save verified location' });
+  const editor = frame.locator('.field-map-location-editor');
+  const save = editor.getByRole('button', { name: 'Save verified location' });
   await expect(save).toBeDisabled();
   await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await expect(save).toBeEnabled();
@@ -305,11 +306,12 @@ test('Field Map blocks another GPS write until a successful manual refresh', asy
   state.failedPaths.add('/api/field-map');
   await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await save.click();
-  await expect(frame.getByRole('alert').first()).toContainText('GPS may have been saved');
+  await expect(editor.getByRole('alert')).toContainText('GPS may have been saved');
   await expect(save).toBeDisabled();
   expect(state.writes).toHaveLength(1);
   await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();
-  await expect(frame.getByRole('alert').first()).toContainText('Synthetic source unavailable');
+  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');
+  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('camera colors are unverified');
   await expect(save).toBeDisabled();
   expect(state.writes).toHaveLength(1);
   state.failedPaths.delete('/api/field-map');
