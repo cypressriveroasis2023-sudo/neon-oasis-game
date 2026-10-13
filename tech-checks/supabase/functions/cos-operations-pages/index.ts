@@ -333,8 +333,12 @@ export function createOperationsHandler(options) {
   };
   /** Read-only execution evidence. Keep full identity/collision rosters while
    * avoiding unrelated provider result hydration. Never accepts actor/source keys. */
-  const readOwnerCensusEnvelope=async(context,nativeId,binding,requestSignal,prepare=false)=>{
-    const signal=AbortSignal.any([requestSignal,AbortSignal.timeout(45000)]);
+  const readOwnerCensusEnvelope=async(context,nativeId,binding,requestSignal,prepare,deadlineMs)=>{
+    // Successful proof time includes authentication and envelope decoding, not a new budget after them.
+    const remaining=deadlineMs-Date.now();
+    if(remaining<=0)fail('Current Owner source proof deadline elapsed.',503);
+    const signal=AbortSignal.any([requestSignal,AbortSignal.timeout(remaining)]);
+    const checkDeadline=()=>{if(signal.aborted||Date.now()>=deadlineMs)fail('Current Owner source proof deadline elapsed.',503);};
     const actorPayload={p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID};
     const readArchives=async()=>{
       const rows=await rpc('cos_archived_representation_projection',{p_organization_id:ORGANIZATION_ID},signal);
@@ -367,6 +371,7 @@ export function createOperationsHandler(options) {
       rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readArchives(),
       readJson(LEGACY_URL+'/rest/v1/rpc/cos_field_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_audit_ids:[binding.auditId]}),signal},'Saved target lookup is unavailable.'),
     ]);
+    checkDeadline();
     if(!Array.isArray(records)||records.length!==1)fail('The enrolled Owner lookup is unavailable.',409);
     const record=records[0];
     if(record?.auditId!==binding.auditId||record.unitKey!==binding.unitKey||record.addressSha256!==binding.addressSha256)fail('The exact Owner lookup binding changed.',409);
@@ -388,6 +393,7 @@ export function createOperationsHandler(options) {
     const preparation=prepare?await readOwnerCensusPreparation({...inputs,binding:{nativeUnitId:nativeId,auditId:binding.auditId,unitKey:binding.unitKey,addressSha256:binding.addressSha256}}):null;
     const evidence=prepare?null:await readOwnerCensusEvidence({...inputs,records},true);
     const final=projectMhelpFieldPlacement(projectArchivedRepresentations(base,archives,bundle.sources.audits,bundle.sources.devices,archiveContext),mhelpReceipt,bundle.sources.audits,bundle.identity);
+    checkDeadline();
     const aliases=final.nativePlacementAliases.filter(a=>a.unitId===nativeId),items=final.items.filter(r=>r.id===nativeId),inventory=final.inventoryItems.filter(r=>r.id===nativeId);
     if(signal.aborted||aliases.length!==1||items.length!==1||inventory.length!==1
       ||[items[0],inventory[0]].some(r=>r.placementSource!=='owner'||r.placement!=='FIELD'||r.status!=='field'||r.currentLocationType!=='field'||r.placementStatus==='needs_identity_review'||r.locationVerification==='owner_verified'))fail('Current complete Owner source proof is unavailable.',409);
@@ -396,18 +402,21 @@ export function createOperationsHandler(options) {
       // A separate preparation marker never substitutes for an enrolled policy.
       // Re-read its exact SQL before-image after source reads, without changing it.
       const latest=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_field_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_audit_ids:[binding.auditId]}),signal},'Current preparation authorization is unavailable.');
-      if(signal.aborted||!Array.isArray(latest)||latest.length!==1||JSON.stringify(latest[0])!==JSON.stringify(record))fail('Owner preparation authorization changed.',409);
+      checkDeadline();
+      if(!Array.isArray(latest)||latest.length!==1||JSON.stringify(latest[0])!==JSON.stringify(record))fail('Owner preparation authorization changed.',409);
       return {preparation:{...preparation,preparedAt:new Date().toISOString()}};
     }
     const proofs=evidence.proofs.filter(p=>p.nativeUnitId===nativeId);
     if(proofs.length!==1||!matchesOwnerCensusProof(proofs[0],record,nativeId))fail('Current complete Owner source proof is unavailable.',409);
     const safeRow=r=>Object.fromEntries(['id','unitNumber','readOnly','placementSource','placement','status','currentLocationType','placementAuditId','placementUnitKey','address','locationVerification'].map(k=>[k,r[k]]));
+    checkDeadline();
     return {record,map:{placementProjectionVersion:2,ownerCensusProofs:proofs,nativePlacementAliases:aliases,items:items.map(safeRow),inventoryItems:inventory.map(safeRow)}};
   };
   // Share one large-transfer slot across imports, original PDF downloads, and private evidence.
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
   return async function handle(request) {
+    const ownerProofDeadlineMs=Date.now()+75000;
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
     const releaseLargeBody = () => {
@@ -587,18 +596,29 @@ export function createOperationsHandler(options) {
         if(typeof body.auditId!=='string'||!/^[1-9]\d{0,18}$/.test(body.auditId)||BigInt(body.auditId)>9223372036854775807n
           ||typeof body.unitKey!=='string'||!body.unitKey.trim()||body.unitKey!==body.unitKey.trim()||body.unitKey.length>250
           ||!(prepare?['addressSha256']:['addressSha256','nativeGuardSha256']).every(k=>typeof body[k]==='string'&&/^[a-f0-9]{64}$/.test(body[k])))fail('Exact reviewed lookup binding is required.');
-        const fresh=await readOwnerCensusEnvelope(context,nativeId,body,request.signal,prepare);
+        let fresh;
+        try{fresh=await readOwnerCensusEnvelope(context,nativeId,body,request.signal,prepare,ownerProofDeadlineMs);}
+        catch(cause){
+          // Only the measured native deadline is a timeout. Preserve explicit
+          // authorization/source holds and cancellation by the incoming caller.
+          if(!request.signal.aborted&&Date.now()>=ownerProofDeadlineMs
+            &&!(cause instanceof HttpError&&[401,403,409].includes(cause.status)))fail('Current Owner source proof deadline elapsed.',504);
+          throw cause;
+        }
+        if(Date.now()>=ownerProofDeadlineMs)fail('Current Owner source proof deadline elapsed.',504);
         if(prepare)return json(fresh.preparation);
         if(censusOnce[2]==='owner-census-proof')return json(fresh.map);
         if(fresh.record.censusOnlyState!=='ready')fail('The enrolled Owner lookup changed or its allowance is unavailable.',409);
         let upstream;
+        const forwardingDeadlineMs=Date.now()+315000,forwardingSignal=AbortSignal.timeout(315000);
         try{upstream=await requestFetch(LEGACY_URL+'/functions/v1/camera-field-geocode',{
             method:'POST',headers:{Authorization:context.authorization,'Content-Type':'application/json'},
-            body:JSON.stringify({auditId:body.auditId,unitKey:body.unitKey}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(210000),
+            body:JSON.stringify({auditId:body.auditId,unitKey:body.unitKey}),redirect:'error',cache:'no-store',signal:forwardingSignal,
           });}
         catch{return json({error:'The lookup outcome is uncertain. Refresh to inspect its saved hold; do not repeat the request.',censusOnly:true,allowance:'unknown'},503);}
         if(!upstream.ok){await upstream.body?.cancel();return json({error:'The Census-only lookup could not finish. Refresh to check its hold.',censusOnly:true,allowance:'unknown'},upstream.status>=500?503:409);}
         let result;try{result=await readOwnerCensusJson(upstream,32768);}catch{fail('The lookup outcome is uncertain. Refresh before taking further action.',503);}
+        if(forwardingSignal.aborted||Date.now()>=forwardingDeadlineMs)fail('The lookup outcome is uncertain. Refresh to inspect the saved result.',503);
         if(result?.ok!==true||result.censusOnly!==true||!['unknown','available','consumed'].includes(result.allowance)||!Array.isArray(result.results)||result.results.length>1
           ||!Array.isArray(result.fallbackResults)||result.fallbackResults.length||result.importedResults!==null
           ||result.results.some(r=>r?.auditId!==body.auditId||r.censusOnly!==true||!['pending','success','no_match','invalid_address','provider_error','held','superseded','draining'].includes(r.status)||!['unknown','available','consumed'].includes(r.allowance)

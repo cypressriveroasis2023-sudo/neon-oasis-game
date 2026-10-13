@@ -2,7 +2,7 @@ import {addressDigest,normalizeAddress} from './censusAddress.ts';
 import {type OwnerCensusOnlyBinding,type VerifyOwnerCensusSource} from './ownerCensusOnly.ts';
 
 export const OWNER_CENSUS_PROOF_CONTRACT='COS_OWNER_ONE_CENSUS_NATIVE_V1';
-export const OWNER_CENSUS_SOURCE_TIMEOUT_MS=45000;
+export const OWNER_CENSUS_SOURCE_TIMEOUT_MS=80000;
 const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const object=(value:unknown):value is Record<string,any>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const sha=(value:unknown)=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
@@ -39,6 +39,7 @@ export async function matchesOwnerCensusSource(snapshot:unknown,binding:OwnerCen
 export function createOwnerCensusSourceVerifier(requestFetch:typeof fetch=fetch):VerifyOwnerCensusSource{
  return async(binding,authorization)=>{
   if(!/^Bearer [^\s]+$/i.test(authorization)||authorization.length>8192)return false;
+  const deadlineMs=Date.now()+OWNER_CENSUS_SOURCE_TIMEOUT_MS;
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),OWNER_CENSUS_SOURCE_TIMEOUT_MS);
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
@@ -51,7 +52,9 @@ export function createOwnerCensusSourceVerifier(requestFetch:typeof fetch=fetch)
    while(true){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;
     if(size>4194304)throw Error('Owner source verification unavailable');text+=decoder.decode(chunk.value,{stream:true});}
    text+=decoder.decode();
-   return matchesOwnerCensusSource(JSON.parse(text),binding);
+   const matched=await matchesOwnerCensusSource(JSON.parse(text),binding);
+   if(controller.signal.aborted||Date.now()>=deadlineMs)throw Error('Owner source verification unavailable');
+   return matched;
   }catch{throw Error('Owner source verification unavailable');}
   finally{clearTimeout(timer);controller.abort();if(reader){await reader.cancel().catch(()=>{});reader.releaseLock();}}
  };

@@ -105,11 +105,19 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   finally { if (pendingReads.get(key) === pending) pendingReads.delete(key); }
 }
 async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<ApiResponse<T>> {
+  const ownerAction = method === 'POST' && /^\/api\/field-map\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/owner-census-(prepare|once)$/.test(path);
+  const preparation = ownerAction && path.endsWith('/owner-census-prepare');
+  // Saved map reads can exceed 30s. Owner actions have a75s native admission
+  // bound including authentication. These are observation limits, never retry grants.
+  const timeoutMs = ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
   const controller = new AbortController();
-  const cancel = () => controller.abort();
+  let abortKind: 'timeout' | 'cancelled' | null = null;
+  const cancel = () => { abortKind ??= 'cancelled'; controller.abort(); };
   signal?.addEventListener('abort', cancel, { once: true });
-  if (signal?.aborted) controller.abort();
-  const timer = window.setTimeout(() => controller.abort(), 30000);
+  if (signal?.aborted) cancel();
+  const timer = window.setTimeout(() => { abortKind ??= 'timeout'; controller.abort(); }, timeoutMs);
+  const preparationFailure = (category: 'timeout' | 'auth' | 'source_hold' | 'upstream_failure' | 'cancelled', status = 503) =>
+    Object.assign(new OperationsApiError('Approved lookup preparation could not be confirmed.', status), { preparationFailure: category });
   try {
     let response: Response;
     try {
@@ -121,13 +129,26 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
         cache: 'no-store',
       });
     } catch (cause) {
+      if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
       throw new OperationsApiError(method === 'POST'
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
     }
     if (!response.ok && [401,403].includes(response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
+    if (preparation && !response.ok) {
+      // Only bounded categories escape this read-only path; do not parse or expose raw errors.
+      void response.body?.cancel().catch(() => {});
+      throw preparationFailure([401,403].includes(response.status) ? 'auth' : response.status === 409 ? 'source_hold' : [408,504].includes(response.status) ? 'timeout' : 'upstream_failure', response.status);
+    }
     let data: any;
-    try { data = await response.json(); } catch { throw new OperationsApiError('Operations returned an incomplete response. Please refresh.', response.status || 503); }
+    try { data = await response.json(); } catch {
+      if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
+      throw new OperationsApiError('Operations returned an incomplete response. Please refresh.', response.status || 503);
+    }
+    if (ownerAction && abortKind) {
+      if (preparation) throw preparationFailure(abortKind);
+      throw new OperationsApiError('The save could not be confirmed. Refresh this workspace before trying again.', 503);
+    }
     if (!response.ok) throw new OperationsApiError(typeof data?.error === 'string' ? data.error : 'Operations request failed.', response.status);
     return { data };
   } finally { window.clearTimeout(timer); signal?.removeEventListener('abort', cancel); }

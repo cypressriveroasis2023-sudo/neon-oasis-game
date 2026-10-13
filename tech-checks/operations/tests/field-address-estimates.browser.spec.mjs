@@ -58,7 +58,7 @@ test('failed imported lookup refresh retains labeled last-good estimates and rec
  await frame.getByRole('button',{name:/Refresh data/}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);
  await frame.locator('.cos-fleet-unit-row').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('Geocodio');
  const before=state.reads;state.mapFailure=true;await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');await expect(frame.getByRole('alert')).toContainText('Imported address lookup results are unavailable');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Showing the last successfully loaded units');await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Imported address lookup results are unavailable');
  await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(4);
  await page.clock.runFor(1000);expect(state.reads).toBe(before+1);
  state.mapFailure=false;state.units[0].locationImportedGeocode={...state.units[0].locationImportedGeocode,latitude:30.2,longitude:-95.2};
@@ -68,7 +68,7 @@ test('failed imported lookup refresh retains labeled last-good estimates and rec
 });
 test('initial imported lookup failure is visibly unavailable and explicit retry restores eligible points',async({page})=>{
  const {frame,state}=await mount(page);await expect.poll(()=>estimatedCount(frame)).toBe(2);state.mapFailure=true;await page.reload();
- await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');await expect(frame.getByRole('alert')).toContainText('Imported address lookup results are unavailable');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('This does not mean the fleet is empty');await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Imported address lookup results are unavailable');
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
  const before=state.reads;await page.clock.runFor(1000);expect(state.reads).toBe(before);
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);expect(state.writes).toHaveLength(0);
@@ -77,7 +77,7 @@ test('exact address estimates are visible by default, separate from health and v
  const {frame,state}=await mount(page);
  await expect.poll(()=>mappedCount(frame)).toBe(3);await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
  const cluster=frame.locator('.cos-field-cluster');await expect(cluster.locator('b')).toHaveText('2');await expect(cluster.locator('.cos-cluster-location')).toHaveText('EST');await expect(cluster).toHaveAttribute('data-health','mixed');
- await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 901'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 902'})).toContainText('IP / PORT OFFLINE');await expect(frame.locator('.field-cluster-list')).toContainText('ADDRESS ESTIMATE');
+ await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.cos-field-pin-estimate[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-estimate[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-pin-location-tag')).toHaveText(['EST','EST']);
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[0]+'"]')).toHaveCount(0);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[2]+'"]')).toHaveCount(1);
  await frame.locator('.cos-fleet-unit-row').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');await expect(frame.locator('.cos-fleet-drawer')).toContainText('U.S. Census address-range estimate');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'Close unit details'}).click();await revealMapInfo(frame);await expect(frame.locator('.field-map-info')).toContainText('1 verified map pins');

@@ -136,11 +136,23 @@ Only ready may invoke Owner POST `/api/field-map/{nativeId}/owner-census-once` w
 `{auditId,unitKey,addressSha256,nativeGuardSha256}`. It uses the same narrow read-only proof helper described below,
 compares the complete proof and enrolled marker, and forwards only auditId/key.
 Uncertain outcomes instruct refresh/readback; never retry or reset the allowance.
-Only this new forwarding call has a 210-second timeout. The targeted guarded
-worker has a 200-second budget, 45-second native proof reads and a scoped
-120-second SQL claim lease; its post-claim/pre-provider lease checks require at
-least 115 seconds and 70 seconds respectively. Existing ordinary app/worker
-timeouts and leases are unchanged.
+Only this forwarding call has a 315-second timeout after the native 75-second
+successful-admission bound. The targeted guarded worker has a 310-second logical
+budget, 80-second native proof reads including response validation, and a scoped
+220-second SQL claim lease. Worker reserves are 280 seconds before proof one,
+200 before claim and 110 before provider; lease reserves are 210 before proof two
+and 110 before provider. Both reserves must retain 10 seconds before finish.
+Census and individual RPC/target dependencies retain 10-second limits. Ordinary
+worker100/lease60 and unrelated browser30 limits remain unchanged.
+
+The exact browser Prepare/Run actions observe for 120 seconds; Field Map GETs
+observe for 90. Prepare diagnostics expose only timeout/auth/source_hold/
+upstream_failure/cancelled, never raw error bodies. The separate parent-session
+handshake remains bounded to 10 seconds. A 150-second hosted HTTP idle boundary
+can still leave long Run work uncertain; neither the forwarding timer nor the
+400-second worker-lifetime assumption guarantees execution after disconnect.
+No POST replay is allowed, and saved-state readback is required. The 480-second
+enrollment drain is unchanged.
 
 Saved guarded success requires an independently recomputed matching native proof
 before projection. Drift withholds the result and blocks fallback. Historical
@@ -200,7 +212,12 @@ runs first; the action is absent from the verified-IT allowlist. The forwarding
 action calls this same internal helper. No provider call, claim or write happens
 in the proof-read action.
 
-The helper has a 45-second total cancellation signal. It reads only the exact
+The helper uses the remainder of a 75-second deadline started at handler entry,
+so authentication/body decoding do not acquire extra time. It checks that absolute
+deadline again before publishing a proof or preparation receipt and before
+forwarding. Inherited authentication transports are not newly interrupted; a late
+authentication result cannot publish or forward. Exhaustion fails closed without
+omitting either complete target round or weakening currentness. It reads only the exact
 legacy policy row; it retains initial/fresh full native snapshots, identity and
 collision rosters, Owner audits, current mHelp receipt, and both archive reads.
 V2 imported source/precedence projections are read for the exact target and all

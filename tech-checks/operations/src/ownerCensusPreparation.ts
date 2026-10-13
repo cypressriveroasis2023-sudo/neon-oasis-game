@@ -62,7 +62,20 @@ export function createOwnerCensusPreparation(api:Api,now=()=>Date.now()){
         const requestedAt=now();
         let result:unknown;
         try{result=(await api.post('/api/field-map/'+expected.nativeUnitId+'/owner-census-prepare',body,{signal:controller.signal})).data;}
-        catch{throw Error('Preparation could not be confirmed. No lookup was started. Refresh and prepare again if needed.');}
+        catch(cause){
+          // Display only safe categories, never transport/backend error text or response bodies.
+          const failure=object(cause)?cause.preparationFailure:null,status=object(cause)&&object(cause.response)?cause.response.status:null;
+          const category=['timeout','auth','source_hold','upstream_failure','cancelled'].includes(failure)?failure
+            :[401,403].includes(status)?'auth':status===409?'source_hold':[408,504].includes(status)?'timeout':status===499?'cancelled':'upstream_failure';
+          const messages={
+            timeout:'Preparation timed out while waiting for saved evidence. No lookup was started. Refresh before preparing again.',
+            auth:'Preparation stopped because the Owner session could not be verified. No lookup was started.',
+            source_hold:'Preparation is on hold because the current approval or installation evidence could not be verified. No lookup was started. Refresh to review its saved state.',
+            upstream_failure:'Preparation could not reach or read the saved evidence service. No lookup was started. Refresh before preparing again.',
+            cancelled:'Preparation was cancelled because the selection or session changed. No lookup was started.',
+          };
+          throw Error(messages[category as keyof typeof messages]);
+        }
         if(!current())throw Error('Preparation belongs to an earlier selection or session. No lookup was started.');
         const receipt=checkedOwnerCensusPreparationReceipt(result);
         if(!receipt)throw Error('Preparation returned incomplete or unsupported proof. No lookup was started.');

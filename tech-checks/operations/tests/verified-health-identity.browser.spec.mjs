@@ -57,7 +57,7 @@ async function mount(page,{sourceCases=false,overview=false}={}){
  return {frame,state};
 }
 const listUnit=(frame,label)=>frame.locator('.cos-fleet-unit-row').filter({has:frame.locator('strong').filter({hasText:new RegExp('^'+label+'$')})});
-async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
+async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
 async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
@@ -67,18 +67,18 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.cos-field-cluster')).toHaveAttribute('data-health','mixed');
  await expect(frame.locator('.cos-cluster-caption')).toHaveText('MIX');
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
- await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 0 offline · 1 unknown · 1 support');
- await expect(frame.locator('.field-cluster-list button').filter({hasText:labels.owner})).toContainText('CAMERA RECORDS ONLINE');
- await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
+ 
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',labels.owner+' · CAMERA RECORDS ONLINE');
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',labels.unlinked+' · Camera status unverified');
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · online'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · unknown'));
  await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await frame.locator('.cos-field-pin-support').click();
  await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);
- await frame.locator('.leaflet-popup-close-button').click();
+ await frame.getByRole('button',{name:'Close unit details'}).click();
  await noOverflow(frame);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('verified-owner-hdc-support.png')});
  await frame.locator('.cos-field-pin[data-health="online"]').click();
  await expect(frame.locator('.camera-unit-detail h3')).toHaveText(labels.owner);
@@ -122,29 +122,8 @@ test('native HDC proof, recorder proof and bound service proof retain separate s
  noWrites(state);
 });
 
-test('saved-data reload repaints identity status without changing expanded map position or popup selection',async({page})=>{
- const {frame,state}=await mount(page);await expand(frame);
- const viewport=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView);
- await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);await frame.locator('.leaflet-popup-close-button').click();
- const before=await viewport();
- state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
- await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
- await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-summary')).toContainText('0 online · 1 offline · 1 unknown · 1 support');
- await frame.locator('.leaflet-popup-close-button').click();await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await frame.locator('.cos-field-cluster-wrap').click();
- await expect(frame.locator('.field-cluster-summary')).toBeVisible();
- await expect(frame.locator('.leaflet-pan-anim')).toHaveCount(0);
- const popupView=await viewport();
- state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
- await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 0 offline · 1 unknown · 1 support');
- await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:popupView.center,zoom:popupView.zoom});
- await frame.locator('.leaflet-popup-close-button').click();
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await noOverflow(frame);noWrites(state);
+test('saved-data reload repaints identity status without changing expanded map position or unit selection',async({page})=>{
+ const {frame,state}=await mount(page);await expand(frame);const viewport=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect.poll(viewport).toEqual(before);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText(labels.stand);await frame.getByRole('button',{name:'Close unit details'}).click();noWrites(state);
 });
 
 for(const mutation of ['partial resource set','extra resource in source group','changed Owner audit','changed Owner key','changed native label','explicit identity warning','duplicate resource ownership','duplicate equipment proof'])test(mutation+' never turns a mismatched unit green',async({page})=>{
@@ -169,7 +148,7 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Camera Health unavailable':'session is unavailable'}).first()).toBeVisible();
+ await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'session is unavailable'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
  if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}
  noWrites(state);

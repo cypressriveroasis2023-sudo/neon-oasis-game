@@ -96,3 +96,13 @@ test('stale or future server receipts are rejected despite valid digest shapes',
   await assert.rejects(a.action.prepare(binding),/stale or future/);
  }
 });
+
+for(const [category,phrase] of [['timeout','Preparation timed out'],['auth','Owner session could not be verified'],['source_hold','Preparation is on hold'],['upstream_failure','saved evidence service'],['cancelled','Preparation was cancelled']])test('preparation exposes only the safe '+category+' diagnostic and sends once',async()=>{
+ const f=fixture(),binding=await checkedOwnerCensusPreparationBinding(f.snapshot,id);let posts=0;
+ const a=adapter(f.snapshot,{post:async()=>{posts++;throw Object.assign(Error('synthetic-private-backend-detail'),{preparationFailure:category,response:{status:503,data:{error:'synthetic-private-address-detail'}}});}});
+ await assert.rejects(a.action.prepare(binding),error=>{assert(error.message.includes(phrase));assert(!error.message.includes('synthetic-private'));assert(error.message.includes('No lookup was started'));return true;});assert.equal(posts,1);
+});
+for(const [status,phrase] of [[401,'Owner session could not be verified'],[403,'Owner session could not be verified'],[409,'Preparation is on hold'],[408,'Preparation timed out'],[504,'Preparation timed out'],[499,'Preparation was cancelled'],[503,'saved evidence service']])test('unclassified preparation HTTP'+status+' maps to a safe category without raw detail',async()=>{
+ const f=fixture(),binding=await checkedOwnerCensusPreparationBinding(f.snapshot,id),a=adapter(f.snapshot,{post:async()=>{throw Object.assign(Error('synthetic-private-detail'),{response:{status,data:{error:'synthetic-private-detail'}}});}});
+ await assert.rejects(a.action.prepare(binding),error=>error.message.includes(phrase)&&!error.message.includes('synthetic-private'));
+});

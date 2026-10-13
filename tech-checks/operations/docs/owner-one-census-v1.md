@@ -137,16 +137,46 @@ do not infer it from the new policy alone.
 
 ## Runtime budgets and visibility
 
-Only guarded claims use a 120-second lease; ordinary claims retain 60 seconds.
-Guarded native proof reads are bounded to 45 seconds each, Census to 10 seconds,
-and existing legacy RPC requests to 10 seconds. Remaining request/lease checks
-can consume an allowance without sending if they cannot safely finish. Guarded
-handler/forwarding abort bounds are 200/210 seconds; ordinary processing keeps
-its original 100-second budget. These are not response guarantees: the normal
-browser can time out at 30 seconds and the hosted gateway at 150 seconds, while
-server work is still uncertain. The UI never retries the POST automatically and
-must refresh saved state before reporting a result. The separate worker-lifetime
-assumption for the drain is at most 400 seconds.
+Only guarded claims use a 220-second lease; ordinary claims retain 60 seconds.
+Native preparation/proof admission has a 75-second absolute deadline measured
+from handler entry, including authentication and envelope decoding. Late inherited
+authentication is rejected before any proof work or forwarding; this is a bound on
+successful admission, not a hard watchdog for stalled authentication transports.
+Each legacy caller allows 80 seconds for the entire native proof response and
+asynchronous canonical validation. Both complete target/history/site/epoch rounds
+remain serial and unchanged. Every target dependency, Census request and legacy
+RPC retains its 10-second limit. Per-dependency maxima need not all fit: exhausting
+the aggregate proof deadline fails closed rather than dropping any read.
+
+The targeted guarded worker has a 310-second logical budget. It requires 280
+seconds before proof one, 200 before claiming, at least 210 seconds of returned
+lease before proof two, and 110 seconds of both worker budget and lease before
+the provider send. At least 10 seconds of each must remain before finish. With
+80-second proofs, bootstrap authentication/list30 + three proofs240 +
+claim/Census/finish30 = 300 seconds, leaving 10 seconds of worker margin. The
+220-second lease covers claim response10 + proof80 + Census10 + proof80 +
+finish10 = 190 seconds, leaving 30 seconds. Source uncertainty can burn the
+allowance without sending; expiry never restores permission. Ordinary processing
+retains its 100-second budget and all existing ordinary leases.
+
+Native forwarding waits at most 315 seconds after its successful initial proof.
+The nominal native admission75 + forwarding315 = 390 seconds leaves 10 seconds
+against the separately verified 400-second worker-lifetime assumption; the
+server-enforced enrollment drain remains 480 seconds. These are not delivery or
+execution-continuation guarantees. The hosted HTTP idle limit may return at 150
+seconds, including on the native-to-legacy call, and disconnect may leave work
+uncertain. No timer change creates background ownership or a retry allowance.
+
+The browser observes exact Prepare/Run POSTs for up to 120 seconds and Field Map
+GETs for 90 seconds; other requests retain 30 seconds and parent authentication
+retains its separate 10-second limit. A slow paired camera-health read can fail
+independently without cancelling the Field Map source. These limits apply per
+request, not to the whole multi-read preparation interaction. Prepare exposes
+only timeout/auth/source_hold/upstream_failure/cancelled failure categories; raw
+backend error bodies are discarded. Selection/session cancellation and complete
+preflight/readback checks remain mandatory. Run never retries its POST and can
+only inspect saved state after uncertainty. Longer observation does not prove
+that a slow Run finished or authorize another provider attempt.
 
 The execution proof is bound to the approving Owner actor. A separate immutable,
 domain-separated source digest covers the same complete target identity and source

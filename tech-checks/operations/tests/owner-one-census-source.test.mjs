@@ -94,7 +94,7 @@ for(const stale of [false,true])for(const normalizedCache of [false,true])test('
  };
  const handler=createGeocodeHandler({verifyFleetActor:async()=>true,verifyOwnerCensusSource:createOwnerCensusSourceVerifier(requestFetch),fetch:requestFetch,geocodioApiKey:'synthetic',rpc:async(name,args)=>{
   if(name==='cos_field_geocode_list_due')return [{...binding,status:'invalid_address',censusOnly:true,censusOnlyState:'ready'}];
-  if(name==='cos_field_geocode_claim'){assert.equal(args.p_audit_id,'owner_one_census_v1:'+auditId);assert.equal(args.p_address,binding.address);assert.equal(args.p_address_sha256,binding.addressSha256);claimed=true;return {claimed:true,claimToken:token,censusOnly:true,censusOnlyGuard:guard,record:{leaseUntil:new Date(Date.now()+120000).toISOString()}};}
+  if(name==='cos_field_geocode_claim'){assert.equal(args.p_audit_id,'owner_one_census_v1:'+auditId);assert.equal(args.p_address,binding.address);assert.equal(args.p_address_sha256,binding.addressSha256);claimed=true;return {claimed:true,claimToken:token,censusOnly:true,censusOnlyGuard:guard,record:{leaseUntil:new Date(Date.now()+220000).toISOString()}};}
   if(name==='cos_field_geocode_finish'){assert.equal(args.p_address,binding.address);assert.equal(args.p_address_sha256,binding.addressSha256);finishes++;return {accepted:true,record:{status:'success'}};}
   throw Error('Unexpected RPC');
  }});
@@ -102,4 +102,22 @@ for(const stale of [false,true])for(const normalizedCache of [false,true])test('
  assert.equal(response.status,200);assert.equal(body.allowance,'consumed');assert.equal(body.results[0].status,stale?'superseded':'success');
  assert.equal(nativeReads,3);assert.equal(providerCalls,1);assert.equal(finishes,stale?0:1);assert.deepEqual(body.fallbackResults,[]);
  assert.equal(snapshot.items[0].address,originalOwnerText);assert.equal(snapshot.inventoryItems[0].address,originalOwnerText);
+});
+
+test('source verifier80s deadline includes asynchronous canonical digest validation',async()=>{
+ const {snapshot,binding}=await fixture(),originalNow=Date.now,originalDigest=crypto.subtle.digest;let clock=originalNow(),started=clock,calls=0;
+ Date.now=()=>clock;
+ crypto.subtle.digest=async function(...args){const result=await originalDigest.apply(this,args);clock=started+80001;return result;};
+ try{
+  const verify=createOwnerCensusSourceVerifier(async()=>{calls++;return json(snapshot);});
+  await assert.rejects(verify(binding,'Bearer synthetic-owner'),/Owner source verification unavailable/);assert.equal(calls,1);
+ }finally{Date.now=originalNow;crypto.subtle.digest=originalDigest;}
+});
+test('source verifier remains bounded at80s and accepts complete proof at79s without retry',async()=>{
+ const {snapshot,binding}=await fixture(),originalNow=Date.now,originalTimer=globalThis.setTimeout;let clock=originalNow(),started=clock,calls=0;const budgets=[];
+ Date.now=()=>clock;globalThis.setTimeout=(fn,ms,...args)=>{budgets.push(ms);return originalTimer(fn,ms,...args);};
+ try{
+  const verify=createOwnerCensusSourceVerifier(async()=>{calls++;clock=started+79000;return json(snapshot);});
+  assert.equal(await verify(binding,'Bearer synthetic-owner'),true);assert.equal(calls,1);assert(budgets.includes(80000));
+ }finally{Date.now=originalNow;globalThis.setTimeout=originalTimer;}
 });

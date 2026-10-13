@@ -141,13 +141,14 @@ test('bounded JSON does not accept oversize, missing, invalid or failed evidence
 // boundary; every equipment, history, placement and provider record is synthetic.
 const legacyOwner='e4abc521-1ef3-45a6-9829-b87faff78210',nativeOwner='3f073784-96e7-43d8-b9e0-33ab31c3c8b1';
 const request=(path,method='GET',body=null)=>new Request('https://native.example/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-owner-token','Content-Type':'application/json'},body:JSON.stringify({path,method,body})});
-async function routeFixture({historicalSite=false,verifiedIt=false}={}){
+async function routeFixture({historicalSite=false,verifiedIt=false,onFetch=()=>{}}={}){
  const f=historicalSite?olderSite(await fixture()):await fixture();f.actorId=nativeOwner;
  const proof=await ownerCensusProof(f);f.record.censusOnlyGuard.nativeGuardSha256=proof.nativeGuardSha256;
  const sourceReceipt=await ownerCensusSourceReceipt(f);f.record.censusOnlySourceSha256=sourceReceipt.nativeSourceSha256;
  const legacyActor=verifiedIt?'4f7044b5-86b6-411f-8898-39bb64b4ddbc':legacyOwner,nativeActor=verifiedIt?'d0757b64-9623-4adc-afff-21cc7853e88a':nativeOwner;
  const calls=[];let denyHistory=false;let denySite=false;let role=verifiedIt?'it':'owner';let networkFailure=false;let archiveRows=[];let archiveReads=0;let recordReader=null;let recordReads=0;
  const transport=async(url,init={})=>{
+  const override=onFetch(url,init);if(override instanceof Response)return override;
   const body=init.body?JSON.parse(init.body):null;calls.push({url,headers:init.headers,body});const json=data=>new Response(JSON.stringify(data));
   if(url.includes('/auth/v1/user'))return json({id:legacyActor});
   if(url.includes('/rest/v1/profiles?'))return json([{user_id:legacyActor,role,active:true,archived_at:null,full_name:verifiedIt?'Teddy Hopper':'Synthetic Owner'}]);
@@ -387,4 +388,87 @@ for(const mode of ['history','site','new GPS','archive'])test('preparation fails
  if(mode==='history')t.deny();if(mode==='site')t.denySite();if(mode==='new GPS')t.f.target.native.gps_recorded_at=moved;
  if(mode==='archive')t.archives([{contract:'COS_ARCHIVED_REPRESENTATION_V1',organizationId:ORG,state:'conflict',provenance:'postgres_admin_reviewed_source_archive',recordedByDatabaseRole:'postgres',id:uid(71),revision:uid(72),archivedNativeId:uid(73),canonicalNativeId:ID,archivedTrackerId:uid(74),canonicalTrackerId:uid(75),reviewSha256:hash,evidenceSha256:hash,beforeSha256:hash,archivedUnitNumber:'OLD SYNTHETIC',canonicalUnitNumber:KEY}]);
  assert.equal((await t.handler(request(p.path,'POST',p.body))).status,409);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);
+});
+
+for(const mode of ['prepare','proof','once'])test('native '+mode+' charges75s total from handler entry and cannot start proof after slow auth',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rest/v1/user_roles?'))clock=started+75000;}});
+ const action=mode==='prepare'?preparation(t):{path:'/api/field-map/'+ID+'/owner-census-'+mode,body:{auditId:'201',unitKey:KEY,addressSha256:t.proof.addressSha256,nativeGuardSha256:t.proof.nativeGuardSha256}};
+ Date.now=()=>clock;
+ try{const response=await t.handler(request(action.path,'POST',action.body));assert.equal(response.status,504);assert.equal(t.calls.some(c=>c.url.includes('/rpc/appdeploy_unit_location_history')),false);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+for(const round of [7000,8000])test('native proof retains both complete target rounds inside the remaining post-auth budget '+round,async()=>{
+ const originalNow=Date.now,originalTimeout=AbortSignal.timeout;let clock=originalNow(),started=clock;const budgets=[];
+ const t=await routeFixture({historicalSite:true,onFetch:url=>{if(url.includes('/rest/v1/user_roles?'))clock=started+60000;if(url.includes('/rpc/appdeploy_unit_location_history'))clock+=round;}});
+ const body={auditId:'201',unitKey:KEY,addressSha256:t.proof.addressSha256,nativeGuardSha256:t.proof.nativeGuardSha256};Date.now=()=>clock;
+ AbortSignal.timeout=milliseconds=>{budgets.push(milliseconds);return originalTimeout(milliseconds);};
+ try{
+  const response=await t.handler(request('/api/field-map/'+ID+'/owner-census-proof','POST',body));assert.equal(response.status,round===7000?200:504);
+  assert(budgets.includes(15000),'authentication consumes60s of the same75s deadline');
+  assert.equal(t.calls.filter(c=>c.url.includes('/rpc/appdeploy_unit_location_history')).length,2);assert.equal(t.calls.filter(c=>c.url.includes('/sites?')).length,2);
+  if(response.status===200)assert.deepEqual((await response.json()).ownerCensusProofs,[t.proof]);
+  assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);
+ }finally{Date.now=originalNow;AbortSignal.timeout=originalTimeout;}
+});
+test('preparation final marker read cannot publish a receipt after75s',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock,reads=0;
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rpc/cos_field_geocode_read_many')&&++reads===2)clock=started+75001;}}),p=preparation(t);Date.now=()=>clock;
+ try{const response=await t.handler(request(p.path,'POST',p.body));assert.equal(response.status,504);assert.equal(t.calls.filter(c=>c.url.includes('/rpc/appdeploy_unit_location_history')).length,2);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+test('Run forwarding uses315s only after an admitted native proof and sends once',async()=>{
+ const originalTimeout=AbortSignal.timeout,budgets=[],t=await routeFixture(),body={auditId:'201',unitKey:KEY,addressSha256:t.proof.addressSha256,nativeGuardSha256:t.proof.nativeGuardSha256};
+ AbortSignal.timeout=milliseconds=>{budgets.push(milliseconds);return originalTimeout(milliseconds);};
+ try{assert.equal((await t.handler(request('/api/field-map/'+ID+'/owner-census-once','POST',body))).status,200);assert(budgets.includes(315000));assert.equal(t.calls.filter(c=>c.url.includes('/functions/v1/camera-field-geocode')).length,1);}
+ finally{AbortSignal.timeout=originalTimeout;}
+});
+
+test('a late forwarding response is uncertainty and is never admitted or replayed',async()=>{
+ const originalNow=Date.now;let clock=originalNow();
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/functions/v1/camera-field-geocode'))clock+=315001;}}),body={auditId:'201',unitKey:KEY,addressSha256:t.proof.addressSha256,nativeGuardSha256:t.proof.nativeGuardSha256};Date.now=()=>clock;
+ try{const response=await t.handler(request('/api/field-map/'+ID+'/owner-census-once','POST',body));assert.equal(response.status,503);assert.match((await response.json()).error,/uncertain/);assert.equal(t.calls.filter(c=>c.url.includes('/functions/v1/camera-field-geocode')).length,1);}
+ finally{Date.now=originalNow;}
+});
+
+for(const elapsed of [10000,75000])test('native envelope AbortError at'+elapsed+'ms uses clock evidence rather than error name for timeout',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rpc/appdeploy_field_map_snapshot')){clock=started+elapsed;throw Object.assign(Error('synthetic-private-upstream-detail'),{name:'AbortError'});}}}),p=preparation(t);Date.now=()=>clock;
+ try{const response=await t.handler(request(p.path,'POST',p.body));assert.equal(response.status,elapsed===75000?504:503);assert.equal((await response.text()).includes('synthetic-private'),false);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+test('native incoming cancellation is not relabeled a deadline timeout even after75s',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;const controller=new AbortController();
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rpc/appdeploy_field_map_snapshot')){controller.abort();clock=started+75000;throw Object.assign(Error('synthetic cancellation'),{name:'AbortError'});}}}),p=preparation(t);Date.now=()=>clock;
+ try{const response=await t.handler(new Request(request(p.path,'POST',p.body),{signal:controller.signal}));assert.equal(response.status,503);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+test('explicit preparation source hold stays409 before the75s boundary',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rpc/cos_field_geocode_read_many'))clock=started+74999;}}),p=preparation(t);delete t.f.record.censusPreparation;Date.now=()=>clock;
+ try{const response=await t.handler(request(p.path,'POST',p.body));assert.equal(response.status,409);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+for(const mode of ['prepare','once'])test('native explicit auth rejection stays403 after75s for '+mode,async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;
+ const t=await routeFixture({verifiedIt:true,onFetch:url=>{if(url.includes('/rest/v1/user_roles?'))clock=started+75000;}}),p=mode==='prepare'?preparation(t):{path:'/api/field-map/'+ID+'/owner-census-once',body:{auditId:'201',unitKey:KEY,addressSha256:t.proof.addressSha256,nativeGuardSha256:t.proof.nativeGuardSha256}};Date.now=()=>clock;
+ try{assert.equal((await t.handler(request(p.path,'POST',p.body))).status,403);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+
+for(const markerRead of [1,2])for(const outcome of ['early_body_failure','deadline','cancelled'])test('preparation marker body '+markerRead+' distinguishes '+outcome+' before shape validation',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock,reads=0;const controller=new AbortController();
+ const t=await routeFixture({onFetch:url=>{
+  if(url.includes('/rpc/cos_field_geocode_read_many')&&++reads===markerRead){
+   const response=new Response('{}');response.json=async()=>{await Promise.resolve();clock=started+(outcome==='early_body_failure'?10000:75000);if(outcome==='cancelled')controller.abort();throw Object.assign(Error('synthetic-private-body-detail'),{name:'AbortError'});};return response;
+  }
+ }}),p=preparation(t);Date.now=()=>clock;
+ try{const response=await t.handler(new Request(request(p.path,'POST',p.body),{signal:controller.signal}));assert.equal(response.status,outcome==='deadline'?504:outcome==='cancelled'?503:409);assert.equal((await response.text()).includes('synthetic-private'),false);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
+});
+for(const status of [401,403,409])test('explicit envelope HTTP'+status+' remains authoritative at the75s boundary',async()=>{
+ const originalNow=Date.now;let clock=originalNow(),started=clock;
+ const t=await routeFixture({onFetch:url=>{if(url.includes('/rpc/cos_field_geocode_read_many')){clock=started+75000;return new Response('{}',{status});}}}),p=preparation(t);Date.now=()=>clock;
+ try{assert.equal((await t.handler(request(p.path,'POST',p.body))).status,status);assert.equal(t.calls.some(c=>c.url.includes('/functions/v1/camera-field-geocode')),false);}
+ finally{Date.now=originalNow;}
 });

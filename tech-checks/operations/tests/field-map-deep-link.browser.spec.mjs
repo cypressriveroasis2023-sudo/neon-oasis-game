@@ -242,7 +242,7 @@ test('one deactivated Shop record does not turn healthy field units gray',async(
 // Failures must not masquerade as an empty fleet; fixtures never reach production.
 test('initial map failure shows unavailable state and retry restores units',async({page})=>{
  const {frame,state}=await mount(page,'Ranger 022',defaultUnits,{mapFailure:true});
- await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('This does not mean the fleet is empty');
  await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.router-map-note')).not.toContainText('0 support units');
@@ -255,7 +255,7 @@ test('failed map refresh retains last good units and labels stale map data',asyn
  const {frame,state}=await mount(page,'Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);state.mapFailure=true;
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Showing the last successfully loaded units');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();

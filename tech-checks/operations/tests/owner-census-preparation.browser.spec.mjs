@@ -4,7 +4,7 @@ import {otherId} from './owner-census-once-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const deferred=()=>{let resolve;const promise=new Promise(y=>{resolve=y;});return {promise,resolve};};
 async function openLocationUnit(frame,name){const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();}
-async function mount(page,{role='Owner',marker=true,holdPost=false,response=receipt()}={}){
+async function mount(page,{role='Owner',marker=true,holdPost=false,response=receipt(),postStatus=200}={}){
  const f=fixture();if(!marker)delete f.row.locationGeocode.censusPreparation;
  f.snapshot.items.push({id:otherId,unitNumber:'SYNTHETIC OTHER 901',status:'field',currentLocationType:'field',readOnly:false,address:'300 Other Fixture Road, Testville, TX 77003',latitude:32,longitude:-97,coordinateSource:'manual',locationVerification:'owner_verified',gpsRecordedAt:'2026-10-11T00:00:00Z',locationVerifiedAt:'2026-10-11T00:00:00Z'});
  Object.assign(f.snapshot.summary,{fieldUnits:2,mappedUnits:1,missingGps:1});
@@ -24,7 +24,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
    if(request.path!=='/api/field-map/'+id+'/owner-census-prepare')return route.fulfill({status:400,headers,body:'{}'});
    if(state.holdPost)await state.postGate.promise;
    state.afterPost?.(state.snapshot);state.postResponses++;
-   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(state.response)}).catch(()=>{/* Invalidating the session or selection aborts this synthetic request. */});
+   return route.fulfill({status:postStatus,headers,contentType:'application/json',body:JSON.stringify(state.response)}).catch(()=>{/* Invalidating the session or selection aborts this synthetic request. */});
   }
   let heldMap=false;
   if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;heldMap=true;await gate.promise;}
@@ -115,8 +115,19 @@ for(const [label,response] of [['duplicate receipt',[receipt(),receipt()]],['ext
 });
 test('preparation timeout is read-only and requires a new deliberate preparation after refresh',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
- await page.clock.runFor(31000);await expect(frame.getByRole('region',{name:'Approved lookup preparation'})).toContainText('could not be confirmed');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await page.clock.runFor(121000);await expect(frame.getByRole('region',{name:'Approved lookup preparation'})).toContainText('Preparation timed out');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
  state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(prepare(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
- state.holdPost=false;state.response={...receipt(),preparedAt:new Date(now+31000).toISOString()};await prepare(frame).click();await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(2);
+ state.holdPost=false;state.response={...receipt(),preparedAt:new Date(now+121000).toISOString()};await prepare(frame).click();await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(2);
  for(const post of state.posts)expect(post.path).toMatch(/\/owner-census-prepare$/);
+});
+
+test('read-only preparation can return a valid receipt after the former30-second transport deadline',async({page})=>{
+ const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
+ await page.clock.runFor(61000);await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');await expect(proof(frame)).toHaveCount(0);
+ state.postGate.resolve();await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
+});
+for(const [postStatus,message] of [[409,'Preparation is on hold'],[503,'saved evidence service']])test('read-only preparation HTTP'+postStatus+' shows a safe category without backend detail',async({page})=>{
+ const {frame,state}=await mount(page,{postStatus,response:{error:'synthetic-private-backend-detail'}});await prepare(frame).click();
+ const region=frame.getByRole('region',{name:'Approved lookup preparation'});await expect(region).toContainText(message);await expect(region).not.toContainText('synthetic-private-backend-detail');
+ await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });

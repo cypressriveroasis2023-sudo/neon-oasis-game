@@ -176,6 +176,57 @@ try {
   assert.deepEqual((await db.query('SELECT rolname,rolsuper,rolinherit,rolcreaterole,rolcreatedb,rolcanlogin,rolreplication,rolbypassrls FROM pg_roles ORDER BY rolname')).rows,rolesBefore);
   assert.deepEqual((await db.query('SELECT roleid,member,grantor,admin_option,inherit_option,set_option FROM pg_auth_members ORDER BY roleid,member,grantor')).rows,membershipsBefore);
  });
+ const leasePatch=await readFile(new URL('../db/owner-one-census-lease-budget-v1.sql',import.meta.url),'utf8');
+ const leaseBody=leasePatch.match(/do \$lease_budget\$[\s\S]*?end \$lease_budget\$;/)?.[0];assert.ok(leaseBody);
+ const claimDef=async()=> (await result(db,"SELECT pg_get_functiondef('public.cos_field_geocode_claim(uuid,text,text,text,text)'::regprocedure) value")).value;
+ const accountJson=async()=> (await result(db,'SELECT to_jsonb(g) value FROM app_private.cos_geocodio_account_state g')).value;
+ async function oldLeaseFixture(){const d=await claimDef();assert.equal(d.split("lease_until=v_now+interval '220 seconds'").length,2);await db.query(d.replace("lease_until=v_now+interval '220 seconds'","lease_until=v_now+interval '120 seconds'"));}
+ await test('supplemental exact-hash120 to220 patch preserves complete prepared account/cache and security catalog',async()=>{
+  await reset();const key=await seed(60),e=await enrollmentEvidence(key);await db.query('BEGIN;SET LOCAL ROLE service_role');await prepare(db,key,e);await db.query('COMMIT');
+  await oldLeaseFixture();const prior=await claimDef(),account=await accountJson(),cache=await ownerRow(key),security=await snapshot();
+  const functions=(await db.query("SELECT oid::regprocedure::text identity,pg_get_functiondef(oid) definition FROM pg_proc WHERE pronamespace IN ('public'::regnamespace,'app_private'::regnamespace) ORDER BY oid")).rows;
+  await db.query(leasePatch);await db.query(leasePatch);
+  assert.equal(await claimDef(),prior.replace("lease_until=v_now+interval '120 seconds'","lease_until=v_now+interval '220 seconds'"));assert.deepEqual(await accountJson(),account);assert.deepEqual(await ownerRow(key),cache);assert.deepEqual(await snapshot(),security);
+  const after=(await db.query("SELECT oid::regprocedure::text identity,pg_get_functiondef(oid) definition FROM pg_proc WHERE pronamespace IN ('public'::regnamespace,'app_private'::regnamespace) ORDER BY oid")).rows;
+  assert.deepEqual(after.filter(x=>!x.identity.startsWith('cos_field_geocode_claim(')),functions.filter(x=>!x.identity.startsWith('cos_field_geocode_claim(')));
+ });
+ await test('supplemental patch waits for an unrelated ordinary claim without deadlock and keeps60s',async()=>{
+  await reset();await oldLeaseFixture();const ordinary=await seed(61);await db.query("UPDATE app_private.cos_field_geocode_cache SET status='pending',reason=null,attempts=0,claim_token=null,geocoded_at=null WHERE audit_id=$1",[ordinary.p_audit_id]);
+  await left.query('BEGIN');const c=await claim(left,ordinary,false);assert.equal(c.claimed,true);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),60000);
+  await right.query('BEGIN');const pending=right.query(leaseBody);await waitBlocked(right);await left.query('COMMIT');await pending;await right.query('COMMIT');
+  assert.ok((await claimDef()).includes("lease_until=v_now+interval '220 seconds'"));assert.equal((await finish(db,ordinary,c.claimToken)).accepted,true);
+ });
+ await test('replacement completes while an old ordinary function invocation waits on its account lock',async()=>{
+  await reset();await oldLeaseFixture();const key=await seed(66);await db.query("UPDATE app_private.cos_field_geocode_cache SET status='pending',reason=null,attempts=0,claim_token=null,geocoded_at=null WHERE audit_id=$1",[key.p_audit_id]);
+  await left.query('BEGIN');await left.query('SELECT 1 FROM app_private.cos_geocodio_account_state WHERE singleton FOR UPDATE');
+  const waiting=claim(right,key,false);await waitBlocked(right);await left.query(leaseBody);await left.query('COMMIT');const c=await waiting;
+  assert.equal(c.claimed,true);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),60000);assert.ok((await claimDef()).includes("lease_until=v_now+interval '220 seconds'"));assert.equal((await finish(db,key,c.claimToken)).accepted,true);
+ });
+ await test('migration-first concurrent enrollment waits for account and claims only revised220s',async()=>{
+  await reset();await oldLeaseFixture();const key=await seed(62),e=await enrollmentEvidence(key);
+  await left.query('BEGIN');await left.query(leaseBody);const pending=enroll(right,key,e);await waitBlocked(right);assert.equal(await policy(),null);await left.query('COMMIT');assert.equal(await pending,1);
+  const c=await claim(db,key);assert.equal(c.claimed,true);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),220000);await noFallback(key);
+ });
+ await test('enrollment-first concurrent migration waits then refuses any function or policy change',async()=>{
+  await reset();await oldLeaseFixture();const key=await seed(63),e=await enrollmentEvidence(key),old=await claimDef();await enroll(left,key,e,true,false);
+  await right.query('BEGIN');const pending=right.query(leaseBody);const rejection=assert.rejects(pending,error=>error.code==='40001');await waitBlocked(right);await left.query('COMMIT');await rejection;await right.query('ROLLBACK');
+  assert.equal(await claimDef(),old);assert.equal((await policy()).claimToken,null);assert.equal((await ownerRow(key)).attempts,1);
+  await reset();await db.query(leasePatch);
+ });
+ await test('supplemental migration rejects definition and ACL drift atomically',async()=>{
+  await reset();await oldLeaseFixture();const old=await claimDef();await db.query(old.replace('declare r app_private','declare  r app_private'));const drift=await claimDef();
+  await assert.rejects(db.query(leasePatch),e=>e.code==='40001');await db.query('ROLLBACK');assert.equal(await claimDef(),drift);await db.query(old);
+  await db.query('GRANT EXECUTE ON FUNCTION public.cos_field_geocode_claim(uuid,text,text,text,text) TO authenticated');
+  await assert.rejects(db.query(leasePatch),e=>e.code==='40001');await db.query('ROLLBACK');assert.equal(await claimDef(),old);
+  await db.query('REVOKE EXECUTE ON FUNCTION public.cos_field_geocode_claim(uuid,text,text,text,text) FROM authenticated');await db.query(leasePatch);
+ });
+ await test('220s clock-relative completion boundary and expired claim never rearm',async()=>{
+  // Synthetic relative clock cases avoid sleeping221s or changing the host clock.
+  for(const expired of [false,true]){await reset();const key=await seed(expired?65:64);await enroll(db,key,await enrollmentEvidence(key));const c=await claim(db,key);assert.equal(c.claimed,true);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),220000);
+   await db.query("UPDATE app_private.cos_field_geocode_cache SET updated_at=clock_timestamp()-interval '121 seconds',lease_until=clock_timestamp()+($2::int*interval '1 second') WHERE audit_id=$1",[key.p_audit_id,expired?-1:99]);
+   assert.equal((await finish(db,key,c.claimToken)).accepted,!expired);assert.equal((await claim(db,key)).claimed,false);assert.equal((await ownerRow(key)).attempts,2);await noFallback(key);}
+ });
+ await reset();
  await test('exact reviewed preparation proposal preserves original evidence and returns only sanitized facts',async()=>{
   await reset();const key=await seed(39),evidence=await enrollmentEvidence(key),beforeRow=await ownerRow(key);
   await db.query('BEGIN;SET LOCAL ROLE service_role');
@@ -256,7 +307,7 @@ try {
  });
  await test('two real simultaneous targeted claims yield exactly one token and one increment',async()=>{
   await reset();const key=await seed(4);await enroll(db,key,await enrollmentEvidence(key));
-  await left.query('BEGIN');const first=await claim(left,key);assert.equal(first.claimed,true);assert.equal(Date.parse(first.record.leaseUntil)-Date.parse(first.record.updatedAt),120000);
+  await left.query('BEGIN');const first=await claim(left,key);assert.equal(first.claimed,true);assert.equal(Date.parse(first.record.leaseUntil)-Date.parse(first.record.updatedAt),220000);
   const pending=claim(right,key);await waitBlocked(right);await left.query('COMMIT');const second=await pending;
   assert.equal(second.claimed,false);assert.equal(second.reason,'owner_one_census_hold');assert.equal((await ownerRow(key)).attempts,2);
   assert.equal((await policy()).claimToken,first.claimToken);assert.equal(first.censusOnly,true);
@@ -368,7 +419,7 @@ try {
   }
   for(const role of ['anon','authenticated']) await assert.rejects(rpc(db,'cos_field_geocode_list_due',{p_organization_id:ORG},role),error=>error.code==='42501');
  });
- const receipt={postgresVersion:(await result(db,'SELECT version() AS value')).value,passed:passes.length,checks:passes,schemaSha256:hash(patch),actualConcurrentClients:4,enrollmentImplementation:operatorBody?'reviewed_operator_template':'synthetic_equivalent_fixture',enrollmentProposalSha256:operatorSource?hash(operatorSource):null,preparationProposalSha256:preparationSource?hash(preparationSource):null,providerCalls:0,productionWrites:0,existingCatalogSecurityPreserved:true};
+ const receipt={postgresVersion:(await result(db,'SELECT version() AS value')).value,passed:passes.length,checks:passes,schemaSha256:hash(patch),supplementalLeaseSha256:hash(leasePatch),guardedLeaseSeconds:220,ordinaryLeaseSeconds:60,actualConcurrentClients:4,enrollmentImplementation:operatorBody?'reviewed_operator_template':'synthetic_equivalent_fixture',enrollmentProposalSha256:operatorSource?hash(operatorSource):null,preparationProposalSha256:preparationSource?hash(preparationSource):null,providerCalls:0,productionWrites:0,existingCatalogSecurityPreserved:true};
  if(process.env.COS_OWNER_TEST_RECEIPT) await writeFile(process.env.COS_OWNER_TEST_RECEIPT,JSON.stringify(receipt,null,2)+'\n');
  console.log(`ALL ${passes.length} OWNER ONE-CENSUS REAL POSTGRES CHECKS PASSED`);
 } finally {
