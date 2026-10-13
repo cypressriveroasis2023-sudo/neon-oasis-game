@@ -16,19 +16,19 @@ export function resolveTicketUnitContext(unitId:string,equipmentData:unknown,map
   const map=checkedFieldMap(mapData);
   const {customers,sites}=readTicketDirectory(customerData,siteData);
   const matches=equipment.filter(row=>row.id===unitId);
-  if(matches.length>1)throw new Error('The selected equipment identity is ambiguous. Return to Field View and refresh.');
+  if(matches.length>1)throw new Error('The selected equipment identity is ambiguous. Return to Fleet Dashboard and refresh.');
   const mapped:Row|undefined=map.items.find((row:Row)=>row.id===unitId);
   if(!matches.length){
-    if(!mapped||mapped.readOnly!==true)throw new Error('The selected unit is no longer available in the current equipment or tracker records. Return to Field View and refresh.');
+    if(!mapped||mapped.readOnly!==true)throw new Error('The selected unit is no longer available in the current equipment or tracker records. Return to Fleet Dashboard and refresh.');
     return {unitId,unitNumber:mapped.unitNumber,modelName:String(mapped.modelName||''),source:'tracker',state:'unresolved',message:'This is a read-only tracker reference. Its customer and site are not linked by verified record IDs. Choose the real customer and site below.'};
   }
   const unit=matches[0];
-  if(mapped?.readOnly===true)throw new Error('This unit identity conflicts with a read-only tracker record. Refresh Field View before creating a ticket.');
+  if(mapped?.readOnly===true)throw new Error('This unit identity conflicts with a read-only tracker record. Refresh Fleet Dashboard before creating a ticket.');
   const base={unitId,unitNumber:String(unit.unitNumber),modelName:String(unit.modelName||''),source:'native' as const};
   if(unit.status!=='installed'||!['site','field'].includes(String(unit.currentLocationType||''))||!isTicketUnitId(unit.installedSiteId))return {...base,state:'unresolved',message:'This unit does not have a verified current installed site. Choose the real customer and site below; no location was guessed.'};
   const site=sites.find(row=>row.id===unit.installedSiteId),customer=customers.find(row=>row.id===site?.customerId);
   if(!site||!customer)return {...base,state:'unresolved',message:'The unit’s recorded site or customer is not active in the current directory. Choose the real customer and site below.'};
-  if(mapped&&mapped.installedSiteId!==unit.installedSiteId)return {...base,state:'unresolved',message:'Field View and the equipment registry disagree about this unit’s installed site. Choose the real customer and site after reviewing the records.'};
+  if(mapped&&mapped.installedSiteId!==unit.installedSiteId)return {...base,state:'unresolved',message:'Fleet Dashboard and the equipment registry disagree about this unit’s installed site. Choose the real customer and site after reviewing the records.'};
   return {...base,state:'linked',siteId:site.id,siteName:site.name,customerId:customer.id,customerName:customer.name,message:'Customer and site were verified from this equipment record’s installed-site and customer IDs. Review them before saving.'};
 }
 export async function loadTicketUnitContext(client:{get:(path:string)=>Promise<{data:unknown}>},unitId:string) {

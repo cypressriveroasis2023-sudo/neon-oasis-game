@@ -28,7 +28,7 @@ const records = (data: any) => {
 const sources: Record<string, string> = {
   'Camera Health': '/api/camera-health/summary-v3', 'InHand Routers': '/api/routers',
   'Victron VRM': '/api/vrm-fleet', 'Units On Hand': '/api/equipment',
-  'Field Map': '/api/field-map', Team: '/api/team-production',
+  'Fleet Dashboard': '/api/field-map', Team: '/api/team-production',
 };
 function summary(workspace: string, data: any,now=Date.now()): string {
   if (workspace === 'Camera Health') {
@@ -40,7 +40,7 @@ function summary(workspace: string, data: any,now=Date.now()): string {
     const { units, unknown } = onHandInventory(data);
     return `${units.length} confirmed on hand · ${unknown} placement not recorded`;
   }
-  if (workspace === 'Field Map') {
+  if (workspace === 'Fleet Dashboard') {
     const { fieldUnits, mappedUnits } = data.summary || {};
     if (!Number.isInteger(fieldUnits) || !Number.isInteger(mappedUnits) || mappedUnits < 0 || mappedUnits > fieldUnits || fieldUnits !== rows.length) throw new Error('Locations unavailable');
     return `${fieldUnits} field units · ${mappedUnits} mapped · ${rows.filter(row => row.address?.trim()).length} with addresses`;
@@ -63,7 +63,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
     setHealthNow(Date.now());
     await Promise.all(visionAreas.map(async area => {
       let value: unknown = null;
-      try { const data=api.fleetSource&&['Camera Health','Field Map'].includes(area.workspace)?await api.fleetSource(area.workspace==='Camera Health'?'health':'fieldMap',force):api.fleet&&['Camera Health','Field Map'].includes(area.workspace)?(await api.fleet(force))[area.workspace==='Camera Health'?'health':'fieldMap']:(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
+      try { const data=api.fleetSource&&['Camera Health','Fleet Dashboard'].includes(area.workspace)?await api.fleetSource(area.workspace==='Camera Health'?'health':'fieldMap',force):api.fleet&&['Camera Health','Fleet Dashboard'].includes(area.workspace)?(await api.fleet(force))[area.workspace==='Camera Health'?'health':'fieldMap']:(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
       catch { /* Keep this card unavailable without hiding other settled sources. */ }
       if (request !== revision.current) return;
       setValues(previous => request === revision.current ? { ...previous, [area.workspace]: area.workspace==='Camera Health'&&(previous[area.workspace] as any)?.fleetFieldUnits&&!(value as any)?.fleetFieldUnits?previous[area.workspace]:value } : previous);
@@ -71,7 +71,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
     if (request === revision.current) running.current = false;
   }, [api]);
   useEffect(() => { void refresh(); return () => { revision.current += 1; running.current = false; }; }, [refresh]);
-  useEffect(()=>{const paired=()=>{const request=revision.current;void api.fleet?.().then(value=>{if(request===revision.current)setValues(previous=>({...previous,'Camera Health':value.health,'Field Map':value.fieldMap}));}).catch(()=>{});};window.addEventListener('cos-fleet-snapshot-updated',paired);return()=>window.removeEventListener('cos-fleet-snapshot-updated',paired);},[api]);
+  useEffect(()=>{const paired=()=>{const request=revision.current;void api.fleet?.().then(value=>{if(request===revision.current)setValues(previous=>({...previous,'Camera Health':value.health,'Fleet Dashboard':value.fieldMap}));}).catch(()=>{});};window.addEventListener('cos-fleet-snapshot-updated',paired);return()=>window.removeEventListener('cos-fleet-snapshot-updated',paired);},[api]);
   useEffect(() => { const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return () => { window.clearInterval(timer);document.removeEventListener('visibilitychange',visible); }; }, []);
   return <section className='vision-areas' aria-label='VISION dashboard'>
     <header className='vision-areas-heading'><div><small>CAMERAS ONSITE</small><h1>VISION Operations</h1><p>Your fleet, power, locations and team in one place.</p></div><button className='secondary' disabled={loading} onClick={() => void refresh(true)}>{loading ? 'Checking fleet…' : 'Refresh fleet'}</button></header>

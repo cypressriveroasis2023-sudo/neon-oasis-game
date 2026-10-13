@@ -33,52 +33,51 @@ async function mount(page,{workspace='field-map',healthFail=false}={}){
 
 test('basemap renders while field records wait, with no invented pins or empty fleet',async({page},info)=>{
  const {frame,state}=await mount(page);
- const canvas=frame.locator('.field-map-canvas');
+ const canvas=frame.locator('.cos-fleet-map-canvas');
  await expect(canvas).toBeVisible();await expect(canvas).toHaveClass(/leaflet-container/);
- await expect(frame.locator('.field-map-display-bar').getByRole('status')).toBeVisible();
- await expect(frame.locator('.field-map-display-bar')).toContainText('Loading field locations…');
+ await expect(frame.getByRole('status').filter({hasText:'Loading the authenticated COS fleet'})).toBeVisible();
  await expect.poll(()=>state.tiles).toBeGreaterThan(0);
  await expect(canvas.locator('.leaflet-tile-loaded').first()).toBeVisible();
- await expect(frame.getByRole('status').filter({hasText:'Loading production field units'})).toBeVisible();
- await expect(frame.locator('.field-map-kpis article b')).toHaveText(['—','—','—','—','—']);
+ await expect(frame.getByRole('status').filter({hasText:'Loading the authenticated COS fleet'})).toBeVisible();
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—']);
  await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.getByText('No units match this filter.')).toHaveCount(0);
- await expect(frame.getByRole('button',{name:'TV / fullscreen map'})).toBeDisabled();
+ await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeEnabled();
  await canvas.evaluate(node=>node.dataset.persistentMap='yes');
  await page.screenshot({path:info.outputPath('basemap-before-field-records.png'),fullPage:true});
  state.release();
- await expect(frame.locator('.field-map-list>button')).toHaveCount(2);
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
- await expect(frame.getByRole('button',{name:'TV / fullscreen map'})).toBeEnabled();
+ await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeEnabled();
  expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });
 
 test('verified field locations remain available when the first camera read fails',async({page})=>{
  const {frame,state}=await mount(page,{healthFail:true});state.release();
- const filters=frame.getByRole('button',{name:/^Filters/});if(await filters.getAttribute('aria-expanded')!=='true')await filters.click();await frame.getByLabel('Field health filter').selectOption('all');
- await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"],.cos-field-pin[data-health="offline"]')).toHaveCount(0);
+ await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"],.cos-field-pin[data-health="offline"]')).toHaveCount(0);
  expect(state.calls.filter(r=>r.path==='/api/field-map')).toHaveLength(1);expect(state.calls.filter(r=>r.path==='/api/camera-health/summary-v3')).toHaveLength(1);expect(state.errors).toEqual([]);
 });
 
 test('initial field failure preserves the basemap and retry fills the same canvas',async({page})=>{
- const {frame,state}=await mount(page);const canvas=frame.locator('.field-map-canvas');
+ const {frame,state}=await mount(page);const canvas=frame.locator('.cos-fleet-map-canvas');
  await expect(canvas).toHaveClass(/leaflet-container/);await canvas.evaluate(node=>node.dataset.persistentMap='yes');
  state.fail=true;state.release();
- await expect(frame.getByRole('alert')).toContainText('Field units could not be loaded. This does not mean the fleet is empty.');
+ await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');
  await expect(canvas).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
- await expect(frame.locator('.field-map-kpis article b')).toHaveText(['—','—','—','—','—']);
- state.fail=false;await frame.getByRole('button',{name:'Retry map load'}).click();
- await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—']);
+ state.fail=false;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
- state.fail=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.getByRole('alert')).toContainText('Map refresh failed. Showing the last successfully loaded units.');
- await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await expect(canvas).toHaveAttribute('data-persistent-map','yes');
+ state.fail=true;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  expect(state.errors).toEqual([]);
 });
 
 test('Camera Health publishes only a complete paired snapshot and retries both sources together',async({page})=>{
- const {frame,state}=await mount(page,{workspace:'camera-health'}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
+ const {frame,state}=await mount(page,{workspace:'camera-health?diagnostics=1'}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
  await expect(health.getByText('Loading Camera Health…')).toBeVisible();await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
  state.fail=true;state.release();await expect(health.getByRole('alert')).toContainText('Synthetic field read unavailable');await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
  state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();await expect(health.getByRole('button',{name:/Field units online/})).toContainText('2');

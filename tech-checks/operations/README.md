@@ -99,6 +99,15 @@ unknown. CSV inventory refreshes preserve existing success timestamps. Stale por
 results no longer display a current green response or latency. Tests exercise the
 actual card/detail presentation against synthetic data, without operational writes.
 
+### Owner Watchful shortcut
+
+The Owner dashboard has a separate Watchful area linking to
+`https://v2.watchful.co.nz/sites`. It opens the normal Watchful portal in a new
+tab with opener and referrer protection; Watchful may require its own sign-in.
+This is a portal shortcut only. COS does not fetch Watchful records, display
+Watchful health counts, embed the portal, or transmit its session credentials.
+The four IT daily tools and Service workspace are unchanged.
+
 ### Dashboard ticket creation
 
 The owner dashboard now exposes Service, Pickup, Install / Delivery and Swap entry points.

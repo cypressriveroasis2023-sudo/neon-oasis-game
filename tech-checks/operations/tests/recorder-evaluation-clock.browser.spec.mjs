@@ -13,7 +13,7 @@ async function mount(page,view,late='map'){
  const rows=identities.map((i,n)=>resource(n+1,i.unitKeys[0],{type:n<2?'NVR':'IPC',activationState:n<2?'deactivated':'active',scope:n<2?'shop':'field',evidence:{kind:'provider',source:'Star4Live',resource:n<2?'recorder':'camera',active:n===2,status:n===0?'online':'offline',observedAt:freshAt,lastOnlineAt:null}}));
  const state={units,rows,guards,identities,reads:{map:0,summary:0},responses:{map:0,summary:0},gates:{map:null,summary:null},stamps:[],writes:[],errors:[],mode:'valid'};
  state.gates[late]=deferred();page.on('pageerror',e=>state.errors.push(e.message));await page.clock.install({time:new Date(startAt)});await page.clock.pauseAt(new Date(startAt));
- const hash=view==='map'?'field-map':view==='overview'?'camera-health':'camera-health?unit='+units[1].id;
+ const hash=view==='map'?'field-map':view==='overview'?'camera-health?diagnostics=1':'camera-health?diagnostics=1&unit='+units[1].id;
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/recorder-clock-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#${hash}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});
@@ -43,18 +43,18 @@ async function mount(page,view,late='map'){
  await expect.poll(()=>state.reads).toEqual({map:1,summary:1});await expect.poll(()=>state.responses[late==='map'?'summary':'map']).toBe(1);
  await page.clock.runFor(2000);state.gates[late].release();state.gates[late]=null;await expect.poll(()=>state.responses).toEqual({map:1,summary:1});
  if(view==='overview')await frame.getByLabel('Camera Health unit filter').selectOption('all');
- if(view==='map'){await frame.getByRole('button',{name:/Filters/}).click();await frame.getByLabel('Field health filter').selectOption('all');}
+ if(view==='map')await frame.getByLabel('Fleet status').selectOption('all');
  return {frame,state};
 }
 async function expectLabels(frame,view,valid){
  if(view==='map'){
-  await expect(frame.locator('.field-map-list>button').nth(0)).toContainText(valid?'RECORDER ONLINE':'RECORDER UNVERIFIED');await expect(frame.locator('.field-map-list>button').nth(1)).toContainText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
-  await expect(frame.locator('.field-map-kpis article b')).toHaveText(valid?['3','1','2','0','0']:['3','0','1','2','0']);
+  await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText(valid?'RECORDER ONLINE':'RECORDER UNVERIFIED');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
+  await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(valid?['3','1','2','0','3']:['3','0','1','2','3']);
  }else if(view==='workspace')await expect(frame.locator('.camera-unit-state')).toHaveText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
  else {for(const [label,status] of [['Spotter 901HDC2','RECORDER ONLINE'],['Spotter 902HDC2','RECORDER OFFLINE']])await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+label}).locator('.camera-status-pill')).toHaveText(valid?status:'RECORDER UNVERIFIED');await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: Spotter 903HDC2'}).locator('.camera-status-pill')).toHaveText('CAMERA RECORDS OFFLINE');}
 }
 async function delayedRefresh(page,frame,state,view){
- state.gates.map=deferred();const before={...state.reads};await frame.getByRole('button',{name:view==='map'?'Refresh':'Reload saved results',exact:true}).click();
+ state.gates.map=deferred();const before={...state.reads};await frame.getByRole('button',{name:view==='map'?'↻ Refresh data':'Reload saved results',exact:true}).click();
  await expect.poll(()=>state.responses.summary).toBe(before.summary+1);await page.clock.runFor(2000);state.gates.map.release();state.gates.map=null;
  await expect.poll(()=>state.responses.map).toBe(before.map+1);
 }

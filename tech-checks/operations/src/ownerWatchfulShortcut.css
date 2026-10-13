@@ -1,0 +1,12 @@
+.owner-watchful-shortcut{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 28px;padding:22px;border:1px solid var(--cos-border);border-radius:12px;background:var(--cos-vision-panel);min-width:0}
+.owner-watchful-shortcut>div{min-width:0}
+.owner-watchful-shortcut small{font-size:10px;letter-spacing:.12em;color:var(--cos-muted)}
+#root .operations-shell .owner-watchful-shortcut h2{font-size:20px;font-weight:600;letter-spacing:0;color:var(--cos-text);margin:6px 0 8px;text-align:left}
+.owner-watchful-shortcut p{margin:0;font-size:12px;line-height:1.6;color:var(--cos-muted)}
+.owner-watchful-action{display:flex;flex-direction:column;align-items:flex-start;gap:9px}
+#root .operations-shell .owner-watchful-action a{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:44px;padding:11px 16px;border:1px solid var(--cos-border);border-radius:8px;background:var(--cos-sidebar);color:var(--cos-text);font-size:14px;font-weight:600;line-height:1.5;text-decoration:none}
+.owner-watchful-action a span{color:var(--cos-blue)}
+#root .operations-shell .owner-watchful-action a:hover{border-color:var(--cos-blue);background:var(--cos-selected)}
+#root .operations-shell .owner-watchful-action a:focus-visible{outline:3px solid var(--cos-blue);outline-offset:3px}
+.owner-watchful-action p{font-size:11px}
+@media(max-width:700px){.owner-watchful-shortcut{flex-direction:column;align-items:stretch;gap:16px;padding:16px;margin-bottom:22px}.owner-watchful-action{align-items:stretch}}

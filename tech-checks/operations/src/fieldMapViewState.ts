@@ -8,6 +8,6 @@ export function readFieldMapView(state:any):Partial<FieldMapView>{
   return {search:text('search'),status:['field','all','installed','tracker','assigned','in_transit','returning','missing'].includes(value.status)?value.status:'field',health:['operational','all','online','offline','unknown','support'].includes(value.health)?value.health:'operational',selectedId:text('selectedId'),selectionExplicit:value.selectionExplicit===true,nearbyId:text('nearbyId'),radius:[5,10,25,50].includes(value.radius)?value.radius:10,showHistorical:value.showHistorical===true,center,zoom:typeof value.zoom==='number'&&value.zoom>=1&&value.zoom<=19?value.zoom:undefined};
 }
 export function saveFieldMapView(value:Partial<FieldMapView>){
-  if(!/^#(?:field-map|field-view)(?:\?|$)/.test(location.hash))return;
+  if(!/^#(?:fleet-dashboard|field-map|field-view)(?:\?|$)/.test(location.hash))return;
   history.replaceState({...history.state,cosFieldMapView:{...readFieldMapView(history.state),...value}},'');
 }

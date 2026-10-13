@@ -114,8 +114,9 @@ test('selection invalidation during preflight survives a return to the original 
  // Exercise the actual FieldMap selection-effect wiring, not a hand-written invalidate call.
  const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');
  const effect=/useEffect\(\(\)=>\{([^\n]*?)\},\[selectedId\]\);/.exec(source);assert.ok(effect,'FieldMap selection effect is present');
- const select=new Function('censusAction','censusPreparation','setCensusMessage','setPreparationMessage',effect[1]);
- const changed=()=>select({current:a.action},{current:{invalidate(){}}},()=>{},()=>{});
+ const preparationSnapshotLock={current:f.snapshot};
+ const select=new Function('preparationSnapshotLock','censusAction','censusPreparation','setCensusMessage','setPreparationMessage',effect[1]);
+ const changed=()=>{select(preparationSnapshotLock,{current:a.action},{current:{invalidate(){}}},()=>{},()=>{});assert.equal(preparationSnapshotLock.current,null);};
  const action=a.action.run(binding,()=>current);await flush();current=false;changed();current=true;changed();
  pending.resolve(f.snapshot);let failure;await action.catch(error=>{failure=error;});
  assert.equal(a.calls.filter(c=>c.method==='POST').length,0);assert.match(failure?.message||'',/no lookup was sent/);

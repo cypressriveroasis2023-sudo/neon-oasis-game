@@ -16,7 +16,7 @@ test('field locations arrive while an optional health feed is still waiting',asy
  const accepted={};
  const loading=loadTvFleetFeeds({get:async path=>({data:path==='/api/camera-health/summary-v3'?await waiting:values[path]})},{...callbacks(accepted),field:value=>{accepted.field=value;fieldArrived();}});
  await arrived;assert.equal(accepted.field.items[0].unitNumber,'Sniper 312');assert.equal(accepted.health,undefined);
- finishHealth(health);assert.deepEqual(await loading,[]);assert.equal(accepted.health,health);
+ finishHealth(health);assert.deepEqual(await loading,[]);assert.deepEqual(accepted.health.rows,health.rows);assert.deepEqual(accepted.health.fleetFieldUnits,field.items);
 });
 
 test('camera and router outages leave verified field locations available and identify each failed feed',async()=>{
@@ -38,4 +38,10 @@ test('a malformed camera summary cannot be accepted as healthy or remove the map
  const errors=await loadTvFleetFeeds({get:async path=>({data:path==='/api/camera-health/summary-v3'?{...health,online:1}:values[path]})},callbacks(accepted));
  assert.equal(accepted.field,field);assert.equal(accepted.health,undefined);assert.ok(accepted.routers);
  assert.equal(errors.length,1);assert.match(errors[0],/^Camera Health: Camera Health returned an incomplete summary/);
+});
+
+test('a failed health refresh clears cached health while retaining verified field locations',async()=>{
+ const accepted={field,health};
+ const errors=await loadTvFleetFeeds({get:async path=>{if(path==='/api/camera-health/summary-v3')throw Error('Saved source unavailable');return {data:values[path]};}}, {...callbacks(accepted),healthUnavailable:()=>{accepted.health=null;}});
+ assert.equal(accepted.field,field);assert.equal(accepted.health,null);assert.ok(accepted.routers);assert.deepEqual(errors,['Camera Health: Saved source unavailable']);
 });

@@ -1,11 +1,3 @@
-export async function revealMapFilters(frame) {
-  const toggle=frame.getByRole('button',{name:/^Filters/});
-  if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
-}
-export async function revealMapInfo(frame) {
-  const detail=frame.locator('.field-map-info');
-  if(!(await detail.evaluate(node=>node.open)))await detail.locator('summary').first().click();
-}
-
-// Review scenarios explicitly opt into unknown health; production defaults remain operational.
-export async function showAllFieldHealth(frame){await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');}
+export async function revealMapFilters(frame){const filters=frame.locator('.cos-fleet-filters .cos-fleet-advanced-filters'),summary=filters.locator(':scope>summary');if(await summary.count()&&await filters.getAttribute('open')===null)await summary.click();}
+export async function revealMapInfo(frame){const summary=frame.locator('.cos-fleet-map-info>summary');if(await summary.count()&&await frame.locator('.cos-fleet-map-info').getAttribute('open')===null)await summary.click();}
+export async function showAllFieldHealth(frame){await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');}

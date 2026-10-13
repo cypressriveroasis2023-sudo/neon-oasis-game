@@ -30,7 +30,7 @@ async function mount(page,{sourceCases=false,overview=false}={}){
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
-  if(url.pathname==='/verified-health-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${overview?'camera-health':'field-map'}"></iframe><script>window.fixtureAuth=true;addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:window.fixtureAuth?'owner':'',accessToken:window.fixtureAuth?'synthetic-only':''},location.origin)})</script>`});
+  if(url.pathname==='/verified-health-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${overview?'camera-health?diagnostics=1':'field-map'}"></iframe><script>window.fixtureAuth=true;addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:window.fixtureAuth?'owner':'',accessToken:window.fixtureAuth?'synthetic-only':''},location.origin)})</script>`});
   if(url.protocol==='http:'&&url.hostname==='127.0.0.1')return route.continue();
   if(/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(request.url()))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e5eadd"/></svg>'});
   if(!url.pathname.endsWith('/functions/v1/cos-operations-pages')){state.blockedExternal.push(request.url());return route.abort('blockedbyclient');}
@@ -52,12 +52,12 @@ async function mount(page,{sourceCases=false,overview=false}={}){
  await page.goto('/verified-health-identity-fixture');
  const frame=page.frameLocator('iframe');
  if(overview)await frame.getByLabel('Camera Health unit filter').selectOption('all');
- await expect(frame.locator(overview?'.camera-overview-card':'.field-map-list>button')).toHaveCount(overview?(sourceCases?5:1):state.units.length);
+ await expect(frame.locator(overview?'.camera-overview-card':'.cos-fleet-unit-row')).toHaveCount(overview?(sourceCases?5:1):state.units.length);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBeGreaterThan(0);
  return {frame,state};
 }
-const listUnit=(frame,label)=>frame.locator('.field-map-list>button').filter({has:frame.locator('strong').filter({hasText:new RegExp('^'+label+'$')})});
-async function expand(frame){await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
+const listUnit=(frame,label)=>frame.locator('.cos-fleet-unit-row').filter({has:frame.locator('strong').filter({hasText:new RegExp('^'+label+'$')})});
+async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
 async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
@@ -66,20 +66,20 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  const {frame,state}=await mount(page);
  await expect(frame.locator('.cos-field-cluster')).toHaveAttribute('data-health','mixed');
  await expect(frame.locator('.cos-cluster-caption')).toHaveText('MIX');
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
- await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 0 offline · 1 unknown · 1 support');
- await expect(frame.locator('.field-cluster-list button').filter({hasText:labels.owner})).toContainText('CAMERA RECORDS ONLINE');
- await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
+
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',labels.owner+' · CAMERA RECORDS ONLINE');
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',labels.unlinked+' · Camera status unverified');
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · online'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · unknown'));
  await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await frame.locator('.cos-field-pin-support').click();
  await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');
- await expect(frame.locator('.field-map-detail h2')).toHaveText(labels.stand);
- await frame.locator('.leaflet-popup-close-button').click();
- await noOverflow(frame);await frame.locator('.field-map-center').screenshot({path:info.outputPath('verified-owner-hdc-support.png')});
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);
+ await frame.getByRole('button',{name:'Close unit details'}).click();
+ await noOverflow(frame);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('verified-owner-hdc-support.png')});
  await frame.locator('.cos-field-pin[data-health="online"]').click();
  await expect(frame.locator('.camera-unit-detail h3')).toHaveText(labels.owner);
  await expect(frame.locator('.camera-unit-state')).toHaveText('CAMERA RECORDS ONLINE');
@@ -89,21 +89,21 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.camera-device-cards .camera-resource-access')).toHaveCount(4);
  for(const [index,id] of ownerIds.entries())await expect(frame.locator('.camera-device-cards .camera-resource-access').nth(index)).toHaveAttribute('href','../../camera-detail.html?id='+id);
  await noOverflow(frame);
- await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
+ await navigate(page,'camera-health?diagnostics=1');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner).toHaveCount(1);await expect(owner.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
- await expect(owner.getByRole('link',{name:'Field View',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.owner));
+ await expect(owner.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.owner));
  await owner.locator('.camera-card-main').click();
  await expect(frame.getByRole('dialog',{name:'Camera Health unit details'})).toContainText('Field record: '+labels.owner);
  await expect(frame.getByRole('dialog',{name:'Camera Health unit details'}).locator('.camera-device-cards article')).toHaveCount(4);
  await noOverflow(frame);noWrites(state);
 });
 
-test('native HDC proof, recorder proof and bound service proof retain separate source labels and exact Field View',async({page},info)=>{
+test('native HDC proof, recorder proof and bound service proof retain separate source labels and exact Fleet Dashboard',async({page},info)=>{
  const {frame,state}=await mount(page,{sourceCases:true,overview:true});
  const native=frame.locator('.camera-overview-card').filter({hasText:'Synthetic native IPC'});
  await expect(native.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
- await expect(native.getByRole('link',{name:'Field View',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.native));
+ await expect(native.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.native));
  await native.locator('.camera-card-main').click();let detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
  await expect(detail).toContainText('Field record: '+labels.native);await expect(detail.locator('.camera-device-cards article')).toHaveCount(1);
  await expect(detail.getByRole('link',{name:'Open saved IP / ports'})).toHaveAttribute('href','../../camera-detail.html?id=92001');
@@ -114,37 +114,16 @@ test('native HDC proof, recorder proof and bound service proof retain separate s
  const service=frame.locator('.camera-overview-card').filter({hasText:'Synthetic bound service'});
  await expect(service.locator('.camera-status-pill')).toHaveText('IP / PORT ONLINE');await expect(service).toContainText('Camera channel status unavailable');
  await noOverflow(frame);await page.screenshot({path:info.outputPath('source-separated-identity-overview.png'),fullPage:true});
- await navigate(page,'field-map');await showAllFieldHealth(frame);await expect(frame.locator('.field-map-list>button')).toHaveCount(7);
+ await navigate(page,'field-map');await showAllFieldHealth(frame);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(7);
  await expect(listUnit(frame,labels.native)).toContainText('CAMERA RECORDS ONLINE');await expect(listUnit(frame,labels.recorder)).toContainText('RECORDER ONLINE');await expect(listUnit(frame,labels.service)).toContainText('IP / PORT ONLINE');
  await expect(listUnit(frame,labels.unbound)).not.toContainText('IP / PORT ONLINE');await expect(listUnit(frame,labels.unbound)).toContainText('unverified');
  await listUnit(frame,labels.recorder).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');
- await navigate(page,'camera-health?unit='+ids.recorder);await expect(frame.locator('.camera-unit-state')).toHaveText('RECORDER ONLINE');await expect(frame.locator('.camera-unit-detail')).toContainText('Individual camera channels and video are not verified');await expect(frame.locator('.camera-device-cards article')).toHaveCount(1);
+ await navigate(page,'camera-health?diagnostics=1&unit='+ids.recorder);await expect(frame.locator('.camera-unit-state')).toHaveText('RECORDER ONLINE');await expect(frame.locator('.camera-unit-detail')).toContainText('Individual camera channels and video are not verified');await expect(frame.locator('.camera-device-cards article')).toHaveCount(1);
  noWrites(state);
 });
 
-test('saved-data reload repaints identity status without changing expanded map position or popup selection',async({page})=>{
- const {frame,state}=await mount(page);await expand(frame);
- const viewport=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView);
- await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.field-map-detail h2')).toHaveText(labels.stand);await frame.locator('.leaflet-popup-close-button').click();
- const before=await viewport();
- state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
- await expect(frame.locator('.field-map-detail h2')).toHaveText(labels.stand);
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-summary')).toContainText('0 online · 1 offline · 1 unknown · 1 support');
- await frame.locator('.leaflet-popup-close-button').click();await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await frame.locator('.cos-field-cluster-wrap').click();
- await expect(frame.locator('.field-cluster-summary')).toBeVisible();
- await expect(frame.locator('.leaflet-pan-anim')).toHaveCount(0);
- const popupView=await viewport();
- state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
- await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 0 offline · 1 unknown · 1 support');
- await expect(frame.locator('.field-map-detail h2')).toHaveText(labels.stand);
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:popupView.center,zoom:popupView.zoom});
- await frame.locator('.leaflet-popup-close-button').click();
- await expect.poll(async()=>{const view=await viewport();return {center:view.center,zoom:view.zoom};}).toEqual({center:before.center,zoom:before.zoom});
- await noOverflow(frame);noWrites(state);
+test('saved-data reload repaints identity status without changing expanded map position or unit selection',async({page})=>{
+ const {frame,state}=await mount(page);await expand(frame);const viewport=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect.poll(viewport).toEqual(before);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);await frame.getByRole('button',{name:'Close unit details'}).click();noWrites(state);
 });
 
 for(const mutation of ['partial resource set','extra resource in source group','changed Owner audit','changed Owner key','changed native label','explicit identity warning','duplicate resource ownership','duplicate equipment proof'])test(mutation+' never turns a mismatched unit green',async({page})=>{
@@ -157,10 +136,10 @@ for(const mutation of ['partial resource set','extra resource in source group','
  if(mutation==='explicit identity warning')state.warnings=[{unitId:ids.owner,reason:'Saved unit identity needs review.'}];
  if(mutation==='duplicate resource ownership')state.identities.push({...state.identities[0],unitId:ids.unlinked,unitNumber:labels.unlinked,kind:'native_provider'});
  if(mutation==='duplicate equipment proof')state.identities.push({...state.identities[0]});
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
- await navigate(page,'camera-health?unit='+ids.owner);await expect(frame.locator('.camera-unit-state')).not.toContainText('ONLINE');await expect(frame.locator('.camera-device-cards article')).toHaveCount(0);
+ await navigate(page,'camera-health?diagnostics=1&unit='+ids.owner);await expect(frame.locator('.camera-unit-state')).not.toContainText('ONLINE');await expect(frame.locator('.camera-device-cards article')).toHaveCount(0);
  if(mutation==='explicit identity warning')await expect(frame.locator('.camera-unit-detail')).toContainText('Saved unit identity needs review.');
  await noOverflow(frame);noWrites(state);
 });
@@ -168,10 +147,10 @@ for(const mutation of ['partial resource set','extra resource in source group','
 for(const failure of ['summary failure','expired authorization'])test(failure+' clears previously green identity evidence',async({page})=>{
  const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Camera Health unavailable':'session is unavailable'}).first()).toBeVisible();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'Your fleet session changed. Reload to verify the current account.'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}
+ if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}else{await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);}
  noWrites(state);
 });
 
@@ -195,11 +174,11 @@ for(const conflict of ['scoped identity warning','duplicate resource ownership']
  }else state.identities.push({...state.identities[0],unitId:ids.unlinked,unitNumber:labels.unlinked,kind:'native_provider'});
  await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();
  await expect(owner.locator('.camera-status-pill')).toHaveText('EQUIPMENT LINK UNVERIFIED');
- await expect(owner.getByRole('link',{name:'Field View',exact:true})).toHaveCount(0);
+ await expect(owner.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveCount(0);
  await expect(owner).toContainText('excluded from unit totals');
  const native=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.native});
  await expect(native.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
- await expect(native.getByRole('link',{name:'Field View',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.native));
+ await expect(native.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.native));
  await owner.locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
  await expect(detail).toContainText('No unique current field record is linked');
@@ -212,7 +191,7 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  const {frame,state}=await mount(page);await expand(frame);
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  state.rows=state.rows.map((row,index)=>index===3?{...row,evidence:undefined}:row);
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
@@ -221,7 +200,7 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  await expect(selectedHealth).toBeVisible();
  await expect(selectedHealth).toContainText('CAMERA RECORDS MIXED / PARTLY VERIFIED');
  await expect(selectedHealth).not.toContainText('SYSTEM ONLINE');
- await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
+ await navigate(page,'camera-health?diagnostics=1');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner.locator('.camera-status-pill')).not.toContainText('ONLINE');
  await expect(owner).toContainText('3 camera/detector records online · 0 offline · 1 unverified');

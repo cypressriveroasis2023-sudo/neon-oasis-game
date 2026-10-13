@@ -5,7 +5,7 @@ export type FleetSnapshot={health:Health;fieldMap:ReturnType<typeof checkedField
 type Unit=FieldHealthUnit&{currentLocationType?:string;placement?:string;placementSource?:string};
 export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
  const value=String(unit.placement||unit.currentLocationType||'').toLowerCase();
- return value==='shop'?'shop':['field','site'].includes(value)?'field':'unknown';
+ return ['shop','root','warehouse','yard'].includes(value)?'shop':['field','site'].includes(value)?'field':'unknown';
 }
 /** Only complete saved resource identities carry the current placement onto devices.
  * Exact unique inventory labels can classify synthetic tracker placeholders only.

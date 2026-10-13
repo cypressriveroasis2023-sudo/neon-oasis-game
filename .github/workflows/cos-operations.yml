@@ -155,13 +155,30 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Verify integrated Fleet Dashboard for Owner and IT
-        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/company-platform.browser.spec.mjs
+        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/company-platform.browser.spec.mjs
       - name: Verify guarded Owner Census preparation and one-use action
         run: npm run test:browser -- tests/owner-census-preparation.browser.spec.mjs tests/owner-census-once.browser.spec.mjs
       - name: Verify Tech Check TV and IT daily navigation and camera scope
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
+      - name: Verify shared map migration and Owner portal regressions before the full browser suite
+        run: >-
+          npm run test:browser --
+          tests/camera-shop-field-restore.browser.spec.mjs
+          tests/company-overview.browser.spec.mjs
+          tests/field-address-estimates.browser.spec.mjs
+          tests/field-health-flow.browser.spec.mjs
+          tests/field-map-deep-link.browser.spec.mjs
+          tests/field-recorder-observation.browser.spec.mjs
+          tests/fleet-battery.browser.spec.mjs
+          tests/operations.browser.spec.mjs
+          tests/owner-watchful-shortcut.browser.spec.mjs
+          tests/recorder-evaluation-clock.browser.spec.mjs
+          tests/routers.browser.spec.mjs
+          tests/shared-fleet-map.browser.spec.mjs
+          tests/verified-health-identity.browser.spec.mjs
+          tests/vision-dashboard.browser.spec.mjs
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()

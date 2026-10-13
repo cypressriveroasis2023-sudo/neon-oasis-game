@@ -31,3 +31,36 @@
 #root#root .cos-fleet-dashboard .cos-fleet-unit-row:hover{background:#1c293a!important;border-color:#74869e!important}
 #root#root .cos-fleet-dashboard .cos-fleet-search button{background:transparent!important;border:0!important}
 #root#root .cos-fleet-dashboard .cos-fleet-refresh{background:#d71935!important;border-color:#ff4157!important}
+
+/* Leaflet icons are fixed-size map symbols; shell typography must never stretch them. */
+#root#root .cos-fleet-map-canvas .cos-dashboard-marker{background:transparent!important;border:0!important;padding:0!important;min-width:0;min-height:0;line-height:1;}
+#root#root .cos-fleet-map-canvas :is(.cos-field-pin,.cos-field-cluster){position:relative;display:grid;place-items:center;box-sizing:border-box;width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;max-height:38px!important;margin:3px;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;transform:none!important;scale:1!important;left:auto;box-shadow:none!important;}
+#root#root .cos-fleet-map-canvas .cos-field-pin>.cos-reticle-artwork{position:absolute;inset:0;width:38px!important;height:38px!important;max-width:38px!important;max-height:38px!important;aspect-ratio:1;overflow:visible;color:var(--pin);}
+#root#root .cos-fleet-map-canvas .cos-field-pin>b.cos-pin-unit-number{position:absolute;top:31px;left:50%;transform:translateX(-50%);display:block;box-sizing:border-box;width:max-content;min-width:24px;max-width:44px;margin:0;padding:1px 3px;background:#080b12;border:1px solid var(--pin);border-radius:4px;color:#fff;font:10px/12px Arial,sans-serif;text-align:center;white-space:nowrap;}
+#root#root .cos-fleet-map-canvas .cos-field-pin>b.cos-reticle-long-id{font-size:9px;letter-spacing:0;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster>b{position:relative;display:block;margin:0;padding:0;font:700 13px/1 Arial,sans-serif;color:#fff;z-index:2;}
+#root#root .cos-fleet-map-canvas .cos-reticle-ring{position:absolute;inset:3px;border:2px solid var(--pin);border-radius:50%!important;background:#071421!important;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster:before{width:38px;height:1px;left:0;top:18.5px;}
+#root#root .cos-fleet-map-canvas .cos-field-cluster:after{height:38px;width:1px;top:0;left:18.5px;}
+#root#root .cos-fleet-map-canvas :is(.cos-pin-location-tag,.cos-cluster-location){font:7px/10px Arial,sans-serif;top:-8px;left:50%;right:auto;transform:translateX(-50%);width:max-content;padding:0 3px;color:#ffd38b;}
+#root#root .cos-fleet-map-canvas .cos-cluster-caption{font:7px/9px Arial,sans-serif;top:34px;left:50%;transform:translateX(-50%);padding:0 3px;}
+#root#root .cos-fleet-map-canvas .cos-cluster-support{top:-4px;right:-15px;height:20px;padding:1px 3px;display:flex;align-items:center;gap:2px;}
+#root#root .cos-fleet-map-canvas .cos-cluster-support svg{width:12px!important;height:14px!important;flex:none;}
+#root#root .cos-fleet-map-canvas .cos-cluster-support small{display:inline;font:700 9px/1 Arial,sans-serif;}
+.cos-fleet-count-note{color:#bac8da;font-size:11px;line-height:1.6;margin-bottom:16px!important;}
+.cos-fleet-picking .leaflet-container{cursor:crosshair;}
+.cos-fleet-pick-note{background:#1a2c41;border-block:1px solid #6e9ccd;padding:10px 12px;font-size:12px;}
+.cos-fleet-pick-note button{margin-left:6px;}
+#root#root .cos-fleet-drawer .field-map-location-editor .field-map-layout{display:block!important;min-height:0;}
+#root#root .cos-fleet-drawer .field-map-location-editor .field-map-detail{position:static!important;width:100%!important;max-width:none!important;border:0!important;padding:14px 0;box-shadow:none!important;}
+#root#root .cos-fleet-drawer[hidden],#root#root .cos-fleet-drawer-backdrop[hidden]{display:none!important;}
+@media(max-width:700px){.cos-fleet-map-toolbar{flex-wrap:wrap;}.cos-fleet-map-toolbar>div:last-child{margin-left:auto;}.cos-fleet-count-note{font-size:10px;}.cos-fleet-pick-note button{margin:6px 0 0;}}
+
+.cos-fleet-advanced-filters{margin-top:12px;color:#c5d2e4;font-size:12px}.cos-fleet-advanced-filters>summary,.cos-fleet-map-info>summary{cursor:pointer;padding:6px 0;font-weight:600}.cos-fleet-advanced-filters small{margin-top:8px}.cos-fleet-map-info{margin-top:12px;padding:10px 14px;border:1px solid #3b485c;border-radius:7px;background:#111720;color:#c5d2e4;font-size:12px}.cos-fleet-map-info p{margin:10px 0}.cos-fleet-map-info ul{padding-left:20px}#root#root .cos-fleet-dashboard .cos-fleet-unit-row.selected{background:#203456!important;border-color:#74869e!important}#root#root .cos-fleet-dashboard .cos-fleet-unit-row.selected strong{color:#f3f6fb!important}#root#root .cos-fleet-dashboard .cos-fleet-unit-row.selected small{color:#c0cee0!important}
+
+.cos-fleet-detail-signals>p{grid-column:1/-1;font-size:12px;color:#c5d2e4;line-height:1.6}
+
+/* Keep actual charge and source times at the top of each shared unit detail. */
+.cos-fleet-battery-summary{margin:14px 0;padding:13px;border:1px solid #3b4a5f;border-radius:7px;background:#16202c}.cos-fleet-battery-summary>strong{display:block;font-size:30px;line-height:1.2}.cos-fleet-battery-summary>p{font-size:12px;margin:4px 0}.cos-fleet-battery-summary>small{margin-top:5px;overflow-wrap:anywhere}.cos-fleet-drawer .cos-fleet-battery-summary dl{margin:10px 0}.cos-fleet-drawer .cos-fleet-battery-summary dl>div{grid-template-columns:minmax(95px,.8fr) minmax(0,1.5fr);gap:8px;border-top:1px solid #314052;font-size:11px}.cos-fleet-battery-summary dt{overflow-wrap:anywhere}.cos-fleet-battery-summary dd small{font-size:10px;margin-top:3px}.cos-fleet-unit-row .cos-fleet-battery-compact{white-space:normal;overflow-wrap:anywhere;color:#d4e2f3}
+
+.cos-fleet-placement-status{margin:12px 0;padding:10px 12px;border:1px solid #526883;border-radius:6px;background:#182435;font-size:12px}.cos-fleet-placement-status p,.cos-fleet-placement-status small{margin-top:5px;overflow-wrap:anywhere}

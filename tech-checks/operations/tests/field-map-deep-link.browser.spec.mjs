@@ -145,8 +145,8 @@ async function mount(page, label, units = defaultUnits, {
   });
   await page.goto(origin + '/fixture');
   const frame = page.frameLocator('iframe');
-  await expect(frame.locator('.field-map-workspace')).toBeVisible();
-  if(!mapFailure)await expect(frame.getByLabel('Search field units')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
+  await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+  if(!mapFailure)await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
   return {
     state,
     frame,
@@ -159,9 +159,9 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     state,
     errors
   } = await mount(page, 'RII-022');
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await expect(frame.locator('.field-pin-label')).toContainText('Recon II 022');
+  await expect(frame.locator('.cos-field-pin-wrap')).toHaveAttribute('title',/Recon II 022/);
   expect(state.writes).toHaveLength(0);
   expect(errors).toEqual([]);
 }], ['Unknown or shop label never picks unrelated field unit', async page => {
@@ -169,9 +169,10 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RANGER 999');
-  await expect(frame.locator('.field-map-detail h2')).toHaveCount(0);
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
   await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
-  await expect(frame.locator('.toast')).toContainText('not currently in the field map');
+  await expect(frame.locator('.cos-fleet-message')).toContainText('not in the current inventory');
+  await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
   expect(state.writes).toHaveLength(0);
 }], ['Canonical alias collision never selects a first pin', async page => {
   const units = [{
@@ -185,24 +186,21 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RANGER 022', units);
-  await expect(frame.locator('.field-map-detail h2')).toHaveCount(0);
-  await expect(frame.locator('.toast')).toContainText('conflicting field records');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
+  await expect(frame.locator('.cos-fleet-message')).toContainText('conflicting identities');
+  await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
   expect(state.writes).toHaveLength(0);
 }], ['Back and Forward from native same-unit health preserve label match', async page => {
   const {
     frame,
     state
   } = await mount(page, 'RII-022');
+  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();
+  await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
-  await frame.getByRole('button', {
-    name: 'Back to Field Map',
-    exact: true
-  }).click();
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
-  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await frame.locator('body').evaluate(() => history.forward());
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+ids[1]);
   expect(state.writes).toHaveLength(0);
 }], ['Explicit deep link clears stale nearby filter that hides target pin', async page => {
   const {
@@ -217,15 +215,16 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
       radius: 5
     }
   });
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 }], ['Different label route resets old health filter', async page => {
   const {
     frame
   } = await mount(page, 'RII-022');
-  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('offline');
+  await frame.getByRole('button',{name:'Close unit details'}).click();
+  await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 }]];
 for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-map deep link ' + width + ': ' + name, async ({
@@ -238,43 +237,42 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-ma
   await run(page);
 });
 
-test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});await revealMapInfo(frame);const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
+test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});const close=frame.getByRole('button',{name:'Close unit details'});if(await close.isVisible())await close.click();await revealMapInfo(frame);const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
 
-test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','online');await expect(frame.locator('.field-map-workspace')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.field-map-detail')).toContainText(/online/i);});
+test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-fleet-dashboard')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.cos-fleet-drawer')).toContainText(/online/i);});
 
 // Failures must not masquerade as an empty fleet; fixtures never reach production.
 test('initial map failure shows unavailable state and retry restores units',async({page})=>{
  const {frame,state}=await mount(page,'Ranger 022',defaultUnits,{mapFailure:true});
- await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('This does not mean the fleet is empty');
  await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
- await expect(frame.locator('.field-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
- await expect(frame.locator('.router-map-note')).not.toContainText('0 support units');
- await expect(frame.getByLabel('Review unverified historical locations').locator('..')).not.toContainText('(0)');
- state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
- await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
+ await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
+ await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['—','—','—','—','—']);
+ state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
 });
 test('failed map refresh retains last good units and labels stale map data',async({page})=>{
  const {frame,state}=await mount(page,'Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);state.mapFailure=true;
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Showing the last successfully loaded units');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
- await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
- state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
- await expect(frame.locator('.field-map-error')).toHaveCount(0);
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
+ state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.locator('.cos-fleet-message')).toHaveCount(0);
 });
 
 test('hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces',async({page})=>{
  const units=[{...defaultUnits[0],unitNumber:'Spotter211HDC2S'},defaultUnits[1]];
  const {frame}=await mount(page,'Spotter211HDC2S',units);
  await expect(frame.locator('.cos-pin-unit-number')).toHaveText('211');
- const card=frame.locator('.field-map-list>button').first();
+ const card=frame.locator('.cos-fleet-unit-row').first();
  await expect(card).toHaveCSS('background-color','rgb(32, 52, 86)');
  await expect(card.locator('strong')).toHaveCSS('color','rgb(243, 246, 251)');
  await expect(card.locator('small').first()).toHaveCSS('color','rgb(192, 206, 224)');
 });
 
 test('closing a deep-linked unit remains closed through manual and automatic refresh',async({page})=>{
- const {frame,state}=await mount(page,'Ranger 022');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.field-map-list>button').first()).toBeFocused();await expect(frame.locator('.field-map-detail')).not.toBeVisible();await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-detail')).not.toBeVisible();await page.clock.fastForward(16*60*1000);await expect(frame.locator('.field-map-detail')).not.toBeVisible();expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,'Ranger 022');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.cos-fleet-unit-row').first()).toBeFocused();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-fleet-drawer')).not.toBeVisible();expect(state.writes).toHaveLength(0);
 });

@@ -26,7 +26,7 @@ test('distant tracker point yields approximate fallback and selected-only review
  await page.goto('/source-conflict-fixture');const frame=page.frameLocator('iframe');
  await expect(frame.locator('.cos-pin-location-tag')).toHaveText('EST');await expect(frame.locator('.cos-field-pin-recorded')).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Tracker point conflict'})).toHaveCount(0);
- await frame.locator('.field-map-list>button').click();
+ await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
  const detail=frame.getByRole('complementary',{name:'Selected unit details'}),conflict=frame.getByRole('region',{name:'Tracker point conflict'});
  await expect(conflict).toContainText('current address estimate');await expect(conflict).toContainText('30, -95');
  await expect(conflict).toContainText('still approximate');await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('31, -96');
@@ -36,15 +36,15 @@ test('distant tracker point yields approximate fallback and selected-only review
  await conflict.scrollIntoViewIfNeeded();await conflict.screenshot({path:info.outputPath('source-conflict-review-explanation.png')});
  await frame.getByRole('region',{name:'Address estimate'}).screenshot({path:info.outputPath('source-conflict-fallback-provenance.png')});
  await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(detail).toBeHidden();
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.field-map-center').screenshot({path:info.outputPath('source-conflict-approximate-map.png')});
- await frame.locator('.field-map-list>button').click();await expect(conflict).toBeVisible();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('source-conflict-approximate-map.png')});
+ await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await expect(conflict).toBeVisible();
  // An older backend can still return SRC; the shared client validator rejects it.
- state.rows=[f.row];await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ state.rows=[f.row];await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-pin-location-tag')).toHaveText('EST');await expect(frame.locator('.cos-field-pin-recorded')).toHaveCount(0);await expect(conflict).toHaveCount(0);
  // A fresh nearby lookup restores eligible SRC and removes stale conflict details.
  f.row.locationImportedGeocode={...f.row.locationImportedGeocode,latitude:30.01,longitude:-95};
  state.rows=(await projectSourceRecordedCoordinates(f.snapshot,[f.record],[],[],now)).items;
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.cos-pin-location-tag')).toHaveText('SRC');await expect(conflict).toHaveCount(0);
+ await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-pin-location-tag')).toHaveText('SRC');await expect(conflict).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Tracker-recorded coordinates'})).toContainText('measurement time is unknown');
  await page.reload();await expect(frame.locator('.cos-pin-location-tag')).toHaveText('SRC');expect(state.writes).toHaveLength(0);
 });

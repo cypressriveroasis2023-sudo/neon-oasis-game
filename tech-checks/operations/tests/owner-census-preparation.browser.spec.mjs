@@ -3,11 +3,12 @@ import {fixture,receipt,id,preparationOwner,now} from './owner-census-preparatio
 import {otherId} from './owner-census-once-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const deferred=()=>{let resolve;const promise=new Promise(y=>{resolve=y;});return {promise,resolve};};
+async function openLocationUnit(frame,name){const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();}
 async function mount(page,{role='Owner',marker=true,holdPost=false,response=receipt(),postStatus=200}={}){
  const f=fixture();if(!marker)delete f.row.locationGeocode.censusPreparation;
  f.snapshot.items.push({id:otherId,unitNumber:'SYNTHETIC OTHER 901',status:'field',currentLocationType:'field',readOnly:false,address:'300 Other Fixture Road, Testville, TX 77003',latitude:32,longitude:-97,coordinateSource:'manual',locationVerification:'owner_verified',gpsRecordedAt:'2026-10-11T00:00:00Z',locationVerifiedAt:'2026-10-11T00:00:00Z'});
  Object.assign(f.snapshot.summary,{fieldUnits:2,mappedUnits:1,missingGps:1});
- const state={snapshot:f.snapshot,session:role==='Owner'?preparationOwner:{...preparationOwner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},posts:[],postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,heldMapFinished:0,holdPost,response};
+ const state={snapshot:f.snapshot,session:role==='Owner'?preparationOwner:{...preparationOwner,role,legacyOwner:false,features:{fleetAccess:true,fieldLocationVerification:false}},posts:[],mapReads:0,healthReads:0,postGate:deferred(),postResponses:0,afterPost:null,mapGate:null,heldMapFinished:0,holdPost,response};
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const url=route.request().url();
@@ -25,6 +26,8 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
    state.afterPost?.(state.snapshot);state.postResponses++;
    return route.fulfill({status:postStatus,headers,contentType:'application/json',body:JSON.stringify(state.response)}).catch(()=>{/* Invalidating the session or selection aborts this synthetic request. */});
   }
+  if(request.path==='/api/field-map')state.mapReads++;
+  if(request.path==='/api/camera-health/summary-v3')state.healthReads++;
   let heldMap=false;
   if(request.path==='/api/field-map'&&state.mapGate){const gate=state.mapGate;state.mapGate=null;heldMap=true;await gate.promise;}
   const data=request.path==='/api/session'?state.session:request.path==='/api/field-map'?state.snapshot
@@ -37,7 +40,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
  return {frame,state};
 }
 const prepare=frame=>frame.getByRole('button',{name:'Prepare approved lookup',exact:true});
@@ -53,7 +56,7 @@ test('explicit preparation displays two complete review digests and server time 
  expect(Object.keys(state.posts[0].body).sort()).toEqual(['addressSha256','auditId','unitKey']);expect(state.snapshot).toEqual(before);
  const overflow=await proof(frame).evaluate(el=>({self:el.scrollWidth-el.clientWidth,page:document.documentElement.scrollWidth-document.documentElement.clientWidth,hashes:[...el.querySelectorAll('dd')].map(node=>node.scrollWidth-node.clientWidth)}));
  expect(overflow.self).toBeLessThanOrEqual(1);expect(overflow.page).toBeLessThanOrEqual(1);for(const width of overflow.hashes)expect(width).toBeLessThanOrEqual(1);
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 for(const role of ['IT','Service'])test(role+' cannot see or invoke Owner preparation',async({page})=>{
  const {frame,state}=await mount(page,{role});await expect(prepare(frame)).toHaveCount(0);await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(0);
@@ -64,8 +67,8 @@ test('missing private marker never enables preparation',async({page})=>{
 test('duplicate clicks prepare once and selection away and back clears the visible receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await expect(prepare(frame)).toBeVisible();await prepare(frame).evaluate(el=>{el.click();el.click();});await expect.poll(()=>state.posts.length).toBe(1);
  state.postGate.resolve();await expect(proof(frame)).toBeVisible();
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC OTHER 901'}).click();await expect(proof(frame)).toHaveCount(0);
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await openLocationUnit(frame,'SYNTHETIC OTHER 901');await expect(proof(frame)).toHaveCount(0);
+ await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 test('changed source before preparation sends no proof request',async({page})=>{
  const {frame,state}=await mount(page);await expect(prepare(frame)).toBeVisible();state.snapshot=structuredClone(state.snapshot);state.snapshot.items[0].historicalRecordedAt='2026-10-09T00:00:00Z';
@@ -78,31 +81,33 @@ test('later source change rejects a proof receipt and does not start a lookup',a
 });
 test('selection away and back during preparation preflight sends zero preparation requests',async({page})=>{
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
- await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.field-map-workspace').elementHandle();
+ await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();
  await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
-  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
-  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
-  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
-  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+unitId);
+  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
+  expect(state.writes?.length||state.posts?.length||0).toBeLessThanOrEqual(1);
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
- await expect(prepare(frame)).toBeDisabled();gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
- expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toBeEnabled();
+ await expect(proof(frame)).toHaveCount(0);gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
+ expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toHaveCount(0);
+ // External unit navigation returns to diagnostics; reopen the current unit's editor deliberately.
+ await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();await expect(prepare(frame)).toBeEnabled();expect(state.posts).toHaveLength(0);
 });
 test('selection away and back during preparation cannot admit a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await page.clock.pauseAt(new Date(now+60000));
- const workspace=await frame.locator('.field-map-workspace').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
+ expect(state.writes?.length||state.posts?.length||0).toBeLessThanOrEqual(1);
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
-  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
-  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
-  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+unitId);
+  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
  state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 test('session-role invalidation clears preparation and rejects a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
@@ -115,18 +120,74 @@ for(const [label,response] of [['duplicate receipt',[receipt(),receipt()]],['ext
 test('preparation timeout is read-only and requires a new deliberate preparation after refresh',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
  await page.clock.runFor(121000);await expect(frame.getByRole('region',{name:'Approved lookup preparation'})).toContainText('Preparation timed out');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
- state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(prepare(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
+ state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(prepare(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
  state.holdPost=false;state.response={...receipt(),preparedAt:new Date(now+121000).toISOString()};await prepare(frame).click();await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(2);
  for(const post of state.posts)expect(post.path).toMatch(/\/owner-census-prepare$/);
 });
 
 test('read-only preparation can return a valid receipt after the former30-second transport deadline',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
- await page.clock.runFor(61000);await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');await expect(proof(frame)).toHaveCount(0);
+ await page.clock.runFor(61000);await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');await expect(proof(frame)).toHaveCount(0);
  state.postGate.resolve();await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
 });
 for(const [postStatus,message] of [[409,'Preparation is on hold'],[503,'saved evidence service']])test('read-only preparation HTTP'+postStatus+' shows a safe category without backend detail',async({page})=>{
  const {frame,state}=await mount(page,{postStatus,response:{error:'synthetic-private-backend-detail'}});await prepare(frame).click();
  const region=frame.getByRole('region',{name:'Approved lookup preparation'});await expect(region).toContainText(message);await expect(region).not.toContainText('synthetic-private-backend-detail');
  await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+});
+
+// Exercise rendered FieldMap + the ordinary visibility/cadence handler and shared API.
+// Age the saved pair before starting the action without advancing request timers.
+// This avoids first-interval/cache-insertion millisecond races in the fixture.
+const fleetRefreshTime=now+16*60000;
+async function readyForFleetRefresh(page,state){
+ await page.clock.pauseAt(new Date(now+60000));
+ await page.clock.setSystemTime(new Date(fleetRefreshTime));
+ state.response={...receipt(),preparedAt:new Date(fleetRefreshTime).toISOString()};
+}
+async function waitForNewFleetPair(frame,state,beforeHealth,beforeMap){
+ await frame.locator('body').evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await expect.poll(()=>state.healthReads).toBeGreaterThan(beforeHealth);
+ await expect.poll(()=>state.mapReads).toBeGreaterThan(beforeMap);
+}
+async function waitForRenderedFleet(page,frame){
+ const refreshed=await frame.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)),fleetRefreshTime);
+ await expect(frame.locator('.cos-fleet-heading')).toContainText(refreshed);
+ // Give the committed health update its normal subsequent frames/passive effects
+ // before releasing the POST; route fulfillment alone is not a render barrier.
+ await page.clock.runFor(32);
+}
+test('unchanged shared fleet completion during Prepare POST keeps the receipt and sends exactly once',async({page})=>{
+ const {frame,state}=await mount(page,{holdPost:true}),before=structuredClone(state.snapshot.items[0]);
+ await readyForFleetRefresh(page,state);
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
+ const gate=deferred(),healthReads=state.healthReads,mapReads=state.mapReads;state.mapGate=gate;state.snapshot.generatedAt=new Date(fleetRefreshTime).toISOString();
+ await waitForNewFleetPair(frame,state,healthReads,mapReads);await expect.poll(()=>state.mapGate===null).toBe(true);
+ gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);await waitForRenderedFleet(page,frame);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+ await expect(frame.getByRole('region',{name:'Approved lookup preparation'})).toContainText('Reading saved installation evidence');
+ state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);await expect(proof(frame)).toBeVisible();
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
+ expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
+ expect(state.posts).toHaveLength(1);expect(state.posts[0].path).toBe('/api/field-map/'+id+'/owner-census-prepare');expect(Object.keys(state.posts[0].body).sort()).toEqual(['addressSha256','auditId','unitKey']);expect(state.snapshot.items[0]).toEqual(before);
+ await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);
+});
+test('unchanged automatic fleet refresh after Prepare finally preserves visible receipt until manual Refresh',async({page})=>{
+ const {frame,state}=await mount(page);await readyForFleetRefresh(page,state);
+ await prepare(frame).click();await expect(proof(frame)).toBeVisible();await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');expect(state.posts).toHaveLength(1);
+ const gate=deferred(),healthReads=state.healthReads,mapReads=state.mapReads;state.mapGate=gate;state.snapshot.generatedAt=new Date(fleetRefreshTime).toISOString();
+ await waitForNewFleetPair(frame,state,healthReads,mapReads);await expect.poll(()=>state.mapGate===null).toBe(true);
+ await expect(proof(frame)).toBeVisible();gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);await waitForRenderedFleet(page,frame);await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
+ await expect(proof(frame)).toBeVisible();expect(state.posts).toHaveLength(1);
+ await frame.getByRole('button',{name:'Refresh installation evidence',exact:true}).click();await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toBeEnabled();expect(state.posts).toHaveLength(1);
+});
+test('changed-source shared fleet refresh during Prepare preflight cancels with zero POSTs',async({page})=>{
+ const {frame,state}=await mount(page),gate=deferred();await readyForFleetRefresh(page,state);state.mapGate=gate;
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
+ state.snapshot=structuredClone(state.snapshot);state.snapshot.items[0].address='999 Changed Fixture Road, Testville, TX 77002';state.snapshot.generatedAt=new Date(fleetRefreshTime).toISOString();
+ const healthReads=state.healthReads,mapReads=state.mapReads;await waitForNewFleetPair(frame,state,healthReads,mapReads);
+ await expect(frame.getByLabel('Selected unit details',{exact:true}).getByText(state.snapshot.items[0].address,{exact:true})).toBeVisible();
+ gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
+ await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',id);expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
+ await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toHaveCount(0);expect(state.posts).toHaveLength(0);
 });

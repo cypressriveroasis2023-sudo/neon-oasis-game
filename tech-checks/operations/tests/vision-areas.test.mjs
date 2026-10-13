@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { primaryAreas, visionAreas, isOnHand, locationLink } from '../src/visionAreas.ts';
 
 test('primary navigation preserves six fleet areas and includes the capability-gated Unit Tracker', () => {
-  assert.deepEqual(visionAreas.map(area => area.label), ['Camera Health', 'InHand Routers', 'Victron Power', 'Units On Hand', 'Field View', 'Team']);
+  assert.deepEqual(visionAreas.map(area => area.label), ['Camera Health', 'InHand Routers', 'Victron Power', 'Units On Hand', 'Fleet Dashboard', 'Team']);
   assert.equal(primaryAreas.length, 9);
   assert.equal(primaryAreas.filter(area=>area.workspace==='Unit Tracker').length,1);
 });
