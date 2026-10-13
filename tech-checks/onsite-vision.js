@@ -6,6 +6,9 @@ let conversationSyncTimer=null;
 let persistenceReady=false;
 let visionVoiceInteraction=false;
 let visionSendBusy=false;
+let visionConversationBusy=false;
+let visionAgentRequestFailed=false;
+const visionDataReads={jobs:{checkedAt:'',available:false},preps:{checkedAt:'',available:false},techs:{checkedAt:'',available:false}};
 let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false,voiceSilenceWatch=null,voiceAudioContext=null;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
@@ -95,6 +98,9 @@ function ensureChat(){
   state.chats.unshift(c);state.chatId=c.id;saveChats();renderHistory();return c;
 }
 async function newChat(){
+  if(visionSendBusy||visionConversationBusy){announceVision('Please wait for the current request before changing conversations.');return;}
+  visionConversationBusy=true;syncConversationControls();
+  try{
   const previous=chat();
   clearTimeout(conversationSyncTimer);
   if(previous&&persistenceReady&&db){
@@ -104,12 +110,14 @@ async function newChat(){
   state.currentTicket='';visionVoiceInteraction=false;document.body.classList.remove('vision-voice-session');
   const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',memory:{},messages:[]};
   state.chats.unshift(c);state.chats=state.chats.slice(0,20);state.chatId=c.id;
-  saveChats();renderHistory();renderThread();renderOrder();closeDrawers();
+  saveChats();renderHistory();renderThread({follow:true});renderOrder();closeDrawers();
   const prompt=$('visionPrompt');if(prompt){prompt.value='';grow(prompt);prompt.blur();}
+  }finally{visionConversationBusy=false;syncConversationControls();}
 }
 function openChat(chatId){
+  if(visionSendBusy||visionConversationBusy){announceVision('Please wait for the current request before changing conversations.');return;}
   const c=state.chats.find(x=>x.id===chatId);if(!c)return;
-  state.chatId=chatId;state.currentTicket=c.ticket||'';renderHistory();renderThread();renderOrder();closeDrawers();
+  state.chatId=chatId;state.currentTicket=c.ticket||'';renderHistory();renderThread({follow:true});renderOrder();closeDrawers();
 }
 function addMessage(role,text='',html=''){
   const c=ensureChat();c.messages.push({id:id(),role,text:String(text),html:String(html),at:now()});
@@ -134,6 +142,7 @@ function agentHistory(currentText=''){
 }
 function renderAgentNotice(){
   const notice=$('visionAgentNotice');if(!notice)return;
+  if($('visionLiveStatus'))$('visionLiveStatus').textContent=state.agentStatus==='online'?'AI READY':state.agentStatus==='unavailable'?'AI UNAVAILABLE':'AI UNVERIFIED';
   notice.textContent=state.agentStatus==='online'?'':state.agentStatus==='unavailable'
     ?'AI is not configured. Basic answers from connected Tech Check data are still available.'
     :'AI connection could not be verified. Basic Tech Check answers may still be available.';
@@ -145,22 +154,15 @@ async function checkAgentStatus(){
     const result=await db.functions.invoke('onsite-vision-agent',{body:{mode:'status'}});
     if(result.error||!result.data?.ok){
       state.agentStatus='unknown';
-      if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
       renderAgentNotice();
       return null;
     }
     state.agentStatus=result.data.model_configured?'online':'unavailable';
-    if($('visionLiveStatus')){
-      $('visionLiveStatus').textContent=result.data.model_configured?'AI LIVE':'DATA LIVE';
-      $('visionLiveStatus').title=result.data.model_configured
-        ?'OnSite Vision server AI '+String(result.data.model||'')+' is connected to live Tech Check data.'
-        :'Live Tech Check data is connected. The server AI model credential is not configured, so Vision is using deterministic fallback behavior.';
-    }
+    if($('visionLiveStatus'))$('visionLiveStatus').title='AI configuration status; Tech Check data checks are shown separately below.';
     renderAgentNotice();
     return result.data;
   }catch(error){
     state.agentStatus='unknown';
-    if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
     renderAgentNotice();
     return null;
   }
@@ -175,6 +177,7 @@ async function callVisionAgent(text){
       history:agentHistory(text)
     }});
     if(result.error||!result.data?.ok){
+      visionAgentRequestFailed=true;
       const code=result.data?.code||'';
       if(code==='OPENAI_API_KEY_MISSING')state.agentStatus='unavailable';
       else state.agentStatus='unknown';
@@ -185,6 +188,7 @@ async function callVisionAgent(text){
     renderAgentNotice();
     return result.data;
   }catch(error){
+    visionAgentRequestFailed=true;
     state.agentStatus='unknown';renderAgentNotice();
     console.warn('OnSite Vision server agent fallback',error);
     return null;
@@ -192,7 +196,7 @@ async function callVisionAgent(text){
 }
 function agentFactsHtml(facts=[]){
   if(!Array.isArray(facts)||!facts.length)return'';
-  return '<div class="vision-agent-facts">'+facts.slice(0,8).map(f=>'<div><small>'+esc(f.certainty||'')+'</small><span>'+esc(f.statement||'')+'</span></div>').join('')+'</div>';
+  return '<div class="vision-agent-facts"><b class="vision-facts-label">Supporting facts</b>'+facts.slice(0,8).map(f=>'<div><small>'+esc(f.certainty||'')+'</small><span>'+esc(f.statement||'')+'</span></div>').join('')+'</div>';
 }
 function agentProposalHtml(p){
   if(!p||p.type==='none')return'';
@@ -573,16 +577,44 @@ async function serverAgentAnswer(raw){
   html+=correctionProposalHtml(result.knowledge_proposal,raw);
   return html;
 }
+function announceVision(text){const node=$('visionRequestStatus');if(node)node.textContent=String(text||'');}
+function syncConversationControls(){
+  const busy=visionSendBusy||visionConversationBusy;
+  document.querySelectorAll('[data-chat-id],#visionNewChat,#visionHeaderNewButton,#visionAddButton').forEach(button=>{button.disabled=busy;});
+  if($('visionSendButton'))$('visionSendButton').disabled=busy;
+}
+function renderDataNotice(){
+  const node=$('visionDataNotice');if(!node)return;
+  const labels={jobs:'Jobs',preps:'Service orders',techs:'Team'};
+  const details=Object.entries(visionDataReads).map(([key,read])=>{
+    const stamp=read.checkedAt?new Date(read.checkedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/Chicago'})+' CT':'';
+    return labels[key]+(read.available?' checked '+stamp:read.checkedAt?' unavailable · last successful check '+stamp:' unavailable');
+  });
+  const partial=Object.values(visionDataReads).some(read=>!read.available);
+  node.textContent=partial?details.filter((_,index)=>!Object.values(visionDataReads)[index].available).join(' · '):'Tech Check checked '+new Date(visionDataReads.jobs.checkedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/Chicago'})+' CT · Jobs, service orders and team';
+  node.title=details.join(' · ');
+  node.classList.toggle('vision-data-partial',partial);
+}
+function unavailableReadHtml(keys){
+  const labels={jobs:'job',preps:'service-order',techs:'team'};
+  const missing=keys.filter(key=>!visionDataReads[key].available);
+  if(!missing.length)return'';
+  return '<div class="vision-direct warn"><b>Current '+missing.map(key=>labels[key]).join(' and ')+' data is unavailable.</b>Refresh data and try again. An unavailable read does not mean there are no records.</div>';
+}
 async function loadData(){
-  if($('visionLiveStatus'))$('visionLiveStatus').textContent='SYNC';
-  const [jobs,preps,techs]=await Promise.all([
+  const notice=$('visionDataNotice');if(notice)notice.textContent='Checking Tech Check data…';
+  const results=await Promise.allSettled([
     db.from('job_assignments').select('*').in('status',['assigned','started','completed']).order('assigned_at',{ascending:false}).limit(250),
     db.from('prep_tickets').select('id,ticket_no,site,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at,prep_items(equipment_type,purpose,unit_tag)').order('created_at',{ascending:false}).limit(250),
     db.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active',true).is('archived_at',null).in('role',['it','service']).order('full_name')
   ]);
-  if(jobs.error)throw jobs.error;
-  state.jobs=jobs.data||[];state.preps=preps.data||[];state.techs=techs.data||[];
-  if($('visionLiveStatus'))$('visionLiveStatus').textContent='LIVE';
+  ['jobs','preps','techs'].forEach((key,index)=>{
+    const result=results[index],response=result.status==='fulfilled'?result.value:null;
+    const available=Boolean(response&&!response.error&&Array.isArray(response.data));
+    visionDataReads[key].available=available;
+    if(available){state[key]=response.data;visionDataReads[key].checkedAt=now();}
+  });
+  renderDataNotice();
 }
 async function init(){
   db=await techCheckDb();
@@ -626,6 +658,7 @@ function renderHistory(){
     return '<button type="button" class="'+(c.id===state.chatId?'active':'')+'" data-chat-id="'+esc(c.id)+'">'+esc(c.title||'Conversation')+(stamp?'<small>'+esc(stamp)+(c.ticket?' · #'+esc(c.ticket):'')+'</small>':'')+'</button>';
   }).join(''):'<div class="vision-system-note">No conversations yet.</div>';
   if($('visionConversationTitle'))$('visionConversationTitle').textContent=chat()?.title||'New conversation';
+  syncConversationControls();
 }
 function sanitizeAssistantHtml(value){
   const template=document.createElement('template');
@@ -659,33 +692,29 @@ const VISION_PROMPT_SUGGESTIONS=['Ask Vision anything about Tech Check','“Give
 let visionPromptSuggestionTimer=null,visionPromptSuggestionIndex=0;
 function startVisionPromptSuggestions(){clearInterval(visionPromptSuggestionTimer);if(!$('visionPromptSuggestion'))return;visionPromptSuggestionTimer=setInterval(()=>{const live=$('visionPromptSuggestion');if(!live){clearInterval(visionPromptSuggestionTimer);return;}live.classList.add('fade-out');setTimeout(()=>{const current=$('visionPromptSuggestion');if(!current)return;visionPromptSuggestionIndex=(visionPromptSuggestionIndex+1)%VISION_PROMPT_SUGGESTIONS.length;current.textContent=VISION_PROMPT_SUGGESTIONS[visionPromptSuggestionIndex];current.classList.remove('fade-out');},650);},4200);}
 function message(m){
-  if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
-  return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./resources/vision-ai.jpg" alt=""> ONSITE <span class="vision-inline-brand">VISI<span class="vision-brand-o">O</span>N</span></div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
+  if(m.role==='user')return '<div class="vision-turn user" role="article" aria-label="Your message"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
+  const basis=String(m.html||'').includes('vision-agent-answer')?'AI response':/vision-job-card|LIVE DATABASE/.test(m.html||'')?'Tech Check lookup':'Vision guidance';
+  const copy=m.id?'<button type="button" class="vision-copy-answer" data-copy-message="'+esc(m.id)+'">Copy answer</button>':'';
+  return '<div class="vision-turn assistant" role="article" aria-label="Vision answer"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./resources/vision-ai.jpg" alt=""> ONSITE <span class="vision-inline-brand">VISI<span class="vision-brand-o">O</span>N</span></div><div class="vision-response-meta"><span>'+basis+'</span>'+copy+'</div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
 }
-function renderThread(){
+function renderThread({follow=false}={}){
   const h=$('visionThread');if(!h)return;const c=chat();const empty=!c||!c.messages.length;
+  const previous=h.querySelector('.vision-results');
+  const sameConversation=h.dataset.conversationId===(c?.id||'');
+  const previousTop=previous?.scrollTop||0;
+  const nearBottom=!previous||previous.scrollHeight-previous.scrollTop-previous.clientHeight<48;
   document.body.classList.toggle('vision-empty-chat',empty);
   document.body.classList.toggle('vision-voice-session',visionVoiceInteraction);
-  const latestMessage=c?.messages[c.messages.length-1];
-  const summary=latestMessage?.role==='assistant'&&String(latestMessage.html||'').includes('vision-draft-card');
-  document.body.classList.toggle('vision-summary-mode',Boolean(summary));
-  if(summary){
-    $('visionPrompt')?.blur();
-    h.innerHTML='<div class="vision-results">'+message(latestMessage)+'</div>'+welcome();
-  }else if(empty){
+  document.body.classList.remove('vision-summary-mode');
+  if(empty){
     h.innerHTML=welcome();
-  }else if(visionVoiceInteraction){
-    let assistantIndex=-1;for(let i=c.messages.length-1;i>=0;i--){if(c.messages[i].role==='assistant'){assistantIndex=i;break;}}
-    let userIndex=-1;if(assistantIndex>=0){for(let i=assistantIndex-1;i>=0;i--){if(c.messages[i].role==='user'){userIndex=i;break;}}}
-    const pair=[userIndex>=0?c.messages[userIndex]:null,assistantIndex>=0?c.messages[assistantIndex]:null].filter(Boolean);
-    const latest=c.messages[c.messages.length-1];
-    if(latest?.role==='user'&&latest!==pair[0])pair.push(latest);
-    h.innerHTML='<div class="vision-results">'+pair.map(message).join('')+'</div>'+welcome();
   }else{
     h.innerHTML='<div class="vision-results">'+c.messages.map(message).join('')+'</div>'+welcome();
   }
+  h.dataset.conversationId=c?.id||'';
   if(empty)startVisionPromptSuggestions();else clearInterval(visionPromptSuggestionTimer);
-  setTimeout(()=>bottom(false),0);
+  if(follow||!sameConversation||nearBottom)setTimeout(()=>bottom(false),0);
+  else if(h.querySelector('.vision-results'))h.querySelector('.vision-results').scrollTop=previousTop;
 }
 function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./resources/vision-ai.jpg" alt=""> ONSITE <span class="vision-inline-brand">VISI<span class="vision-brand-o">O</span>N</span></div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
 function bottom(smooth=true){
@@ -2123,12 +2152,14 @@ async function answer(text){
 
   if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
   const d=dateFrom(raw);
-  if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return dateJobs(d);
+  if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return unavailableReadHtml(['jobs'])||dateJobs(d);
   if(/\b(active jobs?|open jobs?|show me my active jobs?|current jobs?)\b/i.test(lower)){
+    const unavailable=unavailableReadHtml(['jobs']);if(unavailable)return unavailable;
     const all=[...new Set(state.jobs.filter(j=>j.status!=='completed').map(j=>String(j.ticket_no||'')))].filter(Boolean);
     return all.length?'<div class="vision-answer-title">'+all.length+' active Tech Check job'+(all.length===1?'':'s')+'</div>'+all.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No active Tech Check jobs are open right now.</div>';
   }
   if(/\b(needs? attention|attention|stuck|overdue|problem jobs?)\b/i.test(lower)){
+    const unavailable=unavailableReadHtml(['jobs','preps']);if(unavailable)return unavailable;
     const all=[...new Set(state.jobs.filter(j=>j.status!=='completed').map(j=>String(j.ticket_no||'')))].filter(Boolean),flag=all.filter(t=>{const p=prep(t),a=active(t);return a.some(x=>x.requires_it_handoff)&&(!p||!['released','closed'].includes(p.status));});
     return flag.length?'<div class="vision-answer-title">'+flag.length+' job'+(flag.length===1?'':'s')+' need workflow attention</div>'+flag.slice(0,10).map(jobCard).join(''):'<div class="vision-answer-title">No handoff blockers are showing right now.</div>';
   }
@@ -2162,32 +2193,40 @@ async function answer(text){
   return '<div class="vision-answer-title">I can work through the Tech Check record with you.</div><div class="vision-answer-copy">You can ask me to create a new Delivery, Pickup, Swap, or Service job, or work with an existing ticket or unit.</div>';
 }
 async function send(raw=null,source='text'){
-  if(visionSendBusy)return;
+  if(visionSendBusy||visionConversationBusy)return;
   if(source==='voice'){visionVoiceInteraction=true;document.body.classList.add('vision-voice-session');}
   const input=$('visionPrompt'),text=String(raw??input?.value??'').trim();if(!text)return;if(input){input.value='';grow(input);}
   visionSendBusy=true;
-  if($('visionSendButton'))$('visionSendButton').disabled=true;
+  visionAgentRequestFailed=false;syncConversationControls();announceVision('Thinking through your question…');
   document.querySelector('.vision-composer')?.setAttribute('aria-busy','true');
-  titleFrom(text);addMessage('user',text);renderThread();if(source!=='voice')($('visionThread').querySelector('.vision-results')||$('visionThread')).insertAdjacentHTML('beforeend',typing());bottom();
+  titleFrom(text);addMessage('user',text);const questionId=chat()?.messages.at(-1)?.id;renderThread({follow:true});if(source!=='voice')($('visionThread').querySelector('.vision-results')||$('visionThread')).insertAdjacentHTML('beforeend',typing());bottom(false);
   setVisionRuntimeState('thinking','Thinking…');
   try{
     const html=await answer(text);
     setVisionRuntimeState('working','Checking Tech Check…');
     $('visionTyping')?.remove();
-    addMessage('assistant','',html);
+    addMessage('assistant','',html+(visionAgentRequestFailed?editQuestionHtml(questionId):''));
     renderThread();renderOrder();
     const voiceStatus=$('visionVoiceStatus');if(source==='voice'&&voiceStatus){voiceStatus.textContent='';voiceStatus.className='vision-voice-status hidden';}
     setVisionRuntimeState('ready','Ready');
+    announceVision(visionAgentRequestFailed?'AI could not answer. Basic Tech Check guidance is shown; you can edit your question.':'Answer ready.');
     setTimeout(()=>{setVisionRuntimeState('idle','Vision is ready');if(source==='voice'&&visionWakeArmed)setTimeout(startVisionWakeListener,350);},900);
   }catch(error){
-    $('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();
+    $('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>'+editQuestionHtml(questionId));renderThread();announceVision('The request could not finish. Your question is saved; use Edit question to try again.');
     const voiceStatus=$('visionVoiceStatus');if(source==='voice'&&voiceStatus){voiceStatus.textContent='';voiceStatus.className='vision-voice-status hidden';}
     setVisionRuntimeState('error','Vision needs attention');if(source==='voice'&&visionWakeArmed)setTimeout(startVisionWakeListener,1200);
   }finally{
     visionSendBusy=false;
-    if($('visionSendButton'))$('visionSendButton').disabled=false;
+    syncConversationControls();
     document.querySelector('.vision-composer')?.setAttribute('aria-busy','false');
   }
+}
+function editQuestionHtml(questionId){return questionId?'<button type="button" class="vision-edit-question" data-edit-question="'+esc(questionId)+'">Edit question</button>':'';}
+async function copyVisionAnswer(messageId){
+  const m=chat()?.messages.find(row=>row.id===messageId&&row.role==='assistant');if(!m)return;
+  const text=plainHtml(sanitizeAssistantHtml(m.html||''))||String(m.text||'');
+  try{await navigator.clipboard.writeText(text);announceVision('Answer copied.');}
+  catch{announceVision('Copy is unavailable in this browser. Select the answer text to copy it.');}
 }
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;
@@ -2591,6 +2630,11 @@ async function voice(){
   }
 }
 document.addEventListener('click',async e=>{
+  const copy=e.target.closest('[data-copy-message]');if(copy){await copyVisionAnswer(copy.dataset.copyMessage);return;}
+  const edit=e.target.closest('[data-edit-question]');if(edit){
+    const question=chat()?.messages.find(row=>row.id===edit.dataset.editQuestion&&row.role==='user');
+    if(question){const prompt=$('visionPrompt');prompt.value=question.text;grow(prompt);prompt.focus();announceVision('Question restored for editing. Send it when ready.');}return;
+  }
   const c=e.target.closest('[data-chat-id]');if(c)return openChat(c.dataset.chatId);
   const voiceOrb=e.target.closest('[data-vision-voice]');if(voiceOrb)return voice();
   const p=e.target.closest('[data-vision-prompt],[data-order-prompt]');if(p)return send(p.dataset.visionPrompt||p.dataset.orderPrompt);

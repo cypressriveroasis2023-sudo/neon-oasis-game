@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark"><meta name="theme-color" content="#0B111C">
   <title>CAMERAS ONSITE OnSite Vision</title>
   <link rel="icon" type="image/jpeg" href="./resources/vision-ai.jpg?v=3">
@@ -53,7 +53,7 @@
           <button id="visionRefreshButton" class="vision-icon-button" type="button" aria-label="Refresh data">↻</button>
         </div>
       </header>
-      <section id="visionThread" class="vision-thread"></section>
+      <section id="visionThread" class="vision-thread" role="region" aria-label="Conversation"></section>
       <footer class="vision-composer-wrap">
         <label class="vision-prompt-label" for="visionPrompt">Ask Vision</label>
         <div class="vision-composer vision-composer-v36">
@@ -64,6 +64,8 @@
         </div>
         <div id="visionPromptHelp" class="vision-prompt-help">Enter to send · Shift+Enter for a new line</div>
         <div id="visionAgentNotice" class="vision-agent-notice" role="status">Checking AI connection…</div>
+        <div id="visionDataNotice" class="vision-data-notice" role="status" aria-atomic="true">Checking Tech Check data…</div>
+        <div id="visionRequestStatus" class="vision-request-status" role="status" aria-atomic="true"></div>
         <div id="visionVoiceStatus" class="vision-voice-status hidden" aria-live="polite"></div>
         <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
       </footer>

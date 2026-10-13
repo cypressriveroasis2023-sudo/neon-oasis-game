@@ -72,3 +72,50 @@ html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-orb
   html body #visionApp .vision-prompt-help { display: none; }
   html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-rotating-prompt { display: none !important; }
 }
+
+/* Assistant-only response tools and status; shared application styles stay intact. */
+html body #visionApp .vision-data-notice,
+html body #visionApp .vision-request-status {
+  max-width: 700px;
+  margin: 5px auto 0;
+  color: var(--cos-text, #e6edf7);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+html body #visionApp .vision-request-status:empty { display: none; }
+html body #visionApp .vision-data-partial { color: #edc27b; }
+html body #visionApp .vision-response-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--cos-text, #e6edf7);
+  font-size: 12px;
+}
+html body #visionApp .vision-copy-answer,
+html body #visionApp .vision-edit-question {
+  border: 1px solid #617895;
+  border-radius: 8px;
+  background: #18283a;
+  color: #fff;
+  min-height: 36px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+html body #visionApp .vision-copy-answer:focus-visible,
+html body #visionApp .vision-edit-question:focus-visible {
+  outline: 2px solid #91b0ff;
+  outline-offset: 3px;
+}
+html body #visionApp .vision-facts-label { display: block; margin: 12px 0 6px; }
+html body #visionApp .vision-draft-card { max-height: min(60dvh, 480px); overflow-y: auto; }
+html body #visionApp .vision-results { overflow-anchor: none; }
+html[data-vision-state] body.vision-voice-session:not(.vision-empty-chat) #visionThread > .vision-results { display: block !important; }
+html body #visionApp [data-chat-id]:disabled,
+html body #visionApp #visionNewChat:disabled,
+html body #visionApp #visionHeaderNewButton:disabled,
+html body #visionApp #visionAddButton:disabled { opacity: .65; cursor: wait; }
