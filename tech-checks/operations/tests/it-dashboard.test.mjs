@@ -8,6 +8,7 @@ import ts from 'typescript';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as gps from '../src/gpsPersistence.ts';
+import * as fleetSnapshot from '../src/fleetSnapshot.ts';
 import * as locations from '../src/fieldLocations.ts';
 import * as cameras from '../src/cameraDashboardSummary.ts';
 import * as tracker from '../src/unitTracker.ts';
@@ -41,7 +42,7 @@ function fixture() {
     },
     'react/jsx-runtime': require('react/jsx-runtime'),
     './api': { api: { get(path) { const next = deferred(); calls.push({ path, ...next }); return next.promise; } } },
-    './gpsPersistence': gps, './fieldLocations': locations, './cameraDashboardSummary': cameras,
+    './gpsPersistence': gps, './fleetSnapshot': fleetSnapshot, './fieldLocations': locations, './cameraDashboardSummary': cameras,
     './unitTracker': tracker,
     '../../supabase/functions/cos-operations-pages/routers': routers,
     '../../supabase/functions/cos-operations-pages/vrm': vrm,
@@ -287,4 +288,11 @@ test('queue refresh clears stale assignments while its sibling references stay a
   f.calls[7].reject(new Error('Queue unavailable')); await refresh;
   assert.equal(f.readers[6].getSnapshot().data, null); assert.equal(f.readers[6].getSnapshot().readAt, null);
   f.cleanup();
+});
+
+test('daily Field View card shares active field inventory scope with the fleet workspace',()=>{
+ const f=fixture(),source=field();
+ const items=[{...source.items[0],currentLocationType:'site'},{...source.items[1],currentLocationType:'field'}];
+ const summary=f.summarizeITFieldMap({...source,inventoryItems:[...items,{...items[0],id:'33333333-3333-4333-8333-333333333333',currentLocationType:'root'},{...items[0],id:'44444444-4444-4444-8444-444444444444',status:'retired'}]});
+ assert.equal(summary.count,2);assert.equal(summary.metrics.find(metric=>metric.label==='Owner-verified pins').value,1);
 });

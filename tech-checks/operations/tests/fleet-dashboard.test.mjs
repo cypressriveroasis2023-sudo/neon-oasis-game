@@ -21,3 +21,26 @@ test('solar support remains blue and visible across the independent health layer
 test('normal Victron battery and system instances keep charge available and surface a low individual battery',()=>{const multi=structuredClone(vrm),m=multi.power[0].measurements; m.push({...m[0],source:'battery',instance:278,value:75},{...m[0],source:'battery',instance:512});let r=fleetDashboardRows(units,raw,[router],multi,now)[0];assert.equal(r.batteryPercent,75);assert.equal(r.batteryState,'online');m[1].value=12;r=fleetDashboardRows(units,raw,[router],multi,now)[0];assert.equal(r.batteryPercent,12);assert.equal(r.batteryState,'offline');m[1].observedAt='2026-10-01T00:00:00Z';r=fleetDashboardRows(units,raw,[router],multi,now)[0];assert.equal(r.batteryPercent,80);assert.equal(r.batteryState,'online');m.push({metric:'low_soc_alarm',value:2,unit:'state',instance:278,source:'battery',observedAt:fresh});assert.equal(fleetDashboardRows(units,raw,[router],multi,now)[0].batteryState,'offline');});
 
 test('nearby search uses only verified current installation coordinates and never includes estimates',()=>{const located=units.map((u,i)=>({...u,latitude:29.7+i,longitude:-95.4,coordinateSource:'site',locationVerification:i<2?'owner_verified':'address_only',locationVerifiedAt:fresh,gpsRecordedAt:fresh}));const rows=fleetDashboardRows(located,raw,[],vrm,now);const near=filterFleetDashboard(rows,{...initialFleetFilters,status:'all',nearbyId:located[0].id,radius:10});assert.deepEqual(near.map(r=>r.id),[located[0].id]);});
+
+test('charge summaries preserve every distinct source and its measured time, separate from the saved read',()=>{
+ const multi=structuredClone(vrm),power=multi.power[0],at=new Date(now-10*60000).toISOString();power.lastAttemptAt=new Date(now).toISOString();
+ power.measurements=[{...power.measurements[0],value:100},{...power.measurements[0],source:'battery',instance:278,value:92.7,observedAt:at},{...power.measurements[0],source:'battery',instance:512,value:100}];
+ const row=fleetDashboardRows(units,raw,[],multi,now)[0];assert.equal(row.batteryPercent,92.7);assert.deepEqual(row.batteryReadings.map(r=>[r.source,r.percent]),[['Victron · system 0',100],['Victron · battery 278',92.7],['Victron · battery 512',100]]);assert.equal(row.batteryReadings[1].observedAt,at);assert.notEqual(row.batteryReadings[1].observedAt,row.power.lastAttemptAt);
+ const stale=fleetDashboardRows(units,raw,[],multi,now+3600000)[0];assert.equal(stale.batteryPercent,null);assert(stale.batteryReadings.every(r=>!r.fresh));assert.equal(stale.batteryReadings[1].percent,92.7);
+ power.errorCode='provider';const failed=fleetDashboardRows(units,raw,[],multi,now)[0];assert.equal(failed.batteryPercent,null);assert.equal(failed.batteryState,'unknown');assert.equal(failed.batteryReadings.length,3);
+ const ambiguous=fleetDashboardRows([...units,{...units[0],id:'another-identity'}],raw,[],multi,now)[0];assert.deepEqual(ambiguous.batteryReadings,[]);
+});
+test('partial and future charge observations stay explicitly unverified without renewing their timestamps',()=>{
+ const multi=structuredClone(vrm),power=multi.power[0];power.measurements.push({...power.measurements[0],value:10,source:'battery',instance:278,observedAt:'2026-10-01T00:00:00Z'},{...power.measurements[0],value:0,source:'battery',instance:512,observedAt:new Date(now+60000).toISOString()});
+ const row=fleetDashboardRows(units,raw,[],multi,now)[0];assert.equal(row.batteryPercent,80);assert.equal(row.batteryReadings[1].fresh,false);assert.equal(row.batteryReadings[2].observedAt,null);assert.equal(row.batteryReadings[2].fresh,false);
+});
+
+
+test('two canonical Victron installations cannot masquerade as one link when only one has power',()=>{
+ const duplicate=structuredClone(vrm);duplicate.items.push({name:'HELIOS 1',installationId:1002});const row=fleetDashboardRows(units,raw,[],duplicate,now)[0];assert.equal(row.power,null);assert.equal(row.batteryPercent,null);assert.equal(row.batteryState,'unknown');assert.deepEqual(row.batteryReadings,[]);
+});
+
+
+test('global Victron sync failures cannot present retained power as current charge',()=>{
+ for(const sync of [{state:'error',error:'private diagnostic'},{state:'stale',error:null}]){const failed={...vrm,sync},row=fleetDashboardRows(units,raw,[],failed,now)[0];assert.equal(row.batteryPercent,null);assert.equal(row.batteryState,'unknown');assert(row.batteryReadIssue);assert(!row.batteryReadIssue.includes('private'));assert.equal(row.batteryReadings[0].percent,80);}
+});

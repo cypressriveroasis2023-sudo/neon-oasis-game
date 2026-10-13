@@ -12,7 +12,7 @@ const origin = process.env.COS_IT_DAILY_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const dist = resolve(process.env.COS_IT_DAILY_TEST_DIST || fileURLToPath(new URL('../dist', import.meta.url)));
 const readHost = name => readFileSync(new URL('../../' + name, import.meta.url), 'utf8');
 const sources = ['cameras', 'field', 'victron', 'tracker'];
-const labels = ['Camera Health', 'Fleet Dashboard', 'Victron View', '2027 Unit Tracker'];
+const labels = ['Camera Health', 'Field View', 'Victron View', '2027 Unit Tracker'];
 const routes = { cameras: '#camera-health', field: '#fleet-dashboard', victron: '#victron-vrm', tracker: '#unit-tracker' };
 const sourcePaths = { cameras: '/api/camera-health/summary-v3', field: '/api/field-map', victron: '/api/vrm-fleet', tracker: '/api/unit-tracker' };
 const gate = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
@@ -166,6 +166,7 @@ for (const secondVerified of [false, true]) test('daily mode has exactly four vi
     expect((await card(frame, sources[index]).getByRole('button', {name: /^Open /}).boundingBox()).height).toBeGreaterThanOrEqual(44);
   }
   await expect(daily(frame)).not.toContainText(/MHelp information|Assigned checks|Router inventory/);
+  await expect(daily(frame).getByRole('button',{name:'Open Fleet Dashboard →',exact:true})).toHaveCount(0);
   const nav = await menu(frame);
   for (const label of labels) await expect(nav.getByRole('button', {name: label, exact: true})).toBeVisible();
   await expect(nav.getByRole('button', {name: /Tech Checks|InHand Routers|MHelp|Team|Dispatch|Money|Vision assistant/})).toHaveCount(0);
@@ -182,7 +183,7 @@ test('each allowed view survives Back, Forward and reload', async ({page}) => {
   for (const source of sources) {
     await card(frame, source).getByRole('button', {name: /^Open /}).click();
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
-    if (source === 'cameras') await expect(frame.locator('.camera-overview-card')).toHaveCount(1);
+    if (source === 'cameras') await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);
     if (source === 'field') await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible();
     if (source === 'victron') await expect(frame.getByRole('navigation', {name: 'Helios installations'}).getByRole('button')).toHaveCount(1);
     if (source === 'tracker') await expect(frame.getByRole('region', {name: 'Unit Tracker workspace'})).toBeVisible();

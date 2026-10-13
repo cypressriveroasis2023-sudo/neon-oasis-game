@@ -59,3 +59,8 @@
 .cos-fleet-advanced-filters{margin-top:12px;color:#c5d2e4;font-size:12px}.cos-fleet-advanced-filters>summary,.cos-fleet-map-info>summary{cursor:pointer;padding:6px 0;font-weight:600}.cos-fleet-advanced-filters small{margin-top:8px}.cos-fleet-map-info{margin-top:12px;padding:10px 14px;border:1px solid #3b485c;border-radius:7px;background:#111720;color:#c5d2e4;font-size:12px}.cos-fleet-map-info p{margin:10px 0}.cos-fleet-map-info ul{padding-left:20px}.cos-fleet-unit-list .cos-fleet-unit-row.selected{background:#1c293a!important;border-color:#74869e!important}
 
 .cos-fleet-detail-signals>p{grid-column:1/-1;font-size:12px;color:#c5d2e4;line-height:1.6}
+
+/* Keep actual charge and source times at the top of each shared unit detail. */
+.cos-fleet-battery-summary{margin:14px 0;padding:13px;border:1px solid #3b4a5f;border-radius:7px;background:#16202c}.cos-fleet-battery-summary>strong{display:block;font-size:30px;line-height:1.2}.cos-fleet-battery-summary>p{font-size:12px;margin:4px 0}.cos-fleet-battery-summary>small{margin-top:5px;overflow-wrap:anywhere}.cos-fleet-drawer .cos-fleet-battery-summary dl{margin:10px 0}.cos-fleet-drawer .cos-fleet-battery-summary dl>div{grid-template-columns:minmax(95px,.8fr) minmax(0,1.5fr);gap:8px;border-top:1px solid #314052;font-size:11px}.cos-fleet-battery-summary dt{overflow-wrap:anywhere}.cos-fleet-battery-summary dd small{font-size:10px;margin-top:3px}.cos-fleet-unit-row .cos-fleet-battery-compact{white-space:normal;overflow-wrap:anywhere;color:#d4e2f3}
+
+.cos-fleet-placement-status{margin:12px 0;padding:10px 12px;border:1px solid #526883;border-radius:6px;background:#182435;font-size:12px}.cos-fleet-placement-status p,.cos-fleet-placement-status small{margin-top:5px;overflow-wrap:anywhere}

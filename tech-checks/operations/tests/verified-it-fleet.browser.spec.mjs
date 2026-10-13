@@ -38,7 +38,7 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
  await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
- await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
  const routerReads=calls.filter(c=>c.path==='/api/routers').length;
  expect(routerReads).toBeGreaterThan(0);

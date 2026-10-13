@@ -13,7 +13,7 @@ async function mount(page,view,late='map'){
  const rows=identities.map((i,n)=>resource(n+1,i.unitKeys[0],{type:n<2?'NVR':'IPC',activationState:n<2?'deactivated':'active',scope:n<2?'shop':'field',evidence:{kind:'provider',source:'Star4Live',resource:n<2?'recorder':'camera',active:n===2,status:n===0?'online':'offline',observedAt:freshAt,lastOnlineAt:null}}));
  const state={units,rows,guards,identities,reads:{map:0,summary:0},responses:{map:0,summary:0},gates:{map:null,summary:null},stamps:[],writes:[],errors:[],mode:'valid'};
  state.gates[late]=deferred();page.on('pageerror',e=>state.errors.push(e.message));await page.clock.install({time:new Date(startAt)});await page.clock.pauseAt(new Date(startAt));
- const hash=view==='map'?'field-map':view==='overview'?'camera-health':'camera-health?unit='+units[1].id;
+ const hash=view==='map'?'field-map':view==='overview'?'camera-health?diagnostics=1':'camera-health?diagnostics=1&unit='+units[1].id;
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/recorder-clock-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#${hash}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});

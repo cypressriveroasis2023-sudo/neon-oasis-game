@@ -30,7 +30,7 @@ async function mount(page,{sourceCases=false,overview=false}={}){
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
-  if(url.pathname==='/verified-health-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${overview?'camera-health':'field-map'}"></iframe><script>window.fixtureAuth=true;addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:window.fixtureAuth?'owner':'',accessToken:window.fixtureAuth?'synthetic-only':''},location.origin)})</script>`});
+  if(url.pathname==='/verified-health-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${overview?'camera-health?diagnostics=1':'field-map'}"></iframe><script>window.fixtureAuth=true;addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:window.fixtureAuth?'owner':'',accessToken:window.fixtureAuth?'synthetic-only':''},location.origin)})</script>`});
   if(url.protocol==='http:'&&url.hostname==='127.0.0.1')return route.continue();
   if(/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(request.url()))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e5eadd"/></svg>'});
   if(!url.pathname.endsWith('/functions/v1/cos-operations-pages')){state.blockedExternal.push(request.url());return route.abort('blockedbyclient');}
@@ -69,7 +69,7 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
- 
+
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · online'));
  await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · unknown'));
@@ -89,7 +89,7 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.camera-device-cards .camera-resource-access')).toHaveCount(4);
  for(const [index,id] of ownerIds.entries())await expect(frame.locator('.camera-device-cards .camera-resource-access').nth(index)).toHaveAttribute('href','../../camera-detail.html?id='+id);
  await noOverflow(frame);
- await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
+ await navigate(page,'camera-health?diagnostics=1');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner).toHaveCount(1);await expect(owner.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
  await expect(owner.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(labels.owner));
@@ -118,7 +118,7 @@ test('native HDC proof, recorder proof and bound service proof retain separate s
  await expect(listUnit(frame,labels.native)).toContainText('CAMERA RECORDS ONLINE');await expect(listUnit(frame,labels.recorder)).toContainText('RECORDER ONLINE');await expect(listUnit(frame,labels.service)).toContainText('IP / PORT ONLINE');
  await expect(listUnit(frame,labels.unbound)).not.toContainText('IP / PORT ONLINE');await expect(listUnit(frame,labels.unbound)).toContainText('unverified');
  await listUnit(frame,labels.recorder).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');
- await navigate(page,'camera-health?unit='+ids.recorder);await expect(frame.locator('.camera-unit-state')).toHaveText('RECORDER ONLINE');await expect(frame.locator('.camera-unit-detail')).toContainText('Individual camera channels and video are not verified');await expect(frame.locator('.camera-device-cards article')).toHaveCount(1);
+ await navigate(page,'camera-health?diagnostics=1&unit='+ids.recorder);await expect(frame.locator('.camera-unit-state')).toHaveText('RECORDER ONLINE');await expect(frame.locator('.camera-unit-detail')).toContainText('Individual camera channels and video are not verified');await expect(frame.locator('.camera-device-cards article')).toHaveCount(1);
  noWrites(state);
 });
 
@@ -139,7 +139,7 @@ for(const mutation of ['partial resource set','extra resource in source group','
  await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
- await navigate(page,'camera-health?unit='+ids.owner);await expect(frame.locator('.camera-unit-state')).not.toContainText('ONLINE');await expect(frame.locator('.camera-device-cards article')).toHaveCount(0);
+ await navigate(page,'camera-health?diagnostics=1&unit='+ids.owner);await expect(frame.locator('.camera-unit-state')).not.toContainText('ONLINE');await expect(frame.locator('.camera-device-cards article')).toHaveCount(0);
  if(mutation==='explicit identity warning')await expect(frame.locator('.camera-unit-detail')).toContainText('Saved unit identity needs review.');
  await noOverflow(frame);noWrites(state);
 });
@@ -200,7 +200,7 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  await expect(selectedHealth).toBeVisible();
  await expect(selectedHealth).toContainText('CAMERA RECORDS MIXED / PARTLY VERIFIED');
  await expect(selectedHealth).not.toContainText('SYSTEM ONLINE');
- await navigate(page,'camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');
+ await navigate(page,'camera-health?diagnostics=1');await frame.getByLabel('Camera Health unit filter').selectOption('all');
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner.locator('.camera-status-pill')).not.toContainText('ONLINE');
  await expect(owner).toContainText('3 camera/detector records online · 0 offline · 1 unverified');

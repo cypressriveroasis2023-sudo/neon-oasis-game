@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { api, openLegacy } from './api';
 import { checkedFieldMap } from './gpsPersistence';
+import {inventoryPlacement} from './fleetSnapshot';
 import { isCurrentFieldPin, type FieldLocation } from './fieldLocations';
 import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { checkedTrackerSnapshot, trackerAccess } from './unitTracker';
@@ -57,7 +58,7 @@ export function createITSourceReader<T>(load: (force?:boolean) => Promise<T>, en
 
 export function summarizeITFieldMap(value: unknown): Summary {
   const field = checkedFieldMap(value);
-  const rows = field.items as FieldLocation[];
+  const rows = (Array.isArray(field.inventoryItems)?field.inventoryItems.filter((row:Parameters<typeof inventoryPlacement>[0]&{status?:string})=>inventoryPlacement(row)==='field'&&!['retired','decommissioned','deleted','stolen'].includes(String(row.status||''))):field.items) as FieldLocation[];
   return { count: rows.length, label: 'field units', metrics: [
     { label: 'Saved addresses', value: rows.filter(row => typeof row.address === 'string' && row.address.trim()).length },
     { label: 'Owner-verified pins', value: rows.filter(isCurrentFieldPin).length },

@@ -3,6 +3,7 @@ import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {signSheetsAssertion} from './googleSheetsRuntime.ts';
 const mhelpTokens=nativeMhelpTokens(name=>Deno.env.get(name));
 Deno.serve(createOperationsHandler({
+  fetch:mhelpTokens.fetch,
   platformUrl:Deno.env.get('SUPABASE_URL'),
   serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
   vrmEmbeds:Deno.env.get('COS_VRM_EMBEDS'),

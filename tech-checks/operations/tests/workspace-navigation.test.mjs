@@ -58,3 +58,13 @@ test('Victron bookmarks preserve only positive safe installation IDs',()=>{
 });
 
 test('IT-only dashboard and MHelp bookmarks do not change Owner workspace groups',()=>{for(const workspace of ['IT Dashboard','MHelp']){const route={workspace,jobId:'',detail:false};assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);assert.equal(workspaces.includes(workspace),false);}});
+
+test('advanced camera diagnostics is an explicit mode, not a new primary workspace',()=>{
+ const unitId='11111111-1111-4111-8111-111111111111';
+ const route={workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,unitId};
+ assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
+ assert.equal(workspaceHash(route),'#camera-health?diagnostics=1&unit='+unitId);
+ assert.equal(readWorkspaceRoute('#camera-health').diagnostics,undefined);
+ for(const hash of ['#fleet-dashboard?diagnostics=1','#it-dashboard?diagnostics=1','#camera-health?diagnostics=yes'])assert.equal(readWorkspaceRoute(hash).diagnostics,undefined);
+ assert.equal(workspaces.includes('Advanced camera diagnostics'),false);
+});

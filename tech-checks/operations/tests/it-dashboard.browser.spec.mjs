@@ -150,7 +150,7 @@ test('all six cards retain their workspaces, browser Back and Dashboard return',
     await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(routes[source]);
     if(source==='field')await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible();
     if(source==='routers')await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toBeVisible();
-    if(source==='cameras')await expect(frame.locator('.camera-overview-card')).toHaveCount(1);
+    if(source==='cameras')await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);
     if(source==='victron')await expect(frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(11);
     if(source==='tracker')await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
     if(source==='mhelp')await expect(frame.getByRole('region',{name:'MHelp information'})).toContainText('SYN-4101');

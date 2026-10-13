@@ -2,7 +2,7 @@
 // Existing authorization, records and Owner controls remain unchanged.
 export const IT_DAILY_ONLY = true;
 export const IT_DAILY_WORKSPACES = Object.freeze(['Camera Health', 'Fleet Dashboard', 'Victron VRM', 'Unit Tracker']);
-export const itDailyLabel = name => ({'Field Map':'Fleet Dashboard','Victron VRM':'Victron View','Unit Tracker':'2027 Unit Tracker'}[name] || name);
+export const itDailyLabel = name => ({'Field Map':'Field View','Fleet Dashboard':'Field View','Victron VRM':'Victron View','Unit Tracker':'2027 Unit Tracker'}[name] || name);
 
 // Keep the explicit daily context across the existing camera tools, including new tabs.
 export function itDailyCameraUrl(href, search = globalThis.location?.search || '') {

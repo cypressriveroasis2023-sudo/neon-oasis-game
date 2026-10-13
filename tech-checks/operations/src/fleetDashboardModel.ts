@@ -7,7 +7,8 @@ import {cameraTimestamp} from './cameraEvidence';
 
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
-export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
+export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
+export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
 export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
 export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'operational',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
@@ -18,16 +19,20 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const camera=fieldCameraHealth(unit,units,health,now),linkedRouters=(routers||[]).filter(r=>r.match==='exact_name'&&r.candidateUnit?.id===unit.id);
   const routerStates=linkedRouters.map(r=>routerStatus(r,now)).map(s=>s==='reachable'?'online':s==='unreachable'?'offline':'unknown') as Signal[];
   const matches=key?.startsWith('HELIOS|')?power.filter(r=>canonicalCameraUnit(r.name)===key):[];
-  const p=matches.length===1&&units.filter(u=>canonicalCameraUnit(u.unitNumber)===key).length===1?matches[0]:null;
-  let batteryState:Signal='not_available',batteryPercent:number|null=null;
+  const p=matches.length===1&&vrm.items.filter((item:{name:string})=>canonicalCameraUnit(item.name)===key).length===1&&units.filter(u=>canonicalCameraUnit(u.unitNumber)===key).length===1?matches[0]:null;
+  let batteryState:Signal='not_available',batteryPercent:number|null=null,batteryReadings:BatteryReading[]=[];
+  const batteryReadIssue=key?.startsWith('HELIOS|')?(p?.errorCode||vrm?.sync?.error||vrm?.sync?.state==='error'?'Latest Victron read unavailable':vrm?.sync?.state==='stale'?'Victron sync is stale':null):null;
   if(key?.startsWith('HELIOS|')){
    batteryState='unknown';
-   if(p&&!p.errorCode){const recent=p.measurements.filter(m=>cameraTimestamp(m.observedAt,now).fresh),soc=recent.filter(m=>m.metric==='battery_soc');
+   batteryReadings=(p?.measurements||[]).filter(m=>m.metric==='battery_soc').map(m=>({source:'Victron · '+m.source+' '+m.instance,percent:m.value,observedAt:cameraTimestamp(m.observedAt,now).at,fresh:cameraTimestamp(m.observedAt,now).fresh}));
+   if(p&&!batteryReadIssue){const recent=p.measurements.filter(m=>cameraTimestamp(m.observedAt,now).fresh),soc=recent.filter(m=>m.metric==='battery_soc');
     // Multiple battery and system instances are normal in Victron. Surface the lowest recent charge.
     batteryPercent=soc.length?Math.min(...soc.map(m=>m.value)):null;
     batteryState=recent.some(m=>m.unit==='state'&&m.value>0)||batteryPercent!==null&&batteryPercent<20?'offline':batteryPercent!==null?'online':'unknown';}
   }else if(key?.startsWith('RECON2|')){
-   const readings=camera.identity==='matched'?camera.rows.filter(r=>r.evidence?.source==='Reconeyez').map(r=>r.batteryEvidence).filter(Boolean):[];
+   const batteryRows=camera.identity==='matched'?camera.rows.filter(r=>r.evidence?.source==='Reconeyez'&&r.batteryEvidence):[];
+   const readings=batteryRows.map(r=>r.batteryEvidence).filter(Boolean);
+   batteryReadings=batteryRows.filter(r=>r.batteryEvidence!.percent!==null).map(r=>({source:'Reconeyez · '+r.name,percent:r.batteryEvidence!.percent!,observedAt:cameraTimestamp(r.batteryEvidence!.percentObservedAt,now).at,fresh:cameraTimestamp(r.batteryEvidence!.percentObservedAt,now).fresh}));
    const values=readings.filter(b=>b?.percent!==null&&cameraTimestamp(b?.percentObservedAt,now).fresh).map(b=>b!.percent!);
    batteryPercent=values.length?Math.min(...values):null;
    batteryState=combine(readings.map(b=>cameraTimestamp(b?.statusObservedAt,now).fresh&&b?.status?b.status==='normal'?'online':'offline':cameraTimestamp(b?.percentObservedAt,now).fresh&&b?.percent!==null?(b!.percent!<20?'offline':'online'):'unknown'));
@@ -35,7 +40,7 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const locationVerified=isCurrentFieldPin(unit),locationNeedsReview=placement==='field'&&!locationVerified;
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];
   const providers=[...new Set(camera.rows.map(r=>r.evidence?.source).filter(Boolean))];
-  return {unit,id:unit.id,name:unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,routers:linkedRouters,power:p,locationVerified,locationNeedsReview,review};
+  return {unit,id:unit.id,name:unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,locationVerified,locationNeedsReview,review};
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){
