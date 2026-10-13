@@ -84,7 +84,8 @@ test('selection change during fresh preflight cannot send the prior unit lookup'
  const button=frame.getByRole('button',{name:'Run approved Census lookup',exact:true});await expect(button).toBeVisible();await button.click();
  await expect.poll(()=>state.mapGate===null).toBe(true);
  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
- await frame.locator('body').evaluate(unitId=>{location.hash='#field-map?unit='+unitId;},otherId);
+ await frame.locator('body').evaluate((_body,unitId)=>{location.hash='#field-map?unit='+unitId;},otherId);
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+otherId);
  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',otherId);
  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
@@ -126,7 +127,8 @@ test('selection away and back during Run preflight invalidates the old action wi
  await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  // Hash-route unit selection is supported while busy; unlike list clicks it does not wait for a timeout.
  for(const unitId of [otherId,id]){
-  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
   await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
   await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
   expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);

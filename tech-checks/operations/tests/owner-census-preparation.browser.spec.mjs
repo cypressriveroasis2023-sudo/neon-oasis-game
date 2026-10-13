@@ -79,7 +79,8 @@ test('selection away and back during preparation preflight sends zero preparatio
  await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.field-map-workspace').elementHandle();
  await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  for(const unitId of [otherId,id]){
-  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
   await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
   await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
   expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
@@ -93,7 +94,8 @@ test('selection away and back during preparation cannot admit a late receipt',as
  const workspace=await frame.locator('.field-map-workspace').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
  for(const unitId of [otherId,id]){
-  await frame.locator('body').evaluate(value=>{location.hash='#field-map?unit='+value;},unitId);
+  await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
   await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
   expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
  }
