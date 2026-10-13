@@ -36,18 +36,18 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();
  await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
- await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
+ await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
  const routerReads=calls.filter(c=>c.path==='/api/routers').length;
  expect(routerReads).toBeGreaterThan(0);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
- expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(c.path))).toBe(true);
+ expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers','/api/vrm-fleet','/api/equipment'].includes(c.path))).toBe(true);
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });
 for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
-test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
+test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
 
 for(const role of ['it','owner'])test(role+' fullscreen fallback fills host and restores its original frame',async({page})=>{
  await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
@@ -106,7 +106,7 @@ test('Owner Home Fleet Dashboard supports keyboard, browser Back and repeated en
  await page.screenshot({path:testInfo.outputPath('owner-home-field-view.png'),fullPage:true});
  await entry.focus();await page.keyboard.press('Enter');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  await page.evaluate(()=>history.back());await expect(entry).toBeVisible();await expect(frame.locator('.home-field-view')).toHaveCount(1);
- await entry.click();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);
+ await entry.click();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);
  await page.evaluate(()=>history.back());await expect(entry).toBeVisible();expect(calls.every(c=>c.method==='GET')).toBe(true);
 });
 

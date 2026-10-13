@@ -187,7 +187,7 @@ test('endpoint claims/finishes exact original address and hash without accepting
 });
 
 test('suite estimate disclosure explicitly retains original address and unverified suite',()=>{
- const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8')+readFileSync(new URL('../src/LocationEstimatePreview.tsx',import.meta.url),'utf8');
  assert.match(source,/This estimate locates the building address; the suite and installed unit position remain unverified/);
 });
 test('ordinary unsuited Census success/failure behavior and client estimate shape are preserved',async()=>{

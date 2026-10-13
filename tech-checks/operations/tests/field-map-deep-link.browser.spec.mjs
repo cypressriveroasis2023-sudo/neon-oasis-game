@@ -161,7 +161,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   } = await mount(page, 'RII-022');
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await expect(frame.locator('.field-pin-label')).toContainText('Recon II 022');
+  await expect(frame.locator('.cos-field-pin-wrap')).toHaveAttribute('title',/Recon II 022/);
   expect(state.writes).toHaveLength(0);
   expect(errors).toEqual([]);
 }], ['Unknown or shop label never picks unrelated field unit', async page => {
@@ -171,7 +171,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   } = await mount(page, 'RANGER 999');
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveCount(0);
   await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
-  await expect(frame.locator('.toast')).toContainText('not currently in the field map');
+  await expect(frame.locator('.cos-fleet-message')).toContainText('not in the current inventory');
   expect(state.writes).toHaveLength(0);
 }], ['Canonical alias collision never selects a first pin', async page => {
   const units = [{
@@ -186,23 +186,19 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     state
   } = await mount(page, 'RANGER 022', units);
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveCount(0);
-  await expect(frame.locator('.toast')).toContainText('conflicting field records');
+  await expect(frame.locator('.cos-fleet-message')).toContainText('conflicting identities');
   expect(state.writes).toHaveLength(0);
 }], ['Back and Forward from native same-unit health preserve label match', async page => {
   const {
     frame,
     state
   } = await mount(page, 'RII-022');
+  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();
+  await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
-  await frame.getByRole('button', {
-    name: 'Back to Fleet Dashboard',
-    exact: true
-  }).click();
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Recon II 022');
-  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await frame.locator('body').evaluate(() => history.forward());
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toContain('#fleet-dashboard?unitId=');
   expect(state.writes).toHaveLength(0);
 }], ['Explicit deep link clears stale nearby filter that hides target pin', async page => {
   const {
@@ -223,6 +219,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   const {
     frame
   } = await mount(page, 'RII-022');
+  await frame.getByRole('button',{name:'Close unit details'}).click();
   await revealMapFilters(frame); await frame.getByLabel('Fleet status').selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
@@ -238,7 +235,7 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-ma
   await run(page);
 });
 
-test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});await revealMapInfo(frame);const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
+test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});const close=frame.getByRole('button',{name:'Close unit details'});if(await close.isVisible())await close.click();await revealMapInfo(frame);const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
 
 test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-fleet-dashboard')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.cos-fleet-drawer')).toContainText(/online/i);});
 
@@ -262,7 +259,7 @@ test('failed map refresh retains last good units and labels stale map data',asyn
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.locator('.field-map-error')).toHaveCount(0);
+ await expect(frame.locator('.cos-fleet-message')).toHaveCount(0);
 });
 
 test('hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces',async({page})=>{

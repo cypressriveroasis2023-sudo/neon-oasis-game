@@ -38,13 +38,13 @@ async function mount(page) {
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
   await openWorkspace(frame, 'Field Map');await showAllFieldHealth(frame);
-  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(815);
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(80);
   return { frame, requests };
 }
 async function bounded(frame) {
   const size = await frame.locator('.cos-fleet-workspace').evaluate(layout => {
     const list = layout.querySelector('.cos-fleet-unit-list'), map = layout.querySelector('.cos-fleet-map-panel'), detail = layout.querySelector('.cos-fleet-drawer');
-    return { mapHeight: map.getBoundingClientRect().height, listHeight: list.clientHeight, listContent: list.scrollHeight, detailHeight: detail.getBoundingClientRect().height, width: innerWidth, documentWidth: document.documentElement.scrollWidth };
+    return { mapHeight: map.getBoundingClientRect().height, listHeight: list.clientHeight, listContent: list.scrollHeight, detailHeight: detail?.getBoundingClientRect().height||0, width: innerWidth, documentWidth: document.documentElement.scrollWidth };
   });
   expect(size.mapHeight).toBeGreaterThanOrEqual(400);
   expect(size.mapHeight).toBeLessThanOrEqual(760);
@@ -62,18 +62,20 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   const before = await map.boundingBox();
   await frame.locator('.cos-fleet-unit-list').evaluate(list => { list.scrollTop = list.scrollHeight; });
   expect((await map.boundingBox()).y).toBeCloseTo(before.y, 0);
-  await frame.locator('.cos-fleet-unit-list > button').last().click();
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-815');
+  const last=frame.locator('.cos-fleet-unit-row').last();await last.click();
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-080');
   await page.keyboard.press('Shift+Tab');
-  await expect(frame.locator('.cos-fleet-unit-list > button').nth(813)).toBeFocused();
-  await page.keyboard.press('Space');
-  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-814');
-  await expect(frame.locator('.cos-fleet-unit-list > button').nth(813)).toBeInViewport();
+  await expect(frame.locator('.cos-fleet-drawer').getByRole('button').last()).toBeFocused();
+  await frame.getByRole('button',{name:'Close unit details'}).click();
+  await expect(last).toBeFocused();
+  await frame.getByRole('button',{name:'Show more units (735)'}).click();
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(160);
   await bounded(frame);
   await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
-  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(1);
-  await frame.locator('.cos-fleet-unit-list > button').click();
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+  await frame.locator('.cos-fleet-unit-row').click();
   await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-001');
+  await frame.getByRole('button',{name:'Close unit details'}).click();
   await frame.getByRole('button', { name: 'Fit pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await expect(frame.locator('.leaflet-marker-icon')).toHaveCount(1);
@@ -87,7 +89,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await expect(frame.locator('.field-map-empty')).toContainText('No units match');
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
   await frame.getByLabel('Search units, customers, sites or addresses').fill('');
-  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(815);
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(80);
   await frame.getByRole('button', { name: 'Fit pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
@@ -99,7 +101,8 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
 test('field map responds to narrow windows and repeated resizing without a fleet-sized canvas', async ({ page }) => {
   const { frame, requests } = await mount(page);
   await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
-  await frame.locator('.cos-fleet-unit-list > button').click();
+  await frame.locator('.cos-fleet-unit-row').click();
+  await frame.getByRole('button',{name:'Close unit details'}).click();
   for (const [width, height] of [[2048, 900], [1440, 900], [1366, 768], [1280, 576], [1220, 800], [1201, 800], [1200, 800], [1024, 576], [701, 800], [700, 800], [390, 844], [320, 568], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await bounded(frame);

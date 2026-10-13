@@ -185,7 +185,7 @@ test('invalid V2 machine lines never swallow human notes or manufacture GPS time
  const estimate=await checkedReviewedAddressEstimate(row,now,approvals,applications);assert.equal('geocodedAt' in estimate,false);assert.equal('providerMatchQuality' in estimate,false);assert.equal('benchmark' in estimate,false);
  const p=JSON.parse(row.locationNote.split('\n')[0].slice(reviewedEstimatePrefix.length));
  assert.ok(await checkedReviewedAddressEstimate({...row,locationNote:encode({...p,appliedAt:'2026-10-08T01:01:00.123456+00:00'})},now,approvals,applications));
- const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8')+readFileSync(new URL('../src/LocationEstimatePreview.tsx',import.meta.url),'utf8');
  assert.match(source,/Provider-normalized address/);assert.match(source,/Original address:/);assert.match(source,/Result retrieved/);
  assert.match(source,/estimates are excluded from nearby distances/);assert.match(source,/document\.createTextNode\(estimate\?addressEstimateLabel/);
 });

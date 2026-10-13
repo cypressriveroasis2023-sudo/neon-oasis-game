@@ -271,7 +271,7 @@ for (const provider of both) test(`${provider}: manual history input and project
 });
 
 test('source-level UI invariant: nearby centers/distances require current verified coordinates, estimates disclose unverified suites', () => {
-  const ui = readFileSync(root + '/tech-checks/operations/src/FieldMap.tsx', 'utf8');
+  const ui = readFileSync(root + '/tech-checks/operations/src/FieldMap.tsx', 'utf8')+readFileSync(root + '/tech-checks/operations/src/LocationEstimatePreview.tsx', 'utf8');
   assert.match(ui, /const hasCoords = \(unit: FieldUnit\) => isCurrentFieldPin\(unit\)/);
   assert.match(ui, /const nearby=items\.find\(unit=>unit\.id===nearbyId&&hasCoords\(unit\)\)/);
   assert.match(ui, /const distance=\(unit:FieldUnit\)=>nearby&&hasCoords\(unit\)/);
