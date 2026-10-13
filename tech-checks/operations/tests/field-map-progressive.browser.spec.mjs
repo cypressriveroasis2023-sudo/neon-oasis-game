@@ -46,7 +46,9 @@ test('basemap renders while field records wait, with no invented pins or empty f
  await canvas.evaluate(node=>node.dataset.persistentMap='yes');
  await page.screenshot({path:info.outputPath('basemap-before-field-records.png'),fullPage:true});
  state.release();
- await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);
+ await expect(frame.getByLabel('Fleet status',{exact:true})).toHaveValue('all');
+ await expect(frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 3'})).toContainText('Camera status unverified');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeEnabled();
@@ -68,7 +70,7 @@ test('initial field failure preserves the basemap and retry fills the same canva
  await expect(canvas).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—']);
  state.fail=false;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
- await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  state.fail=true;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');

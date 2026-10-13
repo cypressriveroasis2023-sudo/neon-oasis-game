@@ -20,7 +20,7 @@ export type WorkspaceRoute = { workspace:string; jobId:string; detail:boolean; d
 export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {
   const [key,query=''] = hash.replace(/^#/,'').split('?');
   const aliases:Record<string,string> = {overview:'Today','dispatch-board':'Daily Board','field-map':'Fleet Dashboard','field-view':'Fleet Dashboard','victron-power':'Victron VRM',dashboard:'Today'};
-  const workspace = canonicalWorkspace(aliases[key] || [...workspaces,...itWorkspaces].find(name=>name.toLowerCase().replaceAll(' ','-')===key) || 'Today');
+  const workspace = canonicalWorkspace(aliases[key] || [...workspaces,...itWorkspaces].find(name=>name.toLowerCase().replaceAll(' ','-')===key) || 'Fleet Dashboard');
   const params = new URLSearchParams(query);
   const createType = params.get('create');
   const unitId=params.get('unit');

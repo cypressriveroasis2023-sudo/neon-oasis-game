@@ -76,7 +76,7 @@ async function open(value, generation) {
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   const q = new URLSearchParams(location.search), unit = q.get('fieldUnit');
-  const route = q.get('fleetDashboard') === '1' && !unit ? '#fleet-dashboard' : q.get('cameraView') === '1' ? '#camera-health' : q.get('fieldView') === '1' || unit ? '#fleet-dashboard'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : '#it-dashboard';
+  const route = q.get('fleetDashboard') === '1' && !unit ? '#fleet-dashboard' : q.get('cameraView') === '1' ? '#camera-health' : q.get('fieldView') === '1' || unit ? '#fleet-dashboard'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : location.hash === '#it-dashboard' ? '#it-dashboard' : '#fleet-dashboard';
   frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=unified-fleet-20261013'+route;
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
   root.replaceChildren(frame);

@@ -155,7 +155,14 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Verify integrated Fleet Dashboard for Owner and IT
-        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/company-platform.browser.spec.mjs
+        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs tests/fleet-unit-cards.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/company-platform.browser.spec.mjs
+      - name: Fleet candidate visual review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-candidate-visuals
+          path: tech-checks/operations/test-results/**/*.png
+          if-no-files-found: ignore
       - name: Verify guarded Owner Census preparation and one-use action
         run: npm run test:browser -- tests/owner-census-preparation.browser.spec.mjs tests/owner-census-once.browser.spec.mjs
       - name: Verify Tech Check TV and IT daily navigation and camera scope

@@ -195,7 +195,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RII-022');
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();
   await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();

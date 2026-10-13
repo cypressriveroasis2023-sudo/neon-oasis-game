@@ -7,8 +7,9 @@ export const visionAreas = [
   { workspace: 'Team', label: 'Team', icon: 'team', description: 'Your people, assignments and daily readiness.' },
 ] as const;
 export const primaryAreas = [
-  { workspace: 'Today', label: 'Dashboard', icon: 'dashboard' },
-  ...visionAreas,
+  { workspace: 'Fleet Dashboard', label: 'Fleet Dashboard', icon: 'map' },
+  { workspace: 'Today', label: 'Overview', icon: 'dashboard' },
+  ...visionAreas.filter(area => area.workspace !== 'Fleet Dashboard'),
   { workspace: 'Unit Tracker', label: 'Unit Tracker', icon: 'units' },
   { workspace: 'Operations', label: 'Operations', icon: 'operations' },
 ] as const;

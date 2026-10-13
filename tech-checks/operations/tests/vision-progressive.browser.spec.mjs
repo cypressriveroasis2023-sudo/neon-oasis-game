@@ -42,7 +42,7 @@ async function mount(page, { held = [], failures = [], payloads = {} } = {}) {
   await page.clock.setFixedTime(new Date(now));
   await page.route('**/*', async route => {
     const url = route.request().url();
-    if (url === origin + '/vision-progressive-fixture') return route.fulfill({ contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/"></iframe><script>window.syntheticToken='synthetic-session-one';addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:window.syntheticToken},location.origin)})</script>` });
+    if (url === origin + '/vision-progressive-fixture') return route.fulfill({ contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/#today"></iframe><script>window.syntheticToken='synthetic-session-one';addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:window.syntheticToken},location.origin)})</script>` });
     if (url.startsWith(origin + '/')) return route.continue();
     if (!url.endsWith('/functions/v1/cos-operations-pages')) return route.abort('blockedbyclient');
     const headers = { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type' };

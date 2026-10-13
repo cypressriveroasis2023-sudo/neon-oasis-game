@@ -32,3 +32,22 @@ test('dark host overlay is loaded last and does not import workflow code',()=>{
   assert.ok(!css.includes('@import'));
   assert.ok(!css.includes('display:none'));
 });
+
+
+test('Fleet uses the existing COS type and surface tokens without its own branded shell',()=>{
+ const css=read('../src/fleetDashboard.css');
+ for(const token of ['--cos-vision-bg','--cos-vision-panel','--cos-border','--cos-text','--cos-muted','--cos-selected','--cos-blue'])assert.ok(css.includes('var('+token+')'),token);
+ assert.match(css,/\.cos-fleet-dashboard\{[^}]*font:inherit/);
+ assert.doesNotMatch(css,/font:14px\/1.5 Arial|#ff354e|#d71935|\.cos-fleet-brand/);
+ assert.match(css,/\.cos-fleet-unit-health-grid\{/);
+ assert.match(css,/\.cos-fleet-power-metrics\{/);
+});
+
+
+test('unlinked source equipment uses COS surfaces and wraps its record identities at every size',()=>{
+ const css=read('../src/fleetDashboard.css');
+ assert.match(css,/\.cos-fleet-source-record\{[^}]*background:var\(--cos-vision-panel\)[^}]*overflow-wrap:anywhere/);
+ assert.match(css,/\.cos-fleet-source-record li\{[^}]*overflow-wrap:anywhere/);
+ assert.match(css,/\.cos-fleet-source-group-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+ assert.match(css,/@media\(max-width:750px\)\{\.cos-fleet-source-group-grid\{grid-template-columns:1fr/);
+});

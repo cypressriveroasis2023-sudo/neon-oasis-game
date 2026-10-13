@@ -5,6 +5,9 @@ import { primaryAreas, visionAreas, isOnHand, locationLink } from '../src/vision
 test('primary navigation preserves six fleet areas and includes the capability-gated Unit Tracker', () => {
   assert.deepEqual(visionAreas.map(area => area.label), ['Camera Health', 'InHand Routers', 'Victron Power', 'Units On Hand', 'Fleet Dashboard', 'Team']);
   assert.equal(primaryAreas.length, 9);
+  assert.deepEqual(primaryAreas[0],{workspace:'Fleet Dashboard',label:'Fleet Dashboard',icon:'map'});
+  assert.equal(primaryAreas.filter(area=>area.workspace==='Fleet Dashboard').length,1);
+  assert.equal(primaryAreas.find(area=>area.workspace==='Today').label,'Overview');
   assert.equal(primaryAreas.filter(area=>area.workspace==='Unit Tracker').length,1);
 });
 test('on-hand inventory requires recorded physical placement', () => {

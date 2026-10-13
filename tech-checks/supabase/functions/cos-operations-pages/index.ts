@@ -1,4 +1,8 @@
+import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
+import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
+import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
+import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from './combinedFleetRoster.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
@@ -892,7 +896,12 @@ export function createOperationsHandler(options) {
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
           projected=await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity);
-          return json(projectMhelpFleetLocations(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity):projected,mhelpReceipt?.fleetLocations));
+          const locationProofs=await validatedLocationProofs(projected,Date.now(),{originalInventory:freshSnapshot.inventoryItems});
+          const savedPlacement=projectMhelpFleetLocations(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs}):projected,mhelpReceipt?.fleetLocations);
+          const uploaded=projectMhelpUploadPlacement(savedPlacement,mhelpReceipt?.upload,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs});
+          const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
+          const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
+          return json(projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity));
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {

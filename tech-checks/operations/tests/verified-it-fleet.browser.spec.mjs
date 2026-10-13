@@ -114,8 +114,8 @@ test('IT entry uses touch activation and daily views without paused Tech Checks'
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,baseURL:origin});const page=await context.newPage();
  try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
   await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
-  await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Daily views',exact:true}).tap();
-  await expect(frame.getByRole('region',{name:'IT daily dashboard',exact:true})).toBeVisible();
+  await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Camera Health',exact:true}).tap();
+  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
   await page.getByRole('button',{name:'Return to IT Tech Checks'}).tap();await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(entry).toBeFocused();
  }finally{await context.close();}
 });

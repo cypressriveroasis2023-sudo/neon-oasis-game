@@ -2,8 +2,9 @@ import {validateCameraHealth,canonicalCameraUnit,type Health,type FieldHealthUni
 import {resolveVerifiedUnitIdentity} from './verifiedUnitIdentity';
 import {checkedFieldMap} from './gpsPersistence';
 export type FleetSnapshot={health:Health;fieldMap:ReturnType<typeof checkedFieldMap>;readAt:string};
-type Unit=FieldHealthUnit&{currentLocationType?:string;placement?:string;placementSource?:string};
+type Unit=FieldHealthUnit&{activeInventoryEligible?:boolean;currentLocationType?:string;placement?:string;placementSource?:string;effectivePlacement?:{contract:string;state:string}};
 export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
+ if(unit.effectivePlacement?.contract==='COS_EFFECTIVE_FLEET_PLACEMENT_V1'&&['field','shop','unknown'].includes(unit.effectivePlacement.state))return unit.effectivePlacement.state as 'field'|'shop'|'unknown';
  const value=String(unit.placement||unit.currentLocationType||'').toLowerCase();
  return ['shop','root','warehouse','yard'].includes(value)?'shop':['field','site'].includes(value)?'field':'unknown';
 }
@@ -13,9 +14,15 @@ export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
 export function reconcileFleetSnapshot(rawHealth:unknown,rawMap:unknown,now=Date.now()):FleetSnapshot{
  const health=validateCameraHealth(rawHealth),fieldMap=checkedFieldMap(rawMap);
  const inventory=(Array.isArray((fieldMap as any).inventoryItems)?(fieldMap as any).inventoryItems:fieldMap.items) as Unit[];
- const changes=new Map<string,'field'|'shop'>();
+ if(new Set(inventory.map(r=>r.id)).size!==inventory.length)throw Error('Fleet inventory contains duplicate equipment identities.');
+ if(fieldMap.effectivePlacementVersion===1){
+  if(inventory.some(r=>r.effectivePlacement?.contract!=='COS_EFFECTIVE_FLEET_PLACEMENT_V1'||!['field','shop','unknown'].includes(r.effectivePlacement.state)))throw Error('Fleet placement evidence is incomplete.');
+  const fields=inventory.filter(r=>inventoryPlacement(r)==='field'&&r.activeInventoryEligible!==false);
+  if(fields.length!==fieldMap.items.length||fields.some(r=>!fieldMap.items.some((f:Unit)=>f.id===r.id&&f.unitNumber===r.unitNumber)))throw Error('Fleet placement population does not match its field list.');
+ }
+ const changes=new Map<string,'field'|'shop'|'inactive'>();
  for(const unit of inventory){
-  const placement=inventoryPlacement(unit),key=canonicalCameraUnit(unit.unitNumber);
+  const placement=unit.activeInventoryEligible===false?'inactive':inventoryPlacement(unit),key=canonicalCameraUnit(unit.unitNumber);
   if(placement==='unknown'||inventory.filter(r=>r.id===unit.id).length!==1)continue;
   const association=resolveVerifiedUnitIdentity(unit,health,now);
   if(association.state==='verified'){

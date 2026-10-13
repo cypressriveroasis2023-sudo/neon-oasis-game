@@ -165,7 +165,7 @@ function harness({ role = 'owner', userId = ownerId, search = '' } = {}) {
 
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
-  assert.equal(h.frame().src, './operations/dist/index.html?v=unified-fleet-20261013');
+  assert.equal(h.frame().src, './operations/dist/index.html?v=unified-fleet-20261013#fleet-dashboard');
   assert.equal(h.frame().allow, 'geolocation; fullscreen');assert.equal(h.frame().allowFullscreen,true);
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);

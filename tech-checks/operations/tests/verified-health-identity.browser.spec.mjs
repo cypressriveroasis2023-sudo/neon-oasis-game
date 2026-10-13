@@ -81,7 +81,7 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await frame.getByRole('button',{name:'Close unit details'}).click();
  await noOverflow(frame);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('verified-owner-hdc-support.png')});
  await frame.locator('.cos-field-pin[data-health="online"]').click();
- await expect(frame.locator('.camera-unit-detail h3')).toHaveText(labels.owner);
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.owner);
  await expect(frame.locator('.camera-unit-state')).toHaveText('CAMERA RECORDS ONLINE');
  await expect(frame.locator('.camera-unit-detail')).toContainText('verified saved equipment-to-resource association');
  await expect(frame.locator('.camera-device-cards article')).toHaveCount(4);

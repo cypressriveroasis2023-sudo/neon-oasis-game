@@ -48,3 +48,19 @@ test('stale admission and forged assignment fail atomically; partial observation
  assert.equal((await db.query('select observation from cos_mhelp_placement_private.links')).rows[0].observation,null);
  }finally{await db.close();}
 });
+test('additive receipt exposes held reason without changing guards, rows, actor checks or grants',async()=>{
+ const db=await fixture();try{
+  await db.query('select cos_mhelp_placement_private.admit($1,$2)',[[await admission(db)],'a'.repeat(64)]);
+  await db.exec("update cos_mhelp_placement_private.links set observation='{"+'"state":"held","reason":"service_location_unverified"'+"}'::jsonb,observed_at=clock_timestamp()");
+  const before=(await db.query('select to_jsonb(t) row from app_private.vision_tracker_locations t')).rows;
+  const acl=(await db.query("select proacl::text acl from pg_proc where oid='public.cos_mhelp_placement_snapshot(uuid,uuid)'::regprocedure")).rows;
+  await db.exec(await readFile(new URL('../db/mhelp_placement_reason_projection.sql',import.meta.url),'utf8'));
+  const snap=(await db.query('select public.cos_mhelp_placement_snapshot($1,$2) value',[tracker,ORG])).rows[0].value;
+  assert.equal(snap.items[0].reason,'service_location_unverified');assert.equal(snap.items[0].guardCurrent,true);assert.equal(snap.items[0].state,'held');
+  assert.deepEqual((await db.query('select to_jsonb(t) row from app_private.vision_tracker_locations t')).rows,before);
+  assert.deepEqual((await db.query("select proacl::text acl from pg_proc where oid='public.cos_mhelp_placement_snapshot(uuid,uuid)'::regprocedure")).rows,acl);
+  await db.exec("update app_private.vision_tracker_locations set site='Newer changed installation'");
+  const changed=(await db.query('select public.cos_mhelp_placement_snapshot($1,$2) value',[tracker,ORG])).rows[0].value;assert.equal(changed.items[0].guardCurrent,false);
+  for(const role of ['anon','authenticated']){await db.exec('set role '+role);await assert.rejects(()=>db.query('select public.cos_mhelp_placement_snapshot($1,$2)',[tracker,ORG]));await db.exec('reset role');}
+ }finally{await db.close();}
+});

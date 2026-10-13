@@ -9,10 +9,11 @@ const link={equipmentId:'123',fullLabel:'Spotter 023.1',model:null};
 const equipment={...link,name:link.fullLabel,active:null,customerId:'2',serviceLocationId:'3'};
 const customers={2:{customerId:'2',name:'Example Builder',isServiceLocation:false,placement:'FIELD'},3:{customerId:'3',name:'North Job',isServiceLocation:true,placement:'FIELD'}};
 const read=id=>Promise.resolve(customers[id]||null);
-const entry={trackerId:tracker,nativeUnitId:native,trackerLabel:'Spotter 023.1',nativeLabel:'Spotter 023.1',state:'confirmed',placement:'SHOP',customerLabel:'Cameras Onsite',siteLabel:'SHOP',observedAt:new Date(now).toISOString(),locationReview:false};
+const entry={trackerId:tracker,nativeUnitId:native,trackerLabel:'Spotter 023.1',nativeLabel:'Spotter 023.1',guardCurrent:true,state:'confirmed',placement:'SHOP',customerLabel:'Cameras Onsite',siteLabel:'SHOP',observedAt:new Date(now).toISOString(),locationReview:false};
 const receipt=(row={})=>({contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:new Date(now).toISOString(),items:[{...entry,...row}]});
 const snapshot=(row={})=>({items:[{id:native,unitNumber:entry.nativeLabel,latitude:30,longitude:-95}],inventoryItems:[{id:native,unitNumber:entry.nativeLabel,_sourceField:true,readOnly:false,latitude:30,longitude:-95,address:'Original address',site:'Original job',...row}],summary:{fieldUnits:1}});
 const proof={identityVersion:1,unitIdentities:[{unitId:native,unitNumber:entry.nativeLabel,kind:'native_provider',deviceIds:['1','2'],unitKeys:['Spotter 023.1']}],identityWarnings:[]};
+const withoutSourceMarker=rows=>rows.map(({mhelpConfirmedAssignment,...row})=>row);
 test('exact live IDs retain decimal identities and resolve customer/service-location separately',async()=>{
  const result=await collectPlacementObservations([link],[equipment],read);
  assert.deepEqual(result,[{equipmentId:'123',state:'confirmed',customerId:'2',serviceLocationId:'3',placement:'FIELD',customerLabel:'Example Builder',siteLabel:'North Job'}]);
@@ -44,19 +45,20 @@ test('new assignment clears displayed old address/pin while keeping historical c
 });
 test('Owner/technician history, GPS, installed-site authority and changed labels are protected',()=>{
  for(const row of [{placementSource:'owner'},{hasUnitGps:true},{installedSiteId:tracker},{unitNumber:'Spotter 023'},{placementReviewReason:'Identity held'}]){
-  const s=snapshot(row);assert.deepEqual(projectMhelpFieldPlacement(s,receipt(),[],proof,now).inventoryItems,s.inventoryItems);
+  const s=snapshot(row);assert.deepEqual(withoutSourceMarker(projectMhelpFieldPlacement(s,receipt(),[],proof,now).inventoryItems),s.inventoryItems);
  }
- const s=snapshot();assert.deepEqual(projectMhelpFieldPlacement(s,receipt(),[{unit_key:'Spotter 023.1',device_ids:['1']}],proof,now).inventoryItems,s.inventoryItems);
+ const s=snapshot();assert.deepEqual(withoutSourceMarker(projectMhelpFieldPlacement(s,receipt(),[{unit_key:'Spotter 023.1',device_ids:['1']}],proof,now).inventoryItems),s.inventoryItems);
 });
 test('stale, future, held and duplicate observations cannot establish placement',()=>{
  for(const observedAt of [new Date(now-41*60*1000).toISOString(),new Date(now+1).toISOString()])assert.equal(checkedMhelpPlacements(receipt({observedAt}),now).length,0);
  assert.equal(checkedMhelpPlacements(receipt({state:'held'}),now).length,0);
  const r=receipt();r.items.push({...r.items[0]});assert.throws(()=>checkedMhelpPlacements(r,now));
 });
-test('stale or failed source reads suppress older imported pins without hiding newer manual authority',()=>{
+test('stale confirmed placement remains recorded while old pins stay suppressed and manual authority is protected',()=>{
  const r=receipt({guardCurrent:true,observedAt:new Date(now-41*60*1000).toISOString()});
- const result=projectMhelpFieldPlacement(snapshot(),r,[],proof,now);assert.equal(result.items.length,0);assert.equal(result.inventoryItems[0].placement,'UNKNOWN');assert.equal(result.inventoryItems[0].latitude,null);
- const manual=snapshot({placementSource:'owner'});assert.deepEqual(projectMhelpFieldPlacement(manual,r,[],proof,now).inventoryItems,manual.inventoryItems);
+ const result=projectMhelpFieldPlacement(snapshot(),r,[],proof,now);assert.equal(result.items.length,0);assert.equal(result.inventoryItems[0].placement,'SHOP');assert.equal(result.inventoryItems[0].latitude,null);assert.equal(result.inventoryItems[0].placementEvidence.fresh,false);assert.equal(result.inventoryItems[0].placementEvidence.observedAt,r.items[0].observedAt);
+ const manual=snapshot({placementSource:'owner'}),protectedRows=projectMhelpFieldPlacement(manual,r,[],proof,now).inventoryItems;
+ assert.deepEqual(protectedRows.map(({mhelpConfirmedAssignment,...row})=>row),manual.inventoryItems);assert.equal(protectedRows[0].mhelpConfirmedAssignment.observedAt,r.items[0].observedAt);
 });
 test('camera scope uses complete verified native resource sets and leaves all provider telemetry unchanged',()=>{
  const devices=[{id:'1',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'online',battery_percent:80},{id:'2',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'offline'}];
