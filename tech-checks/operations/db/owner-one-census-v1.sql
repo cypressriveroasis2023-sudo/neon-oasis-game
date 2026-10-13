@@ -15,7 +15,7 @@ alter table app_private.cos_geocodio_account_state add column if not exists owne
 do $patch$
 declare definition text:=pg_get_functiondef('public.cos_field_geocode_claim(uuid,text,text,text,text)'::regprocedure);
 begin
- if encode(sha256(convert_to(definition,'UTF8')),'hex')='124661b8b86f20955b8f243724c345472915c618c105ff0931aa6921838ba08a' then return; end if;
+ if encode(sha256(convert_to(definition,'UTF8')),'hex')='29cc852e0646957d17abd80d6cc206fc326532db7f87cc233336b0f56b6d5947' then return; end if;
  if encode(sha256(convert_to(definition,'UTF8')),'hex')<>'f2f031a81b80c46f62e69e6da58793bbb2678ff71f014a1653b43fb0b8a7d3be' then
   raise exception 'Owner one-Census baseline drift: cos_field_geocode_claim.' using errcode='40001'; end if;
  definition:=replace(definition,$before$declare r app_private.cos_field_geocode_cache; v_now timestamptz;$before$,$after$declare r app_private.cos_field_geocode_cache; v_now timestamptz; policy jsonb; one_census boolean:=false;$after$);
@@ -47,7 +47,7 @@ begin
    return jsonb_build_object('censusOnly',true,'censusOnlyGuard',jsonb_build_object('nativeUnitId',policy#>>'{binding,nativeUnitId}','nativeGuardSha256',policy#>>'{binding,nativeGuardSha256}'))||jsonb_build_object('claimed',false,'claimToken',null,'reason','owner_one_census_hold','record',app_private.cos_geocode_record(r)||jsonb_build_object('censusOnly',true,'censusOnlyGuard',jsonb_build_object('nativeUnitId',policy#>>'{binding,nativeUnitId}','nativeGuardSha256',policy#>>'{binding,nativeGuardSha256}'),'censusOnlyNotBefore',(policy->>'enrolledAt')::timestamptz+interval '480 seconds','censusOnlyState',case when policy->>'claimToken' is not null then 'consumed' when (policy->>'enrolledAt')::timestamptz+interval '480 seconds'>clock_timestamp() then 'draining' else 'ready' end)); end if;
   v_now:=clock_timestamp();
   update app_private.cos_field_geocode_cache set status='pending',attempts=attempts+1,claim_token=gen_random_uuid(),
-   lease_until=v_now+interval '120 seconds',next_attempt_at=null,latitude=null,longitude=null,matched_address=null,geocoded_at=null,reason=null,updated_at=v_now
+   lease_until=v_now+interval '220 seconds',next_attempt_at=null,latitude=null,longitude=null,matched_address=null,geocoded_at=null,reason=null,updated_at=v_now
    where organization_id=p_organization_id and audit_id=p_audit_id returning * into r;
   update app_private.cos_geocodio_account_state set owner_one_census_v1=owner_one_census_v1||
    jsonb_build_object('claimToken',r.claim_token::text,'consumedAt',v_now) where singleton returning owner_one_census_v1 into policy;

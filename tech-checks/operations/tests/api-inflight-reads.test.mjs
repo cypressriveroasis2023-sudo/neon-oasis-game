@@ -7,6 +7,8 @@ import ts from 'typescript';
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
+import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
+import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
 
 // Execute the exact production module in an isolated browser-shaped context.
 // All tokens, responses and timers are synthetic; no network is available here.
@@ -23,7 +25,7 @@ function deferred() {
 function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true } = {}) {
   const invalidations=[], listeners = new Set(), otherListeners=new Map(), timers = new Map(), requests = [], handshakes = [];
   const location = { origin: 'https://synthetic.example', search: mode ? '?mode=' + mode : '' };
-  let timerId = 0, requestId = 0;
+  let timerId = 0, requestId = 0, clock = 0;
   const state = { role, token, autoReply };
   const parent = { postMessage(message, origin) {
     assert.equal(origin, location.origin);
@@ -38,7 +40,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
     dispatchEvent(event){invalidations.push(event.type);for(const fn of otherListeners.get(event.type)||[])fn(event);return true;},
     addEventListener(type,fn){if(type==='message')listeners.add(fn);else{if(!otherListeners.has(type))otherListeners.set(type,new Set());otherListeners.get(type).add(fn);}},
     removeEventListener(type,fn){if(type==='message')listeners.delete(fn);else otherListeners.get(type)?.delete(fn);},
-    setTimeout(fn, delay) { timers.set(++timerId, { fn, delay }); return timerId; },
+    setTimeout(fn, delay) { timers.set(++timerId, { fn, delay, at: clock + delay }); return timerId; },
     clearTimeout(id) { timers.delete(id); },
   };
   function reply(message = handshakes.at(-1), credentials = { role: state.role, accessToken: state.token }, event = {}) {
@@ -56,7 +58,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
       const result = deferred();
-      init.signal.addEventListener('abort', () => result.reject(new Error('Synthetic aborted request')), { once: true });
+      init.signal.addEventListener('abort', () => { const error = new Error('Synthetic aborted request'); error.name = 'AbortError'; result.reject(error); }, { once: true });
       requests.push({ url, init, envelope: JSON.parse(init.body), result });
       return result.promise;
     },
@@ -65,6 +67,16 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
     api: exports.api, invalidations, requests, handshakes, state, location, window, timers, listeners, reply,
     answer(index, data = { items: [] }, responseStatus = 200) {
       requests[index].result.resolve(new Response(JSON.stringify(data), { status: responseStatus }));
+    },
+    get elapsed() { return clock; },
+    advance(milliseconds) {
+      const end = clock + milliseconds;
+      while (true) {
+        const next = [...timers].filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next) break;
+        const [id, timer] = next; timers.delete(id); clock = timer.at; timer.fn();
+      }
+      clock = end;
     },
     expire(delay) {
       for (const [id, timer] of [...timers]) if (timer.delay === delay) { timers.delete(id); timer.fn(); }
@@ -417,4 +429,76 @@ test('one failed source never installs a partial fleet snapshot and a POST inval
 });
 test('a fleet read started under a previous account is rejected after an account change',async()=>{
  const f=fixture(),old=f.api.fleet();const rejected=assert.rejects(old,status(409));await flush();f.state.token='synthetic-session-b';const current=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await rejected;assert(!f.invalidations.includes('cos-fleet-snapshot-failed'),'old-session failures cannot invalidate the new account');f.answer(2,fleetHealth);f.answer(3,fleetMap);await current;
+});
+
+const preparedPath='/api/field-map/11111111-1111-4111-8111-111111111111/owner-census-prepare';
+for(const [method,path,deadline] of [
+ ['POST',preparedPath,120000],['POST',preparedPath.replace('11111111','AAAAAAAA'),120000],
+ ['POST',preparedPath.replace('prepare','once'),120000],['GET','/api/field-map',90000],
+ ['GET',preparedPath,30000],['POST',preparedPath.replace('prepare','proof'),30000],
+ ['POST',preparedPath.replace('prepare','prepare-extra'),30000],['POST',preparedPath+'/',30000],
+ ['POST',preparedPath.replace('11111111-1111-4111-8111-111111111111','not-a-uuid'),30000],
+ ['POST',preparedPath.replace('prepare','Prepare'),30000],['POST',preparedPath.replace('owner-census-prepare','gps'),30000],
+ ['POST','/api/field-map',30000],['GET','/api/jobs',30000],['GET','/api/camera-health/summary-v3',30000],
+])test(`bounded observation ${method} ${path} uses only ${deadline}ms`,async()=>{
+ const f=fixture(),pending=method==='POST'?f.api.post(path,{}):f.api.get(path);await flush();
+ assert.equal(f.requests.length,1);assert.deepEqual([...f.timers.values()].map(t=>t.delay),[deadline]);
+ f.answer(0,{ok:true});await pending;assert.equal(f.timers.size,0);
+});
+test('read-only Prepare accepts a valid response after the old 30-second abort boundary',async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath,{}),settled=pending.then(value=>({value}),error=>({error}));await flush();
+ const aborts=[];f.requests[0].init.signal.addEventListener('abort',()=>aborts.push(f.elapsed));
+ f.advance(30000);await flush();const abortedAtFormerDeadline=f.requests[0].init.signal.aborted;
+ f.advance(30000);f.answer(0,{eligible:true});const result=await settled;
+ assert.equal(abortedAtFormerDeadline,false,'a valid response arriving at60s must not have been discarded at30s');
+ assert.equal(result.error,undefined);assert.deepEqual(result.value.data,{eligible:true});assert.deepEqual(aborts,[]);assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+});
+test('Run observation passes 30s but remains bounded at120s without replay',async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath.replace('prepare','once'),{}),failed=assert.rejects(pending,status(503));await flush();
+ f.advance(30000);assert.equal(f.requests[0].init.signal.aborted,false);f.advance(89999);assert.equal(f.requests[0].init.signal.aborted,false);
+ f.advance(1);await failed;assert.equal(f.elapsed,120000);assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+});
+test('Prepare timeout is the actual120s timer-driven AbortError, not an inferred HTTP failure',async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath,{}),failed=assert.rejects(pending,error=>error.preparationFailure==='timeout'&&error.response.status===503);await flush();
+ const aborts=[];f.requests[0].init.signal.addEventListener('abort',()=>aborts.push(f.elapsed));
+ f.advance(119999);assert.equal(f.requests[0].init.signal.aborted,false);f.advance(1);await failed;
+ assert.deepEqual(aborts,[120000]);assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);assert.equal(f.invalidations.length,0);
+ f.answer(0,{eligible:true});await flush();assert.equal(f.requests.length,1,'a late success cannot replay the request');
+});
+for(const [http,category] of [[401,'auth'],[403,'auth'],[409,'source_hold'],[408,'timeout'],[504,'timeout'],[503,'upstream_failure'],[429,'upstream_failure']])test(`Prepare HTTP${http} reports only ${category} and never parses raw backend errors`,async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath,{}),failed=assert.rejects(pending,error=>{
+  assert.equal(error.preparationFailure,category);assert.equal(error.message.includes('synthetic-private-backend-detail'),false);assert.equal(JSON.stringify(error.response).includes('synthetic-private-backend-detail'),false);return true;
+ });await flush();let parsed=0,cancelled=0;
+ f.requests[0].result.resolve({ok:false,status:http,body:{cancel:async()=>{cancelled++;}},json:async()=>{parsed++;return {error:'synthetic-private-backend-detail'};}});
+ await failed;assert.equal(parsed,0);assert.equal(cancelled,1);assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+ assert.equal(f.invalidations.length,[401,403].includes(http)?1:0);
+});
+test('Prepare external cancellation is immediate and distinct from timeout with no replay',async()=>{
+ const f=fixture(),controller=new AbortController(),pending=f.api.post(preparedPath,{}, {signal:controller.signal}),failed=assert.rejects(pending,error=>error.preparationFailure==='cancelled');await flush();
+ f.advance(47000);controller.abort();await failed;assert.equal(f.requests[0].init.signal.aborted,true);assert.equal(f.timers.size,0);assert.equal(f.requests.length,1);
+ f.advance(120000);assert.equal(f.requests.length,1);
+});
+for(const name of ['Error','AbortError'])test('Prepare network '+name+' without local abort is upstream_failure, not timer expiry',async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath,{}),failed=assert.rejects(pending,error=>error.preparationFailure==='upstream_failure');await flush();
+ f.requests[0].result.reject(Object.assign(new Error('synthetic-private-network-detail'),{name}));await failed;assert.equal(f.requests[0].init.signal.aborted,false);assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+});
+test('Prepare response-body deadline is classified without admitting a late valid body',async()=>{
+ const f=fixture(),pending=f.api.post(preparedPath,{}),failed=assert.rejects(pending,error=>error.preparationFailure==='timeout');await flush();
+ const body=deferred();f.requests[0].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+ f.advance(120000);body.resolve({eligible:true});await failed;assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+});
+test('slow Field Map survives independent30s health failure and arrives at62s without a paired cache',async()=>{
+ const f=fixture(),saved=preparationSnapshot().snapshot,field=f.api.fleetSource('fieldMap'),health=f.api.fleetSource('health'),failed=assert.rejects(health,status(503));await flush();
+ f.advance(30000);await failed;assert.equal(f.requests[1].init.signal.aborted,false);
+ f.advance(32000);f.answer(1,saved);const restored=await field;assert.deepEqual(restored,saved);assert.ok(await checkedOwnerCensusPreparationBinding(restored,preparationId));assert.equal(f.elapsed,62000);assert.equal(f.timers.size,0);
+ assert(!f.invalidations.includes('cos-private-data-invalidated'));assert(!f.invalidations.includes('cos-fleet-snapshot-updated'));
+});
+
+for(const reason of ['timeout','cancelled'])test('Run rejects a late parsed body after '+reason+' without replay or preparation diagnostics',async()=>{
+ const f=fixture(),controller=new AbortController(),pending=f.api.post(preparedPath.replace('prepare','once'),{}, {signal:controller.signal});
+ const failed=assert.rejects(pending,error=>{assert.equal(error.response.status,503);assert.match(error.message,/save could not be confirmed/);assert.equal(error.preparationFailure,undefined);return true;});await flush();
+ const body=deferred();f.requests[0].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+ if(reason==='timeout')f.advance(120000);else{f.advance(47000);controller.abort();}
+ assert.equal(f.requests[0].init.signal.aborted,true);body.resolve({ok:true,censusOnly:true,allowance:'consumed'});await failed;
+ assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);f.advance(120000);assert.equal(f.requests.length,1);
 });

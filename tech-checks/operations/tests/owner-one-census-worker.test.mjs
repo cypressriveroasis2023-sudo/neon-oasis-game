@@ -32,7 +32,7 @@ async function harness({provider,verify,claimResult,finishError=false,claimError
    assert.equal(args.p_unit_key,target.unitKey);assert.equal(args.p_address,full);assert.equal(args.p_address_sha256,row.addressSha256);
    const already=ledger.consumed;ledger.consumed=true;if(!already)ledger.claims++;
    if(claimError&&!already)throw Error('synthetic uncertain claim commit');
-   return claimResult??{claimed:!already,...(!already?{claimToken}:{}),censusOnly:true,censusOnlyGuard:guard,record:{status:ledger.status,censusOnlyState:'consumed',leaseUntil:new Date(now()+120000).toISOString()}};
+   return claimResult??{claimed:!already,...(!already?{claimToken}:{}),censusOnly:true,censusOnlyGuard:guard,record:{status:ledger.status,censusOnlyState:'consumed',leaseUntil:new Date(now()+220000).toISOString()}};
   }
   if(name==='cos_field_geocode_finish'){
    finishes.push(args);assert.equal(args.p_audit_id,target.auditId);assert.equal(args.p_address,full);assert.equal(args.p_address_sha256,row.addressSha256);assert.equal(args.p_claim_token,claimToken);
@@ -138,7 +138,7 @@ for(const notBefore of [undefined,'2026-01-01T00:08:00Z'])test('database drainin
  assert.equal(h.ledger.sourceReads,0);assert.equal(h.ledger.claims,0);assert.equal(h.ledger.providerCalls,0);noFallback(h);
 });
 test('a slow native proof cannot start a claim after the request time budget is exhausted',async()=>{
- let clock=0;const h=await harness({now:()=>clock,verify:async()=>{clock=90000;return true;}}),{body}=await h.run();
+ let clock=0;const h=await harness({now:()=>clock,verify:async()=>{clock=111000;return true;}}),{body}=await h.run();
  assert.equal(body.censusOnly,true);assert.equal(body.allowance,'unknown');assert.equal(h.ledger.claims,0);assert.equal(h.ledger.providerCalls,0);noFallback(h);
 });
 test('guarded-only extended budget accommodates three slow fresh proofs within its lease',async()=>{
@@ -158,7 +158,7 @@ for(const leaseUntil of [undefined,'invalid','2025-12-31T23:59:59Z','2026-01-01T
  assert.equal(body.allowance,'consumed');assert.equal(h.ledger.sourceReads,1);assert.equal(h.ledger.claims,1);assert.equal(h.ledger.providerCalls,0);noFallback(h);
 });
 test('native post-claim delay past safe lease margin prevents the provider send',async()=>{
- let clock=Date.UTC(2026,0,1);const h=await harness({now:()=>clock,verify:async(_binding,n)=>{if(n===2)clock+=55000;return true;}}),{body}=await h.run();
+ let clock=Date.UTC(2026,0,1);const h=await harness({now:()=>clock,verify:async(_binding,n)=>{if(n===2)clock+=111000;return true;}}),{body}=await h.run();
  assert.equal(body.allowance,'consumed');assert.equal(body.results[0].status,'held');assert.equal(h.ledger.claims,1);assert.equal(h.ledger.providerCalls,0);noFallback(h);
 });
 
@@ -212,4 +212,35 @@ test('unsafe suite cannot reach provider and invalid immutable source cannot be 
 test('unexpected provider reasons cannot be persisted as a fabricated diagnosis',()=>{
  assert.throws(()=>censusOnlyReason({status:'provider_error',reason:'synthetic unexpected diagnostic'}),/Unsafe Census-only reason/);
  for(const reason of ['provider_timeout','provider_unavailable','invalid_response'])assert.equal(censusOnlyReason({status:'provider_error',reason}),reason);
+});
+
+test('guarded310s chain permits all bounded near-maximum dependencies once with220s lease',async()=>{
+ let clock=0;const h=await harness({now:()=>clock,verify:async()=>{clock+=79999;return true;}}),rpc=h.options.rpc,provider=h.options.fetch;
+ h.options.verifyFleetActor=async()=>{clock+=20000;return true;};
+ h.options.rpc=async(name,args)=>{
+  if(name==='cos_field_geocode_list_due')clock+=10000;
+  const result=await rpc(name,args);
+  if(['cos_field_geocode_claim','cos_field_geocode_finish'].includes(name))clock+=10000;
+  return result;
+ };
+ h.options.fetch=async(...args)=>{clock+=10000;return provider(...args);};
+ const {response,body}=await h.run();assert.equal(response.status,200);assert.equal(body.results[0]?.status,'success','the full bounded chain must reach one successful finish');
+ assert.equal(clock,299997);assert.equal(h.ledger.sourceReads,3);assert.equal(h.ledger.claims,1);assert.equal(h.ledger.providerCalls,1);assert.equal(h.finishes.length,1);noFallback(h);
+});
+test('bootstrap beyond30s refuses the first proof and cannot claim or send',async()=>{
+ let clock=0;const h=await harness({now:()=>clock}),rpc=h.options.rpc;h.options.rpc=async(name,args)=>{if(name==='cos_field_geocode_list_due')clock=30001;return rpc(name,args);};
+ const {body}=await h.run();assert.equal(body.results[0].status,'held');assert.equal(h.ledger.sourceReads,0);assert.equal(h.ledger.claims,0);assert.equal(h.ledger.providerCalls,0);
+});
+for(const remaining of [209999,210000])test('returned guarded lease must retain210s before proof2: '+remaining,async()=>{
+ const clock=Date.UTC(2026,0,1),h=await harness({now:()=>clock,claimResult:{claimed:true,claimToken,censusOnly:true,censusOnlyGuard:guard,record:{leaseUntil:new Date(clock+remaining).toISOString()}}});
+ const {body}=await h.run();assert.equal(body.allowance,'consumed');assert.equal(h.ledger.sourceReads,remaining<210000?1:3);assert.equal(h.ledger.providerCalls,remaining<210000?0:1);noFallback(h);
+});
+for(const bound of ['worker','lease'])test(bound+' below110s after proof2 prevents the only provider send',async()=>{
+ let clock=0;const h=await harness({now:()=>clock,verify:async(_binding,n)=>{if(n===1&&bound==='worker')clock=110000;if(n===2)clock=bound==='worker'?200001:110001;return true;}});
+ const {body}=await h.run();assert.equal(body.results[0].status,'held');assert.equal(body.allowance,'consumed');assert.equal(h.ledger.providerCalls,0);assert.equal(h.finishes.length,0);noFallback(h);
+});
+for(const bound of ['worker','lease'])test(bound+' below10s after final proof withholds finish and never resends',async()=>{
+ let clock=0;const h=await harness({now:()=>clock,verify:async(_binding,n)=>{if(n===1&&bound==='worker')clock=110000;if(n===2&&bound==='worker')clock=190000;if(n===3)clock=bound==='worker'?300001:210001;return true;}});
+ const {body}=await h.run();assert.equal(body.results[0].status,'held');assert.equal(body.allowance,'consumed');assert.equal(h.ledger.providerCalls,1);assert.equal(h.finishes.length,0);
+ await h.run();assert.equal(h.ledger.providerCalls,1);assert.equal(h.ledger.claims,1);noFallback(h);
 });
