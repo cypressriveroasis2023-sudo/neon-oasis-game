@@ -34,6 +34,8 @@
 .cos-reticle-ring{position:absolute;inset:3px;border:2px solid #071421;border-radius:50%;background:var(--pin);box-shadow:0 1px 3px #0006;z-index:1}
 .cos-field-pin>b,.cos-field-cluster>b{z-index:2;position:relative;display:grid;place-items:center;font-size:13px;line-height:1;color:#071421;text-shadow:none}
 .cos-field-pin>b.cos-reticle-long-id{font-size:9px;letter-spacing:-.5px}
+/* Override the shell’s important bold-text inheritance only for numbered map markers. */
+#root#root .operations-shell :is(.cos-field-pin>b.cos-pin-unit-number,.cos-field-cluster>b){color:#071421!important}
 .cos-pin-location-tag,.cos-cluster-caption,.cos-cluster-location{position:absolute;z-index:3;font-size:7px;font-style:normal;line-height:10px;letter-spacing:.25px;background:#071421;color:#e4edf5;padding:0 3px;border-radius:2px;white-space:nowrap}
 .cos-pin-location-tag,.cos-cluster-caption{top:37px;left:50%;transform:translateX(-50%)}
 .cos-cluster-location{top:-7px;left:50%;transform:translateX(-50%);color:#ffd38b}

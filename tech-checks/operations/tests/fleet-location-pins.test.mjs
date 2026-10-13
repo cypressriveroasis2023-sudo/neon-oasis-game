@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {checkedAddressEstimate} from '../src/fieldAddressEstimates.ts';
+import {now as browserFixtureNow} from './fixtures/camera-evidence-fixtures.mjs';
 import {fleetLocationPins} from '../src/fleetLocationPins.ts';
 import {fleetDashboardRows,initialFleetFilters,filterFleetDashboard} from '../src/fleetDashboardModel.ts';
 import {withSyntheticEstimate} from './fixtures/fleet-location-fixtures.mjs';
@@ -18,3 +20,5 @@ test('a rejected or changed-address estimate stays missing; raw coordinates are 
  const rows=fleetDashboardRows([estimate,unit(2,{latitude:30,longitude:-95})],null,null,null);
  assert.deepEqual(await fleetLocationPins(rows),[]);
 });
+
+test('the synthetic accepted estimate predates the actual browser clock and future evidence still fails closed',async()=>{const row=withSyntheticEstimate(unit(9));assert(await checkedAddressEstimate(row,browserFixtureNow));const note=JSON.parse(row.locationNote.split('|')[1]);note.geocodedAt=note.appliedAt='2026-10-07T12:00:00Z';assert.equal(await checkedAddressEstimate({...row,locationNote:'COS_ADDRESS_ESTIMATE_V1|'+JSON.stringify(note)},browserFixtureNow),null);});
