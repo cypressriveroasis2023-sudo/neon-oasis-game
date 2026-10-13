@@ -51,6 +51,6 @@ export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>
    const result=await options.rpc(locations?'cos_mhelp_fleet_finish':'cos_mhelp_placement_finish',{p_lease_id:lease,p_observations:observations,...(locations?{p_locations:locations}:{})});
    if(!object(result)||result.committed!==true)throw Error('Lost lease');
    return reply({state:'current',...result,...(locationError?{locationError}:{}),...(locations?{locationReads:{confirmed:locations.filter(r=>r.state==='confirmed').length,held:locations.filter(r=>r.state==='held').length}}:{}),...(options.readDiagnostics?{customerReads:options.readDiagnostics()}: {})});
-  }catch{if(lease)try{await options.rpc('cos_mhelp_placement_fail',{p_lease_id:lease});}catch{}return reply({error:'mHelpDesk placement sync unavailable'},503);}
+  }catch{if(lease)try{await options.rpc('cos_mhelp_placement_fail',{p_lease_id:lease});}catch{}return reply({error:'mHelpDesk placement sync unavailable',...(options.readDiagnostics?{customerReads:options.readDiagnostics()}: {})},503);}
  };
 }

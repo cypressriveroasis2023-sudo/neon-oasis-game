@@ -7,7 +7,8 @@ import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co',PORTAL='224643';
 const tokens=nativeMhelpTokens(name=>Deno.env.get(name));
-const partner=createMhelpPartnerHandler({fetch,getConfig:tokens.getPartnerConfig,renewAccess:tokens.renewAccess,readNativeUnits:async()=>[],fullEquipmentReview:true});
+const vendorFetch=tokens.fetch;
+const partner=createMhelpPartnerHandler({fetch:vendorFetch,getConfig:tokens.getPartnerConfig,renewAccess:tokens.renewAccess,readNativeUnits:async()=>[],fullEquipmentReview:true});
 async function json(response:Response,max=262144){
  if(!response.ok||!response.body||Number(response.headers.get('Content-Length'))>max)throw Error('Read unavailable');
  const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let raw='',size=0;
@@ -32,12 +33,12 @@ const reads=new Map<string,Promise<any>>();
 const read=async(path:string)=>{if(deadline.aborted){locationFailure('deadline');throw Error('Read unavailable');}const cachedParent=parentCache.read(path);if(cachedParent)return cachedParent;if(!reads.has(path))reads.set(path,(async()=>{
  if(deadline.aborted||!config?.accessToken||config.portalId!==PORTAL||!await gate.acquire()){locationFailure(deadline.aborted?'deadline':'cooldown_deferred');throw Error('Read unavailable');}
  locationHttpReads.attempts++;let response:Response;
- try{response=await fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+PORTAL+path,{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(10000)])});}catch{locationFailure(deadline.aborted?'deadline':'transport_or_timeout');throw Error('Read unavailable');}
+ try{response=await vendorFetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+PORTAL+path,{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(10000)])});}catch{locationFailure(deadline.aborted?'deadline':'transport_or_timeout');throw Error('Read unavailable');}
  if(response.status===429)gate.rateLimited(customerRetryDelay(response.headers.get('Retry-After')));
  if(!response.ok)locationFailure('http_'+response.status);
  try{const value=await json(response);locationHttpReads.readable++;return value;}catch{if(response.ok)locationFailure('response_unreadable');throw Error('Read unavailable');}
 })());return reads.get(path)!;};
-const boundedFetch:typeof fetch=(url,init={})=>fetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
+const boundedFetch:typeof fetch=(url,init={})=>vendorFetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
 const locationReader=createFleetLocationReader(read,boundedFetch,PORTAL,code=>{locationReviews[code]=(locationReviews[code]||0)+1;});
 const placementServiceReads={verified:0,held:0};
 return createPlacementSyncHandler({authenticate:async req=>{
@@ -51,7 +52,7 @@ return createPlacementSyncHandler({authenticate:async req=>{
  config=await tokens.getPartnerConfig();return result.items;
 },customer:async id=>{
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
- return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited,includeActive:true,onVerified:row=>parentCache.remember(id,row)});
+ return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch:vendorFetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited,includeActive:true,onVerified:row=>parentCache.remember(id,row)});
 },service:async(parent,site)=>{
  try{const value=await locationReader.placementService(parent,site);placementServiceReads.verified++;return value;}catch{placementServiceReads.held++;return null;}
 },locations:async equipment=>{
@@ -60,5 +61,5 @@ return createPlacementSyncHandler({authenticate:async req=>{
  // The collector returns every candidate, holding individual reads that could
  // not finish. Keep verified addresses and explicit holds in one full receipt.
  return result;
-},readDiagnostics:()=>({...diagnostics.snapshot(),placementServiceReads,locationHttpReads,locationReviews})})(request);
+},readDiagnostics:()=>({...diagnostics.snapshot(),placementServiceReads,locationHttpReads,locationReviews,vendorBackoff:tokens.readBackoff()})})(request);
 });

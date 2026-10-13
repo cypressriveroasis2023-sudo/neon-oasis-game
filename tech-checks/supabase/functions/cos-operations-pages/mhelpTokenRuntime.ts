@@ -1,5 +1,6 @@
 import {createMhelpTokenManager} from './mhelpTokenSession.ts';
 import {createMhelpReconnect} from './mhelpReconnect.ts';
+import {createMhelpReadBackoff} from './mhelpReadBackoff.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co';
 export function nativeMhelpTokens(env:(name:string)=>string|undefined,fetcher:typeof fetch=fetch){
  const options={getConfig:()=>({accessToken:env('COS_MHELP_ACCESS_TOKEN'),refreshToken:env('COS_MHELP_REFRESH_TOKEN'),clientId:env('COS_MHELP_CLIENT_ID'),clientSecret:env('COS_MHELP_CLIENT_SECRET'),portalId:env('COS_MHELP_PORTAL_ID')}),fetch:fetcher,session:async (body:Record<string,unknown>)=>{
@@ -10,5 +11,7 @@ export function nativeMhelpTokens(env:(name:string)=>string|undefined,fetcher:ty
   try{while(true){const{value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>65536){await reader.cancel();throw Error('Token storage unavailable');}raw+=decoder.decode(value,{stream:true});}raw+=decoder.decode();const result=JSON.parse(raw);if(!result||typeof result!=='object'||Array.isArray(result))throw Error('Token storage unavailable');return result;}
   catch{throw Error('Token storage unavailable');}finally{reader.releaseLock();}
  }};
- return {...createMhelpTokenManager(options),reconnect:createMhelpReconnect(options)};
+ const backoff=createMhelpReadBackoff({fetch:fetcher,gate:options.session});
+ const guarded={...options,fetch:backoff.fetch};
+ return {...createMhelpTokenManager(guarded),reconnect:createMhelpReconnect(guarded),fetch:backoff.fetch,readBackoff:backoff.snapshot};
 }
