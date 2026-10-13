@@ -4,11 +4,13 @@ import './directoryWorkspace.css';
 import {DirectorySaveError,equipmentSnapshot,equipmentStatuses,saveDirectory,searchRecords} from './directoryData.js';
 import type {Row} from './directoryData.js';
 const message=(cause:unknown)=>cause instanceof Error?cause.message:'Equipment registry could not be loaded.';
-export default function EquipmentWorkspace({show}:{show:(message:string)=>void}) {
+export default function EquipmentWorkspace({show,initialUnitName=''}:{show:(message:string)=>void;initialUnitName?:string}) {
   const[data,setData]=useState<{items:Row[];models:Row[]}|null>(null),[form,setForm]=useState<Row|null>(null);
   const[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[query,setQuery]=useState('');
   const[error,setError]=useState(''),[saveError,setSaveError]=useState(''),[uncertain,setUncertain]=useState(false);
   const revision=useRef(0);
+  const draftName=useRef('');
+  useEffect(()=>{if(!data||!initialUnitName||draftName.current===initialUnitName)return;draftName.current=initialUnitName;const existing=data.items.filter(unit=>unit.unitNumber===initialUnitName);if(existing.length){setQuery(initialUnitName);return;}const model=data.models.filter(model=>String(model.name).trim().toLowerCase()==='helios');setForm({modelId:model.length===1?model[0].id:'',unitNumber:initialUnitName,serialNumber:'',status:'available',currentLocationType:'shop'});},[data,initialUnitName]);
   const load=useCallback(async()=>{
     const request=++revision.current;setLoading(true);
     try{const next=equipmentSnapshot((await api.get('/api/equipment')).data);if(request!==revision.current)return;setData(next);setError('');return next;}

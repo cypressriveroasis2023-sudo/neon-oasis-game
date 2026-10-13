@@ -187,8 +187,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
   const currentCameraData=error?null:cameras.data;
-  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,currentCameraData,cameras.now)])),[items,currentCameraData,cameras.now]);
-  const previousHealthById=useMemo(()=>error||cameras.error?new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.fleet?.health||null,cameras.now)])):healthById,[items,error,cameras.error,cameras.fleet,cameras.now,healthById]);
+  const healthInventory=(data as unknown as {inventoryItems?:FieldUnit[]})?.inventoryItems||items;
+  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,healthInventory,currentCameraData,cameras.now)])),[items,healthInventory,currentCameraData,cameras.now]);
+  const previousHealthById=useMemo(()=>error||cameras.error?new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,healthInventory,cameras.fleet?.health||null,cameras.now)])):healthById,[items,healthInventory,error,cameras.error,cameras.fleet,cameras.now,healthById]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
   for(const observation of healthById.values()){if(observation.state==='online')onlineBasis[observation.basis||'provider']++;if(observation.state==='offline')offlineBasis[observation.basis||'provider']++;}
