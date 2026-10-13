@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
+import {revealMapFilters} from './field-map-controls.mjs';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import {resource,snapshot,withStatus,now} from './fixtures/camera-evidence-fixtures.mjs';
 
@@ -50,6 +51,7 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(inventory).not.toContainText(unknown.unitNumber);
   await expect(inventory).toContainText('1 registry units have no recorded placement');
   await openWorkspace(frame,'Field Map');
+  await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');
   await frame.getByRole('button',{name:'Show all verified pins',exact:true}).click();
   await frame.getByRole('button',{name:/FIELD-FIX-002/}).click();
   await expect(frame.getByRole('link',{name:/Look up recorded installation address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');
