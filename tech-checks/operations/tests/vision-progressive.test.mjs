@@ -10,6 +10,12 @@ import { fileURLToPath } from 'node:url';
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+test('company camera source remains available while the paired map is pending',async()=>{
+  const paired=deferred(),health=snapshot([resource(1)]),reads=[];
+  const result=await loadCompanyEquipment({fleet:()=>paired.promise,fleetSource:async(source,force)=>{reads.push({source,force});return health;},get:async()=>({data:{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(now).toISOString()}})});
+  assert.deepEqual(reads,[{source:'health',force:false}]);assert.equal(result.camera.rows.length,1);assert.deepEqual(result.errors,{});
+});
+
 test('initial dashboard shells show checking and unknown values rather than premature zero or success', () => {
   const compiled = buildSync({
     stdin: {

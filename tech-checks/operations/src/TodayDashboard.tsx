@@ -33,6 +33,11 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     void refresh();
     return () => { revision.current += 1; running.current = false; };
   }, []);
+  useEffect(()=>{
+    const reconciled=()=>{const request=revision.current;void api.fleet().then(value=>{if(request===revision.current)setEquipment(previous=>previous?{...previous,camera:value.health}:previous);}).catch(()=>{});};
+    window.addEventListener('cos-fleet-snapshot-updated',reconciled);
+    return()=>window.removeEventListener('cos-fleet-snapshot-updated',reconciled);
+  },[]);
   const failed = dashboardSources.filter(([key]) => Boolean(data.errors[key]));
   const complete = !loading && failed.length === 0 && !Object.keys(equipment?.errors || {}).length;
   const browseStage = (stage: CompanyStageId | null) => {
