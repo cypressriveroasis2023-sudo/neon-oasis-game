@@ -1,29 +1,8 @@
-/* Only the lens moves. User-space offsets match the approved 12-second preview. */
-.company-eye .company-eye-gaze {
-  transform: translateX(0);
-  animation: cos-eye-glance 12s cubic-bezier(0.333333, 0, 0.666667, 1) infinite;
-}
-.company-eye[data-motion-paused='true'] .company-eye-gaze {
-  animation-play-state: paused;
-}
-@keyframes cos-eye-glance {
-  0%, 11.666667% { transform: translateX(0); }
-  21.666667%, 35% { transform: translateX(-10px); }
-  53.333333%, 71.666667% { transform: translateX(10px); }
-  83.333333%, 100% { transform: translateX(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .company-eye .company-eye-gaze {
-    animation: none !important;
-    transform: translateX(0) !important;
-  }
-}
-@media print {
-  .company-eye .company-eye-gaze {
-    animation: none !important;
-    transform: translateX(0) !important;
-  }
-}
+.cos-eye-live { visibility:hidden; }
+[data-eye-ready="true"]>.cos-eye-live { visibility:visible; }
+[data-eye-ready="true"]>.cos-eye-poster { opacity:0; }
+.cos-eye-live canvas { display:block; width:100%; height:100%; }
+@media print { .cos-eye-live { display:none!important; } .cos-eye-poster { opacity:1!important; } }
 
 /* The approved glance is readable at normal dashboard viewing distance. */
 svg.company-eye { display:block; flex:none; border-radius:50%; overflow:hidden; background:#080b12; object-fit:contain; }
