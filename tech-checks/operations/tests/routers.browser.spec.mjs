@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { openWorkspace } from './navigation-helper.mjs';
 import {revealMapFilters} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
@@ -59,9 +60,12 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
  await expect(frame.getByRole('alert')).toContainText('Showing the last successful inventory');
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  state.fail=403;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
- await expect(frame.getByRole('alert')).toContainText('Router fixture unavailable');
+ await expectOperationsReloadRequired(frame);
+ await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:'Refresh routers',exact:true})).toHaveCount(0);
  await expect(records(frame)).toHaveCount(0);
  await expect(frame.getByText('192.0.2.1/32',{exact:true})).toHaveCount(0);
+ expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 
 test('fifteen-minute router polling preserves the map viewport and cannot supply camera colors',async({page})=>{

@@ -107,3 +107,46 @@ test('the selected unit card retains its unknown current badge beside historical
  const html=renderToStaticMarkup(React.createElement(FleetUnitHealth,{row,now:expired,lastKnown:historical}));
  assert.match(html,/camera-status-unknown/);assert.match(html,/Last known CAMERA RECORDS ONLINE/);assert.match(html,/current status unverified/);assert.doesNotMatch(html,/camera-status-online|cos-signal-online/);
 });
+
+test('accepted current timestamps and remembered source times agree on the timestamp-corrected baseline',()=>{
+ const newer=new Date(now-60000).toISOString();
+ const cases=[
+  pair(snapshot([resource(1),resource(2,'Helios 1',{type:'NVR',serviceEvidence:port({observedAt:newer}),evidence:{...resource(2,'Helios 1',{type:'NVR'}).evidence,observedAt:newer}})])),
+  pair(snapshot([withStatus(resource(1),'offline'),withStatus(resource(2),'online',newer)])),
+  pair(raw([resource(1,'Helios 1',{serviceEvidence:port({observedAt:newer})})])),
+  pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:port(),serviceEvidence:port({observedAt:newer})})]),[{...unit,unitNumber:'Sniper 1',modelName:'Sniper'}]),
+ ];
+ for(const fleet of cases){
+  const result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now),saved=history.get(unit.id).observation;
+  assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.basis,result.basis);assert.equal(saved.state,result.state);
+ }
+});
+
+test('new mixed evidence with unchanged membership clears history until a new definitive observation is accepted',()=>{
+ const initial=pair(snapshot([resource(1),resource(2)])),history=rememberCameraHistory(new Map(),initial,now);
+ const changed=pair(snapshot([resource(1),withStatus(resource(2),'unknown',new Date(now-60000).toISOString())]));
+ assert.equal(current(changed).state,'unknown');const cleared=rememberCameraHistory(history,changed,now);assert.equal(cleared.size,0);assert.equal(last(cleared,changed),null);
+ const observedAt=new Date(now).toISOString(),restored=pair(snapshot([withStatus(resource(1),'online',observedAt),withStatus(resource(2),'online',observedAt)]));
+ const freshHistory=rememberCameraHistory(cleared,restored,now);assert.equal(freshHistory.get(unit.id).observation.observedAt,observedAt);assert.equal(last(freshHistory,restored),null);
+});
+
+test('a new accepted connection basis replaces camera history using only the connection source time',()=>{
+ const initial=pair(),history=rememberCameraHistory(new Map(),initial,now),later=now+16*60000,portTime=new Date(later-60000).toISOString();
+ const next=pair(raw([resource(1,'Helios 1',{serviceEvidence:port({observedAt:portTime})})]));
+ const result=current(next,later);assert.equal(result.state,'online');assert.equal(result.basis,'connection');
+ const saved=rememberCameraHistory(history,next,later).get(unit.id).observation;assert.equal(saved.basis,'connection');assert.equal(saved.observedAt,portTime);assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.label,'IP / PORT ONLINE');
+});
+
+for(const state of ['online','offline'])test('legacy '+state+' history cannot borrow a newer inactive sibling observation',()=>{
+ const rows=[withStatus(resource(1),state),withStatus(resource(2,'Helios 1',{scope:'inactive',organization:'RETIRED'}),state,new Date(now-60000).toISOString())];
+ const fleet=pair(snapshot(rows)),result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now),saved=history.get(unit.id).observation;
+ assert.equal(result.state,state);assert.equal(result.association,undefined);assert.equal(result.checkedAt,new Date(fresh).toISOString());assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.oldestObservedAt,result.checkedAt);
+ const newerRows=[rows[0],withStatus(rows[1],state,new Date(now).toISOString())],next=pair(snapshot(newerRows));
+ const refreshed=rememberCameraHistory(history,next,now).get(unit.id).observation;assert.equal(refreshed.observedAt,result.checkedAt);assert.equal(refreshed.oldestObservedAt,result.checkedAt);
+});
+
+for(const state of ['online','offline'])test('durable '+state+' history preserves accepted placement-independent sibling times',()=>{
+ const newer=new Date(now-60000).toISOString(),rows=[withStatus(resource(1),state),withStatus(resource(2,'Helios 1',{scope:'inactive',organization:'RETIRED'}),state,newer)];
+ const fleet=pair({...snapshot(rows),identityVersion:1,unitIdentities:[{...identity,deviceIds:['1','2']}],identityWarnings:[]}),result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now),saved=history.get(unit.id).observation;
+ assert.equal(result.state,state);assert.ok(result.association);assert.equal(result.checkedAt,newer);assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.oldestObservedAt,new Date(fresh).toISOString());
+});

@@ -18,24 +18,38 @@ const extraText=(extraction:MhelpExtraction)=>[
 const err=(cause:unknown)=>cause instanceof Error?cause.message:'The import could not be verified. The original file is retained.';
 
 export default function MhelpTicketImport({show,openJob}:{show:(message:string)=>void;openJob:(id:string)=>void}) {
-  const client=useRef(mhelpImportClient(api)).current;
+  const importSessionValid=useRef(true);
   const [draft,setDraft]=useState<Draft|null>(null),[busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [customers,setCustomers]=useState<any[]>([]),[sites,setSites]=useState<any[]>([]),[query,setQuery]=useState(''),[directoryReady,setDirectoryReady]=useState(false);
   const [reviewed,setReviewed]=useState(false),[history,setHistory]=useState<ImportHistoryRow[]|null>(null),[historyOpen,setHistoryOpen]=useState(false),[historyLocked,setHistoryLocked]=useState(false);
   const [attention,setAttention]=useState(false),[saved,setSaved]=useState<{jobId:string;cleanupConfirmed:boolean;duplicate?:boolean}|null>(null);
   const mounted=useRef(true),revision=useRef(0),running=useRef(false),draftRef=useRef<Draft|null>(null);
   draftRef.current=draft;
-  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;revision.current++;};},[]);
+  useEffect(()=>{
+    mounted.current=true;importSessionValid.current=true;
+    const invalid=()=>{importSessionValid.current=false;revision.current++;};
+    // Healthy legacy navigation cancels old actions without disabling new explicit actions on return.
+    const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')revision.current++;};
+    window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('message',hidden);window.addEventListener('pagehide',invalid);
+    return()=>{mounted.current=false;invalid();window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('message',hidden);window.removeEventListener('pagehide',invalid);};
+  },[]);
+  const captureAction=()=>{
+    const session=api.captureSession(),viewRevision=revision.current;
+    const current=()=>mounted.current&&importSessionValid.current&&session()&&viewRevision===revision.current;
+    return {current,client:mhelpImportClient(api,current)};
+  };
   const directory=async()=>{
+    const {current}=captureAction();
     const [people,locations]=await Promise.all([api.get('/api/customers'),api.get('/api/sites')]);
     const result=readTicketDirectory(people.data,locations.data);
-    if(mounted.current){setCustomers(result.customers);setSites(result.sites);setDirectoryReady(true);}
+    if(current()){setCustomers(result.customers);setSites(result.sites);setDirectoryReady(true);}
     return result;
   };
-  const historyRead=async()=>{const rows=await client.history();if(mounted.current)setHistory(rows);return rows;};
+  const historyRead=async()=>{const {current,client}=captureAction();const rows=await client.history();if(current())setHistory(rows);return rows;};
   const loadHistory=async()=>{
     if(running.current)return;running.current=true;setBusy('history');setError('');
-    try{await historyRead();setHistoryOpen(true);setHistoryLocked(false);}catch(cause){if(mounted.current)setError(err(cause));}
+    const {current}=captureAction();
+    try{await historyRead();if(current()){setHistoryOpen(true);setHistoryLocked(false);}}catch(cause){if(current())setError(err(cause));}
     finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const extracted=async(value:{file:File;sha256:string;parserId:string;parserVersion:string;extraction:MhelpExtraction})=>{
@@ -58,56 +72,63 @@ export default function MhelpTicketImport({show,openJob}:{show:(message:string)=
     if(!draft||running.current||!reviewed||attention||saved)return;
     running.current=true;setBusy('save');setError('');setNotice('');
     const current=draft;let touched=false;
+    const {current:actionCurrent,client}=captureAction();
     try{
       const fresh=await directory();validateReviewedImport(current.ticket,makeDirectory(fresh));
-      if(!mounted.current)return;
+      if(!actionCurrent())return;
       touched=true;
       const attachment=current.attachment||await client.stage(current.attemptId,current.ticket.source,current.file);
-      if(!mounted.current)return;
-      if(mounted.current)setDraft(previous=>previous?{...previous,attachment}:previous);
+      if(!actionCurrent())return;
+      if(actionCurrent())setDraft(previous=>previous?{...previous,attachment}:previous);
       const result=await createMhelpImportSaver(client.adapter).save({organizationId:attachment.organizationId,attachment,ticket:current.ticket,directory:makeDirectory(fresh)});
-      if(!mounted.current)return;
+      if(!actionCurrent())return;
       if(result.status==='saved_and_trashed'||result.status==='saved_file_retained'){
         setSaved({jobId:result.jobId,cleanupConfirmed:result.status==='saved_and_trashed'});setNotice(result.message);show('mHelpDesk '+current.ticket.source.sourceTicketId+' saved and verified.');window.dispatchEvent(new Event('cos-board-updated'));
       }else if(result.status==='duplicate'){
         setSaved({jobId:result.jobId,cleanupConfirmed:false,duplicate:true});setNotice('This mHelpDesk reference or file is already linked to a COS job. Open that job to review it. This imported copy is retained.');
       }else{setAttention(true);setError('message' in result?result.message:'Review import history before another save.');}
-    }catch(cause){if(mounted.current){setError(err(cause));if(touched)setAttention(true);}}
+    }catch(cause){if(actionCurrent()){setError(err(cause));if(touched)setAttention(true);}}
     finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const checkResult=async()=>{
     if(!draft||running.current)return;running.current=true;setBusy('recover');setError('');
+    const {current:actionCurrent,client}=captureAction();
     try{
       const attachment=await client.readAttempt(draft.attemptId);
-      if(!mounted.current)return;
+      if(!actionCurrent())return;
       if(!attachment){setAttention(false);setNotice('No staged copy was found. You may explicitly retry Save using this same import attempt.');return;}
       setDraft(current=>current?{...current,attachment}:current);
       const result=await client.recoverSaved(attachment,draft.ticket);
+      if(!actionCurrent())return;
       if(result?.status==='duplicate'){setSaved({jobId:result.jobId,cleanupConfirmed:false,duplicate:true});setAttention(false);setNotice('This import was confirmed as a duplicate. Open the existing COS job to review it, or start another import. This source copy is retained; no new job or trash move was made.');}
       else if(result?.status==='saved'){setSaved({jobId:result.saved.jobId,cleanupConfirmed:attachment.state==='trash'});setAttention(false);setNotice('The complete saved job is verified. '+(attachment.state==='trash'?'The imported copy is in recoverable app trash.':'The imported copy is retained. You can move it to recoverable trash.'));window.dispatchEvent(new Event('cos-board-updated'));}
       else{setAttention(false);setNotice('The original is safely staged; no linked saved job was found. You may explicitly retry Save with the same staged copy.');}
-    }catch(cause){if(mounted.current)setError(err(cause));}
+    }catch(cause){if(actionCurrent())setError(err(cause));}
     finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const cleanup=async()=>{
     if(!draft?.attachment||!saved||saved.duplicate||running.current||attention)return;running.current=true;setBusy('trash');setError('');
+    const {current:actionCurrent,client}=captureAction();
     try{
       await client.adapter.moveToRecoverableTrash(draft.attachment.id,saved.jobId,draft.ticket);
+      if(!actionCurrent())return;
       const value=await client.adapter.readAttachment(draft.attachment.id);
       if(!value||value.state!=='trash'||value.sha256!==draft.ticket.source.sha256)throw new Error('The trash move could not be confirmed. Check imports before retrying.');
-      if(mounted.current){setSaved({...saved,cleanupConfirmed:true});setNotice('The imported copy is in recoverable app trash.');}
-    }catch(cause){if(mounted.current){setError(err(cause));setAttention(true);}}
+      if(actionCurrent()){setSaved({...saved,cleanupConfirmed:true});setNotice('The imported copy is in recoverable app trash.');}
+    }catch(cause){if(actionCurrent()){setError(err(cause));setAttention(true);}}
     finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const restore=async(row:ImportHistoryRow)=>{
     if(running.current||historyLocked)return;running.current=true;setBusy('restore');setError('');setHistoryLocked(true);
-    try{await client.restore(row.id);await historyRead();if(mounted.current){setNotice('The imported copy was restored. The saved COS job is unchanged.');setHistoryLocked(false);}}
-    catch(cause){if(mounted.current)setError(err(cause));}finally{running.current=false;if(mounted.current)setBusy('');}
+    const {current:actionCurrent,client}=captureAction();
+    try{await client.restore(row.id);if(!actionCurrent())return;await historyRead();if(actionCurrent()){setNotice('The imported copy was restored. The saved COS job is unchanged.');setHistoryLocked(false);}}
+    catch(cause){if(actionCurrent())setError(err(cause));}finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const download=async(row:ImportHistoryRow)=>{
     if(running.current)return;running.current=true;setBusy('download');setError('');
-    try{const blob=await client.download(row);if(!mounted.current)return;const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=row.filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),30_000);}
-    catch(cause){if(mounted.current)setError(err(cause));}finally{running.current=false;if(mounted.current)setBusy('');}
+    const {current:actionCurrent,client}=captureAction();
+    try{const blob=await client.download(row);if(!actionCurrent())return;const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=row.filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),30_000);}
+    catch(cause){if(actionCurrent())setError(err(cause));}finally{running.current=false;if(mounted.current)setBusy('');}
   };
   const selectedSite=sites.find(row=>row.id===draft?.ticket.siteId);
   const matches=customers.filter(row=>[row.name,row.customerNumber,row.legalName].some(value=>String(value||'').toLowerCase().includes(query.toLowerCase()))).slice(0,30);

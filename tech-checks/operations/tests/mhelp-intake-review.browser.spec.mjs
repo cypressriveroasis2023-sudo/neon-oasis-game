@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {test,expect} from '@playwright/test';
 import {existsSync} from 'node:fs';
@@ -34,7 +35,7 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
  });
  await page.goto(origin+'/intake-fixture');const frame=page.frameLocator('iframe');
  if(role!=='service')await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
- else await expect(frame.getByRole('alert')).toContainText('Your existing Tech Check session is unavailable');
+ else await expectOperationsReloadRequired(frame);
  return {frame,panel:frame.getByRole('region',{name:'mHelpDesk automatic intake status',exact:true}),state};
 }
 const reads=state=>state.calls.filter(x=>x.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1');
@@ -60,11 +61,19 @@ test('stale, backoff, error and local read age are explicit without automatic ne
  await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Backoff');await expect(panel).toContainText('SOURCE_UNAVAILABLE');
  await page.clock.fastForward(21*60000);await expect(panel.getByRole('status')).toContainText('Poll error');await expect(panel).toContainText('This status was read more than 15 minutes ago');expect(reads(state)).toHaveLength(2);
 });
-test('failed or malformed refresh clears previous held rows, counts and success without exposing raw errors',async({page})=>{
+test('non-auth failed or malformed refresh clears held rows and can recover without exposing raw errors',async({page})=>{
  const {panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');
- for(const failure of [503,403,401,404]){state.failure=failure;await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');await expect(panel).not.toContainText('000042');await expect(panel.locator('dl')).toHaveCount(0);await expect(panel).not.toContainText('PRIVATE');}
+ for(const failure of [503,404]){state.failure=failure;await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');await expect(panel).not.toContainText('000042');await expect(panel.locator('dl')).toHaveCount(0);await expect(panel).not.toContainText('PRIVATE');}
  state.failure=0;state.value={...status(),source:{body:'PRIVATE'}};await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');await expect(panel).not.toContainText('000042');
  state.value=status();await refresh(panel).click();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
+});
+for(const failure of [401,403])test(`${failure} intake denial quarantines held rows and requires reload`,async({page})=>{
+ const {frame,panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');
+ state.failure=failure;await refresh(panel).click();await expectOperationsReloadRequired(frame);
+ await expect(panel).toHaveCount(0);await expect(panel.locator('dl')).toHaveCount(0);
+ await expect(frame.locator('body')).not.toContainText('000042');await expect(frame.locator('body')).not.toContainText('PRIVATE');
+ await expect(refresh(panel)).toHaveCount(0);expect(reads(state)).toHaveLength(2);
+ expect(state.calls.every(x=>x.method==='GET')).toBe(true);expect(state.calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner'))).toBe(false);expect(state.errors).toEqual([]);
 });
 test('repeated clicks share one in-flight status read and clear previous results immediately',async({page})=>{
  const {panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');state.hold=true;

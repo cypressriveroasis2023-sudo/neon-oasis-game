@@ -569,3 +569,13 @@ test('TV presentation is origin/source checked and restores frame styling on exi
  await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});h.state.role='service';h.state.effectiveRole='service';h.nodes.get('appView').classList.add('hidden');h.flushMutations();assert.equal(h.body.style.overflow,'auto');
 });
 
+
+test('ordinary legacy tool return retains the same Owner frame and only hides private evidence',async()=>{
+ const h=harness(),initial=h.frame();await h.navigate('assign');h.flushMutations();assert.equal(h.nodes.get('cosOperationsMount').hidden,true);assert.ok(initial.contentWindow.messages.some(message=>message.value.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'));assert.equal(initial.removed,false);
+ await h.navigate('operations');h.flushMutations();assert.equal(h.frame(),initial);assert.equal(h.nodes.get('cosOperationsMount').hidden,false);await h.token('after-legacy-return');assert.equal(initial.contentWindow.messages.at(-1).value.accessToken,'fresh-owner-token');
+});
+test('an identity replacement while legacy tools hide Operations destroys the prior frame',async()=>{
+ const h=harness(),initial=h.frame();await h.navigate('assign');h.flushMutations();const pendingAuth=deferred();h.state.getFreshSession=()=>pendingAuth.promise;const pending=h.token('old-hidden-owner');
+ h.state.session={user:{id:secondOwnerId}};h.state.profile={user_id:secondOwnerId,role:'owner',active:true};h.state.authListener('SIGNED_IN',h.state.session);h.flushMutations();assert.equal(initial.removed,true);assert.notEqual(h.frame(),initial);
+ const before=initial.contentWindow.messages.length;pendingAuth.resolve({data:{session:{user:{id:ownerId},access_token:'late-old-hidden-token'}}});await pending;assert.equal(initial.contentWindow.messages.length,before,'old identity may not receive a late handoff');
+});

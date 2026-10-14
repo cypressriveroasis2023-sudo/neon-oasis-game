@@ -38,11 +38,11 @@ function fixture({autoReply=true}={}){
  vm.runInNewContext(apiSource,{exports,window,location,URLSearchParams,AbortController,Event,Error,Date:ClockDate,require:name=>{assert.ok(modules[name],'Unexpected import '+name);return modules[name];},crypto:{randomUUID:()=>`synthetic-request-${++requestId}`},fetch(url,init){assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');const result=deferred();init.signal.addEventListener('abort',()=>result.reject(new Error('Synthetic aborted request')),{once:true});requests.push({url,init,envelope:JSON.parse(init.body),result});return result.promise;}},{filename:'api.ts'});
  const api=exports.api;
  function mount(){
-  const values=[],refs=[],effects=[],cleanups=[];
-  const react={useCallback:fn=>fn,useRef(value){const ref={current:value};refs.push(ref);return ref;},useState(value){const index=values.length;values.push(value);return [value,next=>{values[index]=typeof next==='function'?next(values[index]):next;}];},useEffect:fn=>effects.push(fn)};
+  const values=[],refs=[],effects=[],cleanups=[],historyUpdates=[];let holdHistory=false;
+  const react={useCallback:fn=>fn,useRef(value){const ref={current:value};refs.push(ref);return ref;},useState(value){const index=values.length;values.push(value);return [value,next=>{if(index===4&&holdHistory&&typeof next==='function'){historyUpdates.push(next);return;}values[index]=typeof next==='function'?next(values[index]):next;}];},useEffect:fn=>effects.push(fn)};
   const exports={};vm.runInNewContext(hookSource,{exports,window,document,location,Error,Date:ClockDate,require:name=>name==='react'?react:name==='./api'?{api}:modules[name]},{filename:'useCameraHealth.ts'});
   const hook=exports.useCameraHealth();effects.forEach(fn=>cleanups.push(fn()));
-  return {refresh:hook.refresh,get fleet(){return values[0];},get error(){return values[1];},get loading(){return values[2];},get now(){return values[3];},get cameraHistory(){return values[4];},get lastAttemptAt(){return refs[2].current;},unmount(){cleanups.forEach(fn=>fn?.());}};
+  return {refresh:hook.refresh,deferHistory(){holdHistory=true;},flushHistory(){holdHistory=false;while(historyUpdates.length)values[4]=historyUpdates.shift()(values[4]);},get fleet(){return values[0];},get error(){return values[1];},get loading(){return values[2];},get now(){return values[3];},get cameraHistory(){return values[4];},get lastAttemptAt(){return refs[2].current;},unmount(){cleanups.forEach(fn=>fn?.());}};
  }
  async function advance(milliseconds){
   const end=clock+milliseconds;
@@ -120,10 +120,10 @@ test('session invalidation clears nonempty camera history and rejects late old-s
 });
 
 test('only a verified parent hide clears camera history, including an in-flight read',async()=>{
- const {f,hook}=await bootHistory();
+ const {f,hook}=await bootHistory(),saved=hook.fleet;
  f.window.dispatchEvent({type:'message',origin:'https://untrusted.example',source:{},data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});assert.equal(hook.cameraHistory.size,1);
- const pending=hook.refresh(true);await flush();f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
- f.answer(2,historyHealth);f.answer(3,historyMap);await pending;assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+ const pending=hook.refresh(true);await flush();f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,saved);assert.equal(hook.error,'');
+ f.answer(2,historyHealth);f.answer(3,historyMap);await pending;assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,saved);
 });
 
 test('unmount discards hook-local history and a cold remount cannot invent it from cached stale observations',async()=>{
@@ -132,4 +132,59 @@ test('unmount discards hook-local history and a cold remount cannot invent it fr
  assert.equal(hook.cameraHistory.size,1,'the existing view remembers its actually accepted result');
  hook.unmount();const mounted=f.mount();await flush();
  assert.equal(f.requests.length,4,'the new view adopts the shared saved-data cache without another source read');assert.ok(mounted.fleet);assert.equal(mounted.cameraHistory.size,0,'stale source data alone cannot become a previously verified historical result');mounted.unmount();
+});
+
+for(const status of [401,403])test('real '+status+' saved-read denial clears history before late paired data can return',async()=>{
+ const {f,hook}=await bootHistory(),pending=hook.refresh(true);await flush();
+ f.answer(2,{error:'Synthetic authorization denied'},status);await flush();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+ f.answer(3,historyMap);await pending;assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);assert.equal(hook.loading,false);
+});
+
+test('a real same-role bearer rollover clears accepted history and fences old responses',async()=>{
+ const {f,hook}=await bootHistory(),pending=hook.refresh(true);await flush();
+ const body=deferred();f.requests[2].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+ f.state.token='synthetic-session-b';const current=f.api.get('/api/jobs');await flush();
+ assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);f.answer(4,{items:[]});await current;
+ body.resolve(historyHealth);f.answer(3,historyMap);await pending;assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+});
+
+test('nonempty history adds no background reads while hidden and cannot advance its source time',async()=>{
+ const {f,hook}=await bootHistory(),saved=hook.cameraHistory.get(historyUnit.id).observation;
+ await f.visible(false);await f.advance(21*60000);assert.equal(f.requests.length,2);assert.equal(hook.cameraHistory.get(historyUnit.id).observation,saved);assert.equal(saved.observedAt,observationAt);
+ await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4,'one existing shared refresh resumes; history has no separate reader');
+ f.answer(2,historyHealth);f.answer(3,historyMap);await flush();assert.equal(hook.cameraHistory.get(historyUnit.id).observation.observedAt,observationAt);
+ assert.ok(f.requests.every(request=>request.envelope.method==='GET'));assert.deepEqual([...new Set(f.requests.map(request=>request.envelope.path))].sort(),['/api/camera-health/summary-v3','/api/field-map']);
+});
+
+test('hide messages require both the exact parent source and the same origin',async()=>{
+ const {f,hook}=await bootHistory(),saved=hook.fleet;
+ for(const event of [
+  {origin:'https://synthetic.example',source:{}},
+  {origin:'https://untrusted.example',source:f.window.parent},
+ ])f.window.dispatchEvent({type:'message',...event,data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
+ assert.equal(hook.cameraHistory.size,1);f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,saved);assert.equal(hook.error,'');
+});
+
+test('healthy hide clears only history and a new accepted refresh establishes new history',async()=>{
+ const {f,hook}=await bootHistory(),saved=hook.fleet,calls=f.requests.length;
+ f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,saved);assert.equal(hook.error,'');assert.equal(hook.loading,false);assert.equal(f.requests.length,calls);
+ const next=hook.refresh(true);await flush();f.answer(2,historyHealth);f.answer(3,historyMap);await next;
+ assert.equal(hook.error,'');assert.equal(hook.cameraHistory.size,1);assert.equal(hook.cameraHistory.get(historyUnit.id).observation.observedAt,observationAt);
+});
+
+test('a pre-hide request awaiting parent authorization cannot repopulate cleared history',async()=>{
+ const {f,hook}=await bootHistory(),saved=hook.fleet;f.state.autoReply=false;
+ const pending=hook.refresh(true);await flush();assert.equal(f.requests.length,2);
+ f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,saved);assert.equal(hook.error,'');
+ f.reply();f.state.autoReply=true;await flush();assert.equal(f.requests.length,4);f.answer(2,historyHealth);f.answer(3,historyMap);await pending;
+ assert.ok(hook.fleet,'baseline current-fleet adoption remains unchanged');assert.equal(hook.error,'');assert.equal(hook.cameraHistory.size,0,'history belongs to the pre-hide generation');
+ const current=hook.refresh(true);await flush();f.answer(4,historyHealth);f.answer(5,historyMap);await current;assert.equal(hook.cameraHistory.size,1);
+});
+
+test('a queued history updater cannot repopulate evidence after healthy hide',async()=>{
+ const {f,hook}=await bootHistory();hook.deferHistory();
+ const pending=hook.refresh(true);await flush();f.answer(2,historyHealth);f.answer(3,historyMap);await pending;
+ assert.equal(hook.cameraHistory.size,1);const saved=hook.fleet;f.hide();assert.equal(hook.cameraHistory.size,0);
+ hook.flushHistory();assert.equal(hook.cameraHistory.size,0,'the updater rechecks its history generation when React applies it');assert.equal(hook.fleet,saved);assert.equal(hook.error,'');
+ const current=hook.refresh(true);await flush();f.answer(4,historyHealth);f.answer(5,historyMap);await current;assert.equal(hook.cameraHistory.size,1);
 });

@@ -7,6 +7,7 @@ import ts from 'typescript';
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
+import {createOperationsSessionRecovery} from '../src/operationsSessionRecovery.ts';
 import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
 import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
@@ -520,4 +521,80 @@ for(const reason of ['timeout','cancelled'])test('Run rejects a late parsed body
  if(reason==='timeout')f.advance(120000);else{f.advance(47000);controller.abort();}
  assert.equal(f.requests[0].init.signal.aborted,true);body.resolve({ok:true,censusOnly:true,allowance:'consumed'});await failed;
  assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);f.advance(120000);assert.equal(f.requests.length,1);
+});
+
+const recoveryOwner={authorized:true,legacyOwner:true,role:'Owner',name:'Synthetic Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:true}};
+const recoveryTurn=async()=>{await new Promise(resolve=>setTimeout(resolve,5));await flush();};
+async function recoveryFixture(){
+ const f=fixture(),states=[],reasons=[];
+ const current=createOperationsSessionRecovery({read:async()=>(await f.api.get('/api/session')).data,mode:()=>new URLSearchParams(f.location.search).get('mode')||'',changed:state=>states.push(state)});
+ f.window.addEventListener('cos-private-data-invalidated',event=>{reasons.push(event.detail?.reason);current.invalidate(event.detail?.reason);});
+ f.window.addEventListener('message',event=>{if(event.origin===f.location.origin&&event.source===f.window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')current.hide();});
+ f.window.addEventListener('pagehide',()=>current.invalidate('security-hide'));
+ const boot=current.check();await flush();f.answer(0,recoveryOwner);await boot;
+ return {...f,current,states,reasons,get sessionState(){return states.at(-1);}};
+}
+test('real API token renewal drives one same-Owner session bootstrap without replaying writes',async()=>{
+ const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
+ assert.deepEqual(f.reasons,['token-renewed']);assert.equal(f.sessionState.session,null);assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/session','/api/routers','/api/session']);
+ f.answer(1);f.answer(2,recoveryOwner);await pending;await flush();assert.equal(f.sessionState.session.productionOwnerUserId,recoveryOwner.productionOwnerUserId);assert.equal(f.sessionState.reloadRequired,false);assert.ok(f.requests.every(r=>r.envelope.method==='GET'));f.current.stop();
+});
+test('shared parent timeout emits once and recovery waits until the failed handshake settles',async()=>{
+ const f=await recoveryFixture();f.state.autoReply=false;
+ const a=assert.rejects(f.api.get('/api/routers'),status(401)),b=assert.rejects(f.api.fleet(),status(401));
+ f.expire(10000);f.state.autoReply=true;await Promise.all([a,b]);await recoveryTurn();
+ assert.deepEqual(f.reasons,['parent-timeout']);assert.equal(f.requests.length,2);assert.equal(f.requests[1].envelope.path,'/api/session');assert.equal(f.handshakes.length,3,'failed handshake was not reused by recovery');
+ f.answer(1,recoveryOwner);await flush();assert.equal(f.sessionState.reloadRequired,false);assert.ok(f.sessionState.session);f.current.stop();
+});
+for(const code of [401,403])test('real source HTTP '+code+' cannot become an automatic session retry',async()=>{
+ const f=await recoveryFixture(),pending=assert.rejects(f.api.get('/api/routers'),status(code));await flush();f.answer(1,{error:'Synthetic denied'},code);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['authentication-denied']);assert.equal(f.requests.length,2);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();
+});
+test('real parent role denial and empty token are hard stops, not transient timeouts',async()=>{
+ for(const patch of [{role:'service'},{token:''}]){const f=await recoveryFixture();Object.assign(f.state,patch);await assert.rejects(f.api.get('/api/routers'),status(401));await recoveryTurn();assert.deepEqual(f.reasons,['authentication-denied']);assert.equal(f.requests.length,1);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();}
+});
+test('trusted host security hide during verification rejects its late successful session body',async()=>{
+ const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
+ f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
+ f.answer(1);f.answer(2,recoveryOwner);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed']);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
+});
+test('wrong-origin and sibling hide messages cannot interrupt same-Owner recovery',async()=>{
+ const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
+ f.reply(undefined,undefined,{origin:'https://untrusted.example',data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});f.reply(undefined,undefined,{source:{},data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
+ f.answer(1);f.answer(2,recoveryOwner);await pending;await flush();assert.deepEqual(f.reasons,['token-renewed']);assert.ok(f.sessionState.session);f.current.stop();
+});
+test('denial from the verification request cannot recursively revalidate',async()=>{
+ const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();f.answer(1);f.answer(2,{error:'Synthetic revoked'},403);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed','authentication-denied']);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
+});
+
+test('an unsent POST cannot cross token renewal while parent authorization is pending',async()=>{
+ const f=await recoveryFixture();f.state.autoReply=false;
+ const denied=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),status(401));
+ f.state.token='synthetic-session-b';f.reply();f.state.autoReply=true;await denied;await recoveryTurn();
+ assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/session','/api/session']);assert.ok(f.requests.every(r=>r.envelope.method==='GET'));f.answer(1,recoveryOwner);await flush();assert.ok(f.sessionState.session);f.current.stop();
+});
+test('an unsent POST fails on timeout and a late old parent reply cannot revive it',async()=>{
+ const f=await recoveryFixture();f.state.autoReply=false;const denied=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),status(401));const oldHandshake=f.handshakes.at(-1);
+ f.expire(10000);f.state.autoReply=true;await denied;await recoveryTurn();f.reply(oldHandshake);await flush();assert.ok(f.requests.every(r=>r.envelope.method==='GET'));assert.equal(f.requests.length,2);f.answer(1,recoveryOwner);await flush();assert.ok(f.sessionState.session);f.current.stop();
+});
+test('host hide during POST parent authorization blocks transport even if its old reply succeeds',async()=>{
+ const f=await recoveryFixture();f.state.autoReply=false;const denied=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),status(401));const handshake=f.handshakes.at(-1);
+ f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});f.reply(handshake);await denied;await recoveryTurn();assert.equal(f.requests.length,1);assert.ok(f.sessionState.session);assert.equal(f.sessionState.reloadRequired,false);f.current.stop();
+});
+test('pagehide during POST parent authorization blocks transport even if its old reply succeeds',async()=>{
+ const f=await recoveryFixture();f.state.autoReply=false;const denied=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),status(401));const handshake=f.handshakes.at(-1);
+ f.window.dispatchEvent(new Event('pagehide'));f.reply(handshake);await denied;await recoveryTurn();assert.equal(f.requests.length,1);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();
+});
+test('a previously submitted write is never replayed by successful revalidation',async()=>{
+ const f=await recoveryFixture(),write=f.api.post('/api/owner-tasks',{title:'Synthetic submitted intent'});await flush();assert.equal(f.requests[1].envelope.method,'POST');
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();f.answer(1,{saved:true});await write;await recoveryTurn();assert.equal(f.requests.filter(r=>r.envelope.method==='POST').length,1);assert.equal(f.requests.length,4);assert.ok(f.sessionState.session);f.current.stop();
+});
+
+test('ordinary host hide clears the paired cache and rejects late old sources without replacing a healthy Owner session',async()=>{
+ const f=await recoveryFixture(),before=f.sessionState;const old=f.api.fleet(),rejected=assert.rejects(old,status(409));await flush();
+ f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});f.answer(1,fleetHealth);f.answer(2,fleetMap);await rejected;assert.equal(f.sessionState,before);assert.deepEqual(f.reasons,[]);
+ const fresh=f.api.fleet();await flush();assert.equal(f.requests.length,5);f.answer(3,fleetHealth);f.answer(4,fleetMap);await fresh;assert.equal(f.sessionState.session.productionOwnerUserId,recoveryOwner.productionOwnerUserId);assert.equal(f.sessionState.reloadRequired,false);f.current.stop();
+});
+
+test('a captured draft session remains invalid after same-Owner recovery and a new draft gets a fresh fence',async()=>{
+ const f=await recoveryFixture(),oldDraft=f.api.captureSession();assert.equal(oldDraft(),true);f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();assert.equal(oldDraft(),false);f.answer(1);f.answer(2,recoveryOwner);await read;await flush();assert.ok(f.sessionState.session);assert.equal(oldDraft(),false);assert.equal(f.api.captureSession()(),true);f.current.stop();
 });

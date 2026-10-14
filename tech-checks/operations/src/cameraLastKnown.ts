@@ -36,7 +36,11 @@ export function rememberCameraHistory(previous:CameraHistory,fleet:FleetSnapshot
  for(const unit of units){
   const result=fieldCameraHealth(unit,units,fleet.health,now),signature=unitSignature(unit,units),old=previous.get(unit.id);
   if(result.identity==='matched'&&(result.state==='online'||result.state==='offline')&&result.basis){
-   const supportingRows=result.rows.filter(row=>result.basis==='connection'?savedConnectionObservation(row,now)===result.state
+   // Legacy camera classification excludes inactive inventory before selecting
+   // its witnesses. Durable identities and direct connections intentionally
+   // retain their own placement-independent source populations.
+   const population=!result.association&&result.basis==='camera'?result.rows.filter(row=>row.scope!=='inactive'):result.rows;
+   const supportingRows=population.filter(row=>result.basis==='connection'?savedConnectionObservation(row,now)===result.state
      :result.basis==='camera'?cameraRecord(row)&&cameraState(row,now)===result.state
      :result.basis==='recorder'?resourceKind(row)==='recorders'&&providerRecord(row)&&(result.classification?.fieldRecorderVerified?row.evidence?.status===result.state:providerState(row,now)===result.state)
      :providerRecord(row)&&providerState(row,now)===result.state);
