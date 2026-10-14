@@ -9,6 +9,7 @@ const root=fileURLToPath(new URL('..',import.meta.url));
 const require=createRequire(root+'/package.json'),ts=require('typescript');
 const {reconcileFleetSnapshot}=await import(root+'/src/fleetSnapshot.ts');
 const {validateCameraHealth}=await import(root+'/src/fieldCameraHealth.ts');
+const {rememberCameraHistory}=await import(root+'/src/cameraLastKnown.ts');
 const {checkedFieldMap}=await import(root+'/src/gpsPersistence.ts');
 const {checkedOwnerCensusPreparationBinding,createOwnerCensusPreparation}=await import(root+'/src/ownerCensusPreparation.ts');
 const {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS}=await import(root+'/src/refreshCadence.ts');
@@ -28,14 +29,14 @@ const visibleBody=['preparationBinding','visiblePreparation','visiblePreparation
 const visibleFn=new Function('ownerCensusEnabled','censusSessionInvalid','preparationReady','preparationReceipt','preparationMessage','data','selectedId',visibleBody);
 const health={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date(now).toISOString(),rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
 async function ui(f){
- const initial=preparationSnapshot().snapshot,state={data:initial,selectedId:id,busy:false,message:null,receipt:null,ready:null,error:'',fleet:null,sessionInvalid:false},working={current:false};
+ const initial=preparationSnapshot().snapshot,state={data:initial,selectedId:id,busy:false,message:null,receipt:null,ready:null,error:'',fleet:null,cameraHistory:new Map(),sessionInvalid:false},working={current:false};
  const context={current:{data:initial,selectedId:id,ownerCensusEnabled:true}},sessionRevision={current:0},preparationSnapshotLock={current:null},automaticReadPaused={current:false},mounted={current:true},preparation={current:createOwnerCensusPreparation(f.api,()=>now)};
  const setData=value=>{if(typeof value==='function')value=value(state.data);state.data=value;context.current.data=value;};
  const setReady=value=>state.ready=value,setMessage=value=>state.message=value,setReceipt=value=>state.receipt=value;
  const prepareFn=new Function('working','preparationBinding','data','selected','censusSessionRevision','censusMounted','censusContext','setBusy','setPreparationReady','setPreparationReceipt','setPreparationMessage','censusPreparation','setData','preparationSnapshotLock',expression('FieldMap.tsx','prepareApprovedCensus'));
  const effect=new Function('cameras','setData','sameFieldMapSourceSnapshot','working','preparationSnapshotLock','automaticReadPaused',effectBody);
  const running={current:false},revision={current:0},lastAttemptAt={current:now};
- const refresh=new Function('Date','api','running','lastAttemptAt','revision','setLoading','validateCameraHealth','setFleet','setError','updateClock',expression('useCameraHealth.ts','refresh'))(ClockDate,f.api,running,lastAttemptAt,revision,()=>{},validateCameraHealth,value=>{state.fleet=value;if(!state.deferFleetEffect)effect({fleet:value},setData,sameFieldMapSourceSnapshot,working,preparationSnapshotLock,automaticReadPaused);},value=>state.error=value,()=>{});
+ const refresh=new Function('Date','api','running','lastAttemptAt','revision','setLoading','validateCameraHealth','setFleet','setError','updateClock','setCameraHistory','rememberCameraHistory',expression('useCameraHealth.ts','refresh'))(ClockDate,f.api,running,lastAttemptAt,revision,()=>{},validateCameraHealth,value=>{state.fleet=value;if(!state.deferFleetEffect)effect({fleet:value},setData,sameFieldMapSourceSnapshot,working,preparationSnapshotLock,automaticReadPaused);},value=>state.error=value,()=>{},value=>{state.cameraHistory=typeof value==='function'?value(state.cameraHistory):value;},rememberCameraHistory);
  const invalidate=new Function('censusSessionRevision','censusAction','censusPreparation','setCensusSessionInvalid','setCensusReady','setCensusMessage','setPreparationReady','setPreparationMessage','setPreparationReceipt','preparationSnapshotLock',expression('FieldMap.tsx','invalidate'))(sessionRevision,{current:{invalidate(){}}},preparation,value=>state.sessionInvalid=value,()=>{},()=>{},setReady,setMessage,setReceipt,preparationSnapshotLock);f.window.addEventListener('cos-private-data-invalidated',invalidate);
  const selectionEffect=/useEffect\(\(\)=>\{([^\n]*?)\},\[selectedId\]\);/.exec(fieldSource);assert(selectionEffect);
  const selectChanged=()=>new Function('preparationSnapshotLock','censusAction','censusPreparation','setCensusMessage','setPreparationMessage',selectionEffect[1])(preparationSnapshotLock,{current:{invalidate(){}}},preparation,()=>{},setMessage);
@@ -43,7 +44,7 @@ async function ui(f){
  const bind=async()=>{const binding=state.sessionInvalid?null:await checkedOwnerCensusPreparationBinding(state.data,id);state.ready=binding?{snapshot:state.data,unitId:id,binding}:null;};await bind();
  return {state,working,preparationSnapshotLock,automaticReadPaused,selectChanged,load,context,sessionRevision,preparation,refresh,lastAttemptAt,bind,selectData:setData,effect:value=>effect({fleet:value},setData,sameFieldMapSourceSnapshot,working,preparationSnapshotLock,automaticReadPaused),visible:()=>visibleFn(true,state.sessionInvalid,state.ready,state.receipt,state.message,state.data,id),start:()=>prepareFn(working,state.ready.binding,state.data,state.data.items.find(row=>row.id===id),sessionRevision,mounted,context,value=>state.busy=value,setReady,setReceipt,setMessage,preparation,setData,preparationSnapshotLock)()};
 }
-async function boot(){observationClock=now;const f=apiFixture(),u=await ui(f);const field=f.api.fleetSource('fieldMap'),camera=u.refresh();await flush();f.answer(1,u.state.data);const loaded=await field;u.selectData(loaded);f.answer(0,health);await camera;await u.bind();return {f,u};}
+async function boot(){observationClock=now;const f=apiFixture(),u=await ui(f);const field=f.api.fleetSource('fieldMap'),camera=u.refresh();await flush();f.answer(1,u.state.data);const loaded=await field;u.selectData(loaded);f.answer(0,health);await camera;assert.equal(u.state.error,'','The exact refresh harness must run all production dependencies before checking fleet adoption.');assert.ok(u.state.fleet);await u.bind();return {f,u};}
 async function waitRequest(f,index){for(let attempt=0;attempt<200&&!f.requests[index];attempt++)await new Promise(resolve=>setTimeout(resolve,1));assert.ok(f.requests[index],'expected request '+index);}
 async function answerSession(f,index){await waitRequest(f,index);assert.equal(f.requests[index].envelope.path,'/api/session');f.answer(index,preparationOwner);await flush();}
 

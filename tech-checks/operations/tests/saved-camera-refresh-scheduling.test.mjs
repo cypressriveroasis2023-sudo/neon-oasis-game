@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
+import {rememberCameraHistory} from '../src/cameraLastKnown.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
 import {CAMERA_AUTO_REFRESH_MS,automaticRefreshDue} from '../src/refreshCadence.ts';
 
@@ -33,15 +34,15 @@ function fixture({autoReply=true}={}){
  const document={hidden:false,addEventListener:(type,fn)=>add(documentListeners,type,fn),removeEventListener:(type,fn)=>documentListeners.get(type)?.delete(fn)};
  const ClockDate=class extends Date{static now(){return clock;}};
  const exports={};
- const modules={'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
+ const modules={'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./cameraLastKnown':{rememberCameraHistory},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
  vm.runInNewContext(apiSource,{exports,window,location,URLSearchParams,AbortController,Event,Error,Date:ClockDate,require:name=>{assert.ok(modules[name],'Unexpected import '+name);return modules[name];},crypto:{randomUUID:()=>`synthetic-request-${++requestId}`},fetch(url,init){assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');const result=deferred();init.signal.addEventListener('abort',()=>result.reject(new Error('Synthetic aborted request')),{once:true});requests.push({url,init,envelope:JSON.parse(init.body),result});return result.promise;}},{filename:'api.ts'});
  const api=exports.api;
  function mount(){
   const values=[],refs=[],effects=[],cleanups=[];
   const react={useCallback:fn=>fn,useRef(value){const ref={current:value};refs.push(ref);return ref;},useState(value){const index=values.length;values.push(value);return [value,next=>{values[index]=typeof next==='function'?next(values[index]):next;}];},useEffect:fn=>effects.push(fn)};
-  const exports={};vm.runInNewContext(hookSource,{exports,window,document,Error,Date:ClockDate,require:name=>name==='react'?react:name==='./api'?{api}:modules[name]},{filename:'useCameraHealth.ts'});
+  const exports={};vm.runInNewContext(hookSource,{exports,window,document,location,Error,Date:ClockDate,require:name=>name==='react'?react:name==='./api'?{api}:modules[name]},{filename:'useCameraHealth.ts'});
   const hook=exports.useCameraHealth();effects.forEach(fn=>cleanups.push(fn()));
-  return {refresh:hook.refresh,get fleet(){return values[0];},get error(){return values[1];},get loading(){return values[2];},get now(){return values[3];},get lastAttemptAt(){return refs[2].current;},unmount(){cleanups.forEach(fn=>fn?.());}};
+  return {refresh:hook.refresh,get fleet(){return values[0];},get error(){return values[1];},get loading(){return values[2];},get now(){return values[3];},get cameraHistory(){return values[4];},get lastAttemptAt(){return refs[2].current;},unmount(){cleanups.forEach(fn=>fn?.());}};
  }
  async function advance(milliseconds){
   const end=clock+milliseconds;
@@ -51,7 +52,7 @@ function fixture({autoReply=true}={}){
  const answer=(index,data,status=200)=>{assert.ok(requests[index],'Expected synthetic request '+index);requests[index].result.resolve(new Response(JSON.stringify(data),{status}));};
  const answerPair=(index=0)=>{answer(index,{...health,refreshedAt:new Date(clock).toISOString()});answer(index+1,{...fieldMap,generatedAt:new Date(clock).toISOString()});};
  const visible=async value=>{document.hidden=!value;dispatch(documentListeners,{type:'visibilitychange'});await flush();};
- return {api,window,requests,handshakes,state,events,mount,advance,answer,answerPair,visible,reply,get now(){return clock;}};
+ return {api,window,requests,handshakes,state,events,mount,advance,answer,answerPair,visible,reply,hide(){window.dispatchEvent({type:'message',origin:location.origin,source:parent,data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});},get now(){return clock;}};
 }
 async function prewarm(f){const pending=f.api.fleet();await flush();f.answerPair();return pending;}
 async function boot(){const f=fixture(),hook=f.mount();await flush();f.answerPair();await flush();assert.equal(hook.loading,false);return {f,hook};}
@@ -96,4 +97,39 @@ for(const source of ['health','fieldMap'])test('a pair never adopts one successf
  const {f,hook}=await boot(),saved=hook.fleet;await f.advance(CAMERA_AUTO_REFRESH_MS);
  if(source==='health')f.answer(3,fieldMap);else f.answer(2,health);await flush();assert.equal(hook.fleet,saved);assert.equal(hook.loading,true);
  if(source==='health')f.answer(2,health);else f.answer(3,fieldMap);await flush();assert.notEqual(hook.fleet,saved);assert.equal(hook.loading,false);assert.equal(hook.fleet.readStartedAt,start+CAMERA_AUTO_REFRESH_MS);
+});
+
+const historyUnit={id:'11111111-1111-4111-8111-111111111111',unitNumber:'Helios 1',modelName:'Helios',status:'field',currentLocationType:'field',placement:'FIELD'};
+const historyMap={...fieldMap,items:[historyUnit],inventoryItems:[historyUnit],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1}};
+const observationAt=new Date(start-60000).toISOString();
+const historyHealth={...health,totalDevices:1,fieldDevices:1,review:1,inventory:{...health.inventory,allRecords:1,activeFieldRecords:1},rows:[{id:1,unit:'Helios 1',name:'Synthetic camera',type:'IPC',activationState:'active',scope:'field',status:'review',evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:'online',observedAt:observationAt,lastOnlineAt:observationAt}}]};
+async function bootHistory(){const f=fixture(),hook=f.mount();await flush();f.answer(0,historyHealth);f.answer(1,historyMap);await flush();assert.equal(hook.cameraHistory.size,1);return {f,hook};}
+
+test('the real hook retains actual accepted history through read failure, then drops newer unknown evidence',async()=>{
+ const {f,hook}=await bootHistory(),saved=hook.cameraHistory.get(historyUnit.id).observation;
+ const failed=hook.refresh(true);await flush();f.answer(2,{error:'Synthetic saved-data read failed'},503);f.answer(3,historyMap);await failed;
+ assert.match(hook.error,/failed/);assert.equal(hook.cameraHistory.get(historyUnit.id).observation,saved);assert.equal(saved.observedAt,observationAt);
+ const reread=hook.refresh(true);await flush();f.answer(4,{...historyHealth,rows:historyHealth.rows.map(row=>({...row,evidence:{...row.evidence,status:'unknown',observedAt:new Date(f.now).toISOString()}}))});f.answer(5,historyMap);await reread;
+ assert.equal(hook.error,'');assert.equal(hook.cameraHistory.size,0);
+});
+
+test('session invalidation clears nonempty camera history and rejects late old-session results',async()=>{
+ const {f,hook}=await bootHistory(),pending=hook.refresh(true);await flush();f.window.dispatchEvent(new Event('cos-private-data-invalidated'));
+ assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);f.answer(2,historyHealth);f.answer(3,historyMap);await pending;
+ assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+});
+
+test('only a verified parent hide clears camera history, including an in-flight read',async()=>{
+ const {f,hook}=await bootHistory();
+ f.window.dispatchEvent({type:'message',origin:'https://untrusted.example',source:{},data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});assert.equal(hook.cameraHistory.size,1);
+ const pending=hook.refresh(true);await flush();f.hide();assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+ f.answer(2,historyHealth);f.answer(3,historyMap);await pending;assert.equal(hook.cameraHistory.size,0);assert.equal(hook.fleet,null);
+});
+
+test('unmount discards hook-local history and a cold remount cannot invent it from cached stale observations',async()=>{
+ const {f,hook}=await bootHistory();await f.visible(false);await f.advance(21*60000);
+ const reread=f.api.fleet(true);await flush();f.answer(2,historyHealth);f.answer(3,historyMap);await reread;await flush();
+ assert.equal(hook.cameraHistory.size,1,'the existing view remembers its actually accepted result');
+ hook.unmount();const mounted=f.mount();await flush();
+ assert.equal(f.requests.length,4,'the new view adopts the shared saved-data cache without another source read');assert.ok(mounted.fleet);assert.equal(mounted.cameraHistory.size,0,'stale source data alone cannot become a previously verified historical result');mounted.unmount();
 });

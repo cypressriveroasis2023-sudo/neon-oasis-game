@@ -188,7 +188,7 @@ jobs:
           if-no-files-found: ignore
       - name: Verify saved-camera refresh timing and visibility
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs
+        run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs tests/camera-last-known.browser.spec.mjs
       - name: Saved-camera refresh evidence
         if: always()
         uses: actions/upload-artifact@v4
