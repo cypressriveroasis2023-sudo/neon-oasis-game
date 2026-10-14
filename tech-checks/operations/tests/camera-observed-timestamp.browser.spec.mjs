@@ -81,6 +81,10 @@ for(const status of ['online','offline'])test(`${status} camera and port observa
     await expect(stamp).toContainText(`Latest ${status} ${scenario.basis} record observation: ${scenario.time}`);
     if(scenario.basis==='camera/detector')await expect(stamp).not.toContainText(portTime);
     await expect(overview.locator('.camera-status-pill')).toHaveText(scenario.label);
+    // A whole grid can extend outside the iframe viewport. Capture each visible card's identity and evidence together.
+    const overviewMain=overview.locator('.camera-card-main');
+    await overviewMain.scrollIntoViewIfNeeded();await expect(stamp).toBeVisible();
+    await overviewMain.screenshot({path:info.outputPath(`overview-${status}-${scenario.unit.unitNumber.replaceAll(' ','-')}-observation-time.png`)});
     await overview.getByRole('button',{name:'Open '+scenario.unit.unitNumber+' unit details',exact:true}).click();
     const detail=app.getByRole('dialog',{name:'Camera Health unit details'}),raw=detail.locator('.camera-device-cards article');
     await expect(raw).toHaveCount(1);await expect(raw.locator('p').filter({hasText:'Last reported service result:'})).toContainText(`${scenario.service} · ${portTime}`);
