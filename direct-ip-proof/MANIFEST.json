@@ -102,8 +102,8 @@
       "sha256": "9f9f5bfb8f9f66d05acb5870f26e92bf92b1805e6336477f43a9e347d989bb33"
     },
     "tests/postgres.test.mjs": {
-      "bytes": 16916,
-      "sha256": "4ab50d96414928bc5ed8d81b3cc02b159227f77973f121b09663f28bd874348f"
+      "bytes": 17011,
+      "sha256": "b1cfd1a473960a4da0877e95634db52ed4f4b57023a001011c611108177d7714"
     },
     "tests/verifier.test.mjs": {
       "bytes": 5865,

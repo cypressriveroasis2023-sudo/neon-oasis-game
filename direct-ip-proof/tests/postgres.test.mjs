@@ -153,11 +153,13 @@ for(const [label,table,event,key] of [
  assert.equal((await f.complete(await f.begin())).consecutive_failures,1);await delay(2);
  assert.equal((await f.complete(await f.begin())).consecutive_failures,2);await delay(2);
  const ticket=await f.begin(),holder=await f.database.newClient(),writer=await f.database.newClient();
+ // Fixture expiry updates must finish before receipt/state UPDATE triggers are armed.
+ const expiry=await shortExpiry(f,ticket);
  await holder.query('select pg_advisory_lock($1)',[key]);
  await f.pg.exec(`create function public.proof_wait_late() returns trigger language plpgsql as $$begin
   perform pg_advisory_xact_lock(${key});return new;end $$;
   create trigger zz_proof_wait_late after ${event} on ${table} for each row execute function public.proof_wait_late();`);
- const expiry=await shortExpiry(f,ticket),before=await f.snapshot(),payload=await args(f,ticket);
+ const before=await f.snapshot(),payload=await args(f,ticket);
  await beginTransaction(writer);const pending=start(f,writer,payload);await blocked(f,writer,holder);
  assert(Date.now()<expiry,'fixture setup must reach the intended trigger before expiry');
  assert.deepEqual(await f.snapshot(),before,'no uncommitted definitive mutations may escape the waiting transaction');
