@@ -4,6 +4,8 @@ import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
 import type {FleetDashboardRow,Signal} from './fleetDashboardModel';
 import FleetBatterySummary from './FleetBatterySummary';
+import LastKnownCameraStatus from './LastKnownCameraStatus';
+import type {LastKnownCamera} from './cameraLastKnown';
 
 const stateLabels:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support',not_available:'Not available'};
 const powerLabels:Record<string,string>={solar_power:'Solar output',load_power:'DC system load',battery_power:'Battery power',battery_voltage:'Battery voltage',battery_current:'Battery current',low_voltage_alarm:'Low voltage alarm',low_soc_alarm:'Low charge alarm',high_voltage_alarm:'High voltage alarm'};
@@ -11,13 +13,14 @@ const sourceLabel=(source:string,instance:number)=>`${source==='solarcharger'?'S
 function Status({state,label}:{state:Signal;label?:string}){return <span className={'cos-fleet-badge cos-signal-'+state}><i aria-hidden='true'>●</i>{label||stateLabels[state]}</span>;}
 
 /** Present only the already reconciled row. This card never fetches or associates devices. */
-export default function FleetUnitHealth({row,now,editing=false}:{row:FleetDashboardRow;now:number;editing?:boolean}){
+export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{row:FleetDashboardRow;now:number;editing?:boolean;lastKnown?:LastKnownCamera|null}){
  const metrics=row.power?.measurements.filter(m=>m.metric in powerLabels)||[];
  const recent=row.batteryReadIssue?[]:metrics.filter(m=>cameraTimestamp(m.observedAt,now).fresh);
  return <div className='cos-fleet-unit-health-grid'>
   <section className='cos-fleet-unit-health-section cos-fleet-camera-card' aria-label={editing?'Unit health signals':'Selected unit camera health'}>
    <h3>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
    <p>{row.camera.reason}</p><small>{healthObservationLabel(row.camera.basis,row.camera.state)}: {cameraTime(row.camera.checkedAt,now)}</small>
+   <LastKnownCameraStatus observation={lastKnown} now={now}/>
    <p className='cos-fleet-detail-note'>Use the camera troubleshooting controls below to review the matched devices and saved checks.</p>
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-router-card' aria-label='Selected unit router health'>

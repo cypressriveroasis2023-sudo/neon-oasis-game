@@ -74,6 +74,8 @@
 .cos-fleet-drawer .cos-fleet-unit-health-section h3{margin:0 0 12px;font-size:15px;line-height:1.4}
 .cos-fleet-unit-health-section p{font-size:12px;line-height:1.6;overflow-wrap:anywhere;margin:8px 0}
 .cos-fleet-unit-health-section small{font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.camera-last-known{display:block;margin-top:5px;line-height:1.5;overflow-wrap:anywhere}
+.cos-fleet-unit-row .camera-last-known{white-space:normal;overflow:visible;text-overflow:clip}
 .cos-fleet-unit-health-section article{padding:10px 0;margin:10px 0 0;border:0;border-top:1px solid var(--cos-border);border-radius:0}
 .cos-fleet-unit-health-section .cos-fleet-battery-summary{margin:0;padding:0;border:0;background:transparent}
 .cos-fleet-power-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}

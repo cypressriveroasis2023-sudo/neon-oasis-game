@@ -166,6 +166,16 @@ jobs:
           name: camera-observed-timestamp-results
           path: tech-checks/operations/test-results
           if-no-files-found: ignore
+      - name: Verify guarded last-known camera evidence
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-last-known.browser.spec.mjs
+      - name: Last-known camera evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-last-known-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify read-only Victron dashboards and shared eye branding
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/vrm.browser.spec.mjs tests/eye-branding.browser.spec.mjs tests/company-overview.browser.spec.mjs
