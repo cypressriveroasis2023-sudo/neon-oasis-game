@@ -71,8 +71,8 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
 
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · online'));
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · unknown'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · Online'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · Unverified'));
  await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await frame.locator('.cos-field-pin-support').click();

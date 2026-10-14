@@ -173,3 +173,23 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} direct Camera Health unit 
  await expect(app.locator('.cos-fleet-table-wrap tbody tr').filter({hasText:'Helios 1'}).getByRole('button',{name:'Details →',exact:true})).toBeFocused();
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
+
+test('expanded cluster survives pending location revalidation but settled membership changes reset it',async({page})=>{
+ const catalog=structuredClone(units);
+ for(const unit of catalog.slice(0,3))Object.assign(unit,{latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:fresh,gpsRecordedAt:fresh});
+ const custom={...field,items:catalog.filter(unit=>unit.currentLocationType==='field'),inventoryItems:catalog,summary:{fieldUnits:3,mappedUnits:3,unitGps:0,missingGps:0}};
+ const {app,state}=await mountFleet(page,false,{field:custom,advancingClock:true});
+ const cluster=app.locator('.cos-dashboard-cluster');await expect(cluster).toHaveCount(1);await cluster.click();
+ const ids=()=>app.locator('.cos-dashboard-peer').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-unit-id')).sort());
+ const expected=catalog.slice(0,3).map(unit=>unit.id).sort();await expect.poll(ids).toEqual(expected);
+ const viewport=()=>app.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();
+ await page.clock.runFor(60_000);await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
+ await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
+ const removed=catalog[1].id;for(const unit of state.field.inventoryItems)if(unit.id===removed)Object.assign(unit,{placement:'SHOP',currentLocationType:'shop',status:'available'});
+ state.field.items=state.field.items.filter(unit=>unit.id!==removed);state.field.summary={fieldUnits:2,mappedUnits:2,unitGps:0,missingGps:0};
+ await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await expect(cluster).toHaveAttribute('aria-expanded','false');await expect(app.locator('.cos-dashboard-peer')).toHaveCount(0);
+ await expect(cluster).toHaveAttribute('data-unit-ids',JSON.stringify([catalog[0].id,catalog[2].id]));
+ await cluster.click();await expect.poll(ids).toEqual([catalog[0].id,catalog[2].id].sort());
+ expect(state.calls.every(call=>call.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
+});

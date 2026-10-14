@@ -104,7 +104,7 @@ async function ready(page){const form=inputs(page);await expect(form.save).toBeE
 async function blank(page){const form=await ready(page);await expect(form.site).toHaveValue('');await expect(form.address).toHaveValue('');await expect(page.locator('.cos-placement-dialog h2')).toHaveText('Move to Field');return form;}
 async function complete(page,address=newAddress){const form=await blank(page);await form.site.fill(site);await form.address.fill(address);await form.reason.fill('Synthetic Owner-confirmed reinstallation');await form.confirmed.check();return form;}
 async function noWrites(page,fixture){expect(await mutations(page)).toEqual([]);expect(fixture.geocodes).toEqual([]);expect(fixture.unexpected).toEqual([]);expect(fixture.pageErrors).toEqual([]);}
-async function held(page,fixture){await expect(page.locator('.placement-feedback')).toContainText(/unavailable|verified|review|refresh|reload|missing|incomplete|changed|disagree|conflict|unresolved/i);await expect(inputs(page).save).toBeDisabled();await noWrites(page,fixture);}
+async function held(page,fixture){await expect(page.locator('.placement-feedback')).toContainText(/unavailable|verified|review|refresh|reload|missing|incomplete|changed|disagree|conflict|unresolved|current account cannot verify the saved placement/i);await expect(inputs(page).save).toBeDisabled();await noWrites(page,fixture);}
 
 for(const role of ['owner','it'])test(role+' opens stale native/provider FIELD import from the actual Shop action with an explicit blank destination',async({page},info)=>{
   const fixture=await mount(page,{role}),before=structuredClone(fixture.native);await open(page);const form=await blank(page);
@@ -211,6 +211,7 @@ for(const [name,patch] of [['malformed address',{address:{unexpected:'object'}}]
 
 for(const [name,change] of [['source shape',fixture=>fixture.native.items[0].address={unexpected:'object'}],['identity review',fixture=>fixture.health.identityWarnings.push({unitId:rowId,reason:'Synthetic new warning',deviceIds:['9101'],unitKeys:[key]})],['source access',fixture=>fixture.status=403]])test('incomplete existing FIELD correction rechecks '+name+' before save',async({page})=>{
   const fixture=await mount(page,{legacy:legacyState({placement:'FIELD'}),native:envelope([nativeRow({site:'',address:''})])});const form=await openField(page);await form.site.fill(site);await form.address.fill(newAddress);await form.reason.fill('Synthetic correction');await form.confirmed.check();change(fixture);await form.save.click();await held(page,fixture);expect(fieldReads(fixture)).toHaveLength(2);
+  if(name==='source access'){await expect(page.locator('.placement-feedback')).toContainText('Your current account cannot verify the saved placement.');await expect(page.locator('.placement-feedback')).toContainText('Close and reopen the unit with the correct signed-in account.');await expect(page.locator('.placement-retry')).toBeHidden();}
 });
 
 test('proved native suffix alias shows saved FIELD data but cannot use the incompatible legacy writer',async({page})=>{

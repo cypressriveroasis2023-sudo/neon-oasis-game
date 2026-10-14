@@ -40,7 +40,8 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   }
  },[pins,layer,revision,expandedIds]);
  const fit=()=>{setExpandedIds([]);const values=pinRef.current;if(values.length)map.current?.fitBounds(L.latLngBounds(values.map(p=>p.point)),{padding:[40,50],maxZoom:15});};
- const previousIds=useRef('');useEffect(()=>{const key=pins.map(p=>p.row.id).join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins]);
+ // Pending proof validation hides markers, but is not a settled population change.
+ const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=pins.map(p=>p.row.id).join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,locationsReady]);
  const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>p.row.id===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14));}},[selectedId,pins]);
  return <div ref={panel} className={'cos-fleet-map-panel field-map-workspace'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
   <div className='cos-fleet-map-toolbar'><div><strong>Fleet map</strong><small>{locationsReady?<>{pins.length} unit pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded</>:'Checking saved map locations…'}</small></div><div><button onClick={fit} disabled={!pins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
