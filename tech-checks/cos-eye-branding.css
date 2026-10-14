@@ -1,13 +1,13 @@
+.cos-eye-live { visibility:hidden; }
+[data-eye-ready="true"]>.cos-eye-live { visibility:visible; }
+[data-eye-ready="true"]>.cos-eye-poster { opacity:0; }
+.cos-eye-live canvas { display:block; width:100%; height:100%; }
+.brandTarget:has(>.cos-static-eye) { background:#060708!important; border-radius:50%!important; }
+.brandTarget>.cos-static-eye { width:100%!important; height:100%!important; }
+@media print { .cos-eye-live { display:none!important; } .cos-eye-poster { opacity:1!important; } }
+
 /* Shared COS on-screen branding. Operational data and document output are untouched. */
 .cos-static-eye { display:block; flex:none; width:72px; height:72px; overflow:hidden; border-radius:50%; background:#080b12; }
-.cos-static-eye .cos-eye-gaze { transform:translateX(0); animation:cos-shared-eye-glance 12s cubic-bezier(.333333,0,.666667,1) infinite; }
-.cos-static-eye[data-motion-paused='true'] .cos-eye-gaze { animation-play-state:paused; }
-@keyframes cos-shared-eye-glance {
-  0%,11.666667% { transform:translateX(0); }
-  21.666667%,35% { transform:translateX(-10px); }
-  53.333333%,71.666667% { transform:translateX(10px); }
-  83.333333%,100% { transform:translateX(0); }
-}
 /* Hide superseded artwork before deferred branding runs, retaining its layout. */
 :where(.vision-eye-stage,.vision-assistant-head,.health-eye,.cos-vision-brand,.visionLaunchOrb,.ownerAppBrand,.ownerAppSidebarUtility,.authcard .brand)>img { visibility:hidden; }
 html body .cos-vision-brand { align-items:center; gap:12px; }
@@ -40,12 +40,8 @@ html body .vision-orb { background:transparent!important; box-shadow:none!import
   html body .vision-top-title>.cos-static-eye { display:block; width:56px; height:56px; }
   html body .cos-added-brand>.cos-static-eye { width:64px; height:64px; }
 }
-@media(prefers-reduced-motion:reduce) {
-  .cos-static-eye .cos-eye-gaze { animation:none!important; transform:translateX(0)!important; }
-}
-@media print {
-  .cos-static-eye .cos-eye-gaze { animation:none!important; transform:translateX(0)!important; }
-}
+
+
 
 html body .vision-orb-v36 { width:min(192px,var(--vision-hero-size,192px),60cqh)!important; height:min(192px,var(--vision-hero-size,192px),60cqh)!important; }
 html body .vision-orb-v36 .vision-eye-stage { width:100%!important; height:100%!important; inset:0!important; position:relative!important; }
