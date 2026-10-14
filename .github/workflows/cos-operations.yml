@@ -153,8 +153,27 @@ jobs:
         run: node --import tsx legacy/tests/mhelp-reconnect-postgres.ci.mjs
       - run: npm run typecheck
       - run: npm run build
+        id: build
       - run: npx playwright install --with-deps chromium
+        id: browser_install
+      - name: Verify exact TV outage rotation before dashboard regressions
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage"
+      - name: Verify Fleet usability fixes and placement retry
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/fleet-usability.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/responsive-host.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/vrm.browser.spec.mjs tests/verified-health-identity.browser.spec.mjs tests/fleet-battery.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/field-health-flow.browser.spec.mjs --grep "expanded cluster survives|Owner proof colors|four-minute saved-data|actual charge sources|incomplete existing FIELD correction rechecks source access|plain status circles expand|Field setup keeps|MHelp recorded addresses|missing locations|unit drawer scrolls|unverified combined roster|plain colored circles|Shop pending|approved Today workspace|leaving Tech Checks|IT with.*Victron capability"
+      - name: Fleet usability pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-usability-visuals
+          path: tech-checks/operations/test-results/**/*.png
+          if-no-files-found: ignore
+      - name: Verify saved-camera refresh timing and visibility
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs
       - name: Verify integrated Fleet Dashboard for Owner and IT
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs tests/fleet-unit-cards.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/company-platform.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/owner-watchful-shortcut.browser.spec.mjs tests/routers.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/finance.browser.spec.mjs
       - name: Fleet candidate visual review images
         if: always()
@@ -164,12 +183,16 @@ jobs:
           path: tech-checks/operations/test-results/**/*.png
           if-no-files-found: ignore
       - name: Verify guarded Owner Census preparation and one-use action
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/owner-census-preparation.browser.spec.mjs tests/owner-census-once.browser.spec.mjs
       - name: Verify Tech Check TV and IT daily navigation and camera scope
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
       - name: Verify shared map migration and Owner portal regressions before the full browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: >-
           npm run test:browser --
           tests/camera-shop-field-restore.browser.spec.mjs

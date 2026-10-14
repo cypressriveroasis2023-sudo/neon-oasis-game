@@ -133,7 +133,10 @@ test('leaving Tech Checks clears the scoped bookmark without hijacking another w
   await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
   await frame.getByRole('button',{name:'More',exact:true}).click();
   await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Overview',exact:true}).click();
+  await expect(frame.getByRole('region',{name:'VISION dashboard',exact:true})).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe('');
   await page.reload();
-  await expect(frame.getByRole('heading',{name:'VISION Operations',exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Tech Check workspaces',exact:true})).toHaveCount(0);
+  await expect.poll(()=>new URL(page.url()).hash).toBe('');
 });

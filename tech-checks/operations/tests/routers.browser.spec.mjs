@@ -70,7 +70,7 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(1);
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-map-status-dot')).toHaveCount(1);await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(0);
  await frame.getByRole('button',{name:'Close unit details'}).click();
  await frame.getByLabel('Interactive fleet installation map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('Interactive fleet installation map').boundingBox();
@@ -86,5 +86,5 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
  await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-map-status-dot')).toHaveCount(1);await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(0);
 });

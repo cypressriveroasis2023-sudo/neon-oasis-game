@@ -133,35 +133,48 @@
     const nativeAlias=nativeAliasCapability(snapshot,health,row,key,ids,state);
     return {row,field:field&&!newInstallation,newInstallation,nativeAlias,writerCompatible:placementMatchKey(row.unitNumber)===matchKey||Boolean(nativeAlias),site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state),nativeAlias])};
   }
-  async function readCurrentData(db,key,signal){
-    const sessionResult=await db.auth.getSession(),session=sessionResult.data?.session;
-    if(sessionResult.error||!text(session?.access_token)||!text(session?.user?.id))fail('Sign in again to verify the saved field address.');
-    const get=async path=>{
+  async function readCurrentData(db,key,signal,progress=()=>{}){
+    const current=()=>{if(signal.aborted)fail('The saved placement read was cancelled.');};
+    progress(['signed-in account']);
+    const sessionResult=await db.auth.getSession(),session=sessionResult.data?.session;current();
+    if(sessionResult.error||!text(session?.access_token)||!text(session?.user?.id))fail('Sign in again to verify the saved placement.');
+    const pending=new Set(['saved placement','Field Map inventory','equipment identity']);
+    progress([...pending]);
+    const read=async(name,action)=>{try{const value=await action();current();pending.delete(name);progress([...pending]);return value;}catch(error){current();throw new Error(name+': '+(error?.message||error));}};
+    const get=async(path,name)=>{
       const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({path,method:'GET',body:null}),signal,cache:'no-store'});
-      if(!response.ok)fail(response.status===401||response.status===403?'Your current account cannot verify the field address.':'The current field address is unavailable. Try again after refreshing.');
-      try{return await response.json();}catch{fail('The saved field address response is incomplete.');}
+      if(!response.ok)fail(response.status===401||response.status===403?'Your current account cannot verify the saved placement.':'The current '+name+' is unavailable. Retry verification.');
+      try{return await response.json();}catch{fail('The saved '+name+' response is incomplete.');}
     };
-    const [legacy,snapshot,health]=await Promise.all([db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key}),get('/api/field-map'),get('/api/camera-health/summary-v3')]);
-    if(legacy.error)throw legacy.error;
-    const current=resolvePlacement(snapshot,health,legacy.data,key),fresh=await db.auth.getSession();
+    const [legacy,snapshot,health]=await Promise.all([
+      read('saved placement',async()=>{const value=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});if(value.error)throw value.error;return value;}),
+      read('Field Map inventory',()=>get('/api/field-map','Field Map inventory')),
+      read('equipment identity',()=>get('/api/camera-health/summary-v3','equipment identity'))
+    ]);current();
+    const resolved=resolvePlacement(snapshot,health,legacy.data,key);progress(['signed-in account recheck']);
+    const fresh=await db.auth.getSession();current();
     if(fresh.error||fresh.data?.session?.user?.id!==session.user.id||!text(fresh.data?.session?.access_token))fail('The signed-in account changed. Reopen the unit.');
-    return {...current,state:legacy.data,subject:session.user.id};
+    return {...resolved,state:legacy.data,subject:session.user.id};
   }
-  function readCurrent(db,key,signal){
+  function readCurrent(db,key,signal,progress=()=>{}){
     // Bound the entire read, including Supabase/session promises that do not accept a fetch signal.
     if(signal.aborted)return Promise.reject(new Error('The saved placement read was cancelled or timed out.'));
     return new Promise((resolve,reject)=>{
-      const abort=()=>reject(new Error('The saved placement read was cancelled or timed out. Refresh the unit before trying again.'));
+      let settled=false,waiting=['signed-in account'];
+      const controller=new AbortController(),combined=AbortSignal.any([signal,controller.signal]);
+      const finish=(callback,value)=>{if(settled)return;settled=true;signal.removeEventListener('abort',abort);controller.abort();callback(value);};
+      const abort=()=>finish(reject,new Error('Verification timed out or was cancelled while waiting for '+waiting.join(', ')+'.'));
+      const update=names=>{if(!settled&&!combined.aborted){waiting=names.length?names:['saved identity checks'];progress(waiting);}};
       signal.addEventListener('abort',abort,{once:true});
-      readCurrentData(db,key,signal).then(resolve,reject).finally(()=>signal.removeEventListener('abort',abort));
+      readCurrentData(db,key,combined,update).then(value=>finish(resolve,value),error=>finish(reject,error));
     });
   }
   async function open({db,key,placement,onSaved}){
     if(active||!db||!text(key)||!['SHOP','FIELD'].includes(placement))return;
     const dialog=document.createElement('dialog');dialog.className='cos-placement-dialog';dialog.setAttribute('aria-labelledby','cosPlacementTitle');
-    dialog.innerHTML='<form novalidate><h2 id="cosPlacementTitle"></h2><p class="placement-explanation">This changes the unit’s physical location. Camera online/offline status still comes from its health checks.</p><p class="placement-unit"></p><label class="placement-site-label">Current job / site<input name="site" maxlength="250" autocomplete="off"></label><label class="placement-address-label">Current installation address (street, city, state and ZIP)<input name="address" maxlength="600" autocomplete="street-address" placeholder="Street address, city, state and ZIP code"><small>Use the complete address so COS can locate the new site automatically.</small></label><label>Reason for move<input name="reason" maxlength="1000" required autocomplete="off"></label><label class="placement-confirm"><input name="confirmed" type="checkbox" required> I confirm this is the unit’s current physical placement.</label><p class="placement-pin-note"></p><p class="placement-feedback" role="status">Reading the current unit and Field Map address…</p><div class="placement-buttons"><button type="button" class="placement-cancel">Cancel</button><button type="submit" disabled>Save placement</button></div></form>';
-    document.body.append(dialog);active={dialog,pending:false,controller:new AbortController()};
-    const context=active,form=dialog.querySelector('form'),input=name=>form.elements.namedItem(name),feedback=dialog.querySelector('.placement-feedback'),submit=form.querySelector('[type=submit]'),cancel=form.querySelector('.placement-cancel'),note=dialog.querySelector('.placement-pin-note');
+    dialog.innerHTML='<form novalidate><h2 id="cosPlacementTitle"></h2><p class="placement-explanation">This changes the unit’s physical location. Camera online/offline status still comes from its health checks.</p><p class="placement-unit"></p><label class="placement-site-label">Current job / site<input name="site" maxlength="250" autocomplete="off"></label><label class="placement-address-label">Current installation address (street, city, state and ZIP)<input name="address" maxlength="600" autocomplete="street-address" placeholder="Street address, city, state and ZIP code"><small>Use the complete address so COS can locate the new site automatically.</small></label><label>Reason for move<input name="reason" maxlength="1000" required autocomplete="off"></label><label class="placement-confirm"><input name="confirmed" type="checkbox" required> I confirm this is the unit’s current physical placement.</label><p class="placement-pin-note"></p><p class="placement-feedback" role="status">Checking saved unit identity and placement…</p><div class="placement-buttons"><button type="button" class="placement-retry" hidden>Retry verification</button><button type="button" class="placement-cancel">Cancel</button><button type="submit" disabled>Save placement</button></div></form>';
+    document.body.append(dialog);active={dialog,pending:false,loading:false,controller:new AbortController()};
+    const context=active,form=dialog.querySelector('form'),input=name=>form.elements.namedItem(name),feedback=dialog.querySelector('.placement-feedback'),submit=form.querySelector('[type=submit]'),cancel=form.querySelector('.placement-cancel'),retry=form.querySelector('.placement-retry'),note=dialog.querySelector('.placement-pin-note');
     const alive=()=>active===context&&dialog.isConnected;
     const disableInputs=value=>{for(const element of form.querySelectorAll('input'))element.disabled=value;};
     const requestSignal=()=>AbortSignal.any([context.controller.signal,AbortSignal.timeout(30000)]);
@@ -171,28 +184,39 @@
     disableInputs(true);
     const close=()=>{if(context.pending)return;context.controller.abort();dialog.close();dialog.remove();if(active===context)active=null;window.removeEventListener('popstate',close);window.removeEventListener('hashchange',close);};
     cancel.onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});window.addEventListener('popstate',close);window.addEventListener('hashchange',close);
-    dialog.showModal();let baseline,requestId=crypto.randomUUID(),uncertain=false;
-    try{
-      baseline=await readCurrent(db,key,requestSignal());if(!alive())return;
-      input('site').value=baseline.site;input('address').value=baseline.address;feedback.textContent='';disableInputs(!baseline.writerCompatible);submit.disabled=!baseline.writerCompatible;
-      if(placement==='FIELD'){
-        if(baseline.field)dialog.querySelector('h2').textContent='Update field address';
-        note.textContent=baseline.field?(!text(baseline.site)||!text(baseline.address)?'The saved installation details are incomplete. Enter the current site and complete address, then confirm the correction.':baseline.row.locationVerification==='owner_verified'?'The current Field Map address and verified pin are loaded. An unchanged address will not create a move.':'The current Field Map address is loaded. An unchanged address will not create a move.'):'Enter the new installation address. A confirmed move will locate the saved address automatically; address pins remain approximate until verified on site.';
-      }
-      if(!baseline.writerCompatible){feedback.textContent='The verified address is shown, but this equipment alias needs a placement-link review before a move can be saved.';}else input(placement==='FIELD'?'site':'reason').focus();
-    }catch(error){if(alive())feedback.textContent='Placement controls are unavailable: '+(error?.message||error)+'. No change was made.';}
+    dialog.showModal();let baseline,requestId=crypto.randomUUID(),uncertain=false,openedSubject='';
+    const requiresReopen=error=>/signed-in account changed|Sign in again|current account cannot verify/.test(String(error?.message||error));
+    const reportProgress=names=>{if(alive())feedback.textContent='Checking saved unit identity and placement (up to 30 seconds)… Waiting for '+names.join(', ')+'.';};
+    const loadBaseline=async()=>{
+      if(!alive()||context.pending||context.loading||uncertain)return;
+      baseline=null;context.loading=true;retry.hidden=true;retry.disabled=true;submit.disabled=true;disableInputs(true);input('confirmed').checked=false;
+      try{
+        const loaded=await readCurrent(db,key,requestSignal(),reportProgress);if(!alive())return;
+        if(openedSubject&&loaded.subject!==openedSubject)throw new Error('The signed-in account changed. Close and reopen the unit.');
+        baseline=loaded;openedSubject=loaded.subject;input('site').value=baseline.site;input('address').value=baseline.address;disableInputs(!baseline.writerCompatible);submit.disabled=!baseline.writerCompatible;
+        feedback.textContent=placement==='SHOP'?'Saved unit identity and placement verified. No new installation address or live vendor lookup is needed for Shop / ROOT.':'Saved installation verified. Review the address and confirm before saving.';
+        if(placement==='FIELD'){
+          dialog.querySelector('h2').textContent=baseline.field?'Update field address':'Move to Field';
+          note.textContent=baseline.field?(!text(baseline.site)||!text(baseline.address)?'The saved installation details are incomplete. Enter the current site and complete address, then confirm the correction.':baseline.row.locationVerification==='owner_verified'?'The current Field Map address and verified pin are loaded. An unchanged address will not create a move.':'The current Field Map address is loaded. An unchanged address will not create a move.'):'Enter the new installation address. A confirmed move will locate the saved address automatically; address pins remain approximate until verified on site.';
+        }
+        if(!baseline.writerCompatible)feedback.textContent='The verified address is shown, but this equipment alias needs a placement-link review before a move can be saved.';
+        else input(placement==='FIELD'?'site':'reason').focus();
+      }catch(error){if(alive()){feedback.textContent='Placement verification is unavailable: '+(error?.message||error)+'. No change was made.'+(requiresReopen(error)?' Close and reopen the unit with the correct signed-in account.':' Retry verification to read the saved unit again.');retry.hidden=requiresReopen(error);retry.disabled=false;}}
+      finally{context.loading=false;}
+    };
+    retry.onclick=()=>{void loadBaseline();};
     form.onsubmit=async event=>{
-      event.preventDefault();if(!alive()||context.pending||uncertain||!baseline||!baseline.writerCompatible)return;
+      event.preventDefault();if(!alive()||context.pending||context.loading||uncertain||!baseline||!baseline.writerCompatible)return;
       const site=placement==='FIELD'?input('site').value.trim():'',address=placement==='FIELD'?input('address').value.trim():'',reason=input('reason').value.trim();
       if(placement==='FIELD'&&baseline.field&&text(baseline.address)&&(text(baseline.site)||baseline.row.locationVerification==='owner_verified')&&normal(address)===normal(baseline.address)){
         feedback.textContent=normal(site)===normal(baseline.site)?'The installation address is unchanged. No move was saved; the existing location and verified pin are kept.':'The installation address is unchanged. No move or site-name edit was saved; update the site record to change only its name.';return;
       }
       if(!form.reportValidity()||!reason||(placement==='FIELD'&&(!site||!address)))return;
-      context.pending=true;submit.disabled=true;cancel.disabled=true;disableInputs(true);feedback.textContent='Checking the current placement before saving…';
+      context.pending=true;retry.hidden=true;retry.disabled=true;submit.disabled=true;cancel.disabled=true;disableInputs(true);feedback.textContent='Checking the current placement before saving…';
       let writing=false;
       try{
-        const current=await readCurrent(db,key,requestSignal());
-        if(current.subject!==baseline.subject||current.revision!==baseline.revision)throw new Error('The saved address, placement or equipment identity changed. Close and reopen the unit before saving.');
+        const current=await readCurrent(db,key,requestSignal(),reportProgress);
+        if(current.subject!==baseline.subject||current.revision!==baseline.revision)throw new Error('The saved address, placement or equipment identity changed. Reload the saved placement before confirming again.');
         // This is a frontend freshness check, not an atomic cross-database lock. The existing writer also guards its own audit revision.
         writing=true;feedback.textContent='Saving physical placement…';
         const result=await db.rpc('owner_set_camera_unit_placement_v2',{p_unit_key:key,p_placement:placement,p_site_label:site,p_street_address:address,p_reason:reason,p_expected_audit_id:current.state.auditId,p_request_id:requestId});
@@ -216,9 +240,10 @@
           }catch{ /* Durable queue survives navigation or a failed immediate lookup. */ }
         }
         await onSaved?.(saved);context.pending=false;close();
-      }catch(error){uncertain=true;feedback.textContent=(writing?'The move could not be confirmed: ':'No move was saved: ')+(error?.message||error)+'. Close and refresh this unit before trying again.';}
+      }catch(error){uncertain=writing;feedback.textContent=(writing?'The move could not be confirmed: ':'No move was saved: ')+(error?.message||error)+(writing?'. Close and refresh this unit before trying again.':requiresReopen(error)?'. Close and reopen the unit with the correct signed-in account.':'. Retry verification, review the reloaded placement, and confirm again.');if(!writing){baseline=null;retry.hidden=requiresReopen(error);retry.disabled=false;}}
       finally{context.pending=false;cancel.disabled=false;}
     };
+    await loadBaseline();
   }
   root.CameraPlacementControls={open,stateMatches,placementMatchKey,resolvePlacement};
 })(globalThis);

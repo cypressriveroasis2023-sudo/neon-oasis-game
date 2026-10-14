@@ -3,12 +3,13 @@ import {inventoryPlacement} from './fleetSnapshot';
 import {isCurrentFieldPin,locationExplanation} from './fieldLocations';
 import {routerStatus,type RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
+import type {FleetDisplayAddress} from './fleetDisplayAddress';
 import {cameraTimestamp} from './cameraEvidence';
 
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
-export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
+export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
 export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
 export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'all',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
@@ -49,7 +50,7 @@ export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilte
  return rows.filter(r=>{
   const state=r.support?'support':r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
   return (filters.retired||!r.retired)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||r.family===filters.family)&&(filters.provider==='all'||r.provider===filters.provider)
-   &&(!q||[r.name,r.displayName,r.family,r.provider,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
+   &&(!q||[r.name,r.displayName,r.family,r.provider,r.displayCustomer,r.displayAddress?.text,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
    &&(filters.status==='all'||filters.status==='operational'&&['online','offline','support'].includes(state)||filters.status===state)
    &&(!nearby||r.placement==='field'&&r.locationVerified&&miles(r)<=(filters.radius||10))
    &&(!filters.installationStatus||filters.installationStatus==='all'||filters.installationStatus==='tracker'&&r.unit.readOnly===true||filters.installationStatus==='missing'&&r.locationNeedsReview||filters.installationStatus===r.unit.status)
@@ -63,5 +64,10 @@ export function discoveryNeedsSetup(items:any[],rows:FleetDashboardRow[]){
 /** Export only displayed safe fields; neutralize spreadsheet formulas. */
 export function fleetDashboardCsv(rows:FleetDashboardRow[]){
  const cell=(v:unknown)=>{const text=String(v??'');return '"'+(/^[\s]*[=+@-]/.test(text)?"'":'')+text.replaceAll('"','""')+'"';};
- return ['Unit,Display label,Family,Provider,Placement,Customer,Site,Address,Camera,Router,Battery,Location verified,Review',...rows.map(r=>[r.name,r.displayName,r.family,r.provider,r.placement,r.unit.customer,r.unit.site,r.unit.address,r.cameraState,r.routerState,r.batteryState,r.locationVerified,r.review.join('; ')].map(cell).join(','))].join('\r\n');
+ return ['Unit,Display label,Family,Provider,Placement,Customer,Site,Address,Camera,Router,Battery,Installation location verified,Review,Address source,Address recorded,Installation evidence address',...rows.map(r=>[r.name,r.displayName,r.family,r.provider,r.placement,r.displayCustomer??r.unit.customer,r.unit.site,r.displayAddress?.text??r.unit.address,r.cameraState,r.routerState,r.batteryState,r.locationVerified,r.review.join('; '),r.displayAddress?.label||'Installation address',r.displayAddress?.recordedAt||'',r.unit.address].map(cell).join(','))].join('\r\n');
 }
+
+export function fleetVrmReadAllowed(session:{role?:unknown;legacyOwner?:unknown;features?:Record<string,unknown>}){return session.features?.vrmRead===true||(session.role==='Owner'&&session.legacyOwner!==false&&session.features?.vrmRead!==false);}
+
+/** Describe an already validated estimate without dropping independent health/source warnings. */
+export function fleetLocationReview(row:FleetDashboardRow,acceptedEstimate=false){return row.review.map(note=>acceptedEstimate&&note===locationExplanation(row.unit)?'Unverified estimated / source-recorded point is shown on the map. Confirm the installation before treating it as verified or using nearby-distance results.':note);}

@@ -7,6 +7,7 @@ import ts from 'typescript';
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
+import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
 import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
 
@@ -53,7 +54,8 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   const exports = {};
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
-    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    Date: class extends Date { static now() { return clock; } },
+    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -414,12 +416,27 @@ test('source-only fleet completions cannot cross an account change or a save inv
   await flush();f.answer(2,{saved:true});await other;f.answer(1,fleetMap);f.answer(0,fleetHealth);await denied;
  }
 });
-test('fleet consumers share a complete paired snapshot and re-authorize before using its 15-minute cache',async()=>{
+test('fleet consumers share a complete paired snapshot and re-authorize before using its four-minute cache',async()=>{
  const f=fixture(),a=f.api.fleet(),b=f.api.fleet();await flush();assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
  f.answer(0,fleetHealth);f.answer(1,fleetMap);const values=await Promise.all([a,b]);assert.equal(values[0],values[1]);
  const cached=await f.api.fleet();assert.equal(cached,values[0]);assert.equal(f.requests.length,2);assert.equal(f.handshakes.length,2);
  const forced=f.api.fleet(true);await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await forced;
  f.state.role='service';await assert.rejects(f.api.fleet(),status(401));
+});
+test('paired cache expires four minutes from attempt start, including delayed auth and responses',async()=>{
+ const f=fixture({autoReply:false}),first=f.api.fleet();
+ f.advance(2000);f.reply();await flush();assert.equal(f.requests.length,2);
+ f.advance(6000);f.answer(0,fleetHealth);f.answer(1,fleetMap);const initial=await first;
+ f.state.autoReply=true;f.advance(CAMERA_AUTO_REFRESH_MS-8001);
+ assert.equal(await f.api.fleet(),initial);assert.equal(f.requests.length,2,'the pair stays cached until the exact deadline');
+ f.advance(1);const next=f.api.fleet(),peer=f.api.fleetSource('fieldMap');await flush();
+ assert.equal(f.requests.length,4,'completion latency cannot defer the four-minute read');
+ f.answer(2,fleetHealth);f.answer(3,fleetMap);const refreshed=await next;assert.equal(await peer,refreshed.fieldMap);assert.notEqual(refreshed,initial);
+});
+test('mode and private-data invalidation cannot reuse a cached pair',async()=>{
+ const f=fixture(),first=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await first;
+ f.location.search='?mode=fleet';f.state.role='it';const switched=f.api.fleet();await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await switched;
+ f.window.dispatchEvent(new Event('cos-private-data-invalidated'));const cleared=f.api.fleet();await flush();assert.equal(f.requests.length,6);f.answer(4,fleetHealth);f.answer(5,fleetMap);await cleared;
 });
 test('one failed source never installs a partial fleet snapshot and a POST invalidates both halves',async()=>{
  const f=fixture(),a=f.api.fleet();const checked=assert.rejects(a,status(503));await flush();f.answer(0,fleetHealth);f.answer(1,{error:'Map read unavailable'},503);await checked;assert.deepEqual(f.invalidations,['cos-fleet-snapshot-failed']);
