@@ -59,6 +59,8 @@ const handles = new Set<EyeHandle>();
 let visibility: IntersectionObserver | undefined;
 let preference: MediaQueryList | undefined;
 let frame: number | undefined;
+let wake: Animation | undefined;
+let wakeAt = Infinity;
 let lastDraw = -Infinity;
 let printing = false;
 let atlasPromise: Promise<HTMLImageElement> | undefined;
@@ -70,13 +72,45 @@ function atlas() {
     image.src = robotEyeAtlas;
   }).catch(error => { atlasPromise = undefined; throw error; });
 }
-function activeEyes() { return [...handles].some(eye => eye.active && eye.image); }
-function schedule() {
-  if (activeEyes() && frame === undefined) frame = requestAnimationFrame(tick);
-  if (!activeEyes() && frame !== undefined) { cancelAnimationFrame(frame); frame = undefined; }
+function visualTime() {
+  // The document timeline follows displayed frames. Operational timers can
+  // advance independently without making the eye replay every missed frame.
+  const time = document.timeline?.currentTime;
+  return typeof time === 'number' ? time : performance.now();
 }
-function tick(now: number) {
+function schedule() {
+  const eyes = [...handles].filter(eye => eye.active && eye.image);
+  const now = visualTime();
+  const delay = Math.min(...eyes.map(({ motion }) => {
+    const moving = now < motion.moveStart + motion.moveDuration ||
+      motion.position.x !== motion.target.x || motion.position.y !== motion.target.y;
+    return moving ? Math.max(0, 1000 / 30 - (now - lastDraw)) : Math.max(0, motion.holdUntil - now);
+  }));
+  if (delay === 0) {
+    if (wake !== undefined) { wake.cancel(); wake = undefined; wakeAt = Infinity; }
+    if (frame === undefined) frame = requestAnimationFrame(tick);
+  } else {
+    if (frame !== undefined) { cancelAnimationFrame(frame); frame = undefined; }
+    if (!eyes.length || now + delay < wakeAt) {
+      if (wake !== undefined) wake.cancel();
+      wake = undefined; wakeAt = Infinity;
+      if (eyes.length) {
+        wakeAt = now + delay;
+        // Wake on the visual timeline, independently of operational timers.
+        // Empty keyframes keep the element's appearance and layout intact.
+        const animation = eyes[0].host.animate([], { duration: Math.max(1, Math.ceil(delay)) });
+        wake = animation;
+        void animation.finished.then(() => {
+          if (wake !== animation) return;
+          wake = undefined; wakeAt = Infinity; schedule();
+        }).catch(() => { /* Cancellation accompanies pause or disposal. */ });
+      }
+    }
+  }
+}
+function tick() {
   frame = undefined;
+  const now = visualTime();
   if (now - lastDraw >= 1000 / 30) {
     lastDraw = now;
     for (const eye of handles) if (eye.active && eye.image) paint(eye.canvas, eye.image, stepRobotEye(eye.motion, now), now / 1000);
@@ -85,7 +119,7 @@ function tick(now: number) {
 }
 function sync() {
   const staticView = printing || !!preference?.matches;
-  const now = performance.now();
+  const now = visualTime();
   for (const eye of handles) {
     const active = eye.visible && !document.hidden && !staticView;
     if (active && !eye.active) {
@@ -118,7 +152,7 @@ function startObservers() {
 export function mountRobotEye(host: SVGSVGElement, canvas: HTMLCanvasElement): () => void {
   startObservers();
   const resize = new ResizeObserver(() => resizeCanvas());
-  const eye: EyeHandle = { host, canvas, motion: createEyeMotion(performance.now()), visible: false, active: false, resize, destroyed: false };
+  const eye: EyeHandle = { host, canvas, motion: createEyeMotion(visualTime()), visible: false, active: false, resize, destroyed: false };
   function resizeCanvas() {
     const size = Math.max(32, Math.min(512, Math.round((host.getBoundingClientRect().width || 72) * Math.min(2, window.devicePixelRatio || 1))));
     if (canvas.width !== size || canvas.height !== size) { canvas.width = size; canvas.height = size; }

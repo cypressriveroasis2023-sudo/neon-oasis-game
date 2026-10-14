@@ -213,6 +213,29 @@ test('robotic eye scans randomly while sights stay fixed and hidden/reduced-moti
   await page.emulateMedia({reducedMotion:'no-preference'});await expect(eye).toHaveAttribute('data-motion-paused','false');
 });
 
+test('advancing operational timers does not replay thousands of eye frames', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install({ time: new Date(now) });
+  const { frame } = await mount(page);
+  const eye = frame.locator('.company-mobile-brand .company-eye');
+  await expect(eye).toHaveAttribute('data-eye-ready', 'true');
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+  await eye.locator('canvas').evaluate(canvas => {
+    const getContext = canvas.getContext.bind(canvas);
+    window.eyeClockProof = { draws: 0, timerFired: false, startedAt: document.timeline.currentTime };
+    canvas.getContext = (...args) => { window.eyeClockProof.draws++; return getContext(...args); };
+    setTimeout(() => { window.eyeClockProof.timerFired = true; }, 60_000);
+  });
+  await page.clock.runFor(65_000);
+  const proof = await frame.locator('body').evaluate(() => ({
+    ...window.eyeClockProof,
+    displayedFor: document.timeline.currentTime - window.eyeClockProof.startedAt,
+  }));
+  expect(proof.timerFired).toBe(true);
+  expect(proof.draws).toBeLessThanOrEqual(Math.ceil(proof.displayedFor * 30 / 1000) + 2);
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+});
+
 
 
 test('enlarged eye never overlaps sidebar labels at short desktop heights',async({page},info)=>{
