@@ -66,7 +66,7 @@ for(const [path,entry] of Object.entries(manifest.files)){
  const data=await readFile(join(root,path));
  assert.equal(data.length,entry.bytes,path+' length');assert.equal(sha(data),entry.sha256,path+' SHA256');
 }
-assert.equal(sha(await readFile(join(root,'inputs/direct-ip-attempt-local.sql'))),'1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c');
+assert.equal(sha(await readFile(join(root,'inputs/direct-ip-attempt-local.sql'))),'2c865b5334878812acaec11d81d5db0721ab53343631dc1b87969fa852150a95');
 for(const path of expected)assert(!/camera-provider-reconcile|reconProviderInventory|star-resource-identity|unmapped-resource-diagnostics|reviewed-contract|handler\.test/.test(path),'excluded capture/handler path');
 const launcher=await readFile(join(root,'http/run-hosted-stage.sh'),'utf8');assert(launcher.includes('postgrest/postgrest:v14.5'));assert(!launcher.includes('13.0.8'));
 console.log(JSON.stringify({integrity:'pass',files:expected.length,mode,gitSubtree:prefix||'.',scope:'generic SQL/client and synthetic fixtures only',postgrestTarget:'14.5',runtime:'not established by this check'},null,2));

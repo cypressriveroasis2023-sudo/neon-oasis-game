@@ -2,7 +2,7 @@
   "kind": "generic-direct-ip-hosted-proof",
   "version": 1,
   "sourceOnlyPreparation": true,
-  "runtimeTests": "NOT RUN",
+  "runtimeTests": "Corrected source: local PGlite/static checks only; hosted PostgreSQL/PostgREST rerun pending",
   "postgrestTarget": "14.5",
   "files": {
     ".gitignore": {
@@ -10,16 +10,16 @@
       "sha256": "e11b67ad6ce372ca8d55d281b8c42d50231a05fd287e6360a93bbdce9370e15a"
     },
     "PROVENANCE.json": {
-      "bytes": 3866,
-      "sha256": "2885e10498b3786df2bfb76dc5b50702b22400e4fbb83aece9121f69100fcfdd"
+      "bytes": 5736,
+      "sha256": "5c0ff7d20a7aa088201beeae2d463659d17046c727dc89975bf1ef4ad507d80f"
     },
     "README.md": {
-      "bytes": 7106,
-      "sha256": "6dbb2ed442505f53332456402941ceab8206b003d674dcc5ed05443ea32c7895"
+      "bytes": 9486,
+      "sha256": "3e317afb99c6ff3b41b7ab7210d31e5a304b4d9251e250a4c53146a0854e501c"
     },
     "SCOPE.json": {
-      "bytes": 1694,
-      "sha256": "0c81a0f1f8d53d25901eff92b818d6de3450760b5d2cb87afc39e31488b9d322"
+      "bytes": 1854,
+      "sha256": "c27172f14e740d4463c9f6077c1f90ea0c864ac8ad11f739e4dae975245073b1"
     },
     "ci/loopback-only.cjs": {
       "bytes": 993,
@@ -31,7 +31,7 @@
     },
     "ci/verify.mjs": {
       "bytes": 5367,
-      "sha256": "74b3e0e0e5500cf45d2652d8c44e0bb819ab09fd5055838d8c3d2456972bdbd8"
+      "sha256": "7d426dab3c978ce3329ade4ac9a0cdbdc7eca34fe2e11ad350feb58dc041915f"
     },
     "http/common.mjs": {
       "bytes": 3602,
@@ -46,8 +46,8 @@
       "sha256": "3e219f55888f33d9c03b8c78a1be26797af49747e1e3a154d01dd262c9de6067"
     },
     "http/run-hosted-stage.sh": {
-      "bytes": 2360,
-      "sha256": "8e2ae26c3d7ac79b535342523915badf9fd9ce98d873a5004169e05139398fd3"
+      "bytes": 3121,
+      "sha256": "af889fdb570f1478c448de8c8f278c65e1a607a5ccd4a4e1155a340130e5684a"
     },
     "http/run-postgrest-proof.mjs": {
       "bytes": 15184,
@@ -62,8 +62,8 @@
       "sha256": "78b99685ca49659a0a2bb73c8e0b8ab803f6cd8a211a758193afad04450600ff"
     },
     "inputs/direct-ip-attempt-local.sql": {
-      "bytes": 38462,
-      "sha256": "1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c"
+      "bytes": 39477,
+      "sha256": "2c865b5334878812acaec11d81d5db0721ab53343631dc1b87969fa852150a95"
     },
     "inputs/schema.sql": {
       "bytes": 2951,
@@ -90,20 +90,20 @@
       "sha256": "a1b0d71606127470687b1440b4181b4f98f6698fb053d76d7e7251bf785edd59"
     },
     "tests/client.test.mjs": {
-      "bytes": 4904,
-      "sha256": "55e1b902a08f1eba74b98bd2b60cdfdec75788f5a7cb7c6e74bf323fe94b5cfd"
+      "bytes": 6950,
+      "sha256": "19aa9d5726eb05e5536812bb842283a6358abbc6604c0d8cd7e851889c3c19d2"
     },
     "tests/contract.test.mjs": {
-      "bytes": 23310,
-      "sha256": "f559fb37bb9c0fc7df0322328d42ce8073bec07dff1a335181a766727e7c37e2"
+      "bytes": 29509,
+      "sha256": "4392d29a9176c8b23f6c18d751d399d3755883651ea3f6b3343421007c4b91f5"
     },
     "tests/harness.test.mjs": {
-      "bytes": 1677,
-      "sha256": "675fe664fb1eeeeb643a9e42aad940748ceb04879554624f558155320a4130a1"
+      "bytes": 2487,
+      "sha256": "9f9f5bfb8f9f66d05acb5870f26e92bf92b1805e6336477f43a9e347d989bb33"
     },
     "tests/postgres.test.mjs": {
-      "bytes": 13376,
-      "sha256": "6c956ec23a3fd5af77d220e76ca061fad4cc4ba47b019cd50375c75aaaa15763"
+      "bytes": 16916,
+      "sha256": "4ab50d96414928bc5ed8d81b3cc02b159227f77973f121b09663f28bd874348f"
     },
     "tests/verifier.test.mjs": {
       "bytes": 5865,

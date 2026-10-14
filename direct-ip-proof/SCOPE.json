@@ -1,7 +1,7 @@
 {
   "kind": "generic-proof-public-eligibility-scope",
   "publicationPerformed": false,
-  "executionPerformed": false,
+  "executionPerformed": true,
   "include": [
     ".gitignore",
     "MANIFEST.json",
@@ -54,5 +54,6 @@
     "fixtureOnlyCredentials": "Public fixed ephemeral CI password and signing key; never real credentials"
   },
   "publicBaselineProvenance": "PROVENANCE.json",
-  "publicationApproval": "Separate authorization and independent review still required"
+  "publicationApproval": "Separate authorization and independent review still required",
+  "executionScope": "Local installed-dependency PGlite and source/static checks only. Corrected-source hosted PostgreSQL/PostgREST execution has not occurred."
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {createFixture,resetFixtureCatalog} from '../lib/fixture.mjs';
 test('fixture reset SQL removes prior default ACLs before public recreation and preserves a minimal public boundary',async()=>{
  const f=await createFixture({backend:'pglite',install:false});
@@ -16,4 +17,16 @@ test('fixture reset SQL removes prior default ACLs before public recreation and 
   await f.pg.exec('grant usage on schema public to service_role');
   assert.deepEqual((await f.pg.query("select has_schema_privilege('service_role','public','USAGE') as usage,has_schema_privilege('service_role','public','CREATE') as create")).rows[0],{usage:true,create:false});
  }finally{await f.close();}
+});
+
+
+test('hosted launcher verifies the pinned amd64 CMD and passes the executable to the version probe',async()=>{
+ const text=await readFile(new URL('../http/run-hosted-stage.sh',import.meta.url),'utf8');
+ assert.match(text,/\[\[ "\$\{GITHUB_ACTIONS:-\}" == true \]\]/);
+ assert.match(text,/assert\.equal\(image\.Architecture,"amd64"\)/);
+ assert.match(text,/assert\.deepEqual\(image\.Config\.Cmd,\["\/bin\/postgrest"\]\)/);
+ assert.match(text,/assert\.equal\(\(image\.Config\.Entrypoint\|\|\[\]\)\.length,0\)/);
+ assert.match(text,/docker run --rm --network none "\$image" \/bin\/postgrest --version/);
+ assert.doesNotMatch(text,/docker run --rm --network none "\$image" --version/);
+ assert(text.indexOf('docker image inspect')<text.indexOf('docker run --rm'));
 });

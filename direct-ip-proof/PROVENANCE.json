@@ -23,10 +23,13 @@
   },
   "proposedSql": {
     "path": "inputs/direct-ip-attempt-local.sql",
-    "sha256": "1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c",
+    "sha256": "2c865b5334878812acaec11d81d5db0721ab53343631dc1b87969fa852150a95",
     "legacyBodyMatchesPublicBaseline": true,
     "legacyBodyComparison": "Same function body; nested-block final end uses its required semicolon.",
-    "sqlChangedForSubset": false
+    "sqlChangedForSubset": true,
+    "previousSha256": "1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c",
+    "correction": "Atomic rollback of all completion mutations when the final database-clock check crosses the existing ticket deadline; then persist the unchanged held/unverified contract. Narrow guarded P0001 control flow never masks engine or trigger errors.",
+    "previousSourceParity": "Only this proposed generic SQL changed. A source retaining the previous published hash is no longer byte-identical; results from this corrected source cannot certify that earlier candidate. No live SQL was changed."
   },
   "proposedClient": {
     "path": "inputs/client/directAttemptClient.ts",
@@ -41,9 +44,22 @@
     "officialImage": "postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9",
     "imagePulled": false,
     "executableRun": false,
-    "runtimeVersionMustBeAsserted": true
+    "runtimeVersionMustBeAsserted": true,
+    "scope": "This correction has not pulled or executed any image. The prior hosted run pulled the pinned image but failed before the executable or HTTP tests.",
+    "imageCommandSource": {
+      "commit": "d89826b982808407b67f5db378515db1e6b5d13f",
+      "path": "nix/tools/docker/default.nix",
+      "blobSha": "a77273bb99e75c63a96ddd495c88e9e11d0206ea",
+      "url": "https://github.com/PostgREST/postgrest/blob/d89826b982808407b67f5db378515db1e6b5d13f/nix/tools/docker/default.nix",
+      "architecture": "amd64",
+      "Cmd": [
+        "/bin/postgrest"
+      ],
+      "Entrypoint": null,
+      "runtimeConfigMustMatch": true
+    }
   },
-  "runtimeValidation": "NOT RUN for this subset",
+  "runtimeValidation": "Corrected source: local PGlite/static verification only; hosted PostgreSQL 17.6 and actual PostgREST HTTP rerun required.",
   "hostedPins": {
     "actions": [
       {
@@ -81,6 +97,13 @@
         "architectureSpecificManifestNotUsed": true
       }
     ],
-    "resolution": "Official read-only repository/registry metadata; runtime validation remains unrun"
+    "resolution": "Official read-only repository/registry metadata; prior hosted execution is recorded separately and is not a corrected-source pass."
+  },
+  "priorHostedEvidence": {
+    "head": "57d9f5bb8ea28144627d5c4eb04e259021520486",
+    "run": "https://github.com/cypressriveroasis2023-sudo/neon-oasis-game/actions/runs/38649662707",
+    "postgres": "PostgreSQL 17.6: 91 passed, 1 failed; the unchanged hard BEFORE INSERT expiry gate published health after expiry.",
+    "http": "Fixture setup and pinned image pull passed. --version replaced CMD and failed with exit 127 before HTTP cases.",
+    "appliesToCorrectedSource": false
   }
 }

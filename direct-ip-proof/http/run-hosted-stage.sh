@@ -22,7 +22,18 @@ trap cleanup EXIT
 # Also record the resolved digest and actual executable version as runtime evidence.
 docker pull "$image"
 docker image inspect "$image" --format '{{json .RepoDigests}}' > http/postgrest-image-digests.generated.json
-docker run --rm --network none "$image" --version > http/postgrest-version.generated.txt
+# v14.5 amd64 uses CMD ["/bin/postgrest"] and no ENTRYPOINT. Arguments
+# replace CMD; they are not automatically appended to the executable.
+# Source: PostgREST/postgrest@d89826b982808407b67f5db378515db1e6b5d13f,
+# nix/tools/docker/default.nix. Assert the pulled config before using that path.
+docker image inspect "$image" --format '{{json .}}' > http/postgrest-image-config.generated.json
+node --input-type=module -e '
+ import assert from "node:assert/strict";import {readFileSync} from "node:fs";
+ const image=JSON.parse(readFileSync("http/postgrest-image-config.generated.json","utf8"));
+ assert.equal(image.Architecture,"amd64");assert.deepEqual(image.Config.Cmd,["/bin/postgrest"]);
+ assert.equal((image.Config.Entrypoint||[]).length,0);
+'
+docker run --rm --network none "$image" /bin/postgrest --version > http/postgrest-version.generated.txt
 # This service talks only to the ephemeral PostgreSQL service on the runner's
 # loopback port. Server HTTP is loopback-only; no provider endpoint is contacted.
 docker run --detach --name "$container" --network host --read-only --cap-drop ALL \

@@ -107,8 +107,8 @@ test('GATE: first-health BEFORE INSERT trigger wait past expiry must not publish
  const expiry=await shortExpiry(f,ticket);await beginTransaction(writer);const pending=start(f,writer,await args(f,ticket));await blocked(f,writer,holder);
  assert(Date.now()<expiry,'fixture setup must reach the trigger wait before expiry');await afterExpiry(expiry);await holder.query('select pg_advisory_unlock(91364001)');
  const result=await pending;await writer.query('commit');
- // This is deliberately a hard gate, not skipped or expected-failure. The local
- // synthetic-clock diagnostic shows the reviewed SQL lacks this late recheck.
+ // This remains the original hard nonpublication gate. Hosted run 38649662707
+ // proved the preceding SQL failed it; the correction must pass unchanged.
  assert.equal(result.health_published,false,'expired trigger-wait completion must remain unverified');
  assert.deepEqual(definitive(await f.snapshot()),definitive(before));
 }));
@@ -140,4 +140,44 @@ test('a normal independent first-health insert holds its FK device lock before p
  await beginTransaction(writer);const pending=start(f,writer,payload);await blocked(f,writer,other);await other.query('commit');
  const preserve=(await f.snapshot()).health,result=await pending;await writer.query('commit');
  assert.equal(result.health_published,false);assert.equal(result.reason,'older_observation');assert.deepEqual((await f.snapshot()).health,preserve);
+}));
+
+
+for(const [label,table,event,key] of [
+ ['health conflict update','public.camera_health_current','update',91364011],
+ ['device update','public.camera_devices','update',91364012],
+ ['history insert','public.camera_health_history','insert',91364013],
+ ['receipt update','camera_direct_health_private.attempt_receipts','update',91364014],
+ ['state update','camera_direct_health_private.attempt_state','update',91364015]
+])test(`GATE: AFTER ${label} wait past expiry rolls back every definitive mutation and preserves held replay`,()=>scenario(async f=>{
+ assert.equal((await f.complete(await f.begin())).consecutive_failures,1);await delay(2);
+ assert.equal((await f.complete(await f.begin())).consecutive_failures,2);await delay(2);
+ const ticket=await f.begin(),holder=await f.database.newClient(),writer=await f.database.newClient();
+ await holder.query('select pg_advisory_lock($1)',[key]);
+ await f.pg.exec(`create function public.proof_wait_late() returns trigger language plpgsql as $$begin
+  perform pg_advisory_xact_lock(${key});return new;end $$;
+  create trigger zz_proof_wait_late after ${event} on ${table} for each row execute function public.proof_wait_late();`);
+ const expiry=await shortExpiry(f,ticket),before=await f.snapshot(),payload=await args(f,ticket);
+ await beginTransaction(writer);const pending=start(f,writer,payload);await blocked(f,writer,holder);
+ assert(Date.now()<expiry,'fixture setup must reach the intended trigger before expiry');
+ assert.deepEqual(await f.snapshot(),before,'no uncommitted definitive mutations may escape the waiting transaction');
+ // Queue an exact duplicate behind the outer device lock. It must receive the
+ // same held receipt after commit, rather than rerun or resurrect publication.
+ const duplicate=await f.database.newClient();await beginTransaction(duplicate);
+ const replayPending=start(f,duplicate,payload);await blocked(f,duplicate,writer);
+ await afterExpiry(expiry);await holder.query('select pg_advisory_unlock($1)',[key]);
+ const result=await pending;await writer.query('commit');const replay=await replayPending;await duplicate.query('commit');
+ assert.equal(result.health_published,false);assert.equal(result.reason,'attempt_expired');assert.equal(result.validity,'unverified');
+ assert.equal(result.status,'unknown');assert.equal(result.consecutive_failures,0);assert.equal(result.checked_at,null);assert.equal(result.completed_at,null);
+ assert.deepEqual(replay,result);assert.deepEqual(await f.read(ticket),result);
+ const after=await f.snapshot();assert.deepEqual(definitive(after),definitive(before));
+ assert.equal(after.state[0].validity,'unverified');assert.equal(after.state[0].streak_count,0);assert.equal(after.state[0].seed_count,0);
+ assert.equal(after.state[0].observed_at,null);assert.equal(after.state[0].last_definitive_at,before.state[0].last_definitive_at);
+ const receipt=after.receipts.find(r=>r.attempt_id===ticket.attempt_id),{is_current,...frozen}=result;
+ assert.deepEqual(receipt.completion_receipt,frozen);assert.equal(receipt.valid_observed_at,null);
+ assert.equal(receipt.reported_completed_at,payload.p_health.direct_attempt.result.completed_at);
+ const conflict=structuredClone(payload);conflict.p_health.direct_attempt.result.ports=[unknown()];
+ assert.equal((await f.rpc(conflict)).reason,'attempt_conflict');assert.deepEqual(await f.snapshot(),after);
+ await f.pg.exec(`drop trigger zz_proof_wait_late on ${table};drop function public.proof_wait_late()`);
+ assert.equal((await f.complete(await f.begin())).consecutive_failures,1);
 }));

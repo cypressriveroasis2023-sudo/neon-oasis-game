@@ -197,6 +197,7 @@ declare
  a_count integer:=0;
  a_state_exists boolean:=false;
  a_ticket_exists boolean:=false;
+ a_deadline_rollback boolean:=false;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service role required';end if;
  select * into a_d from public.camera_devices where id=p_device_id for update;
@@ -413,43 +414,61 @@ begin
    if a_validity in ('connected','refused') and a_previous_health_at>a_observed then a_validity:='unverified';a_status:='unknown';a_count:=0;a_first:=null;a_reason:='older_observation';end if;
   end if;
 
-  if a_validity in ('connected','refused') then
-   a_ports:=a_ports||jsonb_build_object('_connection',jsonb_build_object('revision',a_d.connection_revision::text,'checkedAt',to_jsonb(a_observed),
-    'ip',host(a_d.public_ip),'status',a_status,'reachable',a_validity='connected','confirmedOutage',a_count>=3,'consecutiveFailures',a_count));
-   insert into public.camera_health_current(camera_device_id,overall_status,ip_reachable,port_status,checked_at,consecutive_failures,detail,
-    confirmed_outage,confirmation_reason,first_failed_at,last_recovered_at,acknowledged_at,acknowledged_by)
-   values(p_device_id,a_status,a_validity='connected',a_ports,a_observed,a_count,
-    case when a_validity='connected' then 'Saved Avigilon service port responded; individual camera health is unverified.' else 'Configured service connection refused on every configured port; individual camera health is unverified.' end,
-    a_count>=3,case when a_count>=3 then '3 consecutive refused checks of the saved service endpoint' else null end,
-    a_first,case when a_validity='connected' and a_h.overall_status is not null and a_h.overall_status<>'online' then a_observed else a_h.last_recovered_at end,
-    case when a_validity='connected' or a_count=1 then null else a_h.acknowledged_at end,
-    case when a_validity='connected' or a_count=1 then null else a_h.acknowledged_by end)
-   on conflict(camera_device_id) do update set overall_status=excluded.overall_status,ip_reachable=excluded.ip_reachable,port_status=excluded.port_status,
-    checked_at=excluded.checked_at,consecutive_failures=excluded.consecutive_failures,detail=excluded.detail,confirmed_outage=excluded.confirmed_outage,
-    confirmation_reason=excluded.confirmation_reason,first_failed_at=excluded.first_failed_at,last_recovered_at=excluded.last_recovered_at,
-    acknowledged_at=excluded.acknowledged_at,acknowledged_by=excluded.acknowledged_by;
-   -- Inherited timestamp compatibility signal only; not an authority boundary.
-   perform set_config('cos.connection_publish_device',a_d.id::text,true);
-   update public.camera_devices set last_health_checked_at=a_observed,
-    last_probe_online_at=case when a_validity='connected' then a_observed else last_probe_online_at end where id=a_d.id;
-   perform set_config('cos.connection_publish_device','',true);
-   if a_h.overall_status is distinct from a_status then
-    insert into public.camera_health_history(camera_device_id,status,check_source,observed_at,detail)
-    values(a_d.id,a_status,p_source,a_observed,jsonb_build_object('previous_status',a_h.overall_status,'ports',a_ports,'public_ip_used',host(a_d.public_ip),'connection_revision',a_d.connection_revision));
-   end if;
-  end if;
+  -- Every completion mutation is protected, including receipt/state triggers.
+  -- On late expiry, roll back this subtransaction and persist only the existing
+  -- held/unverified outcome. The second pass cannot publish definitive evidence.
+  loop
+   begin
+    if a_validity in ('connected','refused') then
+     a_ports:=a_ports||jsonb_build_object('_connection',jsonb_build_object('revision',a_d.connection_revision::text,'checkedAt',to_jsonb(a_observed),
+      'ip',host(a_d.public_ip),'status',a_status,'reachable',a_validity='connected','confirmedOutage',a_count>=3,'consecutiveFailures',a_count));
+     insert into public.camera_health_current(camera_device_id,overall_status,ip_reachable,port_status,checked_at,consecutive_failures,detail,
+      confirmed_outage,confirmation_reason,first_failed_at,last_recovered_at,acknowledged_at,acknowledged_by)
+     values(p_device_id,a_status,a_validity='connected',a_ports,a_observed,a_count,
+      case when a_validity='connected' then 'Saved Avigilon service port responded; individual camera health is unverified.' else 'Configured service connection refused on every configured port; individual camera health is unverified.' end,
+      a_count>=3,case when a_count>=3 then '3 consecutive refused checks of the saved service endpoint' else null end,
+      a_first,case when a_validity='connected' and a_h.overall_status is not null and a_h.overall_status<>'online' then a_observed else a_h.last_recovered_at end,
+      case when a_validity='connected' or a_count=1 then null else a_h.acknowledged_at end,
+      case when a_validity='connected' or a_count=1 then null else a_h.acknowledged_by end)
+     on conflict(camera_device_id) do update set overall_status=excluded.overall_status,ip_reachable=excluded.ip_reachable,port_status=excluded.port_status,
+      checked_at=excluded.checked_at,consecutive_failures=excluded.consecutive_failures,detail=excluded.detail,confirmed_outage=excluded.confirmed_outage,
+      confirmation_reason=excluded.confirmation_reason,first_failed_at=excluded.first_failed_at,last_recovered_at=excluded.last_recovered_at,
+      acknowledged_at=excluded.acknowledged_at,acknowledged_by=excluded.acknowledged_by;
+     -- Inherited timestamp compatibility signal only; not an authority boundary.
+     perform set_config('cos.connection_publish_device',a_d.id::text,true);
+     update public.camera_devices set last_health_checked_at=a_observed,
+      last_probe_online_at=case when a_validity='connected' then a_observed else last_probe_online_at end where id=a_d.id;
+     perform set_config('cos.connection_publish_device','',true);
+     if a_h.overall_status is distinct from a_status then
+      insert into public.camera_health_history(camera_device_id,status,check_source,observed_at,detail)
+      values(a_d.id,a_status,p_source,a_observed,jsonb_build_object('previous_status',a_h.overall_status,'ports',a_ports,'public_ip_used',host(a_d.public_ip),'connection_revision',a_d.connection_revision));
+     end if;
+    end if;
 
-  a_response:=a_ticket.registration_receipt||jsonb_build_object('phase','completed','validity',a_validity,'status',a_status,
-   'consecutive_failures',a_count,'health_published',a_validity in ('connected','refused'),'reason',a_reason,
-   'checked_at',case when a_validity in ('connected','refused') then to_jsonb(a_observed) else 'null'::jsonb end,
-   'completed_at',case when a_time_valid then to_jsonb(a_observed) else 'null'::jsonb end);
-  update camera_direct_health_private.attempt_receipts set completion_payload=a_payload,completion_receipt=a_response,
-   reported_completed_at=case when a_observed is not null then a_reported else null end,
-   valid_observed_at=case when a_time_valid then a_observed else null end,received_at=a_received where attempt_id=a_id;
-  update camera_direct_health_private.attempt_state set phase='completed',validity=a_validity,
-   observed_at=case when a_time_valid then a_observed else null end,streak_count=a_count,first_failed_at=a_first,
-   seed_count=0,seed_observed_at=null,seed_first_failed_at=null,
-   last_definitive_at=case when a_validity in ('connected','refused') then a_observed else last_definitive_at end where camera_device_id=p_device_id;
+    a_response:=a_ticket.registration_receipt||jsonb_build_object('phase','completed','validity',a_validity,'status',a_status,
+     'consecutive_failures',a_count,'health_published',a_validity in ('connected','refused'),'reason',a_reason,
+     'checked_at',case when a_validity in ('connected','refused') then to_jsonb(a_observed) else 'null'::jsonb end,
+     'completed_at',case when a_time_valid then to_jsonb(a_observed) else 'null'::jsonb end);
+    update camera_direct_health_private.attempt_receipts set completion_payload=a_payload,completion_receipt=a_response,
+     reported_completed_at=case when a_observed is not null then a_reported else null end,
+     valid_observed_at=case when a_time_valid then a_observed else null end,received_at=a_received where attempt_id=a_id;
+    update camera_direct_health_private.attempt_state set phase='completed',validity=a_validity,
+     observed_at=case when a_time_valid then a_observed else null end,streak_count=a_count,first_failed_at=a_first,
+     seed_count=0,seed_observed_at=null,seed_first_failed_at=null,
+     last_definitive_at=case when a_validity in ('connected','refused') then a_observed else last_definitive_at end where camera_device_id=p_device_id;
+    if a_validity in ('connected','refused') and clock_timestamp()>a_ticket.expires_at then
+     -- This local flag survives subtransaction rollback. A trigger raising the
+     -- same P0001 (or message) cannot impersonate this private control signal.
+     a_deadline_rollback:=true;
+     raise exception 'Direct attempt deadline crossed' using errcode='P0001';
+    end if;
+    exit;
+   exception when raise_exception then
+    if not a_deadline_rollback then raise;end if;
+    a_deadline_rollback:=false;
+    a_validity:='unverified';a_status:='unknown';a_count:=0;a_first:=null;a_reason:='attempt_expired';a_time_valid:=false;
+   end;
+  end loop;
   return a_response||jsonb_build_object('is_current',true);
  end if;
 

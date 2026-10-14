@@ -314,3 +314,73 @@ test('legacy direct publication is rejected while unrelated-profile legacy seman
  assert.equal(health.overall_status,'online');assert.equal(health.consecutive_failures,0);assert.equal(health.confirmed_outage,false);
  assert.deepEqual((await f.snapshot()).state,before.state);assert.deepEqual((await f.snapshot()).receipts,before.receipts);
 }));
+
+// Delays below advance only the explicitly substituted fixture clock. Real
+// independent-session waits remain separate mandatory hosted PostgreSQL gates.
+const deadlineTargets=[
+ ['health insert','public.camera_health_current','insert',false],
+ ['health conflict update','public.camera_health_current','update',true],
+ ['device update','public.camera_devices','update',true],
+ ['history insert','public.camera_health_history','insert',true],
+ ['receipt update','camera_direct_health_private.attempt_receipts','update',true],
+ ['state update','camera_direct_health_private.attempt_state','update',true]
+];
+for(const [label,table,event,seed] of deadlineTargets)for(const timing of ['before','after']) {
+ test(`deadline rollback after ${timing} ${label} trigger preserves evidence and immutable held replay`,()=>fixtureRun(async f=>{
+  if(seed)await seedTwo(f);
+  await f.advance(MINUTE);
+  const ticket=await f.begin(),completedAt=new Date(f.now).toISOString(),before=await f.snapshot();
+  const late=new Date(time(ticket.expires_at)+1).toISOString();
+  await f.pg.exec(`create function public.proof_cross_deadline() returns trigger language plpgsql as $$begin
+   perform set_config('direct_ip_test_clock.now','${late}',true);return new;end $$;
+   create trigger zz_proof_cross_deadline ${timing} ${event} on ${table} for each row execute function public.proof_cross_deadline();`);
+  const ports=timing==='after'?[connected()]:[refused()],result=await f.complete(ticket,{completedAt,ports});
+  assert.equal(result.ok,true);assert.equal(result.is_current,true);assert.equal(result.phase,'completed');
+  assert.equal(result.validity,'unverified');assert.equal(result.status,'unknown');assert.equal(result.reason,'attempt_expired');
+  assert.equal(result.health_published,false);assert.equal(result.consecutive_failures,0);
+  assert.equal(result.checked_at,null);assert.equal(result.completed_at,null);
+  assert.deepEqual(Object.keys(result).sort(),Object.keys(ticket).sort(),'closed response shape is unchanged');
+  const after=await f.snapshot();assert.deepEqual(preserved(after),preserved(before));
+  assert.equal(after.state[0].phase,'completed');assert.equal(after.state[0].validity,'unverified');
+  assert.equal(after.state[0].observed_at,null);assert.equal(after.state[0].streak_count,0);assert.equal(after.state[0].first_failed_at,null);
+  assert.equal(after.state[0].seed_count,0);assert.equal(after.state[0].seed_observed_at,null);assert.equal(after.state[0].seed_first_failed_at,null);
+  assert.equal(after.state[0].last_definitive_at,before.state[0].last_definitive_at);
+  const receipt=after.receipts.find(r=>r.attempt_id===ticket.attempt_id),{is_current,...frozen}=result;
+  assert.deepEqual(receipt.completion_receipt,frozen);assert.equal(receipt.reported_completed_at,completedAt);assert.equal(receipt.valid_observed_at,null);
+  await f.setNow(time(ticket.expires_at)+MINUTE);
+  assert.deepEqual(await f.complete(ticket,{completedAt,ports}),result);assert.deepEqual(await f.read(ticket),result);
+  assert.equal((await f.complete(ticket,{completedAt,ports:[unknown()]})).reason,'attempt_conflict');
+  assert.deepEqual(await f.snapshot(),after,'replay and intentional conflict cannot rewrite held evidence');
+  await f.pg.exec(`drop trigger zz_proof_cross_deadline on ${table};drop function public.proof_cross_deadline()`);
+  refusedResult((await observe(f)).result,1);
+ }));
+}
+for(const [label,sql,code] of [
+ ['same-message P0001',"raise exception 'Direct attempt deadline crossed' using errcode='P0001';",'P0001'],
+ ['unique violation',"insert into public.proof_unique(value) values(1);",'23505'],
+ ['invalid integer',"perform 'not-an-integer'::integer;",'22P02']
+])test(`genuine ${label} during protected writes propagates and rolls back without a held receipt`,()=>fixtureRun(async f=>{
+ const ticket=await f.begin(),before=await f.snapshot();
+ await f.pg.exec(`create table public.proof_unique(value integer primary key);insert into public.proof_unique values(1);
+  create function public.proof_engine_error() returns trigger language plpgsql as $$begin
+   perform set_config('direct_ip_test_clock.now','${new Date(time(ticket.expires_at)+1).toISOString()}',true);
+   ${sql} return new;end $$;
+  create trigger zz_proof_engine_error after insert on public.camera_health_history for each row execute function public.proof_engine_error();`);
+ await assert.rejects(()=>f.complete(ticket),e=>e.code===code);assert.deepEqual(await f.snapshot(),before);
+ await f.pg.exec('drop trigger zz_proof_engine_error on public.camera_health_history;drop function public.proof_engine_error()');
+ refusedResult(await f.complete(ticket),1);
+}));
+
+test('an error while persisting the expired held outcome propagates and leaves the whole completion retryable',()=>fixtureRun(async f=>{
+ const ticket=await f.begin(),completedAt=new Date(f.now).toISOString(),before=await f.snapshot();
+ await f.pg.exec(`create function public.proof_late_health() returns trigger language plpgsql as $$begin
+  perform set_config('direct_ip_test_clock.now','${new Date(time(ticket.expires_at)+1).toISOString()}',true);return new;end $$;
+  create trigger zz_proof_late_health before insert on public.camera_health_current for each row execute function public.proof_late_health();
+  create function public.proof_fail_held() returns trigger language plpgsql as $$begin
+   if new.completion_receipt->>'validity'='unverified' then raise exception 'Direct attempt deadline crossed' using errcode='P0001';end if;return new;end $$;
+  create trigger zz_proof_fail_held before update on camera_direct_health_private.attempt_receipts for each row execute function public.proof_fail_held();`);
+ await assert.rejects(()=>f.complete(ticket,{completedAt}),e=>e.code==='P0001');assert.deepEqual(await f.snapshot(),before);
+ await f.pg.exec('drop trigger zz_proof_fail_held on camera_direct_health_private.attempt_receipts;drop function public.proof_fail_held()');
+ const held=await f.complete(ticket,{completedAt});assert.equal(held.reason,'attempt_expired');assert.equal(held.health_published,false);
+ assert.deepEqual(preserved(await f.snapshot()),preserved(before));assert.deepEqual(await f.complete(ticket,{completedAt}),held);
+}));
