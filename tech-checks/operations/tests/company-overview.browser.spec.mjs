@@ -154,7 +154,8 @@ test('approved red eye branding stays readable through responsive navigation and
       const rect = image.getBoundingClientRect();
       const box = el.getBoundingClientRect();
       return {
-        layers: image.querySelectorAll('image').length,
+        posters: image.querySelectorAll('image.cos-eye-poster').length,
+        canvases: image.querySelectorAll('.cos-eye-live canvas').length,
         label: image.getAttribute('aria-label'), width: rect.width, height: rect.height,
         radius: style.borderRadius, fit: style.objectFit,
         textFits: [...el.querySelectorAll('strong,small')].every(text => text.scrollWidth <= text.clientWidth),
@@ -162,7 +163,8 @@ test('approved red eye branding stays readable through responsive navigation and
         background: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(geometry).toMatchObject({ layers: 2, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    expect(geometry).toMatchObject({ posters: 1, canvases: 1, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    await expect(brand.locator('.company-eye')).toHaveAttribute('data-eye-ready', 'true');
     await brand.locator('image').evaluateAll(async layers => { await Promise.all(layers.map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })); });
     expect(geometry.width).toBe(width <= 700 ? 64 : 104);
     expect(geometry.height).toBe(geometry.width);
