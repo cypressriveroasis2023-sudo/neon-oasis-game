@@ -211,12 +211,12 @@ test('red eye uses exact horizontal-only timing, static reduced motion and hidde
     expect(sample.scaleX).toBe(1);
     expect(sample.scaleY).toBe(1);
     expect(sample.housing).toBe('none');
-    expect(Math.abs(sample.x)).toBeLessThanOrEqual(42.01);
+    expect(Math.abs(sample.x)).toBeLessThanOrEqual(10.01);
   }
-  expect(samples.samples.find(s => s.time === 3000).x).toBeCloseTo(-42, 3);
-  expect(samples.samples.find(s => s.time === 7000).x).toBeCloseTo(42, 3);
-  expect(samples.samples.find(s => s.time === 2000).x).toBeCloseTo(-21, 2);
-  expect(samples.samples.find(s => s.time === 9300).x).toBeCloseTo(21, 2);
+  expect(samples.samples.find(s => s.time === 3000).x).toBeCloseTo(-10, 3);
+  expect(samples.samples.find(s => s.time === 7000).x).toBeCloseTo(10, 3);
+  expect(samples.samples.find(s => s.time === 2000).x).toBeCloseTo(-5, 2);
+  expect(samples.samples.find(s => s.time === 9300).x).toBeCloseTo(5, 2);
   await eye.evaluate(el => el.querySelector('.company-eye-gaze').getAnimations()[0].play());
   await frame.locator('body').evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });

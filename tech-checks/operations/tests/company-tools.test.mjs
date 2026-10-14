@@ -1,3 +1,4 @@
+// 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
 // 2026-10-12 reviewed source-separated direct diagnostic wording; current daily four-view markers preserved.
 // 2026-10-08 reviewed read-only effective placement adapter; exact identity, stale read and actual-entry browser coverage.
@@ -28,9 +29,9 @@ const scriptHashes = {
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "3b4fdd5d96f0ea613e2acc2560b031588f39a7a7bb2706a0c8b11e5f0ab42a7b",
+  "camera-health": "b55af66ce5d9e619c5453ec573dc1106acee6d58e0fb66bcb6b786020ad204ec",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
-  "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
+  "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
 const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.url),'utf8');
@@ -39,10 +40,10 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
-    assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
+    assert.equal(html.split('cos-eye-branding.js?v=20261013-mechanical').length-1,1);
     if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
     const availabilityPreserved=name==='it-send-repair'?html.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):html;
-    const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
+    const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-original">\n<script defer src="./cos-eye-branding.js?v=20261013-mechanical"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
     const originalMarkup=preserved.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')

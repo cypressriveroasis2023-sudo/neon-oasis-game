@@ -130,7 +130,7 @@ test('company tools OnSite Vision keeps loading, conversation and modal states',
   await expect(page.locator('#visionApp')).toBeHidden();
   await expect(page.locator('#visionKnowledgeModal')).toBeHidden();
   await expect(page.locator('#visionLoading')).toHaveCSS('background-color','rgb(17, 27, 42)');
-  await expect(page.locator('#visionLoading .vision-eye-stage img')).toHaveAttribute('src','./resources/vision-ai.jpg?v=3');
+  await expect(page.locator('#visionLoading .vision-eye-stage img')).toHaveAttribute('src','./resources/vision-ai.jpg?v=20261014');
   await page.evaluate(() => {
     document.querySelector('#visionLoading').classList.add('hidden');
     document.querySelector('#visionApp').classList.remove('hidden');

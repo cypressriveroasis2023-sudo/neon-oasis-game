@@ -8,8 +8,8 @@
 }
 @keyframes cos-eye-glance {
   0%, 11.666667% { transform: translateX(0); }
-  21.666667%, 35% { transform: translateX(-42px); }
-  53.333333%, 71.666667% { transform: translateX(42px); }
+  21.666667%, 35% { transform: translateX(-10px); }
+  53.333333%, 71.666667% { transform: translateX(10px); }
   83.333333%, 100% { transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) {

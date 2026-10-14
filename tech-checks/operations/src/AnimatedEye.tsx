@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { housingArtwork, lensArtwork } from './eyeArtwork';
 import './animatedEye.css';
 
-/** Presentation only: the approved fixed housing and subtle horizontal glance. */
+/** Presentation only: the reference-matched mechanical housing and subtle horizontal glance. */
 export default function AnimatedEye({ variant = 'header' }: { variant?: 'header' | 'brand' | 'hero' | 'avatar' }) {
   const ref = useRef<SVGSVGElement>(null);
   const apertureId = `cos-eye-${useId().replace(/:/g, '')}`;
@@ -41,13 +41,13 @@ export default function AnimatedEye({ variant = 'header' }: { variant?: 'header'
     >
       <defs>
         <clipPath id={apertureId}>
-          <path d='M 279 585 C 386 463 501 404 625 404 C 750 404 869 470 975 584 C 869 697 744 758 627 758 C 503 758 381 690 279 585 Z' />
+          <circle cx='622.875' cy='587.204' r='189.335' />
         </clipPath>
       </defs>
       <image className='company-eye-housing' href={housingArtwork} width='1254' height='1254' />
       <g clipPath={`url(#${apertureId})`}>
         <g className='company-eye-gaze'>
-          <image href={lensArtwork} x='422' y='375' width='410' height='410' />
+          <image href={lensArtwork} x='0' y='0' width='1254' height='1254' />
         </g>
       </g>
     </svg>
