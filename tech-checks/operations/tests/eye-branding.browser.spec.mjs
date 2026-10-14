@@ -76,3 +76,17 @@ test('dynamic compact avatars keep their slot and removed eyes stop observing',a
   expect((await eye.boundingBox()).width).toBe(20);await expect(eye.locator('canvas')).toHaveCount(1);
   await page.evaluate(()=>document.getElementById('synthetic-avatar').remove());await expect(eye).toHaveCount(0);
 });
+
+test('CSS background eye slots also animate without replacing their container',async({page})=>{
+  await mount(page,'index');
+  await page.evaluate(()=>{
+    const slot=document.createElement('div');slot.id='synthetic-background-eye';slot.className='brandTarget';
+    slot.style.cssText='position:fixed;top:10px;right:10px;z-index:1000';document.body.append(slot);
+  });
+  const slot=page.locator('#synthetic-background-eye'),eye=slot.locator(':scope > .cos-static-eye');
+  await expect(eye).toHaveAttribute('data-eye-ready','true');await expect(eye).toHaveAttribute('data-motion-paused','false');
+  expect((await eye.boundingBox()).width).toBeCloseTo((await slot.boundingBox()).width,1);
+  await expect(eye.locator('canvas')).toHaveCount(1);
+  await page.evaluate(()=>document.getElementById('synthetic-background-eye').append(document.createElement('span')));
+  await expect(slot.locator('.cos-static-eye')).toHaveCount(1);
+});

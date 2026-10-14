@@ -346,6 +346,10 @@ function scan(root) {
     if (width > 0 && width < 64) { svg.style.width = width + 'px'; svg.style.height = width + 'px'; }
     image.replaceWith(svg);
   }
+  // Earlier Tech Check headers paint the eye as a CSS background instead of an img.
+  for (const parent of [...(root.matches('.brandTarget') ? [root] : []), ...root.querySelectorAll('.brandTarget')]) {
+    if (!parent.closest(ignored) && !parent.querySelector(':scope > .cos-static-eye')) parent.append(makeEye(true));
+  }
   for (const parent of [...(root.matches('.vision-brand-v36,.vision-top-title') ? [root] : []), ...root.querySelectorAll('.vision-brand-v36,.vision-top-title')]) {
     if (!parent.querySelector(':scope > .cos-static-eye')) parent.prepend(makeEye(true));
   }
