@@ -168,7 +168,7 @@ jobs:
           if-no-files-found: ignore
       - name: Verify exact TV outage rotation before dashboard regressions
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage"
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage|TV link fills the host|Teddy and Victor have no inspection fields"
       - name: TV outage rotation evidence
         if: always()
         uses: actions/upload-artifact@v4

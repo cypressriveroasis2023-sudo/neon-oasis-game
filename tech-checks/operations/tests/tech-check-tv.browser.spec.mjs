@@ -25,6 +25,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
   await page.addInitScript(()=>{
     window.tvLifecycleEvents=[];
     addEventListener('cos-private-data-invalidated',event=>window.tvLifecycleEvents.push({type:'invalidated',reason:event.detail?.reason??'untyped',at:Date.now()}));
+    addEventListener('focus',()=>window.tvLifecycleEvents.push({type:'focus',at:Date.now()}));
     addEventListener('message',event=>{if(event.origin===location.origin&&event.data?.type==='COS_TV_BOARD_DISPLAY_MODE')window.tvLifecycleEvents.push({type:'display',active:event.data.active,at:Date.now()});});
   });
   // Pause at a future instant while the page is still blank, before app timers exist.
@@ -174,9 +175,22 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
- await page.clock.fastForward(60000);expect(state.fleetReads).toBe(reads);
+ const scheduledReads=state.reads;
+ await page.clock.fastForward(60000);
  const refreshButton=frame.getByRole('button',{name:'Refresh',exact:true});
- await expect(refreshButton).toHaveAttribute('aria-busy','false');
+ await expect.poll(()=>state.reads).toBe(scheduledReads+1);
+ await expect(refreshButton).toHaveAttribute('aria-busy','false');await expect.poll(()=>state.pendingDaily).toBe(0);
+ expect(state.dailyResults.at(-1)).toEqual({read:scheduledReads+1,status:200});expect(state.fleetReads).toBe(reads);
+ // Entering the iframe triggers DailyBoard's legitimate focus refresh before
+ // the button's own fresh read. Settle that separately, then gate only the click.
+ const focusState=()=>frame.locator('body').evaluate(()=>({focused:document.hasFocus(),events:window.tvLifecycleEvents.filter(event=>event.type==='focus').length}));
+ const beforeFocus=await focusState(),focusReads=state.reads;
+ await refreshButton.focus();await expect(refreshButton).toBeFocused();
+ const focusDelta=beforeFocus.focused?0:1;
+ await expect.poll(async()=>{const current=await focusState();return {focused:current.focused,events:current.events-beforeFocus.events};}).toEqual({focused:true,events:focusDelta});
+ await expect.poll(()=>state.reads).toBe(focusReads+focusDelta);
+ await expect(refreshButton).toHaveAttribute('aria-busy','false');await expect.poll(()=>state.pendingDaily).toBe(0);
+ expect(state.dailyResults.at(-1)).toEqual({read:focusReads+focusDelta,status:200});expect(state.fleetReads).toBe(reads);
  const dailyReads=state.reads,gate=deferred();state.dailyGate=gate;
  await refreshButton.click();
  await expect.poll(()=>state.fleetReads).toBe(reads+3);
@@ -185,11 +199,13 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect.poll(()=>state.reads).toBe(dailyReads+1);await expect(refreshButton).toHaveAttribute('aria-busy','true');
  gate.resolve();await expect(refreshButton).toHaveAttribute('aria-busy','false');
  await expect.poll(()=>state.pendingDaily).toBe(0);expect(state.dailyResults.at(-1)).toEqual({read:dailyReads+1,status:200});
+ expect(state.reads).toBe(dailyReads+1);expect(state.fleetReads).toBe(reads+3);expect((await focusState()).events-beforeFocus.events).toBe(focusDelta);
+ expect(await frame.locator('body').evaluate(()=>window.tvLifecycleEvents.filter(event=>event.type==='invalidated'))).toEqual([]);expect(state.writes).toEqual([]);
  state.fail=401;await refreshButton.click();
  await expectOperationsReloadRequired(frame);
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);await expect(refreshButton).toHaveCount(0);
- await expect.poll(()=>state.dailyResults.at(-1)).toEqual({read:dailyReads+2,status:401});expect(state.writes).toEqual([]);
+ await expect.poll(()=>state.dailyResults.at(-1)).toEqual({read:dailyReads+2,status:401});expect(state.reads).toBe(dailyReads+2);expect(state.writes).toEqual([]);
 });
 
 test('TV uses the Field Map background and retains pins when optional feeds fail',async({page})=>{
