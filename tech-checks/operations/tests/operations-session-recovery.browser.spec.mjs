@@ -47,11 +47,13 @@ async function renewal(page,app){await page.evaluate(()=>window.syntheticSession
 async function blocked(app){await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');await expect(app.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);}
 function readOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);}
 
-test('same Owner token renewal clears private views and restores camera, map and supporting-source refresh',async({page})=>{
+test('same Owner token renewal clears private views and restores camera, map and supporting-source refresh',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred();state.sessionGate=gate;
  await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);await expect(privateView(app)).toHaveCount(0);await expect(app.getByText('Verifying your current Operations account…')).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('owner-session-checking.png')});
  const routerReads=state.calls.filter(call=>call.path==='/api/routers').length;gate.resolve();await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  await expect.poll(()=>state.calls.filter(call=>call.path==='/api/routers').length).toBeGreaterThan(routerReads);await expect(app.getByRole('alert')).toHaveCount(0);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+ await page.screenshot({path:testInfo.outputPath('owner-recovered-fleet.png')});
 });
 
 test('one ten-second parent timeout revalidates only the same Owner and restores Refresh',async({page})=>{
@@ -61,8 +63,9 @@ test('one ten-second parent timeout revalidates only the same Owner and restores
 for(const [label,patch] of [['changed actor',{productionOwnerUserId:'22222222-2222-4222-8222-222222222222'}],['permission downgrade',{features:{...owner.features,vrmRead:false}}],['changed role',{legacyOwner:false,role:'IT',productionOwnerUserId:null}]])test(label+' cannot recover the prior Owner private views',async({page})=>{
  const {app,state,initialSessions}=await mount(page);Object.assign(state.session,patch);await renewal(page,app);await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
 });
-for(const status of [401,403])test('true source '+status+' stays blocked without automatic revalidation',async({page})=>{
+for(const status of [401,403])test('true source '+status+' stays blocked without automatic revalidation',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page);state.routerStatus=status;await refresh(app).click();await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions);expect(await reasons(app)).toContain('authentication-denied');readOnly(state);
+ await page.screenshot({path:testInfo.outputPath('owner-source-'+status+'-reload-required.png')});
 });
 test('IT without a server-verified actor ID requires reload after token change',async({page})=>{
  const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);

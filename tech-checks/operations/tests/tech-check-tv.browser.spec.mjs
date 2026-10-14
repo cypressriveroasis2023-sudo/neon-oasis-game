@@ -10,8 +10,23 @@ const time = '2026-10-12T15:00:00Z';
 const cors = {'access-control-allow-origin': origin};
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{width:100%;height:600px;border:0}.hidden{display:none}</style></head><body><header id="hostToolbar">Host tools</header><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
+const diagnostics=new WeakMap();
+const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
+test.afterEach(async({page},testInfo)=>{
+  const state=diagnostics.get(page);if(!state)return;
+  const frames=await Promise.all(page.frames().map(frame=>frame.evaluate(()=>({url:location.href,events:window.tvLifecycleEvents||[],board:document.querySelector('.tech-check-tv')?.getAttribute('data-section')??null,access:document.querySelector('.operations-access')?.textContent??null})).catch(error=>({unavailable:error.message}))));
+  const path=testInfo.outputPath('tv-session-lifecycle.json');
+  await writeFile(path,JSON.stringify({reads:state.reads,pendingDaily:state.pendingDaily,dailyResults:state.dailyResults,fleetReads:state.fleetReads,writes:state.writes,frames},null,2));
+  await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
+});
 async function setup(page, { many = false, pausedClock = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
+  state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
+  await page.addInitScript(()=>{
+    window.tvLifecycleEvents=[];
+    addEventListener('cos-private-data-invalidated',event=>window.tvLifecycleEvents.push({type:'invalidated',reason:event.detail?.reason??'untyped',at:Date.now()}));
+    addEventListener('message',event=>{if(event.origin===location.origin&&event.data?.type==='COS_TV_BOARD_DISPLAY_MODE')window.tvLifecycleEvents.push({type:'display',active:event.data.active,at:Date.now()});});
+  });
   // Pause at a future instant while the page is still blank, before app timers exist.
   await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
   if(pausedClock)await page.clock.pauseAt(new Date(time));
@@ -43,9 +58,14 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     }
     if(method!=='GET'){state.writes.push({path,method,body});return route.fulfill({status:403,headers:cors,json:{error:'Display cannot write'}});}
     if(path==='/api/daily-board'){
-      state.reads++;
-      if(state.fail)return route.fulfill({status:state.fail,headers:cors,json:{error:state.fail===401?'Sign-in required':'Connection unavailable'}});
-      return route.fulfill({headers:cors,json:{jobs:state.jobs,tasks:state.tasks,readiness:state.readiness,asOf:time}});
+      const read=++state.reads,status=state.fail||200,gate=state.dailyGate;state.dailyGate=null;state.pendingDaily++;
+      try{
+        if(gate)await gate.promise;
+        if(status!==200)await route.fulfill({status,headers:cors,json:{error:status===401?'Sign-in required':'Connection unavailable'}});
+        else await route.fulfill({headers:cors,json:{jobs:state.jobs,tasks:state.tasks,readiness:state.readiness,asOf:time}});
+        state.dailyResults.push({read,status});
+      }finally{state.pendingDaily--;}
+      return;
     }
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time}});}
@@ -68,6 +88,10 @@ test('TV link fills the host and sees a saved update without a remote desktop co
   await page.clock.fastForward(60000);
   await expect(frame.getByText('The return rack is ready',{exact:true})).toBeVisible();
   expect(state.reads).toBeGreaterThanOrEqual(2);
+  // A routine shell clock render must not run a false TV exit cleanup.
+  expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
+  await expect(page.locator('#hostToolbar')).toBeHidden();
+  expect(await page.evaluate(()=>window.tvLifecycleEvents.filter(event=>event.type==='display'&&!event.active))).toEqual([]);
   await page.reload();
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
   await expect(frame.getByText('The return rack is ready',{exact:true})).toBeVisible();
@@ -101,6 +125,8 @@ test('network failure marks delayed data and authentication failure clears priva
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);
   await expect(frame.getByRole('button',{name:'Refresh',exact:true})).toHaveCount(0);
   await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
+  await expect(page.locator('#hostToolbar')).toBeVisible();
+  expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
   expect(state.writes).toEqual([]);
 });
 
@@ -149,10 +175,21 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
  await page.clock.fastForward(60000);expect(state.fleetReads).toBe(reads);
- await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ const refreshButton=frame.getByRole('button',{name:'Refresh',exact:true});
+ await expect(refreshButton).toHaveAttribute('aria-busy','false');
+ const dailyReads=state.reads,gate=deferred();state.dailyGate=gate;
+ await refreshButton.click();
  await expect.poll(()=>state.fleetReads).toBe(reads+3);
- state.fail=401;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ // Fleet request starts do not prove that the parallel daily-board read settled.
+ // Hold that response to verify this boundary before injecting the next denial.
+ await expect.poll(()=>state.reads).toBe(dailyReads+1);await expect(refreshButton).toHaveAttribute('aria-busy','true');
+ gate.resolve();await expect(refreshButton).toHaveAttribute('aria-busy','false');
+ await expect.poll(()=>state.pendingDaily).toBe(0);expect(state.dailyResults.at(-1)).toEqual({read:dailyReads+1,status:200});
+ state.fail=401;await refreshButton.click();
+ await expectOperationsReloadRequired(frame);
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);await expect(refreshButton).toHaveCount(0);
+ await expect.poll(()=>state.dailyResults.at(-1)).toEqual({read:dailyReads+2,status:401});expect(state.writes).toEqual([]);
 });
 
 test('TV uses the Field Map background and retains pins when optional feeds fail',async({page})=>{

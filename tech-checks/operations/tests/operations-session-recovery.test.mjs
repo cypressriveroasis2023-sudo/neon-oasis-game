@@ -80,6 +80,6 @@ test('retained old toast/navigation callbacks cannot update the shell during or 
 });
 test('every parent callback that private children retain is generation guarded',()=>{
  const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
- for(const callback of ['show','navigate','openUnitHealth','returnToMap','createTicket','cancelCreateTicket','openJob','selectOverviewJob','openLifecycle','backToOverviewJobs'])assert.ok(app.includes('const '+callback+'=useCallback(guardCurrent('),callback);
- assert.match(app,/onSelectUnit=\{guardCurrent\(/);assert.match(app,/registerEquipment=\{guardCurrent\(/);assert.match(app,/onTvChange=\{guardCurrent\(/);
+ for(const callback of ['show','navigate','openUnitHealth','returnToMap','createTicket','cancelCreateTicket','openJob','selectOverviewJob','openLifecycle','backToOverviewJobs','onTvChange'])assert.ok(app.includes('const '+callback+'=useCallback(guardCurrent('),callback);
+ assert.match(app,/onSelectUnit=\{guardCurrent\(/);assert.match(app,/registerEquipment=\{guardCurrent\(/);assert.match(app,/onTvChange=\{onTvChange\}/);
 });

@@ -222,6 +222,13 @@ jobs:
       - name: Verify Tech Check TV and IT daily navigation and camera scope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
+      - name: Tech Check TV and IT navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tech-check-tv-navigation-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
