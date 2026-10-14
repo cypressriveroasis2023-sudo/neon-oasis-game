@@ -2,26 +2,24 @@
 const knownImage = 'img[src*="vision-ai.jpg"],img[src*="vision-eye-round.svg"],img[src*="techcheck-eye-favicon-32.png"],img[src*="techcheck-eye-192.png"],img[src*="cameras-on-site-logo.webp"]';
 const ignored = '.quote-doc,.quote-doc-header,.invoice-doc,.statement-doc,.print-document,.print-page,.document-preview,.pdf-preview,#printRoot,[data-document-output],[data-print-root]';
 const eyes = new Map();
-const ns = 'http://www.w3.org/2000/svg';
 function makeEye(decorative = false, label = 'Cameras Onsite') {
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('class', 'cos-static-eye');
-  svg.setAttribute('viewBox', '0 0 720 720');
-  svg.setAttribute('width', '72'); svg.setAttribute('height', '72');
-  svg.setAttribute('focusable', 'false');
-  svg.dataset.cosEye = 'approved';
-  if (decorative) svg.setAttribute('aria-hidden', 'true');
-  else { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', label); }
-  const poster = document.createElementNS(ns, 'image');
+  // Keep the canvas in normal HTML. SVG foreignObject can paint at its
+  // unscaled viewBox size in Safari, cropping a close-up into the logo slot.
+  const eye = document.createElement('span');
+  eye.className = 'cos-static-eye';
+  eye.dataset.cosEye = 'approved';
+  if (decorative) eye.setAttribute('aria-hidden', 'true');
+  else { eye.setAttribute('role', 'img'); eye.setAttribute('aria-label', label); }
+  const poster = document.createElement('img');
   poster.setAttribute('class', 'cos-eye-housing cos-eye-poster');
-  poster.setAttribute('href', posterArtwork); poster.setAttribute('width', '720'); poster.setAttribute('height', '720');
-  const live = document.createElementNS(ns, 'foreignObject');
-  live.setAttribute('class', 'cos-eye-live'); live.setAttribute('width', '720'); live.setAttribute('height', '720'); live.setAttribute('aria-hidden', 'true');
-  const canvas = document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+  poster.src = posterArtwork; poster.alt = ''; poster.setAttribute('aria-hidden', 'true');
+  const live = document.createElement('span');
+  live.className = 'cos-eye-live'; live.setAttribute('aria-hidden', 'true');
+  const canvas = document.createElement('canvas');
   canvas.width = 144; canvas.height = 144;
-  live.append(canvas); svg.append(poster, live);
-  eyes.set(svg, mountRobotEye(svg, canvas));
-  return svg;
+  live.append(canvas); eye.append(poster, live);
+  eyes.set(eye, mountRobotEye(eye, canvas));
+  return eye;
 }
 function addBrand(parent) {
   if (!parent || parent.querySelector(':scope > .cos-added-brand')) return;
