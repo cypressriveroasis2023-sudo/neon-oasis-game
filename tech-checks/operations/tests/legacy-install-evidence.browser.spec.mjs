@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
 const origin=process.env.COS_TEST_ORIGIN||'http://127.0.0.1:4173',edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const now='2026-10-10T12:00:00.000Z',completed='2026-10-09T12:00:00.000Z';
@@ -35,7 +36,8 @@ test('all-family evidence is readable, explicit about gaps and cannot approve bi
   const size=await page.frames().find(f=>f.parentFrame()).evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));expect(size.scroll).toBeLessThanOrEqual(size.width+1);expect(state.writes).toHaveLength(0);
 });
 test('empty, truncated and failed reads are distinct and failed refresh clears old evidence',async({page})=>{
-  const {state,section}=await open(page,s=>{s.snapshot.hasMore=true;});await expect(section).toContainText('More recent records exist');state.snapshot.items=[];state.snapshot.hasMore=false;await section.getByRole('button',{name:'Refresh evidence',exact:true}).click();await expect(section).toContainText('No recent saved handoff');state.fail=true;await section.getByRole('button',{name:'Refresh evidence',exact:true}).click();await expect(section.getByRole('alert')).toContainText('unavailable');await expect(section).not.toContainText('No recent saved handoff');await expect(section.getByRole('article')).toHaveCount(0);expect(state.writes).toHaveLength(0);
+  const {state,frame,section}=await open(page,s=>{s.snapshot.hasMore=true;});await expect(section).toContainText('More recent records exist');state.snapshot.items=[];state.snapshot.hasMore=false;await section.getByRole('button',{name:'Refresh evidence',exact:true}).click();await expect(section).toContainText('No recent saved handoff');state.fail=true;await section.getByRole('button',{name:'Refresh evidence',exact:true}).click();
+  await expectOperationsReloadRequired(frame);await expect(section).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('No recent saved handoff');await expect(section.getByRole('article')).toHaveCount(0);expect(state.writes).toHaveLength(0);
 });
 test('close cancels a pending display and ignores the late response',async({page})=>{
   const {state,section}=await open(page,s=>{s.hold=true;});await expect.poll(()=>Boolean(state.release)).toBe(true);await section.getByRole('button',{name:'Close evidence',exact:true}).click();state.release();await expect(section.getByRole('button',{name:'Load recent evidence',exact:true})).toBeVisible();await expect(section.getByRole('article')).toHaveCount(0);state.hold=false;await section.getByRole('button',{name:'Load recent evidence',exact:true}).click();await expect(section.getByRole('article')).toHaveCount(1);expect(state.writes).toHaveLength(0);
@@ -45,7 +47,8 @@ test('new navigation and Back recheck source rather than restoring saved evidenc
   const historyState=await page.frames().find(f=>f.parentFrame()).evaluate(()=>JSON.stringify(history.state));expect(historyState||'').not.toContain('900101');expect(state.writes).toHaveLength(0);
 });
 test('host hiding and subsequent auth denial remove private evidence',async({page})=>{
-  const {state,section}=await open(page);await expect(section.getByRole('article')).toHaveCount(1);await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));await expect(section.getByRole('article')).toHaveCount(0);state.fail=true;await section.getByRole('button',{name:'Load recent evidence',exact:true}).click();await expect(section.getByRole('alert')).toBeVisible();await expect(section.getByRole('article')).toHaveCount(0);
+  const {state,frame,section}=await open(page);await expect(section.getByRole('article')).toHaveCount(1);await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));await expect(section.getByRole('article')).toHaveCount(0);state.fail=true;await section.getByRole('button',{name:'Load recent evidence',exact:true}).click();
+  await expectOperationsReloadRequired(frame);await expect(section).toHaveCount(0);await expect(section.getByRole('article')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('900101');expect(state.writes).toHaveLength(0);
 });
 test('expired evidence closes locally and reload revalidates the snapshot time',async({page})=>{
   const {state,section}=await open(page);await expect(section.getByRole('article')).toHaveCount(1);await page.clock.fastForward(61000);await expect(section.getByRole('article')).toHaveCount(0);await expect(section.getByRole('alert')).toContainText('one minute');state.snapshot.generatedAt='2099-10-10T12:00:00.000Z';state.snapshot.windowStart='2099-09-10T12:00:00.000Z';await section.getByRole('button',{name:'Load recent evidence',exact:true}).click();await expect(section.getByRole('alert')).toContainText('unavailable');expect(state.writes).toHaveLength(0);
@@ -55,10 +58,11 @@ test('existing Owner review navigation clears evidence and does not write',async
 });
 
 for(const pending of [false,true])test('shared auth invalidation clears '+(pending?'pending':'settled')+' legacy evidence',async({page})=>{
- const {state,section}=await open(page,s=>{s.hold=pending;});
+ const {state,frame,section}=await open(page,s=>{s.hold=pending;});
  if(pending)await expect.poll(()=>Boolean(state.release)).toBe(true);else await expect(section.getByRole('article')).toHaveCount(1);
+ const response=pending?page.waitForResponse(result=>result.url()===edge&&result.request().method()==='POST'&&result.request().postDataJSON()?.path==='/api/owner-review/legacy-evidence'):null;
  await page.frames().find(f=>f.parentFrame()).evaluate(()=>dispatchEvent(new Event('cos-private-data-invalidated')));
- if(pending)state.release();
- await expect(section.getByRole('article')).toHaveCount(0);await expect(section.getByRole('alert')).toContainText('current Owner access');
+ if(pending){state.release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
+ await expectOperationsReloadRequired(frame);await expect(section).toHaveCount(0);await expect(section.getByRole('article')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('900101');
  expect(state.requests.filter(r=>r.path==='/api/owner-review/legacy-evidence')).toHaveLength(1);expect(state.writes).toHaveLength(0);
 });

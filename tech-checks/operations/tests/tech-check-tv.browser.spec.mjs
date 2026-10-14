@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -96,7 +97,9 @@ test('network failure marks delayed data and authentication failure clears priva
   await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
   state.fail=401;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
-  await expect(frame.getByRole('alert')).toContainText('BOARD UNAVAILABLE');
+  await expectOperationsReloadRequired(frame);
+  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);
+  await expect(frame.getByRole('button',{name:'Refresh',exact:true})).toHaveCount(0);
   await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
   expect(state.writes).toEqual([]);
 });

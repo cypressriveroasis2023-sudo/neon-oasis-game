@@ -74,14 +74,15 @@ export default function OwnerBoardControls({show,createType,unitId,cancelCreate,
   const selection=ownerJobSelection(jobs,selectedJobId), selected=selection.selected;
   useEffect(()=>{setAssignTech('');setAdvance((current:any)=>({...current,unitNumber:'',note:''}));},[selection.selectedId]);
   const blocked=!!busy||siteSaving||contextLoading||Boolean(contextError)||refreshing||needsRefresh||!loaded;
-  const run=async(key:string,prepare:()=>Promise<{action:OwnerAction;message:string}|null>)=>{
+  const run=async(key:string,prepare:(current:()=>boolean)=>Promise<{action:OwnerAction;message:string}|null>)=>{
     if(actionRunning.current||saver.current!.needsRefresh||activeReads.current>0||!mounted.current)return;
+    const sessionCurrent=api.captureSession();
     actionRunning.current=true;setBusy(key);setError('');
     try{
-      const prepared=await prepare();
-      if(!prepared||!mounted.current)return;
+      const prepared=await prepare(()=>mounted.current&&sessionCurrent());
+      if(!prepared||!mounted.current||!sessionCurrent())return;
       const result=await saver.current!.save(prepared.action);
-      if(!mounted.current)return;
+      if(!mounted.current||!sessionCurrent())return;
       if(result.status==='confirmed'){
         if(prepared.action.kind==='create'){
           setSelectedJobId(result.response.job_id);
@@ -91,17 +92,17 @@ export default function OwnerBoardControls({show,createType,unitId,cancelCreate,
         show(prepared.action.kind==='create'?result.response.job_number+' created and found in current jobs.':prepared.message+' · saved and verified');
         window.dispatchEvent(new Event('focus'));
       }else if('message' in result){setError(result.message);setNeedsRefresh(true);}
-    }catch(cause){if(mounted.current)setError(cause instanceof Error?cause.message:'Owner action could not be completed.');}
+    }catch(cause){if(mounted.current&&sessionCurrent())setError(cause instanceof Error?cause.message:'Owner action could not be completed.');}
     finally{actionRunning.current=false;if(mounted.current)setBusy('');}
   };
-  const lifecycle=(job:any,kind:'close'|'remove')=>run(kind,async()=>{
+  const lifecycle=(job:any,kind:'close'|'remove')=>run(kind,async current=>{
     if(kind==='close'){
       const reason=await cosPrompt('Close reason (optional)');
-      if(reason===null||!await cosConfirm('Close '+job.jobNumber+'? History will be kept.'))return null;
+      if(reason===null||!current()||!await cosConfirm('Close '+job.jobNumber+'? History will be kept.'))return null;
       return {action:{kind,job,body:{reason}},message:job.jobNumber+' closed'};
     }
     const confirmation=await cosPrompt('Type DELETE '+job.jobNumber+' to permanently remove this job');
-    if(confirmation===null)return null;
+    if(confirmation===null||!current())return null;
     if(confirmation.trim()!=='DELETE '+job.jobNumber)throw new Error('Type DELETE followed by the exact COS Job number.');
     if(!await cosConfirm('Permanently delete '+job.jobNumber+'? This cannot be undone. Jobs with protected billing or dependency history will be blocked.'))return null;
     return {action:{kind,job,body:{confirmation:confirmation.trim()}},message:job.jobNumber+' permanently deleted'};
@@ -143,9 +144,9 @@ export default function OwnerBoardControls({show,createType,unitId,cancelCreate,
       return {action:{kind:'advance',job:selected,body:{note:advance.note,unitNumber:unit,serviceTechnician:advance.serviceTechnician,start:advance.date+' '+advance.startTime,end:advance.date+' '+advance.endTime}},message:selected.jobNumber+' advanced from IT and scheduled to '+advance.serviceTechnician};
     });
   };
-  const approveTruck=(check:any)=>run('truck-'+check.id,async()=>{
+  const approveTruck=(check:any)=>run('truck-'+check.id,async current=>{
     const note=await cosPrompt('Owner truck stock approval note (optional)');
-    if(note===null||!await cosConfirm('Approve '+check.technician+' truck stock / check as Owner verified?'))return null;
+    if(note===null||!current()||!await cosConfirm('Approve '+check.technician+' truck stock / check as Owner verified?'))return null;
     return {action:{kind:'truck',check,body:{note}},message:'Truck stock approved'};
   });
   useEffect(()=>{const roster=control.serviceTechnicians||[];setAdvance((current:any)=>current.serviceTechnician&&!roster.includes(current.serviceTechnician)?{...current,serviceTechnician:''}:current);},[control.serviceTechnicians]);
