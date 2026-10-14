@@ -182,6 +182,13 @@ jobs:
       - name: Verify saved-camera refresh timing and visibility
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs
+      - name: Saved-camera refresh evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saved-camera-refresh-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify integrated Fleet Dashboard for Owner and IT
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs tests/fleet-unit-cards.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/company-platform.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/owner-watchful-shortcut.browser.spec.mjs tests/routers.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/finance.browser.spec.mjs
