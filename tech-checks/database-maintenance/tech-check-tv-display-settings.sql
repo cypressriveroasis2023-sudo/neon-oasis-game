@@ -26,7 +26,7 @@ begin
  then raise exception 'Invalid TV settings.' using errcode='22023';end if;
  insert into app_private.cos_tv_board_settings(organization_id) values(p_organization_id) on conflict do nothing;
  select revision into v_revision from app_private.cos_tv_board_settings where organization_id=p_organization_id for update;
- if v_revision<>p_expected_revision then raise exception 'TV settings changed on another computer. Refresh before saving.' using errcode='40001';end if;
+ if v_revision<>p_expected_revision then raise exception 'TV settings changed on another computer. Refresh before saving.' using errcode='PT409';end if;
  update app_private.cos_tv_board_settings set sections=p_sections,rotation_seconds=p_rotation_seconds,revision=revision+1,updated_at=v_time,updated_by=p_actor_user_id where organization_id=p_organization_id;
  insert into app_private.cos_tv_board_settings_history(organization_id,revision,sections,updated_at,updated_by,rotation_seconds)
  values(p_organization_id,v_revision+1,p_sections,v_time,p_actor_user_id,p_rotation_seconds);
