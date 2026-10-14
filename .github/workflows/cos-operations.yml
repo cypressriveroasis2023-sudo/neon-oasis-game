@@ -156,6 +156,16 @@ jobs:
         id: build
       - run: npx playwright install --with-deps chromium
         id: browser_install
+      - name: Verify camera observation timestamp provenance
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-observed-timestamp.browser.spec.mjs
+      - name: Camera observation timestamp evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-observed-timestamp-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify read-only Victron dashboards and shared eye branding
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/vrm.browser.spec.mjs tests/eye-branding.browser.spec.mjs tests/company-overview.browser.spec.mjs

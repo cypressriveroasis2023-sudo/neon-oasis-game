@@ -1,5 +1,6 @@
 import {cameraTimestamp,resourceKind,providerRecord,providerState,cameraState,combinedState,type CameraRow,type CameraState,type EvidenceState} from './cameraEvidence';
 import {savedConnectionObservation} from './savedConnectionObservation';
+import {healthObservationTime} from './healthObservationTime';
 
 /** Server-verified resource associations. Display labels alone never establish these links. */
 export type VerifiedUnitIdentity={unitId:string;unitNumber:string;kind:'native_provider'|'owner_placement'|'owner_confirmed_native'|'reconeyez_area';deviceIds:string[];unitKeys:string[];proof:string;placementAuditId?:string;providerArea?:{detectorCount:number;inventoryObservedAt:string;bridgeLastEventAt:string|null}};
@@ -85,6 +86,6 @@ export function linkedUnitObservation(rows:CameraRow[],now=Date.now()):LinkedUni
   const basis=providers.length&&provider!=='verifying'?providers.every(row=>resourceKind(row)==='recorders')?'recorder':providers.every(row=>['cameras','detectors'].includes(resourceKind(row)))?'camera':'provider':!providers.length||service!=='verifying'?'connection':providers.every(row=>resourceKind(row)==='recorders')?'recorder':'camera';
   const state=basis==='connection'?service:provider;
   const prefix={camera:rows.length&&rows.every(row=>resourceKind(row)==='detectors')?'DETECTOR RECORDS':'CAMERA RECORDS',recorder:'RECORDER',provider:'PROVIDER SYSTEM',connection:'IP / PORT'}[basis];
-  const times=rows.map(row=>basis==='connection'?row.serviceEvidence?.observedAt:row.evidence?.observedAt).map(value=>cameraTimestamp(value,now).at).filter((value):value is string=>Boolean(value)).sort();
-  return {state,basis,label:prefix+' '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED / PARTLY VERIFIED',verifying:'UNVERIFIED'}[state]),checkedAt:times.at(-1)||null,providerState:provider,cameraState:camera,serviceState:service};
+  const checkedAt=healthObservationTime(rows,basis,state,now);
+  return {state,basis,label:prefix+' '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED / PARTLY VERIFIED',verifying:'UNVERIFIED'}[state]),checkedAt,providerState:provider,cameraState:camera,serviceState:service};
 }

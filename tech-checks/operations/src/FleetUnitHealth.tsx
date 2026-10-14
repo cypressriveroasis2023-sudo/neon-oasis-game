@@ -1,5 +1,6 @@
 import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
 import {cameraTimestamp} from './cameraEvidence';
+import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
 import type {FleetDashboardRow,Signal} from './fleetDashboardModel';
 import FleetBatterySummary from './FleetBatterySummary';
@@ -16,7 +17,7 @@ export default function FleetUnitHealth({row,now,editing=false}:{row:FleetDashbo
  return <div className='cos-fleet-unit-health-grid'>
   <section className='cos-fleet-unit-health-section cos-fleet-camera-card' aria-label={editing?'Unit health signals':'Selected unit camera health'}>
    <h3>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
-   <p>{row.camera.reason}</p><small>Observed {cameraTime(row.camera.checkedAt,now)}</small>
+   <p>{row.camera.reason}</p><small>{healthObservationLabel(row.camera.basis,row.camera.state)}: {cameraTime(row.camera.checkedAt,now)}</small>
    <p className='cos-fleet-detail-note'>Use the camera troubleshooting controls below to review the matched devices and saved checks.</p>
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-router-card' aria-label='Selected unit router health'>
