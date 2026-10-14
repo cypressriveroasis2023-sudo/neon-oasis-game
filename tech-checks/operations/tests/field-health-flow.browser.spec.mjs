@@ -5,7 +5,7 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,entryLabel='',evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,mixedCrowd=false,nearbyCrowd=false,ordinaryStand=false,htmlLabel=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,entryLabel='',evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,mixedCrowd=false,nearbyCrowd=false,ordinaryStand=false,htmlLabel=false,pausedClock=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
@@ -26,6 +26,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
  const health={...snapshot(rows),...(oldApi?{evidenceVersion:1,inventory:undefined}:{})};
 
  await page.clock.install({time:new Date(now)});
+ if(pausedClock)await page.clock.pauseAt(new Date(now));
  await page.route('**/*',async route=>{
   const url=route.request().url();
   if(url===origin+'/field-health-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${nativeOverview?'camera-health?diagnostics=1':'field-map'+(entryLabel?'?unitLabel='+encodeURIComponent(entryLabel):'')}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});
@@ -48,7 +49,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
- await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else if(entryLabel)await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(entryLabel);else {await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(state.units.length);if(!crowded&&!trackerCase&&state.units.some(unit=>unit.locationVerification==='owner_verified')){await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toHaveCount(1);if(await frame.locator('.cos-field-cluster-wrap').count())await frame.locator('.leaflet-control-zoom-in').click();}}return {frame,state};
+ await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else if(entryLabel)await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(entryLabel);else {await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(state.units.length);if(!crowded&&!trackerCase&&state.units.some(unit=>unit.locationVerification==='owner_verified')){await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toHaveCount(1);if(await frame.locator('.cos-field-cluster-wrap').count())await frame.locator('.leaflet-control-zoom-in').click();}}if(pausedClock){await page.clock.runFor(500);await expect(frame.locator('.leaflet-zoom-anim')).toHaveCount(0);}return {frame,state};
 }
 
 async function closeUnit(frame){const button=frame.getByRole('button',{name:'Close unit details'});if(await button.isVisible())await button.click();}
@@ -84,8 +85,11 @@ test('a uniquely resolved label deep link returns a cancelled ticket to the same
 });
 
 test('staleness and unavailable health fail gray without moving map or writing',async({page})=>{
- const {frame,state}=await mount(page);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','online');
- await frame.locator('.leaflet-control-zoom-in').click();const transform=await frame.locator('.leaflet-map-pane').getAttribute('style');await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','unknown');expect(await frame.locator('.leaflet-map-pane').getAttribute('style')).toBe(transform);
+ const {frame,state}=await mount(page,{pausedClock:true});await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','online');
+ await frame.locator('.leaflet-control-zoom-in').click();await page.clock.runFor(500);await expect(frame.locator('.leaflet-zoom-anim')).toHaveCount(0);
+ const transform=await frame.locator('.leaflet-map-pane').getAttribute('style'),before=await frame.locator('body').evaluate(()=>Date.now());
+ await page.clock.fastForward(16*60*1000);expect(await frame.locator('body').evaluate(()=>Date.now())-before).toBe(16*60*1000);
+ await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','unknown');expect(await frame.locator('.leaflet-map-pane').getAttribute('style')).toBe(transform);
  state.fail=true;await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.getByRole('alert')).toContainText('Synthetic provider unavailable');expect(state.writes).toHaveLength(0);
 });
 test('historical coordinates remain available for review and excluded from current pins and nearby distances',async({page})=>{

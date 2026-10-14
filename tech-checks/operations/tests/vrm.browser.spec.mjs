@@ -345,8 +345,51 @@ function powerFixture(item,{stale=false}={}){
   {metric:'load_power',value:33.3,unit:'W',source:'system',instance:0,observedAt},
  ]};
 }
+// Full-page screenshots of the outer host do not scroll the native iframe. Capture
+// each real card and caption at the project's unchanged width, with viewport context.
+async function captureNativePower(page,panel,testInfo,prefix){
+ const viewport=testInfo.project.use.viewport;
+ expect(page.viewportSize()).toEqual(viewport);
+ expect(await panel.evaluate(()=>innerWidth)).toBe(viewport.width);
+ const capture=async(target,label)=>{
+  await target.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
+  await expect(target).toBeInViewport({ratio:1});
+  const path=prefix+'-'+testInfo.project.name+'-'+label;
+  await page.screenshot({path:testInfo.outputPath(path+'-viewport.png'),fullPage:false});
+  await target.screenshot({path:testInfo.outputPath(path+'-detail.png')});
+  expect(page.viewportSize()).toEqual(viewport);
+ };
+ await capture(panel.locator('.vrm-native-heading'),'power-overview');
+ for(const [label,key] of [
+  ['Solar generation','solar-generation'],['Battery charge','battery-charge'],
+  ['DC system power','dc-system-power'],['Battery voltage','battery-voltage'],
+  ['Battery current','battery-current-missing'],['Battery power','battery-power-missing'],
+ ]){
+  const card=panel.getByRole('article',{name:label,exact:true});
+  const readings=card.locator('.vrm-native-reading');
+  if(await readings.count()){
+   for(const reading of await readings.all()){
+    await expect(reading.locator('.vrm-native-value')).not.toBeEmpty();
+    await expect(reading.locator('p')).toContainText('Saved reading · ');
+    await expect(reading.locator('.vrm-native-source')).toHaveText(/^(system|battery) · instance \d+$/);
+   }
+  }else{
+   await expect(card.locator('.vrm-native-value')).toHaveText('—');
+   await expect(card).toContainText('Not reported');
+  }
+  await capture(card,key);
+ }
+ const captions=panel.locator('.vrm-native-caption');
+ await expect(captions).toHaveCount(3);
+ await expect(captions.nth(0)).toContainText('not a live Remote Console');
+ await expect(captions.nth(1)).toContainText('Missing measurements stay blank');
+ await expect(captions.nth(2)).toContainText('DC system power is not total site consumption');
+ for(const [index,key] of ['saved-data-context','freshness-and-missing-data','source-provenance'].entries()){
+  await capture(captions.nth(index),key);
+ }
+}
 for(const role of ['owner','it'])test(`${role} sees read-only power for 010, 011 and a newly discovered installation without sharing`,async({page},testInfo)=>{
- let items=[syntheticUnit(1042732,'HELIOS 010'),syntheticUnit(1041373,'HELIOS 011')];
+ let items=[syntheticUnit(3000010,'HELIOS 010'),syntheticUnit(3000011,'HELIOS 011')];
  const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});await openVrm(frame);
  for(const item of items){
   await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:item.name+' Read-only power',exact:true}).click();
@@ -365,9 +408,12 @@ for(const role of ['owner','it'])test(`${role} sees read-only power for 010, 011
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
  if(role==='it')expect(requests.every(r=>r.path!=='/api/vrm-fleet/refresh')).toBeTruthy();
  await page.screenshot({path:testInfo.outputPath('vrm-native-readonly-dashboard.png'),fullPage:true});
+ await captureNativePower(page,frame.getByRole('region',{name:'HELIOS 012 read-only power dashboard'}),testInfo,'vrm-native-'+role+'-helios-012');
+ expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+ if(role==='it')expect(requests.every(r=>r.path!=='/api/vrm-fleet/refresh')).toBeTruthy();
 });
 test('Native power is marked stale, survives a temporary read failure, clears on authorization loss',async({page})=>{
- const item=syntheticUnit(1042732,'HELIOS 010');let status=200;
+ const item=syntheticUnit(3000010,'HELIOS 010');let status=200;
  const {frame}=await mount(page,{onVrmRequest:async()=>status===200?{data:{...fleet([item]),power:[powerFixture(item,{stale:true})]}}:{status,data:{error:'Synthetic read failed'}}});await openVrm(frame);
  const panel=frame.getByRole('region',{name:'HELIOS 010 read-only power dashboard'});
  await expect(panel.getByText('Saved readings · some are stale',{exact:true})).toBeVisible();
@@ -400,4 +446,6 @@ test('Native charge keeps distinct battery and system sources visible without an
  await expect(card.locator('.vrm-native-reading').filter({hasText:'system · instance 0'})).toContainText('98.5');
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
  await page.screenshot({path:testInfo.outputPath('vrm-native-distinct-charge-sources.png'),fullPage:true});
+ await captureNativePower(page,frame.getByRole('region',{name:'HELIOS 098 read-only power dashboard'}),testInfo,'vrm-native-distinct-charge-sources');
+ expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
