@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 // Both the host and board are real built code. All backend traffic is synthetic.
@@ -9,9 +9,11 @@ const time = '2026-10-12T15:00:00Z';
 const cors = {'access-control-allow-origin': origin};
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{width:100%;height:600px;border:0}.hidden{display:none}</style></head><body><header id="hostToolbar">Host tools</header><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
-async function setup(page, { many = false } = {}) {
+async function setup(page, { many = false, pausedClock = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
-  await page.clock.install({ time: new Date(time) });
+  // Pause at a future instant while the page is still blank, before app timers exist.
+  await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
+  if(pausedClock)await page.clock.pauseAt(new Date(time));
   state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetFailures={};
   if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
@@ -167,20 +169,34 @@ test('TV uses the Field Map background and retains pins when optional feeds fail
 function fieldUnit(index,latitude=29.986,longitude=-95.311){return {id:'bbbbbbbb-bbbb-4bbb-8bbb-'+String(index).padStart(12,'0'),unitNumber:'Sniper '+(312+index),modelName:'SNIPER',status:'installed',site:'Field site '+index,address:'Field address '+index,latitude,longitude,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};}
 function cameraRow(unit,status){return {id:'resource-'+unit.id,name:unit.unitNumber+' connection',unit:unit.unitNumber,status,scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status,active:true,resource:'service',observedAt:time,lastOnlineAt:status==='online'?time:'2026-10-12T14:00:00Z',reachable:status==='online',confirmedOutage:status==='offline'}};}
 
-test('Camera Health rotates every red outage and never lists green or unknown units',async({page})=>{
- const {state,frame}=await setup(page);
+test('Camera Health rotates every red outage and never lists green or unknown units',async({page},testInfo)=>{
+ // This exact page-by-page test owns elapsed time; wall-clock progress must not
+ // race its synthetic ticks. Other TV tests retain their existing clock mode.
+ const {state,frame}=await setup(page,{pausedClock:true});
+ const board=frame.getByRole('region',{name:'Tech Check TV Board'}),clockSteps=[];
+ const capture=async event=>{
+  const current=await board.evaluate(node=>({now:Date.now(),page:node.dataset.page,section:node.dataset.section,summary:node.querySelector('.tv-fleet-summary')?.textContent??'',labels:[...node.querySelectorAll('.tv-fleet-record h3')].map(label=>label.textContent)}));
+  clockSteps.push({event,...current,fleetReads:state.fleetReads,writes:state.writes.length});return current;
+ };
+ let elapsed=0;
+ const advance=async milliseconds=>{
+  expect((await capture('before advance '+milliseconds)).now).toBe(Date.parse(time)+elapsed);
+  await page.clock.fastForward(milliseconds);elapsed+=milliseconds;
+  expect((await capture('after advance '+milliseconds)).now).toBe(Date.parse(time)+elapsed);
+ };
+ try{
  const red=Array.from({length:6},(_,index)=>fieldUnit(index,29.986+index*.001,-95.311));
  const green=fieldUnit(8,32.77,-96.79),unknown=fieldUnit(9,30.26,-97.74);
  state.fleetUnits=[...red,green,unknown];state.cameraRows=[...red.map(unit=>cameraRow(unit,'offline')),cameraRow(green,'online')];
  state.settings={sections:['camera'],revision:1,updatedAt:time,rotationSeconds:15};
- await page.clock.fastForward(60000);
+ await advance(60000);
  await expect(frame.locator('.tv-fleet-summary')).toContainText('6 down units');
- const board=frame.getByRole('region',{name:'Tech Check TV Board'}),perPage=page.viewportSize().width<900?1:4,parts=Math.ceil(red.length/perPage);
+ const perPage=page.viewportSize().width<900?1:4,parts=Math.ceil(red.length/perPage);
  await expect(board).toHaveAttribute('data-page','1');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('Red units only · 1 / '+parts);
  const names=new Set();
  for(let index=0;index<6;index++){
-  if(index)await page.clock.fastForward(15000);
+  if(index)await advance(15000);
   const part=index%parts;
   // A visible prior card is not proof that React committed this timer's rotation.
   await expect(board).toHaveAttribute('data-page',String(part+1));
@@ -189,11 +205,18 @@ test('Camera Health rotates every red outage and never lists green or unknown un
   const labels=await frame.locator('.tv-fleet-record h3').allTextContents();labels.forEach(label=>names.add(label));
   await expect(frame.locator('.tv-fleet-record:not(.tv-state-offline)')).toHaveCount(0);
   expect(labels).not.toContain(green.unitNumber);expect(labels).not.toContain(unknown.unitNumber);
+  await capture('settled sample '+index);
  }
  expect([...names].sort()).toEqual(red.map(unit=>unit.unitNumber).sort());
- await page.clock.fastForward(15000);await expect(board).toHaveAttribute('data-page','1');
+ await advance(15000);await expect(board).toHaveAttribute('data-page','1');
  await expect(frame.locator('.tv-fleet-record h3')).toHaveText(red.slice(0,perPage).map(unit=>unit.unitNumber));
  expect(state.fleetReads).toBe(3);expect(state.writes).toEqual([]);
+ }finally{
+  await capture('final').catch(error=>clockSteps.push({event:'final capture unavailable',message:error.message}));
+  const diagnosticPath=testInfo.outputPath('tv-rotation-clock.json');
+  await writeFile(diagnosticPath,JSON.stringify(clockSteps,null,2));
+  await testInfo.attach('tv-rotation-clock',{path:diagnosticPath,contentType:'application/json'});
+ }
 });
 
 test('Field Map visits overview and geographic close-ups with the red area first',async({page})=>{

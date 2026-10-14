@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
+import {openWorkspace} from './navigation-helper.mjs';
 
 // Exercise the real hook/API against saved synthetic DB snapshots. No vendors,
 // database writes, production credentials or source timestamp rewrites are used.
@@ -12,6 +13,7 @@ async function mount(page){
  const unit={id:unitId,unitNumber:'Solar Spotter 22HDC1',modelName:'Solar Spotter',status:'field',currentLocationType:'field',address:'100 Synthetic Road',site:'Synthetic refresh test',customer:'Synthetic customer',latitude:null,longitude:null,locationVerification:'address_only'};
  const state={calls:[],errors:[],failed:false,gate:deferred()};
  page.on('pageerror',error=>state.errors.push(error.message));
+ await page.addInitScript(()=>{window.savedRefreshInvalidations=[];window.addEventListener('cos-private-data-invalidated',()=>window.savedRefreshInvalidations.push(Date.now()));});
  await page.clock.install({time:new Date(start)});await page.clock.pauseAt(new Date(start));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
@@ -74,6 +76,41 @@ test('hidden tabs pause saved reads and visibility resumes one coalesced pair',a
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  await visible(app,true);await visible(app,true);await page.clock.runFor(60000);
  expect(counts(state)).toEqual({health:2,map:2,routers:2,power:2});assertReadOnly(state);
+});
+
+test('returning to Fleet keeps the cached pair original refresh deadline',async({page})=>{
+ const {app,state}=await mount(page);
+ const savedHealth=app.locator('.cos-fleet-heading > div > small'),originalRead=await savedHealth.innerText();
+ // Use the static directory while Fleet is unmounted. An unrelated workspace's
+ // authenticated polling must not run through this synthetic clock jump.
+ await openWorkspace(app,'Operations');
+ await expect(app.getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();
+ await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
+ await page.clock.runFor(177000); // Three minutes from the original saved pair.
+ expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+180000);
+ await openWorkspace(app,'Field Map');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ expect(counts(state).health).toBe(1);expect(counts(state).map).toBe(1);
+ expect(await app.locator('body').evaluate(()=>window.savedRefreshInvalidations)).toEqual([]);
+ state.gate=deferred();
+ const healthResponse=page.waitForResponse(response=>response.request().method()==='POST'&&response.request().postDataJSON()?.path===summaryPath);
+ await page.clock.runFor(60000);
+ await expect.poll(()=>counts(state).health).toBe(2);await expect.poll(()=>counts(state).map).toBe(2);
+ await (await healthResponse).finished();
+ expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000]);
+ // A fresh health response cannot replace the complete shared pair on its own.
+ await expect(app.getByRole('button',{name:'↻ Reading data…',exact:true})).toBeDisabled();
+ await expect(savedHealth).toHaveText(originalRead);
+ await page.clock.runFor(45000);state.gate.resolve();state.gate=null;
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await expect(savedHealth).not.toHaveText(originalRead);
+ await page.clock.runFor(195000);
+ await expect.poll(()=>counts(state).health).toBe(3);await expect.poll(()=>counts(state).map).toBe(3);
+ expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000,start+480000]);
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');assertReadOnly(state);
+ expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+480000);
+ expect(await app.locator('body').evaluate(()=>window.savedRefreshInvalidations)).toEqual([]);
 });
 
 test('a failed saved read waits four minutes to retry and manual reload remains immediate',async({page})=>{

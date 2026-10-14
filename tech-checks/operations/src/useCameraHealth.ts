@@ -12,7 +12,11 @@ export function useCameraHealth(){
   const refresh=useCallback(async(force=false)=>{
     if(running.current)return;
     running.current=true;lastAttemptAt.current=Date.now(); const request=++revision.current;setLoading(true);
-    try {const next=await api.fleet(force);validateCameraHealth(next.health);if(request===revision.current){setFleet(next);setError('');updateClock();}}
+    try {const next=await api.fleet(force);validateCameraHealth(next.health);if(request===revision.current){
+      // Adopting a cached pair is not a new saved-data read. Keep the original
+      // request deadline when a view mounts or another consumer publishes it.
+      if(typeof next.readStartedAt==='number'&&Number.isFinite(next.readStartedAt)&&next.readStartedAt<=Date.now())lastAttemptAt.current=next.readStartedAt;
+      setFleet(next);setError('');updateClock();}}
     catch(cause){if(request===revision.current){setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
     finally{if(request===revision.current){running.current=false;setLoading(false);}}
   },[updateClock]);
