@@ -156,6 +156,16 @@ jobs:
         id: build
       - run: npx playwright install --with-deps chromium
         id: browser_install
+      - name: Verify source-equipment address estimate pins
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/source-equipment-pins.browser.spec.mjs
+      - name: Source-equipment estimate pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-equipment-estimate-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify read-only Victron dashboards and shared eye branding
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/vrm.browser.spec.mjs tests/eye-branding.browser.spec.mjs tests/company-overview.browser.spec.mjs
