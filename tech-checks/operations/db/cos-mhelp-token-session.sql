@@ -2,6 +2,9 @@
 -- Credentials stay encrypted in Vault and are returned only to service-role code.
 -- Apply the signature replacement and its grants as one transaction, so the
 -- old six-argument overload cannot bypass the reconnect lease/CAS checks.
+-- Base installer: apply before cos-mhelp-shared-read-backoff.sql on a fresh
+-- installation. Do not reapply this base over an installed backoff extension;
+-- use cos-mhelp-reconnect-business-conflict.sql for that existing-install repair.
 begin;
 create table if not exists public.cos_mhelp_token_state (
   singleton boolean primary key default true check (singleton),
@@ -109,7 +112,7 @@ begin
         'revision',state.last_reconnect_base_revision+1);
     end if;
     if state.revision is distinct from p_expected_revision then
-      raise exception 'mHelp reconnect configuration changed' using errcode='40001';
+      raise exception 'mHelp reconnect configuration changed' using errcode='PT409';
     end if;
     if p_action='reconnect_claim' then
       if p_portal_id is not null and p_portal_id is distinct from state.portal_id then

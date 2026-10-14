@@ -11,7 +11,7 @@ const revision=(v:unknown):v is number=>Number.isSafeInteger(v)&&Number(v)>0&&Nu
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 export class MhelpReconnectError extends Error{
  readonly status:number;
- constructor(status=503){super(status===403?'The active COS Owner authorization changed. Reopen reconnect after signing in.':status===400?'Enter a fresh matching token pair and reopen the reconnect form if its connection revision changed.':status===409?'A token update is already running. Check the reconnect result before trying again.':'Reconnect could not be confirmed. Check the reconnect result before trying again.');this.status=status;}
+ constructor(status=503,revisionChanged=false){super(status===403?'The active COS Owner authorization changed. Reopen reconnect after signing in.':status===400?'Enter a fresh matching token pair and reopen the reconnect form if its connection revision changed.':status===409?(revisionChanged?'The mHelp connection changed. Reopen reconnect before trying again.':'A token update is already running. Check the reconnect result before trying again.'):'Reconnect could not be confirmed. Check the reconnect result before trying again.');this.status=status;}
 }
 function fail(status=503):never{throw new MhelpReconnectError(status);}
 function checkedRequest(value:unknown,credentials:boolean):Row{
@@ -84,7 +84,7 @@ export function createMhelpReconnect(options:{getConfig:()=>Config;fetch:typeof 
    const commit={p_action:'reconnect_commit',p_session:lease,p_request_id:request.requestId,p_expected_revision:request.expectedRevision,p_portal_id:claimed.portal_id,p_access_token:issued.access_token,p_refresh_token:refresh,p_expires_at:new Date(Date.now()+Number(issued.expires_in)*1000).toISOString()};
    let saved:Row;
    await authorized();
-   try{saved=await deadline(()=>options.session(commit),controller.signal);}catch{await authorized();saved=await deadline(()=>options.session(commit),controller.signal);}
+   try{saved=await deadline(()=>options.session(commit),controller.signal);}catch(cause){if(cause instanceof MhelpReconnectError&&cause.status===409)throw cause;await authorized();saved=await deadline(()=>options.session(commit),controller.signal);}
    if(saved.committed!==true)fail();
    lease=null;return result(saved,request);
   }catch(cause){if(cause instanceof MhelpReconnectError)throw cause;fail();}
