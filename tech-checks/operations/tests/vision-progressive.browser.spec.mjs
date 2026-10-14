@@ -15,8 +15,10 @@ const routers = items => ({ items, generatedAt: stamp, source: 'camera_health', 
 const router = { id: 'synthetic-router', unitKey: 'Synthetic unit', name: 'Synthetic router', model: 'Synthetic', publicIp: null, unitIp: null, port: null, protocol: null, probeStatus: 'unknown', checkedAt: null, lastRecoveredAt: null, reportedStatus: 'Unknown', reportedAt: null, reportedSource: 'Synthetic', savedLatencyMs: null, match: 'unmatched', candidateUnit: null, gps: null };
 const field = items => ({ items, summary: { fieldUnits: items.length, mappedUnits: 0, unitGps: 0, missingGps: items.length }, generatedAt: stamp });
 const job = { id: '33333333-3333-4333-8333-333333333333', jobNumber: 'SYNTHETIC-JOB-1', jobType: 'Delivery', customer: 'Synthetic customer', site: 'Synthetic site', status: 'Scheduled', stage: 'IT Prep' };
+// Only this complete synthetic server identity may recover across bearer renewal.
+const verifiedOwner = { authorized: true, legacyOwner: true, name: 'Synthetic owner', role: 'Owner', productionOwnerUserId: '44444444-4444-4444-8444-444444444444', features: { fleetAccess: true, vrmRead: true, fieldLocationVerification: false } };
 
-async function mount(page, { held = [], failures = [], payloads = {} } = {}) {
+async function mount(page, { held = [], failures = [], payloads = {}, session = { authorized: true, name: 'Synthetic owner', role: 'Owner' } } = {}) {
   const gates = new Map();
   const state = {
     requests: [], failures: new Set(failures), errors: [],
@@ -51,7 +53,7 @@ async function mount(page, { held = [], failures = [], payloads = {} } = {}) {
     state.requests.push(request);
     expect(request.method).toBe('GET');
     const failed = state.failures.has(request.path);
-    const data = request.path === '/api/session' ? { authorized: true, name: 'Synthetic owner', role: 'Owner' }
+    const data = request.path === '/api/session' ? session
       : state.payloads[request.path] ?? { items: [] };
     // Capture each response at request time so a late response really contains older data.
     const body = JSON.stringify(failed ? { error: 'Synthetic source unavailable' } : data);
@@ -182,8 +184,10 @@ test('company refresh removes stale counts while healthy sources recover ahead o
   expect(state.errors).toEqual([]);
 });
 
-test('late responses after navigation and a changed session cannot overwrite the new dashboard', async ({ page }) => {
-  const { frame, dashboard, state } = await mount(page, { held: [paths.field, paths.jobs] });
+test('late responses after navigation and verified Owner renewal cannot overwrite the recovered dashboard', async ({ page }) => {
+  const { frame, dashboard, overview, state } = await mount(page, { held: [paths.field, paths.jobs], session: verifiedOwner });
+  const sessionReads = () => state.requests.filter(request => request.path === '/api/session').length;
+  const initialSessionReads = sessionReads();
   await expect(card(dashboard, 'Team')).toContainText('1 active team members');
   await openWorkspace(frame, 'Operations');
   await expect(dashboard).toHaveCount(0);
@@ -191,14 +195,25 @@ test('late responses after navigation and a changed session cannot overwrite the
   const oldJobs = state.detach(paths.jobs);
   expect(oldField.pending).toBeGreaterThan(0);
   expect(oldJobs.pending).toBeGreaterThan(0);
-  // Navigation remounts both readers. A later round must start from checking, not old state.
+  // A changed bearer clears private views until the same server-verified Owner
+  // is revalidated. Its new readers must then start from checking, not old state.
   state.payloads[paths.field] = field([]);
   state.payloads[paths.jobs] = { items: [] };
   state.hold(paths.field);
   state.hold(paths.jobs);
+  const verification = state.hold('/api/session');
   await page.evaluate(() => { window.syntheticToken = 'synthetic-session-two'; });
   await openWorkspace(frame, 'Today');
+  await expect.poll(() => verification.pending).toBe(1);
+  expect(sessionReads()).toBe(initialSessionReads + 1);
+  await expect(dashboard).toHaveCount(0);
+  await expect(overview).toHaveCount(0);
+  await expect(frame.getByRole('region', { name: 'Daily workspace', exact: true })).toHaveCount(0);
+  await expect(frame.getByText('Verifying your current Operations account…', { exact: true })).toBeVisible();
+  state.release('/api/session');
   await expect(card(dashboard, 'Fleet Dashboard')).toContainText('Checking connected records…');
+  await expect(frame.getByText('OPERATIONS CONNECTED', { exact: true })).toBeVisible();
+  await expect(frame.locator('.operations-access')).toHaveCount(0);
   await expect(frame.getByRole('region', { name: 'Daily workspace', exact: true })).toHaveCount(0);
   state.release(paths.field);
   state.release(paths.jobs);
@@ -209,5 +224,7 @@ test('late responses after navigation and a changed session cannot overwrite the
   await expect.poll(() => oldField.pending + oldJobs.pending).toBe(0);
   await expect(card(dashboard, 'Fleet Dashboard')).toContainText('0 field units · 0 mapped · 0 with addresses');
   await expect(frame.getByRole('region', { name: 'Daily workspace', exact: true })).not.toContainText(job.jobNumber);
+  expect(sessionReads()).toBe(initialSessionReads + 1);
+  expect(state.requests.every(request => request.method === 'GET')).toBe(true);
   expect(state.errors).toEqual([]);
 });

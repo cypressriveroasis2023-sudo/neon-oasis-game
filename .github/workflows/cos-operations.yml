@@ -231,7 +231,16 @@ jobs:
           if-no-files-found: ignore
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
+        run: npm run test:browser -- tests/mhelp-import-flow.browser.spec.mjs tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
+      - name: mHelp interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mhelp-interaction-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
       - name: Verify shared map migration and Owner portal regressions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: >-
@@ -250,6 +259,16 @@ jobs:
           tests/shared-fleet-map.browser.spec.mjs
           tests/verified-health-identity.browser.spec.mjs
           tests/vision-dashboard.browser.spec.mjs
+          tests/vision-progressive.browser.spec.mjs
+      - name: Shared map and Owner portal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-map-owner-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()
