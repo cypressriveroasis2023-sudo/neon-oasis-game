@@ -32,14 +32,14 @@ async function openVrm(frame){
 }
 test('All nine verified VRM portals work with sharing disabled',async({page})=>{
  const {frame,requests}=await mount(page,{config:vrmPortalConfig()});await openVrm(frame);
- await expect(frame.getByText('0 of 9 dashboards enabled inside COS.',{exact:false})).toBeVisible();
+ await expect(frame.getByText('0 embedded dashboards · 9 COS read-only power views.',{exact:false})).toBeVisible();
  const nav=frame.getByRole('navigation',{name:'Helios installations'});
  await expect(nav.getByRole('button')).toHaveCount(9);
  const layout=await nav.evaluate(el=>({display:getComputedStyle(el).display,columns:getComputedStyle(el).gridTemplateColumns.split(' ').length,width:innerWidth}));expect(layout.display).toBe('grid');expect(layout.columns).toBe(layout.width>=1200?9:3);
  for(const unit of vrmPortalConfig().items){
-  await nav.getByRole('button',{name:unit.name+' VRM portal',exact:true}).click();
+  await nav.getByRole('button',{name:unit.name+' Read-only power',exact:true}).click();
   await expect(frame.getByRole('link',{name:'Open '+unit.name+' in VRM ↗',exact:true})).toHaveAttribute('href',unit.portalUrl);
-  await expect(nav.getByRole('button',{name:unit.name+' VRM portal',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(nav.getByRole('button',{name:unit.name+' Read-only power',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(frame.getByRole('definition').filter({hasText:String(unit.installationId)})).toHaveText(String(unit.installationId));
  }
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
@@ -52,7 +52,7 @@ test('Authorized embedded dashboards follow the selected installation',async({pa
  const iframe=frame.locator('iframe.vrm-dashboard');await expect(iframe).toHaveAttribute('title','HELIOS 001 Victron dashboard');
  await expect(iframe).toHaveAttribute('src',config.items[0].embedUrl);await expect(iframe).toHaveAttribute('referrerpolicy','no-referrer');
  await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 002 Dashboard enabled',exact:true}).click();await expect(iframe).toHaveAttribute('src',config.items[1].embedUrl);
- await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 003 VRM portal',exact:true}).click();await expect(iframe).toHaveCount(0);
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 003 Read-only power',exact:true}).click();await expect(iframe).toHaveCount(0);
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('An initial read failure never fabricates fleet installations or dashboards',async({page})=>{
@@ -178,7 +178,7 @@ test('Authorization failure clears previously loaded installation details and ap
  const {frame}=await mount(page,{onVrmRequest:async()=>authorized?{data:fleet([item])}:{status:403,data:{error:'Owner access required'}}});await openVrm(frame);
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(1);
  authorized=false;await fleetButton(frame).click();
- await expect(frame.getByRole('alert')).toContainText('Owner access required');
+ await expect(frame.getByRole('alert')).toContainText('Your session changed');
  await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
  await expect(frame.getByRole('heading',{name:'Private installation',exact:true})).toHaveCount(0);
@@ -318,10 +318,11 @@ test('An old backend supports the new workspace through 404-only legacy fallback
 
 test('A forbidden dynamic fleet never falls back to a legacy installation list',async({page})=>{
  const {frame,requests}=await mount(page,{onVrmRequest:async request=>request.path==='/api/vrm-portal'?{data:vrmPortalConfig()}:{status:403,data:{error:'Synthetic Owner fleet access denied'}}});await openVrm(frame);
- await expect(frame.getByRole('alert')).toContainText('Synthetic Owner fleet access denied');
+ await expect(frame.getByRole('alert')).toContainText('Your session changed');
  await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
- await fleetButton(frame).click();await expect(fleetButton(frame)).toBeEnabled();
- expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet/refresh']);
+ await expect(fleetButton(frame)).toBeDisabled();
+ await page.reload();await openVrm(frame);await expect(frame.getByRole('alert')).toContainText('Your session changed');
+ expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet']);
 });
 
 test('The dashboard uses old-backend fallback only for an absent dynamic fleet route',async({page})=>{
@@ -333,4 +334,70 @@ test('The dashboard uses old-backend fallback only for an absent dynamic fleet r
  forbidden=true;await dashboard.getByRole('button',{name:'Refresh fleet',exact:true}).click();
  await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('Status unavailable · open to check');
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet']);
+});
+
+function powerFixture(item,{stale=false}={}){
+ const observedAt=new Date(Date.now()-(stale?31*60*1000:60*1000)).toISOString();
+ return {installationId:item.installationId,name:item.name,lastAttemptAt:new Date().toISOString(),errorCode:null,measurements:[
+  {metric:'battery_soc',value:98.5,unit:'%',source:'system',instance:0,observedAt},
+  {metric:'battery_voltage',value:24.9,unit:'V',source:'system',instance:0,observedAt},
+  {metric:'solar_power',value:0,unit:'W',source:'system',instance:0,observedAt},
+  {metric:'load_power',value:33.3,unit:'W',source:'system',instance:0,observedAt},
+ ]};
+}
+for(const role of ['owner','it'])test(`${role} sees read-only power for 010, 011 and a newly discovered installation without sharing`,async({page},testInfo)=>{
+ let items=[syntheticUnit(1042732,'HELIOS 010'),syntheticUnit(1041373,'HELIOS 011')];
+ const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});await openVrm(frame);
+ for(const item of items){
+  await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:item.name+' Read-only power',exact:true}).click();
+  const panel=frame.getByRole('region',{name:item.name+' read-only power dashboard'});
+  await expect(panel).toBeVisible();await expect(panel.getByRole('article',{name:'Battery charge'})).toContainText('98.5');
+  await expect(panel.getByRole('article',{name:'Solar generation'})).toContainText('0 W');
+  await expect(panel.getByRole('article',{name:'Battery current'})).toContainText('Not reported');
+  await expect(panel.getByText('Recent saved readings',{exact:true})).toBeVisible();
+ }
+ items=[...items,syntheticUnit(3000123,'HELIOS 012')];
+ await frame.getByRole('button',{name:role==='it'?'Reload saved fleet':'Refresh fleet',exact:true}).click();
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 012 Read-only power',exact:true}).click();
+ await expect(frame.getByRole('region',{name:'HELIOS 012 read-only power dashboard'})).toBeVisible();
+ await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
+ const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
+ expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+ if(role==='it')expect(requests.every(r=>r.path!=='/api/vrm-fleet/refresh')).toBeTruthy();
+ await page.screenshot({path:testInfo.outputPath('vrm-native-readonly-dashboard.png'),fullPage:true});
+});
+test('Native power is marked stale, survives a temporary read failure, clears on authorization loss',async({page})=>{
+ const item=syntheticUnit(1042732,'HELIOS 010');let status=200;
+ const {frame}=await mount(page,{onVrmRequest:async()=>status===200?{data:{...fleet([item]),power:[powerFixture(item,{stale:true})]}}:{status,data:{error:'Synthetic read failed'}}});await openVrm(frame);
+ const panel=frame.getByRole('region',{name:'HELIOS 010 read-only power dashboard'});
+ await expect(panel.getByText('Saved readings · some are stale',{exact:true})).toBeVisible();
+ status=503;await fleetButton(frame).click();await expect(panel.getByText('Readings could not be refreshed',{exact:true})).toBeVisible();
+ await expect(panel.getByRole('article',{name:'Battery charge'})).toContainText('98.5');
+ status=403;await fleetButton(frame).click();await expect(panel).toHaveCount(0);
+});
+
+for(const trigger of ['private-event','verified-parent-message'])test(`Native telemetry clears immediately and rejects delayed reads after ${trigger}`,async({page})=>{
+ const item=syntheticUnit(3000999,'HELIOS 099');let release,hold=false;
+ const {frame,requests}=await mount(page,{onVrmRequest:async()=>{if(hold)await new Promise(resolve=>{release=resolve});return {data:{...fleet([item]),power:[powerFixture(item)]}};}});await openVrm(frame);
+ const panel=frame.getByRole('region',{name:'HELIOS 099 read-only power dashboard'});await expect(panel).toBeVisible();
+ hold=true;const response=page.waitForResponse(res=>res.url()===edge&&res.request().method()==='POST'&&res.request().postDataJSON()?.path==='/api/vrm-fleet/refresh');await fleetButton(frame).click();await expect.poll(()=>Boolean(release)).toBe(true);
+ if(trigger==='private-event')await frame.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
+ else await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
+ await expect(panel).toHaveCount(0);await expect(frame.getByRole('alert')).toContainText('Your session changed');
+ release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:'Refresh fleet',exact:true})).toBeDisabled();
+ await expect(frame.getByText('98.5',{exact:false})).toHaveCount(0);expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+});
+
+test('Native charge keeps distinct battery and system sources visible without an aggregate',async({page},testInfo)=>{
+ const item=syntheticUnit(3000998,'HELIOS 098');const power=powerFixture(item);
+ power.measurements.push({metric:'battery_soc',value:42,unit:'%',source:'battery',instance:278,observedAt:power.measurements[0].observedAt});
+ const {frame,requests}=await mount(page,{onVrmRequest:async()=>({data:{...fleet([item]),power:[power]}})});await openVrm(frame);
+ const card=frame.getByRole('article',{name:'Battery charge',exact:true});
+ await expect(card).toContainText('Separate source readings · no combined charge');
+ await expect(card.locator('.vrm-native-reading')).toHaveCount(2);
+ await expect(card.locator('.vrm-native-reading').filter({hasText:'battery · instance 278'})).toContainText('42');
+ await expect(card.locator('.vrm-native-reading').filter({hasText:'system · instance 0'})).toContainText('98.5');
+ expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+ await page.screenshot({path:testInfo.outputPath('vrm-native-distinct-charge-sources.png'),fullPage:true});
 });
