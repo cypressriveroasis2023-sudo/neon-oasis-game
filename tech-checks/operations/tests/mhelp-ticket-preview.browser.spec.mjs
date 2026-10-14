@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
 import {privateTicketSampleFixture,privateSampleNow,privateSampleRequest} from './fixtures/mhelpTicketPrivateSample.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
@@ -113,11 +114,11 @@ for(const day of ['today','previous'])test(`${day}: navigating away discards an 
   await expectNoDiagnostics(preview);
 });
 for(const day of ['today','previous'])test(`${day}: an expired Owner session clears old aggregates and does not display provider text`,async({page})=>{
-  const {preview,calls,state}=await mount(page);await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
+  const {frame,preview,calls,state}=await mount(page);await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
   state.denied=true;await dayButton(preview,day).click();
-  await expect(preview.getByRole('alert')).toHaveText('Your Owner session could not be verified. Return to Tech Check and sign in again.');
-  await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
-  await expectNoDiagnostics(preview);
+  await expectOperationsReloadRequired(frame);await expect(preview).toHaveCount(0);
+  await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('synthetic private');
+  await expectNoDiagnostics(frame);
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });
 test('known safe diagnostic explains the read failure, clears old counts and redacts unknown codes',async({page})=>{
@@ -235,7 +236,7 @@ test('single-detail absent text and empty nested samples do not imply operationa
   await expect(detail).toContainText('No observations');await expect(detail).toContainText('No string observations');
 });
 test('detail busy guard clears old evidence through day changes, repeated clicks and access denial',async({page})=>{
-  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewDetailFixture();
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewDetailFixture();
   await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();
   let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewDetailFixture({hasDescription:false});
   await dayButton(preview,'previous').click();
@@ -246,8 +247,8 @@ test('detail busy guard clears old evidence through day changes, repeated clicks
   release();state.delay=null;await expect(preview).toContainText('No nonempty text was found');
   await expect(preview).not.toContainText('Nonempty text is present');await expect(preview).toContainText('Preview: previous day');
   state.denied=true;await dayButton(preview).click();
-  await expect(preview.getByRole('alert')).toHaveText('Your Owner session could not be verified. Return to Tech Check and sign in again.');
-  await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
+  await expectOperationsReloadRequired(frame);await expect(preview).toHaveCount(0);
+  await expectNoDiagnostics(frame);await expect(preview.getByRole('table')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.path===path)).toHaveLength(3);
 });
 test('malformed or private detail evidence fails closed at every level and requires explicit retry',async({page})=>{
@@ -342,14 +343,14 @@ test('deleted, hidden, team and recurring appointment candidates stay unverified
   expect(calls.filter(call=>call.path===path)).toHaveLength(1);
 });
 test('appointment busy guard removes old evidence, rejects repeated clicks and clears all results on Owner denial',async({page})=>{
-  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();
   await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
   let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewAppointmentFixture({appointments:[]});await dayButton(preview,'previous').click();
   await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();await expectNoDiagnostics(preview);
   await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
   release();state.delay=null;await expect(preview).toContainText('No match was found within this inspected schedule window');await expect(preview).not.toContainText('One structural match was found');
-  state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');
-  await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');expect(calls.filter(call=>call.path===path)).toHaveLength(3);
+  state.denied=true;await dayButton(preview).click();await expectOperationsReloadRequired(frame);await expect(preview).toHaveCount(0);
+  await expectNoDiagnostics(frame);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('synthetic private');expect(calls.filter(call=>call.path===path)).toHaveLength(3);
 });
 test('malformed appointment bounds, private values and forged safe states fail closed before any evidence renders',async({page})=>{
   const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
@@ -423,11 +424,11 @@ test('appointment variants reject private fields and forged states, clear old di
   state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();expect(calls.filter(call=>call.path===path)).toHaveLength(mutations.length+2);
 });
 test('appointment variants busy guard clears diagnostics through repeated clicks and access denial',async({page})=>{
-  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();
   let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewAppointmentVariantFixture({source:{TotalRows:1,results:[{}]}});await dayButton(preview,'previous').click();
   await expectNoDiagnostics(preview);await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
   release();state.delay=null;await expect(preview).toContainText('Empty object rows: 1');await expect(preview).not.toContainText('Email-like string: 1');
-  state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');await expectNoDiagnostics(preview);await expect(preview.getByRole('status')).toHaveCount(0);expect(calls.filter(call=>call.path===path)).toHaveLength(3);
+  state.denied=true;await dayButton(preview).click();await expectOperationsReloadRequired(frame);await expect(preview).toHaveCount(0);await expectNoDiagnostics(frame);await expect(preview.getByRole('status')).toHaveCount(0);expect(calls.filter(call=>call.path===path)).toHaveLength(3);
 });
 test('appointment variants cannot return from an abandoned request or Back/Forward navigation',async({page})=>{
   const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
@@ -488,7 +489,7 @@ test('private failure and malformed value payloads clear prior data without disp
  for(const mutate of [v=>v.items.rows[0].fields.rate={state:'value',value:'hidden-price'},v=>v.appointments.rows[0].fields.ticketId.value=88002,v=>v.items.rows[0].fields.notes={state:'value',value:'Bearer hidden-secret'},v=>v.schema='verified']){
   state.privateSample=privateTicketSampleFixture();mutate(state.privateSample);await privateRead(region).click();await expect(region.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);for(const text of ['hidden-price','hidden-secret','Synthetic equipment item'])await expect(region).not.toContainText(text);
  }
- state.privateSample=privateTicketSampleFixture();state.denied=true;await privateRead(region).click();await expect(region.getByRole('alert')).toContainText('Your Owner session could not be verified');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);await expect(region).not.toContainText('synthetic private provider text');expect(calls.filter(c=>c.path===path)).toHaveLength(6);
+ state.privateSample=privateTicketSampleFixture();state.denied=true;await privateRead(region).click();await expectOperationsReloadRequired(frame);await expect(region).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('Synthetic equipment item');await expect(frame.locator('body')).not.toContainText('synthetic private provider text');expect(calls.filter(c=>c.path===path)).toHaveLength(6);
 });
 test('private stale responses cannot survive input edits, navigation or Back/Forward',async({page})=>{
  const {frame,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);let release;state.delay=new Promise(resolve=>{release=resolve;});await privateRead(region).click();await expect.poll(()=>calls.filter(c=>c.path===path).length).toBe(1);
@@ -503,6 +504,6 @@ test('aggregate-first reads block private transport and any observed auth denial
  let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(c=>c.path===path).length).toBe(1);
  await expect(privateRead(region)).toBeDisabled();await privateRead(region).evaluate(button=>button.click());expect(calls.filter(c=>c.path===path)).toHaveLength(1);
  release();state.delay=null;await expect(privateRead(region)).toBeEnabled();await privateRead(region).click();await expect(region).toContainText('Synthetic equipment item');
- state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');
- await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();await expect(region.locator('input')).toHaveCount(0);await expect(region).not.toContainText('Synthetic equipment item');expect(calls.filter(c=>c.path===path)).toHaveLength(3);
+ state.denied=true;await dayButton(preview).click();await expectOperationsReloadRequired(frame);await expect(preview).toHaveCount(0);
+ await expect(region).toHaveCount(0);await expect(frame.getByRole('button',{name:'Open private ticket inspection'})).toHaveCount(0);await expect(region.locator('input')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('Synthetic equipment item');expect(calls.filter(c=>c.path===path)).toHaveLength(3);
 });

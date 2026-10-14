@@ -498,28 +498,32 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
   };
 
   const saveGps = async () => {
-    if (!locationWritesEnabled || !selected || selected.readOnly || working.current || gpsSaver.current.needsRefresh || !confirmedLocation) return;
+    if (!censusMounted.current || !locationWritesEnabled || !selected || selected.readOnly || working.current || gpsSaver.current.needsRefresh || !confirmedLocation) return;
+    const sessionCurrent=api.captureSession(),unitId=selected.id,sessionRevision=censusSessionRevision.current;
+    const current=()=>censusMounted.current&&sessionCurrent()&&sessionRevision===censusSessionRevision.current&&censusContext.current.selectedId===unitId;
     working.current = true;
     setBusy(true);
     setGpsMessage('');
     setError('');
     try {
       const verificationNote=await locationVerificationNote(selected.address,note);
+      if(!current())return;
       const payload = gpsWrite({ latitude: lat, longitude: lon, accuracyM: accuracy, source, note:verificationNote }, 'owner', true);
       const saved = await gpsSaver.current.owner(selected.id, payload);
+      if(!current())return;
       setData(saved as unknown as Snapshot);
       void cameras.refresh();onUpdated?.();
       const message = selected.unitNumber + ' location saved and read back successfully.';
       setGpsMessage(message);
       show(message);
     } catch (cause) {
+      if(!current())return;
       const message = cause instanceof Error ? cause.message : 'GPS location could not be verified.';
       setError(message);
       show(message);
     } finally {
       working.current = false;
-      setBusy(false);
-      setRefreshRequired(gpsSaver.current.needsRefresh);
+      if(censusMounted.current){setBusy(false);setRefreshRequired(gpsSaver.current.needsRefresh);}
     }
   };
 

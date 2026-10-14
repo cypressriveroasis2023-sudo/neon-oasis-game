@@ -1,3 +1,4 @@
+import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
 const origin=process.env.MHELP_RECONNECT_TEST_ORIGIN||'http://127.0.0.1:4173',root='/api/mhelpdesk/partner/reconnect';
 const ready={contract:'cos-mhelpdesk-reconnect-v1',state:'ready',portalId:'224643',revision:2,renewalVerified:false};
@@ -54,13 +55,19 @@ test('uncertain save clears secrets and explicit metadata check confirms without
  expect(calls.filter(x=>x.path===root)).toHaveLength(1);const check=calls.filter(x=>x.path===root+'/status').at(-1).body;
  expect(Object.keys(check).sort()).toEqual(['expectedRevision','requestId']);expect(check.requestId).toBe(calls.find(x=>x.path===root).body.requestId);
 });
-test('Close, auth invalidation and navigation discard unsubmitted fields',async({page})=>{
+test('Close and navigation discard unsubmitted fields without losing the current session',async({page})=>{
  const {form,frame,calls}=await mount(page);await openAndFill(form);await form.getByRole('button',{name:'Close reconnect'}).click();
  await form.getByRole('button',{name:'Reconnect mHelpDesk',exact:true}).click();await expect(form.getByLabel('Fresh access token')).toHaveValue('');
- await form.getByLabel('Fresh access token').fill('synthetic-fresh-access');await form.evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
- await expect(form.getByLabel('Fresh access token')).toHaveCount(0);expect(calls.some(x=>x.path===root)).toBe(false);
- await form.getByRole('button',{name:'Reconnect mHelpDesk',exact:true}).click();await form.getByLabel('Fresh access token').fill('synthetic-fresh-access');
+ await expect(form.getByLabel('Matching refresh token')).toHaveValue('');await form.getByLabel('Fresh access token').fill('synthetic-fresh-access');
  await frame.locator('body').evaluate(()=>window.dispatchEvent(new Event('popstate')));await expect(form.getByLabel('Fresh access token')).toHaveCount(0);
+ expect(calls.some(x=>x.path===root)).toBe(false);
+});
+test('auth invalidation discards unsubmitted secrets and requires reload before reconnect',async({page})=>{
+ const {form,frame,calls}=await mount(page);await openAndFill(form);
+ await form.evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));await expectOperationsReloadRequired(frame);
+ await expect(form).toHaveCount(0);await expect(frame.getByLabel('Fresh access token')).toHaveCount(0);await expect(frame.getByLabel('Matching refresh token')).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('synthetic-fresh');
+ expect(calls.some(x=>x.path===root)).toBe(false);
 });
 test('malformed response cannot display private values or successful connection',async({page})=>{
  const {form,state}=await mount(page);await openAndFill(form);state.bad=true;await form.getByRole('button',{name:'Replace pair and verify renewal'}).click();
