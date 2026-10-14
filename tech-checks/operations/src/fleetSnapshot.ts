@@ -1,7 +1,7 @@
 import {validateCameraHealth,canonicalCameraUnit,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {resolveVerifiedUnitIdentity} from './verifiedUnitIdentity';
 import {checkedFieldMap} from './gpsPersistence';
-export type FleetSnapshot={health:Health;fieldMap:ReturnType<typeof checkedFieldMap>;readAt:string};
+export type FleetSnapshot={health:Health;fieldMap:ReturnType<typeof checkedFieldMap>;readAt:string;readStartedAt?:number};
 type Unit=FieldHealthUnit&{activeInventoryEligible?:boolean;currentLocationType?:string;placement?:string;placementSource?:string;effectivePlacement?:{contract:string;state:string}};
 export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
  if(unit.effectivePlacement?.contract==='COS_EFFECTIVE_FLEET_PLACEMENT_V1'&&['field','shop','unknown'].includes(unit.effectivePlacement.state))return unit.effectivePlacement.state as 'field'|'shop'|'unknown';

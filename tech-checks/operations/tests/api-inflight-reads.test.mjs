@@ -427,11 +427,13 @@ test('paired cache expires four minutes from attempt start, including delayed au
  const f=fixture({autoReply:false}),first=f.api.fleet();
  f.advance(2000);f.reply();await flush();assert.equal(f.requests.length,2);
  f.advance(6000);f.answer(0,fleetHealth);f.answer(1,fleetMap);const initial=await first;
+ assert.equal(initial.readStartedAt,0,'client request-start metadata is distinct from response completion');
  f.state.autoReply=true;f.advance(CAMERA_AUTO_REFRESH_MS-8001);
  assert.equal(await f.api.fleet(),initial);assert.equal(f.requests.length,2,'the pair stays cached until the exact deadline');
  f.advance(1);const next=f.api.fleet(),peer=f.api.fleetSource('fieldMap');await flush();
  assert.equal(f.requests.length,4,'completion latency cannot defer the four-minute read');
  f.answer(2,fleetHealth);f.answer(3,fleetMap);const refreshed=await next;assert.equal(await peer,refreshed.fieldMap);assert.notEqual(refreshed,initial);
+ assert.equal(refreshed.readStartedAt,CAMERA_AUTO_REFRESH_MS);
 });
 test('mode and private-data invalidation cannot reuse a cached pair',async()=>{
  const f=fixture(),first=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await first;
