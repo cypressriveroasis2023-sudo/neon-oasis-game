@@ -22,19 +22,19 @@ async function mount(page, name) {
 }
 
 async function checkEyes(page) {
-  const eyes = page.locator('.cos-static-eye:visible');
+  const eyes=page.locator('.cos-static-eye:visible');
   expect(await eyes.count()).toBeGreaterThan(0);
-  const values = await eyes.evaluateAll(async nodes => {
-    await Promise.all(nodes.flatMap(el => [...el.querySelectorAll('image')].map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })));
-    return nodes.map(el => { const r=el.getBoundingClientRect(); const g=el.querySelector('.cos-eye-gaze'); return { width:r.width,height:r.height,housing:getComputedStyle(el.querySelector('.cos-eye-housing')).transform,duration:getComputedStyle(g).animationDuration,layers:el.querySelectorAll('image').length,left:r.left,right:r.right,viewport:innerWidth }; });
-  });
-  for (const v of values.filter(v=>v.right>0 && v.left<v.viewport)) {
-    expect(v.width).toBeGreaterThanOrEqual(31); expect(v.height).toBeCloseTo(v.width,1);
-    expect(v.housing).toBe('none'); expect(v.duration).toBe('12s'); expect(v.layers).toBe(2);
-    expect(v.left).toBeGreaterThanOrEqual(-1); expect(v.right).toBeLessThanOrEqual(v.viewport+1);
+  await expect.poll(()=>eyes.evaluateAll(nodes=>nodes.every(el=>el.dataset.eyeReady==='true'))).toBe(true);
+  const values=await eyes.evaluateAll(nodes=>nodes.map(el=>{
+    const r=el.getBoundingClientRect(),canvas=el.querySelector('canvas');
+    return {width:r.width,height:r.height,housing:getComputedStyle(el.querySelector('.cos-eye-housing')).transform,
+      canvases:el.querySelectorAll('canvas').length,pixels:canvas.width,left:r.left,right:r.right,viewport:innerWidth};
+  }));
+  for(const v of values.filter(v=>v.right>0&&v.left<v.viewport)){
+    expect(v.width).toBeGreaterThanOrEqual(16);expect(v.height).toBeCloseTo(v.width,1);
+    expect(v.housing).toBe('none');expect(v.canvases).toBe(1);expect(v.pixels).toBeLessThanOrEqual(512);
+    expect(v.left).toBeGreaterThanOrEqual(-1);expect(v.right).toBeLessThanOrEqual(v.viewport+1);
   }
-  const ids=await page.locator('.cos-static-eye clipPath').evaluateAll(nodes=>nodes.map(el=>el.id));
-  expect(new Set(ids).size).toBe(ids.length);
 }
 
 for (const name of ['index','camera-health','camera-detail','it-send-repair','onsite-vision']) {
@@ -54,6 +54,25 @@ for (const name of ['index','camera-health','camera-detail','it-send-repair','on
     if(name==='it-send-repair')await expect(page.locator('#sign')).toBeVisible();
     if(name==='onsite-vision'){await expect(page.getByRole('button',{name:'Talk to OnSite Vision',exact:true})).toBeVisible();await expect(page.locator('#visionPrompt')).toHaveCount(1);await page.getByRole('button',{name:'Talk to OnSite Vision',exact:true}).click();}
     await page.emulateMedia({reducedMotion:'reduce'});
-    for(const v of await page.locator('.cos-static-eye .cos-eye-gaze').evaluateAll(nodes=>nodes.map(el=>({animation:getComputedStyle(el).animationName,transform:getComputedStyle(el).transform})))){expect(v.animation).toBe('none');expect(['none','matrix(1, 0, 0, 1, 0, 0)']).toContain(v.transform);}
+    await expect.poll(()=>page.locator('.cos-static-eye').evaluateAll(nodes=>nodes.every(el=>el.dataset.motionPaused==='true'))).toBe(true);
+    const frozen=await page.locator('.cos-static-eye canvas').evaluateAll(nodes=>nodes.map(el=>el.toDataURL()));
+    await page.waitForTimeout(150);
+    expect(await page.locator('.cos-static-eye canvas').evaluateAll(nodes=>nodes.map(el=>el.toDataURL()))).toEqual(frozen);
+    await page.emulateMedia({media:'print'});
+    expect(await page.locator('.cos-static-eye .cos-eye-live').evaluateAll(nodes=>nodes.every(el=>getComputedStyle(el).display==='none'))).toBe(true);
+    expect(await page.locator('.cos-static-eye .cos-eye-poster').evaluateAll(nodes=>nodes.every(el=>getComputedStyle(el).opacity==='1'))).toBe(true);
+
   });
 }
+
+
+test('dynamic compact avatars keep their slot and removed eyes stop observing',async({page})=>{
+  await mount(page,'onsite-vision');
+  await page.evaluate(()=>{
+    const slot=document.createElement('button');slot.id='synthetic-avatar';slot.style.cssText='width:44px;height:44px;position:fixed;top:10px;left:10px;z-index:1000';
+    slot.innerHTML='<img style="width:20px;height:20px" src="./techcheck-eye-favicon-32.png" alt="Cameras Onsite">';document.body.append(slot);
+  });
+  const eye=page.locator('#synthetic-avatar .cos-static-eye');await expect(eye).toHaveAttribute('data-eye-ready','true');
+  expect((await eye.boundingBox()).width).toBe(20);await expect(eye.locator('canvas')).toHaveCount(1);
+  await page.evaluate(()=>document.getElementById('synthetic-avatar').remove());await expect(eye).toHaveCount(0);
+});

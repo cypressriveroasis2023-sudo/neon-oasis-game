@@ -1,29 +1,33 @@
-# Cameras Onsite original mechanical eye
+# Cameras Onsite robotic eye
 
-The owner's IMG_9119 JPEG is preserved byte-for-byte in
-`public/resources/vision-approved-eye.jpeg` and `../resources/vision-ai.jpg`.
-No replacement illustration is used. `scripts/generate-eye-artwork.mjs` embeds
-those original bytes in self-contained SVG image layers for React and the
-legacy renderer, plus a static SVG for application icons.
+The approved 2026-10-14 design is a single bright-red optical lens with four fixed
+sight marks, silver eyelids and a dark machined circular housing. The recessed
+socket contains overlapping metal shutter blades, bearing rings and reflected
+red light. The lens chooses independent random left/right, straight, vertical
+and diagonal glances, with short servo turns and varied lock-on pauses.
 
-SVG framing is `viewBox="205 0 914 914"` on the 1320×914 original. The fixed
-housing keeps the photographed silver metal, crosshair and surrounding rings.
-Only the original optical assembly is clipped at center (659,428), radius 138.
-An opaque near-black socket hides the stationary iris underneath. The moving
-layer overlays the exact original pixels at center and is clipped to that
-socket throughout its ±7.3-source-pixel horizontal glance. The original silver
-rim is outside the moving region. In the application's 1254-square viewBox,
-the socket is (622.875,587.204), radius 189.335, with ±10px motion.
+`robotEyeRuntime.ts` and `robotEyeMechanics.ts` are the shared presentation source.
+`scripts/generate-eye-artwork.mjs` generates the self-contained legacy renderer
+from that same source, with a source hash to detect drift. The approved atlas and
+centered poster are in `public/resources/robot-eye-*.webp`; `eyeArtwork.ts` embeds
+these exact bytes. The static round SVG, avatar image, favicon, installation and
+Apple-touch icons show the same centered design. The earlier reference remains
+archived in `public/resources/vision-approved-eye.jpeg`.
 
-CSS retains the 12-second glance: center through 1.4s, left at 2.6–4.2s,
-right at 6.4–8.6s and center from 10–12s. Reduced-motion/print remain static,
-and hidden/offscreen marks pause. App icons use the original static artwork.
+Operations desktop/mobile branding, TV Board and all existing legacy
+loading/sign-in, IT/Service, Camera Health, Camera Detail, IT repair and VISION
+branding slots use the shared eye. Dynamically added assistant avatars are
+included. Compact inline slots retain their dimensions and surrounding controls.
+Document/export markup is not replaced; static icon consumers receive the new
+centered artwork. Field Map markers retain their existing plain status circles.
 
-Operations/TV and shared legacy loading/sign-in/IT-Service, Camera Health,
-Camera Detail, IT repair and VISION brands use the same source. Dynamic VISION
-avatars are covered. Document/export exclusions remain; map markers stay plain
-circles. Source tests verify embedded image byte identity and renderer parity.
+One decoded atlas and one frame scheduler serve each application context. Motion
+is capped at 30 frames per second and 512 backing pixels per eye. Hidden/offscreen
+eyes pause, removed eyes dispose their observers, and reduced-motion and print
+views stay centered. Loading failures retain the centered poster. No operational
+reads, writes, routing, permissions or data sources are involved.
 
-Center/left/right proof images were rendered with Inkscape and compared to the
-original. Browser checks must run in CI or an authorized hosted browser;
-local browser access is restricted in the implementation executor.
+This source-only branch does not commit compiled Operations dist. The existing
+publishing workflow must build the combined reviewed main source. Coordinate
+release with the active repair work; do not merge or deploy this draft before
+that hold is lifted.

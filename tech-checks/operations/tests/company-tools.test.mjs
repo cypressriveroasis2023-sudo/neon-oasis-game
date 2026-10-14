@@ -40,13 +40,13 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
-    assert.equal(html.split('cos-eye-branding.js?v=20261013-mechanical').length-1,1);
+    assert.equal(html.split('cos-eye-branding.js?v=20261014-robot').length-1,1);
     if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
     const availabilityPreserved=name==='it-send-repair'?html.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):html;
-    const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-original">\n<script defer src="./cos-eye-branding.js?v=20261013-mechanical"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
+    const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot">\n<script defer src="./cos-eye-branding.js?v=20261014-robot"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
-    const originalMarkup=preserved.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')
+    const originalMarkup=preserved.replace(/(techcheck-eye-(?:favicon-32|apple-180)\.png\?v=)20261014-robot/g,'$120261014').replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')
       .replace(/<link rel="stylesheet" href="\.\/company-tools-theme\.css\?v=company-dark-20261006c">\n?/g,'').trim();
     assert.equal(createHash('sha256').update(originalMarkup).digest('hex'),markupHashes[name]);
     assert.equal((html.match(/href="\.\/company-tools-theme\.css\?v=company-dark-20261006c"/g)||[]).length,1);

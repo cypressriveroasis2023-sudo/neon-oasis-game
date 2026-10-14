@@ -2,62 +2,74 @@ import test from 'node:test';
 import { Script } from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { housingArtwork, lensArtwork } from '../src/eyeArtwork.ts';
+import { createHash } from 'node:crypto';
+import { robotEyeAtlas, posterArtwork } from '../src/eyeArtwork.ts';
+import { createEyeMotion, chooseRobotGlance, stepRobotEye } from '../src/robotEyeRuntime.ts';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
-const decode = value => Buffer.from(value.split(',')[1], 'base64').toString();
-test('both self-contained layers preserve the exact original JPEG bytes', () => {
-  const original = readFileSync(new URL('../public/resources/vision-approved-eye.jpeg', import.meta.url));
-  const expected = 'data:image/jpeg;base64,' + original.toString('base64');
-  for (const value of [housingArtwork, lensArtwork]) {
-    assert.ok(value.startsWith('data:image/svg+xml;base64,'));
-    const svg = decode(value);
-    assert.ok(svg.includes(expected));
-    assert.match(svg, /viewBox="205 0 914 914"/);
-    assert.doesNotMatch(svg, /<script|https?:\/\/(?!www.w3.org)/);
+const bytes = value => Buffer.from(value.split(',')[1], 'base64');
+
+test('React and generated legacy branding use the exact approved self-contained artwork', () => {
+  for (const [value, name] of [[robotEyeAtlas, 'robot-eye-atlas.webp'], [posterArtwork, 'robot-eye-poster.webp']]) {
+    assert.ok(value.startsWith('data:image/webp;base64,'));
+    assert.deepEqual(bytes(value), readFileSync(new URL('../public/resources/' + name, import.meta.url)));
+    assert.equal(bytes(value).toString('ascii', 8, 12), 'WEBP');
+    assert.ok(read('../../cos-eye-branding.js').includes(JSON.stringify(value)));
   }
-  assert.ok(read('../public/resources/vision-eye-round.svg').includes(expected));
-  assert.deepEqual(readFileSync(new URL('../../resources/vision-ai.jpg', import.meta.url)), original);
-  assert.match(decode(lensArtwork), /circle cx="659" cy="428" r="138"/);
-});
-test('React and legacy use the same original layers and bounded optical socket', () => {
-  const legacy = read('../../cos-eye-branding.js');
-  assert.doesNotThrow(() => new Script(legacy));
-  assert.ok(legacy.includes(JSON.stringify(housingArtwork)));
-  assert.ok(legacy.includes(JSON.stringify(lensArtwork)));
-  const react = read('../src/AnimatedEye.tsx');
-  for (const source of [legacy, react]) {
-    assert.ok(source.includes('622.875'));
-    assert.ok(source.includes('587.204'));
-    assert.ok(source.includes('189.335'));
-  }
-  assert.match(react, /x='0' y='0' width='1254' height='1254'/);
-  assert.match(legacy, /x="0" y="0" width="1254" height="1254"/);
-});
-test('both renderers preserve gaze timing, accessibility, offscreen pause and reduced-motion', () => {
-  for (const file of ['../src/animatedEye.css', '../../cos-eye-branding.css']) {
-    const css = read(file);
-    for (const pattern of [/12s/, /translateX\(-10px\)/, /translateX\(10px\)/, /prefers-reduced-motion: reduce|prefers-reduced-motion:reduce/, /animation-play-state:\s*paused/, /@media print/]) assert.match(css, pattern);
-  }
-  for (const file of ['../src/AnimatedEye.tsx', '../../cos-eye-branding.js']) {
-    const source = read(file);
-    for (const pattern of [/aria-label/, /visibilitychange/, /IntersectionObserver/, /clipPath/]) assert.match(source, pattern);
-  }
-  const legacy = read('../../cos-eye-branding.js');
-  assert.match(legacy, /image\.closest\(ignored\)/);
-  assert.doesNotMatch(legacy, /leaflet-marker|map-marker|fleet-marker/);
+  assert.ok(read('../public/resources/vision-eye-round.svg').includes(posterArtwork));
+  const runtime = ['../src/robotEyeMechanics.ts', '../src/robotEyeRuntime.ts'].map(read).join('\n');
+  assert.ok(read('../../cos-eye-branding.js').includes('Runtime SHA-256: ' + createHash('sha256').update(runtime).digest('hex')));
+  assert.doesNotThrow(() => new Script(read('../../cos-eye-branding.js')));
 });
 
-test('static branding consumers and service-worker cache advance with the supplied artwork',()=>{
- for(const name of ['index.html','onsite-vision.html','camera-health.html']){
-  const html=readFileSync(new URL('../../'+name,import.meta.url),'utf8');
-  assert.match(html,/cos-eye-branding\.css\?v=20261014-original/);
-  const icons=[...html.matchAll(/<link[^>]+rel=["'](?:icon|apple-touch-icon)["'][^>]*>/g)];assert.ok(icons.length>0,name);
-  for(const [tag] of icons){assert.match(tag,/\?v=20261014["']/);assert.match(tag,/techcheck-eye-(?:favicon-32|apple-180)\.png/);}
- }
- const worker=readFileSync(new URL('../../sw.js',import.meta.url),'utf8');
- assert.match(worker,/tech-check-reference-eye-20261014/);
- assert.match(worker,/icon: '\.\/techcheck-eye-192\.png\?v=20261014'/);
- assert.match(worker,/badge: '\.\/techcheck-eye-favicon-32\.png\?v=20261014'/);
+test('random scans cover all directions with bounded turns and varied pauses', () => {
+  let seed=193;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
+  const state=createEyeMotion(),seen=new Set(),durations=new Set(),pauses=new Set();
+  for(let i=0;i<120;i++){
+    const before=state.lastDirection,now=i*4000;
+    chooseRobotGlance(state,now,random);
+    assert.notEqual(state.lastDirection,before);seen.add(state.lastDirection);
+    assert.ok(Math.abs(state.target.x)<=88);assert.ok(Math.abs(state.target.y)<=42);
+    assert.ok(state.moveDuration>=140&&state.moveDuration<290);
+    const pause=state.holdUntil-now-state.moveDuration;assert.ok(pause>=550&&pause<2050);
+    durations.add(Math.round(state.moveDuration));pauses.add(Math.round(pause));
+    for(const part of [0,.25,.5,.75,1]){
+      const p=stepRobotEye(state,now+state.moveDuration*part,random);
+      assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));assert.ok(Math.abs(p.x)<=88&&Math.abs(p.y)<=42);
+    }
+    assert.ok(Math.abs(state.position.x-state.target.x)<1e-9);assert.ok(Math.abs(state.position.y-state.target.y)<1e-9);
+  }
+  assert.equal(seen.size,9);assert.ok(durations.size>20);assert.ok(pauses.size>40);
 });
 
-test('the install icon declares its actual square PNG dimensions',()=>{const manifest=JSON.parse(read('../../manifest.webmanifest'));assert.deepEqual(manifest.icons,[{src:'./techcheck-eye-192.png?v=20261014',sizes:'192x192',type:'image/png',purpose:'any'}]);});
+test('initial and settled poses stay still until their next glance is due',()=>{
+  const state=createEyeMotion(20);assert.deepEqual(stepRobotEye(state,600),{x:0,y:0});
+  chooseRobotGlance(state,700,()=>.5);stepRobotEye(state,1000);const settled={...state.position};
+  assert.deepEqual(stepRobotEye(state,state.holdUntil-1),settled);
+  stepRobotEye(state,state.holdUntil+1);assert.deepEqual(state.origin,settled);
+});
+
+test('the shared renderer preserves accessibility, pause/cleanup, print and document boundaries without operational calls',()=>{
+  const react=read('../src/AnimatedEye.tsx'),runtime=read('../src/robotEyeRuntime.ts'),adapter=read('../scripts/eye-branding-adapter.js');
+  assert.match(react,/aria-label='Cameras Onsite'/);assert.match(react,/return mountRobotEye/);
+  for(const pattern of [/IntersectionObserver/,/ResizeObserver/,/visibilitychange/,/prefers-reduced-motion/,/beforeprint/,/afterprint/,/cancelAnimationFrame/,/eye\.destroyed/,/unobserve/,/512/,/1000 \/ 30/])assert.match(runtime,pattern);
+  assert.match(adapter,/image\.closest\(ignored\)/);assert.match(adapter,/dispose\(\)/);
+  assert.doesNotMatch(runtime+adapter,/fetch\(|XMLHttpRequest|WebSocket|supabase|localStorage|sessionStorage|geolocation/);
+  for(const name of ['../src/animatedEye.css','../../cos-eye-branding.css'])assert.match(read(name),/@media print/);
+});
+
+test('every existing branding entrypoint and install icon has a fresh cache version',()=>{
+  for(const name of ['index','onsite-vision','camera-health','camera-detail','it-send-repair']){
+    const html=read('../../'+name+'.html');
+    assert.match(html,/cos-eye-branding\.css\?v=20261014-robot/);assert.match(html,/cos-eye-branding\.js\?v=20261014-robot/);
+    for(const [tag] of html.matchAll(/<link[^>]+rel=["'](?:icon|apple-touch-icon)["'][^>]*>/g))assert.match(tag,/techcheck-eye-(?:favicon-32|apple-180)\.png\?v=20261014-robot/);
+  }
+  const worker=read('../../sw.js');assert.match(worker,/tech-check-robot-eye-20261014/);
+  assert.match(worker,/icon: '\.\/techcheck-eye-192\.png\?v=20261014-robot'/);
+  assert.match(worker,/badge: '\.\/techcheck-eye-favicon-32\.png\?v=20261014-robot'/);
+  assert.deepEqual(JSON.parse(read('../../manifest.webmanifest')).icons,[{src:'./techcheck-eye-192.png?v=20261014-robot',sizes:'192x192',type:'image/png',purpose:'any'}]);
+  for(const [name,size] of [['favicon-32',32],['192',192],['apple-180',180]]){
+    const icon=readFileSync(new URL('../../techcheck-eye-'+name+'.png',import.meta.url));
+    assert.equal(icon.readUInt32BE(16),size);assert.equal(icon.readUInt32BE(20),size);
+    assert.deepEqual(icon,readFileSync(new URL('../../../cameras-on-site/tech-check-netlify/techcheck-eye-'+name+'.png',import.meta.url)));
+  }
+});
