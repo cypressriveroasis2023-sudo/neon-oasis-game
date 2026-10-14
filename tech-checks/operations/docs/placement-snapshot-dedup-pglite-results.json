@@ -1,0 +1,69 @@
+{
+  "syntheticOnly": true,
+  "productionWrites": 0,
+  "providerCalls": 0,
+  "engine": "PGlite",
+  "concurrencyLimitation": "Two independent worker-thread engines share CPU; this is not shared PostgreSQL MVCC, pool or lock proof.",
+  "population": {
+    "trackers": 770,
+    "natives": 378,
+    "links": 434,
+    "confirmedLinks": 367,
+    "sourceRecords": 1001,
+    "sourceBound": 564,
+    "trackerRecords": 810,
+    "trackerLinked": 756,
+    "distinctTriples": 770
+  },
+  "sequential": {
+    "baseline": {
+      "samplesMs": [
+        1037.38,
+        1039.78,
+        953.4,
+        1062.55
+      ],
+      "meanMs": 1023.28,
+      "maxMs": 1062.55
+    },
+    "candidate": {
+      "samplesMs": [
+        568.95,
+        569.41,
+        538.29,
+        593.86
+      ],
+      "meanMs": 567.63,
+      "maxMs": 593.86
+    }
+  },
+  "concurrentIndependentEngines": {
+    "baseline": {
+      "samplesMs": [
+        1211.82,
+        1049.38,
+        1234.13,
+        1069.1
+      ],
+      "meanMs": 1141.11,
+      "maxMs": 1234.13,
+      "burstWallMs": 2307.44,
+      "clients": 2,
+      "readsPerClient": 2
+    },
+    "candidate": {
+      "samplesMs": [
+        506.39,
+        499.46,
+        575.88,
+        574.08
+      ],
+      "meanMs": 538.95,
+      "maxMs": 575.88,
+      "burstWallMs": 1154.23,
+      "clients": 2,
+      "readsPerClient": 2
+    }
+  },
+  "sequentialMeanReductionPercent": 44.53
+}
