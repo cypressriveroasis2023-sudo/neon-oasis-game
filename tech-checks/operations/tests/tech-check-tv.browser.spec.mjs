@@ -175,15 +175,24 @@ test('Camera Health rotates every red outage and never lists green or unknown un
  state.settings={sections:['camera'],revision:1,updatedAt:time,rotationSeconds:15};
  await page.clock.fastForward(60000);
  await expect(frame.locator('.tv-fleet-summary')).toContainText('6 down units');
+ const board=frame.getByRole('region',{name:'Tech Check TV Board'}),perPage=page.viewportSize().width<900?1:4,parts=Math.ceil(red.length/perPage);
+ await expect(board).toHaveAttribute('data-page','1');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('Red units only · 1 / '+parts);
  const names=new Set();
  for(let index=0;index<6;index++){
   if(index)await page.clock.fastForward(15000);
+  const part=index%parts;
+  // A visible prior card is not proof that React committed this timer's rotation.
+  await expect(board).toHaveAttribute('data-page',String(part+1));
+  await expect(frame.locator('.tv-fleet-record h3')).toHaveText(red.slice(part*perPage,(part+1)*perPage).map(unit=>unit.unitNumber));
   await expect(frame.locator('.tv-fleet-record').first()).toBeVisible();
   const labels=await frame.locator('.tv-fleet-record h3').allTextContents();labels.forEach(label=>names.add(label));
   await expect(frame.locator('.tv-fleet-record:not(.tv-state-offline)')).toHaveCount(0);
   expect(labels).not.toContain(green.unitNumber);expect(labels).not.toContain(unknown.unitNumber);
  }
  expect([...names].sort()).toEqual(red.map(unit=>unit.unitNumber).sort());
+ await page.clock.fastForward(15000);await expect(board).toHaveAttribute('data-page','1');
+ await expect(frame.locator('.tv-fleet-record h3')).toHaveText(red.slice(0,perPage).map(unit=>unit.unitNumber));
  expect(state.fleetReads).toBe(3);expect(state.writes).toEqual([]);
 });
 

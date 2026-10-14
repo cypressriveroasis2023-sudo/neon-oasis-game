@@ -8,11 +8,11 @@ test('support units have zero camera health even without provider data',()=>{for
 import fs from 'node:fs';
 test('imported map labels are assigned as text instead of Leaflet HTML strings',()=>{const source=fs.readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');assert.match(source,/label.textContent=unit.unitNumber/);assert.match(source,/marker.bindTooltip\(label,/);assert.doesNotMatch(source,/bindTooltip\(unit.unitNumber/);});
 
-test('approved reticles use safe unit identifiers, the approved animated eye and separate blue support',()=>{
+test('plain status circles use safe unit identifiers and distinct health colors',()=>{
   assert.equal(mapUnitIdentifier('SNIPER 2 005'),'005');assert.equal(mapUnitIdentifier('Recon II 022'),'022');assert.equal(mapUnitIdentifier('Helios 1.1'),'1.1');
   assert.equal(mapUnitIdentifier('<img src=x onerror=alert(1)>'),'');
   const online=mapReticleMarkup('Helios <img src=x> 014','online');assert.match(online,/>014<\/b>/);assert.doesNotMatch(online,/<img|onerror/);assert.match(online,/--pin:#2bff35/);
-  assert.match(mapReticleMarkup('Helios 014','unknown'),/data-cos-eye="approved"/);assert.match(mapReticleMarkup('Helios 014','unknown'),/>014<\/b>/);
+  assert.match(mapReticleMarkup('Helios 014','unknown'),/cos-map-status-dot/);assert.match(mapReticleMarkup('Helios 014','unknown'),/>014<\/b>/);
   assert.match(mapReticleMarkup('Solar Stand 044','support'),/data-health="support"/);assert.match(mapReticleMarkup('Solar Stand 044','support'),/--pin:#15a8ff/);
   assert.match(mapReticleMarkup('Helios 014','online','estimate'),/>EST<\/em>/);assert.match(mapReticleMarkup('Helios 014','online','historical'),/>OLD<\/em>/);
   assert.deepEqual(fieldReticleColors,{online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff'});
@@ -30,9 +30,9 @@ test('expanded nearby markers use bounded display offsets without changing sourc
   assert.deepEqual(expandedGroupOffsets(1),[]);
 });
 
-test('individual camera circles contain numbers while blue stands retain panel artwork',()=>{
-  for(const state of ['online','offline','unknown']){const html=mapReticleMarkup('Helios 014',state);assert.match(html,/data-cos-eye="approved"/);assert.match(html,/class="cos-pin-unit-number"/);assert.match(html,/>014<\/b>/);assert.doesNotMatch(html,/cos-reticle-lens|cos-reticle-arcs|cos-reticle-dot|<defs|filter id=/);}
-  const stand=mapReticleMarkup('Solar Stand 044','support');assert.match(stand,/cos-reticle-solar-panel/);assert.match(stand,/>044<\/b>/);assert.doesNotMatch(stand,/data-cos-eye="approved"/);
+test('all individual units use plain filled numbered circles without eye or solar artwork',()=>{
+  for(const state of ['online','offline','unknown','support']){const html=mapReticleMarkup('Helios 014',state);assert.match(html,/cos-map-status-dot/);assert.match(html,/<circle[^>]+fill="currentColor"/);assert.match(html,/class="cos-pin-unit-number"/);assert.match(html,/>014<\/b>/);assert.doesNotMatch(html,/eye|cos-reticle-solar-panel|<use|<image|<path|<defs|filter id=/);}
+  const stand=mapReticleMarkup('Solar Stand 044','support');assert.match(stand,/cos-map-status-dot/);assert.match(stand,/>044<\/b>/);assert.doesNotMatch(stand,/eye|cos-reticle-solar-panel/);
   const cluster=clusterReticleMarkup({online:1,offline:1,unknown:0,support:1});assert.match(cluster,/>3<\/b>/);assert.match(cluster,/>MIX<\/em>/);assert.doesNotMatch(cluster,/cos-pin-unit-number|cos-reticle-circle/);
 });
 test('vertical grouping clearance protects the new number labels without widening horizontal groups',()=>{

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fleetDashboardRows,filterFleetDashboard,fleetDashboardSummary,initialFleetFilters,discoveryNeedsSetup,fleetDashboardCsv} from '../src/fleetDashboardModel.ts';
+import {fleetVrmReadAllowed,fleetDashboardRows,filterFleetDashboard,fleetDashboardSummary,initialFleetFilters,discoveryNeedsSetup,fleetDashboardCsv} from '../src/fleetDashboardModel.ts';
 import {fieldCameraHealth} from '../src/fieldCameraHealth.ts';
 import {resource,snapshot,now,fresh,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
 const unit=(n,name,model,placement='FIELD')=>({id:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,unitNumber:name,modelName:model,placement,currentLocationType:placement.toLowerCase(),status:placement==='FIELD'?'field':'available',address:'123 Synthetic Road, Houston, TX 77001',customer:'Fixture Customer',site:'Fixture Site'});
@@ -52,3 +52,5 @@ test('inactive upload lifecycle preserves recorded placement but stays out of th
 test('approved display alias never changes immutable health identity or source matching',()=>{
  const aliased={...units[0],uploadDisplayUnitNumber:'Helios 1.1'},row=fleetDashboardRows([aliased,...units.slice(1)],raw,[router],vrm,now)[0];assert.equal(row.name,units[0].unitNumber);assert.equal(row.unit.unitNumber,units[0].unitNumber);assert.equal(row.displayName,'Helios 1.1');assert.equal(row.cameraState,'online');assert.equal(row.batteryPercent,80);assert.equal(row.routerState,'offline');assert.equal(filterFleetDashboard([row],{...initialFleetFilters,query:'Helios 1.1'}).length,1);const csv=fleetDashboardCsv([row]);assert.match(csv,/^Unit,Display label,Family,/);assert.match(csv,/\"Helios 1\",\"Helios 1.1\"/);
 });
+
+test('Fleet requests saved Victron data only for an explicit capability or normal Owner',()=>{for(const role of ['IT','Service',undefined]){assert.equal(fleetVrmReadAllowed({role}),false);assert.equal(fleetVrmReadAllowed({role,features:{vrmRead:false}}),false);assert.equal(fleetVrmReadAllowed({role,features:{vrmRead:true}}),true);}assert.equal(fleetVrmReadAllowed({role:'Owner'}),true);assert.equal(fleetVrmReadAllowed({role:'Owner',legacyOwner:false}),false);assert.equal(fleetVrmReadAllowed({role:'Owner',features:{vrmRead:false}}),false);});

@@ -4,7 +4,7 @@ import {vrmPortalConfig} from '../../supabase/functions/cos-operations-pages/vrm
 const origin=process.env.COS_VRM_TEST_ORIGIN||'http://127.0.0.1:4173';
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 // Auth tokens and records are synthetic. Every non-local network request is blocked or intercepted.
-async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm=false,onVrmRequest,initialHash='#victron-vrm',mode=''}={}){
+async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm=false,onVrmRequest,initialHash='#victron-vrm',mode='',features={}}={}){
  const requests=[];
  await page.route('**/*',async route=>{
   const url=route.request().url();
@@ -19,7 +19,7 @@ async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm
   if(onVrmRequest&&request.path.startsWith('/api/vrm-')){const result=await onVrmRequest(request);return route.fulfill({status:result.status||200,headers,contentType:'application/json',body:JSON.stringify(result.data)});}
   if(failVrm&&request.path==='/api/vrm-fleet')return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'VRM configuration unavailable'})});
   if(failJobs&&request.path==='/api/jobs')return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Fixture unavailable'})});
-  const data=request.path==='/api/routers'?{ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() }:request.path.startsWith('/api/vrm-')?config:request.path==='/api/session'?{authorized:true,name:'Fixture user',role:role==='it'?'IT':'Owner',...(role==='it'?{legacyOwner:false}:{}),features:role==='it'?{fleetAccess:true}:{}}:request.path==='/api/jobs'?{items:[{id:'11111111-1111-4111-8111-111111111111',jobNumber:'FIX-101',customer:'Fixture customer',site:'Fixture site',status:'unscheduled'}]}:request.path==='/api/quotes'?{items:[{id:'quote-fixture',status:'pending approval'}]}:{items:[]};
+  const data=request.path==='/api/routers'?{ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() }:request.path.startsWith('/api/vrm-')?config:request.path==='/api/session'?{authorized:true,name:'Fixture user',role:role==='it'?'IT':'Owner',...(role==='it'?{legacyOwner:false}:{}),features:role==='it'?{fleetAccess:true,...features}:features}:request.path==='/api/jobs'?{items:[{id:'11111111-1111-4111-8111-111111111111',jobNumber:'FIX-101',customer:'Fixture customer',site:'Fixture site',status:'unscheduled'}]}:request.path==='/api/quotes'?{items:[{id:'quote-fixture',status:'pending approval'}]}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto(origin+'/vision-test');return {frame:page.frameLocator('iframe'),requests};
@@ -256,11 +256,23 @@ test('The mounted visible workspace polls saved data every minute without discov
  expect(requests.some(request=>request.path==='/api/vrm-fleet/refresh')).toBeFalsy();
 });
 
-test('IT fleet routes never request or expose the Owner Victron workspace',async({page})=>{
- const {frame,requests}=await mount(page,{role:'it',mode:'fleet',initialHash:'#victron-vrm',onVrmRequest:async()=>{throw Error('IT must never request Owner Victron data');}});
+for(const capability of ['omitted','denied'])test('IT with '+capability+' Victron capability never requests or exposes Victron data',async({page})=>{
+ const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:capability==='denied'?{vrmRead:false}:{},initialHash:'#victron-vrm',onVrmRequest:async()=>{throw Error('IT without explicit Victron capability must never request Victron data');}});
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#it-dashboard');
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
  expect(requests.some(request=>request.path.startsWith('/api/vrm-'))).toBeFalsy();
+ expect(requests.every(request=>request.method==='GET')).toBe(true);
+});
+
+test('IT with an explicit Victron capability retains its authorized read-only daily view',async({page})=>{
+ const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:{vrmRead:true},config:fleet([syntheticUnit(3000101,'Synthetic authorized IT installation')])});
+ await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toBeVisible();
+ await expect(selectedId(frame)).toHaveText('3000101');
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#victron-vrm');
+ expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet']);
+ expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 test('Legacy numeric shortcuts resolve only a unique full Helios name and then retain its ID',async({page})=>{

@@ -71,8 +71,8 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
 
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · online'));
- await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · unknown'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',new RegExp(labels.owner+' · Online'));
+ await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',new RegExp(labels.unlinked+' · Unverified'));
  await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await frame.locator('.cos-field-pin-support').click();
@@ -154,13 +154,19 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  noWrites(state);
 });
 
-test('15-minute saved-data polling stays unchanged and observations older than 20 minutes become gray',async({page})=>{
+test('four-minute saved-data polling preserves the 20-minute source expiry',async({page})=>{
  const {frame,state}=await mount(page);await expand(frame);
- const summaryReads=()=>state.requests.filter(request=>request.path==='/api/camera-health/summary-v3').length;
- const baseline=summaryReads();await page.clock.fastForward(14*60*1000);expect(summaryReads()).toBe(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
- await page.clock.fastForward(60*1000);await expect.poll(summaryReads).toBe(baseline+1);
- await page.clock.fastForward(60*1000);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved status refreshes every 15 minutes');
+ const pairedReads=()=>Object.fromEntries(['health','map'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map'][index]).length]));
+ const baseline=pairedReads();await page.clock.runFor(3*60*1000);expect(pairedReads()).toEqual(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ for(let tick=1;tick<=4;tick++){
+  await page.clock.runFor((tick===1?1:4)*60*1000);
+  await expect.poll(pairedReads).toEqual({health:baseline.health+tick,map:baseline.map+tick});
+  await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ }
+ // Saved observations begin five minutes old and remain unchanged by reads:
+ // after sixteen elapsed minutes they must be gray despite four reloads.
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 4 minutes');
  noWrites(state);
 });
 

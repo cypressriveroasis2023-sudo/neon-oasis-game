@@ -2,6 +2,7 @@ import {IT_DAILY_ONLY} from '../../it-feature-availability';
 import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
+import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -156,6 +157,9 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
 /** Dashboard sources can settle separately; complete views still require the pair.
  * Every source completion carries the same actor and invalidation checks. */
 async function readFleet(force=false):Promise<FleetReads>{
+    // Match the camera hook's attempt clock, including parent-auth and response
+    // latency. Dating the cache at completion can skip the next scheduled read.
+    const requestedAt=Date.now();
     const mode=new URLSearchParams(location.search).get('mode');
     if(mode==='production-assignments')throw new OperationsApiError('Open Camera Health from your fleet dashboard.',403);
     // Re-authorize the parent before using even a cached snapshot.
@@ -163,7 +167,7 @@ async function readFleet(force=false):Promise<FleetReads>{
     if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
     const key=JSON.stringify([session.token,session.role,mode]);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
-    const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<15*60*1000)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
     const revision=fleetRevision;
     const current=()=>{
@@ -172,7 +176,7 @@ async function readFleet(force=false):Promise<FleetReads>{
     const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
     const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
-      current();const value=reconcileFleetSnapshot(health,map);fleetSnapshots.set(key,{value,at:Date.now()});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
+      current();const value=reconcileFleetSnapshot(health,map);fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;}).finally(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);})};
     // A source-only caller must not leave the optional pair's rejection unhandled.
     void read.paired.catch(()=>{});
