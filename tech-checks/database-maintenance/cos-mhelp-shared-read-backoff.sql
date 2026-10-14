@@ -1,5 +1,8 @@
 -- Durable mHelp read backoff. No credentials or customer data are stored here.
-do $$ begin if md5(pg_get_functiondef('public.cos_mhelp_token_session(text,uuid,text,text,timestamptz,text,bigint,uuid)'::regprocedure)) <> 'b62daba9db048c3d3dbfea704609ef63' then raise exception 'Token control changed; refresh the reviewed migration' using errcode='40001'; end if; end $$;
+-- Accept the original base installer and its exact PT409-only successor.
+-- This install-once backoff script follows cos-mhelp-token-session.sql. For an
+-- already-installed backoff routine, use cos-mhelp-reconnect-business-conflict.sql.
+do $$ begin if md5(pg_get_functiondef('public.cos_mhelp_token_session(text,uuid,text,text,timestamptz,text,bigint,uuid)'::regprocedure)) not in ('b62daba9db048c3d3dbfea704609ef63','708e5a62ca5302e320cc447a0e8dc11a') then raise exception 'Token control changed; refresh the reviewed migration' using errcode='40001'; end if; end $$;
 create table cos_mhelp_placement_private.read_backoff (
  singleton boolean primary key default true check(singleton),
  blocked_until timestamptz,probe_until timestamptz,probe_lease uuid,
@@ -120,7 +123,7 @@ begin
         'revision',state.last_reconnect_base_revision+1);
     end if;
     if state.revision is distinct from p_expected_revision then
-      raise exception 'mHelp reconnect configuration changed' using errcode='40001';
+      raise exception 'mHelp reconnect configuration changed' using errcode='PT409';
     end if;
     if p_action='reconnect_claim' then
       if p_portal_id is not null and p_portal_id is distinct from state.portal_id then

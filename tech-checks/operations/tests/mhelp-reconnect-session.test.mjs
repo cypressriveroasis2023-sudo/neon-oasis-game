@@ -90,14 +90,14 @@ test('SQL reconnect status and claim are metadata-only and do not read Vault',as
 });
 test('SQL claim requires request ID and positive revision; stale or cross-portal forms preserve everything',async()=>{
  const f=await fixture();for(const o of [{revision:null},{revision:0},{revision:-1},{request:null}])await deny(f.claim(o),'22023');
- await f.bootstrap();const before=await f.snapshot();await deny(f.claim({revision:2}),'40001');await deny(f.claim({portal:'999'}),'22023');assert.deepEqual(await f.snapshot(),before);
+ await f.bootstrap();const before=await f.snapshot();await deny(f.claim({revision:2}),'PT409');await deny(f.claim({portal:'999'}),'22023');assert.deepEqual(await f.snapshot(),before);
 });
 test('SQL duplicate and competing claims obtain only one usable lease and stale forms fail',async()=>{
  const f=await fixture();await f.bootstrap();const attempts=await Promise.allSettled([f.claim(),f.claim(),f.claim({request:other})]);
  assert.equal(attempts.filter(v=>v.status==='fulfilled').length,1);for(const v of attempts.filter(v=>v.status==='rejected'))assert.equal(v.reason.code,'55P03');
  const winner=attempts.find(v=>v.status==='fulfilled').value;assert.equal((await f.state()).lease_id,winner.lease_id);assert.equal((await f.state()).lease_request_id,request);
  const before=await f.snapshot();await deny(f.claim(),'55P03');assert.deepEqual(await f.snapshot(),before);
- const result=await f.commit(winner.lease_id);metadata(result,['committed','portal_id','revision']);assert.deepEqual(result,{committed:true,portal_id:portal,revision:2});await released(f);await deny(f.claim({request:other}),'40001');
+ const result=await f.commit(winner.lease_id);metadata(result,['committed','portal_id','revision']);assert.deepEqual(result,{committed:true,portal_id:portal,revision:2});await released(f);await deny(f.claim({request:other}),'PT409');
 });
 test('SQL renewal and reconnect mutually exclude each other and reject each other\'s leases',async()=>{
  const f=await fixture();await f.bootstrap();const renew=await f.call('claim'),before=await f.snapshot();await deny(f.claim(),'55P03');await deny(f.commit(renew.lease_id),'22023');assert.deepEqual(await f.snapshot(),before);
@@ -107,7 +107,7 @@ test('SQL renewal and reconnect mutually exclude each other and reject each othe
 });
 test('SQL reconnect checks lease/request/revision/portal and token pair before any Vault writes',async()=>{
  const f=await fixture();await f.bootstrap();const claim=await f.claim(),before=await f.snapshot();
- for(const [o,code] of [[{session:null},'22023'],[{session:oldLease},'22023'],[{request:other},'22023'],[{revision:2},'40001'],[{revision:null},'22023'],[{portal:'999'},'22023'],[{portal:null},'22023'],[{access:null},'22023'],[{access:''},'22023'],[{access:'bad token'},'22023'],[{access:'x'.repeat(16385)},'22023'],[{refresh:null},'22023'],[{refresh:''},'22023'],[{refresh:'bad\nrefresh'},'22023'],[{refresh:'x'.repeat(16385)},'22023'],[{expires:null},'22023'],[{expires:new Date(Date.now()-1000).toISOString()},'22023'],[{expires:new Date(Date.now()+3*86400000).toISOString()},'22023']]){
+ for(const [o,code] of [[{session:null},'22023'],[{session:oldLease},'22023'],[{request:other},'22023'],[{revision:2},'PT409'],[{revision:null},'22023'],[{portal:'999'},'22023'],[{portal:null},'22023'],[{access:null},'22023'],[{access:''},'22023'],[{access:'bad token'},'22023'],[{access:'x'.repeat(16385)},'22023'],[{refresh:null},'22023'],[{refresh:''},'22023'],[{refresh:'bad\nrefresh'},'22023'],[{refresh:'x'.repeat(16385)},'22023'],[{expires:null},'22023'],[{expires:new Date(Date.now()-1000).toISOString()},'22023'],[{expires:new Date(Date.now()+3*86400000).toISOString()},'22023']]){
   await deny(f.commit(claim.lease_id,o),code);assert.deepEqual(await f.snapshot(),before);
  }
 });
@@ -138,5 +138,5 @@ test('SQL legacy read/bootstrap/renew/release behavior remains and normal renewa
  const f=await fixture();assert.deepEqual(await f.call('read'),{configured:false});const initial=await f.bootstrap();assert.equal(initial.access_token,'synthetic-old-access');assert.equal(initial.revision,1);const before=await f.snapshot();
  assert.deepEqual(await f.call('bootstrap',{portal:'999',access:'synthetic-unwanted',refresh:'synthetic-unwanted'}),initial);assert.deepEqual(await f.snapshot(),before);
  const renew=await f.call('claim');assert.equal(renew.access_token,'synthetic-old-access');assert.equal(renew.refresh_token,'synthetic-old-refresh');assert.deepEqual(await f.call('commit',{session:renew.lease_id,access:'synthetic-normal-access',refresh:'synthetic-normal-refresh',expires:expiry()}),{committed:true});
- await released(f);const next=await f.snapshot();await deny(f.claim(),'40001');assert.deepEqual(await f.snapshot(),next);assert.equal((await f.call('read')).access_token,'synthetic-normal-access');assert.equal((await f.claim({revision:2,request:other})).revision,2);
+ await released(f);const next=await f.snapshot();await deny(f.claim(),'PT409');assert.deepEqual(await f.snapshot(),next);assert.equal((await f.call('read')).access_token,'synthetic-normal-access');assert.equal((await f.claim({revision:2,request:other})).revision,2);
 });
