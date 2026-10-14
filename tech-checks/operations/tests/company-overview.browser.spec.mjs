@@ -154,7 +154,7 @@ test('approved red eye branding stays readable through responsive navigation and
       const rect = image.getBoundingClientRect();
       const box = el.getBoundingClientRect();
       return {
-        posters: image.querySelectorAll('image.cos-eye-poster').length,
+        posters: image.querySelectorAll('img.cos-eye-poster').length,
         canvases: image.querySelectorAll('.cos-eye-live canvas').length,
         label: image.getAttribute('aria-label'), width: rect.width, height: rect.height,
         radius: style.borderRadius, fit: style.objectFit,
@@ -165,8 +165,8 @@ test('approved red eye branding stays readable through responsive navigation and
     });
     expect(geometry).toMatchObject({ posters: 1, canvases: 1, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
     await expect(brand.locator('.company-eye')).toHaveAttribute('data-eye-ready', 'true');
-    await brand.locator('image').evaluateAll(async layers => { await Promise.all(layers.map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })); });
-    expect(geometry.width).toBe(width <= 700 ? 64 : 104);
+    await brand.locator('img.cos-eye-poster').evaluateAll(async layers => { await Promise.all(layers.map(image => image.decode())); });
+    expect(geometry.width).toBe(width <= 700 ? 40 : 104);
     expect(geometry.height).toBe(geometry.width);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });
@@ -210,6 +210,21 @@ test('robotic eye scans randomly while sights stay fixed and hidden/reduced-moti
   await eye.evaluate(el=>el.style.display='');await expect(eye).toHaveAttribute('data-motion-paused','false');
   await page.emulateMedia({reducedMotion:'reduce'});await expect(eye).toHaveAttribute('data-motion-paused','true');
   const still=await snapshot();await page.waitForTimeout(180);expect(await snapshot()).toEqual(still);
+  // Inspect the rendered pixels, not only the canvas backing store: Safari's
+  // SVG foreignObject bug reports correct bounds but paints a cropped close-up.
+  const rendered=(await eye.screenshot({type:'png',scale:'css'})).toString('base64');
+  const marks=await eye.evaluate(async(el,png)=>{
+    const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
+    const sample=document.createElement('canvas');sample.width=image.width;sample.height=image.height;
+    const c=sample.getContext('2d');c.drawImage(image,0,0);
+    return [[360,100],[80,356],[641,356],[359,620]].map(([x,y])=>{
+      const sx=Math.round(x*image.width/720),sy=Math.round(y*image.height/720);
+      const pixels=c.getImageData(sx-2,sy-2,5,5).data;
+      for(let i=0;i<pixels.length;i+=4)if(pixels[i]>=120&&pixels[i]-pixels[i+1]>=40&&pixels[i]-pixels[i+2]>=40)return true;
+      return false;
+    });
+  },rendered);
+  expect(marks).toEqual([true,true,true,true]);
   await page.emulateMedia({reducedMotion:'no-preference'});await expect(eye).toHaveAttribute('data-motion-paused','false');
 });
 

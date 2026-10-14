@@ -27,7 +27,15 @@ eyes pause, removed eyes dispose their observers, and reduced-motion and print
 views stay centered. Loading failures retain the centered poster. No operational
 reads, writes, routing, permissions or data sources are involved.
 
-This source-only branch does not commit compiled Operations dist. The existing
-publishing workflow must build the combined reviewed main source. Coordinate
-release with the active repair work; do not merge or deploy this draft before
-that hold is lifted.
+The live canvas and centered poster use ordinary HTML layers in a square,
+clipped holder. Avoid SVG `foreignObject`: Safari can paint its canvas without
+the SVG viewBox scaling, producing a cropped close-up even when DOM bounds look
+correct. Mobile headers use a 40px eye, navigation drawers use 48px, and welcome
+art is capped at 128px with the existing available-height constraint. Desktop
+branding retains its dimensions. Pixel checks inspect all four sight marks in
+the rendered screenshot as well as random movement and paused backing pixels.
+
+Build the Operations bundle from current reviewed source and retain all existing
+release checks. Branding script/style and worker cache versions must advance
+together when the renderer changes. Static icon artwork is unchanged by the
+mobile framing fix.

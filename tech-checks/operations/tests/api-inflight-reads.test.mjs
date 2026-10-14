@@ -401,6 +401,72 @@ test('verified parent credential changes and malformed auth responses still inva
 
 const fleetHealth={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:'2026-10-12T18:00:00Z',rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
 const fleetMap={items:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-12T18:00:00Z'};
+for(const failedSource of ['health','fieldMap'])for(const peerFails of [false,true])test(`${failedSource} failure is prompt but retains the shared fleet barrier until its peer ${peerFails?'fails':'succeeds'}`,async()=>{
+ const f=fixture(),first=f.api.fleet();let pairedError;
+ const failed=first.catch(error=>{pairedError=error;});
+ await flush();assert.equal(f.requests.length,2);
+ const failedIndex=failedSource==='health'?0:1,peerIndex=1-failedIndex,peerSource=failedSource==='health'?'fieldMap':'health';
+ f.answer(failedIndex,{error:'Synthetic first source unavailable'},503);await flush();
+ assert.equal(pairedError?.response?.status,503,'the pair rejects before the other HTTP response settles');await failed;
+ assert.equal(f.requests[peerIndex].init.signal.aborted,false,'a failed pair does not cancel its independently useful peer');
+ assert.equal(f.timers.size,1,'the other source remains in flight');
+ assert.deepEqual(f.invalidations,['cos-fleet-snapshot-failed']);
+ const normal=assert.rejects(f.api.fleet(),status(503)),forced=assert.rejects(f.api.fleet(true),status(503));
+ const failedRead=assert.rejects(f.api.fleetSource(failedSource),status(503));
+ const peers=[f.api.fleetSource(peerSource),f.api.fleetSource(peerSource,true)];
+ let settledPeers=0;
+ const outcomes=peers.map(promise=>promise.then(value=>{settledPeers++;return {value};},error=>{settledPeers++;return {error};}));
+ await flush();
+ assert.equal(settledPeers,0,'source-only callers still await the original peer');
+ assert.equal(f.requests.length,2,'normal, forced and source-only reentry must not start another pair');
+ await Promise.all([normal,forced,failedRead]);
+ assert.equal(f.handshakes.length,2,'later callers still verify the current parent session');
+ assert.deepEqual(f.invalidations,['cos-fleet-snapshot-failed'],'reentry does not publish a repeated failure or current snapshot');
+ const peerValue=peerSource==='fieldMap'?fleetMap:fleetHealth;
+ f.answer(peerIndex,peerFails?{error:'Synthetic peer unavailable'}:peerValue,peerFails?503:200);
+ for(const outcome of await Promise.all(outcomes)){
+  if(peerFails)assert.equal(outcome.error?.response?.status,503);
+  else assert.deepEqual(outcome.value,peerValue,'a valid source-only result survives the paired non-auth failure');
+ }
+ assert.equal(f.timers.size,0);assert(!f.invalidations.includes('cos-fleet-snapshot-updated'));
+ const next=f.api.fleet(),nextPeer=f.api.fleetSource(peerSource,true);await flush();
+ assert.equal(f.requests.length,4,'only full settlement releases the barrier, and a failed pair was not cached');
+ f.answer(2,fleetHealth);f.answer(3,fleetMap);const current=await next;
+ assert.deepEqual(await nextPeer,peerValue);assert.equal(await f.api.fleet(),current);
+ assert.equal(f.requests.length,4);assert.equal(f.invalidations.filter(type=>type==='cos-fleet-snapshot-updated').length,1);
+});
+test('a health timeout keeps a slow map body shared through parsing without caching the partial pair',async()=>{
+ const f=fixture(),first=f.api.fleet(),failed=assert.rejects(first,status(503));await flush();
+ const body=deferred();f.requests[1].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+ f.advance(30000);await failed;
+ const peer=f.api.fleetSource('fieldMap',true),again=assert.rejects(f.api.fleet(true),status(503));await flush();
+ assert.equal(f.requests.length,2,'a timeout must not release a peer whose JSON body is still loading');
+ await again;
+ assert.equal(f.requests[1].init.signal.aborted,false);f.advance(32000);body.resolve(fleetMap);
+ assert.deepEqual(await peer,fleetMap);assert.equal(f.elapsed,62000);assert.equal(f.timers.size,0);
+ assert.deepEqual(f.invalidations,['cos-fleet-snapshot-failed']);
+ const fresh=f.api.fleet();await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await fresh;
+});
+for(const invalidation of ['private-data','pagehide','parent-hide','save','account','mode'])test(`${invalidation} during a failed fleet pair's peer wait rejects the old source without clearing a newer pending entry`,async()=>{
+ const f=fixture(),first=f.api.fleet(),failed=assert.rejects(first,status(503));await flush();
+ f.answer(0,{error:'Synthetic first source unavailable'},503);await failed;
+ const oldPeer=f.api.fleetSource('fieldMap'),oldRejected=assert.rejects(oldPeer,status(409));await flush();
+ assert.equal(f.requests.length,2);
+ if(invalidation==='private-data')f.window.dispatchEvent(new Event('cos-private-data-invalidated'));
+ else if(invalidation==='pagehide')f.window.dispatchEvent(new Event('pagehide'));
+ else if(invalidation==='parent-hide')for(const listener of [...f.listeners])listener({origin:f.location.origin,source:f.window.parent,data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
+ else if(invalidation==='account')f.state.token='synthetic-session-b';
+ else if(invalidation==='mode')f.location.search='?mode=synthetic-other-owner-view';
+ else {const save=f.api.post('/api/owner-tasks',{});await flush();f.answer(2,{saved:true});await save;}
+ const offset=f.requests.length,next=f.api.fleet();await flush();assert.equal(f.requests.length,offset+2);
+ const beforeOldSettlement=[...f.invalidations];f.answer(1,fleetMap);await oldRejected;await flush();
+ assert.deepEqual(f.invalidations,beforeOldSettlement,'old cleanup cannot signal a current success or failure');
+ const forced=f.api.fleet(true),source=f.api.fleetSource('fieldMap');await flush();
+ assert.equal(f.requests.length,offset+2,'the old pair cleanup cannot remove the newer pending entry');
+ f.answer(offset,fleetHealth);f.answer(offset+1,fleetMap);
+ const current=await next;assert.equal(await forced,current);assert.deepEqual(await source,current.fieldMap);
+ assert.equal(await f.api.fleet(),current);assert.equal(f.requests.length,offset+2);
+});
 test('a verified dashboard source arrives before its slow peer and survives its non-auth failure',async()=>{
  const f=fixture(),field=f.api.fleetSource('fieldMap'),health=f.api.fleetSource('health');const failed=assert.rejects(health,status(503));
  await flush();assert.equal(f.requests.length,2);f.answer(1,fleetMap);assert.deepEqual(await field,fleetMap);

@@ -1,0 +1,89 @@
+name: Verify COS Placement Label Index
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/placement-label-index*'
+      - 'tech-checks/operations/tests/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/placement-label-index*'
+      - 'tech-checks/operations/tests/fixtures/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/source-admission*'
+      - 'tech-checks/operations/scripts/build-placement-label-index.mjs'
+      - 'tech-checks/operations/package*.json'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/package*.json'
+      - '.github/workflows/cos-placement-label-index-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/placement-label-index*'
+      - 'tech-checks/operations/tests/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/placement-label-index*'
+      - 'tech-checks/operations/tests/fixtures/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/source-admission*'
+      - 'tech-checks/operations/scripts/build-placement-label-index.mjs'
+      - 'tech-checks/operations/package*.json'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/package*.json'
+      - '.github/workflows/cos-placement-label-index-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cos-placement-label-index-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-placement-label-index-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: cos_placement_label_index_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=en-US
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_placement_label_index_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            tech-checks/operations/package-lock.json
+            tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - name: Install existing pinned portable test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations
+      - name: Verify generated guarded SQL has no drift
+        working-directory: tech-checks/operations
+        run: |
+          node scripts/build-placement-label-index.mjs
+          git diff --exit-code -- db/mhelp-placement-label-index-install.sql db/mhelp-placement-label-index-rollback.sql tests/fixtures/placement-label-index-catalog.json
+      - name: Verify portable installer, rollback and complete equivalence proof
+        working-directory: tech-checks/operations
+        run: node --test --test-concurrency=1 tests/placement-label-index.test.mjs
+      - name: Install existing pinned PostgreSQL test client only
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations/legacy/tests/recon-ordering
+      - name: Prove PostgreSQL 17.6 ICU default planning and independent-session MVCC
+        working-directory: tech-checks/operations
+        env:
+          COS_LABEL_INDEX_POSTGRES_CI: '1'
+          COS_LABEL_INDEX_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_placement_label_index_test_ci
+        run: node tests/placement-label-index-postgres.mjs
+      - name: Preserve generic synthetic PostgreSQL proof receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: placement-label-index-postgres-results
+          path: tech-checks/operations/placement-label-index-postgres-results.json
