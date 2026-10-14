@@ -60,10 +60,10 @@ test('the shared renderer preserves accessibility, pause/cleanup, print and docu
 test('every existing branding entrypoint and install icon has a fresh cache version',()=>{
   for(const name of ['index','onsite-vision','camera-health','camera-detail','it-send-repair']){
     const html=read('../../'+name+'.html');
-    assert.match(html,/cos-eye-branding\.css\?v=20261014-robot/);assert.match(html,/cos-eye-branding\.js\?v=20261014-robot/);
+    assert.match(html,/cos-eye-branding\.css\?v=20261014-robot-mobile/);assert.match(html,/cos-eye-branding\.js\?v=20261014-robot-mobile/);
     for(const [tag] of html.matchAll(/<link[^>]+rel=["'](?:icon|apple-touch-icon)["'][^>]*>/g))assert.match(tag,/techcheck-eye-(?:favicon-32|apple-180)\.png\?v=20261014-robot/);
   }
-  const worker=read('../../sw.js');assert.match(worker,/tech-check-robot-eye-20261014/);
+  const worker=read('../../sw.js');assert.match(worker,/tech-check-robot-eye-mobile-20261014/);
   assert.match(worker,/icon: '\.\/techcheck-eye-192\.png\?v=20261014-robot'/);
   assert.match(worker,/badge: '\.\/techcheck-eye-favicon-32\.png\?v=20261014-robot'/);
   assert.deepEqual(JSON.parse(read('../../manifest.webmanifest')).icons,[{src:'./techcheck-eye-192.png?v=20261014-robot',sizes:'192x192',type:'image/png',purpose:'any'}]);

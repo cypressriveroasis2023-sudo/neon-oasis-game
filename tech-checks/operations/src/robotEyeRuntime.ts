@@ -51,7 +51,7 @@ function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, pose: EyePose
 }
 
 type EyeHandle = {
-  host: SVGSVGElement; canvas: HTMLCanvasElement; motion: EyeMotion;
+  host: HTMLElement; canvas: HTMLCanvasElement; motion: EyeMotion;
   visible: boolean; active: boolean; image?: HTMLImageElement;
   resize: ResizeObserver; destroyed: boolean;
 };
@@ -149,7 +149,7 @@ function startObservers() {
 }
 
 /** One shared scheduler and decoded atlas; no operational reads or actions. */
-export function mountRobotEye(host: SVGSVGElement, canvas: HTMLCanvasElement): () => void {
+export function mountRobotEye(host: HTMLElement, canvas: HTMLCanvasElement): () => void {
   startObservers();
   const resize = new ResizeObserver(() => resizeCanvas());
   const eye: EyeHandle = { host, canvas, motion: createEyeMotion(visualTime()), visible: false, active: false, resize, destroyed: false };

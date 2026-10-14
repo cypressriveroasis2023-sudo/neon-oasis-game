@@ -27,12 +27,14 @@ async function checkEyes(page) {
   await expect.poll(()=>eyes.evaluateAll(nodes=>nodes.every(el=>el.dataset.eyeReady==='true'))).toBe(true);
   const values=await eyes.evaluateAll(nodes=>nodes.map(el=>{
     const r=el.getBoundingClientRect(),canvas=el.querySelector('canvas');
-    return {width:r.width,height:r.height,housing:getComputedStyle(el.querySelector('.cos-eye-housing')).transform,
+    const live=canvas.getBoundingClientRect();
+    return {width:r.width,height:r.height,canvasWidth:live.width,canvasHeight:live.height,housing:getComputedStyle(el.querySelector('.cos-eye-housing')).transform,
       canvases:el.querySelectorAll('canvas').length,pixels:canvas.width,left:r.left,right:r.right,viewport:innerWidth};
   }));
   for(const v of values.filter(v=>v.right>0&&v.left<v.viewport)){
     expect(v.width).toBeGreaterThanOrEqual(16);expect(v.height).toBeCloseTo(v.width,1);
     expect(v.housing).toBe('none');expect(v.canvases).toBe(1);expect(v.pixels).toBeLessThanOrEqual(512);
+    expect(v.canvasWidth).toBeCloseTo(v.width,1);expect(v.canvasHeight).toBeCloseTo(v.height,1);
     expect(v.left).toBeGreaterThanOrEqual(-1);expect(v.right).toBeLessThanOrEqual(v.viewport+1);
   }
 }
