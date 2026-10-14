@@ -1,4 +1,4 @@
-import {test,before,after,beforeEach} from 'node:test';
+import {test,before,after,beforeEach,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
@@ -18,13 +18,17 @@ import {checkedAddressEstimate} from '../src/fieldAddressEstimates.ts';
 import {fixture as ownerIdentityFixture,key as ownerIdentityKey} from './owner-identity-fixtures.mjs';
 import {audit as ownerPlacementAudit} from './native-placement-alias-fixtures.mjs';
 import {ownerIdentityDigest,OWNER_IDENTITY_CONTRACT} from '../../supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts';
-let native,legacy;before(async()=>{native=await nativeFixture();legacy=await legacyFixture({imported:true});
+// Pin Date before creating PGlite: its clock_timestamp() uses the same clock.
+// Success cases must not accidentally run in the real vendor midnight blackout.
+// Only Date is mocked; production SQL, provider guards and timers stay intact.
+const fixtureTime=Date.parse('2026-10-13T16:00:00Z');
+let native,legacy;before(async()=>{mock.timers.enable({apis:['Date'],now:fixtureTime});native=await nativeFixture();legacy=await legacyFixture({imported:true});
  for(const file of ['cos-geocode-sources-read-access.sql','cos-geocode-sources-admin-import.sql','cos-tracker-source-v2.sql'])await native.exec(readFileSync(new URL('../db/'+file,import.meta.url),'utf8'));
  await native.exec('alter table app_private.vision_tracker_locations add column customer text');
  await native.exec('revoke usage on schema app_private from service_role');
  await legacy.exec(readFileSync(new URL('../db/geocodio-tracker-source-v2.sql',import.meta.url),'utf8'));
-});after(async()=>{await native?.close();await legacy?.close();});
-beforeEach(async()=>{await legacyReset(legacy);await nativeReset(native);});
+});after(async()=>{try{await native?.close();await legacy?.close();}finally{mock.timers.reset();}});
+beforeEach(async()=>{mock.timers.setTime(fixtureTime);await legacyReset(legacy);await nativeReset(native);});
 const KEY='a'.repeat(64),response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 function serial(fn){let previous=Promise.resolve();return (...args)=>{const task=previous.then(()=>fn(...args));previous=task.catch(()=>{});return task;};}
 function harness({censusMatch=false,providerZip5=false,geocodioEmpty=false,onCensus,onGeocodio,now=Date.now}={}){
@@ -61,6 +65,10 @@ async function projected(h,sources,audits=[],devices=[]){
  const records=await h.rpc('cos_imported_geocode_read_many',{p_organization_id:ORG,p_bindings:bindings});
  return projectImportedGeocodes(placed,records,audits,devices);
 }
+test('pipeline fixture uses the same deterministic Node and PGlite clock',async()=>{
+ assert.equal(Date.now(),fixtureTime);
+ for(const db of [native,legacy])assert.equal((await db.query('select clock_timestamp() instant')).rows[0].instant.getTime(),fixtureTime);
+});
 for(const censusMatch of [true,false])test('eight typed tracker assets traverse bridge, existing queue/cache and honest frontend estimate '+censusMatch,async()=>{
  const sources=[];for(let n=1;n<=8;n++)sources.push((await prepare({number:n})).source);
  const h=harness({censusMatch,providerZip5:true}),result=await h.run();assert.equal(result.syncedSources,8);assert.equal(h.counts.census,1);assert.equal(h.counts.geocodio,censusMatch?0:1);
@@ -89,6 +97,25 @@ test('shared 2400 cap defers V2 and never enrolls it into historical V1 postal r
  const h=harness();await h.run();assert.equal(h.counts.census,1);assert.equal(h.counts.geocodio,0);
  await assert.rejects(()=>h.rpc('cos_imported_geocode_postal_retry_enroll',{p_organization_id:ORG,p_bindings:[source]}),/Historical postal cohort/);
  assert.equal(Number((await legacy.query('select sum(credits) n from app_private.cos_geocodio_daily_budget')).rows[0].n),2400);
+});
+for(const resetAt of ['2026-07-01T04:00:00Z','2026-01-01T05:00:00Z'])for(const secondsBefore of [61,60,1])
+test(`V2 midnight guard preserves budget ${secondsBefore}s before ${resetAt}`,async()=>{
+ const reset=Date.parse(resetAt);mock.timers.setTime(reset-secondsBefore*1000);
+ const {source}=await prepare(),h=harness(),blocked=secondsBefore<=60;
+ await h.run();assert.equal(h.counts.census,1);assert.equal(h.counts.geocodio,blocked?0:1);
+ const charged=async()=>Number((await legacy.query('select coalesce(sum(credits),0) n from app_private.cos_geocodio_daily_budget')).rows[0].n);
+ assert.equal(await charged(),blocked?0:1);
+ assert.equal((await legacy.query('select count(*)::integer n from app_private.cos_geocodio_reservations')).rows[0].n,blocked?0:1);
+ assert.ok((await h.reader.currentMany([sourceIdentity(source)]))[0],'midnight deferral must not invalidate the source');
+ if(blocked){
+  const cached=(await legacy.query('select status,reason,next_attempt_at from app_private.cos_field_geocode_fallback_cache')).rows[0];
+  assert.equal(cached.status,'deferred');assert.equal(cached.reason,'budget_exhausted');assert.equal(cached.next_attempt_at.getTime(),reset);
+  assert.equal(await checkedAddressEstimate((await projected(h,[source])).items[0]),null);
+  await h.run();assert.equal(h.counts.geocodio,0);assert.equal(await charged(),0);
+  mock.timers.setTime(reset);await h.run();
+  assert.equal(h.counts.census,1);assert.equal(h.counts.geocodio,1);assert.equal(await charged(),1);
+ }
+ assert.ok(await checkedAddressEstimate((await projected(h,[source])).items[0]));
 });
 test('V2 identity forgery and product/system confusion fail across every reader',async()=>{
  const {source}=await prepare();const h=harness();for(const patch of [{productId:'123'}, {sourceSystem:'mhelpdesk_product_import'}, {schemaVersion:1}, {entityKind:'equipment_unit'}, {sourceRecordId:'004'}, {sourceRecordId:source.sourceRecordId+'<script>'}]){
