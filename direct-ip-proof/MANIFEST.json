@@ -1,0 +1,113 @@
+{
+  "kind": "generic-direct-ip-hosted-proof",
+  "version": 1,
+  "sourceOnlyPreparation": true,
+  "runtimeTests": "NOT RUN",
+  "postgrestTarget": "14.5",
+  "files": {
+    ".gitignore": {
+      "bytes": 38,
+      "sha256": "e11b67ad6ce372ca8d55d281b8c42d50231a05fd287e6360a93bbdce9370e15a"
+    },
+    "PROVENANCE.json": {
+      "bytes": 3866,
+      "sha256": "2885e10498b3786df2bfb76dc5b50702b22400e4fbb83aece9121f69100fcfdd"
+    },
+    "README.md": {
+      "bytes": 7106,
+      "sha256": "6dbb2ed442505f53332456402941ceab8206b003d674dcc5ed05443ea32c7895"
+    },
+    "SCOPE.json": {
+      "bytes": 1694,
+      "sha256": "0c81a0f1f8d53d25901eff92b818d6de3450760b5d2cb87afc39e31488b9d322"
+    },
+    "ci/loopback-only.cjs": {
+      "bytes": 993,
+      "sha256": "7141e679a29ee1522868b44b66a6492fb61da618860b06fcbac7ec65d8bcf116"
+    },
+    "ci/proposed-workflow.yml": {
+      "bytes": 4435,
+      "sha256": "b7ea24711414fdd45e2e1cf9f423915d074e45f312e4b13a73cc4e3aa3e92b2f"
+    },
+    "ci/verify.mjs": {
+      "bytes": 5367,
+      "sha256": "74b3e0e0e5500cf45d2652d8c44e0bb819ab09fd5055838d8c3d2456972bdbd8"
+    },
+    "http/common.mjs": {
+      "bytes": 3602,
+      "sha256": "b938d6fcae8c5a999c380f2b52c6169169b0551fe01fa74428209dd2d5587ca8"
+    },
+    "http/prepare-fixture.mjs": {
+      "bytes": 4397,
+      "sha256": "ed17f91105773674da9f0731475cae9318d4379f9facc66951f7a51dc1241840"
+    },
+    "http/response-drop-proxy.mjs": {
+      "bytes": 2964,
+      "sha256": "3e219f55888f33d9c03b8c78a1be26797af49747e1e3a154d01dd262c9de6067"
+    },
+    "http/run-hosted-stage.sh": {
+      "bytes": 2360,
+      "sha256": "8e2ae26c3d7ac79b535342523915badf9fd9ce98d873a5004169e05139398fd3"
+    },
+    "http/run-postgrest-proof.mjs": {
+      "bytes": 15184,
+      "sha256": "1e53ef34263e364f9a05b3b5e3845a0af017308f8b0f197ffa90b6f02509eac9"
+    },
+    "inputs/baseline.sql": {
+      "bytes": 11586,
+      "sha256": "56479495e6c40fe661b16a27142033ca7993645a4ac8778bddd8cdf63a624cd1"
+    },
+    "inputs/client/directAttemptClient.ts": {
+      "bytes": 4609,
+      "sha256": "78b99685ca49659a0a2bb73c8e0b8ab803f6cd8a211a758193afad04450600ff"
+    },
+    "inputs/direct-ip-attempt-local.sql": {
+      "bytes": 38462,
+      "sha256": "1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c"
+    },
+    "inputs/schema.sql": {
+      "bytes": 2951,
+      "sha256": "dd1dd2f8eee189536437d47fe2e46daf04df4893df12a13a9aaf9bcc9b9c7e33"
+    },
+    "lib/database.mjs": {
+      "bytes": 1503,
+      "sha256": "d9a40fb1162c91f0299fd7acb872664afd9a9c400245965f59314d1c1d99d1d9"
+    },
+    "lib/fixture.mjs": {
+      "bytes": 11068,
+      "sha256": "a1c5d182bb140a30311a232bfbed2ba2f2339df7a275c0f38efc3d7dc145f581"
+    },
+    "package-lock.json": {
+      "bytes": 21906,
+      "sha256": "30b2e88e87a035c99f046be0d61732908cf14715b5efa3321bba861fceec0c08"
+    },
+    "package.json": {
+      "bytes": 941,
+      "sha256": "e5f29153788bdc64465276c6ee8dd065f87e2d98443cf44a844849760e5a8b3e"
+    },
+    "tests/acl.test.mjs": {
+      "bytes": 18894,
+      "sha256": "a1b0d71606127470687b1440b4181b4f98f6698fb053d76d7e7251bf785edd59"
+    },
+    "tests/client.test.mjs": {
+      "bytes": 4904,
+      "sha256": "55e1b902a08f1eba74b98bd2b60cdfdec75788f5a7cb7c6e74bf323fe94b5cfd"
+    },
+    "tests/contract.test.mjs": {
+      "bytes": 23310,
+      "sha256": "f559fb37bb9c0fc7df0322328d42ce8073bec07dff1a335181a766727e7c37e2"
+    },
+    "tests/harness.test.mjs": {
+      "bytes": 1677,
+      "sha256": "675fe664fb1eeeeb643a9e42aad940748ceb04879554624f558155320a4130a1"
+    },
+    "tests/postgres.test.mjs": {
+      "bytes": 13376,
+      "sha256": "6c956ec23a3fd5af77d220e76ca061fad4cc4ba47b019cd50375c75aaaa15763"
+    },
+    "tests/verifier.test.mjs": {
+      "bytes": 5865,
+      "sha256": "fe3eaf65835b256a5cd9a084382313f34316d4615fbb5f22612c6d8b7ee0a11c"
+    }
+  }
+}

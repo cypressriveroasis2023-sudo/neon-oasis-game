@@ -1,0 +1,86 @@
+{
+  "sourceKind": "public repository test-code baseline plus generic proposed implementation",
+  "repository": "cypressriveroasis2023-sudo/neon-oasis-game",
+  "repositoryVisibility": "public",
+  "publicBaseline": {
+    "ref": "5b205399868fe154a9898242ce178efa520a53b5",
+    "path": "tech-checks/operations/tests/scheduled-direct-source-postgres.py",
+    "blobSha": "d79573bacce38db6276df2e54bdda3f8be5a0c3d",
+    "sourceBytes": 23953,
+    "url": "https://github.com/cypressriveroasis2023-sudo/neon-oasis-game/blob/5b205399868fe154a9898242ce178efa520a53b5/tech-checks/operations/tests/scheduled-direct-source-postgres.py",
+    "extracts": {
+      "schema": {
+        "section": "SCHEMA",
+        "sha256": "dd1dd2f8eee189536437d47fe2e46daf04df4893df12a13a9aaf9bcc9b9c7e33",
+        "exactSectionBytes": true
+      },
+      "baseline": {
+        "section": "BASELINE",
+        "sha256": "56479495e6c40fe661b16a27142033ca7993645a4ac8778bddd8cdf63a624cd1",
+        "exactSectionBytes": true
+      }
+    }
+  },
+  "proposedSql": {
+    "path": "inputs/direct-ip-attempt-local.sql",
+    "sha256": "1516724eadca4b38a4b7c670de3a349413d58d0b206946adbc9b0123f4460c0c",
+    "legacyBodyMatchesPublicBaseline": true,
+    "legacyBodyComparison": "Same function body; nested-block final end uses its required semicolon.",
+    "sqlChangedForSubset": false
+  },
+  "proposedClient": {
+    "path": "inputs/client/directAttemptClient.ts",
+    "sha256": "78b99685ca49659a0a2bb73c8e0b8ab803f6cd8a211a758193afad04450600ff",
+    "implementationSource": "Generic direct-attempt helper",
+    "helperChangedForSubset": false
+  },
+  "postgrest": {
+    "target": "14.5",
+    "officialRelease": "https://github.com/PostgREST/postgrest/releases/tag/v14.5",
+    "releaseCommitShort": "d89826b",
+    "officialImage": "postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9",
+    "imagePulled": false,
+    "executableRun": false,
+    "runtimeVersionMustBeAsserted": true
+  },
+  "runtimeValidation": "NOT RUN for this subset",
+  "hostedPins": {
+    "actions": [
+      {
+        "repository": "actions/checkout",
+        "ref": "v4",
+        "sha": "11d5960a326750d5838078e36cf38b85af677262",
+        "url": "https://github.com/actions/checkout/commit/11d5960a326750d5838078e36cf38b85af677262"
+      },
+      {
+        "repository": "actions/setup-node",
+        "ref": "v4",
+        "sha": "49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "url": "https://github.com/actions/setup-node/commit/49933ea5288caeca8642d1e84afbd3f7d6820020"
+      },
+      {
+        "repository": "actions/upload-artifact",
+        "ref": "v4",
+        "sha": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "url": "https://github.com/actions/upload-artifact/commit/ea165f8d65b6e75b540449e92b4886f43607fa02"
+      }
+    ],
+    "containers": [
+      {
+        "image": "postgres:17.6",
+        "multiPlatformIndexDigest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+        "immutableReference": "postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+        "source": "https://hub.docker.com/layers/library/postgres/17.6/",
+        "architectureSpecificManifestNotUsed": true
+      },
+      {
+        "image": "postgrest/postgrest:v14.5",
+        "multiPlatformIndexDigest": "sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9",
+        "immutableReference": "postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9",
+        "source": "https://hub.docker.com/layers/postgrest/postgrest/v14.5/images/sha256-60f641667a5e0a024c2c990cf1d1c01a49996bad849d7b57f16afd97d486ade2",
+        "architectureSpecificManifestNotUsed": true
+      }
+    ],
+    "resolution": "Official read-only repository/registry metadata; runtime validation remains unrun"
+  }
+}
