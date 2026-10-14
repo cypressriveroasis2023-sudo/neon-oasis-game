@@ -1,0 +1,98 @@
+[
+  {
+    "schema": "cos_mhelp_placement_private",
+    "name": "continuity_current",
+    "args": "t uuid, n uuid, original text",
+    "definition_sha256": "c6f4af6579a1dccee3c33c5b66ec04fc7db02555d2d1391298f5bf9234431ad1",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres}",
+    "security_definer": false,
+    "volatility": "s",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "boolean",
+    "language": "sql"
+  },
+  {
+    "schema": "cos_mhelp_placement_private",
+    "name": "guard",
+    "args": "p_tracker uuid, p_native uuid",
+    "definition_sha256": "80dca565b58028543ee0cfa33b6bb9fea95d92264cfdd5db86c4bd10820596bf",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres}",
+    "security_definer": false,
+    "volatility": "s",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "text",
+    "language": "plpgsql"
+  },
+  {
+    "schema": "cos_mhelp_placement_private",
+    "name": "upload_binding_guard",
+    "args": "p_tracker uuid, p_native uuid",
+    "definition_sha256": "6c6163ee414b04a046e4e4aca49eae9a3b4d609d46dab2de6ebfeb814ec096b7",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres}",
+    "security_definer": false,
+    "volatility": "s",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "text",
+    "language": "sql"
+  },
+  {
+    "schema": "cos_mhelp_placement_private",
+    "name": "upload_snapshot",
+    "args": "",
+    "definition_sha256": "f27867ad4d4fc039a4c7bf2aa5ab5af5c6cd183ee18b5b05e4318db33be2053a",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres}",
+    "security_definer": false,
+    "volatility": "s",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "jsonb",
+    "language": "sql"
+  },
+  {
+    "schema": "cos_mhelp_placement_private",
+    "name": "upload_tracker_snapshot",
+    "args": "p_records jsonb",
+    "definition_sha256": "6f6de7b8a39d128b2ed122aa21913c613a76e6c2a516b099ee0c9fcce51994e4",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres}",
+    "security_definer": false,
+    "volatility": "s",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "jsonb",
+    "language": "sql"
+  },
+  {
+    "schema": "public",
+    "name": "cos_mhelp_placement_snapshot",
+    "args": "p_actor_user_id uuid, p_organization_id uuid",
+    "definition_sha256": "581cfae71bcf952661e125fa7c0a027ab5820932d4c39e48fb2600b970cfdf66",
+    "owner": "postgres",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true,
+    "volatility": "v",
+    "parallel": "u",
+    "settings": [
+      "search_path=\"\""
+    ],
+    "returns": "jsonb",
+    "language": "plpgsql"
+  }
+]

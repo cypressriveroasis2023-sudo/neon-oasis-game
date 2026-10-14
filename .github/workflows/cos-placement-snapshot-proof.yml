@@ -1,0 +1,66 @@
+name: Verify COS Placement Snapshot
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/source-admission*'
+      - 'tech-checks/operations/scripts/build-placement-snapshot-dedup.mjs'
+      - '.github/workflows/cos-placement-snapshot-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/source-admission*'
+      - '.github/workflows/cos-placement-snapshot-proof.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cos-placement-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-placement-snapshot-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: cos_snapshot_dedup_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_snapshot_dedup_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - name: Install existing pinned PostgreSQL test client only
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations/legacy/tests/recon-ordering
+      - name: Prove actual nested snapshots with simultaneous PostgreSQL clients
+        working-directory: tech-checks/operations
+        env:
+          COS_SNAPSHOT_POSTGRES_CI: '1'
+          COS_SNAPSHOT_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_snapshot_dedup_test_ci
+        run: node tests/placement-snapshot-postgres.mjs
+      - name: Preserve synthetic PostgreSQL verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: placement-snapshot-postgres-results
+          path: tech-checks/operations/placement-snapshot-postgres-results.json
