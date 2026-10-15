@@ -58,7 +58,7 @@
 #root#root .cos-fleet-stats .cos-fleet-stat { padding: 16px; border-radius: 10px; }
 #root#root .cos-fleet-stat span { font-size: 12px; line-height: 1.5; letter-spacing: .02em; }
 #root#root .cos-fleet-stat strong { font-size: 34px; line-height: 1.25; margin: 8px 0; }
-#root#root .cos-fleet-stat small { font-size: 12px; }
+#root#root .cos-fleet-stat small { font-size: 12px; font-weight: 400; }
 #root#root .cos-fleet-count-note { font-size: 12px; line-height: 1.7; }
 
 #root#root .cos-fleet-filters { padding: 16px; border-radius: 10px; margin-bottom: 20px; }
@@ -88,6 +88,7 @@
   flex-direction: column;
   align-items: stretch;
   gap: 14px;
+  font-weight: 400;
   padding: 16px;
   margin-bottom: 12px;
   border: 1px solid var(--fleet-line) !important;
@@ -102,6 +103,7 @@
 #root#root .cos-fleet-unit-row > span { width: 100%; min-width: 0; }
 #root#root .cos-fleet-unit-row strong { display: block; font-size: 17px; line-height: 1.5; }
 #root#root .cos-fleet-unit-row small {
+  font-size: 13px;
   margin-top: 6px;
   white-space: normal;
   overflow: visible;
