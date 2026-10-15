@@ -355,3 +355,25 @@ test('rejected saved reads invalidate only their affected evidence and preserve 
  await page.evaluate(async()=>{window.fixtureThrowRead='camera_devices';try{await load();}catch(error){window.fixtureInventoryError=error.message;}});
  await expect(page.locator('#statusPill')).toHaveText('IP / PORT UNVERIFIED');await expect(page.locator('#issueNotice')).toContainText('Saved read unavailable: inventory');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>fixtureInventoryError)).toContain('Synthetic rejected saved read');await noWrites(page,fixture);
 });
+
+
+for(const phase of ['camera_devices','camera_health_current','connection'])for(const ending of ['Close','timeout'])test('interrupted post-save '+phase+' refresh after '+ending+' cannot overwrite newer connection edits',async({page})=>{
+ const fixture=await mount(page);await open(page);const form=await complete(page);
+ await page.evaluate(phase=>{
+  const timeout=AbortSignal.timeout.bind(AbortSignal);window.fixtureRefreshDeadlines=[];AbortSignal.timeout=ms=>{if(ms!==30000)return timeout(ms);const controller=new AbortController();fixtureRefreshDeadlines.push(controller);return controller.signal;};
+  const hold=async(source,value)=>{if(source!==phase||fixtureLegacy.auditId!=='901')return value;const result=structuredClone(value);window.fixtureHostWaiting=true;await new Promise(resolve=>window.fixtureReleaseHost=resolve);window.fixtureHostReturned=true;return result;};
+  const from=fixtureDb.from.bind(fixtureDb);fixtureDb.from=table=>{const query=from(table),then=query.then.bind(query);query.then=(done,failed)=>then(value=>hold(table,value)).then(done,failed);return query;};
+  const rpc=fixtureDb.rpc.bind(fixtureDb);fixtureDb.rpc=async(name,args)=>{if(name!=='get_camera_unit_connection_v2')return rpc(name,args);fixtureCalls.push({name,args});return hold('connection',{data:{device_id:args.p_device_id,unit_key:fixtureDevice.unit_key,public_ip:'192.0.2.8',expected_ports:[443],connection_revision:1,unit_etag:'synthetic-current-unit'}});};
+ },phase);
+ await form.save.click();await expect.poll(()=>page.evaluate(()=>window.fixtureHostWaiting===true)).toBe(true);await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified');
+ const releaseHost=async()=>{await page.evaluate(()=>fixtureReleaseHost());await expect.poll(()=>page.evaluate(()=>window.fixtureHostReturned===true)).toBe(true);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+ if(ending==='timeout'){
+  await page.evaluate(()=>fixtureRefreshDeadlines.at(-1).abort());await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');
+  const ip=await page.locator('#ipSetupInput').inputValue(),ports=await page.locator('#portSetupInput').inputValue(),reads=fixture.allReads.length;await releaseHost();
+  await expect(page.locator('#ipSetupInput')).toHaveValue(ip);await expect(page.locator('#portSetupInput')).toHaveValue(ports);expect(fixture.allReads).toHaveLength(reads);await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');
+ }
+ await page.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+ await page.locator('#ipSetupInput').fill('192.0.2.99');await page.locator('#portSetupInput').fill('8443, 38880');const reads=fixture.allReads.length;
+ if(ending==='Close')await releaseHost();
+ await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');await expect(page.locator('#portSetupInput')).toHaveValue('8443, 38880');await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.allReads).toHaveLength(reads);
+});

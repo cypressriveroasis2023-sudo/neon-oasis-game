@@ -26,13 +26,13 @@ import test from 'node:test';
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
   "camera-health": "7b08277a80556845e4ef16a119fa911bc4e0f767ca9ac2960b5316162d89bb8e",
-  "camera-detail": "7370d1ae33d7b7ef636723f44488b0b042f26ee9579812957d694a29fdd414cd",
+  "camera-detail": "0964f9e6e0da2ffed71edf6ab835b7f5e93fdf2c7a0809394148a9d4def27755",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
   "camera-health": "c29dd2b62e8bd2203b150b5d0295c48baae9dc511fef60efd6c1d33693d2e435",
-  "camera-detail": "d7c542f418effc651ac4bdb2d7fa49c81b6ebb761b40d946409233f33cd85dbe",
+  "camera-detail": "b6596aeda6b435c8d2a5c05f603c9211f0b142028f4751c69331ae95dc44d0e5",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
@@ -43,8 +43,8 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261014-robot-mobile').length-1,1);
-    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v='+(helper==='camera-placement-controls.js'?'20261015-save-recovery-v1':'20261015-placement-read-coalescing-v1')+'"').length-1,1);
-    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-save-recovery-v1"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"','camera-effective-placement.js?v=20261008"');
+    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v='+(helper==='camera-placement-controls.js'?'20261015-save-recovery-v2':'20261015-placement-read-coalescing-v1')+'"').length-1,1);
+    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-save-recovery-v2"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"','camera-effective-placement.js?v=20261008"');
     const availabilityPreserved=name==='it-send-repair'?placementPreserved.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):placementPreserved;
     const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">\n<script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');

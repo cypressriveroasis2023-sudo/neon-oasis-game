@@ -70,7 +70,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">
 <script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>
-<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261015-save-recovery-v1"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"></script></head>
+<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261015-save-recovery-v2"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"></script></head>
 <body>
 <div class="shell">
   <div class="topbar">
@@ -264,8 +264,6 @@ function renderPortEvidence(){
 }
 function renderStatusEvidence(){
   const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
-  $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
-  $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+(device.organization||'No site');
   $('statusPill').textContent=detailObservation().label;$('statusPill').className='pill '+st;
   $('statusSource').textContent=cameraGroup(device)+' · '+sourceStatusText();
   const {attempt,success}=connectionHistory;
@@ -287,6 +285,8 @@ function renderStatusEvidence(){
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
 }
 function render(){
+  $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
+  $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+(device.organization||'No site');
   renderStatusEvidence();
   $('cameraGroup').textContent=cameraGroup(device);$('unitKey').textContent=device.unit_key||'—';$('organization').textContent=device.organization||'—';
   const effectiveIp=effectivePublicIP(),directIp=cleanIP(device.public_ip),isRecon=cameraGroup(device)==='Reconeyez';$('publicIp').textContent=isRecon?'Cloud-managed':(directIp||(effectiveIp?effectiveIp+' (router)':'—'));$('model').textContent=device.device_model||'—';$('serial').textContent=device.device_serial||'—';
@@ -353,24 +353,28 @@ function render(){
   $('connectionNote').textContent=isRecon?'Syncing inventory does not request a new status or battery reading. Reconeyez events supply those observations. Open Reconeyez Cloud to access the provider account.':actionLinks.length?'Saved IP and configured / previously checked ports stay available even when a health result is missing or failed. Use client/service endpoints in the matching application, including Unity where configured. Links do not verify video.':'No saved public IP is available for this device or its linked router.';
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
-async function load(){
+async function load({signal}={}){
+  if(signal?.aborted)return;
   const request=++detailLoadRevision;
   const id=Number(new URLSearchParams(location.search).get('id'));
   if(!Number.isFinite(id)||id<=0)throw new Error('No camera was selected.');
+  const isCurrent=()=>!signal?.aborted&&request===detailLoadRevision&&id===Number(new URLSearchParams(location.search).get('id'));
   const savedRead=async action=>{try{return await action();}catch(error){return {data:null,error};}};
   const {data:d,error:de}=await savedRead(()=>db.from('camera_devices').select('*').eq('id',id).single());
-  if(de||!d){if(request===detailLoadRevision&&device&&Number(device.id)===id){detailReadFailures=['inventory'];current={};renderStatusEvidence();renderPortEvidence();}throw de||new Error('Camera inventory could not be loaded.');}
+  if(!isCurrent())return;
+  if(de||!d){if(device&&Number(device.id)===id){detailReadFailures=['inventory'];current={};renderStatusEvidence();renderPortEvidence();}throw de||new Error('Camera inventory could not be loaded.');}
   const [{data:h,error:he},{data:hist,error:hi},{data:rs,error:re}]=await Promise.all([
     savedRead(()=>db.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle()),
     savedRead(()=>db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80)),
     d.unit_key?savedRead(()=>db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key)):Promise.resolve({data:[],error:null})
   ]);
+  if(!isCurrent())return;
   if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
-  if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   detailReadFailures=[...(he?['service']:[]),...(hi?['history']:[]),...(re?['routers']:[])];
   device=d;current=he?{}:h||{};events=hi?[]:hist||[];unitRouters=re?[]:rs||[];
   $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
-  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();
+  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor(isCurrent);
+  if(!isCurrent())return;
   if(new URLSearchParams(location.search).get('action')==='edit-ip'&&!$('ipSetupWrap').classList.contains('hidden')){$('ipSetupWrap').scrollIntoView({block:'center'});$('ipSetupInput').focus({preventScroll:true});}
 }
 async function verifyNow(){
@@ -437,13 +441,14 @@ async function saveUnitSite(){
   const b=$('saveSiteBtn');b.disabled=true;b.textContent='Saving site…';
   try{let q=db.from('camera_devices').update({organization:site,updated_at:new Date().toISOString()});if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);const {error}=await q;if(error)throw error;await load();b.textContent='Saved ✓';$('siteEditWrap').classList.add('hidden')}catch(e){console.error(e);alert('Could not save site: '+(e?.message||e));b.disabled=false;b.textContent='Save site to this unit'}
 }
-async function loadConnectionEditor(){
+async function loadConnectionEditor(isCurrent=()=>true){
+  if(!isCurrent())return;
   connectionState=null;
   if(!device||!canEditSavedConnection()||cameraGroup(device)==='Reconeyez')return;
-  const id=device.id;try{const {data,error}=await db.rpc('get_camera_unit_connection_v2',{p_device_id:id});if(error)throw error;
+  const id=device.id;try{const {data,error}=await db.rpc('get_camera_unit_connection_v2',{p_device_id:id});if(!isCurrent())return;if(error)throw error;
     if(device.id!==id||!CameraConnectionEditor.state(data,id,device.unit_key))throw new Error('Saved connection identity could not be verified.');
     connectionState=data;$('ipSetupInput').value=data.public_ip||'';$('portSetupInput').value=data.expected_ports.join(', ');$('saveIpBtn').disabled=false;
-  }catch{$('saveIpBtn').disabled=true;$('saveIpBtn').textContent='Connection editing unavailable; reload';}
+  }catch{if(!isCurrent())return;$('saveIpBtn').disabled=true;$('saveIpBtn').textContent='Connection editing unavailable; reload';}
 }
 async function saveUnitPublicIP(){
   if(!device||!canEditSavedConnection())return;
@@ -467,7 +472,7 @@ async function saveUnitPublicIP(){
 
 async function moveUnitToShop(){
   if(!device||!canEditFieldPlacement())return;
-  await CameraPlacementControls.open({db,key:device.unit_key,placement:placementActionAtShop()?'FIELD':'SHOP',onSaved:load});
+  await CameraPlacementControls.open({db,key:device.unit_key,placement:placementActionAtShop()?'FIELD':'SHOP',onSaved:(_saved,{signal}={})=>load({signal})});
 }
 
 
@@ -492,7 +497,7 @@ function refreshReconBatteryPresentation(){if(!device||document.hidden)return;re
 window.setInterval(refreshReconBatteryPresentation,60000);
 document.addEventListener('visibilitychange',refreshReconBatteryPresentation);
 $('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
-$('editFieldBtn').onclick=async()=>{if(!device?.unit_key||!canEditFieldPlacement())return;await CameraPlacementControls.open({db,key:device.unit_key,placement:'FIELD',onSaved:load});};
+$('editFieldBtn').onclick=async()=>{if(!device?.unit_key||!canEditFieldPlacement())return;await CameraPlacementControls.open({db,key:device.unit_key,placement:'FIELD',onSaved:(_saved,{signal}={})=>load({signal})});};
 $('verifyBtn').onclick=verifyNow;
 $('saveSiteBtn').onclick=saveUnitSite;
 $('saveIpBtn').onclick=saveUnitPublicIP;

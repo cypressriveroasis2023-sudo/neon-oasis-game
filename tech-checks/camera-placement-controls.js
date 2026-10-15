@@ -355,7 +355,8 @@
           }catch{ /* Durable queue survives navigation or a failed immediate lookup. */ }
         }
         feedback.textContent='Placement saved and verified. Refreshing this view…';
-        await awaitSaved(()=>onSaved?.(saved),requestSignal());context.pending=false;close();
+        const refreshSignal=requestSignal();
+        await awaitSaved(()=>onSaved?.(saved,{signal:refreshSignal}),refreshSignal);context.pending=false;close();
       }catch(error){if(!alive())return;uncertain=writing;cancel.textContent=writing?'Close':'Cancel';if(verified){feedback.textContent='Placement saved and verified, but this view could not refresh. Close and reload the unit; do not repeat the move. '+(error?.message||error);return;}feedback.textContent=(writing?'The move could not be confirmed: ':'No move was saved: ')+(error?.message||error)+(writing?'. The request may still complete. Closing does not undo it. Close and refresh this unit before trying again.':requiresReopen(error)?'. Close and reopen the unit with the correct signed-in account.':'. Retry verification, review the reloaded placement, and confirm again.');if(!writing){baseline=null;retry.hidden=requiresReopen(error);retry.disabled=false;}}
       finally{context.pending=false;if(alive())cancel.disabled=false;}
     };

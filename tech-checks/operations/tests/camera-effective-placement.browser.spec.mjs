@@ -120,3 +120,14 @@ test('existing unique full-family fallback remains available without claiming an
  await expect(card.locator('[data-placement-status="ready"]')).toContainText('Exact full unit identifier');await expect(card.locator('.compact-unit-site')).toContainText('10 Source Road');
  await page.evaluate(async()=>{const old=healthFixture;window.healthFixture=()=>{const h=old();h.rows.push({id:99,unit:'RANGER 22'});return h};await refreshEffectivePlacement();});await expect(card.locator('[data-placement-status="unresolved"]')).toContainText('Source group remains separate');await expect(card.locator('.compact-unit-site')).not.toContainText('10 Source Road');expect(errors).toEqual([]);
 });
+
+
+test('detail status clock and visibility preserve current authoritative placement metadata',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-15T12:00:00Z')});const errors=await mount(page,'camera-detail.html?id=11');
+ await expect(page.locator('#organization')).toContainText('10 Source Road');await expect(page.locator('#cameraMeta')).toContainText('10 Source Road');
+ await page.locator('#ipSetupInput').fill('192.0.2.99');const reads=await page.evaluate(()=>readRequests.length);await page.clock.runFor(60001);
+ await expect(page.locator('#cameraMeta')).toContainText('10 Source Road');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>readRequests.length)).toBe(reads);
+ await page.evaluate(async()=>{fixtureMode='owner';await refreshEffectivePlacement();});await expect(page.locator('#cameraMeta')).toContainText('99 Owner Road');
+ const updatedReads=await page.evaluate(()=>readRequests.length);await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.clock.runFor(60001);
+ await expect(page.locator('#cameraMeta')).toContainText('99 Owner Road');await expect(page.locator('#organization')).toContainText('99 Owner Road');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>readRequests.length)).toBe(updatedReads);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
+});
