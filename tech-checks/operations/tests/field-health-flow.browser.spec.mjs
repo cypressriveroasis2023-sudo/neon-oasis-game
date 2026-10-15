@@ -256,3 +256,38 @@ test('ordinary ST stands stay blue and outside camera-health totals alongside co
 test('changing the health filter excludes a previously selected unit with another status',async({page})=>{
  const {frame,state}=await mount(page);await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 52'}).click();await closeUnit(frame);await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-row')).toContainText('Solar Spotter 51');await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);expect(state.writes).toEqual([]);
 });
+
+// Regression: legend reflow can change the canvas height by an odd number of
+// pixels. Preserve the exact geographic view, including a later manual pan.
+test('cluster reflow and odd-sized canvas resizes retain exact user center and zoom',async({page})=>{
+ const {frame,state}=await mount(page,{crowded:true,pausedClock:true});
+ const canvas=frame.locator('.cos-fleet-map-canvas');
+ const cluster=frame.locator('.cos-field-cluster-wrap');
+ const view=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));
+ await expect(cluster).toHaveAttribute('aria-expanded','false');
+ const initial=await view();
+ for(let cycle=0;cycle<3;cycle++){
+  await expandGroup(frame,3);await page.clock.runFor(600);
+  expect(await view()).toEqual(initial);
+  await cluster.click();await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await page.clock.runFor(600);
+  expect(await view()).toEqual(initial);
+ }
+ const box=await canvas.boundingBox();
+ await page.mouse.move(box.x+box.width-10,box.y+box.height/2);await page.mouse.down();
+ await page.mouse.move(box.x+box.width-55,box.y+box.height/2+25,{steps:8});await page.mouse.up();await page.clock.runFor(600);
+ const panned=await view();expect(panned.center).not.toEqual(initial.center);
+ await expandGroup(frame,3);await page.clock.runFor(600);expect(await view()).toEqual(panned);
+ const size=await canvas.evaluate(element=>({width:element.clientWidth,height:element.clientHeight}));
+ for(const [width,height] of [[size.width-1,size.height+1],[size.width,size.height],[size.width-1,size.height],[size.width,size.height+1],[size.width,size.height]]){
+  await canvas.evaluate((element,{width,height})=>{element.style.flex='none';element.style.width=width+'px';element.style.height=height+'px';},{width,height});
+  await expect.poll(()=>canvas.evaluate(element=>({width:element.clientWidth,height:element.clientHeight}))).toEqual({width,height});
+  await page.clock.runFor(600);expect(await view()).toEqual(panned);
+  await expect(cluster).toHaveAttribute('aria-expanded','true');await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
+ }
+ await frame.getByRole('button',{name:'Fit pins',exact:true}).click();await page.clock.runFor(600);
+ const fitted=await view();expect(fitted.center).not.toEqual(panned.center);
+ await expect(cluster).toHaveAttribute('aria-expanded','false');
+ await canvas.evaluate(element=>{element.style.removeProperty('flex');element.style.removeProperty('width');element.style.removeProperty('height');});
+ await page.clock.runFor(600);expect(await view()).toEqual(fitted);
+ expect(state.writes).toHaveLength(0);
+});

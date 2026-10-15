@@ -910,8 +910,28 @@ export function createOperationsHandler(options) {
           try{
             const candidates=await sourceEquipmentAddressCandidates(combined,mhelpReceipt?.upload);
             if(!candidates.length)return json(combined);
-            const reviewed=await rpc('cos_source_equipment_estimates_snapshot',actorPayload);
-            return json(await projectSourceEquipmentAddressEstimates(combined,mhelpReceipt.upload,reviewed?.records,reviewed));
+            // This optional receipt read and projection have a two-second added-latency ceiling.
+            // Race explicitly: a transport that ignores abort must not hold the map open.
+            const controller=new AbortController(),deadline=Date.now()+2000;
+            const unavailable=()=>({...combined,sourceEquipmentEstimates:undefined,sourceEquipmentEstimatesStatus:'unavailable'});
+            let cancel=()=>{};let timer:ReturnType<typeof setTimeout>|undefined;
+            const stopped=new Promise(resolve=>{
+              cancel=()=>{controller.abort();resolve(unavailable());};
+              timer=setTimeout(cancel,2000);
+              request.signal.addEventListener('abort',cancel,{once:true});
+            });
+            try{
+              if(request.signal.aborted)cancel();
+              const operation=(async()=>{
+                if(controller.signal.aborted)return unavailable();
+                const reviewed=await rpc('cos_source_equipment_estimates_snapshot',actorPayload,controller.signal);
+                if(controller.signal.aborted||Date.now()>=deadline)return unavailable();
+                const projected=await projectSourceEquipmentAddressEstimates(combined,mhelpReceipt.upload,reviewed?.records,reviewed);
+                return controller.signal.aborted||Date.now()>=deadline?unavailable():projected;
+              })().catch(()=>unavailable());
+              const result=await Promise.race([operation,stopped]);
+              return json(controller.signal.aborted||Date.now()>=deadline?unavailable():result);
+            }finally{clearTimeout(timer);request.signal.removeEventListener('abort',cancel);controller.abort();}
           }catch{return json({...combined,sourceEquipmentEstimatesStatus:'unavailable'});}
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
