@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm --network none postgrest/postgrest:v14.5 --version | tee "$PROOF_DIR/results/postgrest-version.txt"
+          docker run --rm --network none postgrest/postgrest:v14.5 /bin/postgrest --version | tee "$PROOF_DIR/results/postgrest-version.txt"
           grep -Eq 'PostgREST[[:space:]]+14\.5([[:space:](]|$)' "$PROOF_DIR/results/postgrest-version.txt"
           docker image inspect --format '{{json .RepoDigests}}' postgrest/postgrest:v14.5 > "$PROOF_DIR/results/postgrest-image-digests.txt"
       - name: Start synthetic PostgREST on dedicated runner loopback only
