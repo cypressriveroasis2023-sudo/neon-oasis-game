@@ -103,10 +103,10 @@ test('attempt time has an explicit timezone and formatting rejects invalid calen
 
 const detailSource=readFileSync(new URL('../../camera-detail.html',import.meta.url),'utf8');
 function detailContext(device,current){
- const value=vm.createContext({Intl,device,current,cameraGroup:d=>d.group||'Vigilant'});
- vm.runInContext(readFileSync(new URL('../../camera-health-history.js',import.meta.url),'utf8'),value);
+ const value=vm.createContext({Intl,device:{device_type:'IPC',activation_state:'active',...device},current,detailReadFailures:[],cameraGroup:d=>d.group||'Vigilant'});
+ for(const name of ['camera-status-contract.js','camera-health-history.js','camera-health-overview.js'])vm.runInContext(readFileSync(new URL('../../'+name,import.meta.url),'utf8'),value);
  vm.runInContext('Date.now=()=>'+now+';const fmt=value=>CameraHealthHistory.format(value);',value);
- for(const name of ['sourceFresh','checkFresh','effectiveHealth','sourceStatusText','sourceDetailText']){
+ for(const name of ['sourceFresh','checkFresh','effectiveHealth','detailObservation','sourceStatusText','sourceDetailText']){
   const at=detailSource.indexOf('function '+name+'(');
   vm.runInContext(detailSource.slice(at,detailSource.indexOf('\n',at)),value);
  }
@@ -122,7 +122,7 @@ test('actual detail wording leaves provider status authoritative through failed,
   ]){
    const view=detailContext(deviceFixture,health(proof,portResults));
    assert.equal(view.effectiveHealth(view.device,view.current),source_status);
-   assert.equal(view.sourceStatusText(),'Vigilant: '+source_status.toUpperCase()+' · Direct diagnostic: '+label);
+   assert.equal(view.sourceStatusText(),'CAMERA RECORD '+source_status.toUpperCase()+' · Direct diagnostic: '+label);
    assert.match(view.sourceDetailText(),/Attempted ports: (80, )?443\./);
    assert.match(view.sourceDetailText(),/Last direct check: /);
    assert.doesNotMatch(view.sourceDetailText(),/1400|1500|1600|1700/);
@@ -132,10 +132,10 @@ test('actual detail wording leaves provider status authoritative through failed,
 test('actual detail rejects stale, malformed and old-identity direct proof without changing provider availability',()=>{
  for(const proof of [{checkedAt:stale},{checkedAt:'2026-02-30T12:00:00Z'},{revision:3},{ip:'192.0.2.11'}]){
   const view=detailContext({...device,source_status:'online',source_last_seen_at:fresh},health(proof));
-  assert.equal(view.sourceStatusText(),'Vigilant: ONLINE · Direct diagnostic: Reachability unverified');
+  assert.equal(view.sourceStatusText(),'CAMERA RECORD ONLINE · Direct diagnostic: Reachability unverified');
   assert.equal(view.effectiveHealth(view.device,view.current),'online');
  }
- const cloud=detailContext({...device,group:'Reconeyez',source_status:'offline',source_last_seen_at:fresh},health());
- assert.equal(cloud.sourceStatusText(),'Reconeyez: OFFLINE');
+ const cloud=detailContext({...device,group:'Reconeyez',source:'reconeyez',device_type:'detector',source_status:'offline',source_last_seen_at:fresh},health());
+ assert.equal(cloud.sourceStatusText(),'DETECTOR RECORD OFFLINE');
  assert.doesNotMatch(cloud.sourceDetailText(),/Direct port diagnostic/);
 });

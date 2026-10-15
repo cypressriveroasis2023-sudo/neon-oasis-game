@@ -1,3 +1,4 @@
+import '../../camera-status-contract.js';
 /** Public, pure presentation semantics. A saved observation is not a live probe. */
 export const CAMERA_FRESH_MS = 20 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
@@ -60,10 +61,7 @@ export function cameraState(row:CameraRow,now=Date.now()):CameraState {
 }
 export function serviceState(row:CameraRow,now=Date.now()):EvidenceState {
   const evidence=row.serviceEvidence|| (row.evidence?.kind==='service_port'?row.evidence:undefined);
-  if(normalized(row.activationState)!=='ACTIVE'||evidence?.kind!=='service_port'||evidence.active!==true||!cameraTimestamp(evidence.observedAt,now).fresh)return 'verifying';
-  if(evidence.status==='online'&&evidence.reachable===true)return 'online';
-  if(evidence.status==='offline'&&(evidence.confirmedOutage===true||Number.isInteger(evidence.consecutiveFailures)&&Number(evidence.consecutiveFailures)>=3))return 'offline';
-  return evidence.status==='degraded'&&evidence.reachable===true?'degraded':'verifying';
+  return CameraStatusContract.serviceState(evidence?.kind==='service_port'?evidence:undefined,cameraTimestamp(evidence?.observedAt,now).fresh);
 }
 export function combinedState(states:CameraState[],empty:CameraState='verifying'):CameraState {
   if(!states.length)return empty;
@@ -76,9 +74,9 @@ export function classifyCameraUnit(rows:CameraRow[],now=Date.now()):UnitEvidence
   const cameras=active.filter(cameraRecord),providers=active.filter(providerRecord);
   const provider=combinedState(providers.map(row=>providerState(row,now))) as EvidenceState;
   const camera=combinedState(cameras.map(row=>cameraState(row,now)),'mapping');
-  const service=combinedState(active.map(row=>serviceState(row,now))) as EvidenceState;
+  const service=combinedState(rows.map(row=>serviceState(row,now))) as EvidenceState;
   const state=scope==='inactive'?'inactive':scope==='shop'?'shop':provider!=='verifying'?provider:service==='online'?'service':providers.length?'verifying':'mapping';
-  return {scope,state,providerState:scope==='inactive'||scope==='shop'?'verifying':provider,cameraState:scope==='inactive'||scope==='shop'?'mapping':camera,serviceState:scope==='inactive'||scope==='shop'?'verifying':service,systemKind:providers.length&&providers.every(row=>resourceKind(row)==='recorders')?'recorder':providers.length&&providers.every(row=>resourceKind(row)==='detectors')?'detector':'system',recorderOffline:active.some(row=>resourceKind(row)==='recorders'&&providerState(row,now)==='offline')};
+  return {scope,state,providerState:scope==='inactive'||scope==='shop'?'verifying':provider,cameraState:scope==='inactive'||scope==='shop'?'mapping':camera,serviceState:service,systemKind:providers.length&&providers.every(row=>resourceKind(row)==='recorders')?'recorder':providers.length&&providers.every(row=>resourceKind(row)==='detectors')?'detector':'system',recorderOffline:active.some(row=>resourceKind(row)==='recorders'&&providerState(row,now)==='offline')};
 }
 export function evidenceCoverage(groups:UnitEvidence[]) {
   const active=groups.filter(group=>['field','unknown'].includes(group.scope));

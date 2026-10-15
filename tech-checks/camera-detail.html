@@ -70,7 +70,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">
 <script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>
-<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261015-placement-read-coalescing-v1"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"></script></head>
+<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261015-save-recovery-v2"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"></script></head>
 <body>
 <div class="shell">
   <div class="topbar">
@@ -179,7 +179,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   </main>
 </div>
 
-<script src="./camera-health-history.js?v=20261012-direct-diagnostic"></script>
+<script src="./camera-status-contract.js?v=20261015-status-followup-v1"></script><script src="./camera-health-history.js?v=20261012-direct-diagnostic"></script><script src="./camera-health-overview.js?v=20261015-status-followup-v1"></script>
 <script src="./recon-battery.js?v=20261007-battery"></script>
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
@@ -202,17 +202,19 @@ function reconBatteryText(d=device){return ReconBattery.text(reconMetadata(d))}
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase(),model=String(d?.device_model||'').toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),source=String(d?.source||'').toLowerCase();if(source==='reconeyez'||prof==='reconeyez'||s.includes('reconeyez'))return'Reconeyez';if(model.startsWith('ALI-')||['helios','nvr','ranger','solar_spotter','spotter'].includes(prof)||s.includes('alibi'))return'Vigilant';if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
 function isShopDevice(d){const effective=window.CameraEffectivePlacement?.get(d);if(effective?.status==='ready')return effective.scope==='shop';const org=String(d?.organization||'').trim().toLowerCase();return ['root','shop','shop equipment','shop/root','root/shop'].includes(org)||(cameraGroup(d)==='Reconeyez'&&/\bshop\b/.test(org))}
-function sourceFresh(d,ttlMs=20*60*1000){const t=d?.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
-function checkFresh(h,ttlMs=20*60*1000){h=CameraHealthHistory.connectionSnapshot(h||{},device);if(/Star4Live live API reports|Control Center live API reports/.test(String(h?.detail||'')))return false;const t=h?.checked_at?new Date(h.checked_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
+let detailReadFailures=[];
+function sourceFresh(d,ttlMs=20*60*1000){const t=CameraHealthHistory.timestamp(d?.source_last_seen_at);return t.state==='fresh'&&Date.now()-Date.parse(t.at)<=ttlMs}
+function checkFresh(h,ttlMs=20*60*1000){h=CameraHealthHistory.connectionSnapshot(h||{},device);const t=CameraHealthHistory.timestamp(h.checked_at);return t.state==='fresh'&&Date.now()-Date.parse(t.at)<=ttlMs}
 function hasDirectLiveProof(){
   const group=cameraGroup(device),probe=String(CameraHealthHistory.connectionSnapshot(current,device).overall_status||'').toLowerCase(),portOnline=Object.values(current?.port_status||{}).some(v=>v?.online===true);
   if(group==='Vigilant')return sourceFresh(device)&&String(device?.source_status||'').toLowerCase()==='online';
   if(group==='Reconeyez')return sourceFresh(device)&&String(device?.source_status||'').toLowerCase()==='online';
   return checkFresh(current,20*60*1000)&&(probe==='online'||probe==='degraded'||portOnline);
 }
-function effectiveHealth(d,h){h=CameraHealthHistory.connectionSnapshot(h||{},d);const group=cameraGroup(d),source=String(d?.source_status||'').toLowerCase(),probe=String(h.overall_status||'').toLowerCase();if(group==='Vigilant'||group==='Reconeyez'){if(!sourceFresh(d,20*60*1000))return'verifying';return ['online','offline'].includes(source)?source:'verifying'}if(!checkFresh(h,20*60*1000))return'verifying';if(probe==='online'&&h.ip_reachable===true)return'online';if(probe==='degraded'&&h.ip_reachable===true)return'degraded';if(probe==='offline'&&(h.confirmed_outage===true||Number(h.consecutive_failures)>=3))return'offline';return'verifying'}
+function effectiveHealth(d,h){return CameraHealthOverview.observation(d,detailReadFailures.includes('service')?{}:h||{},Date.now(),detailReadFailures.includes('inventory')).state}
 
-function sourceStatusText(){const group=cameraGroup(device),st=effectiveHealth(device,current),source=String(device.source_status||'Unknown').toUpperCase(),sf=sourceFresh(device);if(group==='Reconeyez')return 'Reconeyez: '+(sf?source:'STALE / NOT VERIFIED');if(group==='Vigilant')return 'Vigilant: '+(sf?source:'STALE / NOT VERIFIED')+' · Direct diagnostic: '+CameraHealthHistory.directDiagnostic(device,current).label;return 'Direct health check: '+st.toUpperCase()}
+function detailObservation(){return CameraHealthOverview.observation(device,detailReadFailures.includes('service')?{}:current,Date.now(),detailReadFailures.includes('inventory'))}
+function sourceStatusText(){return detailObservation().label+(CameraHealthOverview.providerRecord(device)&&cameraGroup(device)!=='Reconeyez'?' · Direct diagnostic: '+CameraHealthHistory.directDiagnostic(device,current).label:'')}
 function respondingInterfaceSummary(){
   const labels=device?.port_labels||{},ps=current?.port_status||{};
   const responding=Object.entries(ps).filter(([p])=>CameraHealthHistory.port(current,p,Date.now(),device).state==='responding').map(([p])=>(labels[p]||('Port '+p))+' ('+p+')');
@@ -223,9 +225,9 @@ function coreHeliosInterfacesOnline(){
   const ps=current?.port_status||{};
   return ['1400','1500','1600','1700'].every(p=>CameraHealthHistory.port(current,p,Date.now(),device).state==='responding');
 }
-function sourceDetailText(){const group=cameraGroup(device),st=effectiveHealth(device,current),probe=CameraHealthHistory.directDiagnostic(device,current);if(group==='Vigilant')return 'Star4Live authoritative status: '+st.toUpperCase()+'. Last provider observation: '+(device.source_last_seen_at?fmt(device.source_last_seen_at):'none')+'. Direct port diagnostic: '+probe.label+'. '+probe.detail+' Router diagnostics are shown separately.';if(group==='Reconeyez')return 'Reconeyez authoritative status: '+st.toUpperCase()+'. Last live cloud event: '+(device.source_last_seen_at?fmt(device.source_last_seen_at):'none')+'. Inventory synchronization alone does not prove online status.';return group+' direct approved-port status: '+st.toUpperCase()+'. Offline requires three consecutive failed checks. Last check: '+(CameraHealthHistory.connectionSnapshot(current,device).checked_at?fmt(CameraHealthHistory.connectionSnapshot(current,device).checked_at):'none')}
+function sourceDetailText(){const value=detailObservation();return 'Provider/resource: '+value.providerState.toUpperCase()+' · Camera/detector: '+value.cameraState.toUpperCase()+' · Service/IP: '+value.serviceState.toUpperCase()+'. '+value.video+'. Activation: '+value.activation+' · Placement: '+value.placement+'. Provider observed: '+CameraHealthHistory.format(device.source_last_seen_at)+'. Service observed: '+CameraHealthHistory.format(CameraHealthHistory.connectionSnapshot(current,device).checked_at)+'. '+value.review+' '+CameraHealthHistory.directDiagnostic(device,current).detail}
 
-function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),vig=(sourceFresh(device)?String(device?.source_status||'unknown'):'stale').toLowerCase();if(st==='online')return'';if(st==='degraded')return group==='Vigilant'?(vig==='online'?'Vigilant reports ONLINE, but the direct public-IP/port check is NOT RESPONDING. Overall status is DEGRADED.':'The direct connection is responding, but Vigilant reports OFFLINE. Overall status is DEGRADED because the sources disagree.'):'Health sources disagree. Verify this camera.';if(st==='offline')return group==='Vigilant'?'Star4Live reports this resource OFFLINE.':group==='Reconeyez'?'Reconeyez cloud currently reports this detector OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return group==='Reconeyez'?'Waiting for a definitive Reconeyez cloud health event.':'No definitive ONLINE/OFFLINE result is available yet.';return''}
+function issueReason(){const value=detailObservation();return detailReadFailures.length?'Saved read unavailable: '+detailReadFailures.join(', ')+'. Retry the saved read before relying on affected evidence.':value.review||(value.state==='verifying'?'No recent definitive observation for this resource. Silence is not a confirmed outage.':value.state==='offline'?value.label+'. '+value.video:value.state==='degraded'?'Mixed or contradictory evidence. '+value.video:'')}
 function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
 function interfaceLinks(){return CameraHealthHistory.connections(device,current,effectivePublicIP())}
 let placementView=null,detailLoadRevision=0;
@@ -255,11 +257,14 @@ function refreshEffectivePlacement(){
   if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:renderEffectivePlacement});
   return placementView.refresh();
 }
-function render(){
+function renderPortEvidence(){
+  const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=cameraGroup(device)==='Reconeyez'?[]:[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
+  $('ports').innerHTML=portKeys.map(p=>{const result=CameraHealthHistory.port(current,p,Date.now(),device),online=result.state==='responding',cls=online?'':result.state==='failed'?' off':' pending',suffix=online?' ✓'+(result.latencyMs!==null?' · '+result.latencyMs+'ms':''):' · '+result.label+(result.state==='unverified'&&result.at?' · previous result; not current':'');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
+  return portKeys;
+}
+function renderStatusEvidence(){
   const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
-  $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
-  $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+(device.organization||'No site');
-  $('statusPill').textContent=st.toUpperCase();$('statusPill').className='pill '+st;
+  $('statusPill').textContent=detailObservation().label;$('statusPill').className='pill '+st;
   $('statusSource').textContent=cameraGroup(device)+' · '+sourceStatusText();
   const {attempt,success}=connectionHistory;
   $('lastPing').textContent=success.state==='invalid'?'Unknown (invalid timestamp)':CameraHealthHistory.format(success.at);
@@ -275,8 +280,14 @@ function render(){
     $('failureDetail').textContent=failedChecks?failedChecks+' recent auxiliary/endpoint check'+(failedChecks===1?'':'s')+' did not fully pass, but the HELIOS camera interfaces 1400/1500/1600/1700 are responding now.':'Core HELIOS camera interfaces are responding now.';
   }else{
     $('failureCount').textContent=String(failedChecks)+' failed check'+(failedChecks===1?'':'s');
-    $('failureDetail').textContent=(current?.confirmed_outage?'Confirmed outage. ':'')+(current?.first_failed_at?'First failed '+fmt(current.first_failed_at)+'. ':'')+(current?.confirmation_reason||'');
+    $('failureDetail').textContent=(current?.confirmed_outage?(detailObservation().serviceState==='offline'?'Confirmed service outage. ':'Recorded outage flag; current service status unverified. '):'')+(current?.first_failed_at?'First failed '+fmt(current.first_failed_at)+'. ':'')+(current?.confirmation_reason||'');
   }
+  const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
+}
+function render(){
+  $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
+  $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+(device.organization||'No site');
+  renderStatusEvidence();
   $('cameraGroup').textContent=cameraGroup(device);$('unitKey').textContent=device.unit_key||'—';$('organization').textContent=device.organization||'—';
   const effectiveIp=effectivePublicIP(),directIp=cleanIP(device.public_ip),isRecon=cameraGroup(device)==='Reconeyez';$('publicIp').textContent=isRecon?'Cloud-managed':(directIp||(effectiveIp?effectiveIp+' (router)':'—'));$('model').textContent=device.device_model||'—';$('serial').textContent=device.device_serial||'—';
   if(isRecon){
@@ -288,7 +299,6 @@ function render(){
     $('batteryLabel').classList.add('hidden');$('batteryHealth').classList.add('hidden');$('reconIdLabel').classList.add('hidden');$('reconDeviceId').classList.add('hidden');
   }
   $('firstFailed').textContent=current?.first_failed_at?fmt(current.first_failed_at):'—';$('lastRecovered').textContent=current?.last_recovered_at?fmt(current.last_recovered_at):'—';
-  const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
   $('fieldMapLink').href='./?fieldUnit='+encodeURIComponent(device.unit_key||device.device_name||'');
   const shopWrap=$('shopActionWrap'),shopBtn=$('moveShopBtn'),shopTitle=$('shopActionTitle'),shopText=$('shopActionText');
   const owner=canEditFieldPlacement(),atShop=placementActionAtShop(),liveProof=hasDirectLiveProof();
@@ -296,7 +306,7 @@ function render(){
   if(owner&&atShop){
     shopWrap.classList.remove('hidden');shopWrap.classList.add('at-shop');
     shopTitle.textContent=isShopDevice(device)?'Unit is at Shop / ROOT':'Unit is stored / inactive';
-    shopText.textContent='Shop / ROOT cameras stay out of field-offline and issue counts. If this camera is responding, it can still count as online inventory.';
+    shopText.textContent='Shop / ROOT stays out of Field outage totals. A reachable service remains visible for placement review; it does not verify camera video.';
     shopBtn.textContent='Move to Field';shopBtn.disabled=false;shopBtn.classList.remove('hidden');
   }else if(owner){
     shopWrap.classList.remove('hidden');
@@ -324,8 +334,8 @@ function render(){
     $('saveIpBtn').textContent='Save connection information';
   }else ipSetup.classList.add('hidden');
 
-  const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=cameraGroup(device)==='Reconeyez'?[]:[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
-  $('ports').innerHTML=portKeys.map(p=>{const result=CameraHealthHistory.port(current,p,Date.now(),device),online=result.state==='responding',cls=online?'':result.state==='failed'?' off':' pending',suffix=online?' ✓'+(result.latencyMs!==null?' · '+result.latencyMs+'ms':''):' · '+result.label+(result.state==='unverified'&&result.at?' · previous result; not current':'');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
+  const portKeys=renderPortEvidence();
+
   $('portEmpty').textContent=isRecon?'Cloud-managed detector. This integration does not provide direct camera IP / ports. Status and battery come from Reconeyez events.':portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
   $('portEmpty').classList.toggle('hidden',!isRecon&&portKeys.length>0);
   $('routerInfo').innerHTML=routerSummaryHTML();
@@ -343,22 +353,28 @@ function render(){
   $('connectionNote').textContent=isRecon?'Syncing inventory does not request a new status or battery reading. Reconeyez events supply those observations. Open Reconeyez Cloud to access the provider account.':actionLinks.length?'Saved IP and configured / previously checked ports stay available even when a health result is missing or failed. Use client/service endpoints in the matching application, including Unity where configured. Links do not verify video.':'No saved public IP is available for this device or its linked router.';
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
-async function load(){
+async function load({signal}={}){
+  if(signal?.aborted)return;
   const request=++detailLoadRevision;
   const id=Number(new URLSearchParams(location.search).get('id'));
   if(!Number.isFinite(id)||id<=0)throw new Error('No camera was selected.');
-  const {data:d,error:de}=await db.from('camera_devices').select('*').eq('id',id).single();
-  if(de)throw de;
+  const isCurrent=()=>!signal?.aborted&&request===detailLoadRevision&&id===Number(new URLSearchParams(location.search).get('id'));
+  const savedRead=async action=>{try{return await action();}catch(error){return {data:null,error};}};
+  const {data:d,error:de}=await savedRead(()=>db.from('camera_devices').select('*').eq('id',id).single());
+  if(!isCurrent())return;
+  if(de||!d){if(device&&Number(device.id)===id){detailReadFailures=['inventory'];current={};renderStatusEvidence();renderPortEvidence();}throw de||new Error('Camera inventory could not be loaded.');}
   const [{data:h,error:he},{data:hist,error:hi},{data:rs,error:re}]=await Promise.all([
-    db.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle(),
-    db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80),
-    d.unit_key?db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key):Promise.resolve({data:[],error:null})
+    savedRead(()=>db.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle()),
+    savedRead(()=>db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80)),
+    d.unit_key?savedRead(()=>db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key)):Promise.resolve({data:[],error:null})
   ]);
+  if(!isCurrent())return;
   if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
-  if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
-  device=d;current=h||{};events=hist||[];unitRouters=rs||[];
+  detailReadFailures=[...(he?['service']:[]),...(hi?['history']:[]),...(re?['routers']:[])];
+  device=d;current=he?{}:h||{};events=hi?[]:hist||[];unitRouters=re?[]:rs||[];
   $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
-  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();
+  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor(isCurrent);
+  if(!isCurrent())return;
   if(new URLSearchParams(location.search).get('action')==='edit-ip'&&!$('ipSetupWrap').classList.contains('hidden')){$('ipSetupWrap').scrollIntoView({block:'center'});$('ipSetupInput').focus({preventScroll:true});}
 }
 async function verifyNow(){
@@ -425,13 +441,14 @@ async function saveUnitSite(){
   const b=$('saveSiteBtn');b.disabled=true;b.textContent='Saving site…';
   try{let q=db.from('camera_devices').update({organization:site,updated_at:new Date().toISOString()});if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);const {error}=await q;if(error)throw error;await load();b.textContent='Saved ✓';$('siteEditWrap').classList.add('hidden')}catch(e){console.error(e);alert('Could not save site: '+(e?.message||e));b.disabled=false;b.textContent='Save site to this unit'}
 }
-async function loadConnectionEditor(){
+async function loadConnectionEditor(isCurrent=()=>true){
+  if(!isCurrent())return;
   connectionState=null;
   if(!device||!canEditSavedConnection()||cameraGroup(device)==='Reconeyez')return;
-  const id=device.id;try{const {data,error}=await db.rpc('get_camera_unit_connection_v2',{p_device_id:id});if(error)throw error;
+  const id=device.id;try{const {data,error}=await db.rpc('get_camera_unit_connection_v2',{p_device_id:id});if(!isCurrent())return;if(error)throw error;
     if(device.id!==id||!CameraConnectionEditor.state(data,id,device.unit_key))throw new Error('Saved connection identity could not be verified.');
     connectionState=data;$('ipSetupInput').value=data.public_ip||'';$('portSetupInput').value=data.expected_ports.join(', ');$('saveIpBtn').disabled=false;
-  }catch{$('saveIpBtn').disabled=true;$('saveIpBtn').textContent='Connection editing unavailable; reload';}
+  }catch{if(!isCurrent())return;$('saveIpBtn').disabled=true;$('saveIpBtn').textContent='Connection editing unavailable; reload';}
 }
 async function saveUnitPublicIP(){
   if(!device||!canEditSavedConnection())return;
@@ -455,7 +472,7 @@ async function saveUnitPublicIP(){
 
 async function moveUnitToShop(){
   if(!device||!canEditFieldPlacement())return;
-  await CameraPlacementControls.open({db,key:device.unit_key,placement:placementActionAtShop()?'FIELD':'SHOP',onSaved:load});
+  await CameraPlacementControls.open({db,key:device.unit_key,placement:placementActionAtShop()?'FIELD':'SHOP',onSaved:(_saved,{signal}={})=>load({signal})});
 }
 
 
@@ -475,12 +492,12 @@ async function boot(){
     await loadFleetCapabilities();await load();
   }catch(e){$('loading').classList.add('hidden');$('error').textContent=e?.message||String(e);$('error').classList.remove('hidden')}
 }
-// Age the displayed battery observation without refreshing inventory or resetting edit fields.
-function refreshReconBatteryPresentation(){if(device&&cameraGroup(device)==='Reconeyez'&&!document.hidden)$('batteryHealth').textContent=reconBatteryText(device)}
+// Reevaluate saved evidence without IO or resetting in-progress edit fields.
+function refreshReconBatteryPresentation(){if(!device||document.hidden)return;renderStatusEvidence();renderPortEvidence();if(cameraGroup(device)==='Reconeyez')$('batteryHealth').textContent=reconBatteryText(device)}
 window.setInterval(refreshReconBatteryPresentation,60000);
 document.addEventListener('visibilitychange',refreshReconBatteryPresentation);
 $('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
-$('editFieldBtn').onclick=async()=>{if(!device?.unit_key||!canEditFieldPlacement())return;await CameraPlacementControls.open({db,key:device.unit_key,placement:'FIELD',onSaved:load});};
+$('editFieldBtn').onclick=async()=>{if(!device?.unit_key||!canEditFieldPlacement())return;await CameraPlacementControls.open({db,key:device.unit_key,placement:'FIELD',onSaved:(_saved,{signal}={})=>load({signal})});};
 $('verifyBtn').onclick=verifyNow;
 $('saveSiteBtn').onclick=saveUnitSite;
 $('saveIpBtn').onclick=saveUnitPublicIP;

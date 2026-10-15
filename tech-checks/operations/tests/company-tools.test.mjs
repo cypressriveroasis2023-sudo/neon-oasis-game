@@ -1,3 +1,5 @@
+// 2026-10-15 reviewed canceled Manage Units board reads and selection preservation; actual-host race regressions cover the change.
+// 2026-10-15 scoped status evidence/clock and bounded placement-save recovery; other tools and markup remain pinned.
 // 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
@@ -24,14 +26,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "70cb43e5a1b27b8565abe4b02f64fd105b8604dd5fe9829f3c918e957d5e39ec",
-  "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
+  "camera-health": "da7366e85e745d97e5f8d010c403c75cb462e635797db398be726006f447cfef",
+  "camera-detail": "0964f9e6e0da2ffed71edf6ab835b7f5e93fdf2c7a0809394148a9d4def27755",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "f1e980d25ad2b397f1ea894e54cd3a38bf4fdf92cf1474782f441dd0c69a6d1a",
-  "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
+  "camera-health": "800b5a3de3eeb73302787ba8453b5d9096964aa8fa031cbd77aa7be073641590",
+  "camera-detail": "b6596aeda6b435c8d2a5c05f603c9211f0b142028f4751c69331ae95dc44d0e5",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
@@ -42,8 +44,8 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261014-robot-mobile').length-1,1);
-    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v=20261015-placement-read-coalescing-v1"').length-1,1);
-    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-placement-read-coalescing-v1"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"','camera-effective-placement.js?v=20261008"');
+    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v='+(helper==='camera-placement-controls.js'?'20261015-save-recovery-v2':'20261015-placement-read-coalescing-v1')+'"').length-1,1);
+    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-save-recovery-v2"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"','camera-effective-placement.js?v=20261008"');
     const availabilityPreserved=name==='it-send-repair'?placementPreserved.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):placementPreserved;
     const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">\n<script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');

@@ -30,7 +30,7 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
  await expect(page.locator('#unitDetailSubtitle')).toContainText('10 Source Road');
  await expect(page.locator('#unitDetailMain .effective-placement')).toContainText('Activation: active');
  await page.locator('#unitDetailMain a[href="./camera-detail.html?id=11"]').click();
- await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('10 Source Road');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');
+ await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('10 Source Road');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD OFFLINE');
  const before=await page.evaluate(()=>JSON.stringify(fixtureDevices));
  await page.screenshot({path:info.outputPath('effective-field-detail.png'),fullPage:true});
  await page.evaluate(()=>window.holdPlacementState=true);await page.locator('#editFieldBtn').click();
@@ -39,7 +39,7 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
  await expect(page.getByLabel('Current job / site')).toHaveValue('Approved mHelp job site');await expect(page.getByLabel('Current installation address (street, city, state and ZIP)')).toHaveValue('10 Source Road, Testville, TX 75001');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
- await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');await expect(page.locator('#interfaceActions a').first()).toBeVisible();
+ await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD OFFLINE');await expect(page.locator('#interfaceActions a').first()).toBeVisible();
  await page.evaluate(async()=>{fixtureMode='owner';await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('99 Owner Road');await expect(page.locator('#effectivePlacement')).toContainText('Owner-confirmed placement');
  expect(await page.evaluate(()=>CameraEffectivePlacement.get(device).row.latitude)).toBe(32.123);expect(await page.evaluate(()=>JSON.stringify(fixtureDevices))).toBe(before);
  await page.evaluate(()=>sessionStorage.setItem('syntheticSourcePlacement','owner'));await page.reload();await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('99 Owner Road');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
@@ -59,7 +59,7 @@ test('Shop stays searchable and linked; approved alias keeps full variant; unres
 });
 test('warning, denied refresh, and source revisions cannot falsely confirm placement or clear saved fields',async({page},info)=>{
  const errors=await mount(page,'camera-detail.html?id=11');await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();
- await page.evaluate(async()=>{window.denyPlacement=true;await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('Last read: FIELD');await expect(page.locator('#effectivePlacement')).toContainText('current placement is unavailable');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');
+ await page.evaluate(async()=>{window.denyPlacement=true;await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('Last read: FIELD');await expect(page.locator('#effectivePlacement')).toContainText('current placement is unavailable');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD OFFLINE');
  await page.screenshot({path:info.outputPath('placement-denied-preserves-last-read.png'),fullPage:true});
  await page.evaluate(async()=>{window.denyPlacement=false;fixtureMode='warning';await refreshEffectivePlacement();});await expect(page.locator('#effectivePlacement [data-placement-status="unresolved"]')).toContainText('Source revision changed');await expect(page.locator('#organization')).not.toContainText('10 Source Road');
  await page.evaluate(async()=>{fixtureMode='field';const old=healthFixture;window.healthFixture=()=>{const h=old();h.unitIdentities.push({...h.unitIdentities[0]});return h};await refreshEffectivePlacement();});await expect(page.locator('#effectivePlacement')).toContainText('Conflicting equipment links');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
@@ -108,7 +108,7 @@ test('an unabortable old body blocks duplicate reads until drain and cannot repa
 
 test('initial network denial preserves source context and camera-opening links with an explicit unavailable state',async({page})=>{
  await page.addInitScript(()=>window.denyPlacement=true);const errors=await mount(page,'camera-detail.html?id=11');
- await expect(page.locator('#effectivePlacement [data-placement-status="unavailable"]')).toContainText('unavailable');await expect(page.locator('#organization')).toContainText('source organization: ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#interfaceActions a').first()).toBeVisible();await expect(page.locator('#statusPill')).toHaveText('OFFLINE');expect(errors).toEqual([]);
+ await expect(page.locator('#effectivePlacement [data-placement-status="unavailable"]')).toContainText('unavailable');await expect(page.locator('#organization')).toContainText('source organization: ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#interfaceActions a').first()).toBeVisible();await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD OFFLINE');expect(errors).toEqual([]);
 });
 
 test('existing unique full-family fallback remains available without claiming an Owner or provider identity proof',async({page})=>{
@@ -119,4 +119,15 @@ test('existing unique full-family fallback remains available without claiming an
  expect(await page.evaluate(()=>readRequests.filter(r=>r.path).length)).toBe(before+2);
  await expect(card.locator('[data-placement-status="ready"]')).toContainText('Exact full unit identifier');await expect(card.locator('.compact-unit-site')).toContainText('10 Source Road');
  await page.evaluate(async()=>{const old=healthFixture;window.healthFixture=()=>{const h=old();h.rows.push({id:99,unit:'RANGER 22'});return h};await refreshEffectivePlacement();});await expect(card.locator('[data-placement-status="unresolved"]')).toContainText('Source group remains separate');await expect(card.locator('.compact-unit-site')).not.toContainText('10 Source Road');expect(errors).toEqual([]);
+});
+
+
+test('detail status clock and visibility preserve current authoritative placement metadata',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-15T12:00:00Z')});const errors=await mount(page,'camera-detail.html?id=11');
+ await expect(page.locator('#organization')).toContainText('10 Source Road');await expect(page.locator('#cameraMeta')).toContainText('10 Source Road');
+ await page.locator('#ipSetupInput').fill('192.0.2.99');const reads=await page.evaluate(()=>readRequests.length);await page.clock.runFor(60001);
+ await expect(page.locator('#cameraMeta')).toContainText('10 Source Road');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>readRequests.length)).toBe(reads);
+ await page.evaluate(async()=>{fixtureMode='owner';await refreshEffectivePlacement();});await expect(page.locator('#cameraMeta')).toContainText('99 Owner Road');
+ const updatedReads=await page.evaluate(()=>readRequests.length);await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.clock.runFor(60001);
+ await expect(page.locator('#cameraMeta')).toContainText('99 Owner Road');await expect(page.locator('#organization')).toContainText('99 Owner Road');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>readRequests.length)).toBe(updatedReads);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
 });

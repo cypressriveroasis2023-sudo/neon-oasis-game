@@ -252,7 +252,7 @@
     const resolved=resolvePlacement(snapshot,health,legacy.data,key);progress(['signed-in account recheck']);
     const fresh=await db.auth.getSession();current();
     if(fresh.error||fresh.data?.session?.user?.id!==subject||fresh.data?.session?.access_token!==token)fail('The signed-in account changed. Reopen the unit.');
-    return {...resolved,state:legacy.data,subject};
+    return {...resolved,state:legacy.data,subject,token};
   }
   function readCurrent(db,key,signal,progress=()=>{},share=false){
     // Bound the entire read, including Supabase/session promises that do not accept a fetch signal.
@@ -265,6 +265,18 @@
       const update=names=>{if(!settled&&!combined.aborted){waiting=names.length?names:['saved identity checks'];progress(waiting);}};
       signal.addEventListener('abort',abort,{once:true});
       readCurrentData(db,key,combined,update,share).then(value=>finish(resolve,value),error=>finish(reject,error));
+    });
+  }
+  // Stop waiting without claiming to cancel or undo a server-side write.
+  // Late settlements are consumed, but never update a dismissed/replaced dialog.
+  function awaitSaved(action,signal){
+    return new Promise((resolve,reject)=>{
+      let settled=false;
+      const finish=(callback,value)=>{if(settled)return;settled=true;signal.removeEventListener('abort',abort);callback(value);};
+      const abort=()=>finish(reject,new Error('The saved operation timed out or this form was closed.'));
+      if(signal.aborted){abort();return;}
+      signal.addEventListener('abort',abort,{once:true});
+      Promise.resolve().then(()=>{if(signal.aborted)throw new Error('The form was closed.');return action();}).then(value=>finish(resolve,value),error=>finish(reject,error));
     });
   }
   async function open({db,key,placement,onSaved}){
@@ -280,7 +292,7 @@
     note.textContent=placement==='FIELD'?'Loading the current saved installation. Opening this form does not change its address or verified pin.':'The unit leaves the installed field map and stays searchable in Shop / ROOT. Its location history is kept.';
     for(const name of ['site','address']){input(name).required=placement==='FIELD';input(name).closest('label').hidden=placement!=='FIELD';}
     disableInputs(true);
-    const close=()=>{if(context.pending)return;context.controller.abort();dialog.close();dialog.remove();if(active===context)active=null;window.removeEventListener('popstate',close);window.removeEventListener('hashchange',close);};
+    const close=()=>{context.controller.abort();dialog.close();dialog.remove();if(active===context)active=null;window.removeEventListener('popstate',close);window.removeEventListener('hashchange',close);};
     cancel.onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});window.addEventListener('popstate',close);window.addEventListener('hashchange',close);
     dialog.showModal();let baseline,requestId=crypto.randomUUID(),uncertain=false,openedSubject='',baselineAttempts=0;
     const requiresReopen=error=>/signed-in account changed|Sign in again|current account cannot verify/.test(String(error?.message||error));
@@ -311,36 +323,42 @@
         feedback.textContent=normal(site)===normal(baseline.site)?'The installation address is unchanged. No move was saved; the existing location and verified pin are kept.':'The installation address is unchanged. No move or site-name edit was saved; update the site record to change only its name.';return;
       }
       if(!form.reportValidity()||!reason||(placement==='FIELD'&&(!site||!address)))return;
-      context.pending=true;retry.hidden=true;retry.disabled=true;submit.disabled=true;cancel.disabled=true;disableInputs(true);feedback.textContent='Checking the current placement before saving…';
-      let writing=false;
+      context.pending=true;retry.hidden=true;retry.disabled=true;submit.disabled=true;cancel.disabled=false;disableInputs(true);feedback.textContent='Checking the current placement before saving…';
+      let writing=false,verified=false;
       try{
         const current=await readCurrent(db,key,requestSignal(),reportProgress);
         if(current.subject!==baseline.subject||current.revision!==baseline.revision)throw new Error('The saved address, placement or equipment identity changed. Reload the saved placement before confirming again.');
         // This is a frontend freshness check, not an atomic cross-database lock. The existing writer also guards its own audit revision.
-        writing=true;feedback.textContent='Saving physical placement…';
-        const result=await db.rpc('owner_set_camera_unit_placement_v2',{p_unit_key:key,p_placement:placement,p_site_label:site,p_street_address:address,p_reason:reason,p_expected_audit_id:current.state.auditId,p_request_id:requestId});
+        writing=true;cancel.textContent='Close — save may still complete';feedback.textContent='Saving physical placement… Closing this form does not undo the request. Do not repeat the move until its saved placement is checked.';
+        const result=await awaitSaved(()=>db.rpc('owner_set_camera_unit_placement_v2',{p_unit_key:key,p_placement:placement,p_site_label:site,p_street_address:address,p_reason:reason,p_expected_audit_id:current.state.auditId,p_request_id:requestId}),requestSignal());
         if(result.error)throw result.error;const saved=result.data;
         if(!saved||saved.ok!==true||saved.unit_key!==key||saved.placement!==placement||saved.request_id!==requestId||resourceId(saved.audit_id)!==saved.audit_id)throw new Error('The save receipt was incomplete.');
-        const fresh=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});
+        feedback.textContent='Save receipt received. Verifying saved placement… Closing does not undo the move.';
+        const fresh=await awaitSaved(()=>db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key}),requestSignal());
         if(fresh.error||!stateMatches(fresh.data,key)||fresh.data.auditId!==saved.audit_id||fresh.data.placement!==placement||(placement==='FIELD'&&(fresh.data.streetAddress!==address||fresh.data.siteLabel!==site)))throw new Error('Saved placement could not be verified after reload.');
         if(baseline.nativeAlias){
           // Never replay a committed write when either database's independent readback is uncertain.
           const projected=await readCurrent(db,key,requestSignal()),target=projected.nativeAlias,expected=baseline.nativeAlias;
           if(projected.subject!==baseline.subject||!target||target.unitId!==expected.unitId||target.unitNumber!==expected.unitNumber||target.unitKey!==key||target.proof!==expected.proof||!sameSet(target.deviceIds,expected.deviceIds)||target.auditId!==saved.audit_id||projected.state.auditId!==saved.audit_id||projected.row?.placementAuditId!==saved.audit_id||projected.row?.placementUnitKey!==key||projected.row?.placement!==placement||projected.row?.placementSource!=='owner'||(placement==='FIELD'&&(!projected.field||projected.address!==address||projected.site!==site))||(placement==='SHOP'&&projected.field))throw new Error('Saved placement was not confirmed on exactly one reviewed native map record.');
         }
+        const verifiedSession=await awaitSaved(()=>db.auth.getSession(),requestSignal());
+        if(verifiedSession.error||verifiedSession.data?.session?.user?.id!==current.subject||verifiedSession.data?.session?.access_token!==current.token)throw new Error('The signed-in account or token changed while confirming the save.');
+        verified=true;cancel.textContent='Close';
         // Placement is committed. Geocoding failure must never be reported as a failed move.
         if(placement==='FIELD'){
           feedback.textContent='Placement saved. Locating the installation address…';
           try{
-            const session=await db.auth.getSession(),token=session.data?.session?.access_token;
+            const session=await awaitSaved(()=>db.auth.getSession(),requestSignal()),token=session.data?.session?.access_token;
             if(!token||session.data?.session?.user?.id!==baseline.subject)throw new Error('Sign in again to check the address lookup.');
-            const response=await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-field-geocode',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({unitKey:key,auditId:saved.audit_id}),signal:AbortSignal.timeout(15000),cache:'no-store'});
+            const response=await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-field-geocode',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({unitKey:key,auditId:saved.audit_id}),signal:AbortSignal.any([context.controller.signal,AbortSignal.timeout(15000)]),cache:'no-store'});
             if(!response.ok)throw new Error('The address lookup is queued for background processing.');
           }catch{ /* Durable queue survives navigation or a failed immediate lookup. */ }
         }
-        await onSaved?.(saved);context.pending=false;close();
-      }catch(error){uncertain=writing;feedback.textContent=(writing?'The move could not be confirmed: ':'No move was saved: ')+(error?.message||error)+(writing?'. Close and refresh this unit before trying again.':requiresReopen(error)?'. Close and reopen the unit with the correct signed-in account.':'. Retry verification, review the reloaded placement, and confirm again.');if(!writing){baseline=null;retry.hidden=requiresReopen(error);retry.disabled=false;}}
-      finally{context.pending=false;cancel.disabled=false;}
+        feedback.textContent='Placement saved and verified. Refreshing this view…';
+        const refreshSignal=requestSignal();
+        await awaitSaved(()=>onSaved?.(saved,{signal:refreshSignal}),refreshSignal);context.pending=false;close();
+      }catch(error){if(!alive())return;uncertain=writing;cancel.textContent=writing?'Close':'Cancel';if(verified){feedback.textContent='Placement saved and verified, but this view could not refresh. Close and reload the unit; do not repeat the move. '+(error?.message||error);return;}feedback.textContent=(writing?'The move could not be confirmed: ':'No move was saved: ')+(error?.message||error)+(writing?'. The request may still complete. Closing does not undo it. Close and refresh this unit before trying again.':requiresReopen(error)?'. Close and reopen the unit with the correct signed-in account.':'. Retry verification, review the reloaded placement, and confirm again.');if(!writing){baseline=null;retry.hidden=requiresReopen(error);retry.disabled=false;}}
+      finally{context.pending=false;if(alive())cancel.disabled=false;}
     };
     await loadBaseline();
   }

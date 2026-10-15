@@ -109,7 +109,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
   await page.keyboard.press('Escape');
   await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
   expect(await page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(0);
-}], ['Save blocks repeats/cancel then completes', async page => {
+}], ['Save blocks repeats, remains dismissible, then completes', async page => {
   await mount(page, {
     org: 'field',
     placement: 'FIELD'
@@ -122,10 +122,9 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
     name: 'Save placement'
   }).click();
   await expect(page.getByRole('button', {
-    name: 'Cancel',
+    name: 'Close — save may still complete',
     exact: true
-  })).toBeDisabled();
-  await page.keyboard.press('Escape');
+  })).toBeEnabled();
   await expect(page.locator('.cos-placement-dialog')).toBeVisible();
   await page.evaluate(() => document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit', {
     cancelable: true
@@ -150,7 +149,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
     name: 'Save placement'
   })).toBeDisabled();
   await page.getByRole('button', {
-    name: 'Cancel',
+    name: 'Close',
     exact: true
   }).click();
   await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);

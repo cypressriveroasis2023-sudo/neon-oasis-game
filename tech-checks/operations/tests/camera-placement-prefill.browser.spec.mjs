@@ -174,7 +174,7 @@ test('a real address change keeps required confirmation, refetches both states, 
   const fixture=await mount(page);await open(page);const form=await ready(page);const changed='300 Proposed Fixture Rd, Houston, TX 77001';await form.address.fill(changed);
   await form.save.click();await assertNoWrites(page,fixture);await form.reason.fill('Synthetic physical move');await form.save.click();await assertNoWrites(page,fixture);
   await form.confirmed.check();await page.evaluate(()=>fixtureHoldWrite=true);await form.save.click();
-  await expect.poll(async()=>(await mutations(page)).length).toBe(1);await expect(form.cancel).toBeDisabled();await expect(form.save).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('.cos-placement-dialog')).toBeVisible();
+  await expect.poll(async()=>(await mutations(page)).length).toBe(1);await expect(page.getByRole('button',{name:'Close — save may still complete',exact:true})).toBeEnabled();await expect(form.save).toBeDisabled();await expect(page.locator('.cos-placement-dialog')).toBeVisible();
   await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);
   expect(fieldReads(fixture)).toHaveLength(2);expect(await legacyReads(page)).toBe(2);expect(fixture.geocodes).toEqual([]);
   await page.evaluate(()=>fixtureReleaseWrite());await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
@@ -226,15 +226,15 @@ test('duplicate inventory alias outside the visible field list blocks a seemingl
   const fixture=await mount(page,{native});await open(page);await expect(page.locator('.placement-feedback')).toContainText(/unavailable|verified|review|reload|could not|unique/i);await expect(inputs(page).save).toBeDisabled();await assertNoWrites(page,fixture);
 });
 
-test('preflight remains locked under repeated submission and cancellation until source verification completes',async({page})=>{
+test('preflight prevents repeated submission while remaining dismissible during source verification',async({page})=>{
   const fixture=await mount(page);await open(page);const form=await ready(page);await form.address.fill('300 Proposed Fixture Rd, Houston, TX 77001');await confirm(page);fixture.holdNative=true;await form.save.click();await expect.poll(()=>fixture.gates.length).toBe(1);
-  await expect(form.save).toBeDisabled();await expect(form.cancel).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(2);await assertNoWrites(page,fixture);
+  await expect(form.save).toBeDisabled();await expect(form.cancel).toBeEnabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(2);await assertNoWrites(page,fixture);
   fixture.holdNative=false;fixture.gates.shift()();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
 });
 
 test('an uncertain rejected mutation is not replayed or geocoded',async({page})=>{
   const fixture=await mount(page);await open(page);const form=await ready(page);await form.address.fill('300 Proposed Fixture Rd, Houston, TX 77001');await confirm(page);await page.evaluate(()=>fixtureWriteDenied=true);await form.save.click();
-  await expect(page.locator('.placement-feedback')).toContainText('Synthetic mutation denied');await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  await expect(page.locator('.placement-feedback')).toContainText('Synthetic mutation denied');await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await page.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
 });
 
 for(const placement of ['SHOP','UNKNOWN'])test('effective FIELD unchanged address is safe when legacy placement says '+placement,async({page})=>{

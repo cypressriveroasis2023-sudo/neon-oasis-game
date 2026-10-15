@@ -12,7 +12,7 @@ const resource=(serial,status,patch={})=>({deviceSerial:serial,deviceName:'Helio
 const tracker={canonical_family:'Helios',unit_tag:'901',source_label:'Helios901',tracker_state:'field_or_unknown'};
 const alpha=status=>resource('synthetic-physical-alpha',status);
 const beta=status=>resource('synthetic-external-beta',status);
-function compile(source,context){const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInNewContext(js,context);return context;}
+function compile(source,context){context.require=name=>{assert.equal(name,'../../camera-status-contract.js');vm.runInNewContext(readFileSync(new URL('../../camera-status-contract.js',import.meta.url),'utf8'),context);return {};};const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInNewContext(js,context);return context;}
 async function producer(resources,locals=[local()],options={}){
  const full=readFileSync(new URL('../../supabase/functions/camera-provider-reconcile/index.ts',import.meta.url),'utf8');
  const source=full.slice(full.indexOf('async function mapLimit'),full.indexOf('async function reconInventory'));
@@ -116,7 +116,7 @@ test('authentication and inventory failures preserve the last valid observations
 test('quarantine stays unverified in detail, board, native frontend and backend despite old online health',()=>{
  const read=path=>readFileSync(new URL('../../../'+path,import.meta.url),'utf8');
  const device=local({source_status:'unknown',vigilant_status:'Unknown',source_last_seen_at:new Date().toISOString(),source_metadata:{identityStatus:'conflict'}}),health={overall_status:'online',ip_reachable:true,checked_at:new Date().toISOString()};
- const context=vm.createContext({Intl,device,cameraGroup:()=> 'Vigilant'});vm.runInContext(read('tech-checks/camera-health-history.js'),context);vm.runInContext(read('tech-checks/camera-health-overview.js'),context);
+ const context=vm.createContext({Intl,device,cameraGroup:()=> 'Vigilant'});vm.runInContext(read('tech-checks/camera-health-history.js'),context);vm.runInContext(read('tech-checks/camera-status-contract.js')+'\n'+read('tech-checks/camera-health-overview.js'),context);context.detailReadFailures=[];
  assert.equal(context.CameraHealthOverview.cameraState(device),'verifying');assert.equal(context.CameraHealthOverview.providerState(device),'verifying');
  const detail=read('tech-checks/camera-detail.html');vm.runInContext(detail.match(/^function sourceFresh\(.*$/m)[0]+'\n'+detail.match(/^function effectiveHealth\(.*$/m)[0],context);assert.equal(context.effectiveHealth(device,health),'verifying');
  for(const path of ['tech-checks/operations/src/cameraEvidence.ts','tech-checks/supabase/functions/cos-operations-pages/cameraEvidence.ts']){

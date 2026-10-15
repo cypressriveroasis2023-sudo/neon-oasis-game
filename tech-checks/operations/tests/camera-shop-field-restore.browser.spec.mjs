@@ -16,7 +16,7 @@ test.afterEach(async({page})=>{
   expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length);
   expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
 });
-async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,holdDisplay=false,entry='detail',nativeAfterWrite=null}={}){
+async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,holdDisplay=false,entry='detail',nativeAfterWrite=null,cameraKey=key}={}){
   const fixture={native,health,holdNative,holdDisplay,displayGates:[],nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
   mountedFixtures.set(page.context(),fixture);
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));page.context().on('page',other=>other.on('pageerror',error=>fixture.pageErrors.push(error.message)));
@@ -58,10 +58,10 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
         }
         return {error:{message:'Unexpected fixture RPC '+name}};
       },
-      from(table){let singular=false,selectedId=null;const query={select(){return query},eq(field,value){if(field==='id')selectedId=Number(value);return query},in(){return query},ilike(){return query},order(){return query},range(){return query},limit(){return query},single(){singular=true;return query},maybeSingle(){singular=true;return query},then(done){return Promise.resolve({data:table==='profiles'?{active,role}:table==='camera_devices'?(singular?fixtureDevices.find(row=>selectedId===null||row.id===selectedId):fixtureDevices):table==='camera_health_current'?(singular?{}:[]):[]}).then(done)}};return query;}
+      from(table){let singular=false,selectedId=null;const query={select(){return query},eq(field,value){if(field==='id')selectedId=Number(value);return query},in(){return query},ilike(){return query},order(){return query},range(){return query},limit(){return query},single(){singular=true;return query},maybeSingle(){singular=true;return query},then(done,failed){if(window.fixtureThrowRead===table)return Promise.reject(new Error('Synthetic rejected saved read')).then(done,failed);return Promise.resolve({data:table==='profiles'?{active,role}:table==='camera_devices'?(singular?fixtureDevices.find(row=>selectedId===null||row.id===selectedId):fixtureDevices):table==='camera_health_current'?(singular?(window.fixtureCurrent||{}):[]):[],...(window.fixtureReadFailure===table?{data:null,error:{message:'Synthetic saved read failure'}}:{})}).then(done,failed)}};return query;}
     };
     window.supabase={createClient:()=>fixtureDb};
-  },{role,verifiedIt,active,token,legacy,key});
+  },{role,verifiedIt,active,token,legacy,key:cameraKey});
   await page.context().route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
     if(url.origin===origin){
@@ -139,7 +139,7 @@ for(const [name,native,health] of [
 
 for(const address of [newAddress,oldAddress])test('confirmed SHOP reinstallation at '+(address===oldAddress?'the same former address':'a new address')+' writes once after a fresh reread and readback',async({page})=>{
   const fixture=await mount(page),before=structuredClone(fixture.native);await open(page);const form=await complete(page,address);await page.evaluate(()=>fixtureHoldWrite=true);await form.save.click();
-  await expect.poll(async()=>(await mutations(page)).length).toBe(1);await expect(form.cancel).toBeDisabled();await expect(form.save).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('.cos-placement-dialog')).toBeVisible();
+  await expect.poll(async()=>(await mutations(page)).length).toBe(1);await expect(page.getByRole('button',{name:'Close — save may still complete',exact:true})).toBeEnabled();await expect(form.save).toBeDisabled();await expect(page.locator('.cos-placement-dialog')).toBeVisible();
   await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);
   expect(fieldReads(fixture)).toHaveLength(2);expect(fixture.reads.filter(read=>read.body.path==='/api/camera-health/summary-v3')).toHaveLength(2);expect(await page.evaluate(()=>fixtureReadCount)).toBe(2);expect(fixture.geocodes).toEqual([]);
   await page.evaluate(()=>fixtureReleaseWrite());await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);const calls=await mutations(page);expect(calls).toHaveLength(1);
@@ -193,8 +193,8 @@ test('cancel and late native reads cannot populate a reopened current editor',as
   fixture.holdNative=false;fixture.native=envelope([nativeRow({site,installedSiteId:otherId,status:'installed',currentLocationType:'site',address:newAddress})]);await page.evaluate(()=>fixtureLegacy.placement='FIELD');await open(page);const form=await ready(page);await expect(form.address).toHaveValue(newAddress);fixture.gates.shift()();await expect(form.address).toHaveValue(newAddress);await expect(page.locator('.cos-placement-dialog')).toHaveCount(1);await form.cancel.click();await noWrites(page,fixture);
 });
 
-test('a pending fresh read locks duplicate submissions and Cancel until it completes',async({page})=>{
-  const fixture=await mount(page);await open(page);const form=await complete(page);fixture.holdNative=true;await form.save.click();await expect.poll(()=>fixture.gates.length).toBe(1);await expect(form.cancel).toBeDisabled();await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(2);await noWrites(page,fixture);fixture.holdNative=false;fixture.gates.shift()();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
+test('a pending fresh read locks duplicate submissions and remains dismissible',async({page})=>{
+  const fixture=await mount(page);await open(page);const form=await complete(page);fixture.holdNative=true;await form.save.click();await expect.poll(()=>fixture.gates.length).toBe(1);await expect(form.cancel).toBeEnabled();await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(2);await noWrites(page,fixture);fixture.holdNative=false;fixture.gates.shift()();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
 });
 
 for(const [role,verifiedIt,active] of [['it',false,true],['service',false,true],['owner',true,false]])test(role+' active='+active+' verifiedIT='+verifiedIt+' keeps existing placement permissions',async({page})=>{
@@ -204,7 +204,7 @@ for(const [role,verifiedIt,active] of [['it',false,true],['service',false,true],
 test('a missing bearer never unlocks the Shop form',async({page})=>{const fixture=await mount(page,{token:false});await open(page);await held(page,fixture);expect(fixture.allReads).toEqual([]);});
 
 for(const [flag,feedback] of [['fixtureWriteDenied',/Synthetic writer denied/],['fixtureReadbackMismatch',/could not be verified/i]])test(flag+' never replays an uncertain write or starts geocoding',async({page})=>{
-  const fixture=await mount(page);await open(page);const form=await complete(page);await page.evaluate(flag=>window[flag]=true,flag);await form.save.click();await expect(page.locator('.placement-feedback')).toContainText(feedback);await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  const fixture=await mount(page);await open(page);const form=await complete(page);await page.evaluate(flag=>window[flag]=true,flag);await form.save.click();await expect(page.locator('.placement-feedback')).toContainText(feedback);await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await page.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
 });
 
 const openField=async page=>{await page.locator('#editFieldBtn').click();await expect(page.locator('.cos-placement-dialog')).toBeVisible();return ready(page);};
@@ -325,4 +325,112 @@ test('cancelling an actual joined modal leaves its display reader alive and reop
   await expect.poll(()=>page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevice)?.status)).toBe('ready');
   await page.locator('#editFieldBtn').click();await expect(page.locator('.cos-placement-dialog')).toBeVisible();await blank(page);expect(fieldReads(fixture)).toHaveLength(1);expect(fixture.displayReads).toHaveLength(2);
   await inputs(page).cancel.click();await noWrites(page,fixture);
+});
+
+for(const number of [308,317])test('actual Sniper '+number+' detail retains Shop reachability, ages evidence and preserves edits',async({page})=>{
+ const time=Date.parse('2026-10-15T12:00:00Z'),label='Sniper '+number;await page.clock.install({time:new Date(time)});
+ const native=envelope([nativeRow({unitNumber:label,modelName:'SNIPERS',status:'available',currentLocationType:'shop',site:'',address:''})],[]),health=healthEnvelope();
+ health.rows.forEach(row=>row.unit=label);health.unitIdentities[0].unitNumber=label;health.unitIdentities[0].unitKeys=[label];
+ const fixture=await mount(page,{cameraKey:label,native,health,legacy:legacyState({unitKey:label})});
+ await page.evaluate(async()=>{for(const d of fixtureDevices)Object.assign(d,{device_type:'Sniper',source:'2026_unit_tracker',monitoring_profile:'sniper',source_status:'unknown',public_ip:'192.0.2.8',expected_ports:[443]});window.fixtureCurrent={checked_at:'2026-10-15T11:59:00Z',overall_status:'online',ip_reachable:true,port_status:{443:{online:true}}};await load();});
+ await expect(page.locator('#statusPill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('#sourceDetail')).toContainText('Video not verified');await expect(page.locator('#issueNotice')).toContainText('SHOP / ROOT + service reachable');
+ await page.locator('#ipSetupInput').fill('192.0.2.99');const reads=fixture.allReads.length;await page.clock.fastForward(21*60000);
+ await expect(page.locator('#statusPill')).toHaveText('IP / PORT UNVERIFIED');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(fixture.allReads).toHaveLength(reads);
+ await page.evaluate(async()=>{fixtureCurrent.checked_at=new Date().toISOString();window.fixtureReadFailure='camera_health_current';await load();});
+ await expect(page.locator('#issueNotice')).toContainText('Saved read unavailable: service');await expect(page.locator('#statusPill')).toHaveText('IP / PORT UNVERIFIED');await noWrites(page,fixture);
+});
+test('actual save can be dismissed while pending without undo claims, late UI changes or replay',async({page})=>{
+ const fixture=await mount(page);await open(page);const form=await complete(page);await page.evaluate(()=>fixtureHoldWrite=true);await form.save.click();await expect.poll(async()=>(await mutations(page)).length).toBe(1);
+ await expect(page.locator('.placement-feedback')).toContainText('Closing this form does not undo');await page.getByRole('button',{name:'Close — save may still complete',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+ const reads=fixture.allReads.length;await page.evaluate(()=>fixtureReleaseWrite());await expect.poll(()=>page.evaluate(()=>fixtureLegacy.auditId)).toBe('901');await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.allReads).toHaveLength(reads);expect(fixture.geocodes).toEqual([]);
+});
+
+test('rejected saved reads invalidate only their affected evidence and preserve pending edits',async({page})=>{
+ const fixture=await mount(page);
+ await page.evaluate(async()=>{for(const d of fixtureDevices)Object.assign(d,{device_type:'IPC',source:'vigilant_control_center',activation_state:'active',source_status:'online',source_last_seen_at:new Date().toISOString()});window.fixtureCurrent={checked_at:new Date().toISOString(),overall_status:'online',ip_reachable:true,port_status:{443:{online:true}}};await load();});
+ await expect(page.locator('#statusPill')).toHaveText(/CAMERA RECORD ONLINE/);
+ await page.evaluate(async()=>{window.fixtureThrowRead='camera_health_current';await load();});
+ await expect(page.locator('#statusPill')).toHaveText(/CAMERA RECORD ONLINE/);await expect(page.locator('#sourceDetail')).toContainText('Service/IP: VERIFYING');await expect(page.locator('#issueNotice')).toContainText('Saved read unavailable: service');
+ await page.locator('#ipSetupInput').fill('192.0.2.99');
+ await page.evaluate(async()=>{window.fixtureThrowRead='camera_devices';try{await load();}catch(error){window.fixtureInventoryError=error.message;}});
+ await expect(page.locator('#statusPill')).toHaveText('IP / PORT UNVERIFIED');await expect(page.locator('#issueNotice')).toContainText('Saved read unavailable: inventory');await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');expect(await page.evaluate(()=>fixtureInventoryError)).toContain('Synthetic rejected saved read');await noWrites(page,fixture);
+});
+
+
+for(const phase of ['camera_devices','camera_health_current','connection'])for(const ending of ['Close','timeout'])test('interrupted post-save '+phase+' refresh after '+ending+' cannot overwrite newer connection edits',async({page})=>{
+ const fixture=await mount(page);await open(page);const form=await complete(page);
+ await page.evaluate(phase=>{
+  const timeout=AbortSignal.timeout.bind(AbortSignal);window.fixtureRefreshDeadlines=[];AbortSignal.timeout=ms=>{if(ms!==30000)return timeout(ms);const controller=new AbortController();fixtureRefreshDeadlines.push(controller);return controller.signal;};
+  const hold=async(source,value)=>{if(source!==phase||fixtureLegacy.auditId!=='901')return value;const result=structuredClone(value);window.fixtureHostWaiting=true;await new Promise(resolve=>window.fixtureReleaseHost=resolve);window.fixtureHostReturned=true;return result;};
+  const from=fixtureDb.from.bind(fixtureDb);fixtureDb.from=table=>{const query=from(table),then=query.then.bind(query);query.then=(done,failed)=>then(value=>hold(table,value)).then(done,failed);return query;};
+  const rpc=fixtureDb.rpc.bind(fixtureDb);fixtureDb.rpc=async(name,args)=>{if(name!=='get_camera_unit_connection_v2')return rpc(name,args);fixtureCalls.push({name,args});return hold('connection',{data:{device_id:args.p_device_id,unit_key:fixtureDevice.unit_key,public_ip:'192.0.2.8',expected_ports:[443],connection_revision:1,unit_etag:'synthetic-current-unit'}});};
+ },phase);
+ await form.save.click();await expect.poll(()=>page.evaluate(()=>window.fixtureHostWaiting===true)).toBe(true);await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified');
+ const releaseHost=async()=>{await page.evaluate(()=>fixtureReleaseHost());await expect.poll(()=>page.evaluate(()=>window.fixtureHostReturned===true)).toBe(true);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+ if(ending==='timeout'){
+  await page.evaluate(()=>fixtureRefreshDeadlines.at(-1).abort());await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');
+  const ip=await page.locator('#ipSetupInput').inputValue(),ports=await page.locator('#portSetupInput').inputValue(),reads=fixture.allReads.length;await releaseHost();
+  await expect(page.locator('#ipSetupInput')).toHaveValue(ip);await expect(page.locator('#portSetupInput')).toHaveValue(ports);expect(fixture.allReads).toHaveLength(reads);await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');
+ }
+ await page.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+ await page.locator('#ipSetupInput').fill('192.0.2.99');await page.locator('#portSetupInput').fill('8443, 38880');const reads=fixture.allReads.length;
+ if(ending==='Close')await releaseHost();
+ await expect(page.locator('#ipSetupInput')).toHaveValue('192.0.2.99');await expect(page.locator('#portSetupInput')).toHaveValue('8443, 38880');await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.allReads).toHaveLength(reads);
+});
+
+// Actual Manage Units host: these responses outlive the placement dialog.
+async function managePlacement(page){
+ const fixture=await mount(page,{entry:'health',legacy:legacyState({placement:'FIELD'})});await inputs(page).cancel.click();await page.getByRole('button',{name:'Back to units'}).click();
+ await page.evaluate(async()=>{for(const [id,key] of [[9201,'SNIPER 308'],[9202,'SNIPER 317']])fixtureDevices.push({...fixtureDevice,id,unit_key:key,device_name:key});await load();fixtureDevices=structuredClone(fixtureDevices);fixtureDevice=fixtureDevices[0];});
+ await page.locator('#manageUnitsBtn').click();await page.locator('#moveUnitKey').selectOption(key);await page.locator('#removeUnitKey').selectOption('SNIPER 308');await page.locator('#moveFieldBtn').click();
+ const form=await ready(page);await form.site.fill(site);await form.address.fill(newAddress);await form.reason.fill('Synthetic Manage Units placement correction');await form.confirmed.check();return {fixture,form};
+}
+async function holdBoardRead(page,phase,{beforeWrite=false,rejected=false}={}){
+ await page.evaluate(({phase,beforeWrite,rejected})=>{
+  const timeout=AbortSignal.timeout.bind(AbortSignal);window.fixtureRefreshDeadlines=[];AbortSignal.timeout=ms=>{if(ms!==30000)return timeout(ms);const controller=new AbortController();fixtureRefreshDeadlines.push(controller);return controller.signal;};
+  window.fixtureBoardReads=[];let held=false;const from=fixtureDb.from.bind(fixtureDb);
+  fixtureDb.from=table=>{const query=from(table),then=query.then.bind(query);query.then=(done,failed)=>then(async value=>{
+   fixtureBoardReads.push(table);const result=structuredClone(value);
+   if(table===phase&&!held&&(beforeWrite||fixtureLegacy.auditId==='901')){held=true;window.fixtureBoardWaiting=true;await new Promise(resolve=>window.fixtureReleaseBoard=resolve);window.fixtureBoardReturned=true;if(rejected)throw new Error('Obsolete synthetic board failure');}
+   return result;
+  }).then(done,failed);return query;};
+ },{phase,beforeWrite,rejected});
+}
+async function releaseBoardRead(page){await page.evaluate(()=>fixtureReleaseBoard());await expect.poll(()=>page.evaluate(()=>window.fixtureBoardReturned===true)).toBe(true);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
+async function newerManageSelection(page){
+ if(await page.locator('.cos-placement-dialog').count()===0){
+  for(const id of ['moveUnitKey','removeUnitKey']){await page.locator('#'+id).selectOption('SNIPER 308');await page.locator('#'+id).selectOption('SNIPER 317');}
+  await page.locator('#removeUnitReason').fill('Newer selection reason');
+ }else{
+  // Exercise generation fencing independently of cancellation while the modal still owns focus.
+  await page.evaluate(()=>{for(const id of ['moveUnitKey','removeUnitKey']){const el=document.getElementById(id);el.value='SNIPER 317';el.dispatchEvent(new Event('change',{bubbles:true}));}document.getElementById('removeUnitReason').value='Newer selection reason';});
+ }
+ await page.evaluate(()=>document.getElementById('unitManageMsg').textContent='Newer Manage Units message');
+}
+async function expectNewerManageSelection(page){await expect(page.locator('#moveUnitKey')).toHaveValue('SNIPER 317');await expect(page.locator('#removeUnitKey')).toHaveValue('SNIPER 317');await expect(page.locator('#removeUnitReason')).toHaveValue('Newer selection reason');await expect(page.locator('#unitManageMsg')).toHaveText('Newer Manage Units message');}
+for(const phase of ['camera_devices','asset_inventory','equipment_master','camera_integrations','camera_health_current','camera_unit_routers'])for(const ending of ['Close','timeout','selection'])test('Manage Units '+phase+' refresh after '+ending+' preserves newer selections and messages',async({page})=>{
+ const {fixture,form}=await managePlacement(page);await holdBoardRead(page,phase);const before=await page.evaluate(()=>JSON.stringify({devices,masterInventory,trackerMaster,integrationMeta,health,routers}));
+ await form.save.click();await expect.poll(()=>page.evaluate(()=>window.fixtureBoardWaiting===true)).toBe(true);await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified');
+ if(ending==='Close')await page.locator('.cos-placement-dialog').getByRole('button',{name:'Close',exact:true}).click();
+ if(ending==='timeout'){await page.evaluate(()=>fixtureRefreshDeadlines.at(-1).abort());await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');}
+ await newerManageSelection(page);const reads=await page.evaluate(()=>fixtureBoardReads.slice());await releaseBoardRead(page);
+ await expectNewerManageSelection(page);expect(await page.evaluate(()=>fixtureBoardReads)).toEqual(reads);expect(await page.evaluate(()=>JSON.stringify({devices,masterInventory,trackerMaster,integrationMeta,health,routers}))).toBe(before);
+ if(ending==='timeout'){await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified, but this view could not refresh');await page.locator('.cos-placement-dialog').getByRole('button',{name:'Close',exact:true}).click();}
+ await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
+});
+
+test('Manage Units canceled queued refresh never starts after the earlier board read settles',async({page})=>{
+ const {fixture,form}=await managePlacement(page);await holdBoardRead(page,'camera_devices',{beforeWrite:true});await page.evaluate(()=>{window.fixtureEarlierLoad=load({background:true});});await expect.poll(()=>page.evaluate(()=>window.fixtureBoardWaiting===true)).toBe(true);
+ await form.save.click();await expect(page.locator('.placement-feedback')).toContainText('Placement saved and verified');await page.locator('.cos-placement-dialog').getByRole('button',{name:'Close',exact:true}).click();await newerManageSelection(page);await releaseBoardRead(page);await page.evaluate(()=>fixtureEarlierLoad);
+ await expectNewerManageSelection(page);expect(await page.evaluate(()=>fixtureBoardReads.filter(table=>table==='camera_devices').length)).toBe(1);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
+});
+
+test('Manage Units canceled old failure cannot replace a newer completed board load',async({page})=>{
+ const {fixture,form}=await managePlacement(page);await holdBoardRead(page,'camera_unit_routers',{rejected:true});await form.save.click();await expect.poll(()=>page.evaluate(()=>window.fixtureBoardWaiting===true)).toBe(true);await page.locator('.cos-placement-dialog').getByRole('button',{name:'Close',exact:true}).click();await newerManageSelection(page);
+ await page.evaluate(async()=>{fixtureDevices[0].device_name='Newer saved inventory';await load({background:true});});const status=await page.locator('#screenRefreshStatus').textContent();await releaseBoardRead(page);
+ await expectNewerManageSelection(page);expect(await page.evaluate(()=>devices[0].device_name)).toBe('Newer saved inventory');await expect(page.locator('#screenRefreshStatus')).toHaveText(status);await expect(page.locator('#screenRefreshError')).toHaveText('');expect(await page.evaluate(()=>boardDataReady)).toBe(true);expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
+});
+
+test('Manage Units successful placement keeps both selections while refreshing available units',async({page})=>{
+ const {fixture,form}=await managePlacement(page);await form.save.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);await expect(page.locator('#moveUnitKey')).toHaveValue(key);await expect(page.locator('#removeUnitKey')).toHaveValue('SNIPER 308');await expect(page.locator('#unitManageMsg')).toHaveText(key+' placement saved and verified.');expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toHaveLength(1);
 });

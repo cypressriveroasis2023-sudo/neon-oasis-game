@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import test from 'node:test';import {readFileSync} from 'node:fs';import vm from 'node:vm';
-const context=vm.createContext({Intl,Date});for(const file of ['camera-health-history.js','camera-health-overview.js'])vm.runInContext(readFileSync(new URL('../../'+file,import.meta.url),'utf8'),context);
+const context=vm.createContext({Intl,Date});for(const file of ['camera-status-contract.js','camera-health-history.js','camera-health-overview.js'])vm.runInContext(readFileSync(new URL('../../'+file,import.meta.url),'utf8'),context);
 const api=context.CameraHealthOverview,now=Date.parse('2026-10-06T16:10:00Z');
 const device={source:'reconeyez',unit_key:'RII-028',source_metadata:{area:'Exact vendor area'}};
 const event={id:1,external_device_id:'BRIDGE-1',component_guid:'BRIDGE-1',component_type:'bridge_4g',component_name:'Bridge A',component_area:'Exact vendor area',observed_at:'2026-10-06T16:00:00Z',event_type:'YC',battery_percent:7};

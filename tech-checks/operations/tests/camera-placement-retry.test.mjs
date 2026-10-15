@@ -17,8 +17,8 @@ function fixture(){
  const dialog={isConnected:false,className:'',innerHTML:'',setAttribute(){},querySelector(selector){return selector==='form'?form:selector==='h2'?nodes.title:selector==='.placement-feedback'?nodes.feedback:selector==='.placement-pin-note'?nodes.note:selector==='.placement-unit'?nodes.unit:null;},addEventListener(){},showModal(){},close(){},remove(){this.isConnected=false;}};
  const db={auth:{getSession:async()=>{f.sessionReads++;if(f.sessionReads===f.changeTokenAt)f.token='synthetic-refreshed';const reply={data:{session:{access_token:f.token,user:{id:f.subject}}}};if(f.sessionReads===f.holdSessionAt)await new Promise(resolve=>f.sessionHolds.push(resolve));return reply;}},rpc:async(name,args)=>{
   f.calls.push({name,args});
-  if(name==='owner_camera_unit_placement_state_v2'){const state=structuredClone(f.state);if(f.holdLegacy)await new Promise(resolve=>f.holds.push(resolve));return {data:state};}
-  assert.equal(name,'owner_set_camera_unit_placement_v2');if(f.denyWrite)return {error:{message:'Synthetic writer denied'}};
+  if(name==='owner_camera_unit_placement_state_v2'){const state=structuredClone(f.state);if(f.holdLegacy||(f.holdReadback&&state.auditId==='101'))await new Promise(resolve=>f.holds.push(resolve));return {data:state};}
+  assert.equal(name,'owner_set_camera_unit_placement_v2');if(f.holdWrite)await new Promise(resolve=>f.holds.push(resolve));if(f.denyWrite)return {error:{message:'Synthetic writer denied'}};
   f.state={...f.state,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:'101'};
   return {data:{ok:true,unit_key:key,placement:args.p_placement,request_id:args.p_request_id,audit_id:'101'}};
  }};
@@ -27,7 +27,7 @@ function fixture(){
   const failed=f.failed.has(body.path),data=structuredClone(body.path==='/api/field-map'?f.snapshot:f.health);if(f.holdPath===body.path)await new Promise(resolve=>f.fetchHolds.push(resolve));return {ok:!failed,status:failed?503:200,json:async()=>data};
  }});
  vm.runInContext(source,context);
- Object.assign(f,{context,db,fields,nodes,form,dialog,open:()=>context.CameraPlacementControls.open({db,key,placement:'SHOP',onSaved:saved=>f.saved.push(saved)}),moves:()=>f.calls.filter(call=>call.name==='owner_set_camera_unit_placement_v2'),submit:()=>form.onsubmit({preventDefault(){}})});return f;
+ Object.assign(f,{context,db,fields,nodes,form,dialog,open:()=>context.CameraPlacementControls.open({db,key,placement:'SHOP',onSaved:saved=>{if(f.failRefresh)throw new Error('Synthetic host refresh failed');if(f.holdRefresh)return new Promise(resolve=>f.holds.push(resolve));f.saved.push(saved)}}),moves:()=>f.calls.filter(call=>call.name==='owner_set_camera_unit_placement_v2'),submit:()=>form.onsubmit({preventDefault(){}})});return f;
 }
 
 test('Shop uses saved identity reads, no new address or vendor request, and saves once after a fresh check',async()=>{
@@ -110,4 +110,29 @@ test('cancelling a joined modal cannot abort its active display consumer',async(
 
 test('same-subject token change during the modal authority recheck denies the baseline',async()=>{
  const f=fixture();f.changeTokenAt=2;await f.open();assert.equal(f.nodes.save.disabled,true);assert.equal(f.nodes.retry.hidden,true);assert.match(f.nodes.feedback.textContent,/signed-in account changed/);assert.equal(f.moves().length,0);f.nodes.cancel.onclick();
+});
+
+for(const phase of ['holdWrite','holdReadback'])test('bounded '+phase+' is uncertain, dismissible, and never replays a move',async()=>{
+ const f=fixture();await f.open();f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f[phase]=true;
+ const pending=f.submit();await until(()=>f.holds.length===1);assert.equal(f.nodes.cancel.disabled,false);assert.match(f.nodes.cancel.textContent,/save may still complete/);
+ f.timeouts.at(-1).abort();await pending;assert.match(f.nodes.feedback.textContent,/may still complete.*Closing does not undo/);assert.equal(f.nodes.cancel.disabled,false);assert.equal(f.nodes.retry.hidden,true);
+ const reads=f.calls.length;await f.submit();assert.equal(f.moves().length,1);f.nodes.cancel.onclick();assert.equal(f.dialog.isConnected,false);f.holds[0]();await turn();await turn();assert.equal(f.calls.length,reads);assert.equal(f.saved.length,0);
+});
+for(const phase of ['holdWrite','holdReadback'])test('close during '+phase+' consumes late completion without restoring UI or retrying',async()=>{
+ const f=fixture();await f.open();f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f[phase]=true;
+ const pending=f.submit();await until(()=>f.holds.length===1);f.nodes.cancel.onclick();await pending;assert.equal(f.dialog.isConnected,false);const feedback=f.nodes.feedback.textContent,reads=f.calls.length;
+ f.holds[0]();await turn();await turn();assert.equal(f.nodes.feedback.textContent,feedback);assert.equal(f.calls.length,reads);assert.equal(f.moves().length,1);assert.equal(f.saved.length,0);
+});
+for(const phase of ['failRefresh','holdRefresh'])test('verified placement remains successful after '+phase,async()=>{
+ const f=fixture();await f.open();f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f[phase]=true;
+ const pending=f.submit();if(phase==='holdRefresh'){await until(()=>f.holds.length===1);f.timeouts.at(-1).abort();}await pending;
+ assert.equal(f.state.placement,'SHOP');assert.equal(f.state.auditId,'101');assert.match(f.nodes.feedback.textContent,/Placement saved and verified, but this view could not refresh/);assert.doesNotMatch(f.nodes.feedback.textContent,/move could not be confirmed/);assert.equal(f.moves().length,1);await f.submit();assert.equal(f.moves().length,1);if(f.holds.length)f.holds[0]();
+});
+test('closing a hung pre-save verification never reaches the writer',async()=>{
+ const f=fixture();await f.open();f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f.holdLegacy=true;
+ const pending=f.submit();await until(()=>f.holds.length===1);f.nodes.cancel.onclick();await pending;f.holds[0]();await turn();assert.equal(f.moves().length,0);assert.equal(f.dialog.isConnected,false);
+});
+test('post-write token change keeps an uncertain save from refreshing or replaying',async()=>{
+ const f=fixture();await f.open();f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f.changeTokenAt=f.sessionReads+3;
+ await f.submit();assert.equal(f.moves().length,1);assert.equal(f.state.auditId,'101');assert.match(f.nodes.feedback.textContent,/account or token changed/);assert.equal(f.saved.length,0);assert.equal(f.nodes.retry.hidden,true);await f.submit();assert.equal(f.moves().length,1);
 });
