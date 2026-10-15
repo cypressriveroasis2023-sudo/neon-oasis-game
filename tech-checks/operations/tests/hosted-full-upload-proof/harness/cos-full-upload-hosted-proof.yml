@@ -1,0 +1,231 @@
+# Authorized synthetic proof for the reviewed full-upload optimization repair scope.
+# GitHub-hosted disposable services only; production installation is not authorized.
+name: Verify synthetic full upload over PostgREST
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/tests/hosted-full-upload-proof/**'
+      - 'tech-checks/operations/tests/hosted-camera-receipt-proof/**'
+      - 'tech-checks/operations/tests/fixtures/placement-label-index*'
+      - 'tech-checks/operations/tests/fixtures/placement-snapshot*'
+      - 'tech-checks/operations/tests/fixtures/source-admission*'
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/supabase/functions/cos-operations-pages/**'
+      - 'tech-checks/operations/package-lock.json'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/package-lock.json'
+      - '.github/workflows/cos-full-upload-hosted-proof.yml'
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: 'After explicit approval, enter RUN SYNTHETIC HOSTED PROOF'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: full-upload-synthetic-proof-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  authorization-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      approved: ${{ steps.authorize.outputs.approved }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Fail closed before any service starts
+        id: authorize
+        env:
+          APPROVAL_TEXT: ${{ inputs.authorization }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch) test "$APPROVAL_TEXT" = 'RUN SYNTHETIC HOSTED PROOF' ;;
+            pull_request) ;;
+            *) echo 'Only manual or path-scoped pull-request events are allowed' >&2; exit 1 ;;
+          esac
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const barrier=JSON.parse(readFileSync('tech-checks/operations/tests/hosted-full-upload-proof/harness/PREPARE-ONLY.json','utf8'));
+          assert.equal(barrier.mode,'authorized-hosted-synthetic-proof','Private preparation has not been authorized for execution');
+          assert.equal(barrier.publicationAuthorized,true);
+          assert.equal(barrier.executionAuthorized,true);
+          JS
+          echo 'approved=true' >> "$GITHUB_OUTPUT"
+  hosted-synthetic-proof:
+    needs: authorization-gate
+    if: needs.authorization-gate.outputs.approved == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      COS_FULL_UPLOAD_HOSTED_EXECUTION: authorized-synthetic-hosted-proof
+      COS_FULL_UPLOAD_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      COS_FULL_UPLOAD_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      COS_FULL_UPLOAD_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:55432/cos_camera_receipt_test_ci
+      COS_FULL_UPLOAD_POSTGREST_URL: http://127.0.0.1:53000
+      COS_FULL_UPLOAD_JWT_SECRET: synthetic-camera-receipt-proof-only-20261014
+      PROOF_DIR: tech-checks/operations/tests/hosted-full-upload-proof/harness
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: cos_camera_receipt_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=en-US
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_camera_receipt_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify the exact source revision under test
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHECKOUT_SHA="$(git rev-parse HEAD)"
+          test "$CHECKOUT_SHA" = "$EXPECTED_SOURCE_SHA"
+          echo "COS_FULL_UPLOAD_CHECKOUT_SHA=$CHECKOUT_SHA" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            tech-checks/operations/package-lock.json
+            tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - name: Install only existing locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations/legacy/tests/recon-ordering
+      - name: Prepare clean synthetic-only offline evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PROOF_DIR/results/offline"
+          rm -f tech-checks/operations/tests/hosted-full-upload-proof/tests/*results.json
+          rm -f tech-checks/operations/tests/hosted-full-upload-proof/tests/*-mismatch.json
+          rm -f tech-checks/operations/tests/hosted-full-upload-proof/tests/baseline-plan.json
+          rm -f tech-checks/operations/tests/hosted-full-upload-proof/tests/candidate-plan.json
+          node "$PROOF_DIR/static-check.mjs" > "$PROOF_DIR/results/offline/static-check.json"
+      - name: Verify all guarded package regressions in PGlite
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/package.test.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/package.log
+      - name: Verify complete synthetic parity and exact runtime fast-path gate
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/parity.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/parity.log
+      - name: Verify adversarial full JSON and error parity
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/review-adversarial.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/review-adversarial.log
+      - name: Verify source and tracker ordering edge cases
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/review-ordering.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/review-ordering.log
+      - name: Verify runtime dependency and overload drift fallback
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/review-drift.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/review-drift.log
+      - name: Verify caller and helper permission boundaries
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/tests/review-permissions.mjs | tee tests/hosted-full-upload-proof/harness/results/offline/review-permissions.log
+      - name: Preserve all synthetic offline regression results
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$PROOF_DIR/results/offline"
+          TEST_DIR=tech-checks/operations/tests/hosted-full-upload-proof/tests
+          for source in "$TEST_DIR/"*results.json "$TEST_DIR/"*-mismatch.json "$TEST_DIR/baseline-plan.json" "$TEST_DIR/candidate-plan.json"; do
+            if test -f "$source"; then cp "$source" "$PROOF_DIR/results/offline/$(basename "$source")"; fi
+          done
+      # PGlite package tests render their own metadata-pinned installer. Native
+      # bootstrap MUST run after them and regenerate the exact PostgreSQL package.
+      - name: Build isolated generated fixture and assert PostgreSQL 17.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$PROOF_DIR/bootstrap.mjs" --bootstrap
+          docker inspect --format '{{.Image}}' '${{ job.services.postgres.id }}' > "$PROOF_DIR/results/postgres-image-id.txt"
+          docker image inspect --format '{{json .RepoDigests}}' postgres:17.6 > "$PROOF_DIR/results/postgres-image-digests.txt"
+      - name: Verify exact PostgREST binary version before HTTP startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none postgrest/postgrest:v14.5 /bin/postgrest --version | tee "$PROOF_DIR/results/postgrest-version.txt"
+          grep -Eq 'PostgREST[[:space:]]+14\.5([[:space:](]|$)' "$PROOF_DIR/results/postgrest-version.txt"
+          docker image inspect --format '{{json .RepoDigests}}' postgrest/postgrest:v14.5 > "$PROOF_DIR/results/postgrest-image-digests.txt"
+      - name: Start synthetic PostgREST on dedicated runner loopback only
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name cos-camera-receipt-postgrest --network host \
+            --env PGRST_DB_URI=postgresql://authenticator:synthetic-authenticator-ci-only@127.0.0.1:55432/cos_camera_receipt_test_ci \
+            --env PGRST_DB_SCHEMAS=public \
+            --env PGRST_DB_ANON_ROLE=anon \
+            --env PGRST_JWT_SECRET="$COS_FULL_UPLOAD_JWT_SECRET" \
+            --env PGRST_SERVER_HOST=127.0.0.1 \
+            --env PGRST_SERVER_PORT=53000 \
+            --env PGRST_DB_POOL=10 \
+            --env PGRST_DB_CONFIG=true \
+            postgrest/postgrest:v14.5
+          for attempt in $(seq 1 60); do
+            if curl --silent --show-error --fail --max-time 2 "$COS_FULL_UPLOAD_POSTGREST_URL/" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'Synthetic PostgREST did not become ready' >&2
+          exit 1
+      - name: Verify exact installed one-function change with real SQL clients and HTTP
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/hosted-full-upload-proof/harness/hosted-runner.mjs
+      - name: Collect generic service diagnostics and stop isolated PostgREST
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$PROOF_DIR/results"
+          docker logs cos-camera-receipt-postgrest > "$PROOF_DIR/results/postgrest.log" 2>&1 || true
+          docker rm --force cos-camera-receipt-postgrest > /dev/null 2>&1 || true
+      - name: Preserve generic synthetic evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-upload-synthetic-postgres-postgrest
+          path: tech-checks/operations/tests/hosted-full-upload-proof/harness/results/
+          if-no-files-found: error
+          retention-days: 7

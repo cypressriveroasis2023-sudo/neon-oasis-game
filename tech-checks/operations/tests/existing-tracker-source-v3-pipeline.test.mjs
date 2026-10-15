@@ -1,4 +1,4 @@
-import {test,before,after,beforeEach} from 'node:test';
+import {test,before,after,beforeEach,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto,randomUUID} from 'node:crypto';
 import {fixture as nativeFixture,record,admin,reset as nativeReset,sql,ORG,hash} from './fixtures/existing-tracker-source-v3-fixture.mjs';
@@ -10,14 +10,19 @@ import {processImportedGeocodes} from '../../supabase/functions/camera-field-geo
 import {checkedImportedBinding,projectImportedSourceAddresses,projectImportedGeocodes} from '../../supabase/functions/cos-operations-pages/importedSourceProjection.ts';
 import {checkedAddressEstimate} from '../src/fieldAddressEstimates.ts';
 globalThis.crypto??=webcrypto;
+// Pin Date before creating PGlite: its clock_timestamp() uses the same clock.
+// Success cases must not accidentally run in the real vendor midnight blackout.
+// Only Date is mocked; production SQL, provider guards and timers stay intact.
+const fixtureTime=Date.parse('2026-10-13T16:00:00Z');
 let native,legacy;
 before(async()=>{
+ mock.timers.enable({apis:['Date'],now:fixtureTime});
  native=await nativeFixture();legacy=await legacyFixture({imported:true});
  await legacy.exec('alter table public.camera_inventory_audit add column created_at timestamptz,add column request_id uuid');
  for(const name of ['geocodio-tracker-source-v2.sql','source-precedence-contract.sql','geocodio-source-precedence.sql','geocodio-existing-tracker-source-v3.sql'])await legacy.exec(sql(name));
 });
-after(async()=>{await native?.close();await legacy?.close();});
-beforeEach(async()=>{await nativeReset(native);await legacyReset(legacy);await legacy.exec('truncate app_private.cos_imported_precedence_reviews');});
+after(async()=>{try{await native?.close();await legacy?.close();}finally{mock.timers.reset();}});
+beforeEach(async()=>{mock.timers.setTime(fixtureTime);await nativeReset(native);await legacyReset(legacy);await legacy.exec('truncate app_private.cos_imported_precedence_reviews');});
 const KEY='a'.repeat(64),response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 function serial(fn){let previous=Promise.resolve();return(...args)=>{const task=previous.then(()=>fn(...args));previous=task.catch(()=>{});return task;};}
 function harness({censusMatch=false,onGeocodio}={}){
@@ -42,6 +47,10 @@ async function project(h,sources,{audits=[],devices=[]}={}){
  const estimates=bindings.length?await h.rpc('cos_imported_geocode_read_many',{p_organization_id:ORG,p_bindings:bindings}):[];
  return projectImportedGeocodes(map,estimates,audits,devices,context);
 }
+test('V3 pipeline fixture uses the same deterministic Node and PGlite clock',async()=>{
+ assert.equal(Date.now(),fixtureTime);
+ for(const db of [native,legacy])assert.equal((await db.query('select clock_timestamp() instant')).rows[0].instant.getTime(),fixtureTime);
+});
 for(const censusMatch of [true,false])test('actual SQL V3 sources traverse bridge, existing queue/cache, native map and frontend '+censusMatch,async()=>{
  const inputs=[];for(let n=1;n<=4;n++)inputs.push(await record(native,{family:'Helios',number:String(n).padStart(3,'0')+'HDC4',n}));
  const equipmentBefore=(await native.query('select to_jsonb(u) value from public.equipment_units u order by id')).rows,trackersBefore=(await native.query('select to_jsonb(t) value from app_private.vision_tracker_locations t order by id')).rows;
@@ -73,6 +82,25 @@ test('V3 tracker identity edits during a charged lookup invalidate publication w
 test('V3 uses the existing 2400 shared cap and cannot enter historical V1 postal recovery',async()=>{
  const [source]=await admin(native,[await record(native)]);await legacy.exec("insert into app_private.cos_geocodio_daily_budget(budget_day,credits) values((clock_timestamp() at time zone 'America/New_York')::date,2400)");
  const h=harness();await h.run();assert.deepEqual(h.counts,{census:1,geocodio:0});await assert.rejects(()=>h.rpc('cos_imported_geocode_postal_retry_enroll',{p_organization_id:ORG,p_bindings:[source]}),/Historical postal cohort/);assert.equal(Number((await legacy.query('select sum(credits) n from app_private.cos_geocodio_daily_budget')).rows[0].n),2400);
+});
+for(const resetAt of ['2026-07-01T04:00:00Z','2026-01-01T05:00:00Z'])for(const secondsBefore of [61,60,1])
+test(`V3 midnight guard preserves budget ${secondsBefore}s before ${resetAt}`,async()=>{
+ const reset=Date.parse(resetAt);mock.timers.setTime(reset-secondsBefore*1000);
+ const [source]=await admin(native,[await record(native)]),h=harness(),blocked=secondsBefore<=60;
+ await h.run();assert.deepEqual(h.counts,{census:1,geocodio:blocked?0:1});
+ const charged=async()=>Number((await legacy.query('select coalesce(sum(credits),0) n from app_private.cos_geocodio_daily_budget')).rows[0].n);
+ assert.equal(await charged(),blocked?0:1);
+ assert.equal((await legacy.query('select count(*)::integer n from app_private.cos_geocodio_reservations')).rows[0].n,blocked?0:1);
+ assert.ok((await h.reader.currentMany([sourceIdentity(source)]))[0],'midnight deferral must not invalidate the source');
+ if(blocked){
+  const cached=(await legacy.query('select status,reason,next_attempt_at from app_private.cos_field_geocode_fallback_cache')).rows[0];
+  assert.equal(cached.status,'deferred');assert.equal(cached.reason,'budget_exhausted');assert.equal(cached.next_attempt_at.getTime(),reset);
+  assert.equal(await checkedAddressEstimate((await project(h,[source])).items[0]),null);
+  await h.run();assert.equal(h.counts.geocodio,0);assert.equal(await charged(),0);
+  mock.timers.setTime(reset);await h.run();
+  assert.deepEqual(h.counts,{census:1,geocodio:1});assert.equal(await charged(),1);
+ }
+ assert.ok(await checkedAddressEstimate((await project(h,[source])).items[0]));
 });
 test('actual V3 SHOP map record keeps exact proof and native provenance but carries no address estimate',async()=>{
  const input=await record(native);Object.assign(input,{placement:'SHOP',installation:null,addressSha256:null});const [source]=await admin(native,[input]),h=harness();await h.run();assert.deepEqual(h.counts,{census:0,geocodio:0});
