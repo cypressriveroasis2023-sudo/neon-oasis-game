@@ -154,7 +154,8 @@ test('approved red eye branding stays readable through responsive navigation and
       const rect = image.getBoundingClientRect();
       const box = el.getBoundingClientRect();
       return {
-        layers: image.querySelectorAll('image').length,
+        posters: image.querySelectorAll('img.cos-eye-poster').length,
+        canvases: image.querySelectorAll('.cos-eye-live canvas').length,
         label: image.getAttribute('aria-label'), width: rect.width, height: rect.height,
         radius: style.borderRadius, fit: style.objectFit,
         textFits: [...el.querySelectorAll('strong,small')].every(text => text.scrollWidth <= text.clientWidth),
@@ -162,9 +163,10 @@ test('approved red eye branding stays readable through responsive navigation and
         background: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(geometry).toMatchObject({ layers: 2, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
-    await brand.locator('image').evaluateAll(async layers => { await Promise.all(layers.map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })); });
-    expect(geometry.width).toBe(width <= 700 ? 64 : 104);
+    expect(geometry).toMatchObject({ posters: 1, canvases: 1, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    await expect(brand.locator('.company-eye')).toHaveAttribute('data-eye-ready', 'true');
+    await brand.locator('img.cos-eye-poster').evaluateAll(async layers => { await Promise.all(layers.map(image => image.decode())); });
+    expect(geometry.width).toBe(width <= 700 ? 40 : 104);
     expect(geometry.height).toBe(geometry.width);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });
@@ -189,51 +191,66 @@ test('approved red eye branding stays readable through responsive navigation and
 });
 
 
-test('red eye uses exact horizontal-only timing, static reduced motion and hidden pause', async ({ page }) => {
+test('robotic eye scans randomly while sights stay fixed and hidden/reduced-motion eyes pause', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { frame } = await mount(page);
-  const eye = frame.locator('.company-mobile-brand .company-eye');
-  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
-  const samples = await eye.evaluate(el => {
-    const gaze = el.querySelector('.company-eye-gaze');
-    const animation = gaze.getAnimations()[0];
-    animation.pause();
-    const sample = time => {
-      animation.currentTime = time;
-      const matrix = new DOMMatrix(getComputedStyle(gaze).transform);
-      return { time, x: matrix.e, y: matrix.f, scaleX: matrix.a, scaleY: matrix.d, housing: getComputedStyle(el.querySelector('.company-eye-housing')).transform };
-    };
-    return { duration: animation.effect.getTiming().duration, samples: [0, 1400, 2000, 3000, 4200, 5300, 7000, 8600, 9300, 10000, 11999].map(sample) };
+  const eye=frame.locator('.company-mobile-brand .company-eye');
+  await expect(eye).toHaveAttribute('data-eye-ready','true');await expect(eye).toHaveAttribute('data-motion-paused','false');
+  const snapshot=async()=>eye.locator('canvas').evaluate(canvas=>{
+    const c=canvas.getContext('2d'),scale=canvas.width/720;
+    return {image:canvas.toDataURL(),sights:[[360,100],[80,356],[641,356],[359,620]].flatMap(([x,y])=>[...c.getImageData(Math.round(x*scale),Math.round(y*scale),1,1).data])};
   });
-  expect(samples.duration).toBe(12000);
-  for (const sample of samples.samples) {
-    expect(sample.y).toBe(0);
-    expect(sample.scaleX).toBe(1);
-    expect(sample.scaleY).toBe(1);
-    expect(sample.housing).toBe('none');
-    expect(Math.abs(sample.x)).toBeLessThanOrEqual(10.01);
-  }
-  expect(samples.samples.find(s => s.time === 3000).x).toBeCloseTo(-10, 3);
-  expect(samples.samples.find(s => s.time === 7000).x).toBeCloseTo(10, 3);
-  expect(samples.samples.find(s => s.time === 2000).x).toBeCloseTo(-5, 2);
-  expect(samples.samples.find(s => s.time === 9300).x).toBeCloseTo(5, 2);
-  await eye.evaluate(el => el.querySelector('.company-eye-gaze').getAnimations()[0].play());
-  await frame.locator('body').evaluate(() => {
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect(eye).toHaveAttribute('data-motion-paused', 'true');
-  expect(await eye.locator('.company-eye-gaze').evaluate(el => getComputedStyle(el).animationPlayState)).toBe('paused');
-  await frame.locator('body').evaluate(() => {
-    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  expect(await eye.locator('.company-eye-gaze').evaluate(el => ({ animation: getComputedStyle(el).animationName, matrix: getComputedStyle(el).transform }))).toEqual({ animation: 'none', matrix: 'matrix(1, 0, 0, 1, 0, 0)' });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect.poll(() => eye.locator('.company-eye-gaze').evaluate(el => getComputedStyle(el).animationName)).toBe('cos-eye-glance');
+  const original=await snapshot();await expect.poll(async()=>(await snapshot()).image).not.toBe(original.image);
+  expect((await snapshot()).sights).toEqual(original.sights);
+  await frame.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+  await expect(eye).toHaveAttribute('data-motion-paused','true');const hidden=await snapshot();await page.waitForTimeout(180);expect(await snapshot()).toEqual(hidden);
+  await frame.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+  await expect(eye).toHaveAttribute('data-motion-paused','false');
+  await eye.evaluate(el=>el.style.display='none');await expect(eye).toHaveAttribute('data-motion-paused','true');
+  await eye.evaluate(el=>el.style.display='');await expect(eye).toHaveAttribute('data-motion-paused','false');
+  await page.emulateMedia({reducedMotion:'reduce'});await expect(eye).toHaveAttribute('data-motion-paused','true');
+  const still=await snapshot();await page.waitForTimeout(180);expect(await snapshot()).toEqual(still);
+  // Inspect the rendered pixels, not only the canvas backing store: Safari's
+  // SVG foreignObject bug reports correct bounds but paints a cropped close-up.
+  const rendered=(await eye.screenshot({type:'png',scale:'css'})).toString('base64');
+  const marks=await eye.evaluate(async(el,png)=>{
+    const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
+    const sample=document.createElement('canvas');sample.width=image.width;sample.height=image.height;
+    const c=sample.getContext('2d');c.drawImage(image,0,0);
+    return [[360,100],[80,356],[641,356],[359,620]].map(([x,y])=>{
+      const sx=Math.round(x*image.width/720),sy=Math.round(y*image.height/720);
+      const pixels=c.getImageData(sx-2,sy-2,5,5).data;
+      for(let i=0;i<pixels.length;i+=4)if(pixels[i]>=120&&pixels[i]-pixels[i+1]>=40&&pixels[i]-pixels[i+2]>=40)return true;
+      return false;
+    });
+  },rendered);
+  expect(marks).toEqual([true,true,true,true]);
+  await page.emulateMedia({reducedMotion:'no-preference'});await expect(eye).toHaveAttribute('data-motion-paused','false');
 });
+
+test('advancing operational timers does not replay thousands of eye frames', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install({ time: new Date(now) });
+  const { frame } = await mount(page);
+  const eye = frame.locator('.company-mobile-brand .company-eye');
+  await expect(eye).toHaveAttribute('data-eye-ready', 'true');
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+  await eye.locator('canvas').evaluate(canvas => {
+    const getContext = canvas.getContext.bind(canvas);
+    window.eyeClockProof = { draws: 0, timerFired: false, startedAt: document.timeline.currentTime };
+    canvas.getContext = (...args) => { window.eyeClockProof.draws++; return getContext(...args); };
+    setTimeout(() => { window.eyeClockProof.timerFired = true; }, 60_000);
+  });
+  await page.clock.runFor(65_000);
+  const proof = await frame.locator('body').evaluate(() => ({
+    ...window.eyeClockProof,
+    displayedFor: document.timeline.currentTime - window.eyeClockProof.startedAt,
+  }));
+  expect(proof.timerFired).toBe(true);
+  expect(proof.draws).toBeLessThanOrEqual(Math.ceil(proof.displayedFor * 30 / 1000) + 2);
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+});
+
 
 
 test('enlarged eye never overlaps sidebar labels at short desktop heights',async({page},info)=>{

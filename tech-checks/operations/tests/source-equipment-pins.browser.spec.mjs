@@ -8,6 +8,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} source address pins share 
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('3 equipment pins · 1 verified · 2 estimated');await expect(app.getByRole('button',{name:'Estimated / source-recorded location: 2',exact:true})).toBeVisible();
  const sourceCard=app.locator('.cos-fleet-source-record').filter({hasText:'Ranger 901'});await expect(sourceCard).toContainText('Estimated address · Unlinked equipment');await expect(sourceCard.locator('[data-unit-id]')).toHaveCount(0);
  await sourceCard.getByRole('button',{name:'View estimated address'}).click();const dialog=app.getByRole('dialog',{name:'Ranger 901 source equipment details'});await expect(dialog).toBeVisible();await expect(dialog.getByRole('heading',{name:'Estimated address',exact:true})).toBeVisible();await expect(dialog).toContainText('not live GPS or device health');await expect(dialog.locator('button')).toHaveCount(1);await expect(dialog.locator('[data-unit-id],input,select,textarea,a')).toHaveCount(0);expect(page.url()).not.toContain('mhelp_product');
+ await page.screenshot({path:info.outputPath(`source-equipment-open-drawer-${it?'it':'owner'}-${info.project.name}.png`),fullPage:true});
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(sourceCard.getByRole('button',{name:'View estimated address'})).toBeFocused();await sourceCard.getByRole('button',{name:'View estimated address'}).click();await app.getByRole('button',{name:'Close equipment details'}).click();await expect(dialog).toHaveCount(0);
  await app.getByRole('button',{name:'Estimated / source-recorded location: 2',exact:true}).click();await expect(app.getByRole('heading',{name:'Location verification · 2 units'})).toBeVisible();await expect(app.getByRole('region',{name:'Unlinked Field equipment with estimated addresses'}).locator('.cos-fleet-source-record')).toHaveCount(2);
  await app.getByLabel('Location review type').selectOption('missing');await expect(app.getByRole('heading',{name:'Location verification · 3 units'})).toBeVisible();await expect(app.getByRole('region',{name:'Unlinked Field equipment without a map location'}).locator('.cos-fleet-source-record')).toHaveCount(1);await expect(app.getByRole('region',{name:'Unlinked Field equipment without a map location'})).toContainText('Ranger 903');
@@ -37,7 +38,21 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} explicit menu and repeated
  }
  // A fresh source selection performs its own unitless onSelectUnit transition and must remain open.
  await open();await app.getByRole('button',{name:'Close equipment details'}).click();await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
- expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+ // Use the iframe's real history entries, created by normal workspace navigation.
+ const frameDocument=app.locator('html');
+ const expectWorkspace=async(hash,view)=>{
+  await expect.poll(()=>frameDocument.evaluate(()=>window.location.hash)).toBe(hash);
+  await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
+  await expect(app.locator(view==='map'?'.cos-fleet-map-canvas':'.cos-fleet-table-wrap')).toBeVisible();
+  await expect(app.locator(view==='map'?'.cos-fleet-table-wrap':'.cos-fleet-map-canvas')).toHaveCount(0);
+ };
+ await open();await enter('Camera Health');await expectWorkspace('#camera-health','fleet');
+ await open();await frameDocument.evaluate(()=>window.history.back());await expectWorkspace('#fleet-dashboard','map');
+ await open();await frameDocument.evaluate(()=>window.history.forward());await expectWorkspace('#camera-health','fleet');
+ // Revisiting either entry without a fresh selection must not revive dismissed source details.
+ await frameDocument.evaluate(()=>window.history.back());await expectWorkspace('#fleet-dashboard','map');
+ await frameDocument.evaluate(()=>window.history.forward());await expectWorkspace('#camera-health','fleet');
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.calls.some(call=>/mhelp_product/.test(call.path))).toBe(false);expect(state.errors).toEqual([]);
 });
 
 for(const fieldName of ['receiptId','uploadRecordSha256'])test(`source estimates without reviewed ${fieldName} remain missing`,async({page})=>{

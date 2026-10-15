@@ -24,16 +24,22 @@ const pendingReads = new Map<string, Promise<ApiResponse>>();
 const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
 type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
 const pendingFleetSnapshots=new Map<string,FleetReads>();
-let fleetRevision=0;
+let fleetRevision=0,privateSessionRevision=0;
+// Reasons contain no token or identity. Missing/unknown reasons remain hard stops.
+function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide') {
+ window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason}}));
+}
 function clearSharedReads(){pendingReads.clear();fleetSnapshots.clear();pendingFleetSnapshots.clear();fleetRevision++;}
 if(typeof window!=='undefined'){
- window.addEventListener?.('cos-private-data-invalidated',clearSharedReads);
- window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')clearSharedReads();});
+ window.addEventListener?.('cos-private-data-invalidated',()=>{privateSessionRevision++;clearSharedReads();});
+ window.addEventListener?.('pagehide',()=>{privateSessionRevision++;clearSharedReads();});
+ window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){privateSessionRevision++;clearSharedReads();}});
 }
 let tokenRequest: Promise<ParentSession> | null = null;
 let lastVerifiedSession: ParentSession | null = null;
 function requestParentToken(): Promise<ParentSession> {
   if (window.parent === window || location.origin === 'null') {
+    invalidatePrivateData('authentication-denied');
     return Promise.reject(new OperationsApiError('Open Operations from the Tech Check platform to use your existing account.', 401));
   }
   if (tokenRequest) return tokenRequest;
@@ -48,12 +54,14 @@ function requestParentToken(): Promise<ParentSession> {
       cleanup();
       const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
       if (!(queueMode ? ['it','service'].includes(message.role) : new URLSearchParams(location.search).get('mode') === 'fleet' ? message.role === 'it' : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
+        invalidatePrivateData('authentication-denied');
         reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
       } else {
         const session = { token: message.accessToken, role: message.role };
         if (lastVerifiedSession && (lastVerifiedSession.token !== session.token || lastVerifiedSession.role !== session.role)) {
           clearSharedReads();
-          window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
+          // A changed bearer is only a recovery candidate, never proof of the same actor.
+          invalidatePrivateData(lastVerifiedSession.role === session.role ? 'token-renewed' : 'authentication-denied');
         }
         lastVerifiedSession = session;
         resolve(session);
@@ -62,6 +70,7 @@ function requestParentToken(): Promise<ParentSession> {
     window.addEventListener('message', receive);
     timer = window.setTimeout(() => {
       cleanup();
+      invalidatePrivateData('parent-timeout');
       reject(new OperationsApiError('Operations could not verify the current Tech Check session. Return to the platform and refresh.', 401));
     }, 10000);
     window.parent.postMessage({ type: 'COS_OPERATIONS_TOKEN_REQUEST', requestId }, location.origin);
@@ -82,9 +91,11 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (mode === 'production-assignments' && !permitsTechnicianRequest(method, path, body)) throw new OperationsApiError('This assignment view permits technician reads and taking an available IT queue visit only.', 403);
   // Always verify the current parent session before consulting pending reads.
   // A path-only promise could otherwise expose a previous account's response.
-  let session: ParentSession;
-  try { session = await requestParentToken(); }
-  catch (cause) { if (cause instanceof OperationsApiError && [401,403].includes(cause.response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated')); throw cause; }
+  const sessionRevision = privateSessionRevision;
+  const session = await requestParentToken();
+  // A write still waiting for authorization belongs to its original private view.
+  // Revalidation may start fresh reads, never submit that old unsent intent.
+  if (method === 'POST' && sessionRevision !== privateSessionRevision) throw new OperationsApiError('Your session changed before the save. Reload COS Operations before trying again.', 401);
   if (options?.signal?.aborted) throw new OperationsApiError('The read was cancelled.', 499);
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
@@ -135,7 +146,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
     }
-    if (!response.ok && [401,403].includes(response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
+    if (!response.ok && [401,403].includes(response.status)) invalidatePrivateData('authentication-denied');
     if (preparation && !response.ok) {
       // Only bounded categories escape this read-only path; do not parse or expose raw errors.
       void response.body?.cancel().catch(() => {});
@@ -163,7 +174,7 @@ async function readFleet(force=false):Promise<FleetReads>{
     const mode=new URLSearchParams(location.search).get('mode');
     if(mode==='production-assignments')throw new OperationsApiError('Open Camera Health from your fleet dashboard.',403);
     // Re-authorize the parent before using even a cached snapshot.
-    let session:ParentSession;try{session=await requestParentToken();}catch(cause){clearSharedReads();window.dispatchEvent?.(new Event('cos-private-data-invalidated'));throw cause;}
+    const session=await requestParentToken();
     if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
     const key=JSON.stringify([session.token,session.role,mode]);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
@@ -177,12 +188,17 @@ async function readFleet(force=false):Promise<FleetReads>{
     const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
-    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;}).finally(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);})};
+    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
     // A source-only caller must not leave the optional pair's rejection unhandled.
     void read.paired.catch(()=>{});
+    // Deliver pair errors immediately, but keep sharing a still-running source.
+    // Invalidated reads may settle after a newer read has claimed the same key.
+    void Promise.allSettled([health,fieldMap]).then(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);});
     pendingFleetSnapshots.set(key,read);return read;
 }
 export const api = {
+  // Capture before asynchronous draft preparation, not after it has already crossed a session boundary.
+  captureSession: () => { const revision=privateSessionRevision; return () => revision===privateSessionRevision; },
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
   fleet: async(force=false):Promise<FleetSnapshot>=>(await readFleet(force)).paired,

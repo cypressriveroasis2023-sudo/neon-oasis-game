@@ -1,0 +1,7 @@
+{
+  "mode": "authorized-hosted-synthetic-proof",
+  "publicationAuthorized": true,
+  "executionAuthorized": true,
+  "scope": "Reviewed camera-receipt repair pull request and manual reruns in cypressriveroasis2023-sudo/neon-oasis-game. Disposable GitHub-hosted PostgreSQL 17.6 and PostgREST 14.5; generated fixtures, fixed loopback endpoints and public synthetic credentials only. No production connection or deployment is authorized by this file.",
+  "requiredBeforeChanging": "The integrating parent must complete final source/privacy review and record the existing scoped repair-publication and synthetic-hosted-test authorization. This flag does not independently grant permission. Never include a production handler, startup suffix, customer fixture, credential or endpoint."
+}

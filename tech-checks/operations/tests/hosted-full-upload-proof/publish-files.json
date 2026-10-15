@@ -1,0 +1,51 @@
+{
+  "destination": "tech-checks/operations/tests/hosted-full-upload-proof",
+  "files": [
+    "README.md",
+    "build-package.mjs",
+    "publish-files.json",
+    "db/upload-baseline.sql",
+    "db/upload-setbased.sql",
+    "db/runtime-gate.sql",
+    "tests/parity.mjs",
+    "tests/package.test.mjs",
+    "tests/diagnostic-digests.sql",
+    "tests/fixture-loader.mjs",
+    "tests/review-adversarial.mjs",
+    "tests/review-drift.mjs",
+    "tests/review-ordering.mjs",
+    "tests/review-permissions.mjs",
+    "harness/README.md",
+    "harness/PREPARE-ONLY.json",
+    "harness/bootstrap.mjs",
+    "harness/bootstrap-roles.sql",
+    "harness/hosted-runner.mjs",
+    "harness/overload-fixture.mjs",
+    "harness/fixture-state.mjs",
+    "harness/workload-fixtures.mjs",
+    "harness/static-check.mjs",
+    "harness/local-fixture-check.mjs",
+    "harness/cos-full-upload-hosted-proof.yml"
+  ],
+  "additionalCopies": [
+    {
+      "source": "harness/cos-full-upload-hosted-proof.yml",
+      "destination": ".github/workflows/cos-full-upload-hosted-proof.yml"
+    }
+  ],
+  "excludedGeneratedOrPrivate": [
+    "install.sql",
+    "rollback.sql",
+    "manifest.json",
+    "expected-*-catalog.json",
+    "expected-schema.json",
+    "private-capture-query.sql",
+    "tools/build-gated.py",
+    "tests/*results.json",
+    "tests/*plan.json",
+    "tests/*.log",
+    "harness/*results.json",
+    "harness/*.log",
+    "harness/results/"
+  ]
+}

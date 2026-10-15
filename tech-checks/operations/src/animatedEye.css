@@ -1,47 +1,29 @@
-/* Only the lens moves. User-space offsets match the approved 12-second preview. */
-.company-eye .company-eye-gaze {
-  transform: translateX(0);
-  animation: cos-eye-glance 12s cubic-bezier(0.333333, 0, 0.666667, 1) infinite;
-}
-.company-eye[data-motion-paused='true'] .company-eye-gaze {
-  animation-play-state: paused;
-}
-@keyframes cos-eye-glance {
-  0%, 11.666667% { transform: translateX(0); }
-  21.666667%, 35% { transform: translateX(-10px); }
-  53.333333%, 71.666667% { transform: translateX(10px); }
-  83.333333%, 100% { transform: translateX(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .company-eye .company-eye-gaze {
-    animation: none !important;
-    transform: translateX(0) !important;
-  }
-}
-@media print {
-  .company-eye .company-eye-gaze {
-    animation: none !important;
-    transform: translateX(0) !important;
-  }
-}
+.company-eye { position:relative; width:38px; height:38px; aspect-ratio:1; }
+.company-eye>.cos-eye-poster, .company-eye>.cos-eye-live { position:absolute; inset:0; display:block; width:100%; height:100%; max-width:none; max-height:none; object-fit:contain; }
+.cos-eye-live { visibility:hidden; }
+[data-eye-ready="true"]>.cos-eye-live { visibility:visible; }
+[data-eye-ready="true"]>.cos-eye-poster { opacity:0; }
+.cos-eye-live canvas { display:block; width:100%; height:100%; }
+@media print { .cos-eye-live { display:none!important; } .cos-eye-poster { opacity:1!important; } }
 
 /* The approved glance is readable at normal dashboard viewing distance. */
-svg.company-eye { display:block; flex:none; border-radius:50%; overflow:hidden; background:#080b12; object-fit:contain; }
+.company-eye { display:block; flex:none; border-radius:50%; overflow:hidden; background:#080b12; object-fit:contain; }
 #root .company-brand { flex:none; height:auto; min-height:0; flex-direction:column; align-items:flex-start; gap:10px; margin-bottom:28px; }
 #root .company-brand .company-eye { width:104px !important; height:104px !important; }
 #root .company-mobile-brand .company-eye { width:64px !important; height:64px !important; }
 #root .company-mobile-brand { align-items:center; }
 #root .operations-sidebar-open .company-brand { flex-direction:row; align-items:center; }
 #root .operations-sidebar-open .company-brand .company-eye { width:64px !important; height:64px !important; }
-svg.company-eye.cos-eye-brand { width:72px !important; height:72px !important; }
-svg.company-eye.cos-eye-hero { width:192px !important; height:192px !important; margin:0 auto; }
-svg.company-eye.cos-eye-avatar { width:32px !important; height:32px !important; }
+.company-eye.cos-eye-brand { width:72px !important; height:72px !important; }
+.company-eye.cos-eye-hero { width:192px !important; height:192px !important; margin:0 auto; }
+.company-eye.cos-eye-avatar { width:32px !important; height:32px !important; }
 #root .auth-gate .company-eye { margin-bottom:24px; }
 #root .vision-orb-stage .vision-ring { display:none !important; }
 #root .vision-orb-stage, #root .vision-orb { animation:none !important; transform:none !important; }
 @media(max-width:700px) {
-  #root .company-utility-bar { min-height:88px; }
+  #root .company-mobile-brand .company-eye { width:40px !important; height:40px !important; }
+  #root .operations-sidebar-open .company-brand .company-eye { width:48px !important; height:48px !important; }
   #root .company-brand { margin-bottom:18px; }
-  svg.company-eye.cos-eye-brand { width:64px !important; height:64px !important; }
-  svg.company-eye.cos-eye-hero { width:160px !important; height:160px !important; }
+  .company-eye.cos-eye-brand { width:48px !important; height:48px !important; }
+  .company-eye.cos-eye-hero { width:128px !important; height:128px !important; }
 }

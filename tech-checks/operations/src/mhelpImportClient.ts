@@ -22,20 +22,21 @@ export async function fileBytesBase64(file:File) {
   for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
   return btoa(binary);
 }
-export function mhelpImportClient(api:ImportApi) {
+export function mhelpImportClient(api:ImportApi,current=()=>true) {
+  const post=(path:string,body:unknown)=>{if(!current())throw new Error('The import session changed. Reload COS Operations before continuing.');return api.post(path,body);};
   const adapter:MhelpImportAdapter={
-    commit:async({attachmentId,ticket})=>(await api.post('/api/mhelpdesk/imports/commit',{attachmentId:checkedId(attachmentId),ticket})).data,
+    commit:async({attachmentId,ticket})=>(await post('/api/mhelpdesk/imports/commit',{attachmentId:checkedId(attachmentId),ticket})).data,
     readJob:async id=>(await api.get('/api/mhelpdesk/imports/jobs/'+checkedId(id))).data as SavedImport|null,
-    moveToRecoverableTrash:async(id,verifiedJobId,ticket)=>{await api.post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/trash',{verifiedJobId:checkedId(verifiedJobId),ticket});},
+    moveToRecoverableTrash:async(id,verifiedJobId,ticket)=>{await post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/trash',{verifiedJobId:checkedId(verifiedJobId),ticket});},
     readAttachment:async id=>{const result=(await api.get('/api/mhelpdesk/imports/attachments/'+checkedId(id))).data;return result===null?null:checkedImportAttachment(result);},
   };
   return {
     adapter,
-    stage:async(attemptId:string,source:ImportSource,file:File)=>checkedImportAttachment((await api.post('/api/mhelpdesk/imports/stage',{attemptId:checkedId(attemptId),source,bytesBase64:await fileBytesBase64(file)})).data),
+    stage:async(attemptId:string,source:ImportSource,file:File)=>checkedImportAttachment((await post('/api/mhelpdesk/imports/stage',{attemptId:checkedId(attemptId),source,bytesBase64:await fileBytesBase64(file)})).data),
     readAttempt:async(id:string)=>{const value=(await api.get('/api/mhelpdesk/imports/attempt/'+checkedId(id))).data;if(value===null)return null;const checked=checkedImportAttachment(value);if(checked.attemptId!==id)throw new Error('The recovered attachment belongs to a different import attempt.');return checked;},
     history:async()=>checkedImportHistory((await api.get('/api/mhelpdesk/imports')).data),
     restore:async(id:string)=>{
-      await api.post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/restore',{});
+      await post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/restore',{});
       const value=await adapter.readAttachment(id);
       if(!value||value.state!=='staged')throw new Error('The restored copy could not be verified. Refresh imports before retrying.');
       return value;

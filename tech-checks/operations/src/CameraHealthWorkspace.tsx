@@ -6,13 +6,15 @@ import { api,openLegacy } from './api';
 import { checkedFieldMap } from './gpsPersistence';
 import { fieldCameraHealth,cameraColors,unitHealthLabel,unitDiagnosticsPath,cameraTime,type FieldHealthUnit } from './fieldCameraHealth';
 import { useCameraHealth } from './useCameraHealth';
+import LastKnownCameraStatus from './LastKnownCameraStatus';
+import {lastKnownCamera} from './cameraLastKnown';
 import CameraHealthOverview,{CameraCardActions,CameraResourceObservations,UnitEvidenceDetails,ReconProviderAreaDetails} from './CameraHealthOverview';
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 import {cameraOverview} from './cameraHealthCounts';
 export { validateCameraHealth } from './fieldCameraHealth';
 type Props={powerReadEnabled?:boolean;embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
 export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
-  const {data:health,error,loading,refresh,now,fleet}=useCameraHealth();
+  const {data:health,error,loading,refresh,now,fleet,cameraHistory}=useCameraHealth();
   const units=(fleet?((fleet.fieldMap as any).inventoryItems||fleet.fieldMap.items):null) as FieldHealthUnit[]|null;
   const unitError=error;const loadUnits=()=>refresh();
   const [ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
@@ -28,6 +30,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
       {!units?<p role={unitError?'alert':'status'}>{unitError?'The selected field unit could not be verified. Reload saved results to retry.':'Verifying the selected field unit…'}</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
         {!embedded&&<><h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
         <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p></>}
+        {!embedded&&<LastKnownCameraStatus observation={lastKnownCamera(cameraHistory,selected,units||[],detail)} now={now}/>}
         <UnitEvidenceDetails classification={detail?.classification||null}/><ReconProviderAreaDetails identity={detail?.association} rows={rows} now={now}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
         {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         {group&&<CameraCardActions group={group} now={now} onDetails={()=>openLegacy('camera-health')} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection}/>}

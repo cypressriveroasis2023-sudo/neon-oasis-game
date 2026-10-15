@@ -1,5 +1,6 @@
 import {showAllFieldHealth} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
+import {writeFile} from 'node:fs/promises';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 
 // Synthetic resources, labels, coordinates and proof markers only. Every remote request is intercepted.
@@ -23,11 +24,19 @@ function fixture({sourceCases=false}={}){
  }
  return {units,rows,identities};
 }
-async function mount(page,{sourceCases=false,overview=false}={}){
+async function mount(page,{sourceCases=false,overview=false,diagnostics=false}={}){
  const data=fixture({sourceCases});
  const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0};
  state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings});
  await page.clock.install({time:new Date(now)});
+ if(diagnostics)await page.addInitScript(()=>{
+  if(parent===window)return;
+  window.fixtureSessionDiagnostics={invalidations:[]};
+  window.addEventListener('cos-private-data-invalidated',event=>{
+   const reason=event.detail?.reason;
+   window.fixtureSessionDiagnostics.invalidations.push({at:Date.now(),reason:['token-renewed','parent-timeout','authentication-denied','security-hide'].includes(reason)?reason:'untyped'});
+  });
+ });
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/verified-health-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${overview?'camera-health?diagnostics=1':'field-map'}"></iframe><script>window.fixtureAuth=true;addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:window.fixtureAuth?'owner':'',accessToken:window.fixtureAuth?'synthetic-only':''},location.origin)})</script>`});
@@ -39,7 +48,7 @@ async function mount(page,{sourceCases=false,overview=false}={}){
   const body=request.postDataJSON();state.requests.push({...body,at:await page.evaluate(()=>Date.now())});
   if(body.method!=='GET'){state.writes.push(body);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic test rejects writes'})});}
   if(body.path==='/api/camera-health/summary-v3'&&state.summaryError)return route.fulfill({status:state.summaryError,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic saved summary unavailable'})});
-  const result=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true,fleetAccess:true,fleetPlacementEdit:true,fleetConnectionEdit:true}}
+  const result=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',legacyOwner:true,productionOwnerUserId:uuid(101),features:{fieldLocationVerification:true,fleetAccess:true,fleetPlacementEdit:true,fleetConnectionEdit:true}}
    :body.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now}
    :body.path==='/api/camera-health/summary-v3'?state.health()
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
@@ -148,26 +157,45 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'Your fleet session changed. Reload to verify the current account.'}).first()).toBeVisible();
+ await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'Your session changed. Reload COS Operations to verify your account and permissions.'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
  if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}else{await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);}
  noWrites(state);
 });
 
-test('four-minute saved-data polling preserves the 20-minute source expiry',async({page})=>{
- const {frame,state}=await mount(page);await expand(frame);
+test('four-minute saved-data polling preserves the 20-minute source expiry',async({page},info)=>{
+ const {frame,state}=await mount(page,{diagnostics:true});
+ const samples=[];
+ const sample=async label=>{
+  const browser=await frame.locator('body').evaluate(()=>{
+   const refresh=document.querySelector('.cos-fleet-refresh');
+   return {at:Date.now(),invalidations:window.fixtureSessionDiagnostics?.invalidations||[],refresh:refresh?{text:refresh.textContent,disabled:refresh.disabled}:null,alerts:Array.from(document.querySelectorAll('[role="alert"]'),node=>node.textContent),clusters:Array.from(document.querySelectorAll('.cos-field-cluster-wrap'),node=>({ids:node.getAttribute('data-unit-ids'),expanded:node.getAttribute('aria-expanded')})),pins:Array.from(document.querySelectorAll('.cos-field-pin-wrap'),node=>({id:node.getAttribute('data-unit-id'),health:node.querySelector('.cos-field-pin')?.getAttribute('data-health')})),viewport:{center:history.state?.cosFieldMapView?.center,zoom:history.state?.cosFieldMapView?.zoom}};
+  });
+  samples.push({label,...browser,elapsed:browser.at-Date.parse(now),requests:state.requests.map(({path,method,at})=>({path,method,at})),writes:state.writes.length});
+ };
  const pairedReads=()=>Object.fromEntries(['health','map'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map'][index]).length]));
- const baseline=pairedReads();await page.clock.runFor(3*60*1000);expect(pairedReads()).toEqual(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
- for(let tick=1;tick<=4;tick++){
-  await page.clock.runFor((tick===1?1:4)*60*1000);
-  await expect.poll(pairedReads).toEqual({health:baseline.health+tick,map:baseline.map+tick});
-  await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ try{
+  await expand(frame);await sample('expanded');
+  const baseline=pairedReads();await page.clock.runFor(3*60*1000);await sample('after three minutes');expect(pairedReads()).toEqual(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+  for(let tick=1;tick<=4;tick++){
+   await sample('before poll '+tick);
+   await page.clock.runFor((tick===1?1:4)*60*1000);
+   await sample('after clock advance '+tick);
+   await expect.poll(pairedReads).toEqual({health:baseline.health+tick,map:baseline.map+tick});
+   await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+   await sample('settled poll '+tick);
+  }
+  // Saved observations begin five minutes old and remain unchanged by reads:
+  // after sixteen elapsed minutes they must be gray despite four reloads.
+  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 4 minutes');
+  noWrites(state);
+ }finally{
+  await sample('final').catch(error=>samples.push({label:'diagnostic capture unavailable',error:String(error)}));
+  const path=info.outputPath('saved-polling-session-diagnostics.json');
+  await writeFile(path,JSON.stringify({project:info.project.name,retry:info.retry,samples},null,2));
+  await info.attach('saved-polling-session-diagnostics',{path,contentType:'application/json'});
  }
- // Saved observations begin five minutes old and remain unchanged by reads:
- // after sixteen elapsed minutes they must be gray despite four reloads.
- await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 4 minutes');
- noWrites(state);
 });
 
 for(const conflict of ['scoped identity warning','duplicate resource ownership'])test(conflict+' removes overview unit proof without hiding independent source records',async({page})=>{

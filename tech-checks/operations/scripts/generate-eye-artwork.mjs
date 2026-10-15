@@ -1,17 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 const root = fileURLToPath(new URL('../', import.meta.url));
-// The owner's original JPEG is preserved byte-for-byte. SVG only frames and clips it.
-const source = 'data:image/jpeg;base64,' + readFileSync(root+'public/resources/vision-approved-eye.jpeg').toString('base64');
-const image = `<image href="${source}" x="0" y="0" width="1320" height="914"/>`;
-const open = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="205 0 914 914">';
-// The 138px socket lies inside the original stationary silver rim. A 7.3px glance
-// moves the original optical assembly without exposing a second, stationary iris.
-const housing = open + image + '<circle cx="659" cy="428" r="138" fill="#030203"/></svg>';
-const lens = open + '<defs><clipPath id="lens"><circle cx="659" cy="428" r="138"/></clipPath></defs><g clip-path="url(#lens)">'+image+'</g></svg>';
-const encode = svg => 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-const h = encode(housing), l = encode(lens);
-writeFileSync(root+'src/eyeArtwork.ts', '// Generated from the original owner-supplied JPEG. Do not substitute a redraw.\nexport const housingArtwork = '+JSON.stringify(h)+';\nexport const lensArtwork = '+JSON.stringify(l)+';\n');
-const legacy = root+'../cos-eye-branding.js';
-writeFileSync(legacy, readFileSync(legacy,'utf8').replace(/^  const housing = .*$/m, '  const housing = '+JSON.stringify(h)+';').replace(/^  const lens = .*$/m, '  const lens = '+JSON.stringify(l)+';'));
-writeFileSync(root+'public/resources/vision-eye-round.svg', open + image + '</svg>');
+const atlas = 'data:image/webp;base64,' + readFileSync(root + 'public/resources/robot-eye-atlas.webp').toString('base64');
+const poster = 'data:image/webp;base64,' + readFileSync(root + 'public/resources/robot-eye-poster.webp').toString('base64');
+writeFileSync(root + 'src/eyeArtwork.ts', '// Generated from the approved robotic eye. Run scripts/generate-eye-artwork.mjs.\nexport const robotEyeAtlas = ' + JSON.stringify(atlas) + ';\nexport const posterArtwork = ' + JSON.stringify(poster) + ';\n');
+const files = ['src/robotEyeMechanics.ts', 'src/robotEyeRuntime.ts'];
+const source = files.map(file => readFileSync(root + file, 'utf8')).join('\n');
+const hash = createHash('sha256').update(source).digest('hex');
+const runtime = ts.transpileModule(source.replace(/^import .*$/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^export /gm, '');
+const adapter = readFileSync(root + 'scripts/eye-branding-adapter.js', 'utf8');
+writeFileSync(root + '../cos-eye-branding.js', '// Generated shared COS robotic eye; presentation only.\n// Runtime SHA-256: ' + hash + '\n(() => {\n"use strict";\nconst robotEyeAtlas = ' + JSON.stringify(atlas) + ';\nconst posterArtwork = ' + JSON.stringify(poster) + ';\n' + runtime + '\n' + adapter + '\n})();\n');
+writeFileSync(root + 'public/resources/vision-eye-round.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720"><image href="' + poster + '" width="720" height="720"/></svg>');

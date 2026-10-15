@@ -28,3 +28,15 @@ test('newly created recovery still requires full job and attachment readback',as
   record={...record,attachmentId:ids.attempt};
   await assert.rejects(()=>client.recoverSaved({...attachment(),disposition:'created'},ticket()),/does not match every reviewed field/);
 });
+
+test('file preparation cannot upload after its originating import view is invalidated',async()=>{
+ let valid=true,resolve;const bytes=new Promise(done=>resolve=done),calls=[];
+ const client=mhelpImportClient({get:async()=>({data:null}),post:async(...args)=>{calls.push(args);return {data:attachment()};}},()=>valid);
+ const pending=client.stage(ids.attempt,source,{arrayBuffer:()=>bytes});valid=false;resolve(new Uint8Array(20).buffer);await assert.rejects(pending,/session changed/);assert.equal(calls.length,0);
+});
+test('old import commit, deferred cleanup and restore cannot mutate after invalidation',async()=>{
+ let valid=false;const calls=[];const client=mhelpImportClient({get:async()=>({data:null}),post:async(...args)=>{calls.push(args);return {data:attachment()};}},()=>valid);
+ await assert.rejects(client.adapter.commit({organizationId:ids.org,attachmentId:ids.attachment,ticket:ticket()}),/session changed/);
+ await assert.rejects(client.adapter.moveToRecoverableTrash(ids.attachment,ids.job,ticket()),/session changed/);
+ await assert.rejects(client.restore(ids.attachment),/session changed/);assert.equal(calls.length,0);
+});

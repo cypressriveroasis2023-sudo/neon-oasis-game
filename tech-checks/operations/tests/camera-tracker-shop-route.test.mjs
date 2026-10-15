@@ -39,8 +39,16 @@ async function setup(mode='valid'){
   if(url.endsWith('/cos_camera_identity_epochs_v1'))return json(epochs);
   if(url.endsWith('/cos_mhelp_placement_snapshot')){
    mhelpReads++;if(mhelpReads>1)assert(init.signal instanceof AbortSignal);
+   assert.deepEqual(body,{p_actor_user_id:actorId,p_organization_id:org,p_projection:'camera'});
+   if(mode==='mhelp-initial-denied')return json({message:'Equipment view required'},403);
+   if(mode==='mhelp-initial-failure')return json({message:'PRIVATE consumed receipt failure'},503);
    if(mode==='mhelp-current-failure'&&mhelpReads>1)return json({message:'PRIVATE fixture failure'},503);
+   if(mode==='mhelp-current-denied'&&mhelpReads>1)return json({message:'PRIVATE authorization failure'},403);
+   if(mode==='mhelp-current-null'&&mhelpReads>1)return json(null);
    if(mode==='mhelp-null')return json(null);
+   if(mode==='mhelp-array')return json([]);
+   if(mode==='mhelp-number')return json(7);
+   if(mode==='mhelp-string')return json('invalid');
    const value=clone(receipt);
    if(mode==='mhelp-disabled')value.enabled=false;
    if(mode==='mhelp-mode-change'&&mhelpReads>1)value.enabled=false;
@@ -79,9 +87,18 @@ for(const mode of ['valid','failure','duplicate','unexpected','changed','native-
 });
 test('legacy v2 summary contract does not perform the new reads',async()=>{const {calls,handler}=await setup();const response=await handler(request('/api/camera-health/summary-v2')),result=await response.json();assert.equal(response.status,200);assert.equal(result.rows[0].scope,'unknown');assert.equal(calls.some(c=>c.url.endsWith('/cos_geocode_sources_map_projection')),false);});
 test('unauthenticated request cannot read optional source proof',async()=>{const {calls,handler}=await setup();assert.equal((await handler(request(undefined,false))).status,401);assert.equal(calls.length,0);});
-for(const mode of ['mhelp-valid','mhelp-disabled','mhelp-field','mhelp-held','mhelp-stale','mhelp-empty','mhelp-null','mhelp-changed','mhelp-disappears','mhelp-mode-change','mhelp-current-failure'])test('integrated enabled-receipt guard '+mode,async()=>{
+for(const mode of ['mhelp-valid','mhelp-disabled','mhelp-field','mhelp-held','mhelp-stale','mhelp-empty','mhelp-changed','mhelp-disappears','mhelp-mode-change','mhelp-current-failure','mhelp-current-denied','mhelp-current-null'])test('integrated enabled-receipt guard '+mode,async()=>{
  const {handler,calls,stats}=await setup(mode),response=await handler(request()),result=await response.json();assert.equal(response.status,200,JSON.stringify(result));assert.equal(result.rows[0].scope,['mhelp-valid','mhelp-disabled'].includes(mode)?'shop':'unknown');assert.equal(stats().mhelpReads,2);assert.equal(calls.filter(c=>c.url.endsWith('/cos_mhelp_placement_snapshot')&&c.signal).every(c=>c.signal.aborted),true);
+ assert.equal(calls.filter(c=>c.url.endsWith('/cos_mhelp_location_snapshot')).length,0);
  assert.equal(JSON.stringify(result).includes('guardCurrent'),false);assert.equal(JSON.stringify(result).includes('PRIVATE'),false);
+});
+for(const mode of ['mhelp-null','mhelp-array','mhelp-number','mhelp-string','mhelp-initial-denied','mhelp-initial-failure'])test('initial consumed camera receipt '+mode+' fails closed without optional location work',async()=>{
+ const {handler,calls,stats}=await setup(mode),response=await handler(request()),result=await response.json();
+ assert.equal(response.status,mode==='mhelp-initial-denied'?403:503);assert.equal(stats().mhelpReads,1);assert.equal(result.rows,undefined);
+ if(mode==='mhelp-initial-denied')assert.equal(result.error,'Equipment view required');
+ assert.equal(calls.filter(c=>c.url.endsWith('/cos_mhelp_location_snapshot')).length,0);
+ assert.equal(calls.filter(c=>c.url.endsWith('/cos_geocode_sources_map_projection')).length,0);
+ assert.equal(JSON.stringify(result).includes('PRIVATE'),false);assert.equal(JSON.stringify(result).includes('guardCurrent'),false);
 });
 test('HTTP route preserves newer mHelp actual-camera placement and evidence on optional success and fallback',async()=>{
  const results=[];for(const mode of ['mhelp-actual','mhelp-actual-failure']){const {handler}=await setup(mode),response=await handler(request()),result=await response.json();assert.equal(response.status,200,JSON.stringify(result));assert.equal(result.rows.find(r=>r.trackerOnly).scope,mode==='mhelp-actual'?'shop':'unknown');const camera=result.rows.find(r=>r.id===990700);assert.equal(camera.scope,'shop');assert.equal(camera.evidence.status,'online');results.push({camera,sync:result.mhelpPlacementSync});}assert.deepEqual(results[0],results[1]);

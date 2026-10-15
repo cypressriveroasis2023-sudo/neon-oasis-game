@@ -166,6 +166,26 @@ jobs:
           name: source-equipment-estimate-results
           path: tech-checks/operations/test-results
           if-no-files-found: ignore
+      - name: Verify camera observation timestamp provenance
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-observed-timestamp.browser.spec.mjs
+      - name: Camera observation timestamp evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-observed-timestamp-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify guarded last-known camera evidence
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-last-known.browser.spec.mjs
+      - name: Last-known camera evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-last-known-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify read-only Victron dashboards and shared eye branding
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/vrm.browser.spec.mjs tests/eye-branding.browser.spec.mjs tests/company-overview.browser.spec.mjs
@@ -178,7 +198,7 @@ jobs:
           if-no-files-found: ignore
       - name: Verify exact TV outage rotation before dashboard regressions
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage"
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage|TV link fills the host|Teddy and Victor have no inspection fields"
       - name: TV outage rotation evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -189,12 +209,22 @@ jobs:
       - name: Verify Fleet usability fixes and placement retry
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/fleet-usability.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/responsive-host.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/vrm.browser.spec.mjs tests/verified-health-identity.browser.spec.mjs tests/fleet-battery.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/field-health-flow.browser.spec.mjs --grep "expanded cluster survives|Owner proof colors|four-minute saved-data|actual charge sources|incomplete existing FIELD correction rechecks source access|plain status circles expand|Field setup keeps|MHelp recorded addresses|missing locations|unit drawer scrolls|unverified combined roster|plain colored circles|Shop pending|approved Today workspace|leaving Tech Checks|IT with.*Victron capability"
-      - name: Fleet usability pixel evidence
+      - name: Fleet usability trace and pixel evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fleet-usability-visuals
-          path: tech-checks/operations/test-results/**/*.png
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify bounded Owner session recovery
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/operations-session-recovery.browser.spec.mjs
+      - name: Owner session recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-session-recovery-results
+          path: tech-checks/operations/test-results
           if-no-files-found: ignore
       - name: Verify saved-camera refresh timing and visibility
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
@@ -222,9 +252,25 @@ jobs:
       - name: Verify Tech Check TV and IT daily navigation and camera scope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
+      - name: Tech Check TV and IT navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tech-check-tv-navigation-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs tests/mhelp-import-flow.browser.spec.mjs
+      - name: mHelp interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mhelp-interaction-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
       - name: Verify shared map migration and Owner portal regressions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: >-
@@ -243,6 +289,16 @@ jobs:
           tests/shared-fleet-map.browser.spec.mjs
           tests/verified-health-identity.browser.spec.mjs
           tests/vision-dashboard.browser.spec.mjs
+          tests/vision-progressive.browser.spec.mjs
+      - name: Shared map and Owner portal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-map-owner-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()
