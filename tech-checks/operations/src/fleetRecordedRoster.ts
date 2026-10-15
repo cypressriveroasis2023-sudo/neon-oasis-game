@@ -34,7 +34,7 @@ export function readRecordedRoster(value:unknown,inventory?:DashboardUnit[]):{ro
 }
 export const recordedFamily=(r:RecordedEquipment)=>r.family||canonicalCameraUnit(r.unitNumber)?.split('|')[0]||r.category||'Other equipment';
 export const recordedSourceLabel=(r:RecordedEquipment)=>({owner_supplied_mhelp_export:'MHelp export',current_tracker:'2027 tracker',recorded_inventory:'Recorded inventory',owner:'Owner record'}[r.source]);
-/** Non-UUID source rows stay outside camera classification, map pins and write actions. */
+/** Non-UUID source rows stay outside camera classification and native write actions. */
 export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map'){
  const q=filters.query.trim().toLowerCase();
  return items.filter(r=>r.kind!=='unit'&&(view!=='setup'||r.active&&r.placement==='field')&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')

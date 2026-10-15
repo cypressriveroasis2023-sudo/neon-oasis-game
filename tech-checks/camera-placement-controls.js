@@ -172,30 +172,89 @@
     const writerCompatible=sourceWrite?Boolean(nativeAlias):placementMatchKey(row.unitNumber)===matchKey||Boolean(nativeAlias);
     return {row,field:field&&!newInstallation,newInstallation,nativeAlias,sourcePlacement,writerCompatible,site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state),nativeAlias,sourcePlacement?.revision??null])};
   }
-  async function readCurrentData(db,key,signal,progress=()=>{}){
+  // Share transport only while both authenticated sources are still in flight.
+  // No settled data is cached; every consumer retains its own authority checks.
+  const fleetReads=new WeakMap();
+  function readFleetSources({db,session,signal,share=false,onSource=()=>{}}){
+    if(!db||!text(session?.user?.id)||!text(session?.access_token))return Promise.reject(new Error('Sign in again to verify the saved placement.'));
+    if(!signal||signal.aborted)return Promise.reject(new Error('The saved placement read was cancelled.'));
+    const subject=session.user.id,token=session.access_token;
+    let pool,key,entry;
+    if(share){
+      pool=fleetReads.get(db);if(!pool){pool=new Map();fleetReads.set(db,pool);}
+      key=JSON.stringify([subject,token]);entry=pool.get(key);
+      // A rejected producer remains a denial barrier until both bodies drain.
+      if(entry&&entry.state!=='pending')return Promise.reject(entry.error);
+    }
+    const fresh=!entry;
+    if(fresh){
+      entry={state:'pending',controller:new AbortController(),consumers:new Set(),completed:new Set(),values:{},remaining:2,timer:null,error:null};
+      if(pool)pool.set(key,entry);
+    }
+    const forget=()=>{if(pool?.get(key)===entry)pool.delete(key);};
+    const settle=(consumer,error,value)=>{
+      if(!entry.consumers.delete(consumer))return;
+      consumer.signal.removeEventListener('abort',consumer.abort);
+      if(error)consumer.reject(error);else consumer.resolve(value);
+    };
+    const stop=error=>{
+      if(entry.state!=='pending')return;
+      entry.state='failed';entry.error=error;clearTimeout(entry.timer);entry.controller.abort();
+      for(const consumer of [...entry.consumers])settle(consumer,error);
+    };
+    const notify=(consumer,name)=>{if(!entry.consumers.has(consumer)||consumer.signal.aborted)return;try{consumer.onSource(name);}catch{ /* Progress cannot change shared transport authority. */ }};
+    const promise=new Promise((resolve,reject)=>{
+      const consumer={resolve,reject,signal,onSource,abort:null};
+      consumer.abort=()=>{settle(consumer,new Error('The saved placement read was cancelled.'));if(!entry.consumers.size)stop(new Error('The saved placement read was cancelled.'));};
+      entry.consumers.add(consumer);signal.addEventListener('abort',consumer.abort,{once:true});
+      for(const name of entry.completed)notify(consumer,name);
+    });
+    if(fresh){
+      // Fixed producer lifetime. Joining never renews this deadline or a caller's.
+      entry.timer=setTimeout(()=>stop(new Error('Verification timed out while waiting for the current Field Map inventory and equipment identity.')),30000);
+      const get=async(path,name)=>{
+        const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({path,method:'GET',body:null}),signal:entry.controller.signal,cache:'no-store'});
+        if(!response.ok)fail(response.status===401||response.status===403?'Your current account cannot verify the saved placement.':'The current '+name+' is unavailable. Retry verification.');
+        try{return await response.json();}catch{fail('The saved '+name+' response is incomplete.');}
+      };
+      for(const [path,name,field] of [['/api/field-map','Field Map inventory','snapshot'],['/api/camera-health/summary-v3','equipment identity','health']]){
+        void get(path,name).then(value=>{
+          if(entry.state!=='pending')return;
+          entry.values[field]=value;entry.completed.add(name);
+          if(entry.completed.size===2){
+            // Terminal before progress or delivery: synchronous callbacks cannot
+            // join a pair whose two response bodies have already completed.
+            entry.state='fulfilled';clearTimeout(entry.timer);forget();entry.controller.abort();
+          }
+          for(const consumer of [...entry.consumers])notify(consumer,name);
+          if(entry.state==='fulfilled')for(const consumer of [...entry.consumers])settle(consumer,null,entry.values);
+        },error=>stop(new Error(name+': '+(error?.message||error)))).finally(()=>{
+          if(--entry.remaining)return;
+          clearTimeout(entry.timer);forget();
+        });
+      }
+    }
+    return promise;
+  }
+  async function readCurrentData(db,key,signal,progress=()=>{},share=false){
     const current=()=>{if(signal.aborted)fail('The saved placement read was cancelled.');};
     progress(['signed-in account']);
     const sessionResult=await db.auth.getSession(),session=sessionResult.data?.session;current();
     if(sessionResult.error||!text(session?.access_token)||!text(session?.user?.id))fail('Sign in again to verify the saved placement.');
+    const subject=session.user.id,token=session.access_token;
     const pending=new Set(['saved placement','Field Map inventory','equipment identity']);
     progress([...pending]);
     const read=async(name,action)=>{try{const value=await action();current();pending.delete(name);progress([...pending]);return value;}catch(error){current();throw new Error(name+': '+(error?.message||error));}};
-    const get=async(path,name)=>{
-      const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({path,method:'GET',body:null}),signal,cache:'no-store'});
-      if(!response.ok)fail(response.status===401||response.status===403?'Your current account cannot verify the saved placement.':'The current '+name+' is unavailable. Retry verification.');
-      try{return await response.json();}catch{fail('The saved '+name+' response is incomplete.');}
-    };
-    const [legacy,snapshot,health]=await Promise.all([
+    const [legacy,{snapshot,health}]=await Promise.all([
       read('saved placement',async()=>{const value=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});if(value.error)throw value.error;return value;}),
-      read('Field Map inventory',()=>get('/api/field-map','Field Map inventory')),
-      read('equipment identity',()=>get('/api/camera-health/summary-v3','equipment identity'))
+      readFleetSources({db,session,signal,share,onSource:name=>{current();pending.delete(name);progress([...pending]);}})
     ]);current();
     const resolved=resolvePlacement(snapshot,health,legacy.data,key);progress(['signed-in account recheck']);
     const fresh=await db.auth.getSession();current();
-    if(fresh.error||fresh.data?.session?.user?.id!==session.user.id||!text(fresh.data?.session?.access_token))fail('The signed-in account changed. Reopen the unit.');
-    return {...resolved,state:legacy.data,subject:session.user.id};
+    if(fresh.error||fresh.data?.session?.user?.id!==subject||fresh.data?.session?.access_token!==token)fail('The signed-in account changed. Reopen the unit.');
+    return {...resolved,state:legacy.data,subject};
   }
-  function readCurrent(db,key,signal,progress=()=>{}){
+  function readCurrent(db,key,signal,progress=()=>{},share=false){
     // Bound the entire read, including Supabase/session promises that do not accept a fetch signal.
     if(signal.aborted)return Promise.reject(new Error('The saved placement read was cancelled or timed out.'));
     return new Promise((resolve,reject)=>{
@@ -205,7 +264,7 @@
       const abort=()=>finish(reject,new Error('Verification timed out or was cancelled while waiting for '+waiting.join(', ')+'.'));
       const update=names=>{if(!settled&&!combined.aborted){waiting=names.length?names:['saved identity checks'];progress(waiting);}};
       signal.addEventListener('abort',abort,{once:true});
-      readCurrentData(db,key,combined,update).then(value=>finish(resolve,value),error=>finish(reject,error));
+      readCurrentData(db,key,combined,update,share).then(value=>finish(resolve,value),error=>finish(reject,error));
     });
   }
   async function open({db,key,placement,onSaved}){
@@ -223,14 +282,14 @@
     disableInputs(true);
     const close=()=>{if(context.pending)return;context.controller.abort();dialog.close();dialog.remove();if(active===context)active=null;window.removeEventListener('popstate',close);window.removeEventListener('hashchange',close);};
     cancel.onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});window.addEventListener('popstate',close);window.addEventListener('hashchange',close);
-    dialog.showModal();let baseline,requestId=crypto.randomUUID(),uncertain=false,openedSubject='';
+    dialog.showModal();let baseline,requestId=crypto.randomUUID(),uncertain=false,openedSubject='',baselineAttempts=0;
     const requiresReopen=error=>/signed-in account changed|Sign in again|current account cannot verify/.test(String(error?.message||error));
     const reportProgress=names=>{if(alive())feedback.textContent='Checking saved unit identity and placement (up to 30 seconds)… Waiting for '+names.join(', ')+'.';};
     const loadBaseline=async()=>{
       if(!alive()||context.pending||context.loading||uncertain)return;
       baseline=null;context.loading=true;retry.hidden=true;retry.disabled=true;submit.disabled=true;disableInputs(true);input('confirmed').checked=false;
       try{
-        const loaded=await readCurrent(db,key,requestSignal(),reportProgress);if(!alive())return;
+        const loaded=await readCurrent(db,key,requestSignal(),reportProgress,baselineAttempts++===0);if(!alive())return;
         if(openedSubject&&loaded.subject!==openedSubject)throw new Error('The signed-in account changed. Close and reopen the unit.');
         baseline=loaded;openedSubject=loaded.subject;input('site').value=baseline.site;input('address').value=baseline.address;disableInputs(!baseline.writerCompatible);submit.disabled=!baseline.writerCompatible;
         feedback.textContent=placement==='SHOP'?'Saved unit identity and placement verified. No new installation address or live vendor lookup is needed for Shop / ROOT.':'Saved installation verified. Review the address and confirm before saving.';
@@ -285,5 +344,5 @@
     };
     await loadBaseline();
   }
-  root.CameraPlacementControls={open,stateMatches,placementMatchKey,resolvePlacement,finalizedPlacementSource,sourceDisclosure,sourceLabel};
+  root.CameraPlacementControls={open,readFleetSources,stateMatches,placementMatchKey,resolvePlacement,finalizedPlacementSource,sourceDisclosure,sourceLabel};
 })(globalThis);

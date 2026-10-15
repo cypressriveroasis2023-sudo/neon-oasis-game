@@ -28,7 +28,7 @@ test('bounded read preserves last fields with explicit stale state; changed subj
 });
 test('late older source response cannot replace a newer placement or different resource',async()=>{
  const c=fixture();let release,first=true;const old=c.snapshotFixture();c.fetch=async(_u,o)=>{const path=JSON.parse(o.body).path;if(path==='/api/field-map'&&first){first=false;await new Promise(r=>release=r);return {ok:true,json:async()=>old};}return{ok:true,json:async()=>path==='/api/field-map'?c.snapshotFixture():c.healthFixture()};};
- const v=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});const pending=v.refresh();await new Promise(r=>setTimeout(r,0));c.fixtureMode='shop';await v.refresh();release();await pending;assert.equal(v.get(c.fixtureDevices[0]).scope,'shop');c.fixtureDevices[0]={...c.fixtureDevices[0],unit_key:'RANGER 099'};assert.notEqual(v.get(c.fixtureDevices[0]).status,'ready');v.dispose();
+ const v=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});const pending=v.refresh();await new Promise(r=>setTimeout(r,0));c.fixtureMode='shop';await v.refresh();assert.equal(v.get(c.fixtureDevices[0]).status,'unavailable');release();await pending;await new Promise(r=>setTimeout(r,0));assert.equal(v.get(c.fixtureDevices[0]).status,'unavailable');await v.refresh();assert.equal(v.get(c.fixtureDevices[0]).scope,'shop');c.fixtureDevices[0]={...c.fixtureDevices[0],unit_key:'RANGER 099'};assert.notEqual(v.get(c.fixtureDevices[0]).status,'ready');v.dispose();
 });
 test('an unresponsive session read becomes bounded unavailable without producing empty editable placement',async()=>{
  const c=fixture(),v=c.CameraEffectivePlacement.create({db:{auth:{getSession:()=>new Promise(()=>{})}},getDevices:()=>c.fixtureDevices,timeoutMs:5});await v.refresh();assert.equal(v.get(c.fixtureDevices[0]).status,'unavailable');assert.match(v.get(c.fixtureDevices[0]).reason,/unavailable/);v.dispose();
@@ -51,4 +51,26 @@ test('a valid Owner-confirmed alias may bind an otherwise unparseable source lab
 });
 test('SHOP labels exclude a retained historical field address without modifying its DTO or raw record',async()=>{
  const c=fixture();c.fixtureMode='shop';const old=c.snapshotFixture;c.snapshotFixture=()=>{const snapshot=old();snapshot.inventoryItems[0].address='2045 Historical Field Rd, Testville, TX 75001';snapshot.inventoryItems[0].site='Old Customer Site';return snapshot;};let deny=false;c.fetch=async(_u,o)=>({ok:!deny,json:async()=>JSON.parse(o.body).path==='/api/field-map'?c.snapshotFixture():c.healthFixture()});const view=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});await view.refresh();assert.equal(c.CameraEffectivePlacement.locationText(c.fixtureDevices[0]),'SHOP / ROOT');assert.equal(view.get(c.fixtureDevices[0]).row.address,'2045 Historical Field Rd, Testville, TX 75001');assert.equal(view.get(c.fixtureDevices[0]).row.site,'Old Customer Site');deny=true;await view.refresh();assert.equal(c.CameraEffectivePlacement.locationText(c.fixtureDevices[0]),'Last read: SHOP / ROOT');assert.equal(view.get(c.fixtureDevices[0]).row.address,'2045 Historical Field Rd, Testville, TX 75001');assert.equal(view.get(c.fixtureDevices[0]).row.site,'Old Customer Site');view.dispose();
+});
+
+for(const failedPath of ['/api/field-map','/api/camera-health/summary-v3'])for(const failure of ['http','body'])test('terminal '+failedPath+' '+failure+' failure aborts the sibling saved read',async()=>{
+ const c=fixture(),signals=[];let siblingAborted=false;
+ c.fetch=async(_u,options)=>{const path=JSON.parse(options.body).path;signals.push(options.signal);if(path===failedPath)return {ok:failure!=='http',status:503,json:async()=>{throw Error('Synthetic response body failed');}};
+  return new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>{siblingAborted=true;reject(Error('Synthetic sibling cancelled'));},{once:true}));};
+ const view=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});await view.refresh();
+ assert.equal(signals.length,2);assert.equal(siblingAborted,true);assert.ok(signals.every(signal=>signal.aborted));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');view.dispose();
+});
+test('display timeout aborts both pending transports without extending its deadline',async()=>{
+ const c=fixture(),signals=[];c.fetch=async(_u,options)=>{signals.push(options.signal);return new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Error('Synthetic timed-out transport')),{once:true}));};
+ const view=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices,timeoutMs:5});await view.refresh();assert.equal(signals.length,2);assert.ok(signals.every(signal=>signal.aborted));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');view.dispose();
+});
+test('successful display cleanup aborts its completed attempt without changing ready evidence',async()=>{
+ const c=fixture(),signals=[];c.fetch=async(_u,options)=>{signals.push(options.signal);return {ok:true,json:async()=>JSON.parse(options.body).path==='/api/field-map'?c.snapshotFixture():c.healthFixture()};};
+ const view=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});await view.refresh();assert.ok(signals.every(signal=>signal.aborted));assert.equal(view.get(c.fixtureDevices[0]).status,'ready');view.dispose();
+});
+test('superseded display cleanup keeps the draining barrier until the old bodies settle',async()=>{
+ const c=fixture(),signals=[],releases=[];c.fetch=async(_u,options)=>{const path=JSON.parse(options.body).path;signals.push(options.signal);await new Promise(resolve=>releases.push(resolve));return {ok:true,json:async()=>path==='/api/field-map'?c.snapshotFixture():c.healthFixture()};};
+ const view=c.CameraEffectivePlacement.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices}),older=view.refresh();await new Promise(resolve=>setTimeout(resolve,0));await view.refresh();await older;
+ assert.equal(signals.length,2);assert.ok(signals.every(signal=>signal.aborted));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');releases.forEach(resolve=>resolve());await new Promise(resolve=>setTimeout(resolve,0));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');
+ const newer=view.refresh();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(signals.length,4);assert.ok(signals.slice(2).every(signal=>!signal.aborted));releases.slice(2).forEach(resolve=>resolve());await newer;assert.equal(view.get(c.fixtureDevices[0]).status,'ready');view.dispose();
 });

@@ -41,10 +41,10 @@ async function ownerFixture(){
  return {sources,review,control,audit};
 }
 const project=({sources,review})=>verifiedHealthIdentities(sources,review);
-test('review scope contains exactly 75 opaque native commitments and one Owner commitment',()=>{
- assert.equal(Object.keys(REVIEWED_NATIVE_IDENTITIES).length,75);assert.equal(REVIEWED_OWNER_IDENTITIES.size,1);
+test('review scope contains exactly 76 opaque native commitments and one Owner commitment',()=>{
+ assert.equal(Object.keys(REVIEWED_NATIVE_IDENTITIES).length,76);assert.equal(REVIEWED_OWNER_IDENTITIES.size,1);
  assert.deepEqual(Object.keys(REVIEWED_NATIVE_RESOURCES).sort(),Object.keys(REVIEWED_NATIVE_IDENTITIES).sort());
- assert.equal(Object.values(REVIEWED_NATIVE_RESOURCES).flatMap(row=>row.deviceIds).length,120);
+ assert.equal(Object.values(REVIEWED_NATIVE_RESOURCES).flatMap(row=>row.deviceIds).length,124);
  assert.equal(Object.keys(REVIEWED_OWNER_RESOURCES).length,1);assert.equal(Object.values(REVIEWED_OWNER_RESOURCES)[0].deviceIds.length,4);
  assert.deepEqual(Object.keys(REVIEWED_OWNER_PHYSICAL_IDENTITIES),Object.keys(REVIEWED_OWNER_RESOURCES));
  for(const digest of Object.values(REVIEWED_OWNER_PHYSICAL_IDENTITIES))assert.match(digest,/^[a-f0-9]{64}$/);
@@ -52,6 +52,17 @@ test('review scope contains exactly 75 opaque native commitments and one Owner c
  for(const [key,value] of Object.entries({...REVIEWED_NATIVE_RESOURCES,...REVIEWED_OWNER_RESOURCES}))for(const digest of [key,...value.deviceIds,...value.unitKeys])assert.match(digest,/^[a-f0-9]{64}$/);
  const source=readFileSync(new URL('../../supabase/functions/cos-operations-pages/verifiedHealthIdentityScope.ts',import.meta.url),'utf8');
  assert.doesNotMatch(source,/external_device_id|device_serial|HDC[24]|Solar Spotter|Spotter \d/);
+});
+test('one explicit four-resource admission preserves every previous opaque commitment',async()=>{
+ const key='431457757d33b15d0599c7c93ded5cdbb6a74c85caf225c1fcc7079f7b5ef5f8';
+ assert.equal(REVIEWED_NATIVE_IDENTITIES[key],'dc532cb72f2c0091810d513666813074b10a8afdfb526f00c0a9873554b1dc8e');
+ assert.deepEqual(REVIEWED_NATIVE_RESOURCES[key],{
+  deviceIds:['feed6068a78c6977c764c0365dfcfac2d94f6ddf1535273fc8b6c48e04eb7105','46904bb929ed3ffdbedfdfb4d2c517282d10d2644ca3205a03d9fc2bd06cd987','fdd3c0ca5a1c00eaaddc2c0140aef37c154e4ab6338de9c8bd43575858e2cd13','664c50e58955e2ac4fa545241ed292331f9b9749510742992e0f444e2018a01e'],
+  unitKeys:['0de5ec7e47d0dd1758d9098f9e7accac4adadf71339f289a79541711ef8afa94'],
+ });
+ const previous=value=>Object.entries(value).filter(([id])=>id!==key).sort(([a],[b])=>a.localeCompare(b));
+ assert.equal(await identityDigest(previous(REVIEWED_NATIVE_IDENTITIES)),'d71de9555ec319886bc2a815deb5150c87b99399e59e5c9d08b8e9c24a094cdd');
+ assert.equal(await identityDigest(previous(REVIEWED_NATIVE_RESOURCES)),'7bc7786b919cfa86263d04a0f0748f8c81fa52088ad2dd3b449689d6d16d0c11');
 });
 test('65 actual-shaped complete groups prove 110 unique resources without exposing serials',async()=>{
  const f=await fixture(65),result=await project(f);assert.equal(result.identityVersion,1);assert.equal(result.unitIdentities.length,65);assert.deepEqual(result.identityWarnings,[]);

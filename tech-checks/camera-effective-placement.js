@@ -5,7 +5,6 @@
  */
 (function(root){
   'use strict';
-  const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
   const object=v=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
   const text=v=>typeof v==='string'&&v.trim()!=='';
   const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
@@ -98,16 +97,11 @@
             if(sessionResult.error||!text(session?.access_token)||!text(session?.user?.id))throw new Error('Current account unavailable.');
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
             if(subject&&subject!==session.user.id){values.clear();emit();}subject=session.user.id;
-            const ds=getDevices().slice(),before=signature(ds);
-            const get=async path=>{
-              const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({path,method:'GET',body:null}),cache:'no-store',signal:current.signal});
-              if(!response.ok)throw new Error('Current physical placement unavailable.');
-              return response.json();
-            };
-            const [snapshot,health]=await Promise.all([get('/api/field-map'),get('/api/camera-health/summary-v3')]);
+            const token=session.access_token,ds=getDevices().slice(),before=signature(ds);
+            const {snapshot,health}=await root.CameraPlacementControls.readFleetSources({db,session,signal:current.signal,share:true});
             const resolved=resolve(snapshot,health,ds,{partial}),fresh=await db.auth.getSession();
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
-            if(fresh.error||fresh.data?.session?.user?.id!==subject||!text(fresh.data?.session?.access_token)){values.clear();throw new Error('Signed-in account changed.');}
+            if(fresh.error||fresh.data?.session?.user?.id!==subject||fresh.data?.session?.access_token!==token){values.clear();throw new Error('Signed-in account changed.');}
             if(before!==signature(getDevices()))throw new Error('Displayed camera group changed.');
             return resolved;
           };
@@ -115,7 +109,9 @@
           if(request!==revision||stopped)return;
           values=resolved;loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';emit();}},maxAge+1);expiryTimer?.unref?.();
         }catch{if(request!==revision||stopped)return;status=values.size?'stale':'unavailable';}
-        finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);if(request===revision)emit();}
+        // The sibling transport/body may still be pending after Promise.all rejects.
+        // Abort only this captured attempt, never a newer refresh's controller.
+        finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);current.abort();if(request===revision)emit();}
       },
       clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();status='unavailable';subject=null;emit();},
       dispose(){stopped=true;view.clear();subscription?.unsubscribe();if(client===view)client=null;}

@@ -10,8 +10,8 @@ const fixtures=[
 {id:12,unit_key:'RANGER 023',device_name:'RANGER 023 / Camera 1',device_type:'camera',monitoring_profile:'ranger',organization:'Synthetic west site',source_status:'online',source:'vigilant_control_center',source_last_seen_at:'2026-10-06T12:29:00Z',last_online_at:'2026-10-06T12:29:00Z',activation_state:'active'},
 {id:13,unit_key:'RII-028',device_name:'RII-028 / Detector 1',device_type:'detector',monitoring_profile:'reconeyez',source:'reconeyez',external_device_id:'DETECTOR-TEST',organization:'Synthetic Recon site',source_status:'online',source_last_seen_at:'2026-10-06T12:29:00Z',last_online_at:'2026-10-06T12:29:00Z',activation_state:'active',source_metadata:{area:'Synthetic Recon site',battery_percent:7}}
 ];
-const mock=`window.reads=[];window.originalSetInterval=window.setInterval;window.setInterval=(fn,ms)=>{if(ms===60000)window.freshnessCheck=fn;return window.originalSetInterval(fn,ms)};Date.now=()=>Date.parse('2026-10-06T12:30:00Z');window.fixtureDevices=${JSON.stringify(fixtures)};window.componentEvents=[{id:50,external_device_id:'BRIDGE-TEST',component_guid:'BRIDGE-TEST',component_type:'bridge_4g',component_name:'Bridge test',component_area:'Synthetic Recon site',observed_at:'2026-10-06T12:29:00Z',event_type:'YC',battery_percent:6},{id:51,external_device_id:'SIREN-TEST',component_guid:'SIREN-TEST',component_type:'siren_v1',component_name:'Siren test',component_area:'Synthetic Recon site',observed_at:'2026-10-06T12:29:00Z',event_type:'RP',battery_percent:75}];
-window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'test-owner'},access_token:'synthetic-only'}}})},functions:{invoke:async(name)=>{if(window.holdChecks&&name==='camera-provider-reconcile')await new Promise(resolve=>window.releaseCheck=resolve);return {data:{configured:true}}}},from(table){const q={filters:[],select(){return q},order(){return q},range(){return q},limit(){return q},eq(k,v){q.filters.push([k,v]);return q},in(k,v){q.filters.push([k,v]);return q},single(){return q},then(resolve){window.reads.push({table,filters:q.filters});let data=table==='profiles'?{active:true,role:'owner'}:table==='camera_devices'?window.fixtureDevices:table==='equipment_master'?(window.fixtureTracker||[]):table==='camera_health_current'?(window.fixtureHealth||[]):table==='camera_integrations'?(window.fixtureIntegrations||[]):table==='camera_integration_events'?window.componentEvents.filter(x=>q.filters.every(([k,v])=>k==='provider'?true:k==='payload->device_info->>area'?x.component_area===v:x[k]===v)):table==='camera_health_history'?[{id:1,camera_device_id:11,observed_at:'2026-10-06T10:00:00Z',status:'online',check_source:'Historical east observation'},{id:2,camera_device_id:12,observed_at:'2026-10-06T12:29:00Z',status:'online',check_source:'Other unit only'}].filter(x=>q.filters.every(([k,v])=>Array.isArray(v)?v.includes(x[k]):x[k]===v)):[];return Promise.resolve(window.failHistory&&table==='camera_health_history'?{error:{message:'Synthetic history failure'}}:{data}).then(resolve)}};return q}})};`;
+const mock=`window.reads=[];window.functionCalls=[];window.originalSetInterval=window.setInterval;window.setInterval=(fn,ms)=>{if(ms===60000)window.freshnessCheck=fn;return window.originalSetInterval(fn,ms)};Date.now=()=>Date.parse('2026-10-06T12:30:00Z');window.fixtureDevices=${JSON.stringify(fixtures)};window.componentEvents=[{id:50,external_device_id:'BRIDGE-TEST',component_guid:'BRIDGE-TEST',component_type:'bridge_4g',component_name:'Bridge test',component_area:'Synthetic Recon site',observed_at:'2026-10-06T12:29:00Z',event_type:'YC',battery_percent:6},{id:51,external_device_id:'SIREN-TEST',component_guid:'SIREN-TEST',component_type:'siren_v1',component_name:'Siren test',component_area:'Synthetic Recon site',observed_at:'2026-10-06T12:29:00Z',event_type:'RP',battery_percent:75}];
+window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'test-owner'},access_token:'synthetic-only'}}})},functions:{invoke:async(name,args)=>{window.functionCalls.push({name,args});if(window.holdChecks&&name==='camera-provider-reconcile')await new Promise(resolve=>window.releaseCheck=resolve);return {data:{configured:true}}}},from(table){const q={filters:[],select(){return q},order(){return q},range(){return q},limit(){return q},eq(k,v){q.filters.push([k,v]);return q},in(k,v){q.filters.push([k,v]);return q},single(){return q},then(resolve){window.reads.push({table,filters:q.filters});let data=table==='profiles'?{active:true,role:'owner'}:table==='camera_devices'?window.fixtureDevices:table==='equipment_master'?(window.fixtureTracker||[]):table==='camera_health_current'?(window.fixtureHealth||[]):table==='camera_integrations'?(window.fixtureIntegrations||[]):table==='camera_integration_events'?window.componentEvents.filter(x=>q.filters.every(([k,v])=>k==='provider'?true:k==='payload->device_info->>area'?x.component_area===v:x[k]===v)):table==='camera_health_history'?[{id:1,camera_device_id:11,observed_at:'2026-10-06T10:00:00Z',status:'online',check_source:'Historical east observation'},{id:2,camera_device_id:12,observed_at:'2026-10-06T12:29:00Z',status:'online',check_source:'Other unit only'}].filter(x=>q.filters.every(([k,v])=>Array.isArray(v)?v.includes(x[k]):x[k]===v)):[];return Promise.resolve(window.failHistory&&table==='camera_health_history'?{error:{message:'Synthetic history failure'}}:{data}).then(resolve)}};return q}})};`;
 async function mount(page){
  await page.route('**/functions/v1/cos-operations-pages',async route=>{
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
@@ -28,11 +28,11 @@ async function mount(page){
  await page.route('**/*',route=>{const url=new URL(route.request().url());if(url.pathname==='/functions/v1/cos-operations-pages')return route.fallback();if(url.origin!==origin)return route.abort('blockedbyclient');if(url.pathname==='/tech-checks/camera-health.html')return route.fulfill({contentType:'text/html',body:html.replace('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>','<script>'+mock+'</script>')});const path=resolve(repo,'.'+decodeURIComponent(url.pathname));if(path.startsWith(repo+'/')&&existsSync(path))return route.fulfill({path,contentType:{'.js':'text/javascript','.css':'text/css','.woff':'font/woff','.png':'image/png','.jpg':'image/jpeg'}[extname(path)]||'application/octet-stream'});return route.abort('blockedbyclient')});
  await page.goto('/tech-checks/camera-health.html');await expect(page.locator('.compact-unit')).toHaveCount(3);
 }
-test('automatic reloads wait fifteen minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
- await mount(page);const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length);
- await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:44:59Z');await liveRefresh(true)});
+test('automatic reloads wait four minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
+ await mount(page);await page.waitForFunction(()=>liveRefreshStarted);const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length);const calls=await page.evaluate(()=>functionCalls);
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:33:59Z');await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
- await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:45:00Z');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});await liveRefresh(true)});
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:34:00Z');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
  await page.evaluate(async()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
@@ -42,6 +42,32 @@ test('automatic reloads wait fifteen minutes, skip hidden tabs and share in-flig
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
  await page.evaluate(async()=>{const before=load();const after=loadAfterWrite();await Promise.all([before,after])});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+4);
+ expect(await page.evaluate(()=>functionCalls)).toEqual(calls);
+});
+test('actual timers reread saved status at the rephased four-minute deadline without probing or freshening observations',async({page})=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.clock.install({time:new Date('2026-10-06T12:29:59Z')});await page.clock.pauseAt(new Date('2026-10-06T12:30:00Z'));
+ await mount(page);await page.waitForFunction(()=>liveRefreshStarted);
+ await page.evaluate(()=>{Date.now=()=>new Date().getTime()});
+ const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length),calls=await page.evaluate(()=>functionCalls);
+ await page.getByLabel('Search units',{exact:true}).fill('RANGER 022');
+ await page.clock.runFor(3*60000);
+ await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'online',source_last_seen_at:'2026-10-06T12:33:00Z'}:d)});
+ await page.clock.runFor(59999);expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
+ await page.clock.runFor(1);await expect.poll(()=>page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
+ await expect(page.locator('.compact-unit[data-unit="RANGER 022"] .statuspill')).toHaveText('ONLINE');
+ await expect(page.getByLabel('Search units',{exact:true})).toHaveValue('RANGER 022');
+ expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:33:00Z');
+ expect(await page.evaluate(()=>functionCalls)).toEqual(calls);
+ // An explicit saved reread at minute six must schedule minute ten, not twelve.
+ await page.clock.runFor(2*60000);await page.evaluate(()=>loadAfterWrite({background:true}));
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
+ await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'offline',source_last_seen_at:'2026-10-06T12:35:00Z'}:d)});
+ await page.clock.runFor(2*60000);expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
+ await page.clock.runFor(2*60000);await expect.poll(()=>page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+3);
+ await expect(page.locator('.compact-unit[data-unit="RANGER 022"] .statuspill')).toHaveText('OFFLINE');
+ expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:35:00Z');
+ expect(await page.evaluate(()=>functionCalls)).toEqual(calls);expect(errors).toEqual([]);
 });
 test('overview is quiet; unit cards open scoped history and preserve Back and keyboard navigation',async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);

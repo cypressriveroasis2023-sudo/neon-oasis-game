@@ -9,25 +9,25 @@ const source=fs.readFileSync(new URL('../../camera-placement-controls.js',import
 const turn=()=>new Promise(resolve=>setImmediate(resolve));
 async function until(check){for(let i=0;i<30;i++){if(check())return;await turn();}assert.ok(check(),'synthetic lifecycle did not settle');}
 function fixture(){
- const f={calls:[],requests:[],saved:[],timeouts:[],holds:[],sessionHolds:[],fetchHolds:[],holdSessionAt:0,holdPath:'',failed:new Set(),holdLegacy:false,denyWrite:false,subject:'synthetic-owner',state:legacyState({placement:'FIELD'}),snapshot:envelope([nativeRow({currentLocationType:'field'})]),health:healthEnvelope(),sessionReads:0,dialogs:[]};
+ const f={calls:[],requests:[],signals:[],saved:[],timeouts:[],holds:[],sessionHolds:[],fetchHolds:[],holdSessionAt:0,holdPath:'',failed:new Set(),holdLegacy:false,denyWrite:false,subject:'synthetic-owner',token:'synthetic-only',changeTokenAt:0,state:legacyState({placement:'FIELD'}),snapshot:envelope([nativeRow({currentLocationType:'field'})]),health:healthEnvelope(),sessionReads:0,dialogs:[]};
  const input=(name,required=false)=>({name,required,value:'',checked:false,disabled:false,label:{hidden:false},closest(){return this.label;},focus(){f.focus=this;}});
  const fields={site:input('site'),address:input('address'),reason:input('reason',true),confirmed:input('confirmed',true)};
  const nodes={feedback:{textContent:''},note:{textContent:''},title:{textContent:''},unit:{textContent:''},save:{disabled:true},cancel:{disabled:false},retry:{hidden:true,disabled:false}};
  const form={elements:{namedItem:name=>fields[name]},querySelector(selector){return selector==='[type=submit]'?nodes.save:selector==='.placement-cancel'?nodes.cancel:selector==='.placement-retry'?nodes.retry:null;},querySelectorAll:()=>Object.values(fields),reportValidity:()=>Object.values(fields).every(field=>field.disabled||!field.required||(field.name==='confirmed'?field.checked:field.value.trim()))};
  const dialog={isConnected:false,className:'',innerHTML:'',setAttribute(){},querySelector(selector){return selector==='form'?form:selector==='h2'?nodes.title:selector==='.placement-feedback'?nodes.feedback:selector==='.placement-pin-note'?nodes.note:selector==='.placement-unit'?nodes.unit:null;},addEventListener(){},showModal(){},close(){},remove(){this.isConnected=false;}};
- const db={auth:{getSession:async()=>{f.sessionReads++;const reply={data:{session:{access_token:'synthetic-only',user:{id:f.subject}}}};if(f.sessionReads===f.holdSessionAt)await new Promise(resolve=>f.sessionHolds.push(resolve));return reply;}},rpc:async(name,args)=>{
+ const db={auth:{getSession:async()=>{f.sessionReads++;if(f.sessionReads===f.changeTokenAt)f.token='synthetic-refreshed';const reply={data:{session:{access_token:f.token,user:{id:f.subject}}}};if(f.sessionReads===f.holdSessionAt)await new Promise(resolve=>f.sessionHolds.push(resolve));return reply;}},rpc:async(name,args)=>{
   f.calls.push({name,args});
   if(name==='owner_camera_unit_placement_state_v2'){const state=structuredClone(f.state);if(f.holdLegacy)await new Promise(resolve=>f.holds.push(resolve));return {data:state};}
   assert.equal(name,'owner_set_camera_unit_placement_v2');if(f.denyWrite)return {error:{message:'Synthetic writer denied'}};
   f.state={...f.state,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:'101'};
   return {data:{ok:true,unit_key:key,placement:args.p_placement,request_id:args.p_request_id,audit_id:'101'}};
  }};
- const context=vm.createContext({AbortController,AbortSignal:{any:AbortSignal.any.bind(AbortSignal),timeout(ms){assert.equal(ms,30000);const timer=new AbortController();f.timeouts.push(timer);return timer.signal;}},crypto:{randomUUID},document:{createElement(tag){assert.equal(tag,'dialog');return dialog;},body:{append(element){element.isConnected=true;f.dialogs.push(element);}}},window:{addEventListener(){},removeEventListener(){}},fetch:async(url,options)=>{
-  assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');const body=JSON.parse(options.body);f.requests.push(body);assert.equal(body.method,'GET');assert.equal(body.body,null);assert.ok(['/api/field-map','/api/camera-health/summary-v3'].includes(body.path));
+ const context=vm.createContext({setTimeout,clearTimeout,AbortController,AbortSignal:{any:AbortSignal.any.bind(AbortSignal),timeout(ms){assert.equal(ms,30000);const timer=new AbortController();f.timeouts.push(timer);return timer.signal;}},crypto:{randomUUID},document:{createElement(tag){assert.equal(tag,'dialog');return dialog;},body:{append(element){element.isConnected=true;f.dialogs.push(element);}}},window:{addEventListener(){},removeEventListener(){}},fetch:async(url,options)=>{
+  assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');const body=JSON.parse(options.body);f.requests.push(body);f.signals.push(options.signal);assert.equal(body.method,'GET');assert.equal(body.body,null);assert.ok(['/api/field-map','/api/camera-health/summary-v3'].includes(body.path));
   const failed=f.failed.has(body.path),data=structuredClone(body.path==='/api/field-map'?f.snapshot:f.health);if(f.holdPath===body.path)await new Promise(resolve=>f.fetchHolds.push(resolve));return {ok:!failed,status:failed?503:200,json:async()=>data};
  }});
  vm.runInContext(source,context);
- Object.assign(f,{fields,nodes,form,dialog,open:()=>context.CameraPlacementControls.open({db,key,placement:'SHOP',onSaved:saved=>f.saved.push(saved)}),moves:()=>f.calls.filter(call=>call.name==='owner_set_camera_unit_placement_v2'),submit:()=>form.onsubmit({preventDefault(){}})});return f;
+ Object.assign(f,{context,db,fields,nodes,form,dialog,open:()=>context.CameraPlacementControls.open({db,key,placement:'SHOP',onSaved:saved=>f.saved.push(saved)}),moves:()=>f.calls.filter(call=>call.name==='owner_set_camera_unit_placement_v2'),submit:()=>form.onsubmit({preventDefault(){}})});return f;
 }
 
 test('Shop uses saved identity reads, no new address or vendor request, and saves once after a fresh check',async()=>{
@@ -79,4 +79,35 @@ for(const phase of [1,2])test('the complete read deadline includes signed-in acc
 test('a timed-out inventory reply cannot replace a newer retry baseline',async()=>{
  const f=fixture();f.holdPath='/api/field-map';const opening=f.open();await until(()=>f.fetchHolds.length===1);assert.match(f.nodes.feedback.textContent,/Field Map inventory/);f.timeouts[0].abort();await opening;
  f.holdPath='';f.snapshot.inventoryItems[0].address='300 New Saved Synthetic Road';f.nodes.retry.onclick();await until(()=>!f.nodes.save.disabled);assert.equal(f.fields.address.value,'300 New Saved Synthetic Road');f.fetchHolds[0]();await turn();await turn();assert.equal(f.fields.address.value,'300 New Saved Synthetic Road');assert.equal(f.moves().length,0);
+});
+
+
+test('failed display aborts its orphan before the modal begins its independent fresh pair',async()=>{
+ const f=fixture(),c=f.context;Object.assign(c,{setTimeout,clearTimeout});vm.runInContext(fs.readFileSync(new URL('../../camera-effective-placement.js',import.meta.url),'utf8'),c);
+ const original=c.fetch,displaySignals=[];let displaying=true;c.fetch=async(url,options)=>{if(!displaying)return original(url,options);displaySignals.push(options.signal);if(JSON.parse(options.body).path==='/api/camera-health/summary-v3')return {ok:false,status:503,json:async()=>({})};return new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Error('Synthetic display cancelled')),{once:true}));};
+ const view=c.CameraEffectivePlacement.create({db:f.db,getDevices:()=>[{id:9101,unit_key:key}]});await view.refresh();assert.equal(displaySignals.length,2);assert.ok(displaySignals.every(signal=>signal.aborted));displaying=false;await f.open();assert.equal(f.requests.length,2);assert.equal(f.nodes.save.disabled,false);assert.equal(f.moves().length,0);assert.ok(displaySignals.every(signal=>signal.aborted));f.nodes.cancel.onclick();view.dispose();
+});
+
+
+test('initial modal joins a display pair but its retry and presave remain private fresh reads',async()=>{
+ const f=fixture(),c=f.context;vm.runInContext(fs.readFileSync(new URL('../../camera-effective-placement.js',import.meta.url),'utf8'),c);
+ f.holdPath='/api/field-map';const view=c.CameraEffectivePlacement.create({db:f.db,getDevices:()=>[{id:9101,unit_key:key}],partial:true}),display=view.refresh();await until(()=>f.fetchHolds.length===1);
+ const opening=f.open();await until(()=>f.calls.length===1);await turn();assert.equal(f.requests.length,2);assert.match(f.nodes.feedback.textContent,/Field Map inventory/);assert.equal(f.nodes.save.disabled,true);
+ view.clear();await display;assert.ok(f.signals.every(signal=>!signal.aborted));f.holdPath='';f.fetchHolds[0]();await opening;assert.equal(f.nodes.save.disabled,false);assert.equal(f.moves().length,0);
+ f.fields.reason.value='Synthetic return';f.fields.confirmed.checked=true;f.failed.add('/api/field-map');await f.submit();assert.equal(f.requests.length,4);assert.equal(f.moves().length,0);assert.equal(f.nodes.save.disabled,true);
+ f.failed.clear();f.nodes.retry.onclick();await until(()=>!f.nodes.save.disabled);assert.equal(f.requests.length,6);assert.equal(f.fields.confirmed.checked,false);await f.submit();assert.equal(f.moves().length,0);
+ f.fields.confirmed.checked=true;await f.submit();assert.equal(f.requests.length,8);assert.equal(f.moves().length,1);view.dispose();
+});
+
+test('cancelling a joined modal cannot abort its active display consumer',async()=>{
+ const f=fixture(),c=f.context;vm.runInContext(fs.readFileSync(new URL('../../camera-effective-placement.js',import.meta.url),'utf8'),c);
+ f.snapshot.generatedAt=new Date().toISOString();for(const row of f.health.rows)row.evidence={kind:'provider',source:'Star4Live'};
+ f.holdPath='/api/field-map';const device={id:9101,unit_key:key},view=c.CameraEffectivePlacement.create({db:f.db,getDevices:()=>[device],partial:true}),display=view.refresh();await until(()=>f.fetchHolds.length===1);
+ const opening=f.open();await until(()=>f.calls.length===1);await turn();f.nodes.cancel.onclick();await opening;
+ assert.equal(f.requests.length,2);assert.ok(f.signals.every(signal=>!signal.aborted));assert.equal(f.dialog.isConnected,false);const feedback=f.nodes.feedback.textContent;
+ f.fetchHolds[0]();await display;assert.equal(view.get(device).status,'ready');assert.equal(f.nodes.feedback.textContent,feedback);assert.equal(f.moves().length,0);view.dispose();
+});
+
+test('same-subject token change during the modal authority recheck denies the baseline',async()=>{
+ const f=fixture();f.changeTokenAt=2;await f.open();assert.equal(f.nodes.save.disabled,true);assert.equal(f.nodes.retry.hidden,true);assert.match(f.nodes.feedback.textContent,/signed-in account changed/);assert.equal(f.moves().length,0);f.nodes.cancel.onclick();
 });

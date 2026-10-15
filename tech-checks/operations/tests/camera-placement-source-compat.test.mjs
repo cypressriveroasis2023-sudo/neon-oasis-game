@@ -139,6 +139,6 @@ for(const page of ['camera-health.html','camera-detail.html'])test(page+' reques
  const html=fs.readFileSync(new URL('../../'+page,import.meta.url),'utf8');
  for(const helper of ['camera-placement-controls.js','camera-effective-placement.js']){
   const urls=[...html.matchAll(/src="([^"]+)"/g)].map(match=>match[1]).filter(url=>url.startsWith('./'+helper+'?'));
-  assert.deepEqual(urls,['./'+helper+'?v=20261015-source-placement-compat-v1']);
+  assert.deepEqual(urls,['./'+helper+'?v=20261015-placement-read-coalescing-v1']);
  }
 });

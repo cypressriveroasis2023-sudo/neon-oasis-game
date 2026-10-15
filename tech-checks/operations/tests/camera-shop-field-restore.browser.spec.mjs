@@ -16,14 +16,17 @@ test.afterEach(async({page})=>{
   expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length);
   expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
 });
-async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,entry='detail',nativeAfterWrite=null}={}){
-  const fixture={native,health,holdNative,nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
+async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,holdDisplay=false,entry='detail',nativeAfterWrite=null}={}){
+  const fixture={native,health,holdNative,holdDisplay,displayGates:[],nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
   mountedFixtures.set(page.context(),fixture);
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));page.context().on('page',other=>other.on('pageerror',error=>fixture.pageErrors.push(error.message)));
   await page.context().addInitScript(({role,verifiedIt,active,token,legacy,key})=>{
     // Fixture-only diagnostics: preserve real fetches, headers, bodies, signals,
     // and caching while marking the actual initiating script. Timing cannot
     // distinguish the concurrent Health deep link or post-save display refresh.
+    const actualTimeout=window.setTimeout.bind(window);
+    window.setTimeout=(callback,ms,...args)=>{if(ms===15000)window.fixtureExpireDisplay=()=>callback(...args);return actualTimeout(callback,ms,...args);};
+    window.fixtureReadSignals=[];
     const actualFetch=window.fetch.bind(window);
     window.fetch=(input,init)=>{
       const url=new URL(input instanceof Request?input.url:String(input),location.href);
@@ -31,7 +34,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       const stack=new Error().stack||'';
       const owner=stack.includes('/camera-effective-placement.js')?'display':stack.includes('/camera-placement-controls.js')?'editor':location.pathname==='/tech-checks/operations/dist/index.html'?'map':'unknown';
       const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined));
-      headers.set('X-Synthetic-Read-Owner',owner);
+      headers.set('X-Synthetic-Read-Owner',owner);window.fixtureReadSignals.push({owner,signal:init?.signal});
       return actualFetch(input,{...init,headers});
     };
     window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadbackMismatch=false;window.fixtureReadCount=0;
@@ -85,6 +88,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       if(fixture.nativeAfterWrite&&body.path==='/api/field-map'&&await page.evaluate(()=>fixtureLegacy.auditId==='901'))fixture.native=structuredClone(fixture.nativeAfterWrite);
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:body.path==='/api/camera-health/summary-v3'?fixture.health:body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]}),status=fixture.status;
       if(fixture.nativeAfterWrite&&body.path==='/api/field-map')read.nativeAuditId=data.inventoryItems.find(row=>row.id===rowId)?.placementAuditId??null;
+      if(owner==='display'&&fixture.holdDisplay&&body.path==='/api/field-map')await new Promise(resolve=>fixture.displayGates.push(resolve));
       if(owner==='editor'&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
       read.status=status;return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
     }
@@ -93,8 +97,19 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
   await page.goto(origin+(entry==='map'?'/synthetic-map-entry':entry==='health'?'/tech-checks/camera-health.html?unit='+encodeURIComponent(key)+'&action=edit-field':'/tech-checks/camera-detail.html?id=9101'));
   if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else {await expect(page.frameLocator('iframe').locator('.cos-fleet-dashboard')).toBeVisible();await page.frameLocator('iframe').getByLabel('Fleet status',{exact:true}).selectOption('all');}
   if(entry!=='map'){
-    await expect.poll(()=>page.evaluate(()=>['ready','unresolved','unavailable'].includes(CameraEffectivePlacement.get(fixtureDevice)?.status))).toBe(true);
-    if(token){expect(fixture.displayReads.map(read=>read.body.path).sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map']);expect(fixture.displayReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);}
+    if(holdDisplay)await expect.poll(()=>fixture.displayGates.length).toBe(1);
+    else await expect.poll(()=>page.evaluate(()=>['ready','unresolved','unavailable'].includes(CameraEffectivePlacement.get(fixtureDevice)?.status))).toBe(true);
+    if(token){
+      // Health deep links may open their first modal while the display pair is pending.
+      // Either consumer can own that one transport pair; a settled display is never reused.
+      const expected=['/api/camera-health/summary-v3','/api/field-map'];
+      if(entry==='health'){
+        if(fixture.reads.length)await expect.poll(()=>fixture.reads.length).toBe(2);
+        expect([0,2]).toContain(fixture.displayReads.length);expect([0,2]).toContain(fixture.reads.length);expect([2,4]).toContain(fixture.allReads.length);
+        for(const reads of [fixture.displayReads,fixture.reads])if(reads.length)expect(reads.map(read=>read.body.path).sort()).toEqual(expected);
+      }else expect(fixture.displayReads.map(read=>read.body.path).sort()).toEqual(expected);
+      expect(fixture.displayReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
+    }
   }
   return fixture;
 }
@@ -276,4 +291,38 @@ test('recorded source with missing suffix association stays disabled in the actu
   await expect(page.locator('.placement-feedback')).toContainText('retrying does not create that link');await expect(page.locator('.placement-retry')).toBeHidden();await expect(inputs(page).save).toBeDisabled();await expect(inputs(page).address).toBeDisabled();
   await page.screenshot({path:info.outputPath('synthetic-recorded-source-missing-association.png')});
   await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(1);await noWrites(page,fixture);
+});
+
+
+// Pending display + initial modal share only the authenticated in-flight sources.
+// A cancelled consumer never cancels another reader, and Save always rereads privately.
+const pendingDisplayFixture=()=>{
+  const native={...envelope(),generatedAt:new Date().toISOString()},health=healthEnvelope();
+  for(const row of health.rows)row.evidence={kind:'provider',source:'Star4Live'};
+  return {native,health,holdDisplay:true};
+};
+test('initial actual modal joins the pending display pair and survives its own shorter display deadline',async({page},info)=>{
+  const fixture=await mount(page,pendingDisplayFixture());await open(page);
+  await expect.poll(()=>page.evaluate(()=>fixtureReadCount)).toBe(1);
+  await expect(page.locator('.placement-feedback')).toContainText('Field Map inventory');
+  await expect(inputs(page).save).toBeDisabled();expect(fixture.displayReads).toHaveLength(2);expect(fixture.reads).toHaveLength(0);
+  await page.evaluate(()=>fixtureExpireDisplay());
+  await expect.poll(()=>page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevice)?.status)).toBe('unavailable');
+  expect(await page.evaluate(()=>fixtureReadSignals.every(read=>!read.signal.aborted))).toBe(true);
+  await expect(inputs(page).save).toBeDisabled();await noWrites(page,fixture);
+  fixture.holdDisplay=false;fixture.displayGates.shift()();const form=await complete(page);
+  await page.screenshot({path:info.outputPath('synthetic-shared-display-modal-ready.png')});
+  fixture.health.unitIdentities[0].proof='b'.repeat(64);await form.save.click();
+  await expect(page.locator('.placement-feedback')).toContainText(/identity changed/i);await expect(form.save).toBeDisabled();
+  expect(fieldReads(fixture)).toHaveLength(1);expect(fixture.reads).toHaveLength(2);await noWrites(page,fixture);
+});
+
+test('cancelling an actual joined modal leaves its display reader alive and reopening reads freshly',async({page})=>{
+  const fixture=await mount(page,pendingDisplayFixture());await open(page);await expect.poll(()=>page.evaluate(()=>fixtureReadCount)).toBe(1);
+  expect(fixture.reads).toHaveLength(0);await inputs(page).cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  expect(await page.evaluate(()=>fixtureReadSignals.every(read=>!read.signal.aborted))).toBe(true);
+  fixture.holdDisplay=false;fixture.displayGates.shift()();
+  await expect.poll(()=>page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevice)?.status)).toBe('ready');
+  await page.locator('#editFieldBtn').click();await expect(page.locator('.cos-placement-dialog')).toBeVisible();await blank(page);expect(fieldReads(fixture)).toHaveLength(1);expect(fixture.displayReads).toHaveLength(2);
+  await inputs(page).cancel.click();await noWrites(page,fixture);
 });
