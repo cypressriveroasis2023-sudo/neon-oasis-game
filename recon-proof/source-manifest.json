@@ -23,8 +23,8 @@
     },
     {
       "path": "recon-proof/contention.test.mjs",
-      "sha256": "f045d6e1ccf409da882207b9f10f5b304c5d8e3c7561853ef64975db7a1650f8",
-      "bytes": 11032
+      "sha256": "4bce064f7697ed802c84c38a2b5402bb3d66487bc27ef4755218d5d43982a0f5",
+      "bytes": 13188
     },
     {
       "path": "recon-proof/http/README.md",

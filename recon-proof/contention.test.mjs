@@ -46,8 +46,8 @@ run('A/B/A versus never-applied older, exact no-op snapshots and microseconds',a
  assert.deepEqual(await f.rpc('recon_record_webhook_receipt_v2',{p_event_id:A}),{...a,outcome:'duplicate',applied:false});
  assert.equal((await f.rpc('recon_record_webhook_receipt_v2',{p_event_id:old})).outcome,'superseded');assert.deepEqual(await snapshot(f),before);
 });
-async function seed(f){
- await f.db.query("INSERT INTO camera_devices(id,device_serial,external_device_id,device_name,source,source_metadata,last_probe_online_at) VALUES(401,$1,$2,'Synthetic detector','reconeyez',$3,'2026-01-01T00:00:00Z')",['reconeyez:'+gid(2),gid(2),{battery_updated_at:'2026-01-01T00:00:00Z'}]);
+async function seed(f,{unitKey='Synthetic Field'}={}){
+ await f.db.query("INSERT INTO camera_devices(id,device_serial,external_device_id,device_name,source,unit_key,source_metadata,last_probe_online_at) VALUES(401,$1,$2,'Synthetic detector','reconeyez',$3,$4,'2026-01-01T00:00:00Z')",['reconeyez:'+gid(2),gid(2),unitKey,{battery_updated_at:'2026-01-01T00:00:00Z'}]);
  const payload={event_guid:'synthetic-hosted-event',device_info:{guid:gid(2),type:'detector_hdr_xrl'},binary:[{data:'synthetic-only'}],cos_event_order_v1:{key:'hosted-key'}},hash=createHash('sha256').update(JSON.stringify(payload)).digest('hex');
  const ref={version:1,bucket:'camera-event-archives',sha256:hash,path:'reconeyez/'+hash+'.json.gz',archivedFields:['binary'],jsonBytes:Buffer.byteLength(JSON.stringify(payload)),storedBytes:16};
  const archived={...payload,cos_private_archive:ref};delete archived.binary;
@@ -99,4 +99,25 @@ for(const release of ['COMMIT','ROLLBACK'])run('ordered projector first -> recei
  await projector.query(release);assert.equal((await received).outcome,'applied');assert.equal((await finished).outcome,'applied');
  assert.equal(await f.scalar('SELECT recon_receipt_metadata_applied AS value FROM camera_integration_events WHERE id=$1',[id]),true);
  assert.equal(await f.scalar('SELECT processed AS value FROM camera_integration_events WHERE id=$1',[id]),release==='COMMIT');
+});
+
+for(const release of ['COMMIT','ROLLBACK'])run('changed inventory unit_key invalidates endpoint proof atomically '+release,async f=>{
+ const {id}=await seed(f,{unitKey:'Previous synthetic unit'}),token=await f.begin(),input=await inventoryInput(token.observed_at),[inv]=await clients(f);
+ const before=await snapshot(f),prior=await f.scalar('SELECT to_jsonb(d) AS value FROM camera_devices d WHERE id=401');
+ await begin(inv);assert.equal((await call(inv,'recon_finish_inventory_v2',{p_attempt_id:token.attempt_id,...input})).outcome,'applied');
+ const changed=await value(inv,'SELECT to_jsonb(d) AS value FROM camera_devices d WHERE id=401');
+ assert.equal(changed.unit_key,'Synthetic Field');assert.equal(changed.last_probe_online_at,null);
+ assert.equal(changed.connection_revision,prior.connection_revision+1);assert.equal(changed.source_last_seen_at,prior.source_last_seen_at);
+ const history=await value(inv,"SELECT jsonb_agg(to_jsonb(h)) AS value FROM camera_health_history h WHERE camera_device_id=401 AND check_source='saved_connection_changed'");
+ assert.equal(history.length,1);assert.equal(history[0].detail.previous_revision,prior.connection_revision);
+ assert.equal(history[0].detail.new_revision,changed.connection_revision);
+ assert.equal(Date.parse(history[0].detail.previous_last_success),Date.parse(prior.last_probe_online_at));
+ assert.deepEqual(await snapshot(f),before,'identity change and invalidation stay private before release');
+ await inv.query(release);
+ if(release==='ROLLBACK')assert.deepEqual(await snapshot(f),before,'identity change, revision, history and endpoint invalidation roll back together');
+ else{
+  assert.deepEqual(await f.scalar('SELECT to_jsonb(d) AS value FROM camera_devices d WHERE id=401'),changed);
+  assert.deepEqual(await f.scalar("SELECT jsonb_agg(to_jsonb(h)) AS value FROM camera_health_history h WHERE camera_device_id=401 AND check_source='saved_connection_changed'"),history);
+  assert.equal(await f.scalar('SELECT processed AS value FROM camera_integration_events WHERE id=$1',[id]),false,'inventory does not project provider events');
+ }
 });
