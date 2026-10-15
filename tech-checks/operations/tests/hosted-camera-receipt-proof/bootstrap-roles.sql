@@ -31,13 +31,15 @@ ALTER ROLE authenticator SET lock_timeout='8s';
 ALTER ROLE authenticator SET work_mem='2184kB';
 ALTER ROLE anon SET statement_timeout='8s';
 ALTER ROLE anon SET lock_timeout='8s';
-ALTER ROLE anon SET work_mem='2184kB';
+-- PostgREST 14.5 lowercases replayed role settings; unitless work_mem is kB.
+-- Keep the effective 2184kB budget and its strict HTTP assertions unchanged.
+ALTER ROLE anon SET work_mem='2184';
 ALTER ROLE authenticated SET statement_timeout='8s';
 ALTER ROLE authenticated SET lock_timeout='8s';
-ALTER ROLE authenticated SET work_mem='2184kB';
+ALTER ROLE authenticated SET work_mem='2184';
 ALTER ROLE service_role SET statement_timeout='8s';
 ALTER ROLE service_role SET lock_timeout='8s';
-ALTER ROLE service_role SET work_mem='2184kB';
+ALTER ROLE service_role SET work_mem='2184';
 -- Synthetic-only probe: proves actual PostgREST role/session limits without granting table access.
 CREATE FUNCTION public.synthetic_camera_runtime_settings()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $probe$
