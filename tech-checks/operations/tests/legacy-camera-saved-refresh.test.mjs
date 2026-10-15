@@ -25,7 +25,7 @@ function fixture(){
   captureCameraView:()=>({search:'SNIPER 308'}),restoreCameraView:()=>{},render:()=>{},renderProviderHealth:()=>{},renderCurrentUnitEvidence:()=>{},renderOperations:()=>{},
   loadCameraHealth(options){const request={options,startedAt:clock,result:deferred()};requests.push(request);return request.result.promise;}});
  context.window={addEventListener:(type,fn)=>listen(windowListeners,type,fn)};
- vm.runInContext("let cameraLoadPromise=null,lastCameraLoadStartedAt=0;\n"+line('const CAMERA_AUTO_REFRESH_MS=')+'\n'+line('let liveRefreshTimer=')+'\n'+line('function load(options=')+'\n'+line('function loadAfterWrite(')+'\n'+line('function markCameraInteraction(')+'\n'+scheduler,context);
+ vm.runInContext(html.slice(html.indexOf('let cameraLoadPromise='),html.indexOf('async function loadCameraHealth('))+'\n'+line('let liveRefreshTimer=')+'\n'+line('function markCameraInteraction(')+'\n'+scheduler,context);
  async function advance(ms){
   const end=clock+ms;
   for(let guard=0;guard<10000;guard++){
@@ -112,4 +112,20 @@ test('automatic path is saved-data-only and keeps evidence freshness separate fr
  assert.doesNotMatch(html,/Backend checks every 5 minutes|screen refreshes every 10 minutes/);
  assert.match(html,/\$\('refresh'\)\.onclick=refreshFieldHealth/);
  assert.match(readFileSync(new URL('../../camera-health-history.js',import.meta.url),'utf8'),/const ttl = 20 \* 60 \* 1000/);
+});
+
+
+test('canceled post-save queued reads do not start after the shared predecessor',async()=>{
+ const f=await boot(),controller=new AbortController();const before=f.read(),queued=f.context.loadAfterWrite({signal:controller.signal});controller.abort();await f.reply();await before;assert.equal(await queued,false);assert.equal(f.requests.length,2);
+});
+
+test('aborted readers release coalescing without late cleanup clearing a newer reader',async()=>{
+ const f=await boot(),controller=new AbortController();const canceled=f.context.load({signal:controller.signal});assert.equal(f.requests.length,2);controller.abort();assert.equal(await canceled,false);assert.equal(f.requests[1].options.isCurrent(),false);
+ const newer=f.read();assert.equal(f.requests.length,3);assert.equal(f.requests[2].options.isCurrent(),true);await f.reply(1);assert.equal(f.read(),newer);assert.equal(f.requests.length,3);await f.reply(2);await newer;
+});
+
+test('superseded Manage Units generation suppresses queued reads and invalidates in-flight application',async()=>{
+ const f=await boot();let generation=1;const isCurrent=()=>generation===1;
+ const before=f.read(),queued=f.context.loadAfterWrite({isCurrent});generation++;await f.reply();await before;assert.equal(await queued,false);assert.equal(f.requests.length,2);
+ generation=1;const pending=f.context.load({isCurrent});generation++;assert.equal(f.requests[2].options.isCurrent(),false);await f.reply();await pending;
 });
