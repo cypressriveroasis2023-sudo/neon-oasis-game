@@ -1,0 +1,74 @@
+name: Verify COS Source Receipts
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/source-equipment-receipts-postgres.mjs'
+      - 'tech-checks/operations/tests/fixtures/source-equipment-receipts-*.mjs'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/package*.json'
+      - '.github/workflows/cos-source-receipts-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tech-checks/operations/db/**'
+      - 'tech-checks/operations/tests/source-equipment-receipts-postgres.mjs'
+      - 'tech-checks/operations/tests/fixtures/source-equipment-receipts-*.mjs'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/package*.json'
+      - '.github/workflows/cos-source-receipts-proof.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cos-source-receipts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-source-receipts-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: cos_source_receipts_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_source_receipts_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - name: Install existing pinned PostgreSQL client only
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations/legacy/tests/recon-ordering
+      - name: Prove exact receipt admission, reads and revocation on two PostgreSQL clients
+        working-directory: tech-checks/operations
+        env:
+          COS_RECEIPTS_POSTGRES_CI: '1'
+          COS_RECEIPTS_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_source_receipts_test_ci
+        run: |
+          set +e
+          node tests/source-equipment-receipts-postgres.mjs
+          result=$?
+          set -e
+          if [ "$result" -ne 0 ] && [ ! -f source-equipment-receipts-postgres-results.json ]; then
+            printf '%s\n' '{"status":"failed","complete":false,"stage":"setup-or-receipt-generation","verification":"No complete proof receipt was produced. Consult the job log."}' > source-equipment-receipts-postgres-results.json
+          fi
+          exit "$result"
+      - name: Preserve synthetic proof receipt including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-equipment-receipts-postgres-results
+          path: tech-checks/operations/source-equipment-receipts-postgres-results.json
+          retention-days: 7
+          if-no-files-found: warn

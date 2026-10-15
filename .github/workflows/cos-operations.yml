@@ -156,6 +156,16 @@ jobs:
         id: build
       - run: npx playwright install --with-deps chromium
         id: browser_install
+      - name: Verify source-equipment address estimate pins
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/source-equipment-pins.browser.spec.mjs
+      - name: Source-equipment estimate pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-equipment-estimate-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify camera observation timestamp provenance
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/camera-observed-timestamp.browser.spec.mjs

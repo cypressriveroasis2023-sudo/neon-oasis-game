@@ -3,6 +3,7 @@ import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
 import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
 import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from './combinedFleetRoster.ts';
+import {sourceEquipmentAddressCandidates,projectSourceEquipmentAddressEstimates} from './sourceEquipmentAddressEstimates.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
@@ -903,7 +904,35 @@ export function createOperationsHandler(options) {
           const uploaded=projectMhelpUploadPlacement(savedPlacement,mhelpReceipt?.upload,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs});
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
-          return json(projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity));
+          const combined=projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity);
+          // Only privately reviewed saved receipts are read through the existing
+          // native actor/permission route. No new legacy credential or provider call.
+          try{
+            const candidates=await sourceEquipmentAddressCandidates(combined,mhelpReceipt?.upload);
+            if(!candidates.length)return json(combined);
+            // This optional receipt read and projection have a two-second added-latency ceiling.
+            // Race explicitly: a transport that ignores abort must not hold the map open.
+            const controller=new AbortController(),deadline=Date.now()+2000;
+            const unavailable=()=>({...combined,sourceEquipmentEstimates:undefined,sourceEquipmentEstimatesStatus:'unavailable'});
+            let cancel=()=>{};let timer:ReturnType<typeof setTimeout>|undefined;
+            const stopped=new Promise(resolve=>{
+              cancel=()=>{controller.abort();resolve(unavailable());};
+              timer=setTimeout(cancel,2000);
+              request.signal.addEventListener('abort',cancel,{once:true});
+            });
+            try{
+              if(request.signal.aborted)cancel();
+              const operation=(async()=>{
+                if(controller.signal.aborted)return unavailable();
+                const reviewed=await rpc('cos_source_equipment_estimates_snapshot',actorPayload,controller.signal);
+                if(controller.signal.aborted||Date.now()>=deadline)return unavailable();
+                const projected=await projectSourceEquipmentAddressEstimates(combined,mhelpReceipt.upload,reviewed?.records,reviewed);
+                return controller.signal.aborted||Date.now()>=deadline?unavailable():projected;
+              })().catch(()=>unavailable());
+              const result=await Promise.race([operation,stopped]);
+              return json(controller.signal.aborted||Date.now()>=deadline?unavailable():result);
+            }finally{clearTimeout(timer);request.signal.removeEventListener('abort',cancel);controller.abort();}
+          }catch{return json({...combined,sourceEquipmentEstimatesStatus:'unavailable'});}
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {
