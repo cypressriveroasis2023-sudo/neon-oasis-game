@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {scheduleCameraMhelpIntake,INTAKE_BACKGROUND_INVOCATION_MS} from '../intake/mhelpIntakeBackground.ts';
+import {ReconOwnedConflict,ReconOwnedUnknown,ReconSourceFailure} from '../../supabase/functions/_shared/reconOwnedMetadataV2.ts';
 
 const LEGACY='https://goqrnolcvqnirjmzaeyk.supabase.co',started=Date.parse('2026-10-10T06:03:00Z');
 const request=(headers={},method='POST')=>new Request('https://synthetic.invalid/provider',{method,
@@ -74,7 +75,7 @@ function provider({cronValid=true,role='owner',active=true,providerFailure=false
   const db={rpc:async()=>({data:cronValid}),auth:{getUser:async()=>{profiles.push('getUser');return {data:{user:{id:'synthetic-owner'}}};}},
     from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>{profiles.push('profile');return {data:{role,active}};}})}),update:()=>({eq:async()=>calls.push('provider-failure-recorded')})})};
   const inventory=async()=>{calls.push('provider');if(providerFailure)throw Error('synthetic provider failed');return {unchanged:true};};
-  const context={Date,Response,fetch:async()=>{throw Error('Unexpected synthetic transport');},
+  const context={Date,Response,ReconOwnedConflict,ReconOwnedUnknown,ReconSourceFailure,fetch:async()=>{throw Error('Unexpected synthetic transport');},
     Deno:{env:{get:()=>LEGACY}},EdgeRuntime:{waitUntil:task=>tasks.push(task)},
     createClient:()=>db,cors:{'Content-Type':'application/json'},json:(body,status=200)=>new Response(JSON.stringify(body),{status}),
     console:{error:()=>{}},starInventory:inventory,reconInventory:inventory,avigilonInventory:inventory,witnessInventory:inventory,

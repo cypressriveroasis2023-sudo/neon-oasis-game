@@ -1,0 +1,8 @@
+{
+  "name": "recon-hosted-proof",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "pg": "8.16.3"
+  }
+}

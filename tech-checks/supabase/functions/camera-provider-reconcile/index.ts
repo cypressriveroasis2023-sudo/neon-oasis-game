@@ -5,6 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { crypto } from "jsr:@std/crypto@1";
 import {projectReconProviderInventory} from '../_shared/reconProviderInventory.ts';
 import {scheduleCameraMhelpIntake} from '../../../operations/intake/mhelpIntakeBackground.ts';
+import {beginReconAttempt,recoverReconMutation,failReconAttempt,requireReconSuccess,canonicalReconJson,reconOwnedFingerprint,ReconOwnedConflict,ReconOwnedUnknown,ReconSourceFailure,RECON_V2_LIMITS} from '../_shared/reconOwnedMetadataV2.ts';
 
 const cors={"content-type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-camera-cron-secret","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const json=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:cors});
@@ -268,51 +269,136 @@ async function starInventory(db:any){
   return {account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>resolvedResourceStatus(v)==="online").length,account_offline:all.filter(v=>resolvedResourceStatus(v)==="offline").length,account_unknown:all.filter(v=>resolvedResourceStatus(v)==="unknown").length,inventory_scope:accountInventoryComplete?"account":"tracker_search",server:base.replace(/^https?:\/\//,""),tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,identity_conflicts:identityConflicts,online,offline,unknown,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage};
 }
 async function reconInventory(db:any){
-  const {data:secretRows,error:secretError}=await db.rpc("get_reconeyez_integration_secrets");
-  if(secretError)throw new Error("Reconeyez credentials could not be read");
-  const secret=Array.isArray(secretRows)?secretRows[0]:secretRows;
-  const username=String(secret?.username||""),password=String(secret?.password||""),host=String(secret?.server_host||"na.reconeyez.com"),port=Number(secret?.server_port||9028);
-  if(!username||!password)throw new Error("Reconeyez has not been connected");
-  const auth="Basic "+btoa(`${username}:${password}`);
-  const res=await fetch(`https://${host}:${port}/control/v1/get_device_list`,{headers:{Authorization:auth,Accept:"application/json","User-Agent":"CamerasOnsite-CameraHealth/1.0"},signal:AbortSignal.timeout(45000)});
-  const txt=await res.text();if(!res.ok)throw new Error(`Reconeyez HTTP ${res.status}`);
-  const list=JSON.parse(txt);if(!Array.isArray(list))throw new Error("Reconeyez device list was not an array");
-  const detectors=list.filter((d:any)=>String(d?.type||"").toLowerCase().startsWith("detector"));
-  const {data:locals}=await db.from("camera_devices").select("id,external_device_id,device_serial,activation_state,organization,unit_key").eq("source","reconeyez");
-  const ids=new Set((locals||[]).flatMap((d:any)=>[String(d.external_device_id||""),String(d.device_serial||"").replace(/^reconeyez:/,"")]).filter(Boolean));
-  const active=(locals||[]).filter((d:any)=>String(d.activation_state||"").toLowerCase()!=="deactivated").length;
-  const shop=(locals||[]).length-active;
-  const matched=detectors.filter((d:any)=>ids.has(String(d.guid||""))).length;
-  const {data:reconTracker,error:reconTrackerError}=await db.from("equipment_master")
-    .select("canonical_family,unit_tag,source_label,tracker_state")
-    .in("canonical_family",["Recon","Recon 2"]);
-  if(reconTrackerError)throw reconTrackerError;
-  const reconTrackerKey=(family:string,tag:any)=>String(family).toLowerCase()+"|"+String(tag||"").padStart(3,"0");
-  const localTrackerUnits=new Set<string>();
-  for(const d of locals||[]){
-    const u=String(d.unit_key||"").toUpperCase();
-    let m=u.match(/^RII[-\s]*(\d{3})/);
-    if(m){localTrackerUnits.add(reconTrackerKey("Recon 2",m[1]));continue}
-    m=u.match(/^RI[-\s]*(\d{3})/);
-    if(m)localTrackerUnits.add(reconTrackerKey("Recon",m[1]));
+  // Begin shares the connector's inventory ordinal before any source or credential read.
+  const attempt=await beginReconAttempt(db,"inventory_reconcile");
+  const object=(value:any)=>Boolean(value&&typeof value==="object"&&!Array.isArray(value));
+  const count=(value:any)=>Number.isSafeInteger(value)&&value>=0&&value<=RECON_V2_LIMITS.diagnostic_counter_max;
+  const exact=(value:any,keys:string[])=>object(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+  const reserve=()=>{
+    const remaining=Date.parse(attempt.expires_at)-Date.now()-5000;
+    if(remaining<=0)throw new ReconOwnedConflict("inventory_reconcile");
+    return remaining;
+  };
+  let providerDeadline:number|null=null;
+  const sourceRead=async(query:any):Promise<any>=>{
+    const budget=Math.min(reserve(),providerDeadline===null?Infinity:providerDeadline-Date.now()),controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+    if(budget<=0)throw new ReconSourceFailure("provider_unavailable");
+    try{
+      const request=typeof query?.abortSignal==="function"?query.abortSignal(controller.signal):query;
+      const result=await Promise.race([Promise.resolve(request),new Promise((_resolve,reject)=>{
+        timer=setTimeout(()=>{controller.abort();reject(new ReconSourceFailure(providerDeadline===null?"source_read_failed":"provider_unavailable"))},budget);
+      })]);
+      if(providerDeadline!==null&&Date.now()>=providerDeadline)throw new ReconSourceFailure("provider_unavailable");
+      return result;
+    }catch(error){if(error instanceof ReconSourceFailure)throw error;throw new ReconSourceFailure("source_read_failed")}
+    finally{if(timer!==undefined)clearTimeout(timer)}
+  };
+  const providerWork=async(work:()=>Promise<any>)=>{
+    const budget=Math.min(reserve(),(providerDeadline??0)-Date.now());
+    if(budget<=0)throw new ReconSourceFailure("provider_unavailable");
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    try{
+      const result=await Promise.race([new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(new ReconSourceFailure("provider_unavailable")),budget)}),work()]);
+      if(Date.now()>=(providerDeadline??0))throw new ReconSourceFailure("provider_unavailable");
+      return result;
+    }finally{if(timer!==undefined)clearTimeout(timer)}
+  };
+  const validateDiagnostics=(value:any,detectorCount:number,localCount:number)=>{
+    const keys=["matched_local_detectors","unmatched_provider_detectors","local_active","local_shop","tracker_coverage","reconciled_at"];
+    const familyKeys=["tracker_total","field_or_unknown","shop","retired","matched_local_units","missing_local_units","missing_field_units","local_unit_namespace","namespace_inventory_present"];
+    if(!exact(value,keys)||!keys.slice(0,4).every(key=>count(value[key]))
+      ||value.matched_local_detectors+value.unmatched_provider_detectors!==detectorCount
+      ||value.local_active+value.local_shop!==localCount||localCount<value.matched_local_detectors||value.reconciled_at!==attempt.observed_at
+      ||!object(value.tracker_coverage)||Object.keys(value.tracker_coverage).some(family=>family!=="Recon"&&family!=="Recon 2"))throw new ReconSourceFailure("source_read_failed");
+    for(const [family,row]of Object.entries(value.tracker_coverage) as [string,any][]){
+      if(!exact(row,familyKeys)||!familyKeys.slice(0,6).every(key=>count(row[key]))
+        ||row.tracker_total!==row.field_or_unknown+row.shop+row.retired
+        ||row.tracker_total!==row.matched_local_units+row.missing_local_units
+        ||!Array.isArray(row.missing_field_units)||row.missing_field_units.length>RECON_V2_LIMITS.missing_labels_per_family
+        ||row.missing_field_units.length>row.field_or_unknown||row.missing_field_units.length>row.missing_local_units
+        ||row.missing_field_units.length<Math.max(0,row.missing_local_units-row.shop-row.retired)
+        ||row.local_unit_namespace!==(family==="Recon 2"?"RII":"RI")||typeof row.namespace_inventory_present!=="boolean"
+        ||row.missing_field_units.some((label:any)=>typeof label!=="string"||!label.length||/[\u0000-\u001f\u007f-\u009f]/u.test(label)||new TextEncoder().encode(label).length>RECON_V2_LIMITS.missing_label_utf8_bytes))throw new ReconSourceFailure("source_read_failed");
+    }
+    if(new TextEncoder().encode(canonicalReconJson(value)).length>RECON_V2_LIMITS.diagnostics_utf8_bytes)throw new ReconSourceFailure("source_read_failed");
+  };
+  let publishing=false;
+  try{
+    reserve();
+    const {data:secretRows,error:secretError}=await sourceRead(db.rpc("get_reconeyez_integration_secrets"));
+    const secret=Array.isArray(secretRows)?secretRows.length===1?secretRows[0]:null:secretRows;
+    if(secretError||!object(secret)||typeof secret.username!=="string"||!secret.username||typeof secret.password!=="string"||!secret.password
+      ||typeof secret.server_host!=="string"||!secret.server_host||secret.server_port!==null&&(!Number.isSafeInteger(secret.server_port)||secret.server_port<1||secret.server_port>65535))throw new ReconSourceFailure("source_read_failed");
+    const {username,password,server_host:host}=secret,port=secret.server_port??9028;
+    const providerBudget=Math.min(RECON_V2_LIMITS.provider_total_seconds*1000,reserve());
+    const providerStarted=Date.now();let res:Response,txt:string;
+    providerDeadline=providerStarted+providerBudget;
+    try{
+      res=await providerWork(()=>fetch(`https://${host}:${port}/control/v1/get_device_list`,{headers:{Authorization:"Basic "+btoa(`${username}:${password}`),Accept:"application/json","User-Agent":"CamerasOnsite-CameraHealth/1.0"},signal:AbortSignal.timeout(providerBudget)}));
+      txt=await providerWork(()=>res.text());
+    }catch{throw new ReconSourceFailure("provider_unavailable")}
+    if(Date.now()-providerStarted>=providerBudget)throw new ReconSourceFailure("provider_unavailable");
+    if(res.status===206)throw new ReconSourceFailure("partial_inventory");
+    if(res.status!==200)throw new ReconSourceFailure(res.status===401||res.status===403?"provider_rejected":"provider_unavailable");
+    reserve();let list:any,identityInventory:any;
+    try{list=JSON.parse(txt);identityInventory=await providerWork(()=>projectReconProviderInventory(list,attempt.observed_at))}catch(error){if(error instanceof ReconSourceFailure)throw error;throw new ReconSourceFailure("invalid_inventory")}
+    const detectors=list.filter((d:any)=>String(d.type).startsWith("detector"));
+    const {data:locals,error:localError}=await sourceRead(db.from("camera_devices").select("id,external_device_id,device_serial,activation_state,organization,unit_key").eq("source","reconeyez"));
+    if(localError||!Array.isArray(locals)||locals.length>RECON_V2_LIMITS.diagnostic_counter_max||locals.some((row:any)=>!object(row)))throw new ReconSourceFailure("source_read_failed");
+    const ids=new Set(locals.flatMap((d:any)=>[String(d.external_device_id||""),String(d.device_serial||"").replace(/^reconeyez:/,"")]).filter(Boolean));
+    const active=locals.filter((d:any)=>String(d.activation_state||"").toLowerCase()!=="deactivated").length,shop=locals.length-active;
+    const matched=detectors.filter((d:any)=>ids.has(d.guid)).length;
+    const {data:reconTracker,error:reconTrackerError}=await sourceRead(db.from("equipment_master")
+      .select("canonical_family,unit_tag,source_label,tracker_state").in("canonical_family",["Recon","Recon 2"]));
+    if(reconTrackerError||!Array.isArray(reconTracker)||reconTracker.length>RECON_V2_LIMITS.diagnostic_counter_max
+      ||reconTracker.some((row:any)=>!object(row)||!["Recon","Recon 2"].includes(row.canonical_family)||!["field_or_unknown","shop","retired"].includes(row.tracker_state||"field_or_unknown")))throw new ReconSourceFailure("source_read_failed");
+    const reconTrackerKey=(family:string,tag:any)=>String(family).toLowerCase()+"|"+String(tag||"").padStart(3,"0");
+    const localTrackerUnits=new Set<string>();
+    for(const d of locals){
+      const u=String(d.unit_key||"").toUpperCase();let m=u.match(/^RII[-\s]*(\d{3})/);
+      if(m){localTrackerUnits.add(reconTrackerKey("Recon 2",m[1]));continue}
+      m=u.match(/^RI[-\s]*(\d{3})/);if(m)localTrackerUnits.add(reconTrackerKey("Recon",m[1]));
+    }
+    const trackerCoverage:any={};
+    for(const t of reconTracker){
+      const family=t.canonical_family,state=t.tracker_state||"field_or_unknown";
+      trackerCoverage[family]??={tracker_total:0,field_or_unknown:0,shop:0,retired:0,matched_local_units:0,missing_local_units:0,missing_field_units:[] as string[],local_unit_namespace:family==="Recon 2"?"RII":"RI",namespace_inventory_present:[...localTrackerUnits].some(key=>key.startsWith(family.toLowerCase()+"|"))};
+      const row=trackerCoverage[family];row.tracker_total++;row[state]++;
+      if(localTrackerUnits.has(reconTrackerKey(family,t.unit_tag)))row.matched_local_units++;
+      else{row.missing_local_units++;if(state==="field_or_unknown")row.missing_field_units.push(String(t.source_label||t.unit_tag||""))}
+    }
+    const {data:bridgeEvents,error:bridgeEventError}=await sourceRead(db.from("camera_integration_events").select("external_device_id,observed_at").eq("provider","reconeyez").eq("payload->device_info->>type","bridge_4g").order("observed_at",{ascending:false}).limit(1000));
+    if(bridgeEventError||!Array.isArray(bridgeEvents)||bridgeEvents.some((row:any)=>!object(row)))throw new ReconSourceFailure("source_read_failed");
+    try{identityInventory=await providerWork(()=>projectReconProviderInventory(list,attempt.observed_at,bridgeEvents))}catch(error){if(error instanceof ReconSourceFailure)throw error;throw new ReconSourceFailure("invalid_inventory")}
+    const diagnostics={matched_local_detectors:matched,unmatched_provider_detectors:detectors.length-matched,local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:attempt.observed_at};
+    validateDiagnostics(diagnostics,detectors.length,locals.length);
+    const diagnosticsHash=await providerWork(()=>reconOwnedFingerprint(diagnostics));
+    const input={identity_inventory:identityInventory,inventory_count:list.length,detector_count:detectors.length,diagnostics,server_host:host,server_port:port};
+    const fingerprint=await providerWork(()=>reconOwnedFingerprint(input));reserve();
+    if(Date.now()>=providerDeadline)throw new ReconSourceFailure("provider_unavailable");
+    publishing=true;
+    const finish=await recoverReconMutation(db,attempt,"recon_finish_reconcile_v2",{
+      p_attempt_id:attempt.attempt_id,p_identity_inventory:identityInventory,p_inventory_count:list.length,p_detector_count:detectors.length,
+      p_diagnostics:diagnostics,p_server_host:host,p_server_port:port
+    },{fingerprint,validateResult:(result:any)=>{
+      if(result.inventory_total!==list.length||result.detectors!==detectors.length||result.matched_local_detectors!==matched
+        ||result.unmatched_provider_detectors!==detectors.length-matched||result.local_active!==active||result.local_shop!==shop
+        ||result.diagnostics_sha256!==diagnosticsHash)throw new ReconOwnedUnknown();
+    }});
+    if(finish.terminal_outcome==="failure")throw new ReconOwnedConflict("inventory_reconcile");
+    const result=requireReconSuccess(finish);
+    return {...result,server:host+":"+port,tracker_coverage:trackerCoverage};
+  }catch(error){
+    // Only a definite source failure may finish failure. Unknown publication is recovered with its original token by the shared adapter.
+    const failure=!publishing?(error instanceof ReconSourceFailure?error:!(error instanceof ReconOwnedConflict)&&!(error instanceof ReconOwnedUnknown)?new ReconSourceFailure("source_read_failed"):null):null;
+    if(failure){
+      const finish=await failReconAttempt(db,attempt,failure.reason);
+      if(finish.terminal_outcome==="success")return requireReconSuccess(finish);
+      throw failure;
+    }
+    if(error instanceof ReconSourceFailure||error instanceof ReconOwnedConflict||error instanceof ReconOwnedUnknown)throw error;
+    throw new ReconOwnedUnknown();
   }
-  const trackerCoverage:any={};
-  for(const t of reconTracker||[]){
-    const family=String(t.canonical_family),state=String(t.tracker_state||"field_or_unknown");
-    trackerCoverage[family]??={tracker_total:0,field_or_unknown:0,shop:0,retired:0,matched_local_units:0,missing_local_units:0,missing_field_units:[] as string[],local_unit_namespace:family==="Recon 2"?"RII":"RI",namespace_inventory_present:family==="Recon 2"?[...localTrackerUnits].some(k=>k.startsWith("recon 2|")):[...localTrackerUnits].some(k=>k.startsWith("recon|"))};
-    const a=trackerCoverage[family];a.tracker_total++;a[state]=(a[state]||0)+1;
-    const hit=localTrackerUnits.has(reconTrackerKey(family,t.unit_tag));
-    if(hit)a.matched_local_units++;else{a.missing_local_units++;if(state==="field_or_unknown")a.missing_field_units.push(String(t.source_label||t.unit_tag))}
-  }
-  const now=new Date().toISOString();
-  const {data:intRow}=await db.from("camera_integrations").select("metadata").eq("provider","reconeyez").maybeSingle();
-  const {data:bridgeEvents,error:bridgeEventError}=await db.from("camera_integration_events").select("external_device_id,observed_at").eq("provider","reconeyez").eq("payload->device_info->>type","bridge_4g").order("observed_at",{ascending:false}).limit(1000);
-  const identityInventory=await projectReconProviderInventory(list,now,bridgeEventError?[]:bridgeEvents||[]);
-  // Retain an older event's original time only for the unchanged complete group.
-  for(const group of identityInventory.groups){const previous=intRow?.metadata?.identity_inventory_v1?.groups?.find((g:any)=>g.proof===group.proof&&g.areaKey===group.areaKey);if(group.bridgeLastEventAt===null&&typeof previous?.bridgeLastEventAt==='string'&&Date.parse(previous.bridgeLastEventAt)<=Date.parse(now))group.bridgeLastEventAt=previous.bridgeLastEventAt;}
-  const {error:reconSummaryError}=await db.from("camera_integrations").upsert({provider:"reconeyez",server_host:host,server_port:port,enabled:true,last_sync_at:now,last_sync_status:"ok",last_error:null,metadata:{...(intRow?.metadata||{}),identity_inventory_v1:identityInventory,last_inventory_count:list.length,last_detector_count:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:now}},{onConflict:"provider"});
-  if(reconSummaryError)throw new Error("Reconeyez inventory summary save failed: "+reconSummaryError.message);
-  return {server:host+":"+port,inventory_total:list.length,detectors:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage};
 }
 async function avigilonInventory(db:any){
   const {data:master,error:me}=await db.from("equipment_master").select("canonical_family,unit_tag,source_label,tracker_state").in("canonical_family",["CAMV","Sniper","Sniper 2","Sniper 4"]);
@@ -413,13 +499,15 @@ Deno.serve(async(req)=>{
     const result:any={ok:true,reconciled_at:new Date().toISOString()};
     if(mode==="all"||mode==="vigilant")result.vigilant=await starInventory(db);
     if(mode==="all"||mode==="reconeyez"||mode==="recon"){
-      try{result.reconeyez=await reconInventory(db);}
-      catch(error){await db.from("camera_integrations").update({last_sync_status:"failed",last_error:"Reconeyez authenticated inventory is unavailable."}).eq("provider","reconeyez");throw error;}
+      result.reconeyez=await reconInventory(db);
     }
     if(mode==="all"||mode==="avigilon"||mode==="direct")result.avigilon=await avigilonInventory(db);
     if(mode==="all"||mode==="witness")result.witness=await witnessInventory(db);
     return json(result);
   }catch(e){
+    if(e instanceof ReconOwnedConflict)return json({error:e.message,code:"PT409"},409);
+    if(e instanceof ReconOwnedUnknown||e instanceof ReconSourceFailure)return json({ok:false,error:e.message},502);
+    if(mode==="reconeyez"||mode==="recon")return json({ok:false,error:new ReconOwnedUnknown().message},502);
     const message=String((e as any)?.message||e);console.error("RECONCILE_FAILURE",message);
     if(["vigilant","reconeyez","recon","witness","avigilon","direct"].includes(mode))await db.from("camera_integrations").update({last_sync_status:"failed",last_error:message}).eq("provider",mode==="recon"?"reconeyez":mode==="direct"?"avigilon":mode);
     return json({ok:false,error:message},500)
