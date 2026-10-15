@@ -45,8 +45,12 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
  await page.evaluate(()=>sessionStorage.setItem('syntheticSourcePlacement','owner'));await page.reload();await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('99 Owner Road');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
 });
 test('Shop stays searchable and linked; approved alias keeps full variant; unresolved support stays separate',async({page},info)=>{
- const errors=await mount(page);await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
- const search=page.getByLabel('Search units',{exact:true}),card=page.locator('.compact-unit[data-unit="RANGER 022"]');
+ const errors=await mount(page),search=page.getByLabel('Search units',{exact:true}),card=page.locator('.compact-unit[data-unit="RANGER 022"]');
+ await expect(card.locator('[data-placement-status="ready"]')).toBeVisible();await expect.poll(()=>page.evaluate(()=>boardDataReady===true&&cameraLoadPromise===null)).toBe(true);
+ const before=await page.evaluate(()=>readRequests.filter(r=>r.path).length);
+ await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
+ expect(await page.evaluate(start=>readRequests.filter(r=>r.path).slice(start).map(r=>r.path).sort(),before)).toEqual(['/api/camera-health/summary-v3','/api/field-map']);
+ await expect(card.locator('[data-placement-status="ready"]')).toBeVisible();expect(await page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevices[0]).scope)).toBe('shop');
  await expect(card).toContainText('SHOP / ROOT');await expect(card.getByRole('button',{name:'Troubleshoot'})).toBeVisible();await expect(card.locator('.unit-field-map-link')).toBeVisible();
  await search.fill('Alias verified site');const alias=page.locator('.compact-unit[data-unit="SNIPER 00312.2"]');await expect(alias).toBeVisible();await expect(alias.locator('.unit-field-map-link')).toHaveAttribute('href','./?fieldUnit=SNIPER%20312.2');await expect(alias.locator('.statuspill')).toHaveText('IP / PORT OFFLINE');
  await search.fill('SOLAR STAND');await expect(page.locator('.compact-unit')).toContainText('No verified equipment link. Source group remains separate.');await expect(page.locator('.compact-unit .statuspill')).not.toContainText('CAMERA OFFLINE');
