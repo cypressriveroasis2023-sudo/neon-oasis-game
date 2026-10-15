@@ -185,6 +185,8 @@ export function createOperationsHandler(options) {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload), ...(signal ? {signal} : {}),
   }, 'COS workflow could not be completed. Please retry.');
   const readMhelpPlacements=async(actorPayload,signal=undefined)=>{if(options.mhelpPlacementEnabled!==true)return null;const receipt=await rpc('cos_mhelp_placement_snapshot',actorPayload,signal);try{return {...receipt,fleetLocations:await rpc('cos_mhelp_location_snapshot',actorPayload,signal)};}catch{return receipt;}};
+  // Camera placement consumes only guarded status/items; full map and roster readers stay unchanged.
+  const readMhelpCameraPlacements=async(actorPayload,signal=undefined)=>{if(options.mhelpPlacementEnabled!==true)return null;const receipt=await rpc('cos_mhelp_placement_snapshot',{...actorPayload,p_projection:'camera'},signal);if(!receipt||typeof receipt!=='object'||Array.isArray(receipt))throw Error('Invalid placement receipt');return receipt;};
   const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
@@ -989,7 +991,7 @@ export function createOperationsHandler(options) {
           const witnessIntegrations=providerIntegrations.filter(row=>row.provider==='witness');
           const recon=await projectReconProviderIdentities(reconSources.units,devices,reconSources.integrations)
             .catch(()=>projectReconProviderIdentities([],devices,[]));
-          const mhelpReceipt=await readMhelpPlacements(actorPayload);
+          const mhelpReceipt=await readMhelpCameraPlacements(actorPayload);
           const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
           const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
           // Current guarded source placement only classifies synthetic PDF inventory.
@@ -1013,7 +1015,7 @@ export function createOperationsHandler(options) {
               signal.throwIfAborted();return pages.flat();
             },
             readCurrent:async(signal)=>{
-              const [snapshot,current,mhelpReceipt]=await Promise.all([rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readMhelpPlacements(actorPayload,signal)]);
+              const [snapshot,current,mhelpReceipt]=await Promise.all([rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readMhelpCameraPlacements(actorPayload,signal)]);
               if(!Array.isArray(snapshot?.inventoryItems))throw Error('Current SHOP inventory is unavailable.');
               return shopRead(snapshot.inventoryItems,current,mhelpReceipt);
             },
