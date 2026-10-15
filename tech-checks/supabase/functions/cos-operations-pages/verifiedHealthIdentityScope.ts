@@ -1,7 +1,10 @@
-/** Reviewed 2026-10-09: 75 complete native associations (120 resources), one explicit Owner audit.
+/** Reviewed scope: 76 complete native associations (124 resources), one explicit Owner audit.
+ * Initial 75 associations reviewed 2026-10-09; one exact four-resource association
+ * admitted after explicit Owner physical-identity confirmation on 2026-10-15.
  * Opaque SHA-256 commitments only. Never commit the private serial/roster review input.
  * Any changed association requires a new review; no runtime alias inference is permitted. */
 export const REVIEWED_NATIVE_IDENTITIES:Readonly<Record<string,string>>=Object.freeze({
+  "431457757d33b15d0599c7c93ded5cdbb6a74c85caf225c1fcc7079f7b5ef5f8": "dc532cb72f2c0091810d513666813074b10a8afdfb526f00c0a9873554b1dc8e",
   "06e00932206ffd531b99186f8f1f7ab9456f3eb679219f2bbecd55e4993781bc": "846332d10df653b11ed142dadce45363663d3a41088b8ffdc2b0f3127a6ab693",
   "097e55ccf6a3439033205818afbc2e6e8ffcc1ad6760f9a5f3e3f04d0d978fee": "dc1e2366233e86c34217538b771d522b6176ade5ea762d133734c14d80ae168f",
   "0a98d875d6c81c5244ef2fbac83c2d87a160bce08e6508064739214ec8a5d890": "c69a648f97b8e7b9035e812a3d6ab4dad64917a2f36575e71c8aeed4b382dbb3",
@@ -83,6 +86,17 @@ export const REVIEWED_OWNER_IDENTITIES:ReadonlySet<string>=new Set(["0493a660e8b
 /** Warning-only bindings to the previously reviewed source identities. No current association can extend these sets. */
 export type ReviewedIdentityResources={deviceIds:readonly string[];unitKeys:readonly string[]};
 export const REVIEWED_NATIVE_RESOURCES:Readonly<Record<string,ReviewedIdentityResources>>=Object.freeze({
+  "431457757d33b15d0599c7c93ded5cdbb6a74c85caf225c1fcc7079f7b5ef5f8": {
+    "deviceIds": [
+      "feed6068a78c6977c764c0365dfcfac2d94f6ddf1535273fc8b6c48e04eb7105",
+      "46904bb929ed3ffdbedfdfb4d2c517282d10d2644ca3205a03d9fc2bd06cd987",
+      "fdd3c0ca5a1c00eaaddc2c0140aef37c154e4ab6338de9c8bd43575858e2cd13",
+      "664c50e58955e2ac4fa545241ed292331f9b9749510742992e0f444e2018a01e"
+    ],
+    "unitKeys": [
+      "0de5ec7e47d0dd1758d9098f9e7accac4adadf71339f289a79541711ef8afa94"
+    ]
+  },
   "06e00932206ffd531b99186f8f1f7ab9456f3eb679219f2bbecd55e4993781bc": {
     "deviceIds": [
       "919ebe27f91e752138b6d6860ba66887320054c0401c2c0fa04edc05839eed9c",

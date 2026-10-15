@@ -1,3 +1,4 @@
+// 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
 // 2026-10-12 reviewed source-separated direct diagnostic wording; current daily four-view markers preserved.
@@ -23,13 +24,13 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "eaea57f2fd5cc7a5544938675eda253ee7e36378a8650460edaf2630ac7195af",
+  "camera-health": "70cb43e5a1b27b8565abe4b02f64fd105b8604dd5fe9829f3c918e957d5e39ec",
   "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "b55af66ce5d9e619c5453ec573dc1106acee6d58e0fb66bcb6b786020ad204ec",
+  "camera-health": "f1e980d25ad2b397f1ea894e54cd3a38bf4fdf92cf1474782f441dd0c69a6d1a",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
@@ -41,8 +42,9 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261014-robot-mobile').length-1,1);
-    if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
-    const availabilityPreserved=name==='it-send-repair'?html.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):html;
+    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v=20261015-placement-read-coalescing-v1"').length-1,1);
+    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-placement-read-coalescing-v1"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"','camera-effective-placement.js?v=20261008"');
+    const availabilityPreserved=name==='it-send-repair'?placementPreserved.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):placementPreserved;
     const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">\n<script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);

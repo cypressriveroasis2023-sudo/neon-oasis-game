@@ -156,6 +156,16 @@ jobs:
         id: build
       - run: npx playwright install --with-deps chromium
         id: browser_install
+      - name: Verify legacy camera saved reads and guarded placement
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-health-overview.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/camera-effective-placement.browser.spec.mjs
+      - name: Legacy camera and placement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-camera-placement-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
       - name: Verify source-equipment address estimate pins
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/source-equipment-pins.browser.spec.mjs

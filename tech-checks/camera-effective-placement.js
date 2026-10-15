@@ -5,7 +5,6 @@
  */
 (function(root){
   'use strict';
-  const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
   const object=v=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
   const text=v=>typeof v==='string'&&v.trim()!=='';
   const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
@@ -62,10 +61,14 @@
         if(conflict||mapped.length!==1||mapped[0].unitNumber!==claim.unitNumber||inventory.filter(r=>label(r.unitNumber)===label(claim.unitNumber)).length!==1)value=unverified('The complete camera group or equipment link changed. Refresh and review.');
         else{
           const row=mapped[0],inField=fields.some(r=>r.id===row.id),atShop=String(row.currentLocationType||'').toLowerCase()==='shop'||row.placement==='SHOP';
-          const ownerFields=['placement','placementUnitKey','placementAuditId','placementUpdatedAt'].some(k=>row[k]!=null),badOwner=(ownerFields||row.placementSource!=null)&&row.placementSource!=='owner'||row.placementSource==='owner'&&(!['FIELD','SHOP'].includes(row.placement)||!id(row.placementAuditId)||!text(row.placementUnitKey));
-          if(badOwner||row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string'||warnings.some(w=>w.unitId===row.id)||reviews.some(r=>r.unitId===row.id||label(r.unitNumber)===label(row.unitNumber))||row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||inField&&atShop||!inField&&!atShop||claim.kind==='owner_placement'&&(row.placementAuditId!==claim.placementAuditId||row.placementUnitKey!==claim.unitNumber))value=unverified('Current physical placement needs identity review.');
+          let sourcePlacement=null,sourceInvalid=false;
+          try{sourcePlacement=root.CameraPlacementControls.finalizedPlacementSource(snapshot,row);}catch{sourceInvalid=true;}
+          const importedSource=sourcePlacement&&sourcePlacement.kind!=='recorded_inventory';
+          const sourceIdentityInvalid=importedSource&&(row.readOnly!==false||!['native_provider','owner_confirmed_native'].includes(claim.kind));
+          const ownerFields=['placement','placementUnitKey','placementAuditId','placementUpdatedAt'].some(k=>row[k]!=null),badOwner=!sourcePlacement&&(ownerFields||row.placementSource!=null)&&row.placementSource!=='owner'||row.placementSource==='owner'&&(!['FIELD','SHOP'].includes(row.placement)||!id(row.placementAuditId)||!text(row.placementUnitKey));
+          if(sourceInvalid||sourceIdentityInvalid||badOwner||row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string'||warnings.some(w=>w.unitId===row.id)||reviews.some(r=>r.unitId===row.id||label(r.unitNumber)===label(row.unitNumber))||row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||inField&&atShop||!inField&&!atShop||claim.kind==='owner_placement'&&(row.placementAuditId!==claim.placementAuditId||row.placementUnitKey!==claim.unitNumber))value=unverified('Current physical placement needs identity review.');
           else if(device.activation_source==='owner_location_override_v2'&&(row.placementSource!=='owner'||label(device.organization)!==label(row.placement==='SHOP'?'root':row.site)))value=unverified('The Owner placement changed. Refresh the saved unit.');
-          else value={status:'ready',scope:inField?'field':'shop',site:row.site||'',address:row.address||'',unitId:row.id,unitNumber:row.unitNumber,source:(row.placementSource==='owner'?'Owner-confirmed placement':row.importedInstallation?'mHelpDesk equipment document':'Current Field Map record')+(claim.kind==='exact_full_identifier'?' · Exact full unit identifier':''),identityBasis:claim.kind,row,proof:claim.proof||null,generatedAt:snapshot.generatedAt,reason:''};
+          else value={status:'ready',scope:inField?'field':'shop',site:row.site||'',address:row.address||'',unitId:row.id,unitNumber:row.unitNumber,source:(sourcePlacement?root.CameraPlacementControls.sourceLabel(sourcePlacement):row.placementSource==='owner'?'Owner-confirmed placement':row.importedInstallation?'mHelpDesk equipment document':'Current Field Map record')+(claim.kind==='exact_full_identifier'?' · Exact full unit identifier':''),identityBasis:claim.kind,row,proof:claim.proof||null,generatedAt:snapshot.generatedAt,reason:''};
         }
       }
       result.set(key,{...value,deviceSignature:signature([device])});
@@ -94,16 +97,11 @@
             if(sessionResult.error||!text(session?.access_token)||!text(session?.user?.id))throw new Error('Current account unavailable.');
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
             if(subject&&subject!==session.user.id){values.clear();emit();}subject=session.user.id;
-            const ds=getDevices().slice(),before=signature(ds);
-            const get=async path=>{
-              const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({path,method:'GET',body:null}),cache:'no-store',signal:current.signal});
-              if(!response.ok)throw new Error('Current physical placement unavailable.');
-              return response.json();
-            };
-            const [snapshot,health]=await Promise.all([get('/api/field-map'),get('/api/camera-health/summary-v3')]);
+            const token=session.access_token,ds=getDevices().slice(),before=signature(ds);
+            const {snapshot,health}=await root.CameraPlacementControls.readFleetSources({db,session,signal:current.signal,share:true});
             const resolved=resolve(snapshot,health,ds,{partial}),fresh=await db.auth.getSession();
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
-            if(fresh.error||fresh.data?.session?.user?.id!==subject||!text(fresh.data?.session?.access_token)){values.clear();throw new Error('Signed-in account changed.');}
+            if(fresh.error||fresh.data?.session?.user?.id!==subject||fresh.data?.session?.access_token!==token){values.clear();throw new Error('Signed-in account changed.');}
             if(before!==signature(getDevices()))throw new Error('Displayed camera group changed.');
             return resolved;
           };
@@ -111,7 +109,9 @@
           if(request!==revision||stopped)return;
           values=resolved;loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';emit();}},maxAge+1);expiryTimer?.unref?.();
         }catch{if(request!==revision||stopped)return;status=values.size?'stale':'unavailable';}
-        finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);if(request===revision)emit();}
+        // The sibling transport/body may still be pending after Promise.all rejects.
+        // Abort only this captured attempt, never a newer refresh's controller.
+        finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);current.abort();if(request===revision)emit();}
       },
       clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();status='unavailable';subject=null;emit();},
       dispose(){stopped=true;view.clear();subscription?.unsubscribe();if(client===view)client=null;}
