@@ -10,6 +10,7 @@
   const resourceId=v=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9]\d*$/.test(v)?v:null;
   const sameSet=(a,b)=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(x=>b.includes(x));
   const fail=message=>{throw new Error(message);};
+  const identityReview=message=>{const error=new Error(message);error.placementIdentityReview=true;throw error;};
   let active=null;
   // Kept in parity with the deployed placement projection. Full family, decimals and suffixes are retained.
   function placementMatchKey(value){
@@ -34,9 +35,42 @@
     return [...health.unitIdentities,...(health.ownerConfirmedUnitIdentities||[])];
   }
   function stateMatches(state,key){return object(state)&&state.unitKey===key&&['SHOP','FIELD','UNKNOWN'].includes(state.placement)&&(state.auditId===null||resourceId(state.auditId)===state.auditId)&&typeof state.siteLabel==='string'&&typeof state.streetAddress==='string'&&state.canMove===true;}
-  const revisionFields=['importedPlacement','importedInstallation','id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','snapshotImportedAt','activeJobNumber','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
-  const rowRevision=row=>JSON.stringify(revisionFields.map(key=>row[key]??null));
+  const revisionFields=['customer','placementPrecedenceBinding','inventoryLifecycle','effectivePlacement','placementEvidence','uploadPlacementEvidence','uploadProductId','uploadLifecycle','uploadActiveInventoryEligible','activeInventoryEligible','mhelpConfirmedAssignment','mhelpAssignmentChange','mhelpObservedAt','mhelpPlacementReview','mhelpLocationReview','placementReviewReason','representationStatus','importedPlacement','importedInstallation','id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','snapshotImportedAt','activeJobNumber','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
+  const rowRevision=row=>stable(revisionFields.map(key=>row[key]??null));
+  const stable=value=>JSON.stringify(value,(_,item)=>object(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
   const legacyRevision=state=>JSON.stringify([state.unitKey,state.placement,state.siteLabel,state.streetAddress,state.auditId,state.canMove]);
+  // Read-only source presentation from the authenticated final map. This is never
+  // camera identity or write authority: source moves also require the independent
+  // reviewed resource proof, raw-key writer capability and fresh legacy audit.
+  function finalizedPlacementSource(snapshot,row){
+    if(snapshot.effectivePlacementVersion===undefined&&row.effectivePlacement===undefined)return null;
+    const e=row.effectivePlacement,observed=e?.observedAt,generated=Date.parse(snapshot.generatedAt);
+    const instant=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))&&Date.parse(value)<=generated;
+    if(snapshot.effectivePlacementVersion!==1||!object(e)||e.contract!=='COS_EFFECTIVE_FLEET_PLACEMENT_V1'||!['field','shop'].includes(e.state)||row.placement!==e.state.toUpperCase()||normal(row.currentLocationType)!==e.state||!['recorded','current'].includes(e.freshness)||!text(e.source)||(observed!==null&&!instant(observed))||row.activeInventoryEligible===false||row.uploadActiveInventoryEligible===false||['DO_NOT_USE','MISSING','RETIRED','DECOMMISSIONED'].includes(String(row.uploadLifecycle||row.inventoryLifecycle||'').toUpperCase())||row.placementStatus==='needs_identity_review'||text(row.placementReviewReason)||row.representationStatus==='conflict')fail('The recorded placement contract is incomplete or needs review.');
+    if(e.freshness==='current'&&(!instant(observed)||generated-Date.parse(observed)>40*60*1000))fail('The source placement freshness is inconsistent.');
+    if(row.placementSource==='owner')return null;
+    // A versioned recorded-inventory row can have placement added by the finalizer.
+    // Preserve the existing full-identifier path, without inventing an Owner audit.
+    if(row.placementSource==null&&e.source==='recorded_inventory'&&e.freshness==='recorded'&&row.placementAuditId==null&&row.placementUnitKey==null&&row.placementEvidence==null)return {kind:'recorded_inventory',state:e.state,observedAt:observed,label:'Recorded inventory',revision:stable([snapshot.effectivePlacementVersion,snapshot.placementProjectionVersion,e])};
+    if(row.activeInventoryEligible!==true)fail('The recorded source is not confirmed as active inventory.');
+    const evidence=row.placementEvidence;
+    if(!object(evidence)||!instant(observed)||evidence.observedAt!==observed||evidence.source!==e.source||!['recorded','current'].includes(evidence.state)||typeof evidence.fresh!=='boolean'||evidence.fresh!==(e.freshness==='current')||evidence.state!==(evidence.fresh?'current':'recorded'))fail('The recorded source placement evidence is incomplete.');
+    if(row.placementSource==='mhelpdesk'&&e.source==='mhelpdesk'){
+      const assignment=row.mhelpConfirmedAssignment;
+      if(row.mhelpObservedAt!==observed||!object(assignment)||assignment.contract!=='COS_MHELP_CONFIRMED_ASSIGNMENT_V1'||assignment.unitId!==row.id||assignment.unitNumber!==row.unitNumber||assignment.placement!==row.placement||assignment.observedAt!==observed||![true,false,null].includes(assignment.assignmentChanged))fail('The confirmed mHelpDesk placement binding is incomplete.');
+      return {kind:'mhelpdesk',state:e.state,observedAt:observed,label:'mHelpDesk recorded placement',revision:stable([snapshot.effectivePlacementVersion,snapshot.placementProjectionVersion,e,evidence,assignment])};
+    }
+    if(row.placementSource==='mhelpdesk_upload'&&e.source==='owner_supplied_mhelp_export'){
+      const upload=snapshot.uploadInventory,recorded=row.uploadPlacementEvidence;
+      if(row.uploadActiveInventoryEligible!==true||e.freshness!=='recorded'||evidence.state!=='recorded'||evidence.fresh!==false||evidence.timestampKind!=='upload_received'||!['minute','second'].includes(evidence.timestampPrecision)||typeof evidence.productId!=='string'||resourceId(evidence.productId)!==evidence.productId||evidence.productId!==row.uploadProductId||!/^[a-f0-9]{64}$/.test(evidence.sourceSha256)||!object(recorded)||stable(recorded)!==stable(evidence)||!object(upload)||upload.contract!=='COS_MHELP_UPLOAD_INVENTORY_V1'||upload.source!==e.source||upload.sourceSha256!==evidence.sourceSha256||upload.receivedAt!==observed||upload.receivedAtPrecision!==evidence.timestampPrecision||upload.exportAsOf!==null||!Array.isArray(upload.records)||upload.records.length>10000)fail('The reviewed upload placement receipt is incomplete.');
+      const related=upload.records.filter(r=>r?.productId===evidence.productId||r?.binding?.unitIds?.includes(row.id)||r?.binding?.candidateUnitIds?.includes(row.id)),record=related[0],binding=record?.binding;
+      if(related.length!==1||record.recordId!=='mhelp_product:'+evidence.productId||record.productId!==evidence.productId||record.placement!==row.placement||record.uploadLifecycle!=='UNFLAGGED'||row.uploadLifecycle!=='UNFLAGGED'||record.overlayApplied!==true||!object(binding)||binding.state!=='linked'||binding.placementHeld!==false||!Array.isArray(binding.unitIds)||!binding.unitIds.length||!binding.unitIds.every(uuid)||new Set(binding.unitIds).size!==binding.unitIds.length||!binding.unitIds.includes(row.id)||!Array.isArray(binding.candidateUnitIds)||binding.candidateUnitIds.length||!['reviewed_product_id','exact_family_unit','archived_alias','owner_confirmed_alias'].includes(binding.matchMethod)||binding.reason!==null)fail('The reviewed upload equipment binding is unavailable or changed.');
+      return {kind:'mhelpdesk_upload',state:e.state,observedAt:observed,label:'Owner-supplied mHelpDesk export',revision:stable([snapshot.effectivePlacementVersion,snapshot.placementProjectionVersion,e,evidence,[upload.contract,upload.source,upload.sourceSha256,upload.receivedAt,upload.receivedAtPrecision,upload.exportAsOf],record])};
+    }
+    fail('This recorded placement source is not supported by this move form. Review the equipment record.');
+  }
+  const sourceLabel=source=>source.label+(source.observedAt?(source.kind==='mhelpdesk_upload'?' · received ':' · observed ')+source.observedAt:' · observation time unavailable');
+  const sourceDisclosure=source=>source?sourceLabel(source)+'. Confirm the unit’s physical location before saving.':'';
   // A newer backend explicitly advertises the existing raw-key writer's native projection.
   // Health and legacy state are independently refreshed; a proof alone is not writer support.
   function nativeAliasCapability(snapshot,health,row,key,ids,state){
@@ -89,15 +123,17 @@
       row=matches[0];
       if(proof.kind==='owner_placement'&&(row.placementAuditId!==proof.placementAuditId||row.placementUnitKey!==proof.unitNumber))fail('The saved Owner placement identity changed.');
     }else{
-      if(candidates.length!==1)fail('No unique current equipment record matches this camera.');
+      if(candidates.length!==1)identityReview('No verified equipment association connects this camera group to a unique equipment record. Review the saved camera-to-equipment association before moving this unit; retrying does not create that link.');
       row=candidates[0];
       if(identities.some(identity=>identity.unitId===row.id))fail('This equipment belongs to a different verified camera group.');
     }
     if(warnings.some(warning=>warning.unitId===row.id))fail('The current equipment identity needs review.');
     if(row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||reviews.some(review=>placementMatchKey(review.unitNumber)===matchKey||placementMatchKey(review.unitNumber)===placementMatchKey(row.unitNumber)))fail('The unit’s physical placement needs identity review.');
     if(row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string')fail('The current placement source is malformed.');
+    const sourcePlacement=finalizedPlacementSource(snapshot,row);
     const ownerFields=['placement','placementUnitKey','placementAuditId','placementUpdatedAt'].some(name=>row[name]!=null);
-    if((ownerFields||row.placementSource!=null)&&row.placementSource!=='owner')fail('Owner placement evidence is incomplete. Reload the unit.');
+    if(!sourcePlacement&&(ownerFields||row.placementSource!=null)&&row.placementSource!=='owner')fail('Owner placement evidence is incomplete. Reload the unit.');
+    if(sourcePlacement&&(state.auditId!==null||state.streetAddress.trim()||row.placementAuditId!=null||row.placementUnitKey!=null))fail('The source placement overlaps saved Owner history. Review that placement before using this move form.');
     const fieldRows=items.filter(item=>item.id===row.id),field=fieldRows.length===1;
     if(field&&rowRevision(fieldRows[0])!==rowRevision(row))fail('The field and equipment address records disagree.');
     const declaredField=row.placement==='FIELD'||row.placement!=='SHOP'&&(['field','site'].includes(normal(row.currentLocationType))||['assigned','in_transit','installed','returning'].includes(row.status));
@@ -115,12 +151,13 @@
     // A typed, current imported SHOP presentation may supersede old inferred
     // provider placement, but never a saved Owner address or placement audit.
     const imported=row.importedInstallation;
-    const importedShop=row.importedPlacement==='SHOP'&&row.placementSource==null&&row.placement==null&&row.placementAuditId==null
+    const legacyImportedSource=!sourcePlacement||sourcePlacement.kind==='recorded_inventory';
+    const importedShop=legacyImportedSource&&row.importedPlacement==='SHOP'&&row.placementSource==null&&row.placement==null&&row.placementAuditId==null
       &&object(imported)&&imported.nativeUnitId===row.id&&imported.entityKind===(row.readOnly?'tracker':'equipment_unit')
       &&uuid(imported.sourceRevision)&&resourceId(imported.productId)===imported.productId&&resourceId(imported.eventId)===imported.eventId
       &&/^[a-f0-9]{64}$/.test(imported.nativeGuardSha256)&&!state.streetAddress.trim();
-    if(row.importedPlacement==='SHOP'&&row.placementSource!=='owner'&&!importedShop)fail('The imported Shop placement proof is incomplete. Reload the unit.');
-    const newInstallation=(state.placement==='SHOP'||importedShop)&&(!field||unassignedTrackerField);
+    if(legacyImportedSource&&row.importedPlacement==='SHOP'&&row.placementSource!=='owner'&&!importedShop)fail('The imported Shop placement proof is incomplete. Reload the unit.');
+    const newInstallation=(state.placement==='SHOP'||importedShop||sourcePlacement?.state==='shop')&&(!field||unassignedTrackerField);
     if(newInstallation&&row.placementSource!=='owner'&&row.activeJobNumber!=null)fail('The current equipment has an active job. Review its placement before deploying it.');
     // Empty recorded details can be repaired. Missing fields/types indicate a broken
     // source contract and must never masquerade as an empty editable installation.
@@ -131,7 +168,9 @@
     }else if(state.streetAddress.trim())fail('Camera and Field Map placement revisions disagree. Reload the unit.');
     if(row.locationVerification==='owner_verified'&&(!text(row.address)||!uuid(row.locationHistoryId)||!Number.isFinite(Date.parse(row.locationVerifiedAt))||typeof row.latitude!=='number'||Math.abs(row.latitude)>90||!Number.isFinite(row.latitude)||typeof row.longitude!=='number'||Math.abs(row.longitude)>180||!Number.isFinite(row.longitude)))fail('The verified location record is incomplete.');
     const nativeAlias=nativeAliasCapability(snapshot,health,row,key,ids,state);
-    return {row,field:field&&!newInstallation,newInstallation,nativeAlias,writerCompatible:placementMatchKey(row.unitNumber)===matchKey||Boolean(nativeAlias),site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state),nativeAlias])};
+    const sourceWrite=sourcePlacement&&sourcePlacement.kind!=='recorded_inventory';
+    const writerCompatible=sourceWrite?Boolean(nativeAlias):placementMatchKey(row.unitNumber)===matchKey||Boolean(nativeAlias);
+    return {row,field:field&&!newInstallation,newInstallation,nativeAlias,sourcePlacement,writerCompatible,site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state),nativeAlias,sourcePlacement?.revision??null])};
   }
   async function readCurrentData(db,key,signal,progress=()=>{}){
     const current=()=>{if(signal.aborted)fail('The saved placement read was cancelled.');};
@@ -199,9 +238,10 @@
           dialog.querySelector('h2').textContent=baseline.field?'Update field address':'Move to Field';
           note.textContent=baseline.field?(!text(baseline.site)||!text(baseline.address)?'The saved installation details are incomplete. Enter the current site and complete address, then confirm the correction.':baseline.row.locationVerification==='owner_verified'?'The current Field Map address and verified pin are loaded. An unchanged address will not create a move.':'The current Field Map address is loaded. An unchanged address will not create a move.'):'Enter the new installation address. A confirmed move will locate the saved address automatically; address pins remain approximate until verified on site.';
         }
-        if(!baseline.writerCompatible)feedback.textContent='The verified address is shown, but this equipment alias needs a placement-link review before a move can be saved.';
+        if(baseline.sourcePlacement)feedback.textContent=sourceDisclosure(baseline.sourcePlacement)+(placement==='SHOP'?' No new address or live vendor lookup is needed for Shop / ROOT.':'');
+        if(!baseline.writerCompatible)feedback.textContent=(baseline.sourcePlacement?sourceDisclosure(baseline.sourcePlacement)+' ':'')+'The recorded placement is shown, but a reviewed equipment association and placement-write capability are required before this move can be saved.';
         else input(placement==='FIELD'?'site':'reason').focus();
-      }catch(error){if(alive()){feedback.textContent='Placement verification is unavailable: '+(error?.message||error)+'. No change was made.'+(requiresReopen(error)?' Close and reopen the unit with the correct signed-in account.':' Retry verification to read the saved unit again.');retry.hidden=requiresReopen(error);retry.disabled=false;}}
+      }catch(error){if(alive()){feedback.textContent='Placement verification is unavailable: '+String(error?.message||error).replace(/[.\s]+$/,'')+'. No change was made.'+(requiresReopen(error)?' Close and reopen the unit with the correct signed-in account.':error?.placementIdentityReview?' Close this form and review the equipment association.':' Retry verification to read the saved unit again.');retry.hidden=requiresReopen(error)||error?.placementIdentityReview===true;retry.disabled=false;}}
       finally{context.loading=false;}
     };
     retry.onclick=()=>{void loadBaseline();};
@@ -245,5 +285,5 @@
     };
     await loadBaseline();
   }
-  root.CameraPlacementControls={open,stateMatches,placementMatchKey,resolvePlacement};
+  root.CameraPlacementControls={open,stateMatches,placementMatchKey,resolvePlacement,finalizedPlacementSource,sourceDisclosure,sourceLabel};
 })(globalThis);

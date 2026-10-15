@@ -16,8 +16,8 @@ test.afterEach(async({page})=>{
   expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length);
   expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
 });
-async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,entry='detail'}={}){
-  const fixture={native,health,holdNative,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
+async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,entry='detail',nativeAfterWrite=null}={}){
+  const fixture={native,health,holdNative,nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
   mountedFixtures.set(page.context(),fixture);
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));page.context().on('page',other=>other.on('pageerror',error=>fixture.pageErrors.push(error.message)));
   await page.context().addInitScript(({role,verifiedIt,active,token,legacy,key})=>{
@@ -50,7 +50,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
           if(fixtureHoldWrite)await new Promise(resolve=>window.fixtureReleaseWrite=resolve);
           if(fixtureWriteDenied)return {error:{message:'Synthetic writer denied'}};
           fixtureLegacy={...fixtureLegacy,unitKey:args.p_unit_key,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:'901'};
-          for(const device of fixtureDevices){device.organization=args.p_site_label;device.activation_state='active';device.activation_source='owner_location_override_v2';}
+          for(const device of fixtureDevices){device.organization=args.p_placement==='SHOP'?'root':args.p_site_label;device.activation_state=args.p_placement==='SHOP'?'deactivated':'active';device.activation_source='owner_location_override_v2';}
           return {data:{ok:true,unit_key:args.p_unit_key,placement:args.p_placement,request_id:args.p_request_id,audit_id:'901'}};
         }
         return {error:{message:'Unexpected fixture RPC '+name}};
@@ -82,7 +82,9 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       (owner==='editor'?fixture.reads:owner==='display'?fixture.displayReads:fixture.mapReads).push(read);
       if(!['/api/field-map','/api/camera-health/summary-v3',...(entry==='map'?['/api/session','/api/routers','/api/vrm-fleet','/api/daily-board','/api/field-map/'+rowId+'/history']:[])].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
       if(!(active&&(role==='owner'||role==='it'&&verifiedIt))){read.status=403;return route.fulfill({status:403,headers,contentType:'application/json',body:'{"error":"Synthetic native read denied"}'});}
+      if(fixture.nativeAfterWrite&&body.path==='/api/field-map'&&await page.evaluate(()=>fixtureLegacy.auditId==='901'))fixture.native=structuredClone(fixture.nativeAfterWrite);
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:body.path==='/api/camera-health/summary-v3'?fixture.health:body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]}),status=fixture.status;
+      if(fixture.nativeAfterWrite&&body.path==='/api/field-map')read.nativeAuditId=data.inventoryItems.find(row=>row.id===rowId)?.placementAuditId??null;
       if(owner==='editor'&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
       read.status=status;return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
     }
@@ -215,7 +217,7 @@ for(const [name,change] of [['source shape',fixture=>fixture.native.items[0].add
 });
 
 test('proved native suffix alias shows saved FIELD data but cannot use the incompatible legacy writer',async({page})=>{
-  const row=nativeRow({unitNumber:'Solar Spotter 987654HDC2'}),health=healthEnvelope();health.unitIdentities[0].unitNumber=row.unitNumber;const fixture=await mount(page,{legacy:legacyState({placement:'FIELD'}),native:envelope([row]),health});await page.locator('#editFieldBtn').click();await expect(page.locator('.placement-feedback')).toContainText(/alias|placement-link review/i);await expect(inputs(page).address).toHaveValue(oldAddress);await expect(inputs(page).address).toBeDisabled();await expect(inputs(page).save).toBeDisabled();await noWrites(page,fixture);
+  const row=nativeRow({unitNumber:'Solar Spotter 987654HDC2'}),health=healthEnvelope();health.unitIdentities[0].unitNumber=row.unitNumber;const fixture=await mount(page,{legacy:legacyState({placement:'FIELD'}),native:envelope([row]),health});await page.locator('#editFieldBtn').click();await expect(page.locator('.placement-feedback')).toContainText(/reviewed equipment association and placement-write capability/i);await expect(inputs(page).address).toHaveValue(oldAddress);await expect(inputs(page).address).toBeDisabled();await expect(inputs(page).save).toBeDisabled();await noWrites(page,fixture);
 });
 
 for(const role of ['owner','it'])test(role+' actual camera-card edit-field deep link opens incomplete matching FIELD data',async({page},info)=>{
@@ -231,4 +233,47 @@ test('actual native map marker reaches matching Camera Health resource and its i
   const rows=[9101,9102,9103,9104].map(id=>resource(id,key));const health={...evidenceSnapshot(rows),identityVersion:1,unitIdentities:healthEnvelope().unitIdentities,identityWarnings:[]};
   const fixture=await mount(page,{entry:'map',legacy:legacyState({placement:'FIELD'}),native,health}),frame=page.frameLocator('iframe');await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await frame.locator('.cos-field-pin').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(unitNumber);await expect(frame.locator('.camera-unit-detail')).toContainText('Camera Health unit: '+key);
   const resourceLink=frame.getByRole('link',{name:'Open saved IP / ports ↗',exact:true}).first();await expect(resourceLink).toHaveAttribute('href','../../camera-detail.html?id=9101');const popupPromise=page.waitForEvent('popup');await resourceLink.click();const popup=await popupPromise;await expect(popup.locator('#content')).toBeVisible();await expect(popup.locator('#unitKey')).toHaveText(key);const form=await openField(popup);await expect(form.site).toHaveValue('');await expect(form.address).toHaveValue(oldAddress);await popup.screenshot({path:info.outputPath('synthetic-map-resource-field-editor.png')});await form.cancel.click();await noWrites(popup,fixture);await popup.close();
+});
+
+
+// New source cases reuse the actual-page interceptor and the existing native identity fixture.
+// Recorded assignment receipts do not authorize a move: the independent native alias and Owner confirmation do.
+function recordedSourceFixture(kind){
+  const observedAt=stamp,generatedAt=new Date().toISOString(),source=kind==='mhelpdesk_upload'?'owner_supplied_mhelp_export':'mhelpdesk',sourceSha256='b'.repeat(64),nativeLabel=unitNumber+'HDC2';
+  const evidence={source,observedAt,state:'recorded',fresh:false,reason:kind==='mhelpdesk_upload'?'owner_supplied_export_not_live_api':'placement_refresh_unavailable',...(kind==='mhelpdesk_upload'?{productId:'987654',sourceSha256,timestampKind:'upload_received',timestampPrecision:'second'}:{})};
+  const row=nativeRow({unitNumber:nativeLabel,placement:'FIELD',placementSource:kind,currentLocationType:'field',site:'Historical synthetic source site',effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:'field',source,observedAt,freshness:'recorded',reason:evidence.reason},placementEvidence:evidence,activeInventoryEligible:true});
+  if(kind==='mhelpdesk_upload')Object.assign(row,{uploadProductId:'987654',uploadLifecycle:'UNFLAGGED',uploadActiveInventoryEligible:true,uploadPlacementEvidence:structuredClone(evidence)});
+  else Object.assign(row,{mhelpObservedAt:observedAt,mhelpConfirmedAssignment:{contract:'COS_MHELP_CONFIRMED_ASSIGNMENT_V1',unitId:rowId,unitNumber:nativeLabel,placement:'FIELD',observedAt,assignmentChanged:false}});
+  const health=healthEnvelope();health.unitIdentities[0].unitNumber=nativeLabel;for(const resource of health.rows)Object.assign(resource,{scope:'field',activationState:'active',evidence:{kind:'provider',source:'Star4Live'}});
+  const alias={contract:'COS_NATIVE_PLACEMENT_ALIAS_V1',writerContract:'COS_CAMERA_PLACEMENT_V2',unitId:rowId,unitNumber:nativeLabel,unitKey:key,deviceIds:[...health.unitIdentities[0].deviceIds],proof:health.unitIdentities[0].proof,auditId:null};
+  const native={...envelope([row]),generatedAt,effectivePlacementVersion:1,placementProjectionVersion:2,nativePlacementAliases:[alias]};
+  if(kind==='mhelpdesk_upload')native.uploadInventory={contract:'COS_MHELP_UPLOAD_INVENTORY_V1',source,sourceSha256,receivedAt:observedAt,receivedAtPrecision:'second',exportAsOf:null,records:[{recordId:'mhelp_product:987654',productId:'987654',unitNumber:nativeLabel,placement:'FIELD',uploadLifecycle:'UNFLAGGED',overlayApplied:true,binding:{state:'linked',unitIds:[rowId],candidateUnitIds:[],placementHeld:false,matchMethod:'reviewed_product_id',reason:null}}]};
+  const ownerRow={...structuredClone(row),placement:'SHOP',placementSource:'owner',currentLocationType:'shop',site:'',address:'',placementUnitKey:key,placementAuditId:'901',placementUpdatedAt:generatedAt,effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:'shop',source:'owner',observedAt:generatedAt,freshness:'recorded',reason:null}};
+  const nativeAfterWrite={...structuredClone(native),...envelope([ownerRow],[]),generatedAt,nativePlacementAliases:[{...alias,auditId:'901'}]};
+  return {native,health,nativeAfterWrite,legacy:legacyState({placement:'FIELD'}),observedAt};
+}
+for(const kind of ['mhelpdesk_upload','mhelpdesk'])test('recorded '+kind+' actual FIELD to SHOP modal keeps source time and confirms both saved placements',async({page},info)=>{
+  const source=recordedSourceFixture(kind),fixture=await mount(page,source);
+  await expect(page.locator('#moveShopBtn')).toHaveText('Move unit to Shop / ROOT');await page.locator('#moveShopBtn').click();const form=await ready(page);
+  await expect(page.locator('.cos-placement-dialog h2')).toHaveText('Move to Shop / ROOT');await expect(form.address).toBeHidden();
+  await expect(page.locator('.placement-feedback')).toContainText(source.observedAt);
+  await expect(page.locator('.placement-feedback')).toContainText(kind==='mhelpdesk_upload'?'Owner-supplied mHelpDesk export · received':'mHelpDesk recorded placement · observed');
+  await expect(page.locator('.placement-feedback')).toContainText('Confirm the unit’s physical location before saving.');
+  await page.screenshot({path:info.outputPath('synthetic-recorded-'+kind+'-shop.png')});
+  await form.save.click();await noWrites(page,fixture);expect(fieldReads(fixture)).toHaveLength(1);
+  await form.reason.fill('Synthetic confirmed return to Shop');await form.save.click();await noWrites(page,fixture);expect(fieldReads(fixture)).toHaveLength(1);
+  await form.confirmed.check();await form.save.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  const writes=await mutations(page);expect(writes).toHaveLength(1);expect(writes[0].args).toMatchObject({p_unit_key:key,p_placement:'SHOP',p_site_label:'',p_street_address:'',p_reason:'Synthetic confirmed return to Shop',p_expected_audit_id:null});
+  expect(fieldReads(fixture).map(read=>read.nativeAuditId)).toEqual([null,null,'901']);
+  expect(fixture.reads.filter(read=>read.body.path==='/api/camera-health/summary-v3')).toHaveLength(3);
+  expect(await page.evaluate(()=>fixtureReadCount)).toBe(4);expect(await page.evaluate(()=>fixtureLegacy)).toMatchObject({unitKey:key,placement:'SHOP',auditId:'901',siteLabel:'',streetAddress:''});
+  expect(fixture.native.inventoryItems[0]).toMatchObject({id:rowId,unitNumber:unitNumber+'HDC2',placement:'SHOP',placementSource:'owner',placementAuditId:'901',placementUnitKey:key});
+  expect(fixture.geocodes).toEqual([]);expect(await page.evaluate(()=>fixtureDevice.source_status)).toBe('offline');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');
+});
+test('recorded source with missing suffix association stays disabled in the actual Shop modal without false retry or write',async({page},info)=>{
+  const source=recordedSourceFixture('mhelpdesk_upload');source.health.unitIdentities=[];source.native.nativePlacementAliases=[];const fixture=await mount(page,source);
+  await page.locator('#moveShopBtn').click();await expect(page.locator('.placement-feedback')).toContainText('No verified equipment association');
+  await expect(page.locator('.placement-feedback')).toContainText('retrying does not create that link');await expect(page.locator('.placement-retry')).toBeHidden();await expect(inputs(page).save).toBeDisabled();await expect(inputs(page).address).toBeDisabled();
+  await page.screenshot({path:info.outputPath('synthetic-recorded-source-missing-association.png')});
+  await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(fieldReads(fixture)).toHaveLength(1);await noWrites(page,fixture);
 });

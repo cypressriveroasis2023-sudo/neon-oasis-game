@@ -1,3 +1,4 @@
+// 2026-10-15 reviewed source-placement helper cache keys; normalize only these URLs before unchanged byte hashes.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
 // 2026-10-12 reviewed source-separated direct diagnostic wording; current daily four-view markers preserved.
@@ -41,8 +42,9 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261014-robot-mobile').length-1,1);
-    if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
-    const availabilityPreserved=name==='it-send-repair'?html.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):html;
+    if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v=20261015-source-placement-compat-v1"').length-1,1);
+    const placementPreserved=html.replace('camera-placement-controls.js?v=20261015-source-placement-compat-v1"','camera-placement-controls.js?v=20261008-fleet-identity-placement"').replace('camera-effective-placement.js?v=20261015-source-placement-compat-v1"','camera-effective-placement.js?v=20261008"');
+    const availabilityPreserved=name==='it-send-repair'?placementPreserved.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):placementPreserved;
     const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">\n<script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
