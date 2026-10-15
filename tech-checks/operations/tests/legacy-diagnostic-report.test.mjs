@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const file=name=>readFileSync(new URL('../../'+name,import.meta.url),'utf8');
-const context=vm.createContext({Intl});vm.runInContext(file('camera-health-history.js')+'\n'+file('camera-health-overview.js')+'\n'+file('camera-diagnostic-report.js'),context);
+const context=vm.createContext({Intl});vm.runInContext(file('camera-status-contract.js')+'\n'+file('camera-health-history.js')+'\n'+file('camera-health-overview.js')+'\n'+file('camera-diagnostic-report.js'),context);
 const api=context.CameraDiagnosticReport;
 const now=Date.parse('2026-10-08T01:30:00Z'),fresh='2026-10-08T01:25:00Z',old='2026-10-07T01:00:00Z';
 vm.runInContext('Date.now=()=>'+now,context);

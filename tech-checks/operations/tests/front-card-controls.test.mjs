@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import vm from 'node:vm';
-const context=vm.createContext({Intl});vm.runInContext(readFileSync(new URL('../../camera-health-history.js',import.meta.url),'utf8'),context);vm.runInContext(readFileSync(new URL('../../camera-health-overview.js',import.meta.url),'utf8'),context);
+const context=vm.createContext({Intl});vm.runInContext(readFileSync(new URL('../../camera-health-history.js',import.meta.url),'utf8'),context);vm.runInContext(readFileSync(new URL('../../camera-status-contract.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../../camera-health-overview.js',import.meta.url),'utf8'),context);
 const row={id:1,unit_key:'SNIPER 001',activation_state:'active',organization:'Synthetic site',device_type:'Sniper'};
 const group={k:'SNIPER 001',ds:[row],scope:'field',state:'service',serviceState:'online',providerState:'verifying'};
 const options={effectiveHealth:()=> 'online',cameraGroup:()=> 'Sniper',isShop:()=>false};

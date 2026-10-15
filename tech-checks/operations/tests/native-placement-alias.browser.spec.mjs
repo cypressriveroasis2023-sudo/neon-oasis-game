@@ -79,9 +79,12 @@ for(const problem of ['stale map','changed identity','shadow','readback mismatch
  await p.save.click();await expect(page.locator('.placement-feedback')).toContainText('could not be confirmed');await expect(p.save).toBeDisabled();expect(moves(s)).toHaveLength(1);expect(s.geocodes).toEqual([]);
  await page.evaluate(()=>document.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true})));expect(moves(s)).toHaveLength(1);await p.cancel.click();await expect(page.locator('dialog')).toHaveCount(0);
 });
-test('pending alias write stays locked across repeated clicks, Escape and Back events',async({page})=>{
- const s=await mount(page),p=await changed(page);let release;s.hold=new Promise(resolve=>release=resolve);await p.save.click();await expect.poll(()=>moves(s).length).toBe(1);
- await expect(p.cancel).toBeDisabled();await page.keyboard.press('Escape');await page.evaluate(()=>{document.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));window.dispatchEvent(new PopStateEvent('popstate'));});expect(moves(s)).toHaveLength(1);await expect(page.locator('dialog')).toBeVisible();release();await expect(page.locator('dialog')).toHaveCount(0);expect(moves(s)).toHaveLength(1);
+for(const dismiss of ['Escape','Back'])test('pending alias write prevents duplicates and safely dismisses with '+dismiss,async({page})=>{
+ const s=await mount(page),p=await changed(page);let release;const audits=s.f.sources.audits.length;s.hold=new Promise(resolve=>release=resolve);await p.save.click();await expect.poll(()=>moves(s).length).toBe(1);
+ await expect(p.cancel).toBeEnabled();await expect(p.cancel).toHaveText('Close — save may still complete');await expect(page.locator('.placement-feedback')).toContainText('Closing this form does not undo');
+ await page.evaluate(()=>document.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true})));expect(moves(s)).toHaveLength(1);const reads=s.reads.length;
+ if(dismiss==='Escape')await page.keyboard.press('Escape');else await page.evaluate(()=>window.dispatchEvent(new PopStateEvent('popstate')));
+ await expect(page.locator('dialog')).toHaveCount(0);release();await expect.poll(()=>s.f.sources.audits.length).toBe(audits+1);expect(moves(s)).toHaveLength(1);expect(s.reads).toHaveLength(reads);expect(s.geocodes).toEqual([]);expect(await page.evaluate(()=>saved)).toEqual([]);await expect(page.locator('dialog')).toHaveCount(0);
 });
 test('revoked canMove blocks alias editing and mutation',async({page})=>{
  const s=await mount(page,{canMove:false});await expect(page.locator('.placement-feedback')).toContainText('could not be verified');await expect(inputs(page).save).toBeDisabled();expect(moves(s)).toEqual([]);

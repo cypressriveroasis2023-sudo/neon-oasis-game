@@ -7,22 +7,23 @@ const origin='http://127.0.0.1:4173';
 const list=readFileSync(resolve(repo,'tech-checks/camera-health.html'),'utf8');
 const detail=readFileSync(resolve(repo,'tech-checks/camera-detail.html'),'utf8');
 const overview=readFileSync(resolve(repo,'tech-checks/camera-health-overview.js'),'utf8');
+const contract=readFileSync(resolve(repo,'tech-checks/camera-status-contract.js'),'utf8');
 const helper=readFileSync(resolve(repo,'tech-checks/camera-health-history.js'),'utf8');
 function section(source,start,end){const a=source.indexOf(start),b=source.indexOf(end,a+start.length);if(a<0||b<0)throw new Error('Missing real presentation function');return source.slice(a,b);}
 const listRender=section(list,'function renderUnits()','\nfunction ');
-const detailRender=section(detail,'function render(){','  const liveNow=')+'}';
+const detailRender=section(detail,'function renderStatusEvidence(){','  const liveNow=').replace('function renderStatusEvidence(){','function render(){')+'}';
 const portRender=section(detail,"  $('ports').innerHTML=",'\n');
 const portSetup=section(detail,'  const ps=current?.port_status||{},expected=','\n');
 const connectionFunction=section(detail,'function interfaceLinks()','\n');
 const connectionRender=section(detail,'  const actionLinks=',"\n  $('history')");
-const detailEffective=section(detail,'function effectiveHealth(d,h)','\n\nfunction sourceStatusText');
+const detailEffective=section(detail,'function effectiveHealth(d,h)','\nfunction sourceStatusText');
 const sourceFresh=section(detail,'function sourceFresh(d','\nfunction checkFresh');
 const sourceStatus=section(detail,'function sourceStatusText()','\nfunction respondingInterfaceSummary');
 const sourceDetail=section(detail,'function sourceDetailText()','\n\nfunction issueReason');
 const freshCheck=section(detail,'function checkFresh(h','\nfunction hasDirectLiveProof');
 const effective=section(list,'function effectiveHealth(d)','\nfunction isCountedCamera');
 const escape="const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#039;'}[c]));";
-const shared=`${helper}\n${escape}
+const shared=`${contract}\n${helper}\n${escape}
  const $=id=>document.getElementById(id);const cameraGroup=d=>d.group||'Vigilant';
  const fixedNow=Date.parse('2026-10-06T12:30:00Z');Date.now=()=>fixedNow;
  const evidenceFresh=value=>CameraHealthHistory.timestamp(value).state==='fresh';
@@ -40,7 +41,7 @@ const listScript=`${shared}
  ${listRender}
  window.repaint=()=>{renderUnits();$('unitDetailMain').innerHTML=CameraHealthOverview.details(fleetGroups()[0],{health,cameraGroup,effectiveHealth,reconBatteryBadge});};$('authGate').classList.add('hidden');repaint();$('unitDetailDialog').showModal();
 `;
-const detailScript=`${shared}
+const detailScript=`${shared}\n${overview}\nlet detailReadFailures=[];
  ${sourceFresh}
  ${detailEffective}
  let device=fixture.device,current=fixture.current;const issueReason=()=>'',fmt=value=>CameraHealthHistory.format(value);
@@ -92,14 +93,15 @@ test('actual detail preserves offline success, rejects offline Reconeyez events 
  await page.evaluate(()=>{fixture.device.group='Reconeyez';fixture.device.last_online_at=null;repaint();});
  await expect(page.locator('#lastCheckedLabel')).toHaveText('Last cloud status update');await expect(page.locator('#lastPing')).toHaveText('Never recorded');
  await page.evaluate(()=>{fixture.device.last_online_at='2030-01-01T00:00:00Z';fixture.device.source_last_seen_at='invalid';repaint();});
- await expect(page.locator('#lastPing')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#lastChecked')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#sourceStatusCard')).toHaveClass('card warn');
+ await expect(page.locator('#lastPing')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#lastChecked')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#sourceStatusCard')).toHaveClass('card good');await expect(page.locator('#statusPill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('#sourceDetail')).toContainText('Provider/resource: VERIFYING');
+ await page.evaluate(()=>{fixture.current.checked_at='invalid';repaint();});await expect(page.locator('#sourceStatusCard')).toHaveClass('card warn');await expect(page.locator('#statusPill')).toHaveText('IP / PORT UNVERIFIED');
 });
 
 test('actual direct-port detail distinguishes unchecked, failed and stale evidence',async({page},info)=>{
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await mount(page,'camera-detail');
  await page.evaluate(()=>{
-  fixture.device={...fixture.device,device_name:'Synthetic direct unit',group:'Sniper',monitoring_profile:'sniper',expected_ports:[80,443,8443,38880,38881]};
+  fixture.device={...fixture.device,device_name:'Synthetic direct unit',group:'Sniper',source:'2026_unit_tracker',device_type:'Sniper',monitoring_profile:'sniper',expected_ports:[80,443,8443,38880,38881]};
   fixture.current={overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:10Z',port_status:{
    80:{online:true,latency_ms:5},443:{online:false,error:'timeout'},
    38880:{online:'false'},38881:{online:true,latency_ms:4,checked_at:'2026-10-06T10:55:10Z'}
@@ -111,7 +113,7 @@ test('actual direct-port detail distinguishes unchecked, failed and stale eviden
  await expect(row(443)).toHaveClass('port off');await expect(row(443)).toContainText('No response');await expect(row(443)).not.toContainText('previous result');
  for(const p of [8443,38880]){await expect(row(p)).toHaveClass('port pending');await expect(row(p)).toContainText('Not checked');await expect(row(p)).not.toContainText('No response');}
  await expect(row(38881)).toHaveClass('port pending');await expect(row(38881)).toContainText('No recent result');await expect(row(38881)).not.toContainText('4ms');
- await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ await expect(page.locator('#statusPill')).toHaveText('IP / PORT ONLINE');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   const bounds=await page.locator('#ports').evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth,page:document.documentElement.scrollWidth,view:innerWidth}));
@@ -156,10 +158,10 @@ test('actual provider detail distinguishes unconfirmed checks and displays only 
   }}};repaint();
  });
  const source=page.locator('#sourceStatus'),detail=page.locator('#sourceDetail');
- await expect(source).toHaveText('Vigilant: OFFLINE · Direct diagnostic: Check failed');
+ await expect(source).toHaveText('CAMERA RECORD OFFLINE · Direct diagnostic: Check failed');
  await expect(detail).toContainText('Attempted ports: 80, 443. Last direct check: Oct 6, 2026, 7:25:10 AM CDT');
  await expect(detail).toContainText('Reachability unverified; outage not confirmed.');
- await expect(detail).not.toContainText('1400');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');
+ await expect(detail).not.toContainText('1400');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD OFFLINE');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   const bounds=await page.locator('#sourceStatusCard').evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth,page:document.documentElement.scrollWidth,view:innerWidth}));
@@ -167,10 +169,10 @@ test('actual provider detail distinguishes unconfirmed checks and displays only 
   if(width===390)await page.locator('#sourceStatusCard').screenshot({path:info.outputPath('direct-diagnostic-unconfirmed-mobile.png')});
  }
  await page.evaluate(()=>{fixture.device.source_status='online';repaint();});
- await expect(source).toHaveText('Vigilant: ONLINE · Direct diagnostic: Check failed');await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ await expect(source).toHaveText('CAMERA RECORD ONLINE · Direct diagnostic: Check failed');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD ONLINE');
  await expect(page.locator('#sourceStatusCard')).toHaveClass('card good');
  await page.evaluate(()=>{fixture.current.port_status._connection.confirmedOutage=true;fixture.current.port_status._connection.consecutiveFailures=3;repaint();});
- await expect(source).toContainText('Direct diagnostic: Confirmed service outage');await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ await expect(source).toContainText('Direct diagnostic: Confirmed service outage');await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD ONLINE');
  await page.evaluate(()=>{fixture.current.port_status._connection={...fixture.current.port_status._connection,status:'online',reachable:true,confirmedOutage:false};fixture.current.port_status[443].online=true;repaint();});
  await expect(source).toContainText('Direct diagnostic: Service reachable');await expect(detail).toContainText('video not verified');
  await page.evaluate(()=>{fixture.current.port_status._connection.checkedAt='2026-10-06T10:55:10Z';repaint();});
@@ -180,5 +182,5 @@ test('actual provider detail distinguishes unconfirmed checks and displays only 
  await expect(detail).toContainText('Unknown (invalid timestamp)');await expect(detail).toContainText('No verified attempted ports.');
  await page.evaluate(()=>{fixture.current.port_status._connection.checkedAt='2026-10-06T12:25:10Z';fixture.device.connection_revision=5;repaint();});
  await expect(source).toContainText('Direct diagnostic: Reachability unverified');await expect(detail).toContainText('No verified attempted ports.');
- await expect(page.locator('#statusPill')).toHaveText('ONLINE');expect(errors).toEqual([]);
+ await expect(page.locator('#statusPill')).toHaveText('CAMERA RECORD ONLINE');expect(errors).toEqual([]);
 });

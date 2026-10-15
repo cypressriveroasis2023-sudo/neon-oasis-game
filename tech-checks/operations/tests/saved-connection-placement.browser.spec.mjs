@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {port,resource,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+import {port,resource,snapshot,now,fresh,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
 test('fresh connection survives inactive inventory; refresh and aging never change placement',async({page},testInfo)=>{
  const origin='http://127.0.0.1:4173',id='11111111-1111-4111-8111-111111111111',writes=[];
  const unit={id,unitNumber:'Sniper 901',modelName:'SNIPERS',status:'field',currentLocationType:'field',readOnly:true,address:'123 Synthetic St',site:'Synthetic site',customer:'Synthetic customer',latitude:null,longitude:null,hasUnitGps:false,locationVerification:'address_only'};
@@ -29,4 +29,16 @@ test('fresh connection survives inactive inventory; refresh and aging never chan
  await page.screenshot({path:testInfo.outputPath('saved-online-placement-conflict.png')});
  await page.clock.fastForward(16*60*1000);await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT UNKNOWN');
  await expect(frame.locator('.camera-health-native')).toContainText('Last reported service result: ONLINE');expect(writes).toHaveLength(0);expect(row.activationState).toBe('deactivated');expect(row.serviceEvidence.observedAt).toBe(fresh);
+});
+
+
+test('Fleet keeps reachable Shop Snipers 308 and 317 visible for review and outside Field outage totals',async({page})=>{
+ const {mountFleet}=await import('./fleet-dashboard-fixtures.mjs');
+ const units=[308,317,901].map((number,index)=>({id:'11111111-1111-4111-8111-'+String(index+1).padStart(12,'0'),unitNumber:(index===2?'Helios ':'Sniper ')+number,modelName:index===2?'Helios':'Snipers',status:index===2?'field':'available',currentLocationType:index===2?'field':'shop',placement:index===2?'FIELD':'SHOP',address:'Synthetic saved location',site:'Synthetic site'}));
+ const field={items:[units[2]],inventoryItems:units,summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:fresh};
+ const health=snapshot([resource(308,'Sniper 308',{type:'Sniper',scope:'shop',activationState:'deactivated',evidence:undefined,serviceEvidence:port({active:false})}),resource(317,'Sniper 317',{type:'Sniper',scope:'shop',activationState:'deactivated',evidence:undefined,serviceEvidence:port({active:false})}),withStatus(resource(901,'Helios 901'),'offline')]);
+ const {app,state}=await mountFleet(page,false,{field,health});await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await app.getByLabel('Fleet placement').selectOption('shop');await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(2);await expect(app.locator('.cos-dashboard-marker')).toHaveCount(0);
+ for(const number of [308,317]){await app.locator('.cos-fleet-unit-row').filter({hasText:'Sniper '+number}).click();const dialog=app.getByRole('dialog');await expect(dialog).toContainText('PLACEMENT REVIEW: SHOP / ROOT + service reachable');await expect(dialog).toContainText('camera video is not verified');await dialog.getByRole('button',{name:'Close unit details'}).click();}
+ await app.getByLabel('Fleet placement').selectOption('field');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
