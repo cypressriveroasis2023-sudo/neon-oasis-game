@@ -73,7 +73,7 @@ test('IT desktop lands on Camera Health while phone mounts named handoffs withou
 
 test('direct ittech profile uses server fleet capability instead of the old two-ID browser allowlist',async()=>{
  const host=read('it-daily-host.js');
- const match=host.match(/async function verify\\(value\\) \\{([\\s\\S]*?)\\n\\}/);
+ const match=host.match(/async function verify\(value\) \{([\s\S]*?)\n\}/);
  assert.ok(match,'source authorization function is preserved');
  const verifier=new AsyncFunction('value','context',match[1]);
  const calls=[];
@@ -86,19 +86,19 @@ test('direct ittech profile uses server fleet capability instead of the old two-
  assert.equal(await verifier({...authorized,preview:true},rpc({data:{fleetRead:true}})),false);
  assert.equal(await verifier({...authorized,effective:'service'},rpc({data:{fleetRead:true}})),false);
  assert.deepEqual(calls,Array(3).fill('cos_verified_fleet_capabilities_v1'));
- assert.doesNotMatch(host,/verifiedIT\\.has\\(value\\.id\\)/);
+ assert.doesNotMatch(host,/verifiedIT\.has\(value\.id\)/);
 });
 test('direct ittech routes only to existing COS-authenticated Camera Health; other IT route remains unchanged',()=>{
  const host=read('it-daily-host.js');
  assert.match(host,/const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'/);
- assert.match(host,/frame\\.src=value\\.role==='it'&&value\\.id===legacyCameraOnlyIT\\s*\\? '\\.\\/camera-health\\.html\\?itDaily=1'/);
- assert.match(host,/\\: '\\.\\/operations\\/dist\\/index\\.html\\?mode='/);
- assert.match(host,/const permitted = await verify\\(value\\)/);
- assert.match(host,/key\\(scope\\(\\)\\) !== key\\(value\\)/);
+ assert.match(host,/frame\.src=value\.role==='it'&&value\.id===legacyCameraOnlyIT\s*\? '\.\/camera-health\.html\?itDaily=1'/);
+ assert.match(host,/\: '\.\/operations\/dist\/index\.html\?mode='/);
+ assert.match(host,/const permitted = await verify\(value\)/);
+ assert.match(host,/key\(scope\(\)\) !== key\(value\)/);
  const app=read('app.js'),legacy=read('camera-health.html');
- assert.match(app,/const SUPABASE_URL = 'https:\\/\\/goqrnolcvqnirjmzaeyk.supabase.co'/);
- assert.match(legacy,/const SUPABASE_URL='https:\\/\\/goqrnolcvqnirjmzaeyk.supabase.co'/);
- assert.match(legacy,/async function enterCameraHealth\\(session\\)/);
+ assert.match(app,/const SUPABASE_URL = 'https:\/\/goqrnolcvqnirjmzaeyk.supabase.co'/);
+ assert.match(legacy,/const SUPABASE_URL='https:\/\/goqrnolcvqnirjmzaeyk.supabase.co'/);
+ assert.match(legacy,/async function enterCameraHealth\(session\)/);
  assert.match(legacy,/cos_verified_fleet_capabilities_v1/);
  assert.match(read('it-daily-camera-host.js'),/IT_DAILY_ONLY/);
 });
