@@ -27,7 +27,7 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "fe1cb8a9e931632cf46dcedb7c3be3ca8d31dd83c9e823584f53004b692166f6",
+  "camera-health": "6f12ba2872ed772e0723410fd778b13c5d1ad80f1bb3315b7885bbeb50e788bc",
   "camera-detail": "e6a87f46c959db6647fc71ccca647162067237e1193d1c637064f574151174b0",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
