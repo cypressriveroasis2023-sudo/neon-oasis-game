@@ -195,6 +195,8 @@ function OwnerApp() {
   const [fleetEntryRevision,setFleetEntryRevision]=useState(0);
   const [tvDisplay,setTvDisplay]=useState(()=>new URLSearchParams(location.search).get('tvBoard')==='1');
   const lastRouteHash=useRef(location.hash);
+  // Current role-scoped routes; a direct hash edit must never mount a paused workspace.
+  const allowedFleetRoutes=useRef<string[]|null>(null);
   const active=route.workspace;
   useEffect(()=>{if(/^#(?:field-map|field-view)(?:\?|$)/.test(location.hash)){const hash=workspaceHash(route);history.replaceState(history.state,'',hash);lastRouteHash.current=hash;}},[route]);
   useEffect(()=>{
@@ -232,6 +234,7 @@ function OwnerApp() {
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
   const fleetWorkspaces = useMemo(()=>(dailyOnly?[...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
+  allowedFleetRoutes.current=fleetOnly?fleetWorkspaces:null;
   const label=(name:string)=>dailyOnly?itDailyLabel(name):workspaceLabel(name);
   const [now,setNow]=useState(()=>new Date());
   const [toast,setToast]=useState('');
@@ -262,7 +265,23 @@ function OwnerApp() {
   const toastTimer=useRef<number|null>(null);
   const show=useCallback(guardCurrent((message:string)=>{setToast(message);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);toastTimer.current=window.setTimeout(()=>setToast(''),5000);}),[guardCurrent]);
   useEffect(()=>{document.documentElement.dataset.theme='dark';localStorage.setItem('cos-operations-pages-theme','dark');},[]);
-  useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),30000);const change=()=>{if(lastRouteHash.current===location.hash)return;lastRouteHash.current=location.hash;window.dispatchEvent(new Event('cos-workspace-navigation'));setRoute(readWorkspaceRoute());};window.addEventListener('hashchange',change);window.addEventListener('popstate',change);return()=>{window.clearInterval(timer);window.removeEventListener('hashchange',change);window.removeEventListener('popstate',change);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);};},[]);
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),30000);const change=()=>{
+      if(lastRouteHash.current===location.hash)return;
+      const next=readWorkspaceRoute();
+      const allowed=allowedFleetRoutes.current;
+      if(allowed&&!allowed.includes(next.workspace)){
+        const safe={workspace:'Fleet Dashboard',jobId:'',detail:false};
+        const hash=workspaceHash(safe);
+        lastRouteHash.current=hash;
+        history.replaceState(null,'',hash);
+        setRoute(safe);
+        window.dispatchEvent(new Event('cos-workspace-navigation'));
+        return;
+      }
+      lastRouteHash.current=location.hash;
+      window.dispatchEvent(new Event('cos-workspace-navigation'));
+      setRoute(next);
+    };window.addEventListener('hashchange',change);window.addEventListener('popstate',change);return()=>{window.clearInterval(timer);window.removeEventListener('hashchange',change);window.removeEventListener('popstate',change);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);};},[]);
   const requestWeather=useCallback(()=>{
     if(!navigator.geolocation){setWeatherStatus('Location unavailable');return;}
     setWeatherStatus('Locating…');
@@ -374,7 +393,7 @@ function OwnerApp() {
         :active==='Victron VRM'?<VrmWorkspace canDiscover={!fleetOnly} initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={guardCurrent(installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true))}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}</Fragment>}
     </main>
-    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{(dailyOnly?[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Camera Health',workspace:'Camera Health'},{label:'Unit Tracker',workspace:'Unit Tracker'}]:fleetOnly?[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'IT overview',workspace:'IT Dashboard'},{label:'Tech Checks',workspace:'Tech Check'}]:[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Overview',workspace:'Today'},{label:'Team',workspace:'Team'}]).filter(area=>!fleetOnly||fleetWorkspaces.includes(area.workspace)).map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>
+    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{(dailyOnly?[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Camera Health',workspace:'Camera Health'}]:fleetOnly?[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'IT overview',workspace:'IT Dashboard'},{label:'Tech Checks',workspace:'Tech Check'}]:[{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Overview',workspace:'Today'},{label:'Team',workspace:'Team'}]).filter(area=>!fleetOnly||fleetWorkspaces.includes(area.workspace)).map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
   </div>;
 }
