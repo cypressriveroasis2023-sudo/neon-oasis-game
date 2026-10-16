@@ -134,20 +134,40 @@ begin
  return jsonb_build_object('rolledBack',true,'revision',c.revision+1,'activeId',b.previous_id);
 end $$;
 
--- Existing authorized RPC still owns actor/tenant checks. No exposed function
--- or ACL changes. Retain the global receipt and recheck bindings on every read.
+-- Preserve the installed continuity-aware optimized reader byte-for-byte under
+-- a private helper. Do not replace it with raw guard equality or a slower scan.
+-- The public authorized RPC retains its name, dependencies and existing ACL.
+do $preserve_reader$
+declare definition text;
+begin
+ if to_regprocedure('cos_mhelp_placement_private.continuity_current(uuid,uuid,text)') is null
+  or to_regprocedure('cos_mhelp_placement_private.scoped_base_upload_snapshot()') is not null then
+  raise exception 'Continuity reader prerequisite or install state changed';
+ end if;
+ select pg_get_functiondef('cos_mhelp_placement_private.upload_snapshot()'::regprocedure) into definition;
+ if position('continuity_current' in definition)=0 then raise exception 'Continuity-aware reader required';end if;
+ execute replace(definition,'FUNCTION cos_mhelp_placement_private.upload_snapshot()',
+  'FUNCTION cos_mhelp_placement_private.scoped_base_upload_snapshot()');
+end $preserve_reader$;
+revoke all on function cos_mhelp_placement_private.scoped_base_upload_snapshot() from public,anon,authenticated,service_role;
+
 create or replace function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql stable set search_path='' as $$
- with active as materialized (
-  select b.*,cos_mhelp_placement_private.scoped_records(b.source_sha256) scoped_records,coalesce(c.revision,0) scoped_revision
+ with original as materialized (select cos_mhelp_placement_private.scoped_base_upload_snapshot() snapshot),
+ active as materialized (
+  select cos_mhelp_placement_private.scoped_records(b.source_sha256) records,coalesce(c.revision,0) revision
   from cos_mhelp_placement_private.upload_control u join cos_mhelp_placement_private.upload_batches b on b.source_sha256=u.active_sha256
   left join cos_mhelp_placement_private.scoped_control c on c.base_sha256=b.source_sha256 where u.singleton
+ ), changes as materialized (
+  select r from active a cross join lateral jsonb_array_elements(a.records) r where r ? 'scopedAuthority'
  )
- select (b.receipt-array['receivedMessageId','authorizationSha256'])||jsonb_build_object(
- 'trackerRecords',cos_mhelp_placement_private.upload_tracker_snapshot((select coalesce(jsonb_agg(case when replacement is null then t else t||jsonb_build_object('matchedProductId',replacement->>'productId','binding',(t->'binding')||jsonb_build_object('state','held','placementHeld',true)) end),'[]'::jsonb)
-  from jsonb_array_elements(coalesce(b.receipt->'trackerRecords','[]'::jsonb)) t left join lateral (select r replacement from jsonb_array_elements(b.scoped_records) r where r->>'supersedesProductId'=t->>'matchedProductId') x on true)),
- 'reviewed',true,'payloadSha256',b.payload_sha256,'scopedRevision',b.scoped_revision,'records',(
- select jsonb_agg((r-'binding')||jsonb_build_object('binding',case when r->'binding' is null or r->'binding'='null'::jsonb then 'null'::jsonb else
- ((r->'binding')-'reviewEvidence')||jsonb_build_object('guardCurrent',r->'binding'->>'expectedGuard'=cos_mhelp_placement_private.upload_binding_guard((r->'binding'->>'trackerId')::uuid,(r->'binding'->>'nativeUnitId')::uuid)) end) order by (r->>'sourceRow')::integer)
- from jsonb_array_elements(b.scoped_records) r)) from active b
+ select o.snapshot||jsonb_build_object('scopedRevision',a.revision,
+ 'records',(select jsonb_agg(case when c.r is null then b else
+   (c.r-'binding')||jsonb_build_object('binding',case when c.r->'binding' is null or c.r->'binding'='null'::jsonb then 'null'::jsonb
+    else b->'binding' end) end order by (b->>'sourceRow')::integer)
+  from jsonb_array_elements(o.snapshot->'records') b left join changes c on c.r->'sourceRow'=b->'sourceRow'),
+ 'trackerRecords',(select coalesce(jsonb_agg(case when c.r is null then t else
+   t||jsonb_build_object('matchedProductId',c.r->>'productId','binding',(t->'binding')||jsonb_build_object('state','held','placementHeld',true,'guardCurrent',false)) end order by t->>'recordId'),'[]'::jsonb)
+  from jsonb_array_elements(coalesce(o.snapshot->'trackerRecords','[]'::jsonb)) t left join changes c on c.r->>'supersedesProductId'=t->>'matchedProductId'))
+ from original o cross join active a
 $$;
 revoke all on function cos_mhelp_placement_private.scoped_immutable(),cos_mhelp_placement_private.scoped_records(text),cos_mhelp_placement_private.review_scoped_inventory(uuid,uuid,text,bigint,uuid,jsonb,jsonb,boolean),cos_mhelp_placement_private.rollback_scoped_inventory(uuid,uuid,text,bigint,uuid,text) from public,anon,authenticated,service_role;

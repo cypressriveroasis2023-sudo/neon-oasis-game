@@ -3,7 +3,14 @@ export const tracker='11111111-1111-4111-8111-111111111111',org='ece6d2a2-fd19-4
 export async function fixture(){
  const db=new PGlite();await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
  await db.exec(`create function app_private.cos_owner_identity_assert_actor(a uuid,o uuid,w boolean) returns void language plpgsql as $$begin if a is distinct from '${actor}'::uuid or o is distinct from '${org}'::uuid or w is distinct from true then raise exception 'Owner required';end if;end$$;`);
- for(const file of ['20261012173408_cos_mhelp_placement_sync.sql','mhelp_upload_overlay.sql','scoped_inventory_overlay.sql'])await db.exec(await readFile(new URL('../../db/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261012173408_cos_mhelp_placement_sync.sql','mhelp_upload_overlay.sql'])await db.exec(await readFile(new URL('../../db/'+file,import.meta.url),'utf8'));
+ // Use the production continuity contract before installing the scoped wrapper.
+ await db.exec(`create table cos_mhelp_placement_private.test_continuity(original_guard text primary key,after_guard text);
+ create function cos_mhelp_placement_private.continuity_current(t uuid,n uuid,original text) returns boolean language sql stable set search_path='' as $$select coalesce((select after_guard from cos_mhelp_placement_private.test_continuity where original_guard=original),original)=cos_mhelp_placement_private.upload_binding_guard(t,n)$$;`);
+ const continuity=await readFile(new URL('../../db/mhelp-source-continuity.sql',import.meta.url),'utf8');
+ await db.exec(continuity.slice(continuity.indexOf('create or replace function cos_mhelp_placement_private.upload_tracker_snapshot'),continuity.indexOf('do $$declare x record;')));
+ const readerBefore=(await db.query("select pg_get_functiondef('cos_mhelp_placement_private.upload_snapshot()'::regprocedure) definition")).rows[0].definition;
+ await db.exec(await readFile(new URL('../../db/scoped_inventory_overlay.sql',import.meta.url),'utf8'));
  await db.query(`insert into app_private.vision_tracker_locations values($1,$2,'Sniper 80','sniper80','SNIPERS','SHOP','Company',null,null,null,null)`,[tracker,org]);
  const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) g',[tracker])).rows[0].g;
  const records=[{productId:'101',unitNumber:'Sniper 80',category:'Sniper 2',customerId:'11',customer:'Company',placement:'SHOP',lifecycle:'UNFLAGGED',sourceAddress:{street:'Old customer postal address'},sourceRow:2,binding:{productId:'101',trackerId:tracker,nativeUnitId:null,trackerLabel:'Sniper 80',nativeLabel:null,fullLabel:'Sniper 80',matchMethod:'exact_family_unit',representedUnitIds:[tracker],representationEvidenceSha256:hash,canonicalKey:'SNIPER:80',reviewEvidence:{method:'synthetic'},evidenceSha256:hash,expectedGuard:guard}},
@@ -19,5 +26,5 @@ export async function fixture(){
  const call=async(extra={})=>(await db.query('select cos_mhelp_placement_private.review_scoped_inventory($1,$2,$3,$4,$5,$6,$7,$8) v',[extra.actor??actor,extra.org??org,extra.base??hash,extra.revision??0,extra.requestId??requestId,extra.evidence??evidence,extra.operations??[op],extra.apply??false])).rows[0].v;
  const snapshot=async()=>(await db.query('select cos_mhelp_placement_private.upload_snapshot() v')).rows[0].v;
  const preserved=async()=>(await db.query(`select jsonb_build_object('base',(select jsonb_agg(to_jsonb(b)) from cos_mhelp_placement_private.upload_batches b),'baseControl',(select jsonb_agg(to_jsonb(c)) from cos_mhelp_placement_private.upload_control c),'tracker',(select jsonb_agg(to_jsonb(t)) from app_private.vision_tracker_locations t),'native',(select jsonb_agg(to_jsonb(t)) from public.equipment_units t),'history',(select jsonb_agg(to_jsonb(t)) from public.equipment_unit_location_history t),'links',(select jsonb_agg(to_jsonb(t)) from cos_mhelp_placement_private.links t)) v`)).rows[0].v;
- return {db,records,receipt,evidence,op,call,snapshot,preserved,target};
+ return {db,records,receipt,evidence,op,call,snapshot,preserved,target,readerBefore};
 }

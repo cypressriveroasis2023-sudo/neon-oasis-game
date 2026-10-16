@@ -50,3 +50,25 @@ test('generated private SQL round-trips quoted customer text, dry runs and rolls
  assert.throws(()=>scopedExecutionRequest({plan,before:f.records,source,actorId:actor,organizationId:org,revision:0,requestId,evidence:{...f.evidence,kind:'original_csv'}}),/Derived/);
  }finally{await f.db.close();}
 });
+test('wrapper preserves installed reader, all 92 bindings and continuity-backed unchanged rows',async()=>{
+ const f=await fixture();try{
+ const helper=(await f.db.query("select pg_get_functiondef('cos_mhelp_placement_private.scoped_base_upload_snapshot()'::regprocedure) definition")).rows[0].definition;
+ assert.equal(helper.replace('FUNCTION cos_mhelp_placement_private.scoped_base_upload_snapshot()','FUNCTION cos_mhelp_placement_private.upload_snapshot()'),f.readerBefore);
+ const records=structuredClone(f.records),continuity=[];
+ for(let i=1;i<=91;i++){
+  const id='aaaaaaaa-aaaa-4aaa-8aaa-'+String(i).padStart(12,'0'),productId=String(1000+i),label='Synthetic '+i;
+  await f.db.query('insert into app_private.vision_tracker_locations(id,organization_id,unit_number,unit_key,family,placement,customer) values($1,$2,$3,$3,\'OTHER\',\'SHOP\',\'Company\')',[id,org,label]);
+  const guard=(await f.db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) g',[id])).rows[0].g;
+  records.push({...f.records[0],productId,unitNumber:label,category:'Helios',sourceRow:i+4,binding:{...f.records[0].binding,productId,trackerId:id,trackerLabel:label,fullLabel:label,representedUnitIds:[id],expectedGuard:guard}});
+  if(i<=6)continuity.push({id,guard});
+ }
+ // Seed the immutable pre-existing receipt fixture before checking scoped work.
+ await f.db.query('update cos_mhelp_placement_private.upload_batches set records=$1,receipt=jsonb_set(receipt,\'{recordCount}\',$2::jsonb)',[records,JSON.stringify(records.length)]);
+ for(const {id,guard} of continuity){await f.db.query("update app_private.vision_tracker_locations set customer='Reviewed continuity change' where id=$1",[id]);const after=(await f.db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) g',[id])).rows[0].g;await f.db.query('insert into cos_mhelp_placement_private.test_continuity values($1,$2)',[guard,after]);}
+ const before=await f.snapshot(),preserved=await f.preserved();assert.equal(before.records.filter(r=>r.binding?.guardCurrent).length,92);
+ await f.call({apply:true});const after=await f.snapshot();assert.equal(after.records.filter(r=>r.binding?.guardCurrent).length,92);assert.deepEqual(after.records.slice(1),before.records.slice(1));assert.deepEqual(await f.preserved(),preserved);
+ assert.equal(after.records[0].placement,'FIELD');assert.equal(after.records[0].customer,'Client');
+ await f.db.query("update app_private.vision_tracker_locations set customer='New unreviewed edit' where id=$1",[continuity[0].id]);assert.equal((await f.snapshot()).records.find(r=>r.productId==='1001').binding.guardCurrent,false);
+ for(const role of ['anon','authenticated','service_role']){await f.db.exec('set role '+role);await assert.rejects(()=>f.db.query('select cos_mhelp_placement_private.scoped_base_upload_snapshot()'));await f.db.exec('reset role');}
+ }finally{await f.db.close();}
+});
