@@ -1,7 +1,7 @@
 import {PGlite} from '@electric-sql/pglite';import {readFile} from 'node:fs/promises';import {schema} from './mhelp-placement-schema.mjs';
 export const tracker='11111111-1111-4111-8111-111111111111',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',actor='22222222-2222-4222-8222-222222222222',requestId='33333333-3333-4333-8333-333333333333',hash='a'.repeat(64);
-export async function fixture(){
- const db=new PGlite();await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
+export async function fixture({overlaySql, database}={}){
+ const db=database??new PGlite();await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
  await db.exec(`create function app_private.cos_owner_identity_assert_actor(a uuid,o uuid,w boolean) returns void language plpgsql as $$begin if a is distinct from '${actor}'::uuid or o is distinct from '${org}'::uuid or w is distinct from true then raise exception 'Owner required';end if;end$$;`);
  for(const file of ['20261012173408_cos_mhelp_placement_sync.sql','mhelp_upload_overlay.sql'])await db.exec(await readFile(new URL('../../db/'+file,import.meta.url),'utf8'));
  // Use the production continuity contract before installing the scoped wrapper.
@@ -10,7 +10,7 @@ export async function fixture(){
  const continuity=await readFile(new URL('../../db/mhelp-source-continuity.sql',import.meta.url),'utf8');
  await db.exec(continuity.slice(continuity.indexOf('create or replace function cos_mhelp_placement_private.upload_tracker_snapshot'),continuity.indexOf('do $$declare x record;')));
  const readerBefore=(await db.query("select pg_get_functiondef('cos_mhelp_placement_private.upload_snapshot()'::regprocedure) definition")).rows[0].definition;
- await db.exec(await readFile(new URL('../../db/scoped_inventory_overlay.sql',import.meta.url),'utf8'));
+ await db.exec(overlaySql??await readFile(new URL('../../db/scoped_inventory_overlay.sql',import.meta.url),'utf8'));
  await db.query(`insert into app_private.vision_tracker_locations values($1,$2,'Sniper 80','sniper80','SNIPERS','SHOP','Company',null,null,null,null)`,[tracker,org]);
  const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) g',[tracker])).rows[0].g;
  const records=[{productId:'101',unitNumber:'Sniper 80',category:'Sniper 2',customerId:'11',customer:'Company',placement:'SHOP',lifecycle:'UNFLAGGED',sourceAddress:{street:'Old customer postal address'},sourceRow:2,binding:{productId:'101',trackerId:tracker,nativeUnitId:null,trackerLabel:'Sniper 80',nativeLabel:null,fullLabel:'Sniper 80',matchMethod:'exact_family_unit',representedUnitIds:[tracker],representationEvidenceSha256:hash,canonicalKey:'SNIPER:80',reviewEvidence:{method:'synthetic'},evidenceSha256:hash,expectedGuard:guard}},

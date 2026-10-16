@@ -14,6 +14,7 @@ const visible = node => Boolean(node?.isConnected && node.getClientRects().lengt
 function identity() {
   const c = context(), id = c?.getSession()?.user?.id, profile = c?.getProfile(), role = c?.getRole();
   if (window.COS_IT_DAILY_ONLY && role === 'it') return null;
+  if (window.COS_SERVICE_BASICS_ONLY && role === 'service') return null;
   return pageActive && id && ['it', 'service'].includes(role) && c?.getEffectiveRole() === role &&
     profile?.user_id === id && profile.active === true && !profile.archived_at &&
     (authSubject === undefined || authSubject === id) &&

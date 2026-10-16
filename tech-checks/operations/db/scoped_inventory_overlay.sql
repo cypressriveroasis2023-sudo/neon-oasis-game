@@ -33,10 +33,11 @@ create function cos_mhelp_placement_private.scoped_records(p_base text) returns 
 $$;
 
 -- Admin transport plus existing Owner actor/tenant authorization. No new RPC grant.
-create function cos_mhelp_placement_private.review_scoped_inventory(p_actor uuid,p_org uuid,p_base text,p_revision bigint,p_request_id uuid,p_evidence jsonb,p_operations jsonb,p_apply boolean default false) returns jsonb
+create or replace function cos_mhelp_placement_private.review_scoped_inventory(p_actor uuid,p_org uuid,p_base text,p_revision bigint,p_request_id uuid,p_evidence jsonb,p_operations jsonb,p_apply boolean default false) returns jsonb
 language plpgsql set search_path='' as $$
 declare current_base text; head uuid; rev bigint; request jsonb; prior cos_mhelp_placement_private.scoped_batches;
  records jsonb; op jsonb; old jsonb; target jsonb; next_row jsonb; binding jsonb; seen text[]:='{}';
+ four_family boolean; authority jsonb; address_evidence jsonb; label_parts text[]; canonical text; company_name boolean;
  old_id text; new_id text; observed timestamptz; base_receipt jsonb; n integer:=0;
 begin
  if current_user not in ('postgres','supabase_admin') then raise exception 'Administrator review required' using errcode='42501'; end if;
@@ -67,21 +68,75 @@ begin
   public.equipment_unit_location_history,app_private.cos_owner_identity_claims,app_private.cos_archived_representations,cos_mhelp_placement_private.links in share mode nowait;
  records:=cos_mhelp_placement_private.scoped_records(p_base);
  for op in select value from jsonb_array_elements(p_operations) loop
-  if jsonb_typeof(op) is distinct from 'object' or op-array['expectedRecord','after','mode','inventoryOnlyReason']<>'{}'::jsonb
-   or coalesce(op->>'mode','') not in ('assignment','replace_source_hold') then raise exception 'Invalid operation'; end if;
+  if jsonb_typeof(op) is distinct from 'object' or op-array['expectedRecord','after','mode','inventoryOnlyReason','authority','sourceAddress','sourceAddressEvidence']<>'{}'::jsonb
+   or coalesce(op->>'mode','') not in ('assignment','replace_source_hold','source_label_correction') then raise exception 'Invalid operation'; end if;
   if op ? 'inventoryOnlyReason' and (op->>'inventoryOnlyReason' is distinct from 'no_sim' or op->>'mode'<>'replace_source_hold' or op->'after'->>'placement' is distinct from 'SHOP') then raise exception 'Invalid inventory-only restriction'; end if;
   old_id:=op->'expectedRecord'->>'productId'; target:=op->'after'; new_id:=target->>'productId';
   select value into old from jsonb_array_elements(records) where value->>'productId'=old_id;
   if old is null or old is distinct from op->'expectedRecord' or old_id=any(seen) then raise exception 'Source record changed or duplicated' using errcode='40001'; end if;
   seen:=array_append(seen,old_id);
-  if old->>'category' not in ('Sniper','Sniper ES','Sniper 2','Sniper 2 SA','Sniper 4','Radar - Sniper','Thermal - Sniper','CAM-V')
+  four_family:=coalesce(old->>'category' in ('Spotter','Spotter HD','Spotter HDC2','Spotter HDC4','Solar Spotter','RANGER 1 CAM.','Helios Solar Tower'),false);
+  if old->>'category' is null or old->>'category' not in ('Sniper','Sniper ES','Sniper 2','Sniper 2 SA','Sniper 4','Radar - Sniper','Thermal - Sniper','CAM-V','Spotter','Spotter HD','Spotter HDC2','Spotter HDC4','Solar Spotter','RANGER 1 CAM.','Helios Solar Tower')
    or jsonb_typeof(target) is distinct from 'object' or target-array['productId','unitNumber','category','customerId','customer','placement','lifecycle']<>'{}'::jsonb
    or exists(select 1 from unnest(array['productId','unitNumber','category','customerId','customer','placement','lifecycle']) k where jsonb_typeof(target->k) is distinct from 'string')
-   or target->>'unitNumber' is distinct from old->>'unitNumber' or target->>'category' is distinct from old->>'category'
+   or (op->>'mode'<>'source_label_correction' and target->>'unitNumber' is distinct from old->>'unitNumber') or target->>'category' is distinct from old->>'category'
    or target->>'lifecycle' is distinct from old->>'lifecycle' or coalesce(new_id,'')!~'^[1-9][0-9]{0,14}$'
    or coalesce(target->>'customerId','')!~'^[1-9][0-9]{0,14}$' or length(coalesce(target->>'customer','')) not between 1 and 250
    or target->>'customer'~'[[:cntrl:]<>]' or coalesce(target->>'placement','') not in ('FIELD','SHOP')
    or (target->>'placement'='SHOP') is distinct from ((base_receipt->'companyCustomerIds') ? (target->>'customerId')) then raise exception 'Invalid scoped assignment or restriction change'; end if;
+  -- New families are bound existing inventory only: no creation, rebind or replacement.
+  if four_family then
+   if op->>'mode'='replace_source_hold' or jsonb_typeof(old->'binding') is distinct from 'object'
+    or coalesce(old->'binding'->>'expectedGuard','')!~'^[a-f0-9]{64}$'
+    or coalesce(old->'binding'->>'canonicalKey','') !~ (case old->>'category'
+      when 'Solar Spotter' then '^SOLAR SPOTTER:' when 'RANGER 1 CAM.' then '^RANGER:'
+      when 'Helios Solar Tower' then '^HELIOS:' else '^SPOTTER:' end || '[0-9]+(\.[0-9]+)?$')
+    or old->'binding'->>'productId' is distinct from old_id
+    or coalesce(old->'binding'->>'trackerId',old->'binding'->>'nativeUnitId') is null
+    then raise exception 'Existing four-family identity required'; end if;
+   company_name:=lower(regexp_replace(btrim(target->>'customer'),'[[:space:]]+',' ','g')) in ('cameras onsite llc','cameras onsite','cameras on site');
+   if (target->>'placement'='SHOP') is distinct from company_name
+    or lower(btrim(target->>'customer')) in ('unknown','unassigned','n/a','review','')
+    then raise exception 'Ambiguous or conflicting company assignment'; end if;
+   authority:=op->'authority';
+   if jsonb_typeof(authority) is distinct from 'object'
+    or authority-array['kind','libraryFileId','sha256','receivedAt','authorizationSha256','effectiveAt']<>'{}'::jsonb
+    or coalesce(authority->>'kind','') not in ('service_item_export','user_override')
+    or coalesce(authority->>'libraryFileId','')!~'^libfile_[a-zA-Z0-9]+$'
+    or coalesce(authority->>'sha256','')!~'^[a-f0-9]{64}$'
+    or authority->>'authorizationSha256' is distinct from p_evidence->>'authorizationSha256'
+    or coalesce(authority->>'receivedAt','')!~'(Z|[+-][0-9]{2}:[0-9]{2})$'
+    then raise exception 'Four-family source authority required'; end if;
+   if (authority->>'receivedAt')::timestamptz>observed
+    or (authority->>'receivedAt')::timestamptz<(base_receipt->>'receivedAt')::timestamptz
+    or (old ? 'assignmentAuthority' and (authority->>'receivedAt')::timestamptz<(old->'assignmentAuthority'->>'receivedAt')::timestamptz)
+    then raise exception 'Stale or future assignment authority'; end if;
+   if op->>'mode'='assignment' and old->'assignmentAuthority'->>'kind'='user_override' and authority->>'kind'<>'user_override' then raise exception 'User override requires explicit superseding review'; end if;
+   if authority ? 'effectiveAt' then
+    if authority->>'kind'<>'user_override' or coalesce(authority->>'effectiveAt','')!~'(Z|[+-][0-9]{2}:[0-9]{2})$'
+     then raise exception 'Invalid effective time'; end if;
+    if (authority->>'effectiveAt')::timestamptz>(authority->>'receivedAt')::timestamptz
+     or (old->'assignmentAuthority' ? 'effectiveAt' and (authority->>'effectiveAt')::timestamptz<(old->'assignmentAuthority'->>'effectiveAt')::timestamptz)
+     then raise exception 'Future or regressing effective time'; end if;
+   end if;
+  elsif op ? 'authority' or op ? 'sourceAddress' or op ? 'sourceAddressEvidence' or op->>'mode'='source_label_correction' then
+   raise exception 'Extended operations require four-family identity';
+  end if;
+  if op->>'mode'='source_label_correction' then
+   if (target-'unitNumber') is distinct from (jsonb_build_object('productId',old->>'productId','category',old->>'category','customerId',old->>'customerId','customer',old->>'customer','placement',old->>'placement','lifecycle',old->>'lifecycle'))
+    or target->>'unitNumber' is not distinct from old->>'unitNumber'
+    or (upper(target->>'unitNumber') like '%DO NOT USE%') is distinct from (upper(old->>'unitNumber') like '%DO NOT USE%')
+    or length(target->>'unitNumber')>250 or target->>'unitNumber'~'[[:cntrl:]<>]'
+    or op ? 'sourceAddress' or op ? 'sourceAddressEvidence' then raise exception 'Label correction must only change source label'; end if;
+   label_parts:=regexp_match(upper(target->>'unitNumber'),'^(SOLAR SPOTTER|SPOTTER|RANGER|HELIOS)[[:space:]]+0*([0-9]+(\.[0-9]+)?)([^0-9.]|$)');
+   canonical:=label_parts[1]||':'||label_parts[2];
+   if canonical is null or canonical is distinct from old->'binding'->>'canonicalKey'
+    or exists(select 1 from jsonb_array_elements(records) r where r->>'productId'<>old_id
+      and (r->'binding'->>'canonicalKey'=canonical
+       or regexp_replace(upper(r->>'unitNumber'),'^(SOLAR SPOTTER|SPOTTER|RANGER|HELIOS)[[:space:]]+0*([0-9]+(\.[0-9]+)?)([^0-9.].*|$)$','\1:\2')=canonical))
+    then raise exception 'Source label identity mismatch or collision'; end if;
+  end if;
+  if four_family and op->>'mode'='assignment' and old->'scopedAuthority' is not null and (authority->>'receivedAt')::timestamptz<(old->'scopedAuthority'->>'receivedAt')::timestamptz then raise exception 'Older assignment source evidence'; end if;
   if old->'scopedAuthority' is not null and observed<(old->'scopedAuthority'->>'receivedAt')::timestamptz then raise exception 'Older scoped evidence'; end if;
   if old->>'inventoryOnlyReason'='no_sim' and target->>'placement'<>'SHOP' then raise exception 'Inventory-only connection restriction cannot be relaxed'; end if;
   binding:=old->'binding';
@@ -95,7 +150,44 @@ begin
   -- The old customer address is no longer evidence for this assignment. Never
   -- copy a customer postal address into the installation/GPS tables.
   if target->>'customerId' is distinct from old->>'customerId' or target->>'customer' is distinct from old->>'customer' then next_row:=next_row||jsonb_build_object('sourceAddress','{}'::jsonb); end if;
-  if op->>'mode'='assignment' then
+  if four_family then
+   if op->>'mode'='source_label_correction' then
+    -- Label evidence is not customer/placement evidence. Retain the exact old
+    -- assignment authority, or continue using the original upload receipt.
+    next_row:=(next_row-'scopedAuthority')||jsonb_build_object('sourceLabelAuthority',authority);
+    if old ? 'scopedAuthority' then next_row:=next_row||jsonb_build_object('scopedAuthority',old->'scopedAuthority'); end if;
+   else
+    next_row:=next_row||jsonb_build_object('assignmentAuthority',authority);
+    next_row:=jsonb_set(next_row,'{scopedAuthority,receivedAt}',authority->'receivedAt');
+   end if;
+   -- Exact old records remain in the base/prior immutable batch and request.
+   if op ? 'sourceAddress' or op ? 'sourceAddressEvidence' then
+    address_evidence:=op->'sourceAddressEvidence';
+    if jsonb_typeof(op->'sourceAddress') is distinct from 'object'
+     or (op->'sourceAddress')-array['street','city','state','zip']<>'{}'::jsonb
+     or exists(select 1 from unnest(array['street','city','state','zip']) k where jsonb_typeof(op->'sourceAddress'->k) is distinct from 'string' or length(btrim(op->'sourceAddress'->>k)) not between 1 and 250 or op->'sourceAddress'->>k~'[[:cntrl:]<>]')
+     or jsonb_typeof(address_evidence) is distinct from 'object'
+     or address_evidence-array['libraryFileId','sha256','sourceProductId','customerId','receivedAt','authorizationSha256','kind']<>'{}'::jsonb
+     or coalesce(address_evidence->>'kind','') not in ('service_item_export','user_confirmed_customer_address')
+     or coalesce(address_evidence->>'libraryFileId','')!~'^libfile_[a-zA-Z0-9]+$'
+     or coalesce(address_evidence->>'sha256','')!~'^[a-f0-9]{64}$'
+     or coalesce(address_evidence->>'sourceProductId','')!~'^[1-9][0-9]{0,14}$'
+     or address_evidence->>'customerId' is distinct from target->>'customerId'
+     or address_evidence->>'authorizationSha256' is distinct from p_evidence->>'authorizationSha256'
+     or coalesce(address_evidence->>'receivedAt','')!~'(Z|[+-][0-9]{2}:[0-9]{2})$'
+     then raise exception 'Independent source address evidence required'; end if;
+    if (address_evidence->>'receivedAt')::timestamptz>observed
+     or (address_evidence->>'receivedAt')::timestamptz<(base_receipt->>'receivedAt')::timestamptz
+     or (old ? 'sourceAddressEvidence' and (address_evidence->>'receivedAt')::timestamptz<(old->'sourceAddressEvidence'->>'receivedAt')::timestamptz)
+     or (address_evidence->>'kind'='service_item_export' and address_evidence->>'sourceProductId'<>old_id)
+     or (address_evidence->>'kind'='user_confirmed_customer_address' and authority->>'kind'<>'user_override')
+     then raise exception 'Source address authority mismatch'; end if;
+    next_row:=next_row||jsonb_build_object('sourceAddress',op->'sourceAddress','sourceAddressEvidence',address_evidence);
+   elsif next_row->'sourceAddress'='{}'::jsonb then
+    next_row:=next_row-'sourceAddressEvidence';
+   end if;
+  end if;
+  if op->>'mode' in ('assignment','source_label_correction') then
    if new_id<>old_id then raise exception 'Assignment cannot change ProductId'; end if;
   else
    if old ? 'supersedesProductId' then raise exception 'Previously replaced source requires separate identity review'; end if;
@@ -158,11 +250,12 @@ create or replace function cos_mhelp_placement_private.upload_snapshot() returns
   from cos_mhelp_placement_private.upload_control u join cos_mhelp_placement_private.upload_batches b on b.source_sha256=u.active_sha256
   left join cos_mhelp_placement_private.scoped_control c on c.base_sha256=b.source_sha256 where u.singleton
  ), changes as materialized (
-  select r from active a cross join lateral jsonb_array_elements(a.records) r where r ? 'scopedAuthority'
+  select r from active a cross join lateral jsonb_array_elements(a.records) r where r ? 'scopedAuthority' or r ? 'sourceLabelAuthority'
  )
  select o.snapshot||jsonb_build_object('scopedRevision',a.revision,
  'records',(select jsonb_agg(case when c.r is null then b else
    (c.r-'binding')||jsonb_build_object('binding',case when c.r->'binding' is null or c.r->'binding'='null'::jsonb then 'null'::jsonb
+    when c.r ? 'sourceLabelAuthority' then jsonb_set(b->'binding','{fullLabel}',c.r->'unitNumber')
     else b->'binding' end) end order by (b->>'sourceRow')::integer)
   from jsonb_array_elements(o.snapshot->'records') b left join changes c on c.r->'sourceRow'=b->'sourceRow'),
  'trackerRecords',(select coalesce(jsonb_agg(case when c.r is null then t else

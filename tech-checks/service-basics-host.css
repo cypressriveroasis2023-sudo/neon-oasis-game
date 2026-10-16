@@ -1,0 +1,81 @@
+/* Only the signed-in Service role gets the basic daily presentation. */
+body.cos-service-basics #wlSvcHome [data-wl-service-open-job],
+body.cos-service-basics #wlSvcHome [data-wl-service-trailer-inspection],
+body.cos-service-basics #wlSvcHome [data-wl-service-return],
+body.cos-service-basics #wlSvcHome .wl-service-help,
+body.cos-service-basics #wlSvcHome .vision-ticket-entry,
+body.cos-service-basics #cosServiceAssignmentQueue,
+body.cos-service-basics #view-svc [data-wl-service-truck-usage],
+body.cos-service-basics #view-svc [data-wl-service-resolve-spares],
+body.cos-service-basics #view-svc [data-wl-next-svc-return],
+body.cos-service-basics #techMenuButton,
+body.cos-service-basics #wlTechMenuPanel,
+body.cos-service-basics #wlHelpOverlay,
+body.cos-service-basics #wlGuidedTourLayer,
+body.cos-service-basics #wlHelpCoachToast,
+body.cos-service-basics #wlNotificationPanel,
+body.cos-service-basics #cosProductionAssignmentsButton,
+body.cos-service-basics #cosProductionAssignmentsOverlay,
+body.cos-service-basics #tab-owner,
+body.cos-service-basics #tab-it,
+body.cos-service-basics #view-owner,
+body.cos-service-basics #view-it,
+body.cos-service-basics #view-morning {
+  display: none !important;
+}
+
+/* Authentication must occupy the entire phone viewport, including after logout. */
+html:has(#authView:not(.hidden)),
+html:has(#forcePasswordView:not(.hidden)) {
+  min-height: 100%; background: #0B111C !important;
+}
+html body.cos-auth-visible {
+  min-height: 100vh; min-height: 100dvh;
+  margin: 0 !important; background: #0B111C !important;
+  overflow-y: auto !important; height: auto !important;
+}
+html body.cos-auth-visible #app {
+  min-height: 100vh; min-height: 100dvh; background: #0B111C !important;
+}
+html body :is(#authView,#forcePasswordView) {
+  margin: 0 auto !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 32px) !important;
+  min-height: 100vh; min-height: 100dvh;
+}
+html body.cos-auth-visible :is(#authView,#forcePasswordView) .card {
+  scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 24px);
+}
+body.cos-service-basics [data-wl-submit-truck-inventory],
+body.cos-service-basics [data-wl-service-truck-refresh] { display: none !important; }
+.cos-daily-evidence { margin: 20px 0; }
+.cos-daily-evidence fieldset { border: 1px solid #617895; border-radius: 8px; margin: 14px 0; padding: 14px; min-width: 0; }
+.cos-daily-evidence label { display: block; margin: 12px 0; overflow-wrap: anywhere; }
+.cos-daily-evidence input[type=file] { display: block; width: 100%; min-height: 48px; margin-top: 8px; }
+.cos-daily-evidence img { display: block; max-width: 100%; max-height: 160px; margin-top: 8px; object-fit: contain; }
+.cos-daily-status { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cos-daily-status:empty { display: none; }
+body.cos-service-basics #wlSvcHome .cos-service-basics-flow {
+  max-width: 36rem;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  overflow-wrap: anywhere;
+}
+body.cos-service-basics #view-svc .wl-truck-entry-input {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+body.cos-service-basics #view-svc :is(button, input):focus-visible {
+  outline: 3px solid #fff !important;
+  outline-offset: 3px;
+}
+
+.cos-daily-evidence img[hidden] { display: none !important; }
+
+.cos-daily-signoff { border-top: 1px solid #617895; margin-top: 24px; padding-top: 16px; }
+.cos-daily-signoff [hidden] { display: none !important; }
+.cos-daily-signoff input[type=checkbox], .cos-daily-signoff input[type=radio] { width: 24px !important; height: 24px !important; min-height: 24px !important; margin-right: 8px; vertical-align: middle; }
+.cos-signature-canvas { display: block; width: 100%; height: 180px; box-sizing: border-box; background: white; border: 2px solid #617895; border-radius: 8px; touch-action: none; }
+
+.cos-daily-signoff label { min-height: 44px; box-sizing: border-box; padding: 6px 0; }
