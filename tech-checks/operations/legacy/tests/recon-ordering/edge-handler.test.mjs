@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import vm from 'node:vm';
+import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../../../../supabase/functions/_shared/avigilonReviewedRuntime.ts';
 
 const source=readFileSync(process.env.RECON_WEBHOOK_SOURCE || new URL('../../../../supabase/functions/reconeyez-webhook/index.ts',import.meta.url),'utf8');
 const js=stripTypeScriptTypes(source.replace(/^import .*;\n/gm,''),{mode:'strip'});
@@ -24,6 +25,7 @@ function setup(options={}) {
   }};
   let handler;
   const ctx=vm.createContext({crypto,TextEncoder,Uint8Array,Response,Request,URL,AbortSignal,console:{error(){}},
+    guardedAvigilonClient,reviewedAvigilonRuntime,
     createClient:()=>db,archiveReconPayload:async(_db,b)=>({...structuredClone(b),cos_private_archive:{archivedAt:'synthetic-archive-time'}}),
     Deno:{env:{get:()=> 'synthetic-environment'},serve(fn){handler=fn}}});
   vm.runInContext(js+'\nglobalThis.helpers={parseObservedAt,reconEventKey,withOrderingKey,healthFromEvent};',ctx);
@@ -32,6 +34,7 @@ function setup(options={}) {
 const body={event_type:'RP',event_guid:'synthetic-event',date_time:'2026-10-12T14:07:12Z',device_info:{guid:'SYNTHETIC-1',battery_percentage:80}};
 const request=value=>new Request('https://synthetic.invalid/webhook',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer synthetic-test-secret'},body:JSON.stringify(value)});
 let count=0;async function test(name,fn){await fn();count++;console.log('PASS '+name)};
+await test('unconfigured reviewed runtime preserves the original ordered webhook client',async()=>{const db={};assert.equal(reviewedAvigilonRuntime(),undefined);assert.equal(guardedAvigilonClient(db),db)});
 await test('original provider timestamp retained',async()=>{const x=setup();assert.equal(x.helpers.parseObservedAt(body),'2026-10-12T14:07:12.000Z')});
 await test('missing/invalid time is null, never receipt time',async()=>{const x=setup();assert.equal(x.helpers.parseObservedAt({}),null);assert.equal(x.helpers.parseObservedAt({date_time:'invalid'}),null)});
 await test('original-body key is stable across object-key order',async()=>{const x=setup();assert.equal(await x.helpers.reconEventKey({b:2,a:{d:4,c:3}}),await x.helpers.reconEventKey({a:{c:3,d:4},b:2}))});

@@ -75,6 +75,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
     return route.abort('blockedbyclient');
   });
   await page.goto(origin+'/tech-checks/camera-detail.html?id=11');
+  if(!token){await expect(page.locator('#error')).toContainText('Sign in again');await expect(page.locator('#content')).not.toBeVisible();return fixture;}
   await expect(page.locator('#content')).toBeVisible();
   // The shared physical-placement display now performs its own initial read.
   // Settle that real entry-path read before counting or delaying editor reads.
@@ -131,8 +132,8 @@ for(const [name,native,status] of [
 });
 
 test('missing bearer cannot create an editable native source',async({page})=>{
-  const fixture=await mount(page,{token:false});await open(page);await expect(inputs(page).save).toBeDisabled();
-  await expect(page.locator('.placement-feedback')).toContainText(/unavailable|sign in|verified|session/i);expect(fixture.reads).toEqual([]);await assertNoWrites(page,fixture);
+  const fixture=await mount(page,{token:false});await expect(page.locator('#editFieldBtn')).not.toBeVisible();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  expect(fixture.reads).toEqual([]);await assertNoWrites(page,fixture);
 });
 
 for(const [role,verifiedIt] of [['it',false],['service',false]])test(role+' without existing verified edit authority has no field editor',async({page})=>{

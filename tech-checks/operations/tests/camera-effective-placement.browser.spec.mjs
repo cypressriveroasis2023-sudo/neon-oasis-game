@@ -10,7 +10,8 @@ async function mount(page,path='camera-health.html?q=RANGER%20022'){
   if(url.pathname==='/functions/v1/cos-operations-pages'){
    const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-   const body=route.request().postDataJSON();expect(body.method).toBe('GET');expect(['/api/field-map','/api/camera-health/summary-v3']).toContain(body.path);expect(route.request().headers().authorization).toBe('Bearer synthetic-only');
+   const body=route.request().postDataJSON();expect(route.request().method()).toBe('POST');expect(body.method).toBe('GET');expect(['/api/session','/api/field-map','/api/camera-health/summary-v3']).toContain(body.path);expect(route.request().headers().authorization).toBe('Bearer synthetic-only');
+   if(body.path==='/api/session')return route.fulfill({headers,json:{features:{freshAvigilonChecks:false,avigilonSourceWrites:false}}});
    const state=await page.evaluate(path=>{readRequests.push({path});if(window.denyPlacement)return {deny:true};return {data:path==='/api/field-map'?snapshotFixture():healthFixture()};},body.path);
    if(state.deny)return route.fulfill({status:403,headers,contentType:'application/json',body:'{"error":"Synthetic denied"}'});
    return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(state.data)});

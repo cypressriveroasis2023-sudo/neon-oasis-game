@@ -13,11 +13,11 @@ const mountedFixtures=new WeakMap();
 test.afterEach(async({page})=>{
   const fixture=mountedFixtures.get(page.context());if(!fixture)return;
   expect(fixture.unexpected).toEqual([]);expect(fixture.pageErrors).toEqual([]);
-  expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length);
+  expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length+fixture.featureReads.length);
   expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
 });
 async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,holdDisplay=false,entry='detail',nativeAfterWrite=null}={}){
-  const fixture={native,health,holdNative,holdDisplay,displayGates:[],nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
+  const fixture={native,health,holdNative,holdDisplay,displayGates:[],nativeAfterWrite,status:200,reads:[],displayReads:[],mapReads:[],featureReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
   mountedFixtures.set(page.context(),fixture);
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));page.context().on('page',other=>other.on('pageerror',error=>fixture.pageErrors.push(error.message)));
   await page.context().addInitScript(({role,verifiedIt,active,token,legacy,key})=>{
@@ -32,7 +32,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       const url=new URL(input instanceof Request?input.url:String(input),location.href);
       if(url.href!=='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages')return actualFetch(input,init);
       const stack=new Error().stack||'';
-      const owner=stack.includes('/camera-effective-placement.js')?'display':stack.includes('/camera-placement-controls.js')?'editor':location.pathname==='/tech-checks/operations/dist/index.html'?'map':'unknown';
+      const owner=stack.includes('/avigilon-managed-bridge.js')?'bridge':stack.includes('/camera-effective-placement.js')?'display':stack.includes('/camera-placement-controls.js')?'editor':location.pathname==='/tech-checks/operations/dist/index.html'?'map':'unknown';
       const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined));
       headers.set('X-Synthetic-Read-Owner',owner);window.fixtureReadSignals.push({owner,signal:init?.signal});
       return actualFetch(input,{...init,headers});
@@ -78,9 +78,16 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
     if(url.pathname==='/functions/v1/cos-operations-pages'){
       const body=request.postDataJSON(),owner=request.headers()['x-synthetic-read-owner'];
       const read={body,headers:request.headers(),owner};fixture.allReads.push(read);
-      const recognized=['display','editor','map'].includes(owner)&&(owner!=='map'||entry==='map');
+      const recognized=['display','editor','map','bridge'].includes(owner)&&(owner!=='map'||entry==='map');
       if(!recognized||read.headers.authorization!=='Bearer synthetic-only'||request.method()!=='POST'){
         fixture.unexpected.push({owner,body,reason:'Invalid native read owner, bearer or transport'});return route.fulfill({status:403,headers,body:'{}'});
+      }
+      // The bridge verifies the disabled native runtime independently of the
+      // physical-placement read pair. Attribute and validate that exact read.
+      if(owner==='bridge'){
+        fixture.featureReads.push(read);
+        if(body.path!=='/api/session'||body.method!=='GET'){fixture.unexpected.push({owner,body,reason:'Unexpected managed capability read'});return route.fulfill({status:400,headers,body:'{}'});}
+        return route.fulfill({headers,json:{features:{freshAvigilonChecks:false,avigilonSourceWrites:false}}});
       }
       (owner==='editor'?fixture.reads:owner==='display'?fixture.displayReads:fixture.mapReads).push(read);
       if(!['/api/field-map','/api/camera-health/summary-v3',...(entry==='map'?['/api/session','/api/routers','/api/vrm-fleet','/api/daily-board','/api/field-map/'+rowId+'/history']:[])].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
@@ -95,6 +102,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
     return route.abort('blockedbyclient');
   });
   await page.goto(origin+(entry==='map'?'/synthetic-map-entry':entry==='health'?'/tech-checks/camera-health.html?unit='+encodeURIComponent(key)+'&action=edit-field':'/tech-checks/camera-detail.html?id=9101'));
+  if(entry==='detail'&&!token){await expect(page.locator('#error')).toContainText('Sign in again');await expect(page.locator('#content')).not.toBeVisible();return fixture;}
   if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else {await expect(page.frameLocator('iframe').locator('.cos-fleet-dashboard')).toBeVisible();await page.frameLocator('iframe').getByLabel('Fleet status',{exact:true}).selectOption('all');}
   if(entry!=='map'){
     if(holdDisplay)await expect.poll(()=>fixture.displayGates.length).toBe(1);
@@ -105,7 +113,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       const expected=['/api/camera-health/summary-v3','/api/field-map'];
       if(entry==='health'){
         if(fixture.reads.length)await expect.poll(()=>fixture.reads.length).toBe(2);
-        expect([0,2]).toContain(fixture.displayReads.length);expect([0,2]).toContain(fixture.reads.length);expect([2,4]).toContain(fixture.allReads.length);
+        expect([0,2]).toContain(fixture.displayReads.length);expect([0,2]).toContain(fixture.reads.length);expect([2,4]).toContain(fixture.allReads.length-fixture.featureReads.length);
         for(const reads of [fixture.displayReads,fixture.reads])if(reads.length)expect(reads.map(read=>read.body.path).sort()).toEqual(expected);
       }else expect(fixture.displayReads.map(read=>read.body.path).sort()).toEqual(expected);
       expect(fixture.displayReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
@@ -201,7 +209,7 @@ for(const [role,verifiedIt,active] of [['it',false,true],['service',false,true],
   const fixture=await mount(page,{role,verifiedIt,active});await expect(page.locator('#moveShopBtn')).not.toBeVisible();await expect(page.locator('#editFieldBtn')).not.toBeVisible();expect(fixture.reads).toEqual([]);expect(fixture.displayReads).toHaveLength(2);expect(fixture.displayReads.every(read=>read.status===403)).toBe(true);expect(await page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevice).status)).toBe('unavailable');await noWrites(page,fixture);
 });
 
-test('a missing bearer never unlocks the Shop form',async({page})=>{const fixture=await mount(page,{token:false});await open(page);await held(page,fixture);expect(fixture.allReads).toEqual([]);});
+test('a missing bearer stops the detail read and never unlocks the Shop form',async({page})=>{const fixture=await mount(page,{token:false});await expect(page.locator('#moveShopBtn')).not.toBeVisible();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(fixture.allReads).toEqual([]);await noWrites(page,fixture);});
 
 for(const [flag,feedback] of [['fixtureWriteDenied',/Synthetic writer denied/],['fixtureReadbackMismatch',/could not be verified/i]])test(flag+' never replays an uncertain write or starts geocoding',async({page})=>{
   const fixture=await mount(page);await open(page);const form=await complete(page);await page.evaluate(flag=>window[flag]=true,flag);await form.save.click();await expect(page.locator('.placement-feedback')).toContainText(feedback);await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
