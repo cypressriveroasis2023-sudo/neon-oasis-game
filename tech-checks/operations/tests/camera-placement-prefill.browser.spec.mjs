@@ -77,6 +77,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
   await page.goto(origin+'/tech-checks/camera-detail.html?id=11');
   if(!token){await expect(page.locator('#error')).toContainText('Sign in again');await expect(page.locator('#content')).not.toBeVisible();return fixture;}
   await expect(page.locator('#content')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>detailLoadPromise===null)).toBe(true);
   // The shared physical-placement display now performs its own initial read.
   // Settle that real entry-path read before counting or delaying editor reads.
   await expect(page.locator('#effectivePlacement [data-placement-status]')).toHaveAttribute('data-placement-status',/^(ready|unresolved|unavailable)$/);

@@ -264,8 +264,8 @@ function renderEffectivePlacement(){
   if(value?.status==='ready'||value?.lastRead){$('editSiteBtn').classList.add('hidden');$('siteEditWrap').classList.add('hidden');}
 }
 function placementActionAtShop(){const value=window.CameraEffectivePlacement?.get(device);return value?.status==='ready'||value?.lastRead?value.scope==='shop':isShopDevice(device)||String(device?.activation_state||'').toLowerCase()==='deactivated';}
-function invalidateDetailEvidence(){current={};detailPlacementVersion=null;detailNativeAuthority=null;placementView?.invalidate();if(device){$('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();$('statusPill').textContent='UNVERIFIED';$('statusPill').className='pill verifying';$('statusSource').textContent='Current health unavailable; refresh required.';}}
-function refreshEffectivePlacement(){
+function invalidateDetailEvidence(){current={};detailPlacementVersion=null;detailNativeAuthority=null;if(device)ensureEffectivePlacement();placementView?.invalidate();if(device){$('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();$('statusPill').textContent='UNVERIFIED';$('statusPill').className='pill verifying';$('statusSource').textContent='Current health unavailable; refresh required.';}}
+function ensureEffectivePlacement(){
   if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:()=>{
     if(detailPlacementVersion&&placementView.state()!=='loading'&&(placementView.state()!=='ready'||!CameraEffectivePlacement.versionEqual(placementView.version(),detailPlacementVersion)||!CameraEffectivePlacement.authorityMatches(placementView.version(),detailNativeAuthority))){
       invalidateDetailEvidence();renderEffectivePlacement();
@@ -274,8 +274,9 @@ function refreshEffectivePlacement(){
     }
     renderEffectivePlacement();
   }});
-  return placementView.refresh();
+  return placementView;
 }
+function refreshEffectivePlacement(){return ensureEffectivePlacement().refresh();}
 function render(){
   const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
   $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
@@ -399,7 +400,7 @@ async function loadDetailRead(){
   const {devices:[d],healthRows, hist,hi,rs,re}=snapshot,h=healthRows[0];
   if(hi)console.warn(hi);if(re)console.warn(re);
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
-  device=d;current={};events=hist||[];unitRouters=rs||[];
+  device=d;current={};events=hist||[];unitRouters=rs||[];invalidateDetailEvidence();
   if(beforeError)throw beforeError;
   const placementVersion=await readPlacementVersion();
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;

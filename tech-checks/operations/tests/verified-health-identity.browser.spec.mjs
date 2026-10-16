@@ -24,10 +24,16 @@ function fixture({sourceCases=false}={}){
  }
  return {units,rows,identities};
 }
-async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pausedClock=false}={}){
+async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pausedClock=false,authority=false}={}){
  const data=fixture({sourceCases});
- const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0,placementReads:0,placementVersion:1,changePlacementDuringLoad:false};
- state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings});
+ const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0,placementReads:0,placementVersion:1,healthGeneration:1,mapGeneration:1};
+ const token=generation=>({contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'synthetic-fleet',generation:String(generation),rosterRevision:'synthetic-roster-'+generation,admitted:true});
+ state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings,...(authority?{avigilonAuthority:token(state.healthGeneration)}:{})});
+ // Match projectEffectiveFleetPlacement's complete v1 saved-inventory DTO. A
+ // version flag without per-unit placement evidence must fail closed.
+ state.fieldUnits=()=>state.units.map(unit=>({...unit,updatedAt:String(state.placementVersion),readOnly:false,placement:'FIELD',currentLocationType:'field',activeInventoryEligible:true,
+  ...(unit.placementAuditId?{placementSource:'owner',placementUpdatedAt:fresh}:{}),
+  effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:'field',source:unit.placementAuditId?'owner':'recorded_inventory',observedAt:unit.placementAuditId?fresh:null,freshness:'recorded',reason:null}}));
  // Pause before loading the app, with a future pause target so the clock's
  // initial real-time advancement cannot make pauseAt reject a past instant.
  await page.clock.install({time:new Date(pausedClock?Date.parse(now)-60000:now)});
@@ -52,7 +58,7 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pa
   if(body.method!=='GET'){state.writes.push(body);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic test rejects writes'})});}
   if(body.path==='/api/camera-health/summary-v3'&&state.summaryError)return route.fulfill({status:state.summaryError,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic saved summary unavailable'})});
   const result=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',legacyOwner:true,productionOwnerUserId:uuid(101),features:{fieldLocationVerification:true,fleetAccess:true,fleetPlacementEdit:true,fleetConnectionEdit:true}}
-   :body.path==='/api/field-map'?(state.placementReads++,state.changePlacementDuringLoad&&state.placementReads===2&&(state.placementVersion=2),{items:state.units,inventoryItems:state.units.map(unit=>({...unit,updatedAt:String(state.placementVersion)})),summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now,effectivePlacementVersion:1,placementProjectionVersion:1})
+   :body.path==='/api/field-map'?(state.placementReads++,{items:state.fieldUnits(),inventoryItems:state.fieldUnits(),summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now,effectivePlacementVersion:1,placementProjectionVersion:1,...(authority?{avigilonAuthority:token(state.mapGeneration)}:{})})
    :body.path==='/api/camera-health/summary-v3'?state.health()
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
    :body.path==='/api/equipment'?{items:state.units,models:[]}
@@ -150,14 +156,22 @@ test('saved-data reload repaints identity status without changing expanded map p
  const {frame,state}=await mount(page);await expand(frame);const viewport=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect.poll(viewport).toEqual(before);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);await frame.getByRole('button',{name:'Close unit details'}).click();noWrites(state);
 });
 
-test('placement change during protected health load discards the old receipt and reloads as unverified',async({page})=>{
- const {frame,state}=await mount(page);await expand(frame);
- state.changePlacementDuringLoad=true;state.placementReads=0;state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
+test('mismatched fleet authority clears saved colors and a coherent new generation recovers',async({page})=>{
+ const {frame,state}=await mount(page,{authority:true});await expand(frame);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ state.mapGeneration=2;state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect.poll(()=>state.placementVersion).toBe(2);
+ await expect(frame.getByRole('alert').filter({hasText:'Avigilon authority changed during read'})).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
- await expect(frame.locator('#screenRefreshStatus')).toContainText('Screen updated');
+ state.healthGeneration=2;
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.getByRole('alert').filter({hasText:'Avigilon authority changed during read'})).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
+ await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  noWrites(state);
 });
 

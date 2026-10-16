@@ -1,3 +1,4 @@
+// 2026-10-16 reviewed unavailable placement context and diagnostic-owned refresh fencing; full legacy/native browser scenarios and supersession regressions preserve fail-closed health.
 // 2026-10-16 reviewed retained-native authority fencing, canonical placement comparisons, bounded retries and immediate failed-read clearing; native actual-page and placement regressions cover saved-location retention.
 // 2026-10-16 reviewed complete identity/health snapshot fence, guarded-control disablement, contextual Spotter inventory aliases and Witness not-checked presentation; focused actual-page regressions preserve source labels and service evidence.
 // 2026-10-16 reviewed placement-version fence: a placement change during the protected health read clears the receipt and reloads before totals render.
@@ -28,14 +29,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "8ba7aa423347b8267df9ba9e9e4f46934388df34ad8a2ebfd51ebd84f7ebc054",
-  "camera-detail": "aee2a2ce6b62f0f58704e201643193353fcf0fc311e4ce18e1255c58307a44c9",
+  "camera-health": "174bd6ef6e566478bc14f0f016cf6ac51a986d78384d66cbc16bef026d51d960",
+  "camera-detail": "58ef154376431858e4e3155a1d291548c57581b391052fb3b9a6fa8044957d1f",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "3ada9100d88d7ee001f748a6c1685f6133cc6b848828d847d0e9a1612ec09c0c",
-  "camera-detail": "39d1469224c1e4cad455bcb351f75560ef2f1329a22e4be2059f0189299e3246",
+  "camera-health": "663805f34b8570be4d23e401202d02be3e6bb919ddd1ebbd35ccc5d6296557fb",
+  "camera-detail": "c4ff8934599f009e6d9cacd7e7875811cce5830d2eb666d2aeb3119276273aaa",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
