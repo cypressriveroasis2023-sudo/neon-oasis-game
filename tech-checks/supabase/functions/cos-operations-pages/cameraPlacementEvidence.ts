@@ -1,6 +1,6 @@
 /** Private bridge projection. Presentation semantics are mirrored by the public pure helper and contract-tested. */
 import {CAMERA_FRESH_MS, serviceEvidence, savedCameraConnection} from './cameraEvidence.ts';
-import {inventoryTrackerAlias,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
+import {inventoryTrackerAlias,solarCompatibleSpotterKey,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
 export {CAMERA_FRESH_MS, serviceEvidence} from './cameraEvidence.ts';
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
@@ -174,7 +174,10 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     if(device.source==='reconeyez')row.batteryEvidence=reconBatteryEvidence(device.recon_battery_percent,device.recon_battery_updated_at,device.recon_battery_status,device.recon_battery_status_updated_at);
     row.status=['field','unknown'].includes(row.scope!)?currentCameraStatus(evidence,now):'review';return row;
   });
-  const linked=new Set(devices.map(device=>deviceTrackerKey(device.unit_key)).filter(Boolean));
+  const linked=new Set(devices.map(device=>{
+    const key=deviceTrackerKey(device.unit_key);
+    return key&&key===solarCompatibleSpotterKey(device.unit_key)?inventoryTrackerAlias(device.unit_key,tracker):key;
+  }).filter(Boolean));
   // Presentation deduplication cannot establish equipment-to-resource proof.
   for(const device of devices){const key=inventoryTrackerAlias(device.unit_key,tracker);if(key)linked.add(key);}
   for(const device of devices)for(const record of tracker.filter(row=>normalized(row.source_label)===normalized(device.unit_key))){const key=canonicalTrackerKey(record);if(key)linked.add(key);}

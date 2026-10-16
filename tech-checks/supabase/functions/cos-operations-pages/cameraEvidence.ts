@@ -1,5 +1,5 @@
 /** Private bridge projection. Presentation semantics are mirrored by the public pure helper and contract-tested. */
-import {inventoryTrackerAlias,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
+import {inventoryTrackerAlias,solarCompatibleSpotterKey,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
 export const CAMERA_FRESH_MS = 20 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
@@ -197,7 +197,12 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     if(device.source==='reconeyez')row.batteryEvidence=reconBatteryEvidence(device.recon_battery_percent,device.recon_battery_updated_at,device.recon_battery_status,device.recon_battery_status_updated_at);
     row.status=['field','unknown'].includes(row.scope!)?currentCameraStatus(evidence,now):'review';return row;
   });
-  const linked=new Set(devices.map(device=>deviceTrackerKey(device.unit_key)).filter(Boolean));
+  const linked=new Set(devices.map(device=>{
+    const key=deviceTrackerKey(device.unit_key);
+    // A plain Spotter alias must pass the same master-side restriction guard;
+    // the generic family parser cannot hide a renamed or restricted master.
+    return key&&key===solarCompatibleSpotterKey(device.unit_key)?inventoryTrackerAlias(device.unit_key,tracker):key;
+  }).filter(Boolean));
   // An explicitly approved provider display alias suppresses only a duplicate
   // inventory placeholder. It never rewrites source rows or health identities.
   for(const device of devices){const key=inventoryTrackerAlias(device.unit_key,tracker);if(key)linked.add(key);}

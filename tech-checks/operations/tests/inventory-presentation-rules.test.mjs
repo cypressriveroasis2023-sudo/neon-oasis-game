@@ -12,6 +12,8 @@ vm.runInContext(readFileSync(new URL('../../inventory-presentation-rules.js',imp
 const browser=context.COSInventoryPresentation,at='2026-10-16T12:00:00Z',now=Date.parse(at);
 const master=(tag,extra={})=>({canonical_family:'Spotter',unit_tag:String(tag),source_label:'Spotter '+tag,tracker_state:'field_or_unknown',...extra});
 const device=(unit,extra={})=>({id:10,device_name:'Original provider name',unit_key:unit,device_type:'IPC',activation_state:'active',organization:'Recorded site',source:'vigilant_control_center',source_status:'online',source_last_seen_at:at,...extra});
+const approvedMasterLabels={182:'Spotter 182HDC2S',252:'Spotter 252 (Solar)',253:'Spotter 253 - SOLAR COMPATIBLE',254:'Spotter 254 - SOLAR COMPATIBLE',263:'Spotter 263HDC4S (SOLAR COMPATIBLE) ',285:'Spotter 285 - SOLAR COMPATIBLE',298:'Spotter 298 HDC2S - SOLAR COMPATIBLE',310:'Spotter 310 (Solar Compatible)'};
+const heldMasterLabels=['Spotter 263 DO NOT USE','Spotter 263 retired','Restricted Spotter 263','Spotter 263 decommissioned','Spotter 263.1','Renamed Spotter 263','Spotter 263HDC2S (SOLAR COMPATIBLE)','Spotter 263 (new site)','Spotter 182HDC2S'];
 
 for(const [name,api] of [['browser',browser],['native',native]]){
  test(name+' inventory aliases are restricted to the eight explicitly approved integer Spotters',()=>{
@@ -33,6 +35,26 @@ for(const [name,api] of [['browser',browser],['native',native]]){
    assert.equal(api.inventoryTrackerAlias('SOLARSPOTTER 263',tracker),expected);
   }
   assert.equal(api.inventoryTrackerAlias('SOLARSPOTTER 263',[spotter,master(999,{source_label:'SOLARSPOTTER 263'})]),null);
+ });
+ test(name+' master-side restrictions and renamed labels remain visible while approved solar descriptors survive',()=>{
+  for(const [tag,source_label] of Object.entries(approvedMasterLabels)){
+   const tracker=[master(tag,{source_label})],alias='SOLARSPOTTER '+tag,before=structuredClone(tracker);
+   assert.equal(api.inventoryTrackerAlias(alias,tracker),'spotter|'+tag);
+   assert.equal(api.inventoryLabel(alias,tracker),source_label);
+   assert.deepEqual(tracker,before);
+  }
+  assert.equal(api.inventoryTrackerAlias('SOLARSPOTTER263',[master(263,{source_label:'Spotter263(SOLARCOMPATIBLE)'})]),'spotter|263');
+  assert.equal(api.inventoryLabel('SOLARSPOTTER263',[master('263.0'),master(263,{source_label:approvedMasterLabels[263]})]),approvedMasterLabels[263]);
+  for(const source_label of heldMasterLabels)for(const alias of ['SOLARSPOTTER263','Spotter263','SS 263']){
+   const tracker=[master(263,{source_label})];
+   assert.equal(api.inventoryTrackerAlias(alias,tracker),null,source_label);
+   assert.equal(api.inventoryLabel(alias,tracker),alias,source_label);
+  }
+  for(const tracker_state of ['retired','shop','decommissioned','unknown','',undefined]){
+   const tracker=[master(263,{tracker_state})];
+   assert.equal(api.inventoryTrackerAlias('SOLARSPOTTER263',tracker),null,String(tracker_state));
+   assert.equal(api.inventoryLabel('SOLARSPOTTER263',tracker),'SOLARSPOTTER263');
+  }
  });
  test(name+' Witness exception is exact and keeps decimals and restricted source labels intact',()=>{
   for(const label of ['Spotter 046','SPOTTER052','Spotter 88'])assert.equal(api.witnessStatusNotChecked(label),true);
@@ -60,6 +82,20 @@ for(const [name,summary] of [['legacy',legacySummary],['placement',placementSumm
   const result=summary([device('SOLARSPOTTER 263')],[],now,tracker);
   assert.equal(result.rows.filter(row=>row.trackerOnly).length,1);
   assert.equal(result.rows.find(row=>row.trackerOnly).unit,'Spotter 263');
+ });
+ test(name+' summary preserves master-side restricted and renamed labels even for a plain Spotter parser match',()=>{
+  for(const source_label of heldMasterLabels)for(const alias of ['SOLARSPOTTER 263','Spotter 263','SS 263']){
+   const source=device(alias),tracker=[master(263,{source_label})],before=structuredClone({source,tracker});
+   const result=summary([source],[],now,tracker);
+   assert.equal(result.rows.length,2,alias+' / '+source_label);
+   assert.equal(result.rows.find(row=>row.trackerOnly).unit,source_label);
+   assert.equal(result.rows.find(row=>row.id===10).unit,alias);
+   assert.deepEqual({source,tracker},before);
+  }
+  for(const [tag,source_label] of Object.entries(approvedMasterLabels)){
+   const tracker=[master(tag,{source_label})],result=summary([device('SOLARSPOTTER '+tag)],[],now,tracker);
+   assert.equal(result.rows.length,1);assert.equal(result.inventory.trackerOnlyRecords,0);
+  }
  });
  test(name+' Witness units reject Star4Live health while retaining separately timed service reachability',()=>{
   for(const tag of ['046','052','088'])for(const status of ['online','offline']){
