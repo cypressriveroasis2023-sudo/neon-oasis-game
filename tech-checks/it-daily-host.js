@@ -6,7 +6,9 @@ import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
 window.COS_IT_DAILY_ONLY = IT_DAILY_ONLY;
 const context = () => window.TechCheckContext;
-const verifiedIT = new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911']);
+// Legacy COS account has no separate native-platform identity. The server RPC below
+// remains the authority for IT camera access; this ID only selects the camera UI.
+const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
@@ -68,7 +70,7 @@ function status(message, retry = false) {
   root.append(panel);
 }
 async function verify(value) {
-  if (!value.profileLive || value.preview || value.role === 'it' && (value.effective !== 'it' || !verifiedIT.has(value.id))) return false;
+  if (!value.profileLive || value.preview || (value.role === 'it' && value.effective !== 'it')) return false;
   if (value.role === 'owner') return value.effective === 'owner';
   let timer;
   try { const response = await Promise.race([context().db.rpc('cos_verified_fleet_capabilities_v1'),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),12000);})]); return response && !response.error && response.data?.fleetRead === true; } catch { return false; } finally {clearTimeout(timer);}
@@ -92,7 +94,9 @@ async function open(value, generation, handoffFailure = null) {
   }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#camera-health';
+  frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
+    ? './camera-health.html?itDaily=1'
+    : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#camera-health';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
   root.replaceChildren(...(handoffFallback?[handoffFallback,frame]:[frame]));
   scheduleFrameFit();
