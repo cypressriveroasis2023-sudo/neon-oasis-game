@@ -51,3 +51,8 @@ test('archive interruption preserves reserved IDs for a retry without sending em
 test('ambiguous email timeout stops for review and does not resend',async()=>{
  const f=fixture({sendTimeout:true});await f.post();assert.equal(f.status(),'review');assert.equal(f.report.email_state,'sending');await f.post();assert.equal(f.calls.filter(c=>c.url?.includes('messages/send')).length,1);
 });
+
+test('report ends with authenticated sign-off, Chicago date/time and the signature image link',()=>{
+ const f=fixture();f.report.snapshot.signature={name:'Synthetic <Tech>',username:'synthetic.service',signed_by:'bound-account',signed_at:'2026-10-16T14:30:00Z',method:'drawn',statement:'I confirm this report is accurate.'};f.report.photos.push({category:'Additional images',view:'1',filename:'<image>.png'},{category:'Technician signature',view:'signature'});
+ const html=reportHtml(f.report,{'Technician signature:signature':'https://drive.google.com/file/d/signature/view'});assert.match(html,/Synthetic &lt;Tech&gt;/);assert.match(html,/synthetic.service/);assert.match(html,/09:30:00/);assert.match(html,/America\/Chicago/);assert.match(html,/View handwritten signature/);assert.match(html,/&lt;image&gt;.png/);assert.ok(html.lastIndexOf('<h2>Technician signature</h2>')>html.lastIndexOf('<h2>Photos and image attachments</h2>'));
+});

@@ -1,3 +1,4 @@
+import {createDailySignoff,newSignature,signatureJpeg} from './service-signoff-ui.js?v=20261016';
 // Daily evidence and one atomic completion. Authorization stays on the server.
 const context = () => window.TechCheckContext;
 const types = ['Sniper','Ranger','Spotter','Solar Spotter'];
@@ -63,7 +64,7 @@ async function jpeg(file) {
 }
 function photoInput(category,view,caption,required) {
   const label=document.createElement('label');label.append(caption+(required?' · required':' · optional'));
-  const input=document.createElement('input');input.type='file';input.accept='image/*';input.setAttribute('capture','environment');input.setAttribute('aria-label',category+' '+caption);input.dataset.dailyPhoto=category+':'+view;
+  const input=document.createElement('input');input.type='file';input.accept='image/*';input.setAttribute('aria-label',category+' '+caption);input.dataset.dailyPhoto=category+':'+view;
   const preview=document.createElement('img');preview.alt=category+' '+caption;preview.hidden=true;
   const show=blob=>{if(previewUrls.has(input))URL.revokeObjectURL(previewUrls.get(input));const url=URL.createObjectURL(blob);previewUrls.set(input,url);preview.src=url;preview.hidden=false;};
   const existing=draft.photos.find(p=>p.category===category&&p.view===view);if(existing)show(existing.blob);
@@ -74,13 +75,51 @@ function photoInput(category,view,caption,required) {
     try{
       const blob=await jpeg(input.files[0]);
       if(actor()!==id || current!==id || changes!==version)return;
-      const previous=draft.photos;
-      draft.photos=previous.filter(p=>p.category!==category||p.view!==view).concat({category,view,blob});
-      try{await save();}catch(error){draft.photos=previous;throw error;}
-      show(blob);message('Photo saved on this device. Check that the number or tag is readable.');
-    }catch(error){message(error.message,true);}finally{photosPending--;input.disabled=false;input.value='';}
+      const ownerDraft=draft,previous=ownerDraft.photos;
+      ownerDraft.photos=previous.filter(p=>p.category!==category||p.view!==view).concat({category,view,blob});invalidateSignoff();
+      try{await save();}catch(error){ownerDraft.photos=previous;throw error;}
+      if(actor()!==id||changes!==version)return;show(blob);message('Photo saved on this device. Check that the number or tag is readable.');
+    }catch(error){if(actor()===id&&changes===version)message(error.message,true);}finally{photosPending--;input.disabled=false;input.value='';}
   });
   label.append(input,preview);return label;
+}
+function invalidateSignoff(){
+  if(draft?.signature)draft.signature.confirmed=false;
+  const input=document.querySelector('.cos-daily-signoff input[type="checkbox"]');if(input)input.checked=false;
+}
+function extraImages(){
+  const id=current,version=changes;
+  const field=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='Additional image attachments';field.append(legend);
+  const label=document.createElement('label');label.append('Attach saved images (optional, up to 10)');
+  const input=document.createElement('input');input.type='file';input.accept='image/*';input.multiple=true;input.setAttribute('aria-label','Attach extra images');label.append(input);
+  const list=document.createElement('div');
+  function render(){
+    if(actor()!==id||changes!==version)return;
+    list.replaceChildren();
+    for(const photo of draft.photos.filter(p=>p.category==='Additional images')){
+      const item=document.createElement('div'),image=document.createElement('img'),remove=document.createElement('button');
+      const url=URL.createObjectURL(photo.blob);previewUrls.set(image,url);image.src=url;image.alt=photo.filename||'Additional image '+photo.view;
+      remove.type='button';remove.textContent='Remove attachment '+photo.view;
+      remove.addEventListener('click',async()=>{if(busy||actor()!==id||changes!==version)return;const ownerDraft=draft,previous=ownerDraft.photos;ownerDraft.photos=previous.filter(p=>p!==photo);invalidateSignoff();try{await save();render();}catch(error){ownerDraft.photos=previous;if(actor()===id&&changes===version)message(error.message,true);}});
+      item.append(image,remove);list.append(item);
+    }
+  }
+  input.addEventListener('change',async()=>{
+    const files=[...input.files],id=current,version=changes;if(busy||!files.length)return;
+    if(files.length+draft.photos.filter(p=>p.category==='Additional images').length>10){input.value='';return message('Attach up to 10 additional images.',true);}
+    input.disabled=true;photosPending++;
+    try{
+      for(const file of files){
+        const blob=await jpeg(file);if(actor()!==id||changes!==version)return;
+        const occupied=new Set(draft.photos.filter(p=>p.category==='Additional images').map(p=>p.view));
+        const view=Array.from({length:10},(_,i)=>String(i+1)).find(v=>!occupied.has(v));
+        const ownerDraft=draft,previous=ownerDraft.photos;ownerDraft.photos=previous.concat({category:'Additional images',view,blob,filename:file.name.slice(0,150)});invalidateSignoff();
+        try{await save();}catch(error){ownerDraft.photos=previous;throw error;}
+      }
+      render();message('Additional images saved on this device. Review and sign below.');
+    }catch(error){if(actor()===id&&changes===version){render();message(error.message,true);}}finally{photosPending--;input.disabled=false;input.value='';}
+  });
+  field.append(label,list);render();return field;
 }
 function decorate(card) {
   if(card.dataset.dailyEvidenceKey!==current+':'+currentDay){card.querySelector('.cos-daily-evidence')?.remove();card.dataset.dailyEvidenceKey=current+':'+currentDay;}
@@ -96,6 +135,9 @@ function decorate(card) {
     else field.append(photoInput(category,'1','Photo 1',true),photoInput(category,'2','Photo 2',false));
     section.append(field);
   }
+  draft.signature ||= newSignature();
+  const id=current,version=changes;
+  section.append(extraImages(),createDailySignoff({state:draft.signature,actorName:context()?.getProfile()?.full_name||context()?.getProfile()?.username||'Technician',isBusy:()=>busy,onChange:()=>{if(actor()===id&&changes===version)save().catch(error=>message(error.message,true));}}));
   const button=card.querySelector('[data-wl-save-truck-inventory]');button.before(section);button.textContent='Complete & Send to Ops Manager';
   message('Complete saves your inspection, inventory and photos, then returns to the main screen. Delivery status appears there.');
 }
@@ -126,7 +168,7 @@ async function sync() {
     document.querySelectorAll('.cos-daily-evidence').forEach(node=>node.remove());
     document.querySelectorAll('#wlSvcTruckInventory input').forEach(input=>{input.value='';input.checked=false;});
   }
-  if(id!==current || currentDay!==day()){current=id;currentDay=day();draft=null;changes++;statusKey='';if(id){const version=changes;try{const saved=await device('readonly',store=>store.get(key(id)));if(actor()!==id||changes!==version)return;draft=saved||{id:crypto.randomUUID(),photos:[],values:null};if(draft.photos.some(photo=>['SIM cards','Batteries'].includes(photo.category))){draft.id=crypto.randomUUID();draft.photos=draft.photos.filter(photo=>!['SIM cards','Batteries'].includes(photo.category));await save();}}catch(error){message(error.message,true);return;}}}
+  if(id!==current || currentDay!==day()){current=id;currentDay=day();draft=null;changes++;statusKey='';if(id){const version=changes;try{const saved=await device('readonly',store=>store.get(key(id)));if(actor()!==id||changes!==version)return;draft=saved||{id:crypto.randomUUID(),photos:[],values:null};if(!draft.signature||draft.photos.some(photo=>['SIM cards','Batteries'].includes(photo.category))){draft.id=crypto.randomUUID();draft.photos=draft.photos.filter(photo=>!['SIM cards','Batteries'].includes(photo.category));draft.signature ||= newSignature();await save();}}catch(error){message(error.message,true);return;}}}
   if(!id)return;
   const card=document.getElementById('wlSvcTruckInventory');if(card)decorate(card);
   await homeStatus(id);
@@ -137,7 +179,7 @@ for(const event of ['techcheck:view-changed','techcheck:data-refreshed','pagesho
 // Capture before the protected delegated handlers, so this is one transaction.
 document.addEventListener('input',event=>{
   if(!actor() || busy || !draft || !event.target.closest('#wlSvcTruckInventory') || event.target.type==='file')return;
-  draft.values=valueSnapshot();save().catch(error=>message(error.message,true));
+  if(!event.target.closest('.cos-daily-signoff'))invalidateSignoff();draft.values=valueSnapshot();save().catch(error=>message(error.message,true));
 });
 document.addEventListener('click',async event=>{
   const button=event.target.closest('[data-wl-save-truck-inventory], [data-wl-submit-truck-inventory]');
@@ -159,25 +201,32 @@ document.addEventListener('click',async event=>{
     for(const category of types)for(const view of ['front','tag'])if(!draft.photos.some(p=>p.category===category&&p.view===view))throw new Error('Add the front and rear unit tag photos for '+category+'.');
     for(const category of simCards)for(const view of ['front','back'])if(!draft.photos.some(p=>p.category===category&&p.view===view))throw new Error('Add the '+view+' photo for '+category+'.');
     for(const category of batteryTypes)if(!draft.photos.some(p=>p.category===category&&p.view==='1'))throw new Error('Add a photo of the '+category+'.');
+    const signature=draft.signature;
+    if(!signature?.confirmed)throw new Error('Sign and confirm that this report is accurate before completing.');
+    const accountName=context()?.getProfile()?.full_name||context()?.getProfile()?.username||'';
+    const normalize=name=>name.trim().replace(/\s+/g,' ').toLowerCase();
+    if(signature.method==='typed'&&normalize(signature.typedName||'')!==normalize(accountName))throw new Error('Type your full name exactly as shown for the signed-in technician.');
+    if(signature.method==='drawn'&&!signature.blob)signature.blob=await signatureJpeg(signature);
     draft.values=values;await save();
     const photos=[];
+    const evidence=signature.method==='drawn'?draft.photos.concat({category:'Technician signature',view:'signature',blob:signature.blob}):draft.photos;
     const assertIdentity=()=>{if(actor()!==id||changes!==version)throw new Error('Your session changed. Sign in again to finish this check.');};
     // A completed report's evidence is immutable. If the earlier response was
     // lost, replay completion without trying to upload into its sealed folder.
     const previous=await rpc('service_daily_report_status_v1',{});
     const alreadyAccepted=previous?.some(report=>report.id===draft.id);
-    for(const photo of draft.photos){
-      assertIdentity();message('Saving photos '+(photos.length+1)+' of '+draft.photos.length+'…');
+    for(const photo of evidence){
+      assertIdentity();message('Saving photos '+(photos.length+1)+' of '+evidence.length+'…');
       const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await photo.blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('');
       const path=id+'/'+draft.id+'/'+hash+'.jpg';
       if(!alreadyAccepted){
         const {error}=await context().db.storage.from('service-daily-evidence').upload(path,photo.blob,{contentType:'image/jpeg',upsert:false});
         if(error && String(error.statusCode)!=='409')throw new Error('Photo upload failed. Your photos remain on this device; reconnect and retry.');
       }
-      photos.push({category:photo.category,view:photo.view,path});
+      photos.push({category:photo.category,view:photo.view,path,...(photo.filename?{filename:photo.filename}: {})});
     }
     assertIdentity();message('Completing your daily check…');
-    const saved=await rpc('complete_service_daily_report_v3',{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos});
+    const saved=await rpc('complete_service_daily_report_v4',{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos,p_signature:{method:signature.method,name:signature.method==='typed'?signature.typedName.trim():accountName,confirmed:true,...(signature.method==='drawn'?{path:photos.find(p=>p.category==='Technician signature').path}:{})}});
     if(!saved?.inventory_ready)throw new Error('The server has not confirmed truck readiness. Your draft is preserved.');
     assertIdentity();
     // Accepted submission remains authoritative even if device cleanup fails.
