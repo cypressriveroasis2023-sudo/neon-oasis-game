@@ -25,7 +25,8 @@ create function cos_avigilon_checks_private.claim(p_actor uuid,p_tenant uuid,p_r
 declare previous cos_avigilon_checks_private.runs;run_id uuid;started timestamptz;deadline timestamptz;
 begin
  perform cos_avigilon_checks_private.assert_actor(p_actor,p_tenant);
- if not pg_try_advisory_xact_lock(hashtextextended('avigilon-run:'||p_tenant::text,0)) then raise exception 'Run claim busy; retry saved run lookup' using errcode='55P03';end if;
+ -- Serialize refresh/claim/save transactions; contention is not lease loss.
+ perform pg_advisory_xact_lock(hashtextextended('avigilon-run:'||p_tenant::text,0));
  run_id:=(p_run->>'id')::uuid;started:=(p_run->>'startedAt')::timestamptz;deadline:=(p_run->>'deadlineAt')::timestamptz;
  if run_id is null or p_run->>'tenantId' is distinct from p_tenant::text or p_run->>'state' is distinct from 'pending' or p_run->'completedAt' is distinct from 'null'::jsonb
   or length(coalesce(p_run->>'rosterRevision','')) not between 1 and 256 or started is null or deadline is null or started<clock_timestamp()-interval '30 seconds' or started>clock_timestamp()+interval '5 seconds'
@@ -46,7 +47,8 @@ create function cos_avigilon_checks_private.save(p_actor uuid,p_tenant uuid,p_ru
 declare previous cos_avigilon_checks_private.runs;
 begin
  perform cos_avigilon_checks_private.assert_actor(p_actor,p_tenant);
- if not pg_try_advisory_xact_lock(hashtextextended('avigilon-run:'||p_tenant::text,0)) then return false;end if;
+ -- Wait for an overlapping claim, then evaluate the actual current head.
+ perform pg_advisory_xact_lock(hashtextextended('avigilon-run:'||p_tenant::text,0));
  select r.* into previous from cos_avigilon_checks_private.heads h join cos_avigilon_checks_private.runs r on r.id=h.run_id
  where h.tenant_id=p_tenant and r.id=(p_run->>'id')::uuid for update of r;
  if not found or previous.actor_id<>p_actor or previous.snapshot->>'state'<>'pending' then return false;end if;

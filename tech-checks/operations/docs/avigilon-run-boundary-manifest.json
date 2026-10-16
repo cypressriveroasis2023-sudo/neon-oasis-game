@@ -1,5 +1,5 @@
 {
-  "status": "local_review_candidate_not_applied_not_published",
+  "status": "draft_pr_review_candidate_not_applied_runtime_disabled",
   "transportEnabledByDefault": false,
   "productionExecutionRequiresSeparateApproval": true,
   "privateSignatures": [
@@ -41,5 +41,15 @@
     "cachedAtUtc": "2026-10-16T01:23:27.582607327Z"
   },
   "executionGate": "Do not install, grant, deploy, enable runtime or probe before separate production review/approval. Compatible endpoint checker and deployed mapping verification remain required.",
-  "rollback": "Revoke service-role execution on the three boundary functions; retain private runs and heads. No records deleted."
+  "rollback": "Revoke service-role execution on the three boundary functions; retain private runs and heads. No records deleted.",
+  "releaseBlockers": [
+    "Atomic health publication is not implemented: native run leases and legacy camera health/eligibility are in separate databases. A post-probe read plus a second RPC is not an atomic fence.",
+    "Endpoint checker now stages the proposed patch only. Coordinator marks staged observations atomic_publication_unavailable and never claims a confirmed outage. No publication transport is wired.",
+    "Normal Refresh starts the optional check panel, but fleet health/CSV and morning reporting still use saved views. Complete shared-result consumption and disabled serve wiring remain required before release."
+  ],
+  "reviewRegressionEvidence": [
+    "Held source-Field rows stay in the run/report as unverified; cached actual projection adapter yields 135 total, 41 Field, 94 Shop (local metadata digest for older cached fixture, no identity claims).",
+    "Local PostgreSQL 17 independent connections prove claim/save lock waits, same-lease continuation, supersession rejection and expired-success rejection. Synthetic disposable container has network disabled.",
+    "No cancelled function-definition read repeated; no production access, grants, probes, writes, merge or deployment."
+  ]
 }

@@ -6,7 +6,10 @@ export function allowedPublicIpv4(value:string){const host=value.replace(/\/32$/
 /** Only known endpoint outcomes are nonresponse. Resource exhaustion, permissions,
  * cancellation, invalid input and unknown runtime errors remain checker failures. */
 export function tcpErrorKind(error:unknown):PortResult['kind']{return error instanceof Error&&['ConnectionRefused','TimedOut','EndpointTimeout'].includes(error.name)?'nonresponse':'checker_failure';}
-export function createAvigilonEndpointCheck(d:{read:(actor:Actor,id:string)=>Promise<CurrentEndpoint>;tcp:(host:string,port:number,signal:AbortSignal)=>Promise<PortResult>;publish:(actor:Actor,publication:Publication)=>Promise<{ok:boolean}>;now?:()=>number}){
+/** Probe only. The proposed patch is never published here. A separate, co-located
+ * transaction must validate actor, tenant, current lease, Field eligibility and
+ * endpoint revision before applying it and recording a confirmed outcome. */
+export function createAvigilonEndpointCheck(d:{read:(actor:Actor,id:string)=>Promise<CurrentEndpoint>;tcp:(host:string,port:number,signal:AbortSignal)=>Promise<PortResult>;now?:()=>number}){
  const now=d.now||Date.now;
  return async(actor:Actor,endpoint:Endpoint,signal:AbortSignal):Promise<ProbeResult>=>{
   if(!actor.canCheck||signal.aborted)throw Error('checker_unavailable');
@@ -21,9 +24,8 @@ export function createAvigilonEndpointCheck(d:{read:(actor:Actor,id:string)=>Pro
   const online=results.some(x=>x.result.kind==='responded'),at=new Date(now()).toISOString(),failures=online?0:Math.min(3,current.consecutiveFailures+1);
   if(!Number.isInteger(current.consecutiveFailures)||current.consecutiveFailures<0)throw Error('checker_unavailable');
   const confirmed=!online&&failures>=3;
-  const saved=await d.publish(actor,{p_device_id:endpoint.deviceId,p_revision:endpoint.revision,p_public_ip:endpoint.ip,p_expected_ports:endpoint.ports,p_monitoring_profile:endpoint.profile,p_source:'manual_tcp_check',p_health:{overall_status:online?'online':'offline',ip_reachable:online,port_status:Object.fromEntries(results.map(x=>[x.port,{online:x.result.kind==='responded',latency_ms:x.result.latencyMs}])),checked_at:at,consecutive_failures:failures,first_failed_at:online?null:current.firstFailedAt||at,confirmed_outage:confirmed,confirmation_reason:confirmed?'3+ consecutive failed health checks':null,detail:online?'Avigilon service port responded':'No approved Avigilon service port responded',...(online?{acknowledged_at:null,acknowledged_by:null,...(current.consecutiveFailures>0?{last_recovered_at:at}:{})}:{})}});
-  if(saved.ok!==true)throw Error('endpoint_or_roster_changed');
+  const publication:Publication={p_device_id:endpoint.deviceId,p_revision:endpoint.revision,p_public_ip:endpoint.ip,p_expected_ports:endpoint.ports,p_monitoring_profile:endpoint.profile,p_source:'manual_tcp_check',p_health:{overall_status:online?'online':'offline',ip_reachable:online,port_status:Object.fromEntries(results.map(x=>[x.port,{online:x.result.kind==='responded',latency_ms:x.result.latencyMs}])),checked_at:at,consecutive_failures:failures,first_failed_at:online?null:current.firstFailedAt||at,confirmed_outage:confirmed,confirmation_reason:confirmed?'3+ consecutive failed health checks':null,detail:online?'Avigilon service port responded':'No approved Avigilon service port responded',...(online?{acknowledged_at:null,acknowledged_by:null,...(current.consecutiveFailures>0?{last_recovered_at:at}:{})}:{})}};
   if(signal.aborted)throw Error('checker_unavailable');
-  return {outcome:online?'online':'nonresponse',checkedAt:at,revision:endpoint.revision,confirmedOutage:confirmed};
+  return {outcome:online?'online':'nonresponse',checkedAt:at,revision:endpoint.revision,confirmedOutage:false,publication};
  };
 }

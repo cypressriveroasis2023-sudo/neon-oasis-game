@@ -8,10 +8,10 @@ export async function auditedAvigilonRoster(tenantId:string,snapshot:any,identit
   const members=Array.isArray(ids)&&ids.length&&new Set(ids).size===ids.length?ids:[null];
   return members.map((deviceId:string|null)=>{
   const hits=deviceId?devices.filter(d=>String(d.id)===deviceId):[];
-  const d=hits.length===1?hits[0]:null,verified=r.kind==='unit'&&!!r.unitId&&claims.length===1&&d!==null;
+  const d=hits.length===1?hits[0]:null,verified=r.kind==='unit'&&['field','shop'].includes(r.placement)&&!!r.unitId&&claims.length===1&&d!==null;
   const restricted=r.lifecycle!=='active'||r.active!==true||/DO NOT USE/i.test(r.unitNumber)||Boolean(d&&(d.monitoring_enabled!==true||String(d.activation_state).toLowerCase()!=='active'));
   const endpoint:Endpoint|null=verified&&d.public_ip?{deviceId:String(d.id),revision:String(d.connection_revision),ip:d.public_ip,ports:Array.isArray(d.expected_ports)?d.expected_ports:[],profile:d.monitoring_profile}:null;
-  return {id:members.length>1?r.id+'/'+deviceId:r.id,name:members.length>1?r.unitNumber+' · Device '+deviceId:r.unitNumber,family:r.category,placement:r.placement==='field'?'FIELD':r.placement==='shop'||r.recordedSourcePlacement==='shop'?'SHOP':'UNKNOWN',restricted,identityVerified:verified,endpoint};
+  return {id:members.length>1?r.id+'/'+deviceId:r.id,name:members.length>1?r.unitNumber+' · Device '+deviceId:r.unitNumber,family:r.category,placement:r.placement==='field'?'FIELD':r.placement==='shop'?'SHOP':r.recordedSourcePlacement==='field'?'FIELD':r.recordedSourcePlacement==='shop'?'SHOP':'UNKNOWN',restricted,identityVerified:verified,endpoint};
   });
  });
  const payload=JSON.stringify([tenantId,snapshot.uploadInventory.sourceSha256,snapshot.uploadInventory.payloadSha256,snapshot.uploadInventory.scopedRevision??0,units]);

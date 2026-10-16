@@ -1,3 +1,4 @@
+import type {Publication} from './avigilonEndpointCheck.ts';
 /** Server-side contract. Roster/authorization/store/probe dependencies must come
  * from trusted adapters, never request bodies. No network or database defaults. */
 export type Actor={tenantId:string;actorId:string;canCheck:boolean};
@@ -7,7 +8,7 @@ export type Roster={tenantId:string;revision:string;units:AuditUnit[]};
 export type Outcome='pending'|'online'|'nonresponse'|'unverified';
 export type Row={unitId:string;name:string;outcome:Outcome;reason:string|null;startedAt:string|null;completedAt:string|null;confirmedOutage:boolean;endpointRevision:string|null};
 export type Run={id:string;tenantId:string;rosterRevision:string;startedAt:string;completedAt:string|null;deadlineAt:string;state:'pending'|'completed'|'partial'|'failed';rows:Row[]};
-export type ProbeResult={outcome:'online'|'nonresponse';checkedAt:string;revision:string;confirmedOutage:boolean};
+export type ProbeResult={outcome:'online'|'nonresponse';checkedAt:string;revision:string;confirmedOutage:boolean;publication?:Publication};
 export interface RunStore{
  /** Atomic across workers. Only a pending, unexpired run with the SAME roster
   * revision may coalesce. Expired/superseded leases must reject all later writes. */
@@ -44,9 +45,12 @@ export function createAvigilonCheckRuns(d:Dependencies){
     const after=await d.roster(actor);validateRoster(after,actor);const latest=after.units.find(u=>u.id===row.unitId);
     if(after.revision!==run.rosterRevision||!latest||fingerprint(latest)!==fingerprint(original))throw Error('endpoint_or_roster_changed');
     if(!['online','nonresponse'].includes(result.outcome)||result.revision!==original.endpoint!.revision||!Number.isFinite(Date.parse(result.checkedAt))||Date.parse(result.checkedAt)<Date.parse(row.startedAt!)||Date.parse(result.checkedAt)>now()||typeof result.confirmedOutage!=='boolean')throw Error('invalid_checker_result');
-    if(closed||controller.signal.aborted)return;
+    // Native run leases and legacy camera health are currently in separate DBs.
+    // Never emulate an atomic publication fence with two sequential RPC calls.
+    if(result.publication)throw Error('atomic_publication_unavailable');
+    if(closed||controller.signal.aborted||remaining()<=0)return;
     row.outcome=result.outcome;row.completedAt=result.checkedAt;row.confirmedOutage=result.outcome==='nonresponse'&&result.confirmedOutage;
-   }catch(error){if(closed||controller.signal.aborted)return;row.outcome='unverified';row.reason=error instanceof Error&&['endpoint_or_roster_changed','invalid_checker_result'].includes(error.message)?error.message:'checker_unavailable';row.completedAt=new Date(now()).toISOString();}
+   }catch(error){if(closed||controller.signal.aborted)return;row.outcome='unverified';row.reason=error instanceof Error&&['endpoint_or_roster_changed','invalid_checker_result','atomic_publication_unavailable'].includes(error.message)?error.message:'checker_unavailable';row.completedAt=new Date(now()).toISOString();}
    if(!await save()){closed=true;controller.abort();return;}
   }};
   try{
