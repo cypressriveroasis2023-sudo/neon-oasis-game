@@ -20,6 +20,15 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Preserve exact review source
+        run: |
+          git rev-parse HEAD > /tmp/techcheck-review-source.sha
+          git ls-files -z tech-checks .github | tar --exclude='*.woff' --exclude='*.woff2' --exclude='*.ttf' --exclude='*.otf' -czf /tmp/techcheck-review-source.tar.gz --null -T -
+      - uses: actions/upload-artifact@v4
+        with:
+          name: techcheck-review-source
+          path: /tmp/techcheck-review-source.*
+          retention-days: 1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
