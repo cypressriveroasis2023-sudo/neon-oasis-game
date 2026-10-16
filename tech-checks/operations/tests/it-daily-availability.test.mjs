@@ -12,10 +12,10 @@ async function repairGate(role,{active=true,fail=false,subject='synthetic'}={}) 
   const available=await new AsyncFunction('db','$',helper.replace("const {IT_DAILY_ONLY}=await import('./it-feature-availability.js');",'const IT_DAILY_ONLY=true;'))(db,()=>tickets);
   return {available,calls,tickets};
 }
-test('daily switch is explicit and lists exactly the four approved views',()=>{
+test('daily switch is explicit and limits the desktop to Camera Health',()=>{
   assert.equal(availability.IT_DAILY_ONLY,true);
-  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Fleet Dashboard','Camera Health','Victron VRM','Unit Tracker']);
-  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Fleet Dashboard','Camera Health','Victron Power','2027 Unit Tracker']);
+  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Camera Health']);
+  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Camera Health']);
   assert.doesNotMatch(read('it-feature-availability.js'),/localStorage|fetch\(|mhelp.*===|setTimeout/);
 });
 test('standalone repair pauses IT before any ticket read or release, including restored sessions',async()=>{
@@ -55,18 +55,18 @@ test('daily frame follows available viewport height without resizing fullscreen 
 test('daily landing has no extra Fleet launch and shared modes preserve existing tool labels',()=>{
  const daily=read('operations/src/ITDailyDashboard.tsx'),app=read('operations/src/App.tsx');
  assert.doesNotMatch(daily,/cos-fleet-launch|Open Fleet Dashboard/);
- assert.match(daily,/Fleet Dashboard, Camera Health, Victron Power and the 2027 Unit Tracker/);
+ assert.match(daily,/Camera Health and authorized camera editing/);
  assert.match(app,/active==='Fleet Dashboard'\|\|active==='Camera Health'&&!route.diagnostics/);
  assert.match(app,/initialView=\{active==='Camera Health'\?'fleet':'map'\}/);
  assert.match(app,/openAdvancedDiagnostics=\{!fleetOnly&&!dailyOnly\?/);
 });
 
 
-test('authorized IT lands on Fleet without a fifth competing daily navigation entry',()=>{
+test('IT desktop lands on Camera Health while phone mounts named handoffs without legacy prep controls',()=>{
  const host=read('it-daily-host.js'),app=read('operations/src/App.tsx');
- assert.match(host,/: '#fleet-dashboard';/);
- assert.match(host,/location.hash === '#it-dashboard' \? '#it-dashboard' : '#fleet-dashboard'/);
- assert.match(app,/fleetWorkspaces.filter\(workspace=>!dailyOnly\|\|workspace!=='IT Dashboard'\)/);
- assert.match(app,/if\(fleetOnly&&!fleetWorkspaces.includes\(active\)\) setRouteLocation\(\{workspace:'Fleet Dashboard'/);
- assert.match(app,/active==='IT Dashboard'\?\(dailyOnly\?<ITDailyDashboard/);
+ assert.match(host,/#camera-health/);assert.match(host,/if\(value.phone\)/);
+ assert.match(host,/disposeTransfer=mountTransferDesk/);
+ assert.match(app,/dailyOnly\?'Camera Health':'Fleet Dashboard'/);
+ assert.match(app,/active==='Camera Health'&&dailyOnly\?<CameraHealthWorkspace/);
+ assert.doesNotMatch(app,/dailyOnly\?\[...IT_DAILY_WORKSPACES,'IT Dashboard'\]/);
 });

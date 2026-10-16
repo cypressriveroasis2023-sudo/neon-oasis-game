@@ -76,7 +76,7 @@ function fixture({ role = 'it', linked = true, holdCapability = false, slowLegac
     c.getSession = window.fixtureSession;
     c.getOwnerTestSession = () => window.fixturePreview ? {preview_role: 'it', target_role: 'it', ticket: 'SYN-TEST', persona_id: 'synthetic-persona'} : null;
     c.getEffectiveIdentity = () => ({id: window.fixturePreview ? 'synthetic-persona' : window.fixtureSubject, role: window.fixtureEffectiveRole, owner_test: window.fixturePreview});
-    c.db.rpc = async (name, args) => { window.fixtureRpcCalls.push({name, args}); if (name === 'cos_verified_fleet_capabilities_v1' && window.fixtureHeldCapability) await window.fixtureCapabilityGate; return originalRpc(name, args); };
+    c.db.rpc = async (name, args) => { window.fixtureRpcCalls.push({name, args}); if(name==='techcheck_transfer_readiness_v1')return {data:null,error:{code:'PGRST202',message:'Synthetic handoffs not installed'}}; if (name === 'cos_verified_fleet_capabilities_v1' && window.fixtureHeldCapability) await window.fixtureCapabilityGate; return originalRpc(name, args); };
     c.db.auth.onAuthStateChange = fn => { window.fixtureAuthListeners.push(fn); return {data: {subscription: {unsubscribe() {}}}}; };
     c.db.auth.getSession = async () => { window.fixtureTokens++; return {data: {session: window.fixtureSession()}}; };
     window.addEventListener('message', event => { if (event.data?.type === 'COS_OPERATIONS_TOKEN_RESPONSE') window.fixtureTokenResponses.push(event.data); });
@@ -97,7 +97,7 @@ async function mount(page, options = {}) {
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === origin && url.pathname === '/it-daily-fixture') return route.fulfill({contentType: 'text/html', body: fixture(options)});
-    if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js'].includes(url.pathname)) {
+    if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js','/transfers/desk.js','/transfers/model.js','/transfers/client.js','/transfers/readiness.js','/tech-check-rules.js','/service-signoff-ui.js'].includes(url.pathname)) {
       return route.fulfill({contentType: 'text/javascript', body: readHost(url.pathname.slice(1))});
     }
     if (url.origin === origin && url.pathname.startsWith('/resources/fonts/')) return route.fulfill({path: new URL('../../resources/fonts/' + url.pathname.split('/').pop(), import.meta.url).pathname});
@@ -138,62 +138,37 @@ async function mount(page, options = {}) {
 }
 
 async function ready(frame, except) {
-  await expect(daily(frame)).toBeVisible();
-  await expect(daily(frame).getByRole('heading', {name: 'Daily views', exact: true})).toBeVisible();
-  await expect(daily(frame).locator('[data-source]')).toHaveCount(4);
-  expect(await daily(frame).locator('[data-source]').evaluateAll(nodes => nodes.map(node => node.dataset.source))).toEqual(sources);
-  for (const source of sources.filter(source => source !== except)) await expect(card(frame, source).locator('time')).toHaveCount(1);
+  await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+  await expect(daily(frame)).toHaveCount(0);
+  if(!except)await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
 }
+
 async function assertReads(page, state) {
   expect(state.errors).toEqual([]); expect(state.unexpected).toEqual([]);
   expect(state.calls.every(call => call.method === 'GET' && call.body === null)).toBe(true);
   const names = await page.evaluate(() => window.fixtureRpcCalls.map(call => call.name));
-  expect(names.every(name => name === 'cos_verified_fleet_capabilities_v1')).toBe(true);
+  expect(names.every(name => ['cos_verified_fleet_capabilities_v1','techcheck_transfer_readiness_v1'].includes(name))).toBe(true);
 }
 async function menu(frame) {
   await frame.getByRole('button', {name: 'More', exact: true}).first().click();
   return frame.getByRole('dialog', {name: 'Operations navigation'});
 }
 
-for (const secondVerified of [false, true]) test('explicit daily overview keeps four source cards for verified IT ' + (secondVerified ? 'second' : 'first'), async ({page}, info) => {
-  const {frame, state} = await mount(page, {secondVerified}); await ready(frame);
-  await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
-  await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('title', 'IT daily views');
-  await expect(page.locator('#existing-it-tool')).toBeHidden();
-  await expect(page.locator('#techMenuButton')).toBeHidden();
-  for (let index = 0; index < sources.length; index++) {
-    await expect(card(frame, sources[index])).toContainText(labels[index]);
-    expect((await card(frame, sources[index]).getByRole('button', {name: /^Open /}).boundingBox()).height).toBeGreaterThanOrEqual(44);
-  }
-  await expect(daily(frame)).not.toContainText(/MHelp information|Assigned checks|Router inventory/);
-  await expect(daily(frame).getByRole('button',{name:'Open Fleet Dashboard',exact:true})).toHaveCount(1);
-  const nav = await menu(frame);
-  for (const label of labels) await expect(nav.getByRole('button', {name: label, exact: true})).toBeVisible();
-  await expect(nav.getByRole('button', {name: /Tech Checks|InHand Routers|MHelp|Team|Dispatch|Money|Vision assistant/})).toHaveCount(0);
-  await nav.getByRole('button', {name: /Close menu/}).click();
-  const fit = await frame.locator('body').evaluate(() => ({width: innerWidth, content: document.documentElement.scrollWidth}));
-  expect(fit.content).toBeLessThanOrEqual(fit.width);
-  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
-  await page.screenshot({path: info.outputPath('it-daily-four.png'), fullPage: true}); await assertReads(page, state);
+for (const secondVerified of [false,true]) test('verified IT Camera Health-only shell '+secondVerified,async({page})=>{
+ const {frame,state}=await mount(page,{secondVerified});await ready(frame);
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);await expect(page.locator('#existing-it-tool')).toBeHidden();await expect(page.locator('#techMenuButton')).toBeHidden();
+ const nav=await menu(frame),links=nav.getByRole('navigation',{name:'COS Operations',exact:true});await expect(links.getByRole('button')).toHaveCount(1);await expect(links.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
+ await expect(nav.getByRole('button',{name:/Fleet Dashboard|Victron Power|Unit Tracker|Tech Checks|MHelp|Team|Dispatch|Money|Vision assistant/})).toHaveCount(0);await nav.getByRole('button',{name:/Close menu/}).click();
+ const fit=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(fit.content).toBeLessThanOrEqual(fit.width);expect(state.calls.some(c=>['/api/routers','/api/unit-tracker','/api/vrm-fleet'].includes(c.path))).toBe(false);await assertReads(page,state);
 });
-
-test('each allowed view survives Back, Forward and reload', async ({page}) => {
-  const {frame, state} = await mount(page, {fieldDiagnostics: true}); await ready(frame);
-  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
-  for (const source of sources) {
-    await card(frame, source).getByRole('button', {name: /^Open /}).click();
-    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
-    if (source === 'cameras') await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);
-    if (source === 'field') await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible();
-    if (source === 'victron') await expect(frame.getByRole('navigation', {name: 'Helios installations'}).getByRole('button')).toHaveCount(1);
-    if (source === 'tracker') await expect(frame.getByRole('region', {name: 'Unit Tracker workspace'})).toBeVisible();
-    await traverseIframeHistory(frame, 'back', '#it-dashboard'); await ready(frame);
-    await traverseIframeHistory(frame, 'forward', routes[source]);
-    await frame.locator('body').evaluate(() => location.reload());
-    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
-    await frame.locator('body').evaluate(() => {location.hash='#it-dashboard';}); await ready(frame);
-  }
-  await page.reload(); await ready(frame); await assertReads(page, state);
+test('camera-only routing survives Back Forward and reload',async({page})=>{
+ const {frame,state}=await mount(page);await ready(frame);
+ for(const hash of ['#fleet-dashboard','#victron-vrm','#unit-tracker','#it-dashboard']){
+  await frame.locator('body').evaluate((_node,hash)=>location.hash=hash,hash);await ready(frame);
+  await traverseIframeHistory(frame,'back','#camera-health');await ready(frame);await traverseIframeHistory(frame,'forward','#camera-health');await ready(frame);
+  await frame.locator('body').evaluate(()=>location.reload());await ready(frame);
+ }await page.reload();await ready(frame);await assertReads(page,state);
 });
 
 for (const role of ['it', 'owner']) test(role + ' daily menu stays on screen through header changes and phone rotation', async ({page}) => {
@@ -203,6 +178,7 @@ for (const role of ['it', 'owner']) test(role + ' daily menu stays on screen thr
   for (const viewport of [{width:390,height:844},{width:390,height:640},{width:844,height:390}]) {
     await page.setViewportSize(viewport);
     await page.locator('#ownerTestAppBanner').evaluate(node => {node.style.paddingBottom='28px';});
+    await ready(frame);await page.locator('#cosITDailyFrame').evaluate(node=>node.scrollIntoView({block:'start'}));
     await expect.poll(async () => {
       const bounds = await frame.getByRole('button', {name:'More',exact:true}).first().boundingBox();
       return Boolean(bounds && bounds.y >= 0 && bounds.y + bounds.height <= viewport.height && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width);
@@ -222,13 +198,13 @@ for (const role of ['it', 'owner']) test(role + ' daily menu stays on screen thr
 });
 
 test('blocked direct and history routes cannot mount paused features', async ({page}) => {
-  const {frame, state} = await mount(page, {deepLink: '?itHome=checks#tech-checks/it',fieldDiagnostics:true}); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+  const {frame, state} = await mount(page, {deepLink: '?itHome=checks#tech-checks/it',fieldDiagnostics:true}); await ready(frame);
   for (const hash of ['#mhelp', '#tech-check', '#inhand-routers', '#team', '#jobs', '#calendar']) {
     await frame.locator('body').evaluate((_node, hash) => { location.hash = hash; }, hash);
-    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#fleet-dashboard'); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
-    await frame.locator('body').evaluate(() => history.back()); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#camera-health'); await ready(frame);
+    await frame.locator('body').evaluate(() => history.back()); await ready(frame);
   }
-  expect(state.calls.some(call => call.path === '/api/routers')).toBe(true);
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
   await assertReads(page, state);
 });
 
@@ -245,8 +221,8 @@ test('legacy redraw, repeated clicks, synthetic events and old overlays remain u
       document.querySelector('#wlTechMenuPanel button').click();
     });
     expect(await page.evaluate(() => window.fixtureLegacyActions)).toBe(0);
-    await card(frame, 'field').getByRole('button', {name: /^Open /}).evaluate(button => {button.click(); button.click();});
-    await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible(); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
+    await frame.getByRole('button',{name:'Reload saved results',exact:true}).evaluate(button=>{button.click();button.click();});
+    await ready(frame); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
     await frame.locator('body').evaluate(() => {location.hash='#it-dashboard';}); await ready(frame);
   }
   await assertReads(page, state);
@@ -257,16 +233,11 @@ test('daily view opens independently of a stalled old IT Home loader', async ({p
   await expect(page.locator('#wlItHome')).toContainText('Loading Home'); await assertReads(page, state);
 });
 
-for (const source of sources) test(source + ' slow and failed source does not block the other three views', async ({page}) => {
-  const {frame, state} = await mount(page, {holdSource: source}); await ready(frame, source);
-  await expect(card(frame,source).locator('.it-dashboard-status')).toHaveText('Loading');await expect(card(frame,source).locator('time')).toHaveCount(0);
-  state.fail[sourcePaths[source]] = true; state.release(source);
-  await expect(card(frame,source).locator('.it-dashboard-status')).toHaveText('Unavailable');await expect(card(frame,source).locator('time')).toHaveCount(0);
-  const before = state.calls.length; delete state.fail[sourcePaths[source]];
-  await card(frame, source).getByRole('button', {name: /^Retry /}).click(); await ready(frame);
-  // A fresh fleet retry rechecks both inputs; a healthy source stays available.
-  const refreshed=['cameras','field'].includes(source)?['cameras','field']:[source];
-  expect(state.calls.slice(before).map(call => call.path).sort()).toEqual(refreshed.map(id=>sourcePaths[id]).sort()); await assertReads(page, state);
+for(const source of ['cameras','field'])test(source+' failed saved read stays unverified and retries',async({page})=>{
+ const {frame,state}=await mount(page,{holdSource:source});await ready(frame,source);await expect(frame.getByRole('button',{name:'Reading saved results…',exact:true})).toBeDisabled();
+ state.fail[sourcePaths[source]]=true;state.release(source);await expect(frame.getByRole('alert')).toContainText('Current camera state cannot be verified');await expect(frame.locator('.camera-overview-card')).toHaveCount(0);
+ delete state.fail[sourcePaths[source]];const before=state.calls.length;await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();await ready(frame);await expect(frame.getByRole('alert').filter({hasText:'Current camera state cannot be verified'})).toHaveCount(0);await frame.getByLabel('Camera Health unit filter',{exact:true}).selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);
+ expect(state.calls.slice(before).map(c=>c.path).sort()).toEqual([sourcePaths.cameras,sourcePaths.field].sort());await assertReads(page,state);
 });
 
 test('late capability cannot reopen a signed-out session; relogin restores only daily views', async ({page}) => {
@@ -302,9 +273,8 @@ test('Owner persona preview has no iframe/token and can still return to Owner', 
 
 test('the integrated fleet deep link opens through the existing verified IT daily gate', async ({page}) => {
   const {frame,state}=await mount(page,{deepLink:'?fleetDashboard=1',fieldDiagnostics:true});
-  await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/mode=fleet.*#fleet-dashboard$/);
-  await expect(frame.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
-  await expect(frame.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+  await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/mode=fleet.*#camera-health$/);
+  await ready(frame);await expect(frame.locator('.cos-fleet-stat-field')).toHaveCount(0);
   await expect(page.locator('#existing-it-tool')).toBeHidden();
   await expect(frame.getByRole('button',{name:'Register in COS inventory →'})).toHaveCount(0);
   await assertReads(page,state);
@@ -355,18 +325,9 @@ test('a late source response cannot replace a new login or revive an old iframe'
 });
 
 
-for (const [feature, source, label] of [['unitTracker', 'tracker', '2027 Unit Tracker'], ['vrmRead', 'victron', 'Victron Power']]) test(feature + ' remains disabled when the current account lacks its capability', async ({page}) => {
-  const {frame, state} = await mount(page, {[feature]: false,fieldDiagnostics:true}); await ready(frame, source);
-  await expect(card(frame, source).locator('.it-dashboard-status')).toHaveText('Access not enabled');
-  await expect(card(frame, source).getByRole('button', {name: /^Open /})).toBeDisabled();
-  expect(state.calls.some(call => call.path === sourcePaths[source])).toBe(false);
-  const nav = await menu(frame); await expect(nav.getByRole('button', {name: label, exact: true})).toHaveCount(0);
-  await nav.getByRole('button', {name: /Close menu/}).click();
-  await frame.locator('body').evaluate((_node, hash) => {location.hash = hash;}, routes[source]);
-  await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#fleet-dashboard');
-  expect(state.calls.some(call => call.path === sourcePaths[source])).toBe(false); await assertReads(page, state);
+for(const [feature,source,label] of [['unitTracker','tracker','2027 Unit Tracker'],['vrmRead','victron','Victron Power']])test(feature+' cannot restore a paused workspace',async({page})=>{
+ const {frame,state}=await mount(page,{[feature]:false});await ready(frame);const nav=await menu(frame);await expect(nav.getByRole('button',{name:label,exact:true})).toHaveCount(0);await nav.getByRole('button',{name:/Close menu/}).click();await frame.locator('body').evaluate((_node,hash)=>location.hash=hash,routes[source]);await ready(frame);expect(state.calls.some(c=>c.path===sourcePaths[source])).toBe(false);await assertReads(page,state);
 });
-
 
 for (const exit of ['logout', 'Owner return']) test('stale legacy overlays stay closed after ' + exit, async ({page}) => {
   const {frame, state} = await mount(page, {role: exit === 'Owner return' ? 'owner' : 'it'});
@@ -404,51 +365,21 @@ test('failed IT session verification never offers Owner or paused workflow contr
   await ready(frame); await assertReads(page,state);
 });
 
-for (const role of ['it', 'owner']) test(role + ' daily tracker opens the original sheet while COS summary is unavailable', async ({page}) => {
-  const {frame, state} = await mount(page, {role, trackerUnavailable: true});
-  if (role === 'owner') await page.evaluate(() => window.show('it'));
-  await ready(frame, 'tracker');
-  const tracker = card(frame, 'tracker');
-  await expect(tracker.locator('.it-dashboard-status')).toHaveText('Unavailable');
-  await expect(tracker).toContainText('COS summary is unavailable. Open the 2027 Google Sheet for current tracker records.');
-  await expect(tracker.locator('.it-dashboard-count')).toHaveCount(0);
-  const link = tracker.getByRole('link', {name: 'Open 2027 Google Sheet'});
-  await expect(link).toHaveAttribute('href', 'https://docs.google.com/spreadsheets/d/1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA/edit');
-  await expect(link).toHaveAttribute('target', '_blank');
-  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  const callsBefore = state.calls.length;
-  await page.context().route('https://docs.google.com/spreadsheets/**', route => route.fulfill({contentType: 'text/html', body: '<h1>Synthetic original tracker</h1>'}));
-  const popupPromise = page.waitForEvent('popup');
-  await link.click();
-  const popup = await popupPromise;
-  await expect(popup).toHaveURL('https://docs.google.com/spreadsheets/d/1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA/edit');
-  expect(state.calls.length).toBe(callsBefore);
-  await popup.close();
-  await expect(tracker.getByRole('button', {name: 'Open COS inventory'})).toBeEnabled();
-  await assertReads(page, state);
+for(const role of ['it','owner'])test(role+' daily presentation cannot reopen tracker even with capability',async({page})=>{
+ const {frame,state}=await mount(page,{role,trackerUnavailable:true});if(role==='owner')await page.evaluate(()=>window.show('it'));await ready(frame);await expect(frame.getByRole('link',{name:'Open 2027 Google Sheet'})).toHaveCount(0);await frame.locator('body').evaluate(()=>location.hash='#unit-tracker');await ready(frame);expect(state.calls.some(c=>c.path==='/api/unit-tracker')).toBe(false);await assertReads(page,state);
 });
+test('tracker denial cannot expose tracker source links',async({page})=>{const {frame,state}=await mount(page,{unitTracker:false});await ready(frame);await expect(frame.getByRole('link',{name:'Open 2027 Google Sheet'})).toHaveCount(0);expect(state.calls.some(c=>c.path==='/api/unit-tracker')).toBe(false);await assertReads(page,state);});
 
-test('daily tracker source link is absent when the current account lacks tracker access', async ({page}) => {
-  const {frame, state} = await mount(page, {unitTracker: false});
-  await ready(frame, 'tracker');
-  await expect(card(frame, 'tracker').getByRole('link')).toHaveCount(0);
-  await expect(card(frame, 'tracker').getByRole('button', {name: 'Open COS inventory'})).toBeDisabled();
-  expect(state.calls.some(call => call.path === '/api/unit-tracker')).toBe(false);
-  await assertReads(page, state);
-});
-
-
-for(const role of ['it','owner'])test(role+' protected host defaults to Fleet with four existing capabilities',async({page},info)=>{
+for(const role of ['it','owner'])test(role+' protected daily host resolves to Camera Health only',async({page},info)=>{
  const {frame,state}=await mount(page,{role,deepLink:'',fieldDiagnostics:true});
  if(role==='owner')await page.evaluate(()=>window.show('it'));
- await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/#fleet-dashboard$/);
- await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+ await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/#camera-health$/);
+ await ready(frame);
  await expect(daily(frame)).toHaveCount(0);
- await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(1);
+ await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(0);
  const nav=await menu(frame),links=nav.getByRole('navigation',{name:'COS Operations',exact:true});
- await expect(links.getByRole('button')).toHaveCount(4);
- await expect(links.getByRole('button').first()).toHaveText('Fleet Dashboard');
+ await expect(links.getByRole('button')).toHaveCount(1);
+ await expect(links.getByRole('button').first()).toHaveText('Camera Health');
  await expect(links.getByRole('button',{name:'IT Dashboard',exact:true})).toHaveCount(0);
  await expect(links.getByRole('button',{name:/InHand Routers|MHelp|Tech Checks/})).toHaveCount(0);
  await nav.getByRole('button',{name:/Close menu/}).click();

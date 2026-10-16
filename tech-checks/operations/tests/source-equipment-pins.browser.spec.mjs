@@ -1,8 +1,9 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet,field} from './fleet-dashboard-fixtures.mjs';
 import {combinedSourcePinFixture,sourceReceipt} from './fixtures/source-equipment-pin-fixtures.mjs';
-for(const it of [false,true])test(`${it?'IT':'Owner'} source address pins share counts and have read-only source selection`,async({page},info)=>{
+for(const it of [false,true])test(`${it?'IT Camera Health excludes the source-address map workspace':'Owner source address pins share counts and have read-only source selection'}`,async({page},info)=>{
  const value=combinedSourcePinFixture(field),{app,state}=await mountFleet(page,it,{field:value});
+ if(it){await expect(app.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(app.locator('.cos-source-equipment-marker,.cos-fleet-source-record')).toHaveCount(0);await expect(app.getByRole('button',{name:'View estimated address'})).toHaveCount(0);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);return;}
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('6');await expect(app.locator('.cos-fleet-stat-verify strong')).toHaveText('3');
  for(const status of ['online','offline','unknown'])await expect(app.locator('.cos-fleet-stat-'+status+' strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('3 equipment pins · 1 verified · 2 estimated');await expect(app.getByRole('button',{name:'Estimated / source-recorded location: 2',exact:true})).toBeVisible();
@@ -24,8 +25,9 @@ test('mixed clusters preserve all native/source identities and do not assert sou
  const {app,state}=await mountFleet(page,false,{field:value});await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(1);const cluster=app.locator('.cos-dashboard-cluster');await expect(cluster).toHaveAttribute('data-record-ids',JSON.stringify(['mhelp_product:910001','mhelp_product:910002']));await expect(cluster).toHaveAttribute('data-unit-ids',JSON.stringify([field.items[0].id]));await expect(cluster).toHaveAttribute('data-health','mixed');await expect(cluster.locator('[data-unlinked-count]')).toHaveAttribute('data-unlinked-count','2');await cluster.click();await expect(app.locator('.cos-dashboard-peer')).toHaveCount(3);await expect(app.locator('.cos-source-equipment-marker')).toHaveCount(2);await expect(app.locator('.cos-source-equipment-marker [data-health]')).toHaveCount(0);await cluster.click();await expect(app.locator('.cos-dashboard-peer')).toHaveCount(0);expect(state.errors).toEqual([]);
 });
 
-for(const it of [false,true])test(`${it?'IT':'Owner'} explicit menu and repeated workspace entries dismiss source details`,async({page})=>{
+for(const it of [false,true])test(`${it?'IT repeated Fleet aliases cannot expose source details':'Owner explicit menu and repeated workspace entries dismiss source details'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{field:combinedSourcePinFixture(field)});
+ if(it){for(const hash of ['#fleet-dashboard','#field-map','#camera-health']){await app.locator('body').evaluate((_,hash)=>location.hash=hash,hash);await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');await expect(app.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(app.getByRole('dialog',{name:/source equipment details/})).toHaveCount(0);await expect(app.locator('.cos-fleet-source-record')).toHaveCount(0);}expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);return;}
  const source=()=>app.locator('.cos-fleet-source-record').filter({hasText:'Ranger 901'}).getByRole('button',{name:'View estimated address'});
  const open=async()=>{await source().click();await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toBeVisible();};
  // Synthetic menu clicks exercise the normal navigate callback even while the modal blocks pointer input.
