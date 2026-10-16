@@ -8,8 +8,8 @@ const name='cos-avigilon-test-'+process.pid,tenant='ece6d2a2-fd19-4cc7-b56a-2fa0
 const literal=s=>"'"+String(s).replaceAll("'","''")+"'";
 function session(sql,held=false,app='avigilon-test'){
  const child=spawn('docker',['exec','-i','-e','PGAPPNAME='+app,name,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d','cos_avigilon_test'],{stdio:['pipe','pipe','pipe']});
- let out='',err='',readyResolve;const ready=new Promise(r=>readyResolve=r),timer=setTimeout(()=>child.kill(),15000);
- const done=new Promise((resolve,reject)=>{child.stdout.on('data',d=>{out+=d;if(out.includes('HELD'))readyResolve();});child.stderr.on('data',d=>err+=d);child.on('error',reject);child.on('close',code=>{clearTimeout(timer);code===0?resolve(out.trim()):reject(Error(err));});});done.catch(()=>{});
+ let out='',err='',readyResolve,readyReject;const ready=new Promise((r,j)=>{readyResolve=r;readyReject=j;}),timer=setTimeout(()=>child.kill(),15000);
+ const done=new Promise((resolve,reject)=>{child.stdout.on('data',d=>{out+=d;if(out.includes('HELD'))readyResolve();});child.stderr.on('data',d=>err+=d);child.on('error',reject);child.on('close',code=>{clearTimeout(timer);if(held&&!out.includes('HELD'))readyReject(Error(err||'No held transaction'));code===0?resolve(out.trim()):reject(Error(err));});});done.catch(()=>{});
  child.stdin[held?'write':'end']("set statement_timeout='10s';\n"+sql+(held?'\n\\echo HELD\n':'\n'));
  return {done,ready,release:()=>{child.stdin.end('commit;\n');return done;}};
 }
@@ -34,5 +34,28 @@ try{
  await exec(`update cos_avigilon_checks_private.runs set deadline_at=clock_timestamp()-interval '1 second' where id='${replacement.id}';`);
  const late=structuredClone(replacement);late.rows[0].outcome='online';late.rows[0].completedAt=new Date().toISOString();
  await assert.rejects(()=>exec(call('save',late)),/Stale or invalid run outcome/);
- console.log('PASS independent PostgreSQL sessions: refresh/save contention, save/claim contention, supersession, expired success.');
+ await exec(await readFile(new URL('../db/avigilon_health_publication.sql',import.meta.url),'utf8'));
+ const endpoint={deviceId:'10',revision:'1',ip:'8.8.8.8',ports:[443],profile:'sniper'};
+ const roster={tenantId:tenant,revision:'publication',units:[{id:'u1',name:'Synthetic Sniper',family:'Sniper',placement:'FIELD',restricted:false,identityVerified:true,endpoint}]};
+ const fence=`select cos_avigilon_checks_private.fence('${owner}','${tenant}');`;
+ const admit=epoch=>`select cos_avigilon_checks_private.admit('${owner}','${tenant}',${epoch},${literal(JSON.stringify(roster))}::jsonb);`;
+ await exec(admit(await exec(fence)));
+ const publicationRun=candidate('publication');await exec(call('claim',publicationRun));
+ const at=new Date().toISOString();const payload={runId:publicationRun.id,unitId:'u1',startedAt:at,publication:{p_device_id:'10',p_revision:'1',p_public_ip:'8.8.8.8',p_expected_ports:[443],p_monitoring_profile:'sniper',p_source:'manual_tcp_check',p_health:{checked_at:at,port_status:{443:{online:true}},ip_reachable:true,overall_status:'online'}}};
+ const publish=`select cos_avigilon_checks_private.commit_result('${owner}','${tenant}',${literal(JSON.stringify(payload))}::jsonb);`;
+ // A committed fence beats a waiting publisher, leaving no health or receipt.
+ const heldFence=session('begin;'+fence,true);await heldFence.ready;
+ const blocked=session(publish,false,'waiting-publication');await waiting('waiting-publication');const fencedEpoch=(await heldFence.release()).split('\n')[0];await assert.rejects(()=>blocked.done,/Current (authority|lease)/);
+ assert.equal(await exec('select count(*) from cos_avigilon_checks_private.publications;'),'0');
+ await exec(admit(fencedEpoch));
+ roster.revision='publication-2';await exec(admit(await exec(fence)));const nextRun=candidate('publication-2');await exec(call('claim',nextRun));
+ payload.runId=nextRun.id;payload.startedAt=new Date().toISOString();payload.publication.p_health.checked_at=payload.startedAt;
+ const publishNext=`select cos_avigilon_checks_private.commit_result('${owner}','${tenant}',${literal(JSON.stringify(payload))}::jsonb);`;
+ // If publication wins the lock, the subsequent fence waits and then hides it.
+ const heldPublish=session('begin;'+publishNext,true);await heldPublish.ready;
+ const nextFence=session(fence,false,'waiting-fence');await waiting('waiting-fence');await heldPublish.release();await nextFence.done;
+ assert.equal(await exec('select count(*) from cos_avigilon_checks_private.publications;'),'1');
+ const health=JSON.parse(await exec(`select cos_avigilon_checks_private.read_health('${owner}','${tenant}');`));assert.equal(health.items[0].health,null);
+ console.log('PASS independent PostgreSQL sessions: refresh/save, claim/save, lease supersession, expiry, fence-before-publication rejection, publication-before-fence serialization.');
+
 }finally{execFileSync('docker',['rm','--force',name],{stdio:'ignore'});}

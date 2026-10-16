@@ -1,0 +1,121 @@
+PR177 continuation: candidate only, runtime disabled, no production changes
+
+Boundary and consistency
+The native project owns runs, the authoritative admitted roster generation, and
+health publications. commit_result locks the tenant lease, current authority and
+actor profile/role rows, validates current Field eligibility, identity uniqueness,
+restrictions, endpoint revision/IP/ports/profile and observation times, then writes
+the health outcome, monotonic failure count, receipt and run row in ONE native
+PostgreSQL transaction. save cannot invent successful outcomes or receipts.
+Repeated exact commit requests return the same receipt without incrementing the
+failure count. A lost response can be resolved by reading the run. Successful rows
+survive later stale worker saves. A failed/partial refresh never renews timestamps.
+
+This does NOT transact across the native and legacy Supabase projects. Native
+health is authoritative for managed Avigilon endpoints. Legacy health is neither
+written nor required for success. The shared summary reads native publications,
+not a legacy replica. No distributed-transaction guarantee is made. There is no
+legacy replication worker in this patch; replica_ack_at is reserved metadata,
+never a success signal. Any future legacy copy must carry the native receipt,
+be idempotent and reject older generations/receipts; it cannot drive these views.
+
+Cross-project source protocol (required before enablement)
+Every writer of placement, restrictions/DNU, activation/monitoring, resource
+identity, IP, port list, profile or connection revision must participate. This
+includes scheduled provider/import jobs and administrative SQL, not just UI edits.
+1. Acquire native fence(actor, tenant). This closes publication/health reads,
+   invalidates the current lease, and returns an exclusive generation token.
+2. Only after confirmed fence acquisition may that writer mutate remote/native
+   source records. withAvigilonAuthorityFence implements this ordering.
+3. Read back complete reconciled inventory, reviewed identity and endpoint state;
+   derive the roster with auditedAvigilonRoster. Recheck source revisions around
+   the read, with no competing source writers allowed.
+4. admit(actor, tenant, exact_generation, roster) reopens publication. The next
+   run binds its generation in a database trigger, never a client timestamp.
+
+Fence acquisition fails when already closed; there is no expiry/takeover. A crash,
+ambiguous write response or failed readback leaves authority closed. Recovery must
+quiesce the original writer, verify all source state, and explicitly admit the
+held generation through the reviewed administrative path. Merely copying source
+state asynchronously, or post-probe re-reading it, does NOT satisfy this protocol.
+The adapter is implemented but existing production source writers are NOT wired
+by this isolated patch. Until every writer is integrated or quiesced, leave
+runtime disabled. In particular do not modify the parallel scoped inventory work
+or silently treat its currently deployed snapshot as transactionally protected.
+
+Consumers
+Operations summary-v3 uses projectAvigilonHealth whenever the optional run runtime
+is provided; an unavailable/malformed native read fails the refresh. The existing
+shared fleet pair feeds Fleet, Camera Health, details and CSV. Pending/new runs,
+closed fences, changed endpoints, Shop, inactive and restricted units suppress
+old service health. Managed identity tombstones prevent removed mappings from
+reviving old legacy observations. Provider health, placement, activation, IPs,
+router, power and video remain separate. CSV adds basis, observation time, explicit
+unknown channel/video coverage and receipt IDs. Run reports name receipts too.
+Failure retains inventory/location; current health becomes unknown. Historical
+report rows remain historical evidence and never move inventory.
+
+Exact permission / rollout requirements (NOT authorized by this coding task)
+- Review and approve installing candidate SQL in the native project as postgres:
+  avigilon_check_runs.sql; avigilon_health_publication.sql;
+  avigilon_check_run_boundary.sql; avigilon_health_boundary.sql.
+  They are local candidates, not production migration history. If any candidate
+  is already installed, produce/review an ALTER migration against that exact DDL;
+  these CREATE scripts are not intended to be rerun over installed objects.
+- Existing PR177 boundary proposes EXECUTE to service_role only on
+  public.cos_avigilon_run_claim(uuid,uuid,jsonb),
+  public.cos_avigilon_run_read(uuid,uuid,uuid),
+  public.cos_avigilon_run_save(uuid,uuid,jsonb).
+- Additional individually approved EXECUTE grants would be required for the
+  existing service_role on public.cos_avigilon_run_commit(uuid,uuid,jsonb) and
+  public.cos_avigilon_health_read(uuid,uuid). The new SQL intentionally grants
+  neither. Both wrappers require the service JWT role and recheck native actor.
+- No PUBLIC/anon/authenticated EXECUTE, private-schema USAGE, direct table or
+  sequence grants, role memberships, new credentials or browser capabilities.
+  Private RLS remains enabled with no public policies. postgres owns the fixed
+  SECURITY DEFINER wrappers, each with empty search_path.
+- fence(uuid,uuid) and admit(uuid,uuid,bigint,jsonb) remain private administrative
+  operations. Review the existing administrative writer transport and all writer
+  integrations separately. No public fence/admit wrappers/grants are supplied.
+- Approve deployment and explicit runtime wiring only after writer coverage,
+  actor/tenant mapping, endpoint inventory and readback have been reviewed.
+  Existing service credentials must remain server-side. No new secret needed.
+- Rollback: disable runtime first; close/quiesce authority; revoke service EXECUTE
+  on all five public functions. Retain runs/publications/managed identities for
+  audit. Do not drop evidence or reopen source writers automatically.
+
+Scope preservation
+Main 916129fcc09049cffdd2c519f67b2ef95e5d3587; PR177 starting head
+8f4c3ffafd685ca1f885055fee4efc6c7135c646. PR176 is not reapplied. No tracker,
+scoped_inventory_overlay.sql, source rows or IPs changed. Parent's saved revision
+1 batch b32682c5-ec8d-49f0-9c53-103473837e2e remains untouched. Supplied counts
+(135 Avigilon / 41 Field / 94 Shop / 24 DNU; 517 inventory = 194 Field + 323 Shop;
+480 provider devices) are separate baselines, not recomputed or reconciled here.
+User's 230 SHOP no SIM/no IP, Ranger 007 SHOP as of 18:00 Central Oct 15, and Ranger
+024 FIELD Metro Park Square remain source-authority inputs. This patch contains
+only synthetic test identities and endpoints and does not overwrite corrections.
+
+Validation in this continuation (2026-10-16, synthetic/local only)
+- Focused node suite: 167 passed, 0 failed. Covers Avigilon coordinator, native
+  SQL publication/permissions/rollback, API read races, fleet classifier, Camera
+  Health and diagnostic report consumers.
+  node --import tsx --test --test-concurrency=1 tests/avigilon-*.test.mjs
+    tests/api-inflight-reads.test.mjs tests/fleet-dashboard-model.test.mjs
+    tests/field-camera-health.test.mjs tests/camera-health-native-overview.test.mjs
+    tests/unit-diagnostic-report.test.mjs
+- Independent PostgreSQL 17 sessions: passed refresh/save and claim/save lock
+  waits, lease supersession/expiry, fence-before-publication rejection and
+  publication-before-fence serialization. Network-disabled disposable container.
+  COS_AVIGILON_LOCAL_POSTGRES=1 node tests/avigilon-postgres-concurrency.local.mjs
+- Browser: 9 passed (desktop 1440), covering new shared receipt/CSV/failure test,
+  run panel/report and existing Fleet dashboard Owner/IT, Shop, stale health,
+  location retention and session invalidation checks. Used installed Chromium
+  154 with a temporary executablePath config. Node 24 needed PW_DISABLE_TS_ESM=1
+  and --import tsx for Playwright 1.51.1. Bundled browser download was blocked;
+  no package/dependency upgrade or repository test-config change was made.
+- npm run typecheck and npm run build passed. Existing Vite large-chunk warning.
+- Broad npm test run: 4,049 passed, 3 skipped, one file process failed from a
+  JavaScript heap limit (source-admission-continuity.test.mjs). That unchanged
+  file was rerun with --max-old-space-size=4096: all 27 passed. Do not describe
+  the first broad run as green. Final changes were covered by the focused suite.
+- git diff --check passed. Built dist artifacts are deliberately excluded.

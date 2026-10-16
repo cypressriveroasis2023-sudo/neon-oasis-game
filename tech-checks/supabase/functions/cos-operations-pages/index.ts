@@ -1,3 +1,4 @@
+import {projectAvigilonHealth} from '../_shared/avigilonHealthProjection.ts';
 import {createAvigilonCheckRuns} from '../_shared/avigilonCheckRun.ts';
 import {auditedAvigilonRoster} from '../_shared/avigilonAuditedRoster.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
@@ -1050,7 +1051,11 @@ export function createOperationsHandler(options) {
             .catch(()=>projectReconProviderIdentities([],devices,[]));
           const mhelpReceipt=await readMhelpCameraPlacements(actorPayload);
           const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
-          const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          let summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          if(options.avigilonChecks){
+            if(!options.avigilonChecks.readHealth)fail('Current Avigilon publication reader unavailable.',503);
+            summary=projectAvigilonHealth(summary,await options.avigilonChecks.readHealth({tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true}),ORGANIZATION_ID,devices);
+          }
           // Current guarded source placement only classifies synthetic PDF inventory.
           // This is optional, bounded, read-only and never changes a camera resource.
           const shopRead=(inventory,current,mhelpReceipt)=>({inventory,mhelpReceipt:mhelpReceipt??(options.mhelpPlacementEnabled===true?{}:null),nativeUnits:current.sources.units,devices:current.sources.devices,audits:current.sources.audits,identity:current.identity,matches:current.sources.matches,ownerClaims:current.sources.ownerCrosswalk.claims});

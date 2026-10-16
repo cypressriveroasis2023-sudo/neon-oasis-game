@@ -5,17 +5,23 @@
   "privateSignatures": [
     "cos_avigilon_checks_private.claim(p_actor uuid, p_tenant uuid, p_run jsonb) returns jsonb",
     "cos_avigilon_checks_private.read_run(p_actor uuid, p_tenant uuid, p_id uuid) returns jsonb",
-    "cos_avigilon_checks_private.save(p_actor uuid, p_tenant uuid, p_run jsonb) returns boolean"
+    "cos_avigilon_checks_private.save(p_actor uuid, p_tenant uuid, p_run jsonb) returns boolean",
+    "cos_avigilon_checks_private.commit_result(uuid,uuid,jsonb) returns jsonb",
+    "cos_avigilon_checks_private.read_health(uuid,uuid) returns jsonb",
+    "cos_avigilon_checks_private.fence(uuid,uuid) returns bigint",
+    "cos_avigilon_checks_private.admit(uuid,uuid,bigint,jsonb) returns void"
   ],
   "proposedServiceBoundary": [
     "public.cos_avigilon_run_claim(p_actor_user_id uuid, p_organization_id uuid, p_run jsonb) returns jsonb",
     "public.cos_avigilon_run_read(p_actor_user_id uuid, p_organization_id uuid, p_run_id uuid) returns jsonb",
-    "public.cos_avigilon_run_save(p_actor_user_id uuid, p_organization_id uuid, p_run jsonb) returns boolean"
+    "public.cos_avigilon_run_save(p_actor_user_id uuid, p_organization_id uuid, p_run jsonb) returns boolean",
+    "public.cos_avigilon_run_commit(uuid,uuid,jsonb) returns jsonb",
+    "public.cos_avigilon_health_read(uuid,uuid) returns jsonb"
   ],
   "privileges": {
     "currentProduction": "No change made; proposed objects are not installed by this work.",
     "privateStoreCandidate": "postgres owns functions/tables; RLS enabled; PUBLIC, anon, authenticated and service_role have no direct schema/table/function access.",
-    "proposedBoundary": "Three SECURITY DEFINER functions owned by postgres, empty search_path. EXECUTE granted only to service_role after revoking PUBLIC, anon and authenticated. No grants on private tables/schema/functions.",
+    "proposedBoundary": "Three original run wrappers propose service-only EXECUTE; the two additional publication wrappers revoke all access until separately reviewed grants. All use empty search_path and postgres ownership.",
     "browserAccess": "None. Browser sends an empty start request or run ID through the existing authenticated Operations bridge.",
     "rolesAndCredentials": "Existing Owner/IT identities and existing platform service credential only. No role memberships, user profiles, secrets or credentials created or changed."
   },
@@ -32,7 +38,11 @@
     "db/avigilon_check_runs.sql",
     "db/avigilon_check_run_boundary.sql",
     "db/avigilon_check_run_boundary_rollback.sql",
-    "../supabase/functions/_shared/avigilonServiceRuntime.ts"
+    "../supabase/functions/_shared/avigilonServiceRuntime.ts",
+    "db/avigilon_health_publication.sql",
+    "db/avigilon_health_boundary.sql",
+    "docs/avigilon-publication-protocol.txt",
+    "db/avigilon_health_boundary_rollback.sql"
   ],
   "readerEvidence": {
     "provenance": "Earlier authorized read-only Supabase get-function-definition query, cached privately before cancellation notice; no later cancelled read repeated or bypassed.",
@@ -41,15 +51,16 @@
     "cachedAtUtc": "2026-10-16T01:23:27.582607327Z"
   },
   "executionGate": "Do not install, grant, deploy, enable runtime or probe before separate production review/approval. Compatible endpoint checker and deployed mapping verification remain required.",
-  "rollback": "Revoke service-role execution on the three boundary functions; retain private runs and heads. No records deleted.",
+  "rollback": "Disable runtime, quiesce/fence writers and revoke service execution on all five boundary functions; retain durable evidence.",
   "releaseBlockers": [
-    "Atomic health publication is not implemented: native run leases and legacy camera health/eligibility are in separate databases. A post-probe read plus a second RPC is not an atomic fence.",
-    "Endpoint checker now stages the proposed patch only. Coordinator marks staged observations atomic_publication_unavailable and never claims a confirmed outage. No publication transport is wired.",
-    "Normal Refresh starts the optional check panel, but fleet health/CSV and morning reporting still use saved views. Complete shared-result consumption and disabled serve wiring remain required before release."
+    "Production SQL/grants/deployment/enablement require separate approval; new health wrappers intentionally have no service EXECUTE grants.",
+    "All source writers must use the exclusive native fence before mutation and admit after verified readback; existing production writers are not wired in this isolated task.",
+    "Native health is authoritative; no legacy replication or cross-project transaction is claimed."
   ],
   "reviewRegressionEvidence": [
     "Held source-Field rows stay in the run/report as unverified; cached actual projection adapter yields 135 total, 41 Field, 94 Shop (local metadata digest for older cached fixture, no identity claims).",
     "Local PostgreSQL 17 independent connections prove claim/save lock waits, same-lease continuation, supersession rejection and expired-success rejection. Synthetic disposable container has network disabled.",
     "No cancelled function-definition read repeated; no production access, grants, probes, writes, merge or deployment."
-  ]
+  ],
+  "protocol": "docs/avigilon-publication-protocol.txt"
 }

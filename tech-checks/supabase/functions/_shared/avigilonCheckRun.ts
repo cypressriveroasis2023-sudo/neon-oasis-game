@@ -6,7 +6,7 @@ export type Endpoint={deviceId:string;revision:string;ip:string;ports:number[];p
 export type AuditUnit={id:string;name:string;family:string;placement:'FIELD'|'SHOP'|'UNKNOWN';restricted:boolean;identityVerified:boolean;endpoint:Endpoint|null};
 export type Roster={tenantId:string;revision:string;units:AuditUnit[]};
 export type Outcome='pending'|'online'|'nonresponse'|'unverified';
-export type Row={unitId:string;name:string;outcome:Outcome;reason:string|null;startedAt:string|null;completedAt:string|null;confirmedOutage:boolean;endpointRevision:string|null};
+export type Row={unitId:string;name:string;outcome:Outcome;reason:string|null;startedAt:string|null;completedAt:string|null;confirmedOutage:boolean;endpointRevision:string|null;publicationReceipt?:string};
 export type Run={id:string;tenantId:string;rosterRevision:string;startedAt:string;completedAt:string|null;deadlineAt:string;state:'pending'|'completed'|'partial'|'failed';rows:Row[]};
 export type ProbeResult={outcome:'online'|'nonresponse';checkedAt:string;revision:string;confirmedOutage:boolean;publication?:Publication};
 export interface RunStore{
@@ -15,6 +15,7 @@ export interface RunStore{
  claim(candidate:Run):Promise<{run:Run;claimed:boolean}>;
  read(tenantId:string,id:string):Promise<Run|null>;
  save(run:Run):Promise<boolean>;
+ commit?(run:Run,unit:AuditUnit,result:ProbeResult):Promise<Row>;
 }
 export type Dependencies={authorize:(request:Request)=>Promise<Actor>;roster:(actor:Actor)=>Promise<Roster>;store:RunStore;probe:(actor:Actor,endpoint:Endpoint,signal:AbortSignal)=>Promise<ProbeResult>;background:(work:Promise<void>)=>void;now?:()=>number;id:()=>string;budgetMs?:number;concurrency?:number};
 const families=new Set(['Sniper','Sniper ES','Sniper 2','Sniper 2 SA','Sniper 4','Radar - Sniper','Thermal - Sniper','CAM-V']);
@@ -22,8 +23,11 @@ const fingerprint=(u:AuditUnit)=>JSON.stringify([u.id,u.family,u.placement,u.res
 const validEndpoint=(e:Endpoint|null)=>!!e&&['sniper','camv'].includes(e.profile)&&/^\d+$/.test(e.deviceId)&&/^\d+$/.test(e.revision)&&typeof e.ip==='string'&&e.ip.length>0&&Array.isArray(e.ports)&&e.ports.length>0&&e.ports.length<=32&&e.ports.every(p=>Number.isInteger(p)&&p>0&&p<=65535);
 function validateRoster(r:Roster,a:Actor){if(r.tenantId!==a.tenantId||!r.revision||!Array.isArray(r.units)||r.units.length>10000||r.units.some(u=>!u.id||!u.name)||new Set(r.units.map(u=>u.id)).size!==r.units.length)throw Error('Authoritative roster unavailable');}
 const eligibility=(u:AuditUnit)=>u.restricted?'restricted':!u.identityVerified?'identity_unverified':!validEndpoint(u.endpoint)?'no_approved_endpoint':null;
+export function requirePublicationReceipts(run:Run){
+ if(run.rows.some(row=>['online','nonresponse'].includes(row.outcome)&&!/^[1-9]\d*$/.test(row.publicationReceipt||'')))throw Error('Unreceipted check outcome');return run;
+}
 export function summarizeRun(run:Run){return {total:run.rows.length,pending:run.rows.filter(r=>r.outcome==='pending').length,online:run.rows.filter(r=>r.outcome==='online').length,nonresponse:run.rows.filter(r=>r.outcome==='nonresponse').length,unverified:run.rows.filter(r=>r.outcome==='unverified').length};}
-export function runReport(run:Run){return ['Avigilon Field endpoint checks','Run: '+run.id,'State: '+run.state,'Started: '+run.startedAt,'Completed: '+(run.completedAt||'Pending'),'TCP service reachability; does not verify video or every camera.',...run.rows.map(r=>[r.name,r.outcome,r.reason||'',r.completedAt||'Pending',r.confirmedOutage?'Outage confirmed':'Outage not confirmed'].join(' | '))].join('\n');}
+export function runReport(run:Run){return ['Avigilon Field endpoint checks','Run: '+run.id,'State: '+run.state,'Started: '+run.startedAt,'Completed: '+(run.completedAt||'Pending'),'TCP service reachability; expected camera coverage unknown; video not verified.',...run.rows.map(r=>[r.name,r.outcome,r.reason||'',r.completedAt||'Pending',r.confirmedOutage?'Outage confirmed':'Outage not confirmed',r.publicationReceipt?'Publication receipt: '+r.publicationReceipt:'No publication receipt'].join(' | '))].join('\n');}
 export function createAvigilonCheckRuns(d:Dependencies){
  const now=d.now||Date.now,budget=Math.min(90000,Math.max(1,d.budgetMs??45000)),concurrency=Math.min(8,Math.max(1,d.concurrency??4));
  const auth=async(request:Request)=>{const a=await d.authorize(request);if(!a?.tenantId||!a.actorId||a.canCheck!==true)throw Error('Existing Owner or IT check permission required');return a;};
@@ -47,10 +51,12 @@ export function createAvigilonCheckRuns(d:Dependencies){
     if(!['online','nonresponse'].includes(result.outcome)||result.revision!==original.endpoint!.revision||!Number.isFinite(Date.parse(result.checkedAt))||Date.parse(result.checkedAt)<Date.parse(row.startedAt!)||Date.parse(result.checkedAt)>now()||typeof result.confirmedOutage!=='boolean')throw Error('invalid_checker_result');
     // Native run leases and legacy camera health are currently in separate DBs.
     // Never emulate an atomic publication fence with two sequential RPC calls.
-    if(result.publication)throw Error('atomic_publication_unavailable');
+    if(!result.publication||!d.store.commit)throw Error('atomic_publication_unavailable');
     if(closed||controller.signal.aborted||remaining()<=0)return;
-    row.outcome=result.outcome;row.completedAt=result.checkedAt;row.confirmedOutage=result.outcome==='nonresponse'&&result.confirmedOutage;
-   }catch(error){if(closed||controller.signal.aborted)return;row.outcome='unverified';row.reason=error instanceof Error&&['endpoint_or_roster_changed','invalid_checker_result','atomic_publication_unavailable'].includes(error.message)?error.message:'checker_unavailable';row.completedAt=new Date(now()).toISOString();}
+    const receipt=await d.store.commit(structuredClone(run),original,result);
+    if(typeof receipt?.publicationReceipt!=='string'||!/^[1-9]\d*$/.test(receipt.publicationReceipt)||typeof receipt.confirmedOutage!=='boolean'||receipt.outcome==='online'&&receipt.confirmedOutage||receipt.unitId!==row.unitId||receipt.endpointRevision!==original.endpoint!.revision||receipt.outcome!==result.outcome||receipt.completedAt!==result.checkedAt)throw Error('invalid_publication_receipt');
+    Object.assign(row,receipt);
+   }catch(error){if(closed||controller.signal.aborted)return;row.outcome='unverified';row.reason=error instanceof Error&&['endpoint_or_roster_changed','invalid_checker_result','atomic_publication_unavailable','invalid_publication_receipt'].includes(error.message)?error.message:'checker_unavailable';row.completedAt=new Date(now()).toISOString();}
    if(!await save()){closed=true;controller.abort();return;}
   }};
   try{
@@ -71,7 +77,7 @@ export function createAvigilonCheckRuns(d:Dependencies){
    if(result.claimed)d.background(execute(actor,roster,structuredClone(result.run)));
    return {run:result.run,coalesced:!result.claimed};
   },
-  async read(request:Request,id:string){const actor=await auth(request),run=await d.store.read(actor.tenantId,id);if(!run||run.tenantId!==actor.tenantId)throw Error('Run unavailable');
+  async read(request:Request,id:string){const actor=await auth(request),run=await d.store.read(actor.tenantId,id);if(!run||run.tenantId!==actor.tenantId)throw Error('Run unavailable');requirePublicationReceipts(run);
    // A killed worker must not leave a report pending forever. This read-only
    // projection never invents a completed endpoint check or renews a timestamp.
    if(run.state==='pending'&&Date.parse(run.deadlineAt)<=now()){

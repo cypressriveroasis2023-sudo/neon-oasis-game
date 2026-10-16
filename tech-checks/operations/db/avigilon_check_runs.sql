@@ -31,11 +31,11 @@ begin
  if run_id is null or p_run->>'tenantId' is distinct from p_tenant::text or p_run->>'state' is distinct from 'pending' or p_run->'completedAt' is distinct from 'null'::jsonb
   or length(coalesce(p_run->>'rosterRevision','')) not between 1 and 256 or started is null or deadline is null or started<clock_timestamp()-interval '30 seconds' or started>clock_timestamp()+interval '5 seconds'
   or deadline<=clock_timestamp() or deadline>started+interval '90 seconds' or jsonb_typeof(p_run->'rows') is distinct from 'array' or jsonb_array_length(p_run->'rows')>1000
-  or exists(select 1 from jsonb_array_elements(p_run->'rows') r where coalesce(r->>'outcome','') not in('pending','unverified') or coalesce(r->>'unitId','')='' or r->'confirmedOutage' is distinct from 'false'::jsonb)
+  or exists(select 1 from jsonb_array_elements(p_run->'rows') r where r ? 'publicationReceipt' or coalesce(r->>'outcome','') not in('pending','unverified') or coalesce(r->>'unitId','')='' or r->'confirmedOutage' is distinct from 'false'::jsonb)
   or (select count(*)<>count(distinct r->>'unitId') from jsonb_array_elements(p_run->'rows') r) then raise exception 'Invalid new check run';end if;
  select r.* into previous from cos_avigilon_checks_private.heads h join cos_avigilon_checks_private.runs r on r.id=h.run_id where h.tenant_id=p_tenant;
  if previous.snapshot->>'state'='pending' and previous.deadline_at>clock_timestamp() and previous.roster_revision=p_run->>'rosterRevision' then return jsonb_build_object('run',previous.snapshot,'claimed',false);end if;
- insert into cos_avigilon_checks_private.runs values(run_id,p_tenant,p_actor,p_run->>'rosterRevision',deadline,p_run);
+ insert into cos_avigilon_checks_private.runs(id,tenant_id,actor_id,roster_revision,deadline_at,snapshot) values(run_id,p_tenant,p_actor,p_run->>'rosterRevision',deadline,p_run);
  insert into cos_avigilon_checks_private.heads values(p_tenant,run_id) on conflict(tenant_id) do update set run_id=excluded.run_id;
  return jsonb_build_object('run',p_run,'claimed',true);
 end $$;
@@ -52,6 +52,12 @@ begin
  select r.* into previous from cos_avigilon_checks_private.heads h join cos_avigilon_checks_private.runs r on r.id=h.run_id
  where h.tenant_id=p_tenant and r.id=(p_run->>'id')::uuid for update of r;
  if not found or previous.actor_id<>p_actor or previous.snapshot->>'state'<>'pending' then return false;end if;
+ if jsonb_typeof(p_run->'rows') is distinct from 'array' or jsonb_array_length(p_run->'rows')<>jsonb_array_length(previous.snapshot->'rows') then raise exception 'Run metadata changed';end if;
+ -- Success is owned by commit_result, never a caller-supplied save. Preserve
+ -- committed rows when another worker saves an older pending snapshot.
+ p_run:=jsonb_set(p_run,'{rows}',(select coalesce(jsonb_agg(case when old.r ? 'publicationReceipt' then old.r else fresh.r end order by old.n),'[]'::jsonb)
+  from jsonb_array_elements(previous.snapshot->'rows') with ordinality old(r,n)
+  join jsonb_array_elements(p_run->'rows') with ordinality fresh(r,n) using(n)));
  if (p_run-array['rows','completedAt','state']) is distinct from (previous.snapshot-array['rows','completedAt','state'])
   or coalesce(p_run->>'state','') not in('pending','completed','partial','failed') or jsonb_typeof(p_run->'rows') is distinct from 'array'
   or jsonb_array_length(p_run->'rows')<>jsonb_array_length(previous.snapshot->'rows') then raise exception 'Run metadata changed';end if;
@@ -59,10 +65,17 @@ begin
   join jsonb_array_elements(p_run->'rows') with ordinality fresh(r,n) using(n)
   where (old.r-array['outcome','reason','startedAt','completedAt','confirmedOutage']) is distinct from (fresh.r-array['outcome','reason','startedAt','completedAt','confirmedOutage'])
    or (old.r->>'outcome'<>'pending' and old.r is distinct from fresh.r)
+   or (fresh.r->>'outcome' in ('online','nonresponse') and not (old.r ? 'publicationReceipt'))
+   or (fresh.r->>'outcome' in ('pending','unverified') and fresh.r->'confirmedOutage' is distinct from 'false'::jsonb)
+   or (fresh.r ? 'publicationReceipt' and not (old.r ? 'publicationReceipt'))
    or coalesce(fresh.r->>'outcome','') not in('pending','online','nonresponse','unverified')
    or (clock_timestamp()>previous.deadline_at and old.r->>'outcome'='pending' and fresh.r->>'outcome' in('online','nonresponse'))
  ) then raise exception 'Stale or invalid run outcome';end if;
  if p_run->>'state'<>'pending' and exists(select 1 from jsonb_array_elements(p_run->'rows') r where r->>'outcome'='pending') then raise exception 'Incomplete terminal run';end if;
+ if p_run->>'state'<>'pending' then
+  p_run:=jsonb_set(p_run,'{state}',to_jsonb(case when exists(select 1 from jsonb_array_elements(p_run->'rows') r where r->>'outcome'='unverified') then
+   case when exists(select 1 from jsonb_array_elements(p_run->'rows') r where r->>'outcome' in ('online','nonresponse')) then 'partial' else 'failed' end else 'completed' end));
+ end if;
  update cos_avigilon_checks_private.runs set snapshot=p_run where id=previous.id;return true;
 end $$;
 revoke all on all functions in schema cos_avigilon_checks_private from public,anon,authenticated,service_role;

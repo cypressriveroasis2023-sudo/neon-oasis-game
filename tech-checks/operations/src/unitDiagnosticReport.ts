@@ -58,6 +58,7 @@ export function unitDiagnosticReport(input:UnitDiagnosticInput):string {
         ...observationLines('Provider',provider,now),
         'Current saved service result: '+serviceEvidenceLabel(savedConnectionObservation(row,now)),
         ...observationLines('Service',service,now));
+      if(row.avigilonPublication&&/^[1-9]\d{0,18}$/.test(row.avigilonPublication.receiptId))lines.push('Native health publication receipt: '+row.avigilonPublication.receiptId);
       if(row.trackerOnly)lines.push('Inventory-only resource: no camera observation is established.');
       if(resourceKind(row)==='recorders')lines.push('Recorder state does not establish camera channel status.');
     }
