@@ -1,3 +1,4 @@
+import '../_shared/avigilonDeployment.ts';
 import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import { resolveStarResources, starResourceStatus } from "./star-resource-identity.js";
 import { unmappedResourceDiagnostics } from "./unmapped-resource-diagnostics.js";

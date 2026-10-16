@@ -1,0 +1,105 @@
+DISABLED DEPLOYMENT CANDIDATE — NOT ACTIVATED OR APPLIED
+
+The shared avigilonDeployment module is code-gated enabled:false. It neither
+reads credentials nor makes calls. Operations imports its optional checks and
+actor-scoped sources; each provider writer imports the same module in its own
+Edge Function isolate. No environment flag or request can activate it.
+
+The reviewed factory requires explicit existing transport, actor, background
+lifecycle and connect bindings. Missing enabled bindings throw synchronously;
+there is no fallback to an unconfigured legacy publisher. The endpoint adapter
+reads admitted native roster/publication evidence, rejects Shop/restricted or
+ambiguous resources, and reports TCP SERVICE REACHABILITY ONLY. Video and camera
+coverage remain unverified. Native commit owns failure accumulation and receipts.
+
+Before activation, verify these existing deployment facts without changing or
+copying credentials into reports:
+- Native project URL and existing service transport availability in each writer.
+- Existing legacy project transport (goqrnolcvqnirjmzaeyk) in Operations.
+- Existing active authorized Owner/IT actor and fixed organization mapping.
+- EdgeRuntime.waitUntil availability and reviewed Deno.connect host binding,
+  including pending-connection resource bounds and lifecycle. The adapter bounds
+  its result promise and closes late sockets; it cannot cancel the underlying
+  native connect operation through the current transport contract.
+- Current installed function bodies, ownership, ACLs, schemas and original manual
+  RPC signatures against this reviewed revision. Missing schema is a separate
+  installation blocker; do not treat permissions as installation.
+
+Read-only deployment verification, 2026-10-16 21:44 UTC:
+- Native project tughscoxralhofrckvxy and legacy goqrnolcvqnirjmzaeyk are
+  existing active projects. All 25 native fence source tables and all seven
+  legacy source/evidence tables required by the reviewed package exist.
+- Native organization ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5 has one active
+  Owner and two active IT actors satisfying the SQL actor predicate. No new
+  account or role is required. The chosen scheduler actor must be explicitly
+  bound and revalidated at cutover; never select an arbitrary visitor.
+- No cos_avigilon_* functions are installed in either project. Permissions
+  cannot repair this absence. Existing manual legacy RPC signatures match the
+  dynamic argument-binding approach, including placement expected audit/request
+  IDs and connection expected revision/etag/ports.
+- Operations v96 source has no reviewed runtime or deployment bootstrap.
+  Its declared SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY belong to its native
+  project. Provider writers' same variable names refer to their legacy project.
+  These names are NOT interchangeable cross-project bindings. No credential
+  values were retrieved, printed or copied. Existing cross-project transport
+  availability is not established by source-code references alone.
+
+Production dependency order:
+1. Complete latest-head code checks and independent review; preserve baseline.
+2. Stage coordinated DISABLED code to Operations and all five writer isolates;
+   verify versions and unchanged legacy behavior. Do not install the legacy
+   source guard while legacy writers continue uncoordinated: it seals writes
+   immediately and would interrupt provider updates and manual source actions.
+3. Prepare a controlled cutover with writer traffic quiescent and queued work
+   retained. Verify existing cross-project transports, selected active actor,
+   and native connection lifecycle/resource bounds before any activation.
+   Install native reviewed SQL in dependency order: avigilon_check_runs.sql,
+   avigilon_check_run_boundary.sql, avigilon_health_publication.sql,
+   avigilon_health_boundary.sql, avigilon_source_operations.sql, then
+   avigilon_native_source_fences.sql. Install avigilon_legacy_source_guard.sql
+   only within this coordinated cutover. These files include security-definer
+   boundaries and triggers; their installation requires explicit security-change
+   approval, even though all wrappers start postgres-only. Snapshot definitions,
+   ACLs and affected state, use exact preconditions, and re-read every result.
+4. Obtain action-time approval for exactly these service_role EXECUTE grants:
+   Native existing project:
+   cos_avigilon_run_claim(uuid,uuid,jsonb)
+   cos_avigilon_run_read(uuid,uuid,uuid)
+   cos_avigilon_run_save(uuid,uuid,jsonb)
+   cos_avigilon_run_commit(uuid,uuid,jsonb)
+   cos_avigilon_health_read(uuid,uuid)
+   cos_avigilon_source_control(uuid,uuid,text,jsonb)
+   Legacy existing project:
+   cos_avigilon_source_apply(jsonb)
+   cos_avigilon_source_seal()
+   cos_avigilon_source_cancel(jsonb)
+   Use the guarded native/legacy permission scripts only after verifying exact
+   definitions and preimage ACLs. No anon/authenticated/PUBLIC or direct private
+   schema/table grants, new credentials, role changes or permission expansion.
+5. Review the explicit activation code/bindings and coordinated server versions.
+   Keep the approved writer pause through installation, ACL readback, grants,
+   explicit actor/binding activation and initial authority admission. Never enable
+   readers with unmigrated writers. Activation is a separate production step.
+6. Verify actual native receipt publication/readback and latest source generation,
+   failed-refresh clearing, placement preservation and consistent Fleet/detail
+   service evidence. Do not certify video or full inventory synchronization from
+   a responding endpoint or a successful code deployment. Resume only migrated
+   writers after initial admission and receipt/readback checks pass; preserve
+   queued events and keep failed cutover closed rather than restoring an unsafe
+   uncoordinated writer against sealed tables.
+
+Static publication: the checked-in GitHub Pages smoke workflow verifies published
+bytes against the merged commit. Passing GitHub Actions does not deploy Supabase
+Edge Functions or grant the runtime access. Existing Pages/Cloudflare settings
+and actual production edge versions must be read before using their controls.
+
+Unresolved activation gates, with required next evidence:
+- Existing cross-project authenticated transports in each isolate: inspect
+  deployment binding presence through an authorized metadata-only route. Do not
+  create/copy persistent credentials to fill the gap without action-time approval.
+- All SQL installation and nine grants: exact reviewed bundle, hashes, before/after
+  ACLs and cutover approval. No grants or schema changes have been applied.
+- Selected scheduler actor and native Deno.connect lifecycle bounds: explicit
+  binding review and controlled runtime verification, not a public health probe.
+- Coordinated writer pause/resume and rollback: verify original function versions,
+  retain queued events, and prevent fallback to unfenced writers after sealing.
