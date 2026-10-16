@@ -87,7 +87,8 @@ test('recorded provider synchronization failure stays review even with fresh old
 test('interrupted/overlapping verification records only the latest attempt result independently of view navigation',async()=>{
  const html=file('camera-health.html'),start=html.indexOf('async function verifyDiagnosticDevices('),end=html.indexOf('function directEvidence(d)',start);
  const failures=new Set(),pending=new Set(),versions=new Map(),runs=[];
- const verify=new Function('unitDiagnosticFailures','unitDiagnosticPending','unitVerificationVersions','freshDeviceChecks',html.slice(start,end)+';return verifyDiagnosticDevices;')(failures,pending,versions,()=>new Promise((resolve,reject)=>runs.push({resolve,reject})));
+ const verify=new Function('unitDiagnosticFailures','unitDiagnosticPending','unitVerificationVersions','freshDeviceChecks','unitDiagnosticRequest',html.slice(start,end)+';return verifyDiagnosticDevices;')(failures,pending,versions,(_devices,request)=>{assert.equal(request,7);return new Promise((resolve,reject)=>runs.push({resolve,reject}));},7);
  const a=verify('A',[]);assert.equal(pending.has('A'),true);runs[0].reject(Error('fixture denied'));await assert.rejects(a);assert.equal(failures.has('A'),true);assert.equal(pending.has('A'),false);
- const oldAttempt=verify('A',[]),latest=verify('A',[]);runs[2].resolve();await latest;runs[1].reject(Error('older result'));await assert.rejects(oldAttempt);assert.equal(failures.has('A'),false);
+ const oldAttempt=verify('A',[]),latest=verify('A',[]);runs[2].resolve(true);await latest;runs[1].reject(Error('older result'));await assert.rejects(oldAttempt);assert.equal(failures.has('A'),false);
+ failures.add('A');const cancelled=verify('A',[]);runs[3].resolve(false);await cancelled;assert.equal(failures.has('A'),true);assert.equal(pending.has('A'),false);
 });
