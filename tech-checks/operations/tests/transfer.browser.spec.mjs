@@ -7,11 +7,22 @@ async function fillUnit(page,tag='001',sim='00123456789012345670'){
  await page.getByLabel('Unit family / name 1',{exact:true}).fill('Sniper');await page.getByLabel('Unit number 1',{exact:true}).fill(tag);await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('2');await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('SD card | 1');
  await page.getByLabel('Equipment photo 1',{exact:true}).setInputFiles(photo);await expect(page.locator('.tc-evidence img')).toBeVisible();
 }
-test('desktop IT opens only Camera Health; old workspace hashes cannot reveal other boards',async({page},info)=>{
+test('desktop IT opens Fleet Map plus Camera Health; unrelated workspaces stay denied',async({page},info)=>{
  await page.setViewportSize({width:1440,height:900});f=await mountTransfers(page);
- const frame=page.frameLocator('#cosITDailyFrame');await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(frame.locator('nav[aria-label="COS Operations"] button')).toHaveCount(1);await expect(frame.locator('nav[aria-label="COS Operations"]')).toHaveText('Camera Health');await expect(page.locator('#legacy')).toBeHidden();await expect(frame.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
- await page.screenshot({path:info.outputPath('IT-desktop-camera-health.png'),fullPage:true});
- for(const route of ['#fleet-dashboard','#unit-tracker','#daily-board','#victron-vrm']){await page.locator('#cosITDailyFrame').evaluate((el,hash)=>el.contentWindow.location.hash=hash,route);await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect.poll(()=>page.locator('#cosITDailyFrame').evaluate(el=>el.contentWindow.location.hash)).toBe('#camera-health');}
+ const frame=page.frameLocator('#cosITDailyFrame');
+ await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ const nav=frame.locator('nav[aria-label="COS Operations"]');
+ await expect(nav.getByRole('button')).toHaveCount(2);
+ await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
+ await expect(page.locator('#legacy')).toBeHidden();
+ await expect(frame.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
+ await page.screenshot({path:info.outputPath('IT-desktop-fleet-map.png'),fullPage:true});
+ for(const route of ['#unit-tracker','#daily-board','#victron-vrm']){
+  await page.locator('#cosITDailyFrame').evaluate((el,hash)=>el.contentWindow.location.hash=hash,route);
+  await expect.poll(()=>page.locator('#cosITDailyFrame').evaluate(el=>el.contentWindow.location.hash)).toBe('#fleet-dashboard');
+  await expect(nav.getByRole('button')).toHaveCount(2);
+ }
  expect(f.errors).toEqual([]);expect(f.calls.some(c=>c.path==='/api/unit-tracker')).toBe(false);
 });
 test('phone IT has check-out/check-in only and creates a recipient-scoped handoff without truck inventory',async({page},info)=>{
