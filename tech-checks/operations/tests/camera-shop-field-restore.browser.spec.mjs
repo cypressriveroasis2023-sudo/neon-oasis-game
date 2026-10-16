@@ -34,7 +34,8 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       const stack=new Error().stack||'';
       const owner=stack.includes('/avigilon-managed-bridge.js')?'bridge':stack.includes('/camera-effective-placement.js')?'display':stack.includes('/camera-placement-controls.js')?'editor':location.pathname==='/tech-checks/operations/dist/index.html'?'map':'unknown';
       const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined));
-      headers.set('X-Synthetic-Read-Owner',owner);window.fixtureReadSignals.push({owner,signal:init?.signal});
+      headers.set('X-Synthetic-Read-Owner',owner);
+      if(owner!=='bridge')window.fixtureReadSignals.push({owner,signal:init?.signal});
       return actualFetch(input,{...init,headers});
     };
     window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadbackMismatch=false;window.fixtureReadCount=0;
