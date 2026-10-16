@@ -3,7 +3,7 @@ import { mountServiceBasics } from './helpers/service-basics-fixture.mjs';
 
 const units = {'Sniper':'SN-0001A','Ranger':'RA-002B','Spotter':'SP-003C','Solar Spotter':'SS-004D'};
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
-async function photos(page){for(const input of await page.locator('[data-daily-photo]').all()){if((await input.getAttribute('data-daily-photo')).endsWith(':2'))continue;await input.setInputFiles(photo);await expect(input.locator('..').locator('img')).toBeVisible();}}
+async function photos(page,skip=''){for(const input of await page.locator('[data-daily-photo]').all()){const key=await input.getAttribute('data-daily-photo');if(key.endsWith(':2')||key===skip)continue;await input.setInputFiles(photo);await expect(input.locator('..').locator('img')).toBeVisible();}}
 const sims = ['00123456789012345670','00123456789012345671','00123456789012345672'];
 async function truck(page) {
   await page.locator('#wlSvcHome [data-wl-svc="inspect"]').click();
@@ -83,9 +83,10 @@ test('one completion saves exact numbers, photos and returns home without anothe
   await page.getByRole('button',{name:'Complete & Send to Ops Manager',exact:true}).click();
   await expect(page.locator('#wlSvcHome [data-wl-service-truck-inventory]')).toContainText('Completed Today');
   await expect(page.locator('[data-daily-delivery-status]')).toContainText('delivery is pending');
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v1').args);
-  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(10);
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v1'))).toHaveLength(1);
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
+  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(15);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(1);
 });
 
 test('short battery quantities keep the truck unready',async({page})=>{
@@ -150,11 +151,11 @@ test('missing photos blocks completion and failed upload preserves the evidence 
   await inventory(page);await fillInventory(page);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('front and rear unit tag photos');
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v1'))).toHaveLength(0);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
   await photos(page);await page.evaluate(()=>fixture.uploadFailure=true);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Photo upload failed');
-  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(10);
+  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(15);
   await page.evaluate(()=>fixture.uploadFailure=false);await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('#wlSvcHome')).toBeVisible();
 });
@@ -177,7 +178,7 @@ test('draft numbers and photos survive reopening inventory and are isolated on a
   await inventory(page);await fillInventory(page);await photos(page);
   await page.locator('#wlSvcTruckInventory [data-wl-home="svc"]').click();
   await page.locator('#wlSvcHome [data-wl-service-truck-inventory]').click();
-  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(10);
+  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(15);
   await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue(sims[0]);
   await page.evaluate(()=>{fixture.actor='synthetic-second-service';dispatchEvent(new CustomEvent('techcheck:data-refreshed'));});
   await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(0);
@@ -191,4 +192,25 @@ test('lost completion response retries sealed evidence without reuploading',asyn
   await page.evaluate(()=>fixture.uploadFailure=true);
   await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('#wlSvcHome')).toBeVisible();
   expect(await page.evaluate(()=>fixture.uploaded.length)).toBe(count);
+});
+
+
+test('three individual SIM cards each require front and back photos',async({page},testInfo)=>{
+  await inventory(page);await fillInventory(page);await photos(page,'SIM Card 3:back');
+  await expect(page.locator('[data-daily-photo^="SIM cards:"]')).toHaveCount(0);
+  for(let n=1;n<=3;n++){
+    const group=page.getByRole('group',{name:'SIM Card '+n,exact:true});
+    await expect(group.getByLabel('SIM Card '+n+' Front photo',{exact:true})).toBeVisible();
+    await expect(group.getByLabel('SIM Card '+n+' Back photo',{exact:true})).toBeVisible();
+  }
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('back photo for SIM Card 3');
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
+  await page.locator('[data-daily-photo="SIM Card 3:back"]').setInputFiles(photo);
+  await expect(page.locator('[data-daily-photo="SIM Card 3:back"]').locator('..').locator('img')).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('individual-sim-cards.png'),fullPage:true});
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
+  expect(saved.p_photos.filter(p=>p.category.startsWith('SIM Card ')).map(p=>p.category+':'+p.view).sort()).toEqual([1,2,3].flatMap(n=>['SIM Card '+n+':back','SIM Card '+n+':front']).sort());
 });
