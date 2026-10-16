@@ -79,8 +79,10 @@ export function projectCombinedFleetRoster(snapshot:Row,audits:Row[],identity?:R
  if(upload.contract!=='COS_MHELP_UPLOAD_INVENTORY_V1'||!Array.isArray(upload.records)||!Number.isFinite(time(upload.receivedAt)))throw Error('Invalid combined roster source');
  const tracker=checkedTracker(upload),byId=new Map<string,Row>();
  const trackerOnlyIds=new Set<string>(tracker?.records.filter(r=>r.matchedProductId===null).flatMap(r=>r.binding.unitIds)||[]);
+ const rowCutoffs=new Map<string,number>();
+ for(const r of upload.records){if(r.observedAt!==undefined&&!Number.isFinite(time(r.observedAt)))throw Error('Invalid source record timestamp');for(const id of r.binding?.unitIds||[])rowCutoffs.set(id,time(r.observedAt||upload.receivedAt));}
  const inventory:Row[]=snapshot.inventoryItems.map((row:Row)=>{
-  const cutoff=tracker&&trackerOnlyIds.has(row.id)?time(tracker.source.observedAt):time(upload.receivedAt);
+  const cutoff=tracker&&trackerOnlyIds.has(row.id)?time(tracker.source.observedAt):(rowCutoffs.get(row.id)??time(upload.receivedAt));
   if(!unseenSourceConflict(row,cutoff,audits,identity))return row;
   const reason='A newer confirmed primary-source assignment conflicts with protected saved placement; review the current assignment.';
   return {...withoutPoint(row),placement:'UNKNOWN',currentLocationType:'unknown',placementReviewReason:reason,effectivePlacement:{...row.effectivePlacement,state:'unknown',freshness:'review',reason}};
@@ -89,7 +91,7 @@ export function projectCombinedFleetRoster(snapshot:Row,audits:Row[],identity?:R
  const used=new Map<string,string>(),records:Row[]=[],products=new Set<string>();
  const currentMembership=new Set<string>(tracker?.records.flatMap(r=>[...r.binding.unitIds,...(r.binding.candidateUnitIds||[])])||[]);
  const cutoff=time(upload.receivedAt);
- const strongerCurrent=(row:Row)=>row.placementSource==='owner'&&(!Number.isFinite(time(row.placementUpdatedAt))||time(row.placementUpdatedAt)>=cutoff)||protectedHistory(row,audits,cutoff,identity)||row.hasUnitGps===true||Boolean(row.installedSiteId)||newerPrimary(row,cutoff)||Boolean(currentSourceMarker(row,cutoff));
+ const strongerCurrent=(row:Row,cutoff=time(upload.receivedAt))=>row.placementSource==='owner'&&(!Number.isFinite(time(row.placementUpdatedAt))||time(row.placementUpdatedAt)>=cutoff)||protectedHistory(row,audits,cutoff,identity)||row.hasUnitGps===true||Boolean(row.installedSiteId)||newerPrimary(row,cutoff)||Boolean(currentSourceMarker(row,cutoff));
  const claim=(ids:string[],recordId:string)=>{for(const id of ids){if(used.has(id)&&used.get(id)!==recordId)throw Error('Conflicting combined source identities');used.set(id,recordId);}};
  const common=(r:Row)=>({unitNumber:r.unitNumber,category:r.category||null,customer:r.customer||null,sourceAddress:r.sourceAddress||null,reviewReason:null});
  const sourceItem=(r:Row,source:string,observedAt:string|null,lifecycle:string,p:string,ids:string[]=[],reason:string|null=null)=>({...common(r),id:source==='current_tracker'&&!r.recordId.startsWith('tracker_row:')?'tracker_row:'+r.recordId.replace(/^tracker:/,''):r.recordId,kind:p==='unknown'?'identity_review':'source_equipment',unitId:null,unit:null,placement:p,lifecycle,active:lifecycle==='active',source,observedAt,productIds:r.productId?[r.productId]:[],sourceRecordIds:[r.recordId],representedUnitIds:ids,reviewReason:reason});
@@ -100,7 +102,7 @@ export function projectCombinedFleetRoster(snapshot:Row,audits:Row[],identity?:R
   const trackerIds=supplemental.flatMap(t=>trackerTargets(t,byId).map(row=>row.id));
   const exactIds=new Set<string>(r.binding.state==='linked'?r.binding.unitIds:[]);
   const proposed=[...new Set<string>([...r.binding.unitIds,...r.binding.candidateUnitIds,...trackerIds])].filter(id=>byId.has(id));
-  const protectedCandidates=proposed.filter(id=>!exactIds.has(id)&&strongerCurrent(byId.get(id)!));
+  const protectedCandidates=proposed.filter(id=>!exactIds.has(id)&&strongerCurrent(byId.get(id)!,time(r.observedAt||upload.receivedAt)));
   const ids=proposed.filter(id=>!protectedCandidates.includes(id));
   claim(ids,r.recordId);
   const exactRows=r.binding.state==='linked'?r.binding.unitIds.map((id:string)=>byId.get(id)).filter(Boolean):[];
@@ -108,8 +110,8 @@ export function projectCombinedFleetRoster(snapshot:Row,audits:Row[],identity?:R
   const associationHeld=(!chosen&&exactRows.length>0)||r.binding.placementHeld===true||r.binding.candidateUnitIds.length>0||r.binding.state==='held'&&r.binding.unitIds.length>0;
   if(chosen&&!associationHeld&&protectedCandidates.length===0){
    const chosenLife=r.overlayApplied?lifecycle:rowLife(chosen);
-   records.push(unitItem(chosen,r,'owner_supplied_mhelp_export',upload.receivedAt,chosenLife,ids));
-  }else records.push({...sourceItem(r,'owner_supplied_mhelp_export',upload.receivedAt,lifecycle,associationHeld||protectedCandidates.length?'unknown':placement(r.placement),ids,protectedCandidates.length?'A possible registry association has newer primary-source, Owner or verified-location evidence; resolve identity before counting this source assignment.':associationHeld?r.binding.reason||'Source identity needs review':null),...(associationHeld||protectedCandidates.length?{recordedSourcePlacement:placement(r.placement),candidateUnitIds:proposed,candidatePlacements:proposed.map(id=>({unitId:id,unitNumber:byId.get(id)!.unitNumber,placement:byId.get(id)!.effectivePlacement.state,source:byId.get(id)!.effectivePlacement.source,observedAt:byId.get(id)!.effectivePlacement.observedAt})),identityAssociation:'unresolved'}:{})});
+   records.push(unitItem(chosen,r,'owner_supplied_mhelp_export',r.observedAt||upload.receivedAt,chosenLife,ids));
+  }else records.push({...sourceItem(r,'owner_supplied_mhelp_export',r.observedAt||upload.receivedAt,lifecycle,associationHeld||protectedCandidates.length?'unknown':placement(r.placement),ids,protectedCandidates.length?'A possible registry association has newer primary-source, Owner or verified-location evidence; resolve identity before counting this source assignment.':associationHeld?r.binding.reason||'Source identity needs review':null),...(associationHeld||protectedCandidates.length?{recordedSourcePlacement:placement(r.placement),candidateUnitIds:proposed,candidatePlacements:proposed.map(id=>({unitId:id,unitNumber:byId.get(id)!.unitNumber,placement:byId.get(id)!.effectivePlacement.state,source:byId.get(id)!.effectivePlacement.source,observedAt:byId.get(id)!.effectivePlacement.observedAt})),identityAssociation:'unresolved'}:{})});
  }
  if(tracker)for(const r of tracker.records){
   if(r.matchedProductId!==null){if(!products.has(r.matchedProductId))throw Error('Tracker refers to unavailable primary product');continue;}

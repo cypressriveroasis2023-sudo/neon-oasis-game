@@ -190,7 +190,14 @@ test('front placement confirmation moves shop and field without changing health'
 test('visible folders and global search include deactivated ROOT units without family collisions',async({page})=>{
  await mount(page);await page.evaluate(async()=>{fixtureDevices.push({id:999,unit_key:'SNIPER 312',device_name:'Shop camera 312',organization:'ROOT',activation_state:'deactivated',device_type:'Sniper',source:'2026_unit_tracker'});await load();});
  await page.getByRole('button',{name:'Shop / ROOT folder',exact:true}).click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 312');
- await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await page.getByLabel('Search units').fill('312');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('#boardTitle')).toContainText('Search all inventory');await expect(page.locator('.compact-unit')).toContainText('SHOP / ROOT');
+ await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await page.getByLabel('Search units').fill('312');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('#boardTitle')).toContainText('Search all inventory');const card=page.locator('.compact-unit');
+ await expect(card.locator('.statuspill')).toHaveText('SHOP');await expect(card.locator('.compact-unit-site')).toHaveText('SHOP');
+ await expect(card.locator('.effective-placement')).toContainText('Provider organization: ROOT');await expect(card.locator('.effective-placement')).toContainText('Activation: deactivated');
+ await expect(card.locator('.effective-placement')).toContainText(/No verified equipment link|physical placement unavailable/i);
+ await expect(card.locator('.compact-unit-summary')).toContainText('Shop inventory; excluded from operational outage totals');
+ await expect(card.locator('.compact-unit-summary')).not.toContainText(/online|offline|active shop|verified physical placement|owner-confirmed placement/i);
+ // Existing integration readiness is read-only; no probe, sync or mutation is allowed.
+ for(const call of await page.evaluate(()=>functionCalls))expect(call).toEqual({name:'reconeyez-connect',args:{body:{action:'status'}}});
 });
 
 test('online and offline edges stay bright without selection while stale and shop stay neutral',async({page},info)=>{
