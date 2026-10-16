@@ -78,9 +78,20 @@ async function verify(value) {
 async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
-  if (!permitted) { status(value.preview ? 'Exit the test persona to view the daily tools with your own authorized account. Other IT features are paused until further notice.' : 'Daily view access could not be verified. Other IT features are paused until further notice.', !value.preview); return; }
+  if (!permitted) {
+    status(value.preview ? 'Test IT is a preview persona, not a verified IT account. Sign in with your authorized IT account to use Camera Health or Tech Check.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
+    // Camera Health enforces its own active Owner/IT profile authorization. Do not
+    // mount an equipment transfer desk or request an operations token on failure.
+    const link=document.createElement('a'); link.href='./camera-health.html?itDaily=1';
+    link.textContent='Open Camera Health sign-in'; link.className='btn';
+    root.querySelector('.cos-it-daily-status')?.append(link);
+    return;
+  }
+  // On mobile, camera monitoring is the default. Equipment handoffs are an
+  // explicit Tech Check destination and must pass independent readiness gates.
+  const handoffSelected=value.phone && new URLSearchParams(location.search).get('techCheck')==='handoff';
   let handoffFallback = null;
-  if(value.phone){
+  if(handoffSelected){
     const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
     if(generation!==revision || key(scope())!==key(value) || !root)return;
     if(readiness.ready){root.replaceChildren();const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Opening Camera Health…');void open(value,generation,reason);}});return;}
@@ -94,11 +105,18 @@ async function open(value, generation, handoffFailure = null) {
   }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
+  frame.src=value.phone || (value.role==='it'&&value.id===legacyCameraOnlyIT)
     ? './camera-health.html?itDaily=1'
     : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#camera-health';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
-  root.replaceChildren(...(handoffFallback?[handoffFallback,frame]:[frame]));
+  const entry=document.createElement('nav'); entry.className='cos-it-mobile-entry';
+  if(value.phone){
+    const camera=document.createElement('a');camera.href='./camera-health.html?itDaily=1';camera.textContent='Camera Health';camera.className='btn';
+    const checks=document.createElement('button');checks.type='button';checks.textContent='Tech Check · Equipment handoffs';
+    checks.onclick=()=>{const url=new URL(location.href);url.searchParams.set('techCheck','handoff');location.assign(url.href);};
+    entry.append(camera,checks);
+  }
+  root.replaceChildren(...(value.phone?[entry,...(handoffFallback?[handoffFallback]:[]),frame]:(handoffFallback?[handoffFallback,frame]:[frame])));
   scheduleFrameFit();
 }
 function present() {
