@@ -1213,8 +1213,9 @@ async function addOwnerUnit(){const msg=$('unitManageMsg');msg.textContent='Addi
 async function moveOwnerUnit(forceRoot=false,keyOverride=''){const key=keyOverride||$('moveUnitKey').value;if(!key){alert('Choose a unit.');return false}if(!canEditFieldPlacement())return false;await CameraPlacementControls.open({db,key,placement:forceRoot?'SHOP':'FIELD',onSaved:async()=>{await loadAfterWrite();refreshRemoveUnitOptions();$('unitManageMsg').textContent=key+' placement saved and verified.';}});return false}
 async function removeOwnerUnit(){const key=$('removeUnitKey').value,reason=$('removeUnitReason').value.trim();if(!key){alert('Choose a unit to remove.');return}if(!reason){alert('Enter why this unit is being removed.');return}if(!confirm('Remove '+key+' from Camera Health inventory? This removes every camera component under this unit.'))return;const msg=$('unitManageMsg');msg.textContent='Removing '+key+'…';const {error}=await db.rpc('owner_remove_camera_unit_v1',{p_unit_key:key,p_reason:reason});if(error){msg.textContent='Could not remove unit: '+error.message;return}msg.textContent=key+' removed ✓';await loadAfterWrite();refreshRemoveUnitOptions()}
 let placementView=null,healthPlacementVersion=null;
+function clearDisplayedEvidence(message='Current health unavailable; placement must be verified.'){health={};healthPlacementVersion=null;boardDataReady=false;document.querySelectorAll('.health-kpis b,.scope-review-counts b,.provider-breakdown b').forEach(el=>el.textContent='—');for(const id of ['cameraCoverage','serviceCoverage'])if($(id))$(id).textContent='Current evidence unavailable';if($('unitCards')){$('unitCards').innerHTML='';$('unitCards').hidden=true;$('unitCards').style.display='none';}$('rows')&&($('rows').innerHTML='');if($('deviceTable'))$('deviceTable').style.display='none';if($('empty')){$('empty').style.display='block';$('empty').textContent=message;}if($('screenRefreshStatus'))$('screenRefreshStatus').textContent=message;}
 function refreshEffectivePlacement(){
-  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>devices,onChange:()=>{const version=placementView?.version?.();if(healthPlacementVersion&&version&&version!==healthPlacementVersion){health={};healthPlacementVersion=null;placementView.clear();if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement changed; saved health cleared. Rechecking…';void loadCameraHealth({background:true,consistencyRetry:true});return;}if(boardDataReady){render();if(selectedUnitKey)renderCurrentUnitEvidence();}}});
+  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>devices,onChange:()=>{const version=placementView?.version?.();if(healthPlacementVersion&&version&&version!==healthPlacementVersion){health={};healthPlacementVersion=null;placementView.clear();if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement changed; saved health cleared. Rechecking…';void load({background:true});return;}if(boardDataReady){render();if(selectedUnitKey)renderCurrentUnitEvidence();}}});
   return placementView.refresh();
 }
 // Placement is a second protected read.  Never publish a health receipt beside
@@ -1254,12 +1255,12 @@ loadCameraHealth=async function(options={}){
     let before=null,after=null;
     try{before=await readPlacementVersion();}catch{before=null;}
     if(!before){if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement unavailable; health cleared. Retrying…';continue;}
-    try{await loadCameraHealthRead({...options,deferRender:true});}catch(error){health={};healthPlacementVersion=null;boardDataReady=false;if(attempt===maxAttempts-1)throw error;continue;}
+    try{await loadCameraHealthRead({...options,deferRender:true});}catch(error){clearDisplayedEvidence('Health read failed; saved evidence cleared. Retrying…');if(attempt===maxAttempts-1)throw error;continue;}
     try{after=await readPlacementVersion();}catch{after=null;}
-    if(!after||!CameraEffectivePlacement.versionEqual(before,after)){health={};healthPlacementVersion=null;boardDataReady=false;placementView?.clear();if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement changed; saved health cleared. Rechecking…';continue;}
+    if(!after||!CameraEffectivePlacement.versionEqual(before,after)){clearDisplayedEvidence('Placement changed; saved health cleared. Rechecking…');placementView?.clear();continue;}
     healthPlacementVersion=after;boardDataReady=true;render();refreshOpenUnitDetails();restoreCameraHealthReturnState();applyCameraHealthUrlSearch();renderProviderHealth();restoreUnitDetailsFromUrl();void refreshEffectivePlacement();return;
   }
-  health={};healthPlacementVersion=null;boardDataReady=false;render();
+  clearDisplayedEvidence('Placement could not be verified; saved health cleared.');
 };
 function isShop(d){return CameraHealthOverview.placement(d,trackerMaster)==='shop'}
 function linkedRouter(d){const k=String(d?.unit_key||'').trim().toLowerCase();return routers.find(r=>String(r.unit_key||'').trim().toLowerCase()===k&&(r.router_public_ip||r.unit_ip))||null}

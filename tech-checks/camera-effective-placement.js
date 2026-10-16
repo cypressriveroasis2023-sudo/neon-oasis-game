@@ -132,6 +132,7 @@
     const links=value.status==='ready'&&value.scope==='field'&&value.address?'<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(value.address)+'" target="_blank" rel="noopener noreferrer">Look up recorded installation address ↗</a>':'';
     return '<div class="effective-placement" data-placement-status="'+esc(value.status)+'">'+(includeLocation?'<b>Physical placement: '+esc(locationText(device))+'</b>':'')+'<span>'+esc(value.status==='ready'?value.source:value.reason)+'</span><span>Provider organization: '+esc(device.organization||'not recorded')+' · Activation: '+esc(device.activation_state||'unknown')+'</span>'+links+'</div>';
   }
-  const versionEqual=(a,b)=>a===b;
+  const canonical=value=>{if(typeof value!=='string')return JSON.stringify(value,Object.keys(value||{}).sort());try{const parsed=JSON.parse(value);const sort=v=>Array.isArray(v)?v.map(sort):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;return JSON.stringify(sort(parsed));}catch{return String(value);}};
+  const versionEqual=(a,b)=>canonical(a)===canonical(b);
   root.CameraEffectivePlacement={resolve,create,get,locationText,markup,versionEqual,fieldLabel:device=>{const value=get(device);return value?.status==='ready'?value.unitNumber:device?.unit_key||device?.device_name||'';}};
 })(globalThis);
