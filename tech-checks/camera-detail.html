@@ -348,14 +348,19 @@ async function load(){
   const request=++detailLoadRevision;
   const id=Number(new URLSearchParams(location.search).get('id'));
   if(!Number.isFinite(id)||id<=0)throw new Error('No camera was selected.');
-  const {data:d,error:de}=await db.from('camera_devices').select('*').eq('id',id).single();
-  if(de)throw de;
-  const [{data:h,error:he},{data:hist,error:hi},{data:rs,error:re}]=await Promise.all([
-    db.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle(),
-    db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80),
-    d.unit_key?db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key):Promise.resolve({data:[],error:null})
-  ]);
-  if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
+  const snapshot=await AvigilonManagedBridge.readSnapshot(db,async readDb=>{
+    const {data:d,error:de}=await readDb.from('camera_devices').select('*').eq('id',id).single();
+    if(de)throw de;
+    const [{data:h,error:he},{data:hist,error:hi},{data:rs,error:re}]=await Promise.all([
+      readDb.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle(),
+      readDb.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80),
+      d.unit_key?readDb.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key):Promise.resolve({data:[],error:null})
+    ]);
+    if(he)throw new Error('Health data load failed: '+he.message);
+    return {devices:[d],healthRows:h?[h]:[],hist,hi,rs,re};
+  });
+  const {devices:[d],healthRows, hist,hi,rs,re}=snapshot,h=healthRows[0];
+  if(hi)console.warn(hi);if(re)console.warn(re);
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   device=d;current=h||{};events=hist||[];unitRouters=rs||[];
   $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
@@ -373,7 +378,7 @@ async function verifyNow(){
     }
     if(['sniper','camv'].includes(String(device.monitoring_profile||'').toLowerCase())){
       const run=await AvigilonManagedBridge.create(db).checkManaged();
-      if(run){let details=document.getElementById('nativeRunReport');if(!details){details=document.createElement('details');details.id='nativeRunReport';const summary=document.createElement('summary');summary.textContent='Native Field check report';const text=document.createElement('textarea');text.setAttribute('aria-label','Native Field check report');text.readOnly=true;text.rows=12;details.append(summary,text);b.parentElement.after(details);}details.open=true;details.querySelector('textarea').value='Run '+run.id+' · '+run.state+'\nService reachability only; video/channel coverage unknown. Shop excluded.\n'+run.rows.map(row=>row.name+': '+row.outcome+' · '+(row.publicationReceipt?'receipt '+row.publicationReceipt:row.reason||'unverified')).join('\n');b.textContent='Native check '+run.state;return;}
+      if(run){await load();let details=document.getElementById('nativeRunReport');if(!details){details=document.createElement('details');details.id='nativeRunReport';const summary=document.createElement('summary');summary.textContent='Native Field check report';const text=document.createElement('textarea');text.setAttribute('aria-label','Native Field check report');text.readOnly=true;text.rows=12;details.append(summary,text);b.parentElement.after(details);}details.open=true;details.querySelector('textarea').value='Run '+run.id+' · '+run.state+'\nService reachability only; video/channel coverage unknown. Shop excluded.\n'+run.rows.map(row=>row.name+': '+row.outcome+' · '+(row.publicationReceipt?'receipt '+row.publicationReceipt:row.reason||'unverified')).join('\n');b.textContent='Native check '+run.state;return;}
     }
     if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
     if(cameraGroup(device)!=='Vigilant'&&!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');

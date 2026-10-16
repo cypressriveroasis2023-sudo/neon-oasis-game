@@ -8,12 +8,26 @@ function fixture(features={avigilonSourceWrites:true,freshAvigilonChecks:true}){
 }
 test('manual connection RPC uses native actor boundary, preserves original arguments, and never falls back after failure',async()=>{const f=fixture();const args={p_device_id:10,p_public_ip:'8.8.8.8',p_expected_revision:2,p_expected_unit_etag:'etag',p_ports:[443]};assert.equal((await f.bridge.db.rpc('set_camera_unit_connection_v2',args)).data.ok,true);assert.equal(f.legacy.length,0);assert.deepEqual(f.calls[1].body.args,args);assert.equal(f.calls[1].body.name,'set_camera_unit_connection_v2');f.setFail();assert.match((await f.bridge.db.rpc('set_camera_unit_connection_v2',args)).error.message,/network/);assert.equal(f.legacy.length,0);});
 test('disabled native capability preserves existing RPC; managed manual verification requires native receipts',async()=>{const off=fixture({});assert.equal((await off.bridge.db.rpc('owner_remove_camera_unit_v1',{})).data.legacy,true);const f=fixture();const result=await f.bridge.db.functions.invoke('camera-health-check',{body:{device_id:10}});assert.equal(result.data.nativePublication,true);assert.equal(result.data.publicationReceipts[0],'73');assert.equal(f.legacy.length,0);f.dropReceipt();assert.match((await f.bridge.db.functions.invoke('camera-health-check',{body:{device_id:10}})).error.message,/receipt missing/);assert.equal(f.legacy.length,0);});
-test('legacy detail health reads use native receipts and clear stale managed health when no current receipt exists',async()=>{
- let present=true;const legacy={camera_device_id:10,checked_at:'old',overall_status:'online',port_status:{443:{online:true}}};
- const query={select(){return this;},eq(){return this;},maybeSingle(){return this;},then(resolve){return Promise.resolve({data:legacy,error:null}).then(resolve);}};
+test('standalone managed health reads fail closed because identity must be loaded in the same generation',async()=>{
+ const query={select(){return this;},eq(){return this;},maybeSingle(){return this;},then(resolve){return Promise.resolve({data:{camera_device_id:10,overall_status:'online'},error:null}).then(resolve);}};
  const db={auth:{getSession:async()=>({data:{session:{access_token:'synthetic'}}})},from:()=>query};
- const fetch=async(url,o)=>{const {path}=JSON.parse(o.body);return Response.json(path==='/api/session'?{features:{freshAvigilonChecks:true}}:{evidenceVersion:2,avigilonAuthority:{admitted:true},rows:[{id:10,connection:{publicIp:'8.8.8.8'},avigilonPublication:present?{receiptId:'73',endpointRevision:'2'}:null,serviceEvidence:{observedAt:'2026-10-16T12:00:00Z',status:'online',reachable:true,confirmedOutage:false,consecutiveFailures:0}}]});};
+ const fetch=async()=>Response.json({features:{freshAvigilonChecks:true}});
  const context={fetch,crypto:{randomUUID:()=>''},setTimeout,Date};vm.runInNewContext(source,context);const bridge=context.AvigilonManagedBridge.create(db,fetch);
- const first=await bridge.db.from('camera_health_current').select('*').eq('camera_device_id',10).maybeSingle();assert.equal(first.data.native_publication_receipt,'73');assert.equal(first.data.port_status._connection.revision,'2');assert.equal(first.data.port_status['443'],undefined);
- present=false;const failed=await bridge.db.from('camera_health_current').select('*').eq('camera_device_id',10).maybeSingle();assert.equal(failed.data.overall_status,'unknown');assert.equal(failed.data.checked_at,null);assert.equal(failed.data.native_publication_receipt,null);
+ const result=await bridge.db.from('camera_health_current').select('*').eq('camera_device_id',10).maybeSingle();
+ assert.equal(result.data,null);assert.match(result.error.message,/identity and health together/);
+});
+
+test('legacy invocation decorators cannot recurse through the guarded functions proxy',async()=>{
+ const f=fixture({});let decorated=0;const invoke=f.bridge.db.functions.invoke;
+ f.bridge.db.functions.invoke=async(...args)=>{decorated++;if(decorated>2)throw Error('Legacy decorator recursion');return invoke(...args);};
+ const result=await f.bridge.db.functions.invoke('camera-health-check',{body:{device_id:10}});
+ assert.equal(result.error,undefined);assert.equal(result.data.legacy,true);assert.equal(f.legacy.length,1);assert.equal(decorated,1);
+});
+test('disabled native checks preserve legacy calls without identity lookups; denied checks never fall back',async()=>{
+ let reads=0,legacy=0,denied=false;
+ const db={auth:{getSession:async()=>({data:{session:{access_token:'synthetic-only'}}})},from(){reads++;throw Error('Disabled native reader must not run');},functions:{invoke:async()=>{legacy++;return {data:{legacy:true},error:null};}}};
+ const fetch=async()=>denied?Response.json({error:'Initiating actor revoked'},{status:403}):Response.json({features:{freshAvigilonChecks:false}});
+ const context={fetch,setTimeout,Date};vm.runInNewContext(source,context);const bridge=context.AvigilonManagedBridge.create(db,fetch);
+ assert.equal((await bridge.db.functions.invoke('camera-health-check',{body:{device_id:10}})).data.legacy,true);assert.equal(reads,0);assert.equal(legacy,1);
+ denied=true;const result=await bridge.db.functions.invoke('camera-health-check',{body:{device_id:10}});assert.match(result.error.message,/actor revoked/);assert.equal(legacy,1);assert.equal(reads,0);
 });
