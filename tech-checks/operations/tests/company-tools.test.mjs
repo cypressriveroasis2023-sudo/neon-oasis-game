@@ -1,3 +1,4 @@
+// 2026-10-16 reviewed retained-native authority fencing, canonical placement comparisons, bounded retries and immediate failed-read clearing; native actual-page and placement regressions cover saved-location retention.
 // 2026-10-16 reviewed complete identity/health snapshot fence, guarded-control disablement, contextual Spotter inventory aliases and Witness not-checked presentation; focused actual-page regressions preserve source labels and service evidence.
 // 2026-10-16 reviewed placement-version fence: a placement change during the protected health read clears the receipt and reloads before totals render.
 // 2026-10-16 candidate receipt-backed Avigilon bridge and manual report; covered by managed-bridge/manual browser tests.
@@ -27,14 +28,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "1f14b8460c6284618855e43ed05c6449a1f91d9d4bfc4272b1313773418032b2",
-  "camera-detail": "96e41b092da36f010489a3652213f5b9eb994ee8f308c28387a3a24798e363f5",
+  "camera-health": "8ba7aa423347b8267df9ba9e9e4f46934388df34ad8a2ebfd51ebd84f7ebc054",
+  "camera-detail": "aee2a2ce6b62f0f58704e201643193353fcf0fc311e4ce18e1255c58307a44c9",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "09bb0f0b19c552d36ccb5a51de9271af2fda3cdc57d426b6a6483f06c64f7d4f",
-  "camera-detail": "866df43b1a1bfe578c8a9720bdf5f1bdaf93a3f738b78557ab147f4a49702e7c",
+  "camera-health": "3ada9100d88d7ee001f748a6c1685f6133cc6b848828d847d0e9a1612ec09c0c",
+  "camera-detail": "39d1469224c1e4cad455bcb351f75560ef2f1329a22e4be2059f0189299e3246",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
