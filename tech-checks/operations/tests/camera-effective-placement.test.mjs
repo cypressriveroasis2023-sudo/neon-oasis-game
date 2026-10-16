@@ -74,3 +74,23 @@ test('superseded display cleanup keeps the draining barrier until the old bodies
  assert.equal(signals.length,2);assert.ok(signals.every(signal=>signal.aborted));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');releases.forEach(resolve=>resolve());await new Promise(resolve=>setTimeout(resolve,0));assert.equal(view.get(c.fixtureDevices[0]).status,'unavailable');
  const newer=view.refresh();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(signals.length,4);assert.ok(signals.slice(2).every(signal=>!signal.aborted));releases.slice(2).forEach(resolve=>resolve());await newer;assert.equal(view.get(c.fixtureDevices[0]).status,'ready');view.dispose();
 });
+test('canonical source fence rejects split map/summary authority and compares retained native authority',()=>{
+ const c=fixture(),api=c.CameraEffectivePlacement,s=c.snapshotFixture(),h=c.healthFixture();
+ const a={contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'tenant',generation:'1',rosterRevision:'roster',admitted:true};
+ s.avigilonAuthority={...a};h.avigilonAuthority={...a};const v=api.sourceVersion(s,h);
+ assert.equal(api.authorityMatches(v,a),true);assert.equal(api.authorityMatches(v,{...a,generation:'2'}),false);assert.equal(api.authorityMatches(v,null),false);
+ h.avigilonAuthority={...a,generation:'2'};assert.throws(()=>api.sourceVersion(s,h),/authority changed/);
+ h.avigilonAuthority={...a,admitted:false};assert.throws(()=>api.sourceVersion(s,h),/authority changed/);
+ delete h.avigilonAuthority;assert.throws(()=>api.sourceVersion(s,h),/authority changed/);
+});
+test('canonical source comparison ignores recursive key order but detects inventory placement changes',()=>{
+ const c=fixture(),api=c.CameraEffectivePlacement,s=c.snapshotFixture(),h=c.healthFixture();
+ const a={contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'tenant',generation:'1',rosterRevision:'roster',admitted:true};s.avigilonAuthority=a;h.avigilonAuthority=a;
+ const before=api.sourceVersion(s,h);const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).reverse().map(k=>[k,reorder(v[k])])):v;
+ assert.equal(api.versionEqual(before,api.sourceVersion(reorder(s),reorder(h))),true);
+ s.inventoryItems[0].address='Changed location';assert.equal(api.versionEqual(before,api.sourceVersion(s,h)),false);assert.equal(api.versionEqual(null,null),false);
+});
+test('explicit invalidation removes authority immediately while retaining saved location as stale',async()=>{
+ const c=fixture();c.fetch=async(_u,o)=>({ok:true,json:async()=>JSON.parse(o.body).path==='/api/field-map'?c.snapshotFixture():c.healthFixture()});
+ const api=c.CameraEffectivePlacement,v=api.create({db:c.supabase.createClient(),getDevices:()=>c.fixtureDevices});await v.refresh();assert.equal(v.state(),'ready');assert.ok(v.version());v.invalidate();assert.equal(v.version(),null);assert.equal(v.state(),'stale');assert.match(api.locationText(c.fixtureDevices[0]),/10 Source Road/);v.dispose();
+});

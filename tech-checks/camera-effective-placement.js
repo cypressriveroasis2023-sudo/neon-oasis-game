@@ -15,9 +15,25 @@
   const signature=ds=>stable(ds.map(d=>[id(d.id),d.unit_key||'',d.activation_source||'',d.organization||'']).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const maxAge=20*60*1000;
+  const validAuthority=a=>object(a)&&a.contract==='COS_AVIGILON_AUTHORITY_V1'&&text(a.tenantId)&&typeof a.generation==='string'&&/^[1-9]\d*$/.test(a.generation)&&text(a.rosterRevision)&&a.admitted===true;
+  const authorityKey=a=>validAuthority(a)?[a.contract,a.tenantId,a.generation,a.rosterRevision,a.admitted]:null;
+  const versionEqual=(a,b)=>{try{return a!=null&&b!=null&&stable(typeof a==='string'?JSON.parse(a):a)===stable(typeof b==='string'?JSON.parse(b):b);}catch{return false;}};
+  function sourceVersion(snapshot,health){
+    const mapAuthority=snapshot?.avigilonAuthority,healthAuthority=health?.avigilonAuthority;
+    if(mapAuthority!=null||healthAuthority!=null){
+      if(!validAuthority(mapAuthority)||!validAuthority(healthAuthority)||!versionEqual(authorityKey(mapAuthority),authorityKey(healthAuthority)))throw Error('Map and health authority changed during read.');
+    }
+    if(!Array.isArray(snapshot?.inventoryItems))throw Error('Current inventory unavailable.');
+    const rows=snapshot.inventoryItems.map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null,r.unitNumber??null,r.activeInventoryEligible??null,r.effectivePlacement??null,r.importedInstallation??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+    return stable([snapshot.equipmentMasterVersion??snapshot.inventoryVersion??snapshot.placementVersion??null,snapshot.effectivePlacementVersion??null,snapshot.placementProjectionVersion??null,rows,authorityKey(healthAuthority)]);
+  }
+  function authorityMatches(version,nativeAuthority){
+    try{const a=JSON.parse(version)[4];return nativeAuthority==null?a===null:validAuthority(nativeAuthority)&&versionEqual(a,authorityKey(nativeAuthority));}catch{return false;}
+  }
   let client=null;
   function resolve(snapshot,health,devices,{partial=false,now=Date.now()}={}){
     const fail=message=>{throw new Error(message);};
+    sourceVersion(snapshot,health);
     const date=Date.parse(snapshot?.generatedAt||'');
     if(!object(snapshot)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(snapshot.items)||!object(snapshot.summary)||!Number.isFinite(date)||date>now+60000||now-date>maxAge||snapshot.inventoryItems.length>100000||snapshot.items.length>100000)fail('Current Field Map placement is unavailable or stale.');
     const inventory=snapshot.inventoryItems,fields=snapshot.items;
@@ -76,7 +92,7 @@
     return result;
   }
   function create({db,getDevices,onChange=()=>{},partial=false,timeoutMs=15000}){
-    let values=new Map(),status='loading',revision=0,controller=null,loadedAt=0,subject=null,stopped=false,expiryTimer=null,sourceVersion=null;
+    let values=new Map(),status='loading',revision=0,controller=null,loadedAt=0,subject=null,stopped=false,expiryTimer=null,sourceVersionValue=null;
     const emit=()=>{if(!stopped)onChange();};
     const view={
       get(device){
@@ -107,14 +123,16 @@
           };
           const resolved=await Promise.race([run(),new Promise((_,reject)=>{abort=()=>reject(new Error('Placement read cancelled.'));current.signal.addEventListener('abort',abort,{once:true});timer=setTimeout(()=>{current.abort();},timeoutMs);})]);
           if(request!==revision||stopped)return;
-          values=resolved.resolved;const source=resolved.snapshot||{},sourceHealth=resolved.health||{};sourceVersion=stable([source.equipmentMasterVersion??source.inventoryVersion??source.placementVersion??null,source.effectivePlacementVersion??null,source.placementProjectionVersion??null,(source.inventoryItems||[]).map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))),sourceHealth.avigilonAuthority??null]);loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';emit();}},maxAge+1);expiryTimer?.unref?.();
-        }catch{if(request!==revision||stopped)return;status=values.size?'stale':'unavailable';}
+          values=resolved.resolved;sourceVersionValue=sourceVersion(resolved.snapshot,resolved.health);loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';sourceVersionValue=null;emit();}},maxAge+1);expiryTimer?.unref?.();
+        }catch{if(request!==revision||stopped)return;sourceVersionValue=null;status=values.size?'stale':'unavailable';}
         // The sibling transport/body may still be pending after Promise.all rejects.
         // Abort only this captured attempt, never a newer refresh's controller.
         finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);current.abort();if(request===revision)emit();}
       },
-      version(){return sourceVersion;},
-      clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();sourceVersion=null;status='unavailable';subject=null;emit();},
+      version(){return sourceVersionValue;},
+      state(){return status;},
+      invalidate(){++revision;controller?.abort();clearTimeout(expiryTimer);sourceVersionValue=null;status=values.size?'stale':'unavailable';emit();},
+      clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();sourceVersionValue=null;status='unavailable';subject=null;emit();},
       dispose(){stopped=true;view.clear();subscription?.unsubscribe();if(client===view)client=null;}
     };
     const subscription=db.auth.onAuthStateChange?.((_event,session)=>{if(subject&&session?.user?.id!==subject)view.clear();})?.data?.subscription;
@@ -132,7 +150,5 @@
     const links=value.status==='ready'&&value.scope==='field'&&value.address?'<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(value.address)+'" target="_blank" rel="noopener noreferrer">Look up recorded installation address ↗</a>':'';
     return '<div class="effective-placement" data-placement-status="'+esc(value.status)+'">'+(includeLocation?'<b>Physical placement: '+esc(locationText(device))+'</b>':'')+'<span>'+esc(value.status==='ready'?value.source:value.reason)+'</span><span>Provider organization: '+esc(device.organization||'not recorded')+' · Activation: '+esc(device.activation_state||'unknown')+'</span>'+links+'</div>';
   }
-  const canonical=value=>{if(typeof value!=='string')return JSON.stringify(value,Object.keys(value||{}).sort());try{const parsed=JSON.parse(value);const sort=v=>Array.isArray(v)?v.map(sort):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;return JSON.stringify(sort(parsed));}catch{return String(value);}};
-  const versionEqual=(a,b)=>canonical(a)===canonical(b);
-  root.CameraEffectivePlacement={resolve,create,get,locationText,markup,versionEqual,fieldLabel:device=>{const value=get(device);return value?.status==='ready'?value.unitNumber:device?.unit_key||device?.device_name||'';}};
+  root.CameraEffectivePlacement={resolve,create,get,locationText,markup,versionEqual,sourceVersion,authorityMatches,fieldLabel:device=>{const value=get(device);return value?.status==='ready'?value.unitNumber:device?.unit_key||device?.device_name||'';}};
 })(globalThis);
