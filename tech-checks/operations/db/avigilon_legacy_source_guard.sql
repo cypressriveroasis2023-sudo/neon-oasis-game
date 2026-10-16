@@ -25,7 +25,7 @@ do $$declare target text;begin
 end $$;
 create function cos_avigilon_source_private.apply(p_ticket jsonb) returns jsonb language plpgsql set search_path='' as $$
 declare prior cos_avigilon_source_private.receipts; gate cos_avigilon_source_private.control;
- command jsonb; row_data jsonb; target regclass; columns text; projections text; updates text; predicate text; conflict text; result jsonb; routine record; declarations text; named_args text; prior_claims text; results jsonb:='[]'; receipt jsonb; key text;
+ command jsonb; row_data jsonb; target regclass; columns text; projections text; updates text; predicate text; conflict text; result jsonb; routine record; declarations text; named_args text; prior_claims text; prior_claim text; prior_sub text; prior_role text; actor_claims text; results jsonb:='[]'; receipt jsonb; key text;
 begin
  select * into gate from cos_avigilon_source_private.control where singleton for update;
  select * into prior from cos_avigilon_source_private.receipts where id=(p_ticket->>'id')::uuid;
@@ -42,9 +42,18 @@ begin
     if jsonb_typeof(command->'args') is distinct from 'object' or exists(select 1 from jsonb_object_keys(command->'args') k where not k=any(routine.proargnames)) then raise exception 'Invalid guarded RPC arguments';end if;
     select string_agg(format('%I %s',name,format_type(routine.proargtypes[n-1],null)),',' order by n),string_agg(format('%I=>x.%I',name,name),',' order by n) into declarations,named_args from unnest(routine.proargnames) with ordinality as args(name,n) where command->'args'?name;
     prior_claims:=current_setting('request.jwt.claims',true);
-    perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',command->>'legacyActorId')::text,true);
+    prior_claim:=current_setting('request.jwt.claim',true);
+    prior_sub:=current_setting('request.jwt.claim.sub',true);
+    prior_role:=current_setting('request.jwt.claim.role',true);
+    actor_claims:=jsonb_build_object('role','authenticated','sub',command->>'legacyActorId')::text;
+    -- Deployed auth.uid() prefers the scalar sub; auth.jwt() also supports the
+    -- older singular claim. Scope every supported form to the same actor.
+    perform set_config('request.jwt.claims',actor_claims,true),set_config('request.jwt.claim',actor_claims,true),
+     set_config('request.jwt.claim.sub',command->>'legacyActorId',true),set_config('request.jwt.claim.role','authenticated',true);
     execute format('select to_jsonb(public.%I(%s)) from jsonb_to_record($1) as x(%s)',command->>'name',named_args,declarations) into result using command->'args';
-    perform set_config('request.jwt.claims',coalesce(prior_claims,''),true);
+    perform set_config('request.jwt.claims',coalesce(prior_claims,''),true),set_config('request.jwt.claim',coalesce(prior_claim,''),true),
+     set_config('request.jwt.claim.sub',coalesce(prior_sub,''),true),set_config('request.jwt.claim.role',coalesce(prior_role,''),true);
+    if result->'ok' is distinct from 'true'::jsonb then raise exception 'Guarded manual RPC did not confirm success';end if;
    else raise exception 'Unsupported guarded RPC';end if;
    results:=results||jsonb_build_array(result);continue;
   end if;
@@ -101,8 +110,34 @@ revoke all on all functions in schema cos_avigilon_source_private from public,an
 revoke all on function public.cos_avigilon_source_apply(jsonb),public.cos_avigilon_source_seal() from public,anon,authenticated,service_role;
 -- Legacy/manual health publication must not remain a second authoritative path.
 create function cos_avigilon_source_private.reject_managed_health() returns trigger language plpgsql security definer set search_path='' as $$
+declare device jsonb; candidate jsonb:=to_jsonb(new); writer bigint;
 begin
- if exists(select 1 from public.camera_devices where id=new.camera_device_id and monitoring_profile in ('sniper','camv')) then raise exception 'Managed Avigilon checks require native publication receipts';end if;
+ select to_jsonb(d) into device from public.camera_devices d where id=new.camera_device_id and monitoring_profile in ('sniper','camv');
+ if device is not null then
+  select writer_xid into writer from cos_avigilon_source_private.control where singleton;
+  -- The installed camera_connection_invalidate_v1 trigger must still invalidate
+  -- a saved endpoint inside its sealed source transaction. This exception can
+  -- only clear health to unknown; it cannot publish observations or edit links.
+  if writer=txid_current() and pg_trigger_depth()=2 then
+   if tg_table_name='camera_health_history' and tg_op='INSERT'
+    and candidate->>'status'='unknown' and candidate->>'check_source'='saved_connection_changed'
+    and candidate->'detail'->'previous_revision'=device->'connection_revision'
+    and candidate->'detail'->>'new_revision'=((device->>'connection_revision')::bigint+1)::text
+    and candidate->'detail'->>'previous_ip' is not distinct from host((device->>'public_ip')::inet)
+    and candidate->'detail'->'previous_ports'=device->'expected_ports'
+   then return new;end if;
+   if tg_table_name='camera_health_current' and tg_op='UPDATE'
+    and candidate->>'overall_status'='unknown' and candidate->'checked_at'='null'::jsonb
+    and candidate->'ip_reachable'='null'::jsonb and candidate->'port_status'='{}'::jsonb
+    and candidate->'consecutive_failures'='0'::jsonb and candidate->'confirmed_outage'='false'::jsonb
+    and candidate->'confirmation_reason'='null'::jsonb
+    and candidate->>'detail'='Saved connection changed; awaiting a check of the new endpoint.'
+    and candidate-array['overall_status','checked_at','ip_reachable','port_status','consecutive_failures','confirmed_outage','confirmation_reason','detail']
+     =to_jsonb(old)-array['overall_status','checked_at','ip_reachable','port_status','consecutive_failures','confirmed_outage','confirmation_reason','detail']
+   then return new;end if;
+  end if;
+  raise exception 'Managed Avigilon checks require native publication receipts';
+ end if;
  return new;
 end $$;
 do $$declare target text;begin

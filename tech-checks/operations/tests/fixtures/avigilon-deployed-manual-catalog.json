@@ -1,0 +1,1420 @@
+{
+  "projectId": "goqrnolcvqnirjmzaeyk",
+  "capturedAtUtc": "2026-10-16T14:08:56.091Z",
+  "scope": "Read-only pg_proc/pg_get_functiondef, pg_depend, pg_trigger, pg_attribute and pg_constraint snapshot. No provider or application rows. Function bodies do not list all PL/pgSQL dependencies in pg_depend.",
+  "functions": [
+    {
+      "kind": "function",
+      "identity": "app_private.cos_verified_fleet_actor(uuid)",
+      "detail": {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "md5": "2d4bbc04aa46d4d29733fc6b1ec8bab5",
+        "owner": "postgres",
+        "config": [
+          "search_path=\"\""
+        ],
+        "defaults": null,
+        "arguments": "p_user_id uuid",
+        "definition": "CREATE OR REPLACE FUNCTION app_private.cos_verified_fleet_actor(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n select exists(select 1 from public.profiles p where p.user_id=p_user_id\n  and p.active=true and p.archived_at is null and\n  (p.role::text='owner' or (p.role::text='it' and p.user_id in\n   ('4f7044b5-86b6-411f-8898-39bb64b4ddbc'::uuid,'b7cc3cbf-d11e-4d4a-9742-c07701857911'::uuid))))\n$function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "auth.jwt()",
+      "detail": {
+        "acl": "{=X/supabase_auth_admin,postgres=X/supabase_auth_admin,supabase_auth_admin=X/supabase_auth_admin,dashboard_user=X/supabase_auth_admin}",
+        "md5": "20054548ba2003f61a6bcb472175700b",
+        "owner": "supabase_auth_admin",
+        "config": null,
+        "defaults": null,
+        "arguments": "",
+        "definition": "CREATE OR REPLACE FUNCTION auth.jwt()\n RETURNS jsonb\n LANGUAGE sql\n STABLE\nAS $function$\n  select \n    coalesce(\n        nullif(current_setting('request.jwt.claim', true), ''),\n        nullif(current_setting('request.jwt.claims', true), '')\n    )::jsonb\n$function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "auth.uid()",
+      "detail": {
+        "acl": "{=X/supabase_auth_admin,supabase_auth_admin=X/supabase_auth_admin,dashboard_user=X/supabase_auth_admin}",
+        "md5": "ea3b41bf29e2ad573067939329aa088e",
+        "owner": "supabase_auth_admin",
+        "config": null,
+        "defaults": null,
+        "arguments": "",
+        "definition": "CREATE OR REPLACE FUNCTION auth.uid()\n RETURNS uuid\n LANGUAGE sql\n STABLE\nAS $function$\n  select \n  coalesce(\n    nullif(current_setting('request.jwt.claim.sub', true), ''),\n    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')\n  )::uuid\n$function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "owner_add_camera_unit_v1(text,text,integer,text,text,text)",
+      "detail": {
+        "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "md5": "41fd8e2376d01a30173ceb33f13c1705",
+        "owner": "postgres",
+        "config": [
+          "search_path=public, pg_temp"
+        ],
+        "defaults": null,
+        "arguments": "p_unit_key text, p_unit_type text, p_camera_count integer, p_public_ip text, p_organization text, p_reason text",
+        "definition": "CREATE OR REPLACE FUNCTION public.owner_add_camera_unit_v1(p_unit_key text, p_unit_type text, p_camera_count integer, p_public_ip text, p_organization text, p_reason text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare v_actor public.profiles%rowtype; v_key text:=trim(coalesce(p_unit_key,'')); v_type text:=upper(trim(coalesce(p_unit_type,''))); v_reason text:=trim(coalesce(p_reason,'')); v_org text:=nullif(trim(coalesce(p_organization,'')),''); v_ip inet; i int; v_ids bigint[]:='{}'; v_id bigint; v_profile text; v_dtype text;\nbegin\n select * into v_actor from public.profiles where user_id=auth.uid() and active=true and archived_at is null;\n if not found or v_actor.role::text<>'owner' then raise exception 'Owner account required.'; end if;\n if v_key='' then raise exception 'Unit name/number is required.'; end if;\n if v_reason='' then raise exception 'Enter why this unit is being added.'; end if;\n if p_camera_count<1 or p_camera_count>8 then raise exception 'Camera count must be 1 through 8.'; end if;\n if exists(select 1 from public.camera_devices where lower(trim(coalesce(unit_key,'')))=lower(v_key)) then raise exception 'That unit already exists.'; end if;\n if nullif(trim(coalesce(p_public_ip,'')),'') is not null then v_ip:=trim(p_public_ip)::inet; end if;\n v_profile:=case when v_type like 'SNIPER%' then 'avigilon' when v_type like 'CAM V%' then 'avigilon' when v_type like 'HELIOS%' then 'helios' when v_type like 'SOLAR SPOTTER%' then 'solar_spotter' when v_type like 'SPOTTER%' then 'spotter' when v_type like 'RANGER%' then 'ranger' when v_type like 'RECON%' then 'reconeyez' else lower(replace(v_type,' ','_')) end;\n v_dtype:=case when v_type like 'SNIPER%' then 'Avigilon' when v_type like 'CAM V%' then 'Avigilon' else v_type end;\n for i in 1..p_camera_count loop\n  insert into public.camera_devices(device_serial,device_name,device_model,device_type,device_owner,organization,public_ip,vigilant_status,source,monitoring_enabled,tech_check_unit_type,monitoring_profile,activation_state,activation_source,activated_at,unit_key,public_ip_source,public_ip_mapped_at,source_metadata)\n  values('MANUAL-'||replace(v_key,' ','-')||'-CAM'||i,v_key||' Camera '||i,v_dtype,v_dtype,'Cameras Onsite',coalesce(v_org,'root'),v_ip,'Unknown','owner_manual',true,v_type,v_profile,'active','owner_manual',now(),v_key,case when v_ip is null then null else 'owner_manual' end,case when v_ip is null then null else now() end,jsonb_build_object('camera_number',i,'manual_inventory',true))\n  returning id into v_id; v_ids:=array_append(v_ids,v_id);\n end loop;\n insert into public.camera_inventory_audit(actor_id,actor_name,action,unit_key,device_ids,after_state,reason) values(v_actor.user_id,coalesce(v_actor.full_name,v_actor.username,'Owner'),'ADD_UNIT',v_key,v_ids,jsonb_build_object('unit_type',v_type,'camera_count',p_camera_count,'public_ip',p_public_ip,'organization',coalesce(v_org,'root')),v_reason);\n return jsonb_build_object('ok',true,'unit_key',v_key,'added_devices',p_camera_count,'device_ids',v_ids);\nend $function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "owner_remove_camera_unit_v1(text,text)",
+      "detail": {
+        "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "md5": "8e001d5b40d3811432545c823be2ac2d",
+        "owner": "postgres",
+        "config": [
+          "search_path=public, pg_temp"
+        ],
+        "defaults": null,
+        "arguments": "p_unit_key text, p_reason text",
+        "definition": "CREATE OR REPLACE FUNCTION public.owner_remove_camera_unit_v1(p_unit_key text, p_reason text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare v_actor public.profiles%rowtype; v_key text:=trim(coalesce(p_unit_key,'')); v_reason text:=trim(coalesce(p_reason,'')); v_ids bigint[]; v_before jsonb;\nbegin\n select * into v_actor from public.profiles where user_id=auth.uid() and active=true and archived_at is null;\n if not found or v_actor.role::text<>'owner' then raise exception 'Owner account required.'; end if;\n if v_key='' then raise exception 'Unit is required.'; end if;\n if v_reason='' then raise exception 'Enter why this unit is being removed.'; end if;\n select array_agg(id),jsonb_agg(to_jsonb(d)) into v_ids,v_before from public.camera_devices d where lower(trim(coalesce(unit_key,'')))=lower(v_key);\n if coalesce(array_length(v_ids,1),0)=0 then raise exception 'Unit not found.'; end if;\n insert into public.camera_inventory_audit(actor_id,actor_name,action,unit_key,device_ids,before_state,reason) values(v_actor.user_id,coalesce(v_actor.full_name,v_actor.username,'Owner'),'REMOVE_UNIT',v_key,v_ids,v_before,v_reason);\n delete from public.camera_devices where id=any(v_ids);\n return jsonb_build_object('ok',true,'unit_key',v_key,'removed_devices',array_length(v_ids,1));\nend $function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "owner_set_camera_unit_placement_v2(text,text,text,text,text,bigint,uuid)",
+      "detail": {
+        "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "md5": "3c631ed4ac2479f3d9b0125cf92966ec",
+        "owner": "postgres",
+        "config": [
+          "search_path=\"\""
+        ],
+        "defaults": null,
+        "arguments": "p_unit_key text, p_placement text, p_site_label text, p_street_address text, p_reason text, p_expected_audit_id bigint, p_request_id uuid",
+        "definition": "CREATE OR REPLACE FUNCTION public.owner_set_camera_unit_placement_v2(p_unit_key text, p_placement text, p_site_label text, p_street_address text, p_reason text, p_expected_audit_id bigint, p_request_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare actor public.profiles; v_key text:=btrim(coalesce(p_unit_key,'')); v_place text:=upper(btrim(coalesce(p_placement,''))); v_site text:=nullif(btrim(p_site_label),''); v_address text:=nullif(btrim(p_street_address),''); v_reason text:=btrim(coalesce(p_reason,'')); v_ids bigint[]; v_before jsonb; a public.camera_inventory_audit; v_latest bigint; v_id bigint; v_control uuid; v_payload jsonb; v_after jsonb;\nbegin\n select * into actor from public.profiles where user_id=auth.uid() and active=true and archived_at is null;\n if not found or not app_private.cos_verified_fleet_actor(actor.user_id) then raise exception 'Owner account required.' using errcode='42501'; end if;\n if length(v_key) not between 1 and 250 or v_place not in ('FIELD','SHOP') then raise exception 'Choose a camera unit and Field or Shop placement.' using errcode='22023'; end if;\n if length(v_reason) not between 1 and 4000 or p_request_id is null or (p_expected_audit_id is not null and p_expected_audit_id<1) then raise exception 'Reason, request identity and current placement revision are required.' using errcode='22023'; end if;\n if v_place='FIELD' and (coalesce(length(v_site),0) not between 1 and 250 or coalesce(length(v_address),0) not between 1 and 600\n  or lower(v_site) in ('root','shop','shop/root','root/shop','shop / root','root / shop')\n  or lower(v_address) in ('root','shop','shop/root','root/shop','shop / root','root / shop')) then\n  raise exception 'Enter the current field site and installation street address.' using errcode='22023'; end if;\n if v_place='SHOP' and (v_site is not null or v_address is not null) then raise exception 'Shop moves do not replace a field site or address.' using errcode='22023'; end if;\n v_payload:=jsonb_build_object('unit_key',lower(v_key),'placement',v_place,'site_label',v_site,'street_address',v_address,'reason',v_reason,'expected_audit_id',p_expected_audit_id::text);\n -- This release gate also serializes the guarded, pre-first-use rollback.\n perform pg_advisory_xact_lock(702000,2);\n if to_regprocedure('public.owner_set_camera_unit_placement_v2(text,text,text,text,text,bigint,uuid)') is null then\n  raise exception 'Placement controls changed. Reload the camera app.' using errcode='40001';\n end if;\n -- Request lock precedes unit lock to make replay safe even across different unit requests.\n perform pg_advisory_xact_lock(hashtextextended(p_request_id::text,702002));\n select * into a from public.camera_inventory_audit where after_state->>'placement_contract'='COS_CAMERA_PLACEMENT_V2' and after_state->>'request_id'=p_request_id::text order by id desc limit 1;\n if found then\n  if a.actor_id<>actor.user_id or a.after_state->'request_payload' is distinct from v_payload then raise exception 'Request identity was reused with different details.' using errcode='40001'; end if;\n  return jsonb_build_object('ok',true,'unit_key',a.unit_key,'placement',a.after_state->>'placement','site_label',a.after_state->>'site_label','street_address',a.after_state->>'street_address','audit_id',a.id::text,'request_id',p_request_id,'devices_updated',cardinality(a.device_ids),'replayed',true);\n end if;\n perform pg_advisory_xact_lock(hashtextextended(lower(v_key),702001));\n -- Lock source rows before checking the latest audit, including against the existing v1 writer.\n perform id from public.camera_devices where lower(btrim(unit_key))=lower(v_key) order by id for update;\n select array_agg(id order by id),jsonb_agg(to_jsonb(d) order by id) into v_ids,v_before from public.camera_devices d where lower(btrim(unit_key))=lower(v_key);\n if coalesce(cardinality(v_ids),0)=0 then raise exception 'Camera unit not found.' using errcode='P0002'; end if;\n select id into v_latest from public.camera_inventory_audit where lower(btrim(unit_key))=lower(v_key) order by id desc limit 1;\n if v_latest is distinct from p_expected_audit_id then raise exception 'Placement changed. Reload the unit before saving.' using errcode='40001'; end if;\n select coalesce(after_state->>'control_id',after_state->>'request_id')::uuid into v_control from public.camera_inventory_audit\n where lower(btrim(unit_key))=lower(v_key) and after_state->>'placement_contract'='COS_CAMERA_PLACEMENT_V2' order by id asc limit 1;\n v_control:=coalesce(v_control,p_request_id);\n v_after:=jsonb_build_object('control_id',v_control,'placement_contract','COS_CAMERA_PLACEMENT_V2','placement',v_place,'site_label',v_site,'street_address',v_address,'request_id',p_request_id,'request_payload',v_payload,\n  'organization',case when v_place='SHOP' then 'root' else v_site end,'activation_state',case when v_place='SHOP' then 'deactivated' else 'active' end);\n insert into public.camera_inventory_audit(actor_id,actor_name,action,unit_key,device_ids,before_state,after_state,reason)\n values(actor.user_id,coalesce(actor.full_name,actor.username,'Owner'),case when v_place='SHOP' then 'MOVE_TO_ROOT' else 'MOVE_TO_FIELD' end,v_key,v_ids,v_before,v_after,v_reason) returning id into v_id;\n update public.camera_devices set organization=v_after->>'organization',activation_state=v_after->>'activation_state',activation_source='owner_location_override_v2',\n  activated_at=case when v_place='FIELD' then now() else activated_at end,updated_at=now() where id=any(v_ids);\n return jsonb_build_object('ok',true,'unit_key',v_key,'placement',v_place,'site_label',v_site,'street_address',v_address,'audit_id',v_id::text,'request_id',p_request_id,'devices_updated',cardinality(v_ids),'replayed',false);\nend $function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "set_camera_unit_connection_v2(bigint,text,bigint,text,integer[])",
+      "detail": {
+        "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "md5": "464e910ab64a4c8cf8d529ab3b251e1a",
+        "owner": "postgres",
+        "config": [
+          "search_path=pg_catalog, public"
+        ],
+        "defaults": "NULL::integer[]",
+        "arguments": "p_device_id bigint, p_public_ip text, p_expected_revision bigint, p_expected_unit_etag text, p_ports integer[] DEFAULT NULL::integer[]",
+        "definition": "CREATE OR REPLACE FUNCTION public.set_camera_unit_connection_v2(p_device_id bigint, p_public_ip text, p_expected_revision bigint, p_expected_unit_etag text, p_ports integer[] DEFAULT NULL::integer[])\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\ndeclare d public.camera_devices%rowtype; selected public.camera_devices%rowtype; actor public.profiles%rowtype; address inet; ids bigint[]; affected integer; etag text;\nbegin\n select * into actor from public.profiles where user_id=auth.uid() and active=true and archived_at is null;\n if not found or not app_private.cos_verified_fleet_actor(auth.uid()) then raise exception 'Owner or IT account required';end if;\n select * into selected from public.camera_devices where id=p_device_id;\n if not found then raise exception 'Camera device not found';end if;\n if coalesce(trim(selected.unit_key),'') !~* '^(HELIOS|RANGER|SOLAR[ _-]*SPOTTER|SPOTTER|SS[ _-]*HYBRID|SNIPER( +[24])?|CAM *V|RECON( +(II|2))?|RII|RI) *[-#]? *[0-9]+([.][0-9]+)?$' then raise exception 'Unit family mapping required before changing this connection.';end if;\n -- Keep the exact family-qualified unit identity. Never match a bare number or IP.\n perform 1 from public.camera_devices where id=p_device_id or (coalesce(trim(selected.unit_key),'') ~* '^(HELIOS|RANGER|SOLAR[ _-]*SPOTTER|SPOTTER|SS[ _-]*HYBRID|SNIPER( +[24])?|CAM *V|RECON( +(II|2))?|RII|RI) *[-#]? *[0-9]+([.][0-9]+)?$' and lower(trim(unit_key))=lower(trim(selected.unit_key))) order by id for update;\n select * into d from public.camera_devices where id=p_device_id;\n select md5(jsonb_agg(jsonb_build_array(id,connection_revision,public_ip,expected_ports,unit_key) order by id)::text) into etag from public.camera_devices where id=p_device_id or (coalesce(trim(d.unit_key),'') ~* '^(HELIOS|RANGER|SOLAR[ _-]*SPOTTER|SPOTTER|SS[ _-]*HYBRID|SNIPER( +[24])?|CAM *V|RECON( +(II|2))?|RII|RI) *[-#]? *[0-9]+([.][0-9]+)?$' and lower(trim(unit_key))=lower(trim(d.unit_key)));\n if etag is distinct from p_expected_unit_etag then raise exception 'Unit connection changed. Reload before saving.';end if;\n if d.connection_revision is distinct from p_expected_revision or d.unit_key is distinct from selected.unit_key then raise exception 'Connection changed. Reload before saving.';end if;\n begin address:=trim(p_public_ip)::inet;exception when others then raise exception 'Enter a valid public IPv4 address';end;\n if address is null or family(address)<>4 or masklen(address)<>32 or address<<any(array['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.0.0.0/24','192.0.2.0/24','192.168.0.0/16','198.18.0.0/15','198.51.100.0/24','203.0.113.0/24','224.0.0.0/4','240.0.0.0/4']::inet[]) then raise exception 'Enter a public IPv4 host address';end if;\n if p_ports is not null and (cardinality(p_ports)>32 or cardinality(p_ports)=0 or array_position(p_ports,null) is not null or exists(select 1 from unnest(p_ports) p where p<1 or p>65535)) then raise exception 'Enter 1 to 32 valid service ports';end if;\n select array_agg(id order by id) into ids from public.camera_devices where id=p_device_id or (coalesce(trim(d.unit_key),'') ~* '^(HELIOS|RANGER|SOLAR[ _-]*SPOTTER|SPOTTER|SS[ _-]*HYBRID|SNIPER( +[24])?|CAM *V|RECON( +(II|2))?|RII|RI) *[-#]? *[0-9]+([.][0-9]+)?$' and lower(trim(unit_key))=lower(trim(d.unit_key)));\n if exists(select 1 from public.camera_devices where id=any(ids) and public_ip is distinct from d.public_ip) then raise exception 'This unit has conflicting saved endpoints. Resolve the device mapping first.';end if;\n update public.camera_devices set public_ip=address,expected_ports=case when id=p_device_id and p_ports is not null then array(select distinct p from unnest(p_ports) p order by p) else expected_ports end,\n public_ip_source='owner_manual',public_ip_mapped_at=now(),updated_at=now() where id=any(ids);\n get diagnostics affected=row_count;\n update public.equipment_master set tracker_public_ip=address,updated_at=now() where coalesce(trim(d.unit_key),'') ~* '^(HELIOS|RANGER|SOLAR[ _-]*SPOTTER|SPOTTER|SS[ _-]*HYBRID|SNIPER( +[24])?|CAM *V|RECON( +(II|2))?|RII|RI) *[-#]? *[0-9]+([.][0-9]+)?$' and lower(trim(source_label))=lower(trim(d.unit_key));\n select * into d from public.camera_devices where id=p_device_id;\n select md5(jsonb_agg(jsonb_build_array(id,connection_revision,public_ip,expected_ports,unit_key) order by id)::text) into etag from public.camera_devices where id=any(ids);\n return jsonb_build_object('ok',true,'device_id',d.id,'unit_etag',etag,'unit_key',d.unit_key,'public_ip',host(d.public_ip),'expected_ports',coalesce(d.expected_ports,'{}'::integer[]),'connection_revision',d.connection_revision,'camera_rows_updated',affected);\nend $function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "app_private.cos_geocode_normalize_address(text)",
+      "detail": {
+        "md5": "598e366c8f6a758f9344b291ecc6e031",
+        "definition": "CREATE OR REPLACE FUNCTION app_private.cos_geocode_normalize_address(p_address text)\n RETURNS text\n LANGUAGE sql\n IMMUTABLE STRICT\n SET search_path TO ''\nAS $function$\n select lower(btrim(regexp_replace(p_address, U&'[\\0009-\\000D\\0020\\00A0\\1680\\2000-\\200A\\2028\\2029\\202F\\205F\\3000\\FEFF]+', ' ', 'g')))\n$function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "identity": "app_private.cos_geocode_unit_key(text)",
+      "detail": {
+        "md5": "69dda44a02976967aa176221ea25a9bd",
+        "definition": "CREATE OR REPLACE FUNCTION app_private.cos_geocode_unit_key(p_label text)\n RETURNS text\n LANGUAGE sql\n IMMUTABLE STRICT\n SET search_path TO ''\nAS $function$\n select case when length(btrim(p_label)) between 1 and 250 then btrim(p_label) end\n$function$\n"
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "kind": "pg_depend",
+      "identity": "function app_private.cos_verified_fleet_actor(uuid)",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema app_private"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function auth.jwt()",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema auth"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function auth.uid()",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema auth"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_add_camera_unit_v1(text,text,integer,text,text,text)",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema public"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_add_camera_unit_v1(text,text,integer,text,text,text)",
+      "detail": {
+        "deptype": "n",
+        "reference": "language plpgsql"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_remove_camera_unit_v1(text,text)",
+      "detail": {
+        "deptype": "n",
+        "reference": "language plpgsql"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_remove_camera_unit_v1(text,text)",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema public"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_set_camera_unit_placement_v2(text,text,text,text,text,bigint,uuid)",
+      "detail": {
+        "deptype": "n",
+        "reference": "language plpgsql"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function owner_set_camera_unit_placement_v2(text,text,text,text,text,bigint,uuid)",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema public"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function set_camera_unit_connection_v2(bigint,text,bigint,text,integer[])",
+      "detail": {
+        "deptype": "n",
+        "reference": "schema public"
+      }
+    },
+    {
+      "kind": "pg_depend",
+      "identity": "function set_camera_unit_connection_v2(bigint,text,bigint,text,integer[])",
+      "detail": {
+        "deptype": "n",
+        "reference": "language plpgsql"
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "kind": "trigger",
+      "identity": "camera_devices.camera_connection_invalidate_v1",
+      "detail": {
+        "enabled": "O",
+        "function": "camera_connection_invalidate_v1()",
+        "definition": "CREATE TRIGGER camera_connection_invalidate_v1 BEFORE UPDATE ON public.camera_devices FOR EACH ROW EXECUTE FUNCTION camera_connection_invalidate_v1()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.camera_connection_invalidate_v1()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nbegin\n  if row(new.public_ip,new.expected_ports,new.monitoring_profile,new.unit_key,new.monitoring_enabled)\n     is distinct from row(old.public_ip,old.expected_ports,old.monitoring_profile,old.unit_key,old.monitoring_enabled) then\n    insert into public.camera_health_history(camera_device_id,status,check_source,observed_at,detail)\n    values(old.id,'unknown','saved_connection_changed',clock_timestamp(),jsonb_build_object(\n      'actor',auth.uid(),'previous_ip',host(old.public_ip),'new_ip',host(new.public_ip),\n      'previous_ports',old.expected_ports,'new_ports',new.expected_ports,\n      'previous_revision',old.connection_revision,'new_revision',old.connection_revision+1,\n      'previous_last_success',old.last_probe_online_at));\n    new.connection_revision:=old.connection_revision+1;\n    new.last_probe_online_at:=null;\n    if lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then new.last_health_checked_at:=null; end if;\n    update public.camera_health_current set port_status='{}',ip_reachable=null,\n      overall_status=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then 'unknown' else overall_status end,\n      checked_at=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then null else checked_at end,\n      consecutive_failures=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then 0 else consecutive_failures end,\n      confirmed_outage=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then false else confirmed_outage end,\n      confirmation_reason=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then null else confirmation_reason end,\n      detail=case when lower(coalesce(new.monitoring_profile,'')) in ('sniper','camv') then 'Saved connection changed; awaiting a check of the new endpoint.' else detail end\n    where camera_device_id=new.id;\n  else\n    new.connection_revision:=old.connection_revision;\n    -- Older publishers cannot refresh a new endpoint's last-success timestamp.\n    if new.last_probe_online_at is distinct from old.last_probe_online_at\n       and current_setting('cos.connection_publish_device',true) is distinct from new.id::text then\n      new.last_probe_online_at:=old.last_probe_online_at;\n    end if;\n  end if;\n  return new;\nend $function$\n"
+      }
+    },
+    {
+      "kind": "trigger",
+      "identity": "camera_devices.camera_devices_owner_placement_v2",
+      "detail": {
+        "enabled": "O",
+        "function": "enforce_camera_owner_placement_v2()",
+        "definition": "CREATE TRIGGER camera_devices_owner_placement_v2 BEFORE INSERT OR UPDATE OF organization, activation_state, activation_source, unit_key ON public.camera_devices FOR EACH ROW EXECUTE FUNCTION enforce_camera_owner_placement_v2()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.enforce_camera_owner_placement_v2()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare a public.camera_inventory_audit;\nbegin\n select * into a from public.camera_inventory_audit where lower(btrim(unit_key))=lower(btrim(new.unit_key)) order by id desc limit 1;\n if a.after_state->>'placement_contract'='COS_CAMERA_PLACEMENT_V2' and new.id=any(a.device_ids) then\n  new.organization:=a.after_state->>'organization';new.activation_state:=a.after_state->>'activation_state';new.activation_source:='owner_location_override_v2';\n elsif new.activation_source='owner_location_override_v2' then\n  new.activation_source:=null;\n end if;\n return new;\nend $function$\n"
+      }
+    },
+    {
+      "kind": "trigger",
+      "identity": "camera_devices.cos_camera_identity_changed",
+      "detail": {
+        "enabled": "O",
+        "function": "app_private.cos_camera_identity_changed()",
+        "definition": "CREATE TRIGGER cos_camera_identity_changed AFTER INSERT OR DELETE OR UPDATE ON public.camera_devices FOR EACH ROW EXECUTE FUNCTION app_private.cos_camera_identity_changed()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION app_private.cos_camera_identity_changed()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n if tg_op='UPDATE' and row(old.id,old.source,old.device_type,old.external_device_id,old.device_serial,old.unit_key)\n  is not distinct from row(new.id,new.source,new.device_type,new.external_device_id,new.device_serial,new.unit_key) then return new; end if;\n if tg_op in ('UPDATE','DELETE') and old.unit_key is not null then\n  insert into app_private.cos_camera_identity_events(unit_key,camera_device_id) values(old.unit_key,old.id);\n end if;\n if tg_op='INSERT' or (tg_op='UPDATE' and new.unit_key is distinct from old.unit_key) then\n  if new.unit_key is not null then insert into app_private.cos_camera_identity_events(unit_key,camera_device_id) values(new.unit_key,new.id); end if;\n end if;\n if tg_op='DELETE' then return old; end if;\n return new;\nend $function$\n"
+      }
+    },
+    {
+      "kind": "trigger",
+      "identity": "camera_devices.cos_camera_identity_truncated",
+      "detail": {
+        "enabled": "O",
+        "function": "app_private.cos_camera_identity_truncated()",
+        "definition": "CREATE TRIGGER cos_camera_identity_truncated BEFORE TRUNCATE ON public.camera_devices FOR EACH STATEMENT EXECUTE FUNCTION app_private.cos_camera_identity_truncated()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION app_private.cos_camera_identity_truncated()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n insert into app_private.cos_camera_identity_events(unit_key,camera_device_id) select unit_key,id from public.camera_devices where unit_key is not null;\n return null;\nend $function$\n"
+      }
+    },
+    {
+      "kind": "trigger",
+      "identity": "camera_inventory_audit.cos_geocode_queue_after_owner_audit",
+      "detail": {
+        "enabled": "O",
+        "function": "app_private.cos_geocode_enqueue_new_audit()",
+        "definition": "CREATE TRIGGER cos_geocode_queue_after_owner_audit AFTER INSERT ON public.camera_inventory_audit FOR EACH ROW EXECUTE FUNCTION app_private.cos_geocode_enqueue_new_audit()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION app_private.cos_geocode_enqueue_new_audit()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_key text; v_address text;\nbegin\n if new.action::text<>'MOVE_TO_FIELD' or new.after_state->>'placement_contract' is distinct from 'COS_CAMERA_PLACEMENT_V2'\n  or new.after_state->>'placement' is distinct from 'FIELD' then return new; end if;\n if not app_private.cos_verified_fleet_actor(new.actor_id) then return new; end if;\n v_key:=app_private.cos_geocode_unit_key(new.unit_key);\n v_address:=app_private.cos_geocode_normalize_address(new.after_state->>'street_address');\n if v_key is null or v_address is null or length(v_key)>250 or length(v_address) not between 1 and 600 then return new; end if;\n insert into app_private.cos_field_geocode_cache(organization_id,audit_id,unit_key,address,address_sha256)\n values('ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',new.id::text,v_key,v_address,encode(sha256(convert_to(v_address,'UTF8')),'hex'))\n on conflict (organization_id,audit_id) do nothing;\n return new;\nend $function$\n"
+      }
+    },
+    {
+      "kind": "trigger",
+      "identity": "profiles.trg_ensure_service_truck_baseline",
+      "detail": {
+        "enabled": "O",
+        "function": "ensure_service_truck_baseline_trigger_v1()",
+        "definition": "CREATE TRIGGER trg_ensure_service_truck_baseline AFTER INSERT OR UPDATE OF role, active ON public.profiles FOR EACH ROW EXECUTE FUNCTION ensure_service_truck_baseline_trigger_v1()",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.ensure_service_truck_baseline_trigger_v1()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  if new.active=true and new.role::text='service' then\n    perform public.ensure_service_truck_baseline_v1(new.user_id);\n  end if;\n  return new;\nend;\n$function$\n"
+      }
+    }
+  ],
+  "columns": [
+    {
+      "kind": "column",
+      "identity": "camera_devices.activated_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.activation_source",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.activation_state",
+      "detail": {
+        "type": "text",
+        "default": "'active'::text",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.connection_revision",
+      "detail": {
+        "type": "bigint",
+        "default": "0",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.created_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_model",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_name",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_owner",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_serial",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_type",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.device_version",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.expected_ports",
+      "detail": {
+        "type": "integer[]",
+        "default": "'{}'::integer[]",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.external_device_id",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": true,
+        "identity": "d",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.last_health_checked_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.last_online_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.last_online_source_text",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.last_probe_online_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.monitoring_enabled",
+      "detail": {
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.monitoring_profile",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.organization",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.port_labels",
+      "detail": {
+        "type": "jsonb",
+        "default": "'{}'::jsonb",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.public_ip",
+      "detail": {
+        "type": "inet",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.public_ip_mapped_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.public_ip_source",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.source",
+      "detail": {
+        "type": "text",
+        "default": "'vigilant_control_center'::text",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.source_imported_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.source_last_seen_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.source_metadata",
+      "detail": {
+        "type": "jsonb",
+        "default": "'{}'::jsonb",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.source_status",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.tech_check_unit_type",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.unit_key",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.updated_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_devices.vigilant_status",
+      "detail": {
+        "type": "text",
+        "default": "'Unknown'::text",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.action",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.actor_id",
+      "detail": {
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.actor_name",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.after_state",
+      "detail": {
+        "type": "jsonb",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.before_state",
+      "detail": {
+        "type": "jsonb",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.created_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.device_ids",
+      "detail": {
+        "type": "bigint[]",
+        "default": "'{}'::bigint[]",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": true,
+        "identity": "d",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.reason",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_inventory_audit.unit_key",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.canonical_family",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.equipment_key",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.health_provider",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.imported_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.source_family",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.source_file",
+      "detail": {
+        "type": "text",
+        "default": "'2026 UNIT TRACKER.pdf'::text",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.source_label",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.source_page",
+      "detail": {
+        "type": "integer",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.tracker_public_ip",
+      "detail": {
+        "type": "inet",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.tracker_state",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.unit_tag",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.updated_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "equipment_master.workflow_type",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.active",
+      "detail": {
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.archived_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.archived_by",
+      "detail": {
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.archived_reason",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.created_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.email",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.email_handoff_updates",
+      "detail": {
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.email_job_assignments",
+      "detail": {
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.email_owner_copies",
+      "detail": {
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.full_name",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.must_change_password",
+      "detail": {
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.notification_email",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.password_changed_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.role",
+      "detail": {
+        "type": "app_role",
+        "default": "'pending'::app_role",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.updated_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.user_id",
+      "detail": {
+        "type": "uuid",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "profiles.username",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.acknowledged_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.acknowledged_by",
+      "detail": {
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.camera_device_id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.checked_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.confirmation_reason",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.confirmed_outage",
+      "detail": {
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.consecutive_failures",
+      "detail": {
+        "type": "integer",
+        "default": "0",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.detail",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.first_failed_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.ip_reachable",
+      "detail": {
+        "type": "boolean",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.job_assignment_id",
+      "detail": {
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.last_recovered_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.overall_status",
+      "detail": {
+        "type": "text",
+        "default": "'unknown'::text",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.port_status",
+      "detail": {
+        "type": "jsonb",
+        "default": "'{}'::jsonb",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_current.service_ticket_id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.camera_device_id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.check_source",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.detail",
+      "detail": {
+        "type": "jsonb",
+        "default": "'{}'::jsonb",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.id",
+      "detail": {
+        "type": "bigint",
+        "default": null,
+        "notnull": true,
+        "identity": "d",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.latency_ms",
+      "detail": {
+        "type": "integer",
+        "default": null,
+        "notnull": false,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.observed_at",
+      "detail": {
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    },
+    {
+      "kind": "column",
+      "identity": "camera_health_history.status",
+      "detail": {
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "identity": "",
+        "generated": ""
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "kind": "constraint",
+      "identity": "camera_devices.camera_devices_device_serial_key",
+      "detail": {
+        "definition": "UNIQUE (device_serial)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "camera_devices.camera_devices_pkey",
+      "detail": {
+        "definition": "PRIMARY KEY (id)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "camera_inventory_audit.camera_inventory_audit_pkey",
+      "detail": {
+        "definition": "PRIMARY KEY (id)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "equipment_master.equipment_master_pkey",
+      "detail": {
+        "definition": "PRIMARY KEY (equipment_key)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "equipment_master.equipment_master_source_identity_key",
+      "detail": {
+        "definition": "UNIQUE (source_family, unit_tag)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "equipment_master.equipment_master_tracker_state_check",
+      "detail": {
+        "definition": "CHECK ((tracker_state = ANY (ARRAY['shop'::text, 'field_or_unknown'::text, 'retired'::text])))"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "profiles.profiles_archived_by_fkey",
+      "detail": {
+        "definition": "FOREIGN KEY (archived_by) REFERENCES auth.users(id) ON DELETE SET NULL"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "profiles.profiles_pkey",
+      "detail": {
+        "definition": "PRIMARY KEY (user_id)"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "profiles.profiles_user_id_fkey",
+      "detail": {
+        "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+      }
+    },
+    {
+      "kind": "constraint",
+      "identity": "profiles.profiles_username_format",
+      "detail": {
+        "definition": "CHECK (((username IS NULL) OR (username ~ '^[a-z0-9][a-z0-9._-]{2,31}$'::text)))"
+      }
+    }
+  ],
+  "enums": [
+    {
+      "kind": "enum",
+      "identity": "app_role",
+      "detail": {
+        "values": [
+          "pending",
+          "it",
+          "service",
+          "owner"
+        ]
+      }
+    }
+  ]
+}

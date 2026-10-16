@@ -21,7 +21,7 @@
   "privileges": {
     "currentProduction": "No change made; proposed objects are not installed by this work.",
     "privateStoreCandidate": "postgres owns functions/tables; RLS enabled; PUBLIC, anon, authenticated and service_role have no direct schema/table/function access.",
-    "proposedBoundary": "Three original run wrappers propose service-only EXECUTE; the two additional publication wrappers revoke all access until separately reviewed grants. All use empty search_path and postgres ownership.",
+    "proposedBoundary": "All nine wrappers revoke all access during schema installation. Two separate guarded permission scripts propose six native and three legacy service-only EXECUTE grants after action-time approval. All use empty search_path and postgres ownership.",
     "browserAccess": "None. Browser sends an empty start request or run ID through the existing authenticated Operations bridge.",
     "rolesAndCredentials": "Existing Owner/IT identities and existing platform service credential only. No role memberships, user profiles, secrets or credentials created or changed."
   },
@@ -37,6 +37,8 @@
   "files": [
     "db/avigilon_check_runs.sql",
     "db/avigilon_check_run_boundary.sql",
+    "db/avigilon_native_permissions.sql",
+    "db/avigilon_legacy_permissions.sql",
     "db/avigilon_check_run_boundary_rollback.sql",
     "../supabase/functions/_shared/avigilonServiceRuntime.ts",
     "db/avigilon_health_publication.sql",

@@ -1,4 +1,4 @@
--- REVIEW-ONLY CANDIDATE. Do not execute in production without separate approval.
+-- REVIEW-ONLY CANDIDATE. No service EXECUTE grants; separate permission approval required.
 -- Install after avigilon_check_runs.sql. Existing platform service credential only.
 begin;
 set local lock_timeout='2s';
@@ -28,5 +28,4 @@ begin
  return cos_avigilon_checks_private.save(p_actor_user_id,p_organization_id,p_run);
 end $$;
 revoke all on function public.cos_avigilon_run_claim(uuid,uuid,jsonb),public.cos_avigilon_run_read(uuid,uuid,uuid),public.cos_avigilon_run_save(uuid,uuid,jsonb) from public,anon,authenticated,service_role;
-grant execute on function public.cos_avigilon_run_claim(uuid,uuid,jsonb),public.cos_avigilon_run_read(uuid,uuid,uuid),public.cos_avigilon_run_save(uuid,uuid,jsonb) to service_role;
 commit;
