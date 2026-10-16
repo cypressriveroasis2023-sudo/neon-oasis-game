@@ -38,7 +38,7 @@ for(const name of ['camera-health','camera-detail']){
  });
 }
 test('obsolete activation, acknowledgment and ticket buttons are disabled before any guarded or ticket write',async({page})=>{
- await mount(page,'camera-health');await page.evaluate(()=>{for(const name of ['activate-unit','activate','ack-unit','ticket-unit']){const button=document.createElement('button');button.className=name;button.textContent='Obsolete control';document.body.append(button);}});
- for(const name of ['activate-unit','activate','ack-unit','ticket-unit']){const button=page.locator('button.'+name);await expect(button).toBeDisabled();await expect(button).toContainText(/unavailable/);await expect(button).toHaveAttribute('aria-describedby','guardedActionStatus');}
+ await mount(page,'camera-health');await page.evaluate(()=>{for(const name of ['activate-unit','activate','ack-unit','issue-ack','ticket-unit']){const button=document.createElement('button');button.className=name;button.textContent='Obsolete control';document.body.append(button);}});
+ for(const name of ['activate-unit','activate','ack-unit','issue-ack','ticket-unit']){const button=page.locator('button.'+name);await expect(button).toBeDisabled();await expect(button).toContainText(/unavailable/);await expect(button).toHaveAttribute('aria-describedby','guardedActionStatus');}
  await expect(page.locator('#guardedActionStatus')).toContainText('use Operations Job flow');expect(await page.evaluate(()=>snapshotWrites)).toEqual([]);
 });
