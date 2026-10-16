@@ -72,3 +72,10 @@ body.cos-service-basics #view-svc :is(button, input):focus-visible {
 }
 
 .cos-daily-evidence img[hidden] { display: none !important; }
+
+.cos-daily-signoff { border-top: 1px solid #617895; margin-top: 24px; padding-top: 16px; }
+.cos-daily-signoff [hidden] { display: none !important; }
+.cos-daily-signoff input[type=checkbox], .cos-daily-signoff input[type=radio] { width: 24px !important; height: 24px !important; min-height: 24px !important; margin-right: 8px; vertical-align: middle; }
+.cos-signature-canvas { display: block; width: 100%; height: 180px; box-sizing: border-box; background: white; border: 2px solid #617895; border-radius: 8px; touch-action: none; }
+
+.cos-daily-signoff label { min-height: 44px; box-sizing: border-box; padding: 6px 0; }

@@ -3,7 +3,8 @@ import { mountServiceBasics } from './helpers/service-basics-fixture.mjs';
 
 const units = {'Sniper':'SN-0001A','Ranger':'RA-002B','Spotter':'SP-003C','Solar Spotter':'SS-004D'};
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
-async function photos(page,skip=''){for(const input of await page.locator('[data-daily-photo]').all()){const key=await input.getAttribute('data-daily-photo');if(key.endsWith(':2')||key===skip)continue;await input.setInputFiles(photo);await expect(input.locator('..').locator('img')).toBeVisible();}}
+async function signOff(page){await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill('Synthetic Service');await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();}
+async function photos(page,skip='',sign=true){for(const input of await page.locator('[data-daily-photo]').all()){const key=await input.getAttribute('data-daily-photo');if(key.endsWith(':2')||key===skip)continue;await input.setInputFiles(photo);await expect(input.locator('..').locator('img')).toBeVisible();}if(sign)await signOff(page);}
 const sims = ['00123456789012345670','00123456789012345671','00123456789012345672'];
 async function truck(page) {
   await page.locator('#wlSvcHome [data-wl-svc="inspect"]').click();
@@ -84,9 +85,9 @@ test('one completion saves exact numbers, photos and returns home without anothe
   await expect(page.locator('#wlSvcHome [data-wl-service-truck-inventory]')).toContainText('Completed Today');
   await expect(page.locator('[data-daily-delivery-status]')).toContainText('delivery is pending');
   await expect(page.locator('#wlSvcHome')).toBeVisible();
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
-  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(15);
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(1);
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v4').args);
+  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(18);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v4'))).toHaveLength(1);
 });
 
 test('short battery quantities keep the truck unready',async({page})=>{
@@ -138,7 +139,7 @@ test('mobile fields fit the screen and stay usable with a keyboard',async({page}
   await inventory(page);
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:900});
-    const layout=await page.locator('#wlSvcTruckInventory').evaluate(card=>({scroll:document.documentElement.scrollWidth,width:innerWidth,fields:[...card.querySelectorAll('input:not([type="checkbox"])')].map(input=>{const r=input.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
+    const layout=await page.locator('#wlSvcTruckInventory').evaluate(card=>({scroll:document.documentElement.scrollWidth,width:innerWidth,fields:[...card.querySelectorAll('input:not([type="checkbox"]):not([type="radio"])')].filter(input=>input.getClientRects().length).map(input=>{const r=input.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
     expect(layout.scroll).toBeLessThanOrEqual(layout.width);
     for(const field of layout.fields){expect(field.left).toBeGreaterThanOrEqual(0);expect(field.right).toBeLessThanOrEqual(layout.width);expect(field.height).toBeGreaterThanOrEqual(44);}
   }
@@ -151,11 +152,11 @@ test('missing photos blocks completion and failed upload preserves the evidence 
   await inventory(page);await fillInventory(page);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('front and rear unit tag photos');
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v4'))).toHaveLength(0);
   await photos(page);await page.evaluate(()=>fixture.uploadFailure=true);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Photo upload failed');
-  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(15);
+  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(18);
   await page.evaluate(()=>fixture.uploadFailure=false);await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('#wlSvcHome')).toBeVisible();
 });
@@ -178,7 +179,7 @@ test('draft numbers and photos survive reopening inventory and are isolated on a
   await inventory(page);await fillInventory(page);await photos(page);
   await page.locator('#wlSvcTruckInventory [data-wl-home="svc"]').click();
   await page.locator('#wlSvcHome [data-wl-service-truck-inventory]').click();
-  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(15);
+  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(18);
   await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue(sims[0]);
   await page.evaluate(()=>{fixture.actor='synthetic-second-service';dispatchEvent(new CustomEvent('techcheck:data-refreshed'));});
   await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(0);
@@ -205,12 +206,58 @@ test('three individual SIM cards each require front and back photos',async({page
   }
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('back photo for SIM Card 3');
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v4'))).toHaveLength(0);
   await page.locator('[data-daily-photo="SIM Card 3:back"]').setInputFiles(photo);
   await expect(page.locator('[data-daily-photo="SIM Card 3:back"]').locator('..').locator('img')).toBeVisible();
+  await signOff(page);
   await page.screenshot({path:testInfo.outputPath('individual-sim-cards.png'),fullPage:true});
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('#wlSvcHome')).toBeVisible();
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v4').args);
   expect(saved.p_photos.filter(p=>p.category.startsWith('SIM Card ')).map(p=>p.category+':'+p.view).sort()).toEqual([1,2,3].flatMap(n=>['SIM Card '+n+':back','SIM Card '+n+':front']).sort());
+});
+
+test('each battery type has its own required photo and optional second photo',async({page},testInfo)=>{
+  await inventory(page);await fillInventory(page);await photos(page,'12V 35Ah:1');
+  const categories=['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'];
+  await expect(page.locator('[data-daily-photo^="Batteries:"]')).toHaveCount(0);
+  for(const category of categories){
+    const group=page.getByRole('group',{name:category,exact:true});
+    await expect(group.getByLabel(category+' Photo 1',{exact:true})).toBeVisible();
+    await expect(group.getByLabel(category+' Photo 2',{exact:true})).toBeVisible();
+  }
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Add a photo of the 12V 35Ah');
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v4'))).toHaveLength(0);
+  await page.locator('[data-daily-photo="12V 35Ah:1"]').setInputFiles(photo);
+  await expect(page.locator('[data-daily-photo="12V 35Ah:1"]').locator('..').locator('img')).toBeVisible();
+  await signOff(page);
+  await page.screenshot({path:testInfo.outputPath('battery-types.png'),fullPage:true});
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v4').args);
+  expect(saved.p_photos.filter(p=>categories.includes(p.category)).map(p=>p.category+':'+p.view).sort()).toEqual(categories.map(category=>category+':1').sort());
+});
+
+test('extra image attachments persist, sign-off is required and typing signs as the current technician',async({page})=>{
+  await inventory(page);await fillInventory(page);await photos(page,'',false);
+  await expect(page.locator('[data-daily-photo][capture]')).toHaveCount(0);
+  await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Sign and confirm');
+  await page.getByLabel('Attach extra images',{exact:true}).setInputFiles([photo,{...photo,name:'second.png'}]);
+  await expect(page.getByRole('button',{name:'Remove attachment 2',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Remove attachment 1',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Remove attachment 1',exact:true})).toHaveCount(0);
+  await signOff(page);await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v4').args);
+  expect(saved.p_photos.filter(p=>p.category==='Additional images')).toHaveLength(1);expect(saved.p_signature).toEqual({method:'typed',name:'Synthetic Service',confirmed:true});
+});
+
+test('drawn signature is saved with the report and a changed quantity clears confirmation',async({page})=>{
+  await inventory(page);await fillInventory(page);await photos(page,'',false);
+  const canvas=page.locator('.cos-signature-canvas');await canvas.scrollIntoViewIfNeeded();const box=await canvas.boundingBox();
+  await page.mouse.move(box.x+30,box.y+60);await page.mouse.down();await page.mouse.move(box.x+80,box.y+100,{steps:6});await page.mouse.move(box.x+150,box.y+50,{steps:6});await page.mouse.up();
+  const confirm=page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true});await confirm.check();
+  await page.locator('#wlTruckReconQty').fill('26');await expect(confirm).not.toBeChecked();await confirm.check();
+  await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v4').args);expect(saved.p_signature.method).toBe('drawn');expect(saved.p_signature.path).toContain('/');expect(saved.p_photos.some(p=>p.category==='Technician signature'&&p.path===saved.p_signature.path)).toBe(true);
 });

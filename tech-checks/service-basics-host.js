@@ -1,7 +1,7 @@
 // Service's basic daily tools use the existing inspection and inventory writers.
 // This is product presentation, not a replacement for server authorization.
 import './auth-mobile-host.js?v=20261016';
-import './service-daily-report-host.js?v=20261016-sim3';
+import './service-daily-report-host.js?v=20261016-signoff';
 export const SERVICE_BASICS_ONLY = true;
 window.COS_SERVICE_BASICS_ONLY = SERVICE_BASICS_ONLY;
 const context = () => window.TechCheckContext;

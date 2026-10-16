@@ -1,3 +1,4 @@
+import {summaryPdf,summaryHtml} from './summary.ts';
 import {DRIVE_FOLDER,RECIPIENT,reportHtml,rawEmail} from './report.ts';
 const ORIGINS=new Set(['https://cypressriveroasis2023-sudo.github.io','https://cos-vision-integration-preview.pages.dev']);
 export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}:any) {
@@ -71,6 +72,17 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
    const html=reportHtml(report,links);
    await create('report','TechCheck '+report.check_date+'.html',folder,'text/html',new Blob([html],{type:'text/html'}));
    await create('answers','TechCheck '+report.check_date+'.json',folder,'application/json',new Blob([JSON.stringify({id:report.id,actor_name:report.actor_name,check_date:report.check_date,submitted_at:report.submitted_at,snapshot:report.snapshot,photos:report.photos.map((p:any)=>({category:p.category,view:p.view,url:links[p.category+':'+p.view]}))},null,2)],{type:'application/json'}));
+   let signature:Uint8Array|undefined;
+   const signaturePhoto=report.photos.find((p:any)=>p.category==='Technician signature'&&p.view==='signature');
+   if(report.snapshot.signature?.method==='drawn'){
+    if(!signaturePhoto)throw new Error('Saved signature missing.');
+    const {data,error}=await admin.storage.from('service-daily-evidence').download(signaturePhoto.path);
+    if(error||!data)throw new Error('Saved signature could not be read.');
+    signature=new Uint8Array(await data.arrayBuffer());
+   }
+   const pdf=summaryPdf(report,signature);
+   const summaryId=await create('summary_pdf_v1','READ ME - TechCheck '+report.check_date+' - Summary.pdf',folder,'application/pdf',new Blob([pdf as BlobPart],{type:'application/pdf'}));
+   const emailHtml=summaryHtml(report,folder,'https://drive.google.com/file/d/'+summaryId+'/view');
    manifest.complete=true;await checkpoint();
    if(report.email_state==='sending'||report.email_state==='review'){
     // A timeout after send may have delivered. Do not send a second copy.
@@ -78,7 +90,7 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
    }
    if(report.email_state!=='sent'){
     await queue('checkpoint',{email_state:'sending'});report.email_state='sending';
-    const sent=await api('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({raw:rawEmail(report,html,folder)})});
+    const sent=await api('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({raw:rawEmail(report,emailHtml,folder,signature,pdf)})});
     if(!sent.id)throw new Error('Email delivery confirmation missing.');
     await queue('checkpoint',{email_state:'sent',email_id:sent.id});report.email_state='sent';
    }

@@ -22,16 +22,18 @@ before(async()=>{
  `);
  await db.exec(await readFile(new URL('../../database-maintenance/service-daily-reports-v1.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../database-maintenance/service-daily-individual-sim-photos-v2.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../database-maintenance/service-daily-battery-type-photos-v3.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../database-maintenance/service-daily-signoff-attachments-v4.sql',import.meta.url),'utf8'));
  await db.exec('grant usage on schema auth,storage to authenticated; grant execute on function auth.uid() to authenticated;');
 });
 after(async()=>db?.close());
-function request(){const id=randomUUID();return {p_report_id:id,p_units:{Sniper:'SN-01',Ranger:'RA-02',Spotter:'SP-03','Solar Spotter':'SS-04'},p_sims:{1:'00123456789012345670',2:'00123456789012345671',3:'00123456789012345672'},p_stock:{recon_battery_qty:25,agm_12v_110ah_qty:4,litime_12v_100ah_qty:2,battery_12v_35ah_qty:4},p_photos:[...['Sniper','Ranger','Spotter','Solar Spotter'].flatMap(category=>['front','tag'].map(view=>({category,view}))),{category:'Batteries',view:'1'},...[1,2,3].flatMap(n=>['front','back'].map(view=>({category:'SIM Card '+n,view})))].map((p,i)=>({...p,path:actor+'/'+id+'/'+String(i).padStart(64,'0')+'.jpg'}))};}
+function request(){const id=randomUUID();return {p_report_id:id,p_signature:{method:'typed',name:'Synthetic service',confirmed:true},p_units:{Sniper:'SN-01',Ranger:'RA-02',Spotter:'SP-03','Solar Spotter':'SS-04'},p_sims:{1:'00123456789012345670',2:'00123456789012345671',3:'00123456789012345672'},p_stock:{recon_battery_qty:25,agm_12v_110ah_qty:4,litime_12v_100ah_qty:2,battery_12v_35ah_qty:4},p_photos:[...['Sniper','Ranger','Spotter','Solar Spotter'].flatMap(category=>['front','tag'].map(view=>({category,view}))),...['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'].map(category=>({category,view:'1'})),...[1,2,3].flatMap(n=>['front','back'].map(view=>({category:'SIM Card '+n,view})))].map((p,i)=>({...p,path:actor+'/'+id+'/'+String(i).padStart(64,'0')+'.jpg'}))};}
 async function seed(p){await db.exec('reset role');for(const photo of p.p_photos)await db.query("insert into storage.objects values('service-daily-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[photo.path]);}
-async function complete(p,who=actor,endpoint="complete_service_daily_report_v2"){await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[who]);await db.exec('set role authenticated');try{return (await db.query(`select public.${endpoint}(${Object.keys(p).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(p))).rows[0].result;}finally{await db.exec('reset role');}}
+async function complete(p,who=actor,endpoint="complete_service_daily_report_v4"){await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[who]);await db.exec('set role authenticated');try{if(endpoint!=='complete_service_daily_report_v4'){p={...p};delete p.p_signature;}return (await db.query(`select public.${endpoint}(${Object.keys(p).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(p))).rows[0].result;}finally{await db.exec('reset role');}}
 const total=async table=>(await db.query('select count(*)::integer n from '+table)).rows[0].n;
 test('atomic completion snapshots exact inspection, names, SIM strings and photos; retry is idempotent',async()=>{
  const p=request();await seed(p);const result=await complete(p);assert.equal(result.inventory_ready,true);assert.equal(result.delivery_status,'queued');
- const record=(await db.query('select * from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0];assert.deepEqual(record.request.units,p.p_units);assert.deepEqual(record.request.sims,p.p_sims);assert.equal(Object.keys(record.snapshot.truck_checks).length,8);assert.equal(record.snapshot.taking_trailer,false);assert.equal(record.photos.length,15);
+ const record=(await db.query('select * from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0];assert.deepEqual(record.request.units,p.p_units);assert.deepEqual(record.request.sims,p.p_sims);assert.equal(Object.keys(record.snapshot.truck_checks).length,8);assert.equal(record.snapshot.taking_trailer,false);assert.equal(record.photos.length,18);
  const before=await total('writer_calls');assert.equal((await complete(p)).id,result.id);assert.equal(await total('writer_calls'),before);
  await assert.rejects(complete({...p,p_units:{...p.p_units,Sniper:'changed'}}),/already used/);
  await assert.rejects(complete(p,other),/already used/);
@@ -81,19 +83,64 @@ test('server queue uses leases, enforces ownership and cannot mark unsent report
 test('every individual SIM card needs both sides; another photo cannot substitute for a missing side',async()=>{
  const p=request();await seed(p);const before=await total('writer_calls');
  for(const category of ['SIM Card 1','SIM Card 2','SIM Card 3'])for(const view of ['front','back']){
-  const photos=p.p_photos.filter(photo=>photo.category!==category||photo.view!==view).concat({...p.p_photos[8],category:'Batteries',view:'2'});
+  const photos=p.p_photos.filter(photo=>photo.category!==category||photo.view!==view).concat({...p.p_photos[8],category:'Recon batteries',view:'2'});
   await assert.rejects(complete({...p,p_photos:photos}),/each require a front and back photo/);
  }
  assert.equal(await total('writer_calls'),before);
- const optional={...p.p_photos[8],category:'Batteries',view:'2'};
+ const optional={...p.p_photos[8],category:'Recon batteries',view:'2'};
  await complete({...p,p_photos:p.p_photos.concat(optional)});
- assert.equal((await db.query('select jsonb_array_length(photos) n from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0].n,16);
+ assert.equal((await db.query('select jsonb_array_length(photos) n from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0].n,19);
 });
 
 
 test('old endpoint rejects new grouped SIM evidence but accepts an identical historical retry',async()=>{
- const p=request();const grouped={...p,p_photos:p.p_photos.filter(photo=>!photo.category.startsWith('SIM Card ')).concat({...p.p_photos[9],category:'SIM cards',view:'1'})};await seed(grouped);
- await assert.rejects(complete(grouped,actor,'complete_service_daily_report_v1'),/Photograph/);
+ const p=request();const grouped={...p,p_photos:p.p_photos.filter(photo=>['Sniper','Ranger','Spotter','Solar Spotter'].includes(photo.category)).concat({...p.p_photos[8],category:'Batteries',view:'1'},{...p.p_photos[12],category:'SIM cards',view:'1'})};await seed(grouped);
+ await assert.rejects(complete(grouped,actor,'complete_service_daily_report_v1'),/signature and confirmation required/);
  await db.query("insert into app_private.service_daily_reports(id,service_tech_id,check_date,actor_name,request,snapshot,photos) values($1,$2,current_date,'Historical synthetic',$3,'{}',$4)",[p.p_report_id,actor,{units:p.p_units,sims:p.p_sims,stock:p.p_stock,photos:grouped.p_photos},grouped.p_photos]);
  assert.equal((await complete(grouped,actor,'complete_service_daily_report_v1')).id,p.p_report_id);
+});
+
+test('each battery type requires its own photo; optional pictures cannot replace another type',async()=>{
+ const p=request();await seed(p);const before=await total('writer_calls');
+ const types=['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'];
+ for(const category of types){
+  const substitute=types.find(type=>type!==category);
+  const photos=p.p_photos.filter(photo=>photo.category!==category).concat({...p.p_photos.find(photo=>photo.category===substitute),view:'2'});
+  await assert.rejects(complete({...p,p_photos:photos}),/Each battery type requires its own photo/);
+ }
+ assert.equal(await total('writer_calls'),before);
+ const photos=p.p_photos.concat(types.map(category=>({...p.p_photos.find(photo=>photo.category===category),view:'2'})));
+ await complete({...p,p_photos:photos});
+ assert.equal((await db.query('select jsonb_array_length(photos) n from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0].n,22);
+});
+
+test('v2 grouped battery reports remain retryable, but new reports need individual battery evidence',async()=>{
+ const p=request();const categories=['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'];
+ const grouped={...p,p_photos:p.p_photos.filter(photo=>!categories.includes(photo.category)).concat({...p.p_photos[8],category:'Batteries',view:'1'})};await seed(grouped);
+ await assert.rejects(complete(grouped,actor,'complete_service_daily_report_v2'),/signature and confirmation required/);
+ await db.query("insert into app_private.service_daily_reports(id,service_tech_id,check_date,actor_name,request,snapshot,photos) values($1,$2,current_date,'Historical v2 synthetic',$3,'{}',$4)",[p.p_report_id,actor,{units:p.p_units,sims:p.p_sims,stock:p.p_stock,photos:grouped.p_photos},grouped.p_photos]);
+ assert.equal((await complete(grouped,actor,'complete_service_daily_report_v2')).id,p.p_report_id);
+});
+
+test('signature is required, bound to the signed-in profile and dated by the server',async()=>{
+ const p=request();await seed(p);const before=await total('writer_calls');
+ for(const signature of [null,{}, {...p.p_signature,confirmed:false},{...p.p_signature,name:'Another technician'}])await assert.rejects(complete({...p,p_signature:signature}),/signature and confirmation required|full name shown/);
+ assert.equal(await total('writer_calls'),before);
+ await complete({...p,p_signature:{...p.p_signature,signed_by:other,signed_at:'1900-01-01T00:00:00Z',statement:'I did not check anything'}});
+ const r=(await db.query('select snapshot,submitted_at from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0];
+ const signature=r.snapshot.signature;assert.equal(signature.signed_by,actor);assert.equal(signature.name,'Synthetic service');assert.equal(signature.username,'test');assert.equal(signature.timezone,'America/Chicago');assert.match(signature.statement,/physically checked/);assert.equal(new Date(signature.signed_at).getTime(),r.submitted_at.getTime());
+});
+
+test('additional images and handwritten signature remain in the signed immutable report',async()=>{
+ const p=request(),extra={category:'Additional images',view:'1',filename:'stock-note.png',path:actor+'/'+p.p_report_id+'/'+'e'.repeat(64)+'.jpg'},sign={category:'Technician signature',view:'signature',path:actor+'/'+p.p_report_id+'/'+'f'.repeat(64)+'.jpg'};
+ const signed={...p,p_photos:p.p_photos.concat(extra,sign),p_signature:{method:'drawn',name:'Synthetic service',confirmed:true,path:sign.path}};await seed(signed);await complete(signed);
+ const r=(await db.query('select snapshot,photos from app_private.service_daily_reports where id=$1',[p.p_report_id])).rows[0];assert.equal(r.snapshot.signature.path,sign.path);assert.equal(r.photos.length,20);assert.equal(r.photos.find(p=>p.category==='Additional images').filename,'stock-note.png');
+ assert.equal((await complete(signed)).id,p.p_report_id);await assert.rejects(complete({...signed,p_signature:{...signed.p_signature,method:'typed'}}),/already used/);
+ const missing=request();await seed(missing);await assert.rejects(complete({...missing,p_signature:{method:'drawn',name:'Synthetic service',confirmed:true}}),/Draw and upload/);
+});
+
+test('attachment slots are bounded and all image paths retain actor isolation',async()=>{
+ const p=request();const extra=Array.from({length:11},(_,i)=>({category:'Additional images',view:String(i+1),path:actor+'/'+p.p_report_id+'/'+String(i+50).padStart(64,'0')+'.jpg'}));await seed({...p,p_photos:p.p_photos.concat(extra)});
+ await assert.rejects(complete({...p,p_photos:p.p_photos.concat(extra)}),/Invalid photo identity/);
+ await assert.rejects(complete({...p,p_photos:p.p_photos.concat({...extra[0],path:extra[0].path.replace(actor,other)})}),/Invalid photo identity/);
 });
