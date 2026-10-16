@@ -84,9 +84,9 @@ test('one completion saves exact numbers, photos and returns home without anothe
   await expect(page.locator('#wlSvcHome [data-wl-service-truck-inventory]')).toContainText('Completed Today');
   await expect(page.locator('[data-daily-delivery-status]')).toContainText('delivery is pending');
   await expect(page.locator('#wlSvcHome')).toBeVisible();
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
-  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(15);
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(1);
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v3').args);
+  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(18);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v3'))).toHaveLength(1);
 });
 
 test('short battery quantities keep the truck unready',async({page})=>{
@@ -151,11 +151,11 @@ test('missing photos blocks completion and failed upload preserves the evidence 
   await inventory(page);await fillInventory(page);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('front and rear unit tag photos');
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v3'))).toHaveLength(0);
   await photos(page);await page.evaluate(()=>fixture.uploadFailure=true);
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Photo upload failed');
-  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(15);
+  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(18);
   await page.evaluate(()=>fixture.uploadFailure=false);await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('#wlSvcHome')).toBeVisible();
 });
@@ -178,7 +178,7 @@ test('draft numbers and photos survive reopening inventory and are isolated on a
   await inventory(page);await fillInventory(page);await photos(page);
   await page.locator('#wlSvcTruckInventory [data-wl-home="svc"]').click();
   await page.locator('#wlSvcHome [data-wl-service-truck-inventory]').click();
-  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(15);
+  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(18);
   await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue(sims[0]);
   await page.evaluate(()=>{fixture.actor='synthetic-second-service';dispatchEvent(new CustomEvent('techcheck:data-refreshed'));});
   await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(0);
@@ -205,12 +205,33 @@ test('three individual SIM cards each require front and back photos',async({page
   }
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('[data-wl-truck-save-status]')).toContainText('back photo for SIM Card 3');
-  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v2'))).toHaveLength(0);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v3'))).toHaveLength(0);
   await page.locator('[data-daily-photo="SIM Card 3:back"]').setInputFiles(photo);
   await expect(page.locator('[data-daily-photo="SIM Card 3:back"]').locator('..').locator('img')).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('individual-sim-cards.png'),fullPage:true});
   await page.locator('[data-wl-save-truck-inventory]').click();
   await expect(page.locator('#wlSvcHome')).toBeVisible();
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v2').args);
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v3').args);
   expect(saved.p_photos.filter(p=>p.category.startsWith('SIM Card ')).map(p=>p.category+':'+p.view).sort()).toEqual([1,2,3].flatMap(n=>['SIM Card '+n+':back','SIM Card '+n+':front']).sort());
+});
+
+test('each battery type has its own required photo and optional second photo',async({page},testInfo)=>{
+  await inventory(page);await fillInventory(page);await photos(page,'12V 35Ah:1');
+  const categories=['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'];
+  await expect(page.locator('[data-daily-photo^="Batteries:"]')).toHaveCount(0);
+  for(const category of categories){
+    const group=page.getByRole('group',{name:category,exact:true});
+    await expect(group.getByLabel(category+' Photo 1',{exact:true})).toBeVisible();
+    await expect(group.getByLabel(category+' Photo 2',{exact:true})).toBeVisible();
+  }
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Add a photo of the 12V 35Ah');
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v3'))).toHaveLength(0);
+  await page.locator('[data-daily-photo="12V 35Ah:1"]').setInputFiles(photo);
+  await expect(page.locator('[data-daily-photo="12V 35Ah:1"]').locator('..').locator('img')).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('battery-types.png'),fullPage:true});
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v3').args);
+  expect(saved.p_photos.filter(p=>categories.includes(p.category)).map(p=>p.category+':'+p.view).sort()).toEqual(categories.map(category=>category+':1').sort());
 });
