@@ -372,10 +372,20 @@ async function load(){
   if(hi)console.warn(hi);if(re)console.warn(re);
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   device=d;current=h||{};events=hist||[];unitRouters=rs||[];
-  const placementVersion=await readPlacementVersion().catch(()=>null);
+  let placementVersion=null;
+  try {
+    if(typeof readPlacementVersion==='function') placementVersion=await readPlacementVersion();
+    else if(typeof CameraPlacementControls==='undefined'||typeof CameraPlacementControls.readFleetSources!=='function') placementVersion='__unavailable__';
+    else {
+      const s=await db.auth.getSession(),session=s?.data?.session;if(s?.error||!session?.user?.id||!session?.access_token)throw new Error('Current account unavailable.');
+      const pair=await CameraPlacementControls.readFleetSources({db,session,share:false}),snap=pair?.snapshot||{},h=pair?.health||{};
+      const rows=Array.isArray(snap.inventoryItems)?snap.inventoryItems.map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
+      placementVersion=JSON.stringify([snap.equipmentMasterVersion??snap.inventoryVersion??snap.placementVersion??null,snap.effectivePlacementVersion??null,snap.placementProjectionVersion??null,rows,h.avigilonAuthority||null]);
+    }
+  } catch { placementVersion=null; }
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   detailPlacementVersion=placementVersion;
-  if(!placementVersion)current={};
+  if(placementVersion===null)current={};
   const witness=cameraGroup(device)==='Witness';$('verifyBtn').disabled=witness;$('verifyBtn').title=witness?'Witness status not checked. Use Witness to verify this unit.':'';
   $('verifyBtn').textContent=witness?'Witness check unavailable':cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
   $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();
