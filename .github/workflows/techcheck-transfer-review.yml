@@ -1,0 +1,42 @@
+name: TechCheck transfer review
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/techcheck-transfer-review.yml'
+      - 'tech-checks/transfers/**'
+      - 'tech-checks/service-transfer-host.js'
+      - 'tech-checks/database-maintenance/techcheck-named-handoffs-v1.sql'
+      - 'tech-checks/operations/tests/transfer*'
+      - 'tech-checks/supabase/functions/service-daily-delivery/**'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install existing project toolchain
+        run: npm ci
+        working-directory: tech-checks/operations
+      - name: Preserve reproducible local validation toolchain
+        run: tar --exclude='*.woff' --exclude='*.woff2' --exclude='*.ttf' --exclude='*.otf' -czf /tmp/techcheck-review-toolchain.tar.gz -C tech-checks/operations node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: techcheck-review-toolchain
+          path: /tmp/techcheck-review-toolchain.tar.gz
+          retention-days: 1
+      - name: Existing delivery regression tests
+        run: node --import tsx --test tests/service-daily-delivery.test.mjs
+        working-directory: tech-checks/operations
+      - name: TypeScript
+        run: npm run typecheck
+        working-directory: tech-checks/operations
+      - name: Build existing application
+        run: npm run build
+        working-directory: tech-checks/operations
