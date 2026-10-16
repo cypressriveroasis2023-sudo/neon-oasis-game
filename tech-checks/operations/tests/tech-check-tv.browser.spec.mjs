@@ -295,8 +295,26 @@ test('Field Map visits overview and geographic close-ups with the red area first
  expect(state.fleetReads).toBe(3);expect(state.writes).toEqual([]);
 });
 
-test('Owner saves rotation time and a remote timing update changes the TV interval',async({page})=>{
- const {state,frame}=await setup(page);
+test('Owner saves rotation time and a remote timing update changes the TV interval',async({page},testInfo)=>{
+ // This test owns exact elapsed time in both the host and embedded board.
+ // Leaving the fake clock running can race its real-time tick with fastForward
+ // and rewind the iframe's clock while the host retains the requested jump.
+ const {state,frame}=await setup(page,{pausedClock:true});
+ const board=frame.getByRole('region',{name:'Tech Check TV Board'}),clockSteps=[];
+ const capture=async event=>{
+  const hostNow=await page.evaluate(()=>Date.now());
+  const current=await board.evaluate(node=>({now:Date.now(),page:node.dataset.page,section:node.dataset.section,timing:node.querySelector('.tech-check-tv-footer')?.textContent??''}));
+  clockSteps.push({event,hostNow,...current,reads:state.reads,fleetReads:state.fleetReads,writes:state.writes.length});
+  return {hostNow,boardNow:current.now};
+ };
+ let elapsed=0;
+ const advance=async milliseconds=>{
+  const expected=()=>({hostNow:Date.parse(time)+elapsed,boardNow:Date.parse(time)+elapsed});
+  expect(await capture('before advance '+milliseconds)).toEqual(expected());
+  await page.clock.fastForward(milliseconds);elapsed+=milliseconds;
+  expect(await capture('after advance '+milliseconds)).toEqual(expected());
+ };
+ try{
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
  const controls=frame.getByRole('region',{name:'TV board settings'});
  await controls.getByRole('checkbox',{name:'Shop updates',exact:true}).uncheck();
@@ -308,15 +326,20 @@ test('Owner saves rotation time and a remote timing update changes the TV interv
  expect(state.writes[0].path).toBe('/api/tv-board/settings');
  expect(state.writes[0].body.expectedRevision).toBe(1000000030);
  await frame.getByRole('button',{name:'TV View',exact:true}).click();
- const board=frame.getByRole('region',{name:'Tech Check TV Board'});
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await expect(board).toContainText('Rotate 30s');
- await page.clock.fastForward(25000);await expect(board).toHaveAttribute('data-page','1');
- await page.clock.fastForward(6000);await expect(board).toHaveAttribute('data-page','2');
+ await advance(25000);await expect(board).toHaveAttribute('data-page','1');
+ await advance(6000);await expect(board).toHaveAttribute('data-page','2');
  state.settings={...state.settings,revision:state.settings.revision+1,rotationSeconds:5};
- await page.clock.fastForward(30000);await expect(board).toContainText('Rotate 5s');
+ await advance(30000);await expect(board).toContainText('Rotate 5s');
  await expect(board).toHaveAttribute('data-page','1');
- await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','1');
- await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','2');
+ await advance(3000);await expect(board).toHaveAttribute('data-page','1');
+ await advance(3000);await expect(board).toHaveAttribute('data-page','2');
  expect(state.fleetReads).toBe(3);
+ }finally{
+  await capture('final').catch(error=>clockSteps.push({event:'final capture unavailable',message:error.message}));
+  const diagnosticPath=testInfo.outputPath('tv-timing-clock.json');
+  await writeFile(diagnosticPath,JSON.stringify(clockSteps,null,2));
+  await testInfo.attach('tv-timing-clock',{path:diagnosticPath,contentType:'application/json'});
+ }
 });
