@@ -1,3 +1,4 @@
+// 2026-10-16 reviewed complete identity/health snapshot fence, guarded-control disablement, contextual Spotter inventory aliases and Witness not-checked presentation; focused actual-page regressions preserve source labels and service evidence.
 // 2026-10-16 candidate receipt-backed Avigilon bridge and manual report; covered by managed-bridge/manual browser tests.
 // 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
@@ -25,14 +26,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "fd13700293c6e38e59ff8fa57dc1c3562efb80fbaf86d7ed221eb5130bd73591",
-  "camera-detail": "75fc2835a7864c6745c558dd27bf0443bbf3205a79e31160e55ee54a4c642093",
+  "camera-health": "f50da86af3d3216c999b79373abb3dff5e8c22c38c0ef9a4bf186f19381cdeaf",
+  "camera-detail": "4cbc81a57daec6ff1d35f345b6e64eec1f80c724de9e20326d9bc917cc32ccc3",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "8bacc9d0476ae001931423b62d2c7f023d00bb12eeb0f10e013fdde16ddba488",
-  "camera-detail": "7d223955ccd22f880855282bc01197bad2df3e7e7c00440c34caf32c0f01f864",
+  "camera-health": "6459c9693410a99e0fc227a6618e80a24d522d260c1eab649d141ad8e51694c3",
+  "camera-detail": "6f991555b3aa7348d178091c922e8dc0772239bd00bd37ebbb6c5a32ac4b1ac8",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
