@@ -1,0 +1,59 @@
+name: Verify scoped inventory upgrade
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/scoped_inventory_overlay.sql'
+      - 'tech-checks/operations/tests/scoped*'
+      - 'tech-checks/operations/tests/fixtures/scoped-inventory-fixture.mjs'
+      - '.github/workflows/cos-scoped-inventory-proof.yml'
+permissions:
+  contents: read
+jobs:
+  scoped-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix legacy/tests/recon-ordering
+      - name: Scoped regression receipt
+        run: |
+          set -o pipefail
+          node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/scoped*test.mjs | tee scoped-tests.txt
+      - name: Actual PR176 upgrade and independent PostgreSQL sessions
+        env:
+          COS_SCOPED_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_scoped_test_ci
+        run: |
+          set -o pipefail
+          node tests/scoped-inventory-postgres-concurrency.mjs | tee scoped-postgres.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scoped-inventory-receipts
+          path: |
+            tech-checks/operations/scoped-tests.txt
+            tech-checks/operations/scoped-postgres.txt
