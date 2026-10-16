@@ -63,7 +63,7 @@ function status(message, retry = false) {
   if (!root) return;
   clearFrame(); root.replaceChildren();
   const panel = document.createElement('section'); panel.className = 'cos-it-daily-status';
-  const title = document.createElement('h1'); title.textContent = 'IT daily views';
+  const title = document.createElement('h1'); title.textContent = scope()?.phone?'Equipment Check Out / Check In':'Camera Health and Fleet Map';
   const note = document.createElement('p'); note.textContent = message; note.setAttribute('role','status');
   panel.append(title,note);
   if (retry) { const button = document.createElement('button'); button.type='button'; button.textContent='Retry daily views'; button.onclick=()=>{scopeKey='';present();}; panel.append(button); }
@@ -80,11 +80,18 @@ async function open(value, generation, handoffFailure = null) {
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
   if (!permitted) {
     status(value.preview ? 'Test IT is a preview persona, not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
-    // Camera Health enforces its own active Owner/IT profile authorization. Do not
-    // mount an equipment transfer desk or request an operations token on failure.
-    const link=document.createElement('a'); link.href='./camera-health.html?itDaily=1';
-    link.textContent='Open Camera Health sign-in'; link.className='btn';
-    root.querySelector('.cos-it-daily-status')?.append(link);
+    // An unverified actor cannot mount transfer controls or request private data.
+    if(value.phone){
+      const actions=document.createElement('div');actions.className='cos-it-handoff-actions';
+      for(const label of ['Check Out / Hand Off','Check In / Return']){
+        const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=true;actions.append(button);
+      }
+      root.querySelector('.cos-it-daily-status')?.append(actions);
+    } else {
+      const link=document.createElement('a');link.href='./camera-health.html?itDaily=1';
+      link.textContent='Open Camera Health sign-in';link.className='btn';
+      root.querySelector('.cos-it-daily-status')?.append(link);
+    }
     return;
   }
   // Phone Tech Check is dedicated to equipment check-out and check-in.
@@ -101,14 +108,18 @@ async function open(value, generation, handoffFailure = null) {
     note.textContent=transferReadinessMessage(readiness.reason)+' Check Out and Check In remain unavailable until the required backend and inventory safeguards are verified.';
     const retry=document.createElement('button');retry.type='button';retry.textContent='Check handoff availability';
     retry.onclick=()=>{if(generation!==revision || key(scope())!==key(value))return;scopeKey='';present();};
-    handoffFallback.append(note,retry);
+    const actions=document.createElement('div');actions.className='cos-it-handoff-actions';
+    for(const label of ['Check Out / Hand Off','Check In / Return']){
+      const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=true;actions.append(button);
+    }
+    handoffFallback.append(actions,note,retry);
   }
   if(value.phone) {
     // A failed rollout must not display a substitute workflow on the phone.
     root.replaceChildren(handoffFallback);
     return;
   }
-  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='Camera Health and Fleet Map';
+  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
     ? './camera-health.html?itDaily=1'
@@ -141,7 +152,7 @@ function present() {
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
-  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px}';
+  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;font-weight:700;border-radius:10px;white-space:normal}.cos-it-handoff-actions button:disabled{opacity:.6;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
   document.head.append(style);
   // Runs before protected legacy delegated/inline handlers; inert also blocks keyboard entry.
   for (const type of ['click','submit','change','input']) window.addEventListener(type,event=>{

@@ -1,0 +1,246 @@
+/* Presentation only. Fleet data, signal colors, map symbols and action guards stay upstream. */
+#root#root .cos-fleet-dashboard {
+  --cos-vision-bg: #13171c;
+  --cos-vision-panel: #20262d;
+  --cos-vision-raised: #29313b;
+  --cos-border: #454b54;
+  --cos-text: #f5f7fa;
+  --cos-muted: #c2c8d1;
+  --cos-selected: #203b56;
+  --cos-blue: #63b4ff;
+  --fleet-bg: var(--cos-vision-bg);
+  --fleet-panel: var(--cos-vision-panel);
+  --fleet-line: var(--cos-border);
+  --fleet-text: var(--cos-text);
+  --fleet-muted: var(--cos-muted);
+  background: var(--fleet-bg);
+  color: var(--fleet-text);
+  font: 14px/1.6 'Open Sans', Arial, sans-serif;
+  border: 0;
+  min-width: 0;
+}
+
+#root#root .cos-fleet-dashboard :is(button, input, select, textarea) {
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+#root#root .cos-fleet-dashboard button { min-width: 44px; line-height: 1.5; }
+#root#root .cos-fleet-dashboard small { font-size: 12px; line-height: 1.6; }
+#root#root .cos-fleet-dashboard :is(button, input, select, a, summary):focus-visible {
+  outline: 3px solid var(--cos-blue);
+  outline-offset: 3px;
+}
+#root#root .cos-fleet-dashboard summary { min-height: 44px; align-content: center; }
+
+#root#root .cos-fleet-tabs { gap: 4px; padding: 6px; scrollbar-width: thin; }
+#root#root .cos-fleet-tabs button { padding: 12px 16px; font-size: 14px; flex-shrink: 0; }
+#root#root .cos-fleet-tabs button[aria-current=page] {
+  background: var(--cos-selected) !important;
+  border-bottom-color: var(--cos-blue) !important;
+}
+#root#root .cos-fleet-content { padding-top: 24px; }
+#root#root .cos-fleet-heading { gap: 24px; margin-bottom: 24px; }
+#root#root .cos-fleet-heading h1 { font-size: clamp(26px, 2.3vw, 34px); line-height: 1.3; }
+#root#root .cos-fleet-heading p { font-size: 14px; margin-top: 10px; }
+#root#root .cos-fleet-heading small { font-size: 12px; }
+#root#root .cos-fleet-eyebrow { font-size: 12px; letter-spacing: .06em; }
+#root#root .cos-fleet-clock time { font-size: 22px; }
+#root#root .cos-fleet-dashboard .cos-fleet-refresh {
+  background: var(--cos-vision-raised) !important;
+  border-color: var(--cos-border) !important;
+  font-size: 14px;
+  padding: 10px 16px;
+}
+
+#root#root .cos-fleet-stats { gap: 12px; margin-bottom: 16px; }
+#root#root .cos-fleet-stats .cos-fleet-stat { padding: 16px; border-radius: 10px; }
+#root#root .cos-fleet-stat span { font-size: 12px; line-height: 1.5; letter-spacing: .02em; }
+#root#root .cos-fleet-stat strong { font-size: 34px; line-height: 1.25; margin: 8px 0; }
+#root#root .cos-fleet-stat small { font-size: 12px; font-weight: 400; }
+#root#root .cos-fleet-count-note { font-size: 12px; line-height: 1.7; }
+
+#root#root .cos-fleet-filters { padding: 16px; border-radius: 10px; margin-bottom: 20px; }
+#root#root .cos-fleet-search { min-height: 48px; height: auto; }
+#root#root .cos-fleet-search input { font-size: 14px; padding: 12px; min-height: 46px; }
+#root#root .cos-fleet-search input::placeholder { color: var(--fleet-muted); opacity: 1; }
+#root#root .cos-fleet-search button { align-self: stretch; font-size: 23px; }
+#root#root .cos-fleet-filter-row { gap: 12px; margin-top: 16px; }
+#root#root .cos-fleet-filter-row > label { font-size: 12px; letter-spacing: .02em; min-width: 140px; }
+#root#root .cos-fleet-filter-row select { font-size: 14px; padding: 10px; margin-top: 6px; }
+#root#root .cos-fleet-filter-row .cos-fleet-checkbox { font-size: 13px; min-height: 44px; gap: 10px; }
+#root#root .cos-fleet-checkbox input { min-height: 20px; width: 20px; height: 20px; flex: none; }
+#root#root .cos-fleet-advanced-filters { font-size: 13px; }
+
+#root#root .cos-fleet-workspace {
+  grid-template-columns: minmax(290px, .36fr) minmax(0, .64fr);
+  border-radius: 12px;
+  min-height: 600px;
+}
+#root#root .cos-fleet-unit-panel { background: var(--fleet-bg); }
+#root#root .cos-fleet-unit-panel > div:first-child { padding: 16px; }
+#root#root .cos-fleet-unit-panel h2 { font-size: 18px; line-height: 1.4; }
+#root#root .cos-fleet-unit-panel > div > small { font-size: 12px; }
+#root#root .cos-fleet-unit-list { height: 540px; overflow-y: auto; padding: 12px; scrollbar-gutter: stable; }
+#root#root .cos-fleet-dashboard .cos-fleet-unit-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  font-weight: 400;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--fleet-line) !important;
+  border-radius: 10px;
+  background: var(--fleet-panel) !important;
+}
+#root#root .cos-fleet-dashboard .cos-fleet-unit-row:hover { border-color: var(--cos-blue) !important; }
+#root#root .cos-fleet-dashboard .cos-fleet-unit-row.selected {
+  border-color: var(--cos-blue) !important;
+  background: var(--cos-selected) !important;
+}
+#root#root .cos-fleet-unit-row > span { width: 100%; min-width: 0; }
+#root#root .cos-fleet-unit-row strong { display: block; font-size: 17px; line-height: 1.5; }
+#root#root .cos-fleet-unit-row small {
+  font-size: 13px;
+  margin-top: 6px;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+#root#root .cos-fleet-signals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fleet-line);
+}
+#root#root .cos-fleet-signals > span {
+  display: block;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+#root#root .cos-fleet-signals .cos-fleet-signal-label { color: var(--fleet-muted); margin: 0 0 5px; }
+#root#root .cos-fleet-signals b {
+  display: block;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#root#root .cos-fleet-signals i { font-style: normal; margin-right: 5px; }
+
+#root#root .cos-fleet-map-panel { min-height: 600px; }
+#root#root .cos-fleet-map-toolbar { padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
+#root#root .cos-fleet-map-toolbar strong { font-size: 17px; }
+#root#root .cos-fleet-map-toolbar small { font-size: 12px; }
+#root#root .cos-fleet-map-toolbar > div:last-child { gap: 8px; margin-left: auto; flex-wrap: wrap; }
+#root#root .cos-fleet-map-toolbar button { font-size: 13px; padding: 10px 12px; }
+#root#root .cos-fleet-map-canvas { height: 500px; min-height: 330px; background: #17202a; }
+/* Only raster tiles are toned down. Markers, locations, controls and attribution are untouched. */
+#root#root .cos-fleet-map-canvas .leaflet-tile-pane { filter: grayscale(.7) invert(.9) hue-rotate(180deg) brightness(.75) contrast(.9); }
+#root#root .cos-fleet-map-canvas .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+#root#root .cos-fleet-map-canvas .leaflet-control-attribution { font-size: 11px; line-height: 1.5; }
+#root#root .cos-fleet-map-legend { gap: 10px 16px; padding: 14px 16px; font-size: 13px; }
+#root#root .cos-fleet-map-legend strong { font-size: 12px; }
+#root#root .cos-fleet-map-legend small { flex-basis: 100%; font-size: 12px; }
+#root#root .cos-fleet-map-note { background: #20262df5; color: var(--fleet-text); font-size: 14px; }
+#root#root .cos-fleet-map-footnote { gap: 12px; font-size: 12px; line-height: 1.7; }
+#root#root .cos-fleet-map-footnote button { font-size: 13px; }
+#root#root .cos-fleet-map-panel:is(:fullscreen, .cos-fleet-map-expanded) { height: 100dvh; min-height: 0; border-radius: 0; }
+#root#root .cos-fleet-map-panel:is(:fullscreen, .cos-fleet-map-expanded) .cos-fleet-map-canvas { height: auto; min-height: 0; flex: 1 1 0; }
+#root#root .cos-fleet-map-panel:is(:fullscreen, .cos-fleet-map-expanded) > :not(.cos-fleet-map-canvas) { flex-shrink: 0; }
+
+#root#root .cos-fleet-drawer {
+  width: min(760px, 100%);
+  padding: 24px;
+  background: var(--fleet-bg);
+  color: var(--fleet-text);
+  overflow-x: hidden;
+}
+#root#root .cos-fleet-drawer .cos-fleet-drawer-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  width: 44px;
+  height: 44px;
+  margin: -8px -8px 8px 8px;
+  z-index: 2;
+}
+#root#root .cos-fleet-drawer > h2 { font-size: 30px; line-height: 1.35; overflow-wrap: anywhere; }
+#root#root .cos-fleet-drawer > p { font-size: 14px; line-height: 1.7; }
+#root#root .cos-fleet-drawer h3 { font-size: 17px; line-height: 1.5; }
+#root#root .cos-fleet-drawer > section.cos-fleet-recorded-address { padding: 18px; background: var(--fleet-panel); border-radius: 10px; }
+#root#root .cos-fleet-recorded-address p { font-size: 14px; }
+#root#root .cos-fleet-unit-health-grid { gap: 14px; margin: 20px 0 24px; }
+#root#root .cos-fleet-unit-health-section { padding: 18px; border-radius: 10px; }
+#root#root .cos-fleet-unit-health-section p { font-size: 14px; line-height: 1.7; }
+#root#root .cos-fleet-unit-health-section small { font-size: 12px; }
+#root#root .cos-fleet-badge { font-size: 13px; line-height: 1.6; padding: 5px 8px; }
+#root#root .cos-fleet-badge i { font-size: 12px; }
+#root#root .cos-fleet-battery-summary > strong { font-size: 40px; line-height: 1.3; margin: 8px 0; }
+#root#root .cos-fleet-battery-summary > p { font-size: 14px; }
+#root#root .cos-fleet-power-metrics { gap: 12px; }
+#root#root .cos-fleet-power-metrics > div { padding: 14px; }
+#root#root .cos-fleet-power-metrics :is(dt, dd) { font-size: 13px; }
+#root#root .cos-fleet-power-metrics strong { font-size: 22px; }
+#root#root .cos-fleet-drawer dl > div { font-size: 14px; gap: 14px; padding: 10px 0; }
+#root#root .cos-fleet-drawer .cos-fleet-detail-note { font-size: 13px; line-height: 1.7; padding: 12px; }
+#root#root .cos-fleet-drawer .camera-health-native { padding: 16px; border-radius: 10px; }
+#root#root .cos-fleet-drawer .camera-health-native button { font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
+#root#root .cos-fleet-review-grid :is(p, button),
+#root#root .cos-fleet-source-record :is(p, button),
+#root#root .cos-fleet-evidence-rules p { font-size: 14px; line-height: 1.7; }
+#root#root .cos-fleet-table-wrap { font-size: 14px; }
+#root#root .cos-fleet-table-wrap :is(th, small) { font-size: 12px; }
+#root#root .cos-fleet-table-wrap button { font-size: 13px; }
+#root#root .cos-fleet-map-info { font-size: 13px; line-height: 1.7; }
+#root#root .cos-fleet-dashboard footer { font-size: 12px; line-height: 1.7; }
+
+@media (max-width: 1100px) {
+  #root#root .cos-fleet-workspace { grid-template-columns: minmax(270px, .42fr) minmax(0, .58fr); }
+  #root#root .cos-fleet-unit-row { padding: 14px; }
+  #root#root .cos-fleet-stats .cos-fleet-stat { padding: 12px; }
+}
+@media (max-width: 750px) {
+  #root#root .cos-fleet-content { padding-top: 18px; }
+  #root#root .cos-fleet-heading { gap: 16px; margin-bottom: 20px; }
+  #root#root .cos-fleet-heading > div:last-child { max-width: none; width: 100%; gap: 12px; }
+  #root#root .cos-fleet-heading h1 { font-size: 26px; }
+  #root#root .cos-fleet-heading p { font-size: 14px; }
+  #root#root .cos-fleet-tabs { padding: 4px; }
+  #root#root .cos-fleet-tabs button { padding: 10px 12px; font-size: 13px; }
+  #root#root .cos-fleet-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #root#root .cos-fleet-stat:last-child { grid-column: 1 / -1; }
+  #root#root .cos-fleet-stat strong { font-size: 30px; }
+  #root#root .cos-fleet-count-note { font-size: 12px; }
+  #root#root .cos-fleet-filters { padding: 12px; }
+  #root#root .cos-fleet-filter-row { gap: 12px; }
+  #root#root .cos-fleet-filter-row > label { flex: 1 1 calc(50% - 12px); min-width: 0; }
+  #root#root .cos-fleet-filter-row .cos-fleet-checkbox { flex-basis: 100%; }
+  #root#root .cos-fleet-workspace { min-height: 0; }
+  #root#root .cos-fleet-map-panel { min-height: 440px; }
+  #root#root .cos-fleet-map-canvas { height: 330px; min-height: 300px; }
+  #root#root .cos-fleet-map-toolbar { padding: 12px; }
+  #root#root .cos-fleet-map-legend { padding: 12px; gap: 10px 14px; }
+  #root#root .cos-fleet-unit-list { height: 500px; padding: 12px; }
+  #root#root .cos-fleet-unit-panel { border-top: 1px solid var(--fleet-line); }
+  #root#root .cos-fleet-drawer { padding: 20px 16px; }
+  #root#root .cos-fleet-drawer > h2 { font-size: 26px; }
+  #root#root .cos-fleet-unit-health-section { padding: 16px; }
+  #root#root .cos-fleet-drawer dl > div { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+  #root#root .cos-fleet-power-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 360px) {
+  #root#root .cos-fleet-filter-row > label { flex-basis: 100%; }
+  #root#root .cos-fleet-signals { gap: 6px; }
+  #root#root .cos-fleet-power-metrics { grid-template-columns: 1fr; }
+}
