@@ -1,6 +1,7 @@
 /* Presentation adapter: the original Service lookup owns authorization, readiness,
    record reads and all writes. This form forwards to its existing controls. */
 const decorateService=()=>{
+  if(window.COS_SERVICE_BASICS_ONLY && window.TechCheckContext?.getRole()==='service')return;
   const home=document.querySelector('#wlSvcHome .wl-service-simple-shell');
   if(!home||home.querySelector('.vision-ticket-entry'))return;
   const trigger=home.querySelector('[data-wl-service-open-job]');
