@@ -1249,8 +1249,10 @@ function trackerStateForDevice(d){for(const raw of [d?.unit_key,d?.device_name])
 const loadCameraHealthRead=loadCameraHealth;
 loadCameraHealth=async function(options={}){
   const before=await readPlacementVersion().catch(()=>null);
+  if(!before){health={};healthPlacementVersion=null;placementView?.clear();if(!options.consistencyRetry)return loadCameraHealth({background:Boolean(options.background),consistencyRetry:true});return;}
   await loadCameraHealthRead(options);
   const after=await readPlacementVersion().catch(()=>null);
+  if(!after){health={};healthPlacementVersion=null;placementView?.clear();return;}
   if(after)healthPlacementVersion=after;
   if(before&&after&&before!==after&&!options.consistencyRetry){
     health={};

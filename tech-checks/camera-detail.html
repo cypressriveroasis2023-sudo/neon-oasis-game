@@ -375,6 +375,7 @@ async function load(){
   const placementVersion=await readPlacementVersion().catch(()=>null);
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   detailPlacementVersion=placementVersion;
+  if(!placementVersion)current={};
   const witness=cameraGroup(device)==='Witness';$('verifyBtn').disabled=witness;$('verifyBtn').title=witness?'Witness status not checked. Use Witness to verify this unit.':'';
   $('verifyBtn').textContent=witness?'Witness check unavailable':cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
   $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();
