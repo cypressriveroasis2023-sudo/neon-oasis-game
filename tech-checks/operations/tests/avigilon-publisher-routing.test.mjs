@@ -15,3 +15,9 @@ test('disabled candidate does no IO; managed scheduled route uses native receipt
   assert.equal(response.data,null);assert.match(response.error.message,/held/);
  }
  });
+
+test('enabled candidate requires and forwards the host background lifecycle',async()=>{
+ const options={enabled:true,actor:{tenantId:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',actorId:'10000000-0000-4000-8000-000000000001',canCheck:true},platformUrl:'https://native.invalid',serviceKey:'synthetic',legacyUrl:'https://goqrnolcvqnirjmzaeyk.supabase.co',legacyServiceKey:'synthetic',fetch:()=>{throw Error('Unexpected IO');},probe:async()=>{throw Error('Unexpected probe');}};
+ assert.throws(()=>createAvigilonProductionCandidate(options),/background lifecycle/);
+ const retained=[];const candidate=createAvigilonProductionCandidate({...options,background:work=>retained.push(work)});const job=Promise.resolve();candidate.checks.background(job);assert.deepEqual(retained,[job]);await job;
+});

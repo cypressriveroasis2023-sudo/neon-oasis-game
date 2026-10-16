@@ -7,8 +7,9 @@ import type {Actor,Endpoint,ProbeResult} from './avigilonCheckRun.ts';
 /** Candidate bootstrap, disabled unless explicitly invoked with enabled:true by
  * reviewed server code. No entrypoint invokes it in this PR. No new credentials
  * are minted. Both configured existing project transports are required. */
-export function createAvigilonProductionCandidate(o:{enabled?:boolean;actor:Actor;platformUrl:string;serviceKey:string;legacyUrl:string;legacyServiceKey:string;fetch?:typeof fetch;probe:(actor:Actor,endpoint:Endpoint,signal:AbortSignal)=>Promise<ProbeResult>}){
+export function createAvigilonProductionCandidate(o:{enabled?:boolean;actor:Actor;platformUrl:string;serviceKey:string;legacyUrl:string;legacyServiceKey:string;fetch?:typeof fetch;background?:(work:Promise<void>)=>void;probe:(actor:Actor,endpoint:Endpoint,signal:AbortSignal)=>Promise<ProbeResult>}){
  if(o.enabled!==true)return undefined;
+ if(typeof o.background!=='function')throw Error('Reviewed host background lifecycle required');
  if(new URL(o.legacyUrl).origin!=='https://goqrnolcvqnirjmzaeyk.supabase.co')throw Error('Source reader legacy project mismatch');
  const fetcher=o.fetch||fetch;
  const transport=(url:string,key:string)=>{const base=new URL(url);if(base.protocol!=='https:'||base.username||base.password||!key)throw Error('Reviewed project transport required');return async(name:string,payload:any)=>{const response=await fetcher(new URL('/rest/v1/rpc/'+name,base),{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(payload),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Source transport unavailable; durable operation remains pending');return response.json();};};
@@ -25,7 +26,7 @@ export function createAvigilonProductionCandidate(o:{enabled?:boolean;actor:Acto
   return sourcesForActor(state.pending?{...o.actor,actorId:state.pending.actorId}:o.actor).reconcile();
  };
  const jobs=new Set<Promise<void>>();
- const checks=createAvigilonServiceRuntime({...o,enabled:true,background:work=>{jobs.add(work);void work.finally(()=>jobs.delete(work)).catch(()=>{});}})!;
+ const checks=createAvigilonServiceRuntime({...o,enabled:true,background:work=>{o.background!(work);jobs.add(work);void work.finally(()=>jobs.delete(work)).catch(()=>{});}})!;
  const checksWithRecovery={...checks,readHealth:async(actor:Actor)=>{if(actor.tenantId!==o.actor.tenantId)throw Error('Tenant mismatch');await recoverSources();return checks.readHealth(actor);}};
  const checkManaged=async()=>{
   await recoverSources();

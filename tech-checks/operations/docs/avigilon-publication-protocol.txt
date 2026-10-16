@@ -207,7 +207,9 @@ records. Database guards reject legacy health writes for sniper/camv resources.
 Bootstrap is code-gated and disabled: no serve entrypoint calls
 createAvigilonProductionCandidate(enabled:true) or configureReviewedAvigilonRuntime.
 A reviewed server bootstrap supplies existing project transports and an existing
-active Owner/IT actor, creates the candidate, configures provider workers, and
+active Owner/IT actor and an explicit host background lifecycle callback (for
+example the existing EdgeRuntime.waitUntil), creates the candidate, configures
+provider workers, and
 passes checks plus sourcesForActor as the Operations handler's avigilonChecks and
 avigilonSources. No new credential is minted, requested or provisioned here.
 All guarded writer entrypoints must be deployed together before enabling readers;
