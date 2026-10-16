@@ -42,7 +42,7 @@ const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},ge
     fixture.calls.push({name,args:structuredClone(args)});
     if(fixture.role!=='service')return {error:{message:'Active Service Tech required.'}};
     if(name==='service_daily_report_status_v1')return {data:structuredClone(fixture.reports)};
-    if(name==='complete_service_daily_report_v3'){
+    if(name==='complete_service_daily_report_v4'){
       if(fixture.failSave)return {error:{message:'Synthetic inventory save failed'}};
       const r=await liveDb.rpc('service_save_my_truck_inventory_v3',{p_units:args.p_units,p_sims:args.p_sims,...Object.fromEntries(Object.entries(args.p_stock).map(([k,v])=>['p_'+k,v]))});
       if(r.error)return r;
@@ -69,7 +69,7 @@ const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},ge
   },
   from:()=>{const q={select:()=>q,eq:()=>q,gte:()=>q,order:()=>q,limit:async()=>({data:fixture.morning?[structuredClone(fixture.morning)]:[]})};return q;}
 };
-window.TechCheckContext={db:liveDb,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getSession:()=>fixture.actor?{user:{id:fixture.actor}}:null};
+window.TechCheckContext={db:liveDb,getProfile:()=>({full_name:'Synthetic Service',username:'synthetic.service',user_id:fixture.actor}),getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getSession:()=>fixture.actor?{user:{id:fixture.actor}}:null};
 function ownerTestPreviewContext(){return null;}
 function ownerTestPreviewFor(){return null;}
 function resetWizardPosition(){}

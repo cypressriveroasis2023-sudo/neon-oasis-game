@@ -39,3 +39,11 @@ Legacy `app.js`, the protected technician wizard and protected migrations are un
 ## Validation
 
 Disposable SQL tests cover atomicity, idempotency, evidence validation, role/identity isolation, private access, shortages and queue leases. Provider simulations cover unauthorized callers, missing configuration, archive-before-mail ordering, persisted Drive IDs and ambiguous email failures. Browser tests exercise real legacy inspection/rendering code with synthetic identities and fully intercepted requests, including phone/desktop layout, conditional trailer checks, one-button completion, exact SIM strings, photos, failure recovery and unchanged Owner/IT tools. No synthetic production technician reports or test emails are sent.
+
+## Attachments and technician sign-off (v4)
+
+Apply `service-daily-signoff-attachments-v4.sql` after v3. Technicians can use the native photo/library picker for each evidence slot and attach up to ten additional saved images. Extra images are converted to private JPEG evidence with the same actor/submission path restrictions; each can be removed before completion. The required truck, SIM and four battery type photos remain required.
+
+A technician must sign on screen or choose the keyboard alternative and type their own account name, then explicitly confirm the accuracy statement. A blank drawing, missing confirmation or different typed name cannot complete the check. Changing an inventory entry, photo or attachment clears the confirmation. Drawn signatures are stored as private JPEG evidence. The server binds the sign-off to the authenticated account ID, canonical profile name/username, a fixed statement/version and the database completion timestamp. Client-supplied signer IDs, times or statements cannot replace those values. The readable report ends with the sign-off and a Chicago date/time; the JSON archive retains the exact timestamp and account identity.
+
+Earlier report versions are preserved as unsigned history and can only retry their identical saved submission through earlier endpoints. New submissions require sign-off; no historical signature is invented. This records the technician's acknowledgment of the report; it makes no claim about legal enforceability. The external Google delivery connection requirement above remains unchanged.
