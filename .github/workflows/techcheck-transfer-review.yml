@@ -5,9 +5,13 @@ on:
       - '.github/workflows/techcheck-transfer-review.yml'
       - 'tech-checks/transfers/**'
       - 'tech-checks/service-transfer-host.js'
+      - 'tech-checks/service-signoff-ui.js'
+      - 'tech-checks/it-daily-host.js'
+      - 'tech-checks/it-feature-availability.js'
       - 'tech-checks/database-maintenance/techcheck-named-handoffs-v1.sql'
       - 'tech-checks/operations/tests/transfer*'
-      - 'tech-checks/supabase/functions/service-daily-delivery/**'
+      - 'tech-checks/operations/tests/helpers/transfer*'
+      - 'tech-checks/operations/tests/playwright.transfer.config.mjs'
 permissions:
   contents: read
 jobs:
@@ -24,15 +28,8 @@ jobs:
       - name: Install existing project toolchain
         run: npm ci
         working-directory: tech-checks/operations
-      - name: Preserve reproducible local validation toolchain
-        run: tar --exclude='*.woff' --exclude='*.woff2' --exclude='*.ttf' --exclude='*.otf' -czf /tmp/techcheck-review-toolchain.tar.gz -C tech-checks/operations node_modules
-      - uses: actions/upload-artifact@v4
-        with:
-          name: techcheck-review-toolchain
-          path: /tmp/techcheck-review-toolchain.tar.gz
-          retention-days: 1
-      - name: Existing delivery regression tests
-        run: node --import tsx --test tests/service-daily-delivery.test.mjs
+      - name: PostgreSQL, transfer and existing Service regressions
+        run: node --import tsx --test tests/transfer-core.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
         working-directory: tech-checks/operations
       - name: TypeScript
         run: npm run typecheck
@@ -40,3 +37,15 @@ jobs:
       - name: Build existing application
         run: npm run build
         working-directory: tech-checks/operations
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+        working-directory: tech-checks/operations
+      - name: Synthetic handoff and camera-only browser tests
+        run: npx playwright test --config tests/playwright.transfer.config.mjs
+        working-directory: tech-checks/operations
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: techcheck-transfer-review-results
+          path: tech-checks/operations/test-results-transfers
+          retention-days: 7

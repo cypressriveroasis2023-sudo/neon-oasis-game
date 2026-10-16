@@ -12,15 +12,15 @@ export async function signatureJpeg(state){
   if(!hasSignatureInk(state))throw new Error('Draw your signature, or choose Type signature and enter your full name.');
   return await new Promise((resolve,reject)=>canvasFor(state).toBlob(blob=>blob?resolve(blob):reject(new Error('Could not save your signature. Please retry.')),'image/jpeg',0.95));
 }
-export function createDailySignoff({state,actorName,onChange,isBusy}) {
+export function createDailySignoff({state,actorName,onChange,isBusy,statementText=SIGNOFF_STATEMENT,signatureGroup='daily-signature-method-'+crypto.randomUUID()}) {
   const section=document.createElement('section');section.className='cos-daily-signoff';
   const title=document.createElement('h3');title.textContent='Technician signature';
   const account=document.createElement('p');account.textContent='Signed-in technician: '+actorName;
-  const statement=document.createElement('p');statement.textContent=SIGNOFF_STATEMENT;
+  const statement=document.createElement('p');statement.textContent=statementText;
   const choices=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='Signature method';choices.append(legend);
   const radios={};
   for(const [value,caption] of [['drawn','Draw signature'],['typed','Type signature']]){
-    const label=document.createElement('label'),input=document.createElement('input');input.type='radio';input.name='daily-signature-method';input.value=value;input.checked=state.method===value;radios[value]=input;label.append(input,' '+caption);choices.append(label);
+    const label=document.createElement('label'),input=document.createElement('input');input.type='radio';input.name=signatureGroup;input.value=value;input.checked=state.method===value;radios[value]=input;label.append(input,' '+caption);choices.append(label);
     input.addEventListener('change',()=>{if(isBusy())return;state.method=value;invalidate();render();});
   }
   const draw=document.createElement('div'),canvas=canvasFor(state);canvas.setAttribute('aria-label','Draw technician signature');canvas.setAttribute('role','img');canvas.className='cos-signature-canvas';
