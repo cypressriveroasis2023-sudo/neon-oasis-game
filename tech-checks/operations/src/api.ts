@@ -100,6 +100,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
+  if (method === 'POST' && path === '/api/avigilon-check-runs') return sendRequest<T>(method,path,session.token,body,options?.signal);
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.

@@ -1,3 +1,5 @@
+import {createAvigilonCheckRuns} from '../_shared/avigilonCheckRun.ts';
+import {auditedAvigilonRoster} from '../_shared/avigilonAuditedRoster.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
@@ -577,20 +579,46 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
-      if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
+      const avigilonRoute=options.avigilonChecks && (method==='POST'&&path==='/api/avigilon-check-runs'||method==='GET'&&/^\/api\/avigilon-check-runs\/[a-f0-9-]{36}$/i.test(path));
+      if (!context.legacyOwner && !(verifiedFleetIt && (fleetRouteAllowed(method,path)||avigilonRoute))) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,
-        features:fleetFeatures(), productionOwnerUserId:null, provisioningNeeded:null, reason:null,
+        features:{...fleetFeatures(),freshAvigilonChecks:Boolean(options.avigilonChecks)}, productionOwnerUserId:null, provisioningNeeded:null, reason:null,
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
+        features: { freshAvigilonChecks:Boolean(options.avigilonChecks), unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if(avigilonRoute){
+        if(method==='POST' && body===null)body=await requestBody(request);
+        if(body&&Object.keys(body).length)fail('Check run inputs are server-derived.');
+        const actor={tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true};
+        let pendingRoster=null;
+        const readRoster=()=>{
+          if(pendingRoster)return pendingRoster;
+          const work=(async()=>{
+            const fresh=await authenticate(request);
+            if(fresh.actorId!==actor.actorId||(!fresh.legacyOwner&&!verifiedItFleet(fresh)))fail('Fresh check authorization changed.',403);
+            const [response,bundle,endpoints]=await Promise.all([
+              handle(new Request(new URL(request.url).origin+'/functions/v1/cos-operations-pages',{method:'POST',headers:request.headers,body:JSON.stringify({method:'GET',path:'/api/field-map'})})),
+              readIdentitySources(fresh),
+              legacyAll('camera_devices?select=id,public_ip,expected_ports,connection_revision,monitoring_profile,monitoring_enabled,activation_state&order=id.asc',fresh.headers),
+            ]);
+            if(!response.ok)fail('Audited Field roster is unavailable.',503);
+            return auditedAvigilonRoster(ORGANIZATION_ID,await response.json(),[...(bundle.identity.unitIdentities||[]),...(bundle.identity.ownerConfirmedUnitIdentities||[])],endpoints);
+          })();pendingRoster=work;void work.finally(()=>{if(pendingRoster===work)pendingRoster=null;}).catch(()=>{});return work;
+        };
+        const runs=createAvigilonCheckRuns({authorize:async()=>actor,roster:readRoster,
+          store:options.avigilonChecks.store(actor),probe:(a,e,signal)=>options.avigilonChecks.probe(a,e,signal),
+          background:options.avigilonChecks.background,id:()=>crypto.randomUUID()});
+        const result=method==='POST'?await runs.start(request):await runs.read(request,path.split('/').at(-1));
+        return json(result,method==='POST'?202:200);
+      }
       const censusOnce=/^\/api\/field-map\/([^/]+)\/(owner-census-once|owner-census-proof|owner-census-prepare)$/.exec(path);
       if(censusOnce){
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
