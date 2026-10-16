@@ -1,0 +1,39 @@
+/* Only the signed-in Service role gets the basic daily presentation. */
+body.cos-service-basics #wlSvcHome [data-wl-service-open-job],
+body.cos-service-basics #wlSvcHome [data-wl-service-trailer-inspection],
+body.cos-service-basics #wlSvcHome [data-wl-service-return],
+body.cos-service-basics #wlSvcHome .wl-service-help,
+body.cos-service-basics #view-svc [data-wl-service-truck-usage],
+body.cos-service-basics #view-svc [data-wl-service-resolve-spares],
+body.cos-service-basics #view-svc [data-wl-next-svc-return],
+body.cos-service-basics #techMenuButton,
+body.cos-service-basics #wlTechMenuPanel,
+body.cos-service-basics #wlHelpOverlay,
+body.cos-service-basics #wlGuidedTourLayer,
+body.cos-service-basics #wlHelpCoachToast,
+body.cos-service-basics #wlNotificationPanel,
+body.cos-service-basics #cosProductionAssignmentsButton,
+body.cos-service-basics #cosProductionAssignmentsOverlay,
+body.cos-service-basics #tab-owner,
+body.cos-service-basics #tab-it,
+body.cos-service-basics #view-owner,
+body.cos-service-basics #view-it,
+body.cos-service-basics #view-morning {
+  display: none !important;
+}
+body.cos-service-basics #wlSvcHome .cos-service-basics-flow {
+  max-width: 36rem;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  overflow-wrap: anywhere;
+}
+body.cos-service-basics #view-svc .wl-truck-entry-input {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+body.cos-service-basics #view-svc :is(button, input):focus-visible {
+  outline: 3px solid #fff !important;
+  outline-offset: 3px;
+}
