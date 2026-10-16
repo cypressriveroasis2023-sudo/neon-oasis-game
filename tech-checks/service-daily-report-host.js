@@ -2,6 +2,7 @@
 const context = () => window.TechCheckContext;
 const types = ['Sniper','Ranger','Spotter','Solar Spotter'];
 const simCards = ['SIM Card 1','SIM Card 2','SIM Card 3'];
+const batteryTypes = ['Recon batteries','AGM 12V 110Ah','LiTime 12V 100Ah','12V 35Ah'];
 const counts = {recon_battery_qty:['wlTruckReconQty',25],agm_12v_110ah_qty:['wlTruckAgmQty',4],litime_12v_100ah_qty:['wlTruckLiTimeQty',2],battery_12v_35ah_qty:['wlTruck35AhQty',4]};
 const day = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const actor = () => context()?.getRole()==='service' && !document.getElementById('appView')?.classList.contains('hidden') ? context()?.getSession()?.user?.id : null;
@@ -87,8 +88,8 @@ function decorate(card) {
   restoreValues(card);
   const section=document.createElement('section');section.className='cos-daily-evidence';
   const heading=document.createElement('h3');heading.textContent='Truck photos';
-  const info=document.createElement('p');info.textContent='Photograph the actual stock today. Each unit needs a clear front photo and a rear photo showing its unit tag. Each of the three SIM cards needs its own front and back photo, with the SIM number readable.';section.append(heading,info);
-  for(const category of [...types,'Batteries',...simCards]){
+  const info=document.createElement('p');info.textContent='Photograph the actual stock today. Each unit needs a clear front photo and a rear photo showing its unit tag. Photograph each battery type separately. Each of the three SIM cards needs its own front and back photo, with the SIM number readable.';section.append(heading,info);
+  for(const category of [...types,...batteryTypes,...simCards]){
     const field=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=category;field.append(legend);
     if(types.includes(category))field.append(photoInput(category,'front','Front photo',true),photoInput(category,'tag','Rear unit tag photo',true));
     else if(simCards.includes(category))field.append(photoInput(category,'front','Front photo',true),photoInput(category,'back','Back photo',true));
@@ -125,7 +126,7 @@ async function sync() {
     document.querySelectorAll('.cos-daily-evidence').forEach(node=>node.remove());
     document.querySelectorAll('#wlSvcTruckInventory input').forEach(input=>{input.value='';input.checked=false;});
   }
-  if(id!==current || currentDay!==day()){current=id;currentDay=day();draft=null;changes++;statusKey='';if(id){const version=changes;try{const saved=await device('readonly',store=>store.get(key(id)));if(actor()!==id||changes!==version)return;draft=saved||{id:crypto.randomUUID(),photos:[],values:null};if(draft.photos.some(photo=>photo.category==='SIM cards')){draft.id=crypto.randomUUID();draft.photos=draft.photos.filter(photo=>photo.category!=='SIM cards');await save();}}catch(error){message(error.message,true);return;}}}
+  if(id!==current || currentDay!==day()){current=id;currentDay=day();draft=null;changes++;statusKey='';if(id){const version=changes;try{const saved=await device('readonly',store=>store.get(key(id)));if(actor()!==id||changes!==version)return;draft=saved||{id:crypto.randomUUID(),photos:[],values:null};if(draft.photos.some(photo=>['SIM cards','Batteries'].includes(photo.category))){draft.id=crypto.randomUUID();draft.photos=draft.photos.filter(photo=>!['SIM cards','Batteries'].includes(photo.category));await save();}}catch(error){message(error.message,true);return;}}}
   if(!id)return;
   const card=document.getElementById('wlSvcTruckInventory');if(card)decorate(card);
   await homeStatus(id);
@@ -157,7 +158,7 @@ document.addEventListener('click',async event=>{
     for(const [name,[,minimum]] of Object.entries(counts)){const n=Number(values.stock[name]);if(!Number.isSafeInteger(n)||n<minimum)throw new Error('Truck stock is short. Verify all required battery quantities before completing.');values.stock[name]=n;}
     for(const category of types)for(const view of ['front','tag'])if(!draft.photos.some(p=>p.category===category&&p.view===view))throw new Error('Add the front and rear unit tag photos for '+category+'.');
     for(const category of simCards)for(const view of ['front','back'])if(!draft.photos.some(p=>p.category===category&&p.view===view))throw new Error('Add the '+view+' photo for '+category+'.');
-    if(!draft.photos.some(p=>p.category==='Batteries'&&p.view==='1'))throw new Error('Add a photo of the batteries.');
+    for(const category of batteryTypes)if(!draft.photos.some(p=>p.category===category&&p.view==='1'))throw new Error('Add a photo of the '+category+'.');
     draft.values=values;await save();
     const photos=[];
     const assertIdentity=()=>{if(actor()!==id||changes!==version)throw new Error('Your session changed. Sign in again to finish this check.');};
@@ -176,7 +177,7 @@ document.addEventListener('click',async event=>{
       photos.push({category:photo.category,view:photo.view,path});
     }
     assertIdentity();message('Completing your daily check…');
-    const saved=await rpc('complete_service_daily_report_v2',{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos});
+    const saved=await rpc('complete_service_daily_report_v3',{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos});
     if(!saved?.inventory_ready)throw new Error('The server has not confirmed truck readiness. Your draft is preserved.');
     assertIdentity();
     // Accepted submission remains authoritative even if device cleanup fails.
