@@ -1,0 +1,45 @@
+{
+  "status": "local_review_candidate_not_applied_not_published",
+  "transportEnabledByDefault": false,
+  "productionExecutionRequiresSeparateApproval": true,
+  "privateSignatures": [
+    "cos_avigilon_checks_private.claim(p_actor uuid, p_tenant uuid, p_run jsonb) returns jsonb",
+    "cos_avigilon_checks_private.read_run(p_actor uuid, p_tenant uuid, p_id uuid) returns jsonb",
+    "cos_avigilon_checks_private.save(p_actor uuid, p_tenant uuid, p_run jsonb) returns boolean"
+  ],
+  "proposedServiceBoundary": [
+    "public.cos_avigilon_run_claim(p_actor_user_id uuid, p_organization_id uuid, p_run jsonb) returns jsonb",
+    "public.cos_avigilon_run_read(p_actor_user_id uuid, p_organization_id uuid, p_run_id uuid) returns jsonb",
+    "public.cos_avigilon_run_save(p_actor_user_id uuid, p_organization_id uuid, p_run jsonb) returns boolean"
+  ],
+  "privileges": {
+    "currentProduction": "No change made; proposed objects are not installed by this work.",
+    "privateStoreCandidate": "postgres owns functions/tables; RLS enabled; PUBLIC, anon, authenticated and service_role have no direct schema/table/function access.",
+    "proposedBoundary": "Three SECURITY DEFINER functions owned by postgres, empty search_path. EXECUTE granted only to service_role after revoking PUBLIC, anon and authenticated. No grants on private tables/schema/functions.",
+    "browserAccess": "None. Browser sends an empty start request or run ID through the existing authenticated Operations bridge.",
+    "rolesAndCredentials": "Existing Owner/IT identities and existing platform service credential only. No role memberships, user profiles, secrets or credentials created or changed."
+  },
+  "mandatoryChecks": [
+    "Existing legacy session, active profile, same-person native mapping and native Owner/IT role verified by Operations handler.",
+    "Actor and fixed tenant derived server-side; client actor/tenant/roster parameters rejected.",
+    "Boundary requires service_role JWT context and service-only EXECUTE privilege.",
+    "Every private claim/read/save rechecks active native user profile, organization and matching Owner or IT technician role.",
+    "Claims are tenant-locked; saves require current lease, creating actor, immutable run metadata and non-regressing terminal outcomes.",
+    "Reads require the authorized tenant; no browser or direct service-role private store access."
+  ],
+  "whyNeeded": "Existing refresh claim stores no run ID/outcomes and does not coalesce. Edge runtime needs bounded durable state without exposing tables or granting browser writes.",
+  "files": [
+    "db/avigilon_check_runs.sql",
+    "db/avigilon_check_run_boundary.sql",
+    "db/avigilon_check_run_boundary_rollback.sql",
+    "../supabase/functions/_shared/avigilonServiceRuntime.ts"
+  ],
+  "readerEvidence": {
+    "provenance": "Earlier authorized read-only Supabase get-function-definition query, cached privately before cancellation notice; no later cancelled read repeated or bypassed.",
+    "file": "/workspace/scratch/oct15-audit/installed-upload-reader.sql",
+    "cachedFileSha256": "098213b2d732a9dedbeb54156162a0e6b5ebad58df706d73673a61c564a3cb6b",
+    "cachedAtUtc": "2026-10-16T01:23:27.582607327Z"
+  },
+  "executionGate": "Do not install, grant, deploy, enable runtime or probe before separate production review/approval. Compatible endpoint checker and deployed mapping verification remain required.",
+  "rollback": "Revoke service-role execution on the three boundary functions; retain private runs and heads. No records deleted."
+}
