@@ -39,6 +39,7 @@ const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},ge
   storage:{from:()=>({upload:async(path,blob)=>{if(fixture.uploadFailure)return {error:{statusCode:503}};fixture.uploaded.push({path,size:blob.size});return {};}})},
   functions:{invoke:async()=>({data:{status:'blocked'}})},
   rpc:async(name,args)=>{
+    if(name==='techcheck_transfer_readiness_v1')return {error:{code:'PGRST202',message:'Synthetic handoff backend not installed'}};
     fixture.calls.push({name,args:structuredClone(args)});
     if(fixture.role!=='service')return {error:{message:'Active Service Tech required.'}};
     if(name==='service_daily_report_status_v1')return {data:structuredClone(fixture.reports)};
@@ -69,7 +70,7 @@ const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},ge
   },
   from:()=>{const q={select:()=>q,eq:()=>q,gte:()=>q,order:()=>q,limit:async()=>({data:fixture.morning?[structuredClone(fixture.morning)]:[]})};return q;}
 };
-window.TechCheckContext={db:liveDb,getProfile:()=>({full_name:'Synthetic Service',username:'synthetic.service',user_id:fixture.actor}),getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getSession:()=>fixture.actor?{user:{id:fixture.actor}}:null};
+window.TechCheckContext={db:liveDb,getProfile:()=>({active:true,archived_at:null,full_name:'Synthetic Service',username:'synthetic.service',user_id:fixture.actor}),getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getSession:()=>fixture.actor?{user:{id:fixture.actor}}:null};
 function ownerTestPreviewContext(){return null;}
 function ownerTestPreviewFor(){return null;}
 function resetWizardPosition(){}

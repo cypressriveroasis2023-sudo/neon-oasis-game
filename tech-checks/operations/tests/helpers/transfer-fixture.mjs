@@ -5,7 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {snapshot,resource} from '../fixtures/camera-evidence-fixtures.mjs';
 export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',SERVICE='00000000-0000-4000-8000-000000000002',OTHER='00000000-0000-4000-8000-000000000003';
 const root=new URL('../../../',import.meta.url).pathname;
-export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false}={}){
+export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false,rollout='ready',readinessDelay=0}={}){
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
@@ -19,7 +19,8 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  grant usage on schema auth,app_private,storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
  `);
  await db.exec(await readFile(root+'database-maintenance/techcheck-named-handoffs-v1.sql','utf8'));
- await db.exec('update app_private.techcheck_transfer_settings set enabled=true');
+ await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-rollout-v2.sql','utf8'));
+ await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
  // Serialize fixture connections exactly; roles cannot bleed between HTTP requests.
  let pending=Promise.resolve();
  const run=(actor,sql,args=[])=>{const result=pending.then(async()=>{await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[actor]);await db.exec('set role authenticated');try{return await db.query(sql,args);}finally{await db.exec('reset role');}});pending=result.catch(()=>{});return result;};
@@ -28,6 +29,10 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  const args={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:serviceActor,p_items:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:['00123456789012345670'],battery_count:2,parts:[{name:'SD card',quantity:1}]}],p_checks:{'sniper:001':Object.fromEntries(rules.families.Sniper.bool_fields.map(field=>[field,true]))},p_signature:{method:'typed',name:'Synthetic IT',confirmed:true},p_photos:[{equipment_key:'sniper:001',kind:'unit',path}],p_notes:'Synthetic equipment checked for the named Service technician.'};
  handoff=(await run(IT,`select submit_techcheck_transfer_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args))).rows[0].result;
  }
+ if(rollout==='missing')await db.exec('drop function public.techcheck_transfer_readiness_v1()');
+ if(rollout==='disabled')await db.exec('update app_private.techcheck_transfer_settings set enabled=false');
+ if(rollout==='reports-held')await db.exec('update app_private.techcheck_transfer_settings set reports_ready=false');
+ if(rollout==='missing-submit')await db.exec('alter function public.submit_techcheck_transfer_v1(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text) rename to undeployed_submit');
  const actor=role==='it'?IT:SERVICE;
  const html=`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#101010;color:#fff;font:16px Arial}.hidden{display:none!important}#appView{padding:10px}button{min-height:44px}</style></head><body><div id="appView"><div id="view-it" class="${role==='it'?'':'hidden'}"><section id="legacy"><button>Legacy IT prep</button></section></div><div id="view-svc" class="${role==='service'?'':'hidden'}"><div id="wlSvcTruckInventory"><h1>Morning truck check</h1><button id="existingDailyComplete">Complete &amp; Send</button></div></div><div id="view-owner" class="hidden">Owner tools</div><div id="view-morning" class="hidden"></div><button id="techMenuButton">Legacy menu</button></div><script>
  window.fixture={actor:${JSON.stringify(actor)},role:${JSON.stringify(role)},online:true,uploadFail:false,rpcFail:false,loseResponse:false};
@@ -51,8 +56,10 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:html});
  if(url.pathname==='/synthetic/rpc'){
   const {name,args}=req.postDataJSON();calls.push({name,args});
-  if(!['techcheck_transfer_context_v1','submit_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
-  try{const rows=await run(req.headers()['x-actor'],`select public.${name}(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args));return route.fulfill({json:{data:rows.rows[0].result}});}catch(e){return route.fulfill({json:{error:{message:e.message,code:e.code}}});}
+  if(name==='techcheck_transfer_readiness_v1'&&readinessDelay)await new Promise(resolve=>setTimeout(resolve,readinessDelay));
+  if(name==='techcheck_transfer_context_v1'&&rollout==='read-cache-missing')return route.fulfill({json:{error:{code:'PGRST202',message:'Synthetic missing schema cache'}}});
+  if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
+  try{const rows=await run(req.headers()['x-actor'],`select public.${name}(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args));return route.fulfill({json:{data:rows.rows[0].result}});}catch(e){return route.fulfill({json:{error:{message:e.message,code:e.code==='42883'?'PGRST202':e.code}}});}
  }
  if(url.pathname==='/synthetic/storage'){
   const bytes=req.postDataBuffer(),path=url.searchParams.get('name');try{await run(req.headers()['x-actor'],"insert into storage.objects values('techcheck-transfer-evidence',$1,$2)",[path,{mimetype:'image/jpeg',size:bytes.length}]);paths.set(path,bytes);return route.fulfill({json:{ok:true}});}catch(e){return route.fulfill({status:e.code==='23505'?409:403,json:{error:e.message}});}

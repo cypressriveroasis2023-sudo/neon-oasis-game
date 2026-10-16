@@ -1,10 +1,11 @@
 // Uses the existing signed-in Supabase client. No new identity or credentials.
+import {transferReadiness,transferReadinessMessage} from './readiness.js';
 export function transferClient(context) {
- const actor=context.getSession()?.user?.id;
- const current=()=>Boolean(actor&&context.getSession()?.user?.id===actor);
+ const actor=context.getSession()?.user?.id,role=context.getRole();
+ const current=()=>{const p=context.getProfile();return Boolean(actor&&context.getSession()?.user?.id===actor&&context.getRole()===role&&p?.user_id===actor&&p?.active===true&&!p?.archived_at);};
  const assert=()=>{if(!current())throw new Error('Your session changed. Sign in again.');};
- const rpc=async(name,args={})=>{assert();const {data,error}=await context.db.rpc(name,args);assert();if(error)throw Object.assign(new Error(error.message||'Transfer request failed.'),{rejected:['P0001','42501','22P02','23505','23514'].includes(error.code)});return data;};
- const read=async()=>{const data=await rpc('techcheck_transfer_context_v1');if(data?.version!==1||!['it','service'].includes(data.role)||!Array.isArray(data.transfers)||!Array.isArray(data.equipment)||!Array.isArray(data.technicians))throw new Error('Transfer information is unavailable or incomplete.');return data;};
+ const rpc=async(name,args={})=>{assert();const {data,error}=await context.db.rpc(name,args);assert();if(error)throw Object.assign(new Error(error.message||'Transfer request failed.'),{rejected:['P0001','42501','22P02','23505','23514'].includes(error.code),unavailable:error.code==='PGRST202',reason:error.code==='PGRST202'?'not_installed':undefined});return data;};
+ const read=async()=>{const readiness=await transferReadiness(context,role);assert();if(!readiness.ready)throw Object.assign(new Error(transferReadinessMessage(readiness.reason)),{unavailable:true,reason:readiness.reason});const data=await rpc('techcheck_transfer_context_v1');if(data?.version!==1||!['it','service'].includes(data.role)||!Array.isArray(data.transfers)||!Array.isArray(data.equipment)||!Array.isArray(data.technicians))throw new Error('Transfer information is unavailable or incomplete.');return data;};
  async function submit(args,photos,onProgress=()=>{}) {
   assert();const before=await read();
   const accepted=before.transfers.flatMap(t=>t.events||[]).find(e=>e.id===args.p_request_id);

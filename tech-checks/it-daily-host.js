@@ -1,5 +1,6 @@
 import {mountTransferDesk} from './transfers/desk.js';
 import {isPhoneSurface} from './transfers/model.js';
+import {transferReadiness,transferReadinessMessage} from './transfers/readiness.js';
 import {IT_DAILY_ONLY} from './it-feature-availability.js';
 import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
@@ -72,16 +73,28 @@ async function verify(value) {
   let timer;
   try { const response = await Promise.race([context().db.rpc('cos_verified_fleet_capabilities_v1'),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),12000);})]); return response && !response.error && response.data?.fleetRead === true; } catch { return false; } finally {clearTimeout(timer);}
 }
-async function open(value, generation) {
+async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
   if (!permitted) { status(value.preview ? 'Exit the test persona to view the daily tools with your own authorized account. Other IT features are paused until further notice.' : 'Daily view access could not be verified. Other IT features are paused until further notice.', !value.preview); return; }
-  if(value.phone){root.replaceChildren();const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it'});return;}
+  let handoffFallback = null;
+  if(value.phone){
+    const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
+    if(generation!==revision || key(scope())!==key(value) || !root)return;
+    if(readiness.ready){root.replaceChildren();const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Opening Camera Health…');void open(value,generation,reason);}});return;}
+    handoffFallback=document.createElement('section');handoffFallback.className='cos-it-daily-status';
+    handoffFallback.setAttribute('aria-label','Equipment handoff availability');
+    const note=document.createElement('p');note.setAttribute('role','status');
+    note.textContent=transferReadinessMessage(readiness.reason)+' Camera Health remains available below. This availability check does not check out or accept equipment.';
+    const retry=document.createElement('button');retry.type='button';retry.textContent='Check handoff availability';
+    retry.onclick=()=>{if(generation!==revision || key(scope())!==key(value))return;scopeKey='';present();};
+    handoffFallback.append(note,retry);
+  }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#camera-health';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
-  root.replaceChildren(frame);
+  root.replaceChildren(...(handoffFallback?[handoffFallback,frame]:[frame]));
   scheduleFrameFit();
 }
 function present() {

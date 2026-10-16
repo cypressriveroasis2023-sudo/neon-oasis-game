@@ -29,3 +29,16 @@ npm run typecheck
 npm run build
 npx playwright test --config tests/playwright.transfer.config.mjs
 ```
+
+## Missing-backend entry repair
+
+The phone UI now requires an account-bound, timed readiness response before opening handoffs. A missing function, disabled rollout, incompatible schema, missing submit endpoint, public/incompatible evidence bucket, unfinished report/daily-link/custody gate, or unavailable read keeps transfer controls closed. IT receives the existing authorized Camera Health view with a retry notice; Service's original morning form remains usable. The transfer client also preflights reads/submissions, and a schema-cache mismatch after a successful probe returns the host to its safe view. Late readiness replies cannot change a newer account or replace a timed-out fallback.
+
+`techcheck-transfer-rollout-v2.sql` is an additive migration after v1. It adds separate operator release attestations (`reports_ready`, `receipt_link_ready`, `custody_ready`), all false by default. Public context/submit entry points and storage access require all gates; the previous core routines move to private, client-inaccessible names. No flag is enabled by this migration. These flags do not implement or prove the unfinished report adapter or custody reconciliation; the original release blockers above remain.
+
+Local focused validation: 64 Node/PGlite tests passed, strict TypeScript passed, and build passed. The browser configuration includes 39 cases (8 existing transfers, 13 new readiness cases, and 18 original Service basics cases); browser execution must be verified in the normal GitHub review runner. No local browser policy bypass or production migration was attempted.
+
+Additional command:
+```
+node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
+```

@@ -13,7 +13,7 @@ const expectedText=item=>`${item.family} ${item.unit_tag}\nSIM: ${item.sims.join
 function input(type,value,changed){const n=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')n.type=type;n.value=value??'';n.addEventListener('input',()=>changed(n.value));return n;}
 function loadStyle(){if(document.querySelector('[data-transfer-style]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href=new URL('./desk.css',import.meta.url).href;l.dataset.transferStyle='';document.head.append(l);}
 // Mounts inside the original TechCheck page, using its current account and database.
-export function mountTransferDesk(root,context,{role='it'}={}){
+export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}){
  loadStyle();root.classList.add('tc-transfer');root.setAttribute('aria-label',role==='it'?'IT equipment check in and check out':'Equipment received from IT');
  const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
  const current=()=>!disposed&&client.current()&&root.isConnected;
@@ -27,7 +27,7 @@ export function mountTransferDesk(root,context,{role='it'}={}){
  async function load(notice=''){
   const turn=++revision;reset();heading(role==='it'?'Equipment handoffs':'Equipment received from IT');message('Reading your saved handoffs…');
   try{const [result,rules]=await Promise.all([client.read(),contract?Promise.resolve(contract):fetch(new URL('./checklist-contract.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('Equipment checks unavailable.');return r.json();})]);guard();if(turn!==revision)return;if(result.role!==role)throw new Error('Your current role does not match this screen.');data=result;contract=rules;home(notice);}
-  catch(e){if(current()&&turn===revision){message('Handoffs unavailable. '+e.message+' No equipment has been accepted.',true);root.append(button('Retry handoffs',()=>load()));}}
+  catch(e){if(current()&&turn===revision){if(onUnavailable){onUnavailable(e.reason||'unavailable');return;}message('Handoffs unavailable. '+e.message+' Saved handoff status could not be verified.',true);root.append(button('Retry handoffs',()=>load()));}}
  }
  function home(notice=''){
   reset();draft=null;heading(role==='it'?'Check equipment. Hand it over.':'Equipment received from IT',role==='it'?'Check only the equipment being transferred. Service completes their own truck inventory.':'Physically verify the equipment assigned to you. IT sending it does not mean you accepted it.');
@@ -107,7 +107,7 @@ export function mountTransferDesk(root,context,{role='it'}={}){
    const result=await client.submit(draft.request,photos,(n,total)=>message(`Saving evidence ${n} of ${total}…`));guard();
    await deviceDraft(storageKey,null,true).catch(()=>{});guard();
    await load(transferTitle(result.state)+'. Saved in COS; transfer report delivery is pending.');
-  }catch(e){if(current()){if(e.rejected&&draft){draft.request=null;draft.submissionPhotos=null;await persist().catch(()=>{});}if(draft?.request)render(transfer);message(e.message,true);}}
+  }catch(e){if(current()){if(e.unavailable&&onUnavailable){onUnavailable(e.reason||'unavailable');return;}if(e.rejected&&draft){draft.request=null;draft.submissionPhotos=null;await persist().catch(()=>{});}if(draft?.request)render(transfer);message(e.message,true);}}
   finally{busy=false;for(const [n,disabled] of controls)if(n.isConnected)n.disabled=disabled;}
  }
  void load();
