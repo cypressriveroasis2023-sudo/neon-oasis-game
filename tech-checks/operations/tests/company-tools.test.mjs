@@ -33,7 +33,7 @@ const scriptHashes = {
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "010039955b153ccdf5baeb0f52ffb1cb0169972eb7968b285f30be3222fb2dfe",
+  "camera-health": "773a1c2c612f636332e74e61165d459b0e558db3f14e1aadf7c1b3df4ab55670",
   "camera-detail": "3a375db191071a96ae6f42112e7c00117be181c982676dc9944f92a71b6e5269",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
