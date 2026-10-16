@@ -1,3 +1,4 @@
+import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import { resolveStarResources } from "./star-resource-identity.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -17,7 +18,7 @@ Deno.serve(async(req)=>{
   const targetUnitKey=String(body?.unit_key||"").trim();
   const username=Deno.env.get("vigilant_username")||Deno.env.get("VIGILANT_USERNAME"),password=Deno.env.get("vigilant_password")||Deno.env.get("VIGILANT_PASSWORD");
   if(!username||!password)throw new Error("Vigilant secrets are not configured");
-  const sb=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const sb=guardedAvigilonClient(createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!));
   const discovery=await post("https://www.star4live.com/openapi/user/account/server/getbyloginname",{loginName:username});
   const host=discovery?.data?.serverHost||discovery?.data?.server||discovery?.data?.host||"os.star4live.com";
   const base=host.startsWith("http")?host:`https://${host}`;

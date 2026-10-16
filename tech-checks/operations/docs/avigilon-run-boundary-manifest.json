@@ -43,7 +43,11 @@
     "db/avigilon_health_boundary.sql",
     "docs/avigilon-publication-protocol.txt",
     "db/avigilon_health_boundary_rollback.sql",
-    "db/avigilon_native_source_fences.sql"
+    "db/avigilon_native_source_fences.sql",
+    "db/avigilon_source_operations.sql",
+    "db/avigilon_legacy_source_guard.sql",
+    "../supabase/functions/_shared/avigilonSourceCoordinator.ts",
+    "../supabase/functions/_shared/avigilonProductionCandidate.ts"
   ],
   "readerEvidence": {
     "provenance": "Earlier authorized read-only Supabase get-function-definition query, cached privately before cancellation notice; no later cancelled read repeated or bypassed.",
@@ -55,7 +59,7 @@
   "rollback": "Disable runtime, quiesce/fence writers and revoke service execution on all five boundary functions; retain durable evidence.",
   "releaseBlockers": [
     "Production SQL/grants/deployment/enablement require separate approval; new health wrappers intentionally have no service EXECUTE grants.",
-    "Native source statement hooks are candidate-only; legacy cross-project source fencing, native readback/admission orchestrators, and scheduled/manual publisher migration remain blocked as enumerated in the protocol. Runtime stays disabled.",
+    "Source-operation schemas and integrated adapters are candidate-only. Review source/RPC compatibility, all nine boundary grants, coordinated server deployment and existing credential/actor configuration before enabling; runtime stays disabled.",
     "Native health is authoritative; no legacy replication or cross-project transaction is claimed."
   ],
   "reviewRegressionEvidence": [

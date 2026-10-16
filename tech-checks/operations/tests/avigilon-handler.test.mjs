@@ -4,6 +4,7 @@ const response=data=>Response.json(data),at=new Date().toISOString();
 test('authenticated mounted route derives actual projection; capability defaults closed and client data rejected',async()=>{
  const jobs=[],runs=new Map();let probes=0,denied=false,generation=1,changeDuringRead=false;
  const fetch=async(url)=>{const name=new URL(url).pathname.split('/').at(-1);
+  if(name==='cos_avigilon_source_control')return response({tenantId:org,generation:'1',admitted:false,pending:null});
   if(name==='user')return denied?Response.json({error:'Denied'},{status:401}):response({id:owner});
   if(name==='profiles')return response([{user_id:owner,full_name:'Synthetic Owner',role:'owner',active:true,archived_at:null}]);
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
@@ -19,6 +20,7 @@ test('authenticated mounted route derives actual projection; capability defaults
  const request=(path,method='GET',body={})=>new Request('https://bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-only','Content-Type':'application/json'},body:JSON.stringify({path,method,body})});
  const closed=createOperationsHandler(options);assert.equal((await (await closed(request('/api/session'))).json()).features.freshAvigilonChecks,false);
  const baseMap=await (await closed(request('/api/field-map'))).json();const roster=await auditedAvigilonRoster(org,baseMap,[],[]);
+ assert.deepEqual(await closed.readAuthorityRoster({tenantId:org,actorId:actor,canCheck:true},{Authorization:'Bearer synthetic-only'}),roster);
  const handler=createOperationsHandler({...options,avigilonChecks:{readHealth:async()=>({contract:'COS_AVIGILON_PUBLICATIONS_V1',tenantId:org,authority:{contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:org,generation:String(generation),rosterRevision:roster.revision,admitted:true},roster,items:[]}),store:a=>{assert.equal(a.actorId,actor);assert.equal(a.tenantId,org);return {claim:async run=>{runs.set(run.id,run);return {run,claimed:true};},read:async(tenant,id)=>{assert.equal(tenant,org);return runs.get(id);},save:async run=>{runs.set(run.id,run);return true;}};},probe:async()=>{probes++;throw Error('Forbidden fixture probe');},background:p=>jobs.push(p)}});
  const invalid=await handler(request('/api/avigilon-check-runs','POST',{tenantId:'other'}));assert.equal(invalid.status,400);assert.equal(runs.size,0);
  const mapResponse=await handler(request('/api/field-map'));assert.equal(mapResponse.status,200,JSON.stringify(await mapResponse.clone().json()));

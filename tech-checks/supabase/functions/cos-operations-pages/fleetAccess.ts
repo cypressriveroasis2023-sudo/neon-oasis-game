@@ -7,7 +7,7 @@ export function verifiedItFleet(context: any): boolean {
 }
 export function fleetRouteAllowed(method: string, path: string): boolean {
   return method === 'GET' && (path === '/api/unit-tracker' || /^\/api\/unit-tracker\/(?:requests\/)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(path))
-    || method === 'POST' && (path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
+    || method === 'POST' && (path === '/api/avigilon-source-write'||path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
     || method === 'GET' && new Set([
     '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/routers',

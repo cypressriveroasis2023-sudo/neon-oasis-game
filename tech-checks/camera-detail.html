@@ -69,6 +69,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./company-tools-theme.css?v=company-dark-20261006c">
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261014-robot-mobile">
+<script src="./avigilon-managed-bridge.js"></script>
 <script defer src="./cos-eye-branding.js?v=20261014-robot-mobile"></script>
 <link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261015-placement-read-coalescing-v1"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261015-placement-read-coalescing-v1"></script></head>
 <body>
@@ -370,6 +371,10 @@ async function verifyNow(){
       if(error)throw new Error(await edgeErrorMessage(error));if(data?.error)throw new Error(data.error);
       await load();b.textContent='Inventory synced';return;
     }
+    if(['sniper','camv'].includes(String(device.monitoring_profile||'').toLowerCase())){
+      const run=await AvigilonManagedBridge.create(db).checkManaged();
+      if(run){let details=document.getElementById('nativeRunReport');if(!details){details=document.createElement('details');details.id='nativeRunReport';const summary=document.createElement('summary');summary.textContent='Native Field check report';const text=document.createElement('textarea');text.setAttribute('aria-label','Native Field check report');text.readOnly=true;text.rows=12;details.append(summary,text);b.parentElement.after(details);}details.open=true;details.querySelector('textarea').value='Run '+run.id+' · '+run.state+'\nService reachability only; video/channel coverage unknown. Shop excluded.\n'+run.rows.map(row=>row.name+': '+row.outcome+' · '+(row.publicationReceipt?'receipt '+row.publicationReceipt:row.reason||'unverified')).join('\n');b.textContent='Native check '+run.state;return;}
+    }
     if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
     if(cameraGroup(device)!=='Vigilant'&&!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');
     const profile=String(device.monitoring_profile||'').toLowerCase();
@@ -467,7 +472,7 @@ function canEditSavedConnection(){return profile?.active===true&&(String(profile
 async function boot(){
   try{
     if(!window.supabase?.createClient){await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://unpkg.com/@supabase/supabase-js@2';s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
-    db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);db=AvigilonManagedBridge.create(db).db;
     const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Please sign in to Tech Check first.');
     const {data:pr,error:pe}=await db.from('profiles').select('user_id,role,active').eq('user_id',session.user.id).maybeSingle();
     if(pe)console.warn('Camera detail profile lookup:',pe);

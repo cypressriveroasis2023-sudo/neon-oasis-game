@@ -1,3 +1,4 @@
+// 2026-10-16 candidate receipt-backed Avigilon bridge and manual report; covered by managed-bridge/manual browser tests.
 // 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
@@ -24,14 +25,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "70cb43e5a1b27b8565abe4b02f64fd105b8604dd5fe9829f3c918e957d5e39ec",
-  "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
+  "camera-health": "fd13700293c6e38e59ff8fa57dc1c3562efb80fbaf86d7ed221eb5130bd73591",
+  "camera-detail": "75fc2835a7864c6745c558dd27bf0443bbf3205a79e31160e55ee54a4c642093",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "f1e980d25ad2b397f1ea894e54cd3a38bf4fdf92cf1474782f441dd0c69a6d1a",
-  "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
+  "camera-health": "8bacc9d0476ae001931423b62d2c7f023d00bb12eeb0f10e013fdde16ddba488",
+  "camera-detail": "7d223955ccd22f880855282bc01197bad2df3e7e7c00440c34caf32c0f01f864",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };

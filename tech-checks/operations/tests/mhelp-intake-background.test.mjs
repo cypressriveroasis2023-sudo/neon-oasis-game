@@ -1,3 +1,4 @@
+import {guardedAvigilonClient} from '../../supabase/functions/_shared/avigilonReviewedRuntime.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -74,7 +75,7 @@ function provider({cronValid=true,role='owner',active=true,providerFailure=false
   const db={rpc:async()=>({data:cronValid}),auth:{getUser:async()=>{profiles.push('getUser');return {data:{user:{id:'synthetic-owner'}}};}},
     from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>{profiles.push('profile');return {data:{role,active}};}})}),update:()=>({eq:async()=>calls.push('provider-failure-recorded')})})};
   const inventory=async()=>{calls.push('provider');if(providerFailure)throw Error('synthetic provider failed');return {unchanged:true};};
-  const context={Date,Response,fetch:async()=>{throw Error('Unexpected synthetic transport');},
+  const context={guardedAvigilonClient,Date,Response,fetch:async()=>{throw Error('Unexpected synthetic transport');},
     Deno:{env:{get:()=>LEGACY}},EdgeRuntime:{waitUntil:task=>tasks.push(task)},
     createClient:()=>db,cors:{'Content-Type':'application/json'},json:(body,status=200)=>new Response(JSON.stringify(body),{status}),
     console:{error:()=>{}},starInventory:inventory,reconInventory:inventory,avigilonInventory:inventory,witnessInventory:inventory,

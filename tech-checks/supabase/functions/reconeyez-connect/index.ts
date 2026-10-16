@@ -1,3 +1,4 @@
+import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -168,10 +169,10 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Camera Health is limited to active Owner / IT accounts." }, 403);
   }
 
-  const db = createClient(
+  const db = guardedAvigilonClient(createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  ));
 
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || "status").toLowerCase();

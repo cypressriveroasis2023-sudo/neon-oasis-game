@@ -65,7 +65,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
       fixture.geocodes.push(request.postDataJSON());return route.fulfill({headers,contentType:'application/json',body:'{"ok":true}'});
     }
     if(url.pathname==='/functions/v1/cos-operations-pages'){
-      const body=request.postDataJSON();fixture.reads.push({body,headers:request.headers()});
+      const body=request.postDataJSON();if(body.path==='/api/session'&&body.method==='GET')return route.fulfill({headers,contentType:'application/json',body:JSON.stringify({features:{freshAvigilonChecks:false,avigilonSourceWrites:false}})});fixture.reads.push({body,headers:request.headers()});
       if(!['/api/field-map','/api/camera-health/summary-v3'].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:fixture.health),status=fixture.status;
       if(fixture.editorReadsArmed&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
