@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { mountServiceBasics } from './helpers/service-basics-fixture.mjs';
 
 const units = {'Sniper':'SN-0001A','Ranger':'RA-002B','Spotter':'SP-003C','Solar Spotter':'SS-004D'};
+const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
+async function photos(page){for(const input of await page.locator('[data-daily-photo]').all()){if((await input.getAttribute('data-daily-photo')).endsWith(':2'))continue;await input.setInputFiles(photo);await expect(input.locator('..').locator('img')).toBeVisible();}}
 const sims = ['00123456789012345670','00123456789012345671','00123456789012345672'];
 async function truck(page) {
   await page.locator('#wlSvcHome [data-wl-svc="inspect"]').click();
@@ -69,34 +71,28 @@ test('inventory stays gated before inspection and missing unit or SIM is not rea
   await inventory(page);await fillInventory(page);
   await page.getByRole('textbox',{name:'Sniper unit number',exact:true}).fill('');
   await page.getByRole('textbox',{name:'SIM card 3 number',exact:true}).fill('');
-  await page.locator('[data-wl-submit-truck-inventory]').click();
-  await expect.poll(()=>page.evaluate(()=>fixture.alerts.at(-1))).toContain('TRUCK NOT READY');
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect.poll(()=>page.evaluate(()=>document.querySelector('[data-wl-truck-save-status]').textContent)).toContain('Enter all four');
   expect(await page.evaluate(()=>fixture.readiness.inventory_ready)).toBe(false);
 });
 
-test('saves exact unit and SIM strings and requires physical verification after save',async({page},testInfo)=>{
-  await inventory(page);await fillInventory(page);
-  await page.getByRole('textbox',{name:'SIM card 1 number',exact:true}).focus();
-  await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toBeFocused();
-  await page.screenshot({path:testInfo.outputPath('service-basics-inventory.png'),fullPage:true});
-  await page.locator('[data-wl-save-truck-inventory]').click();
-  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Saved:');
-  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='service_save_my_truck_inventory_v3').args);
-  expect(saved.p_units).toEqual(units);
-  expect(Object.values(saved.p_sims)).toEqual(sims);
-  expect(await page.evaluate(()=>fixture.readiness.inventory_ready)).toBe(false);
-  await page.locator('[data-wl-submit-truck-inventory]').click();
+test('one completion saves exact numbers, photos and returns home without another button',async({page},testInfo)=>{
+  await inventory(page);await fillInventory(page);await photos(page);
+  await expect(page.locator('[data-wl-submit-truck-inventory]')).toBeHidden();
+  await page.screenshot({path:testInfo.outputPath('daily-inventory-photos.png'),fullPage:true});
+  await page.getByRole('button',{name:'Complete & Send to Ops Manager',exact:true}).click();
   await expect(page.locator('#wlSvcHome [data-wl-service-truck-inventory]')).toContainText('Completed Today');
-  await page.locator('#wlSvcHome [data-wl-service-truck-inventory]').click();
-  for(const [type,value] of Object.entries(units))await expect(page.getByRole('textbox',{name:type+' unit number',exact:true})).toHaveValue(value);
-  for(let n=0;n<3;n++)await expect(page.getByRole('textbox',{name:'SIM card '+(n+1)+' number',exact:true})).toHaveValue(sims[n]);
+  await expect(page.locator('[data-daily-delivery-status]')).toContainText('delivery is pending');
+  const saved=await page.evaluate(()=>fixture.calls.find(c=>c.name==='complete_service_daily_report_v1').args);
+  expect(saved.p_units).toEqual(units);expect(Object.values(saved.p_sims)).toEqual(sims);expect(saved.p_photos).toHaveLength(10);
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v1'))).toHaveLength(1);
 });
 
 test('short battery quantities keep the truck unready',async({page})=>{
   await inventory(page);await fillInventory(page);
   await page.locator('#wlTruck35AhQty').fill('3');
-  await page.locator('[data-wl-submit-truck-inventory]').click();
-  await expect.poll(()=>page.evaluate(()=>fixture.alerts.at(-1))).toContain('TRUCK NOT READY');
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect.poll(()=>page.evaluate(()=>document.querySelector('[data-wl-truck-save-status]').textContent)).toContain('stock is short');
   expect(await page.evaluate(()=>fixture.readiness.inventory_ready)).toBe(false);
 });
 
@@ -114,10 +110,10 @@ test('offline or rejected inspection preserves the draft without starting invent
 });
 
 test('failed inventory save preserves numbers and never claims ready',async({page})=>{
-  await inventory(page);await fillInventory(page);
+  await inventory(page);await fillInventory(page);await photos(page);
   await page.evaluate(()=>fixture.failSave=true);
-  await page.locator('[data-wl-submit-truck-inventory]').click();
-  await expect.poll(()=>page.evaluate(()=>fixture.alerts.at(-1))).toBe('Synthetic inventory save failed');
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect.poll(()=>page.evaluate(()=>document.querySelector('[data-wl-truck-save-status]').textContent)).toBe('Synthetic inventory save failed');
   await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue(sims[0]);
   expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='submit_my_service_truck_inventory_check_v3'))).toHaveLength(0);
 });
@@ -130,7 +126,7 @@ test('Owner and IT retain their existing tools and leaving Service restores attr
   await expect(page.locator('body')).not.toHaveClass(/cos-service-basics/);
   await expect(input).not.toHaveAttribute('required','');
   await page.evaluate(()=>renderServiceHome());
-  await expect(page.locator('#wlSvcHome [data-wl-service-open-job]')).toBeVisible();
+  await expect(page.locator('#wlSvcHome .vision-ticket-entry')).toBeVisible();
   await expect(page.locator('#wlSvcHome [data-wl-service-return]')).toBeVisible();
   await page.evaluate(()=>{setIdentity('it');show('it');});
   await expect(page.locator('#view-it')).toBeVisible();
@@ -148,4 +144,51 @@ test('mobile fields fit the screen and stay usable with a keyboard',async({page}
   await page.getByRole('textbox',{name:'Sniper unit number',exact:true}).focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('textbox',{name:'Ranger unit number',exact:true})).toBeFocused();
+});
+
+test('missing photos blocks completion and failed upload preserves the evidence for retry',async({page})=>{
+  await inventory(page);await fillInventory(page);
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('front and rear unit tag photos');
+  expect(await page.evaluate(()=>fixture.calls.filter(c=>c.name==='complete_service_daily_report_v1'))).toHaveLength(0);
+  await photos(page);await page.evaluate(()=>fixture.uploadFailure=true);
+  await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Photo upload failed');
+  await expect(page.locator('.cos-daily-evidence img:visible')).toHaveCount(10);
+  await page.evaluate(()=>fixture.uploadFailure=false);await page.locator('[data-wl-save-truck-inventory]').click();
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+});
+
+test('sign-in resets scroll, fills the viewport and supports keyboard submit',async({page},testInfo)=>{
+  await page.evaluate(()=>{setIdentity(null);document.getElementById('authView').classList.remove('hidden');window.login=()=>{window.authCalls=(window.authCalls||0)+1;};});
+  const auth=page.locator('#authView');await expect(auth).toBeVisible();
+  await expect(page.locator('body')).toHaveClass(/cos-auth-visible/);
+  expect(await page.evaluate(()=>scrollY)).toBe(0);
+  await page.getByRole('textbox',{name:'Username',exact:true}).fill('synthetic.service');
+  await page.getByRole('textbox',{name:'Username',exact:true}).press('Enter');await expect(page.locator('#loginPassword')).toBeFocused();
+  await page.locator('#loginPassword').fill('synthetic-only');await page.locator('#loginPassword').press('Enter');
+  expect(await page.evaluate(()=>authCalls)).toBe(1);
+  const layout=await auth.evaluate(el=>({height:el.getBoundingClientRect().height,viewport:innerHeight,top:el.getBoundingClientRect().top,scroll:document.documentElement.scrollWidth,width:innerWidth}));
+  expect(layout.height).toBeGreaterThanOrEqual(layout.viewport);expect(layout.top).toBeGreaterThanOrEqual(0);expect(layout.scroll).toBeLessThanOrEqual(layout.width);
+  await page.screenshot({path:testInfo.outputPath('mobile-sign-in.png'),fullPage:true});
+});
+
+test('draft numbers and photos survive reopening inventory and are isolated on account change',async({page})=>{
+  await inventory(page);await fillInventory(page);await photos(page);
+  await page.locator('#wlSvcTruckInventory [data-wl-home="svc"]').click();
+  await page.locator('#wlSvcHome [data-wl-service-truck-inventory]').click();
+  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(10);
+  await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue(sims[0]);
+  await page.evaluate(()=>{fixture.actor='synthetic-second-service';dispatchEvent(new CustomEvent('techcheck:data-refreshed'));});
+  await expect(page.locator('.cos-daily-evidence img:not([hidden])')).toHaveCount(0);
+  await expect(page.getByRole('textbox',{name:'SIM card 1 number',exact:true})).toHaveValue('');
+});
+
+test('lost completion response retries sealed evidence without reuploading',async({page})=>{
+  await inventory(page);await fillInventory(page);await photos(page);await page.evaluate(()=>fixture.loseResponse=true);
+  await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('[data-wl-truck-save-status]')).toContainText('Synthetic response lost');
+  const count=await page.evaluate(()=>fixture.uploaded.length);
+  await page.evaluate(()=>fixture.uploadFailure=true);
+  await page.locator('[data-wl-save-truck-inventory]').click();await expect(page.locator('#wlSvcHome')).toBeVisible();
+  expect(await page.evaluate(()=>fixture.uploaded.length)).toBe(count);
 });

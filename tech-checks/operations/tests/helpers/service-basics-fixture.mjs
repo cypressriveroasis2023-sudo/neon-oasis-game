@@ -29,16 +29,25 @@ const toolClicks = section("  if(e.target.closest('[data-wl-service-trailer-insp
 const homeClick = section('  if (e.target.closest("[data-wl-home=\'it\']"))', '  const cr = e.target.closest');
 const sourceHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const script = `
-window.fixture={role:'service',actor:'synthetic-service',online:true,calls:[],alerts:[],draft:null,morning:null,failMorning:false,failSave:false,failRead:false,
+window.fixture={role:'service',actor:'synthetic-service',online:true,reports:[],uploadFailure:false,loseResponse:false,uploaded:[],calls:[],alerts:[],draft:null,morning:null,failMorning:false,failSave:false,failRead:false,
   readiness:{inspection_ready:false,inventory_ready:false,units:['Sniper','Ranger','Spotter','Solar Spotter'].map(equipment_type=>({equipment_type,unit_tag:'',status:'unassigned'})),
   sims:[1,2,3].map(slot_no=>({slot_no,sim_number:'',status:'unassigned'})),stock:{recon_battery_qty:0,agm_12v_110ah_qty:0,litime_12v_100ah_qty:0,battery_12v_35ah_qty:0}}};
 window.alert=message=>fixture.alerts.push(message);
 Object.defineProperty(navigator,'onLine',{get:()=>fixture.online,configurable:true});
 const subscriptions=[];
 const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},getUser:async()=>({data:{user:{id:fixture.actor}}})},
+  storage:{from:()=>({upload:async(path,blob)=>{if(fixture.uploadFailure)return {error:{statusCode:503}};fixture.uploaded.push({path,size:blob.size});return {};}})},
+  functions:{invoke:async()=>({data:{status:'blocked'}})},
   rpc:async(name,args)=>{
     fixture.calls.push({name,args:structuredClone(args)});
     if(fixture.role!=='service')return {error:{message:'Active Service Tech required.'}};
+    if(name==='service_daily_report_status_v1')return {data:structuredClone(fixture.reports)};
+    if(name==='complete_service_daily_report_v1'){
+      if(fixture.failSave)return {error:{message:'Synthetic inventory save failed'}};
+      const r=await liveDb.rpc('service_save_my_truck_inventory_v3',{p_units:args.p_units,p_sims:args.p_sims,...Object.fromEntries(Object.entries(args.p_stock).map(([k,v])=>['p_'+k,v]))});
+      if(r.error)return r;
+      fixture.readiness.inventory_ready=true;fixture.reports=[{id:args.p_report_id,delivery_status:'blocked'}];if(fixture.loseResponse){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return {data:{id:args.p_report_id,inventory_ready:true}};
+    }
     if(name==='service_departure_readiness_v1')return fixture.failRead?{error:{message:'Synthetic unavailable'}}:{data:structuredClone(fixture.readiness)};
     if(name==='submit_morning_check'){
       if(fixture.failMorning)return {error:{message:'Synthetic inspection save failed'}};
@@ -90,7 +99,7 @@ window.logout=()=>setIdentity(null);
 document.getElementById('sessionLoading').remove();
 injectStyles();setIdentity('service');show('svc');renderServiceHome();
 `;
-const html = sourceHtml.replace('</body>', `<script>${script}</script><script type="module" src="./operations-host.js"></script><script type="module" src="./service-basics-host.js"></script></body>`);
+const html = sourceHtml.replace('</body>', `<script>${script}</script><script type="module" src="./vision-workspace.js"></script><script type="module" src="./it-ticket-instructions-host.js"></script><script type="module" src="./operations-host.js"></script><script type="module" src="./service-basics-host.js"></script></body>`);
 
 export async function mountServiceBasics(page) {
   await page.route('**/*', async route => {
