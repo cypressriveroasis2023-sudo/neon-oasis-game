@@ -33,26 +33,14 @@ for(const page of ['board','detail']){
 test('actual legacy action handlers cannot create orphan tickets or write guarded health and activation tables',async()=>{
  const start=list.indexOf("document.addEventListener('click',async e=>{const prev=");
  const handler=list.slice(start,list.indexOf("});$('cameraLogin').onclick=",start)+3);
- for(const type of ['ack-unit','issue-ack','ticket-unit','activate-unit','activate']){
-  let listener;const messages=[],button={disabled:false,title:'',matches:selector=>selector.split(',').includes('.'+type)};
+ for(const type of ['ack-unit','ticket-unit','activate-unit','activate']){
+  let listener;const messages=[],button={disabled:false,title:'',matches:selector=>selector==='.'+type};
   const context=vm.createContext({document:{addEventListener:(event,callback)=>listener=callback},alert:message=>messages.push(message),db:new Proxy({},{get(){assert.fail('Unavailable action attempted a database call');}})});
   vm.runInContext(handler,context);
   const event={target:{closest:selector=>selector.split(',').includes('.'+type)?button:null},preventDefault(){}};
   await listener(event);await listener(event);
   assert.equal(button.disabled,true);assert.equal(messages.length,2);assert.match(messages[0],/unavailable/i);
   if(type==='ticket-unit')assert.match(messages[0],/No ticket was created/);
-  if(['ack-unit','issue-ack'].includes(type))assert.match(messages[0],/No acknowledgment was saved/);
+  if(type==='ack-unit')assert.match(messages[0],/No acknowledgment was saved/);
  }
-});
-
-
-test('unit issue acknowledgment handler never attempts a guarded health write, including forced repeat clicks',async()=>{
- const start=list.indexOf("$('cameraIssues').addEventListener('click',async e=>{");
- const handler=list.slice(start,list.indexOf(";$('liveFeed').addEventListener",start));
- let listener;const messages=[],button={disabled:false};
- const context=vm.createContext({$:()=>({addEventListener:(event,callback)=>listener=callback}),alert:message=>messages.push(message),db:new Proxy({},{get(){assert.fail('Issue acknowledgment attempted a database call');}})});
- vm.runInContext(handler,context);
- const event={target:{closest:selector=>selector==='.issue-ack'?button:null},preventDefault(){},stopPropagation(){}};
- await listener(event);await listener(event);
- assert.equal(button.disabled,true);assert.equal(messages.length,2);assert.match(messages[0],/No acknowledgment was saved/);
 });

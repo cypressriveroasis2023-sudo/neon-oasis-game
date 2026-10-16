@@ -1,5 +1,5 @@
-// 2026-10-16 reviewed remaining issue acknowledgment disablement and fail-closed click handling; actual-page and source regressions reject guarded health writes.
 // 2026-10-16 reviewed complete identity/health snapshot fence, guarded-control disablement, contextual Spotter inventory aliases and Witness not-checked presentation; focused actual-page regressions preserve source labels and service evidence.
+// 2026-10-16 reviewed placement-version fence: a placement change during the protected health read clears the receipt and reloads before totals render.
 // 2026-10-16 candidate receipt-backed Avigilon bridge and manual report; covered by managed-bridge/manual browser tests.
 // 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
@@ -27,14 +27,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "4c639f2f551eb28cc0b5d9436662706c31220cc9b210856cec1a34f995c4e526",
-  "camera-detail": "4cbc81a57daec6ff1d35f345b6e64eec1f80c724de9e20326d9bc917cc32ccc3",
+  "camera-health": "6f12ba2872ed772e0723410fd778b13c5d1ad80f1bb3315b7885bbeb50e788bc",
+  "camera-detail": "e6a87f46c959db6647fc71ccca647162067237e1193d1c637064f574151174b0",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "fae48515e27f3f0b19d03e8b26c02e8ae1f7165d1c5ffd8af15fae9f09dabbb5",
-  "camera-detail": "6f991555b3aa7348d178091c922e8dc0772239bd00bd37ebbb6c5a32ac4b1ac8",
+  "camera-health": "773a1c2c612f636332e74e61165d459b0e558db3f14e1aadf7c1b3df4ab55670",
+  "camera-detail": "3a375db191071a96ae6f42112e7c00117be181c982676dc9944f92a71b6e5269",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };

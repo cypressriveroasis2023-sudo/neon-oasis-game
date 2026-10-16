@@ -76,7 +76,7 @@
     return result;
   }
   function create({db,getDevices,onChange=()=>{},partial=false,timeoutMs=15000}){
-    let values=new Map(),status='loading',revision=0,controller=null,loadedAt=0,subject=null,stopped=false,expiryTimer=null;
+    let values=new Map(),status='loading',revision=0,controller=null,loadedAt=0,subject=null,stopped=false,expiryTimer=null,sourceVersion=null;
     const emit=()=>{if(!stopped)onChange();};
     const view={
       get(device){
@@ -103,17 +103,18 @@
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
             if(fresh.error||fresh.data?.session?.user?.id!==subject||fresh.data?.session?.access_token!==token){values.clear();throw new Error('Signed-in account changed.');}
             if(before!==signature(getDevices()))throw new Error('Displayed camera group changed.');
-            return resolved;
+            return {resolved,snapshot,health};
           };
           const resolved=await Promise.race([run(),new Promise((_,reject)=>{abort=()=>reject(new Error('Placement read cancelled.'));current.signal.addEventListener('abort',abort,{once:true});timer=setTimeout(()=>{current.abort();},timeoutMs);})]);
           if(request!==revision||stopped)return;
-          values=resolved;loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';emit();}},maxAge+1);expiryTimer?.unref?.();
+          values=resolved.resolved;const source=resolved.snapshot||{},sourceHealth=resolved.health||{};sourceVersion=stable([source.equipmentMasterVersion??source.inventoryVersion??source.placementVersion??null,source.effectivePlacementVersion??null,source.placementProjectionVersion??null,(source.inventoryItems||[]).map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))),sourceHealth.avigilonAuthority??null]);loadedAt=Date.now();status='ready';clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>{if(status==='ready'){status='stale';emit();}},maxAge+1);expiryTimer?.unref?.();
         }catch{if(request!==revision||stopped)return;status=values.size?'stale':'unavailable';}
         // The sibling transport/body may still be pending after Promise.all rejects.
         // Abort only this captured attempt, never a newer refresh's controller.
         finally{clearTimeout(timer);if(abort)current.signal.removeEventListener('abort',abort);current.abort();if(request===revision)emit();}
       },
-      clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();status='unavailable';subject=null;emit();},
+      version(){return sourceVersion;},
+      clear(){++revision;controller?.abort();clearTimeout(expiryTimer);values.clear();sourceVersion=null;status='unavailable';subject=null;emit();},
       dispose(){stopped=true;view.clear();subscription?.unsubscribe();if(client===view)client=null;}
     };
     const subscription=db.auth.onAuthStateChange?.((_event,session)=>{if(subject&&session?.user?.id!==subject)view.clear();})?.data?.subscription;
@@ -131,5 +132,6 @@
     const links=value.status==='ready'&&value.scope==='field'&&value.address?'<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(value.address)+'" target="_blank" rel="noopener noreferrer">Look up recorded installation address ↗</a>':'';
     return '<div class="effective-placement" data-placement-status="'+esc(value.status)+'">'+(includeLocation?'<b>Physical placement: '+esc(locationText(device))+'</b>':'')+'<span>'+esc(value.status==='ready'?value.source:value.reason)+'</span><span>Provider organization: '+esc(device.organization||'not recorded')+' · Activation: '+esc(device.activation_state||'unknown')+'</span>'+links+'</div>';
   }
-  root.CameraEffectivePlacement={resolve,create,get,locationText,markup,fieldLabel:device=>{const value=get(device);return value?.status==='ready'?value.unitNumber:device?.unit_key||device?.device_name||'';}};
+  const versionEqual=(a,b)=>a===b;
+  root.CameraEffectivePlacement={resolve,create,get,locationText,markup,versionEqual,fieldLabel:device=>{const value=get(device);return value?.status==='ready'?value.unitNumber:device?.unit_key||device?.device_name||'';}};
 })(globalThis);
