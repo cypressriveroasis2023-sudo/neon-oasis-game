@@ -26,7 +26,7 @@ function fixture({sourceCases=false}={}){
 }
 async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pausedClock=false}={}){
  const data=fixture({sourceCases});
- const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0};
+ const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0,placementReads:0,placementVersion:1,changePlacementDuringLoad:false};
  state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings});
  // Pause before loading the app, with a future pause target so the clock's
  // initial real-time advancement cannot make pauseAt reject a past instant.
@@ -52,7 +52,7 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pa
   if(body.method!=='GET'){state.writes.push(body);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic test rejects writes'})});}
   if(body.path==='/api/camera-health/summary-v3'&&state.summaryError)return route.fulfill({status:state.summaryError,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic saved summary unavailable'})});
   const result=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',legacyOwner:true,productionOwnerUserId:uuid(101),features:{fieldLocationVerification:true,fleetAccess:true,fleetPlacementEdit:true,fleetConnectionEdit:true}}
-   :body.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now}
+   :body.path==='/api/field-map'?(state.placementReads++,state.changePlacementDuringLoad&&state.placementReads===2&&(state.placementVersion=2),{items:state.units,inventoryItems:state.units.map(unit=>({...unit,updatedAt:String(state.placementVersion)})),summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now,effectivePlacementVersion:1,placementProjectionVersion:1})
    :body.path==='/api/camera-health/summary-v3'?state.health()
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
    :body.path==='/api/equipment'?{items:state.units,models:[]}
@@ -148,6 +148,17 @@ test('native HDC proof, recorder proof and bound service proof retain separate s
 
 test('saved-data reload repaints identity status without changing expanded map position or unit selection',async({page})=>{
  const {frame,state}=await mount(page);await expand(frame);const viewport=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect.poll(viewport).toEqual(before);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);await frame.getByRole('button',{name:'Close unit details'}).click();noWrites(state);
+});
+
+test('placement change during protected health load discards the old receipt and reloads as unverified',async({page})=>{
+ const {frame,state}=await mount(page);await expand(frame);
+ state.changePlacementDuringLoad=true;state.placementReads=0;state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect.poll(()=>state.placementVersion).toBe(2);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
+ await expect(frame.locator('#screenRefreshStatus')).toContainText('Screen updated');
+ noWrites(state);
 });
 
 for(const mutation of ['partial resource set','extra resource in source group','changed Owner audit','changed Owner key','changed native label','explicit identity warning','duplicate resource ownership','duplicate equipment proof'])test(mutation+' never turns a mismatched unit green',async({page})=>{

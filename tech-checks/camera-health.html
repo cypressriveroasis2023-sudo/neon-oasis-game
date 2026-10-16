@@ -1217,6 +1217,19 @@ function refreshEffectivePlacement(){
   if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>devices,onChange:()=>{if(boardDataReady){render();if(selectedUnitKey)renderCurrentUnitEvidence();}}});
   return placementView.refresh();
 }
+// Placement is a second protected read.  Never publish a health receipt beside
+// an equipment/placement read from a different source version.
+async function readPlacementVersion(){
+  const s=await wait(db.auth.getSession(),'Session',12000),session=s?.data?.session;
+  if(s?.error||!session?.user?.id||!session?.access_token)throw new Error('Current account unavailable.');
+  const controller=new AbortController();
+  try{
+    const pair=await CameraPlacementControls.readFleetSources({db,session,signal:controller.signal,share:false});
+    const snap=pair?.snapshot||{},healthRead=pair?.health||{};
+    const rows=Array.isArray(snap.inventoryItems)?snap.inventoryItems.map(r=>[r.id,r.updatedAt||r.placementUpdatedAt||r.addressUpdatedAt||r.sourceVerifiedAt||null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
+    return JSON.stringify([snap.generatedAt||null,snap.effectivePlacementVersion||null,snap.placementProjectionVersion||null,rows,healthRead.avigilonAuthority||null]);
+  }finally{controller.abort();}
+}
 let boardDataReady=false;
 let cameraLoadPromise=null,lastCameraLoadStartedAt=0;
 const CAMERA_AUTO_REFRESH_MS=4*60*1000;
@@ -1230,6 +1243,23 @@ function trackerLabelNorm(v){return String(v||'').trim().toLowerCase().replace(/
 function rebuildTrackerStateIndex(){trackerStateIndex=new Map();trackerLabelStateIndex=new Map();for(const r of trackerMaster||[]){const state=String(r.tracker_state||'').toLowerCase(),k=trackerKey(r.canonical_family,r.unit_tag),label=trackerLabelNorm(r.source_label);if(k)trackerStateIndex.set(k,state);if(label)trackerLabelStateIndex.set(label,state)}}
 function trackerIdentityForDevice(d){const label=trackerLabelNorm(d?.unit_key||d?.device_name);const exact=(trackerMaster||[]).find(t=>trackerLabelNorm(t.source_label)===label),special=COSInventoryPresentation.solarCompatibleSpotterKey(d?.unit_key||d?.device_name),alias=COSInventoryPresentation.inventoryTrackerAlias(d?.unit_key||d?.device_name,trackerMaster);if(exact){if(special&&String(exact.canonical_family).toLowerCase()==='spotter'&&!alias)return null;return trackerKey(exact.canonical_family,exact.unit_tag)}if(alias)return alias;if(special)return null;const s=String(d?.unit_key||d?.device_name||'').trim(),u=s.toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),tag='(\\d{1,3}(?:\\.\\d+)?)';let m;if((m=u.match(new RegExp('^RII[-\\s]*'+tag))))return trackerKey('Recon 2',m[1]);if((m=u.match(new RegExp('^RI[-\\s]*'+tag))))return trackerKey('Recon',m[1]);if((m=u.match(new RegExp('SNIPER\\s*4\\s*'+tag))))return trackerKey('Sniper 4',m[1]);if((m=u.match(new RegExp('SNIPER\\s*2\\s*'+tag))))return trackerKey('Sniper 2',m[1]);if((m=u.match(new RegExp('SNIPER\\s*'+tag))))return trackerKey('Sniper',m[1]);if((m=u.match(new RegExp('(?:CAM\\s*V|CAMV)\\s*'+tag))))return trackerKey('CAMV',m[1]);if((m=u.match(new RegExp('HELIOS\\s*'+tag))))return trackerKey('Helios',m[1]);if((m=u.match(new RegExp('RANGER\\s*'+tag))))return trackerKey('Ranger',m[1]);if((m=u.match(new RegExp('SS\\s*HYBRID\\s*'+tag))))return trackerKey('SS Hybrid',m[1]);if((m=u.match(new RegExp('SOLAR\\s*SPOTTER\\s*'+tag)))){const solar=trackerKey('Solar Spotter',m[1]),hybrid=trackerKey('SS Hybrid',m[1]);return trackerStateIndex.has(solar)?solar:(trackerStateIndex.has(hybrid)?hybrid:solar)}if((m=u.match(new RegExp('SPOTTER\\s*'+tag))))return trackerKey('Spotter',m[1]);if(prof==='helios'&&(m=u.match(new RegExp(tag))))return trackerKey('Helios',m[1]);if(prof==='ranger'&&(m=u.match(new RegExp(tag))))return trackerKey('Ranger',m[1]);if(prof==='solar_spotter'&&(m=u.match(new RegExp(tag)))){const solar=trackerKey('Solar Spotter',m[1]),hybrid=trackerKey('SS Hybrid',m[1]);return trackerStateIndex.has(solar)?solar:(trackerStateIndex.has(hybrid)?hybrid:solar)}return null}
 function trackerStateForDevice(d){for(const raw of [d?.unit_key,d?.device_name]){if(!raw)continue;const direct=trackerLabelStateIndex.get(trackerLabelNorm(raw));if(direct)return direct;const k=trackerIdentityForDevice({...d,unit_key:raw,device_name:raw});const state=k?trackerStateIndex.get(k)||'':'';if(state)return state}return ''}
+// Recheck the placement/equipment version after the protected device/health
+// snapshot. A move during the read invalidates the saved receipt; clear it and
+// reload so outage totals cannot be computed against an older placement.
+const loadCameraHealthRead=loadCameraHealth;
+loadCameraHealth=async function(options={}){
+  const before=await readPlacementVersion().catch(()=>null);
+  await loadCameraHealthRead(options);
+  const after=await readPlacementVersion().catch(()=>null);
+  if(before&&after&&before!==after&&!options.consistencyRetry){
+    health={};
+    placementView?.clear();
+    boardDataReady=true;
+    render();
+    if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement changed while health was loading; rechecking…';
+    return loadCameraHealth({background:Boolean(options.background),consistencyRetry:true});
+  }
+};
 function isShop(d){return CameraHealthOverview.placement(d,trackerMaster)==='shop'}
 function linkedRouter(d){const k=String(d?.unit_key||'').trim().toLowerCase();return routers.find(r=>String(r.unit_key||'').trim().toLowerCase()===k&&(r.router_public_ip||r.unit_ip))||null}
 function resolvedDeviceIP(d){return String(d?.public_ip||linkedRouter(d)?.router_public_ip||linkedRouter(d)?.unit_ip||'').replace('/32','')}
