@@ -1212,9 +1212,9 @@ function toggleManageUnits(show){const p=$('manageUnitsPanel');if(!p)return;p.st
 async function addOwnerUnit(){const msg=$('unitManageMsg');msg.textContent='Adding unit…';const args={p_unit_key:$('addUnitKey').value.trim(),p_unit_type:$('addUnitType').value,p_camera_count:Number($('addUnitCount').value||0),p_public_ip:$('addUnitIp').value.trim()||null,p_organization:$('addUnitOrg').value.trim()||'root',p_reason:$('addUnitReason').value.trim()};const {error}=await db.rpc('owner_add_camera_unit_v1',args);if(error){msg.textContent='Could not add unit: '+error.message;return}msg.textContent='Unit added ✓';await loadAfterWrite();refreshRemoveUnitOptions()}
 async function moveOwnerUnit(forceRoot=false,keyOverride=''){const key=keyOverride||$('moveUnitKey').value;if(!key){alert('Choose a unit.');return false}if(!canEditFieldPlacement())return false;await CameraPlacementControls.open({db,key,placement:forceRoot?'SHOP':'FIELD',onSaved:async()=>{await loadAfterWrite();refreshRemoveUnitOptions();$('unitManageMsg').textContent=key+' placement saved and verified.';}});return false}
 async function removeOwnerUnit(){const key=$('removeUnitKey').value,reason=$('removeUnitReason').value.trim();if(!key){alert('Choose a unit to remove.');return}if(!reason){alert('Enter why this unit is being removed.');return}if(!confirm('Remove '+key+' from Camera Health inventory? This removes every camera component under this unit.'))return;const msg=$('unitManageMsg');msg.textContent='Removing '+key+'…';const {error}=await db.rpc('owner_remove_camera_unit_v1',{p_unit_key:key,p_reason:reason});if(error){msg.textContent='Could not remove unit: '+error.message;return}msg.textContent=key+' removed ✓';await loadAfterWrite();refreshRemoveUnitOptions()}
-let placementView=null;
+let placementView=null,healthPlacementVersion=null;
 function refreshEffectivePlacement(){
-  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>devices,onChange:()=>{if(boardDataReady){render();if(selectedUnitKey)renderCurrentUnitEvidence();}}});
+  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>devices,onChange:()=>{const version=placementView?.version?.();if(healthPlacementVersion&&version&&version!==healthPlacementVersion){health={};healthPlacementVersion=null;placementView.clear();if($('screenRefreshStatus'))$('screenRefreshStatus').textContent='Placement changed; saved health cleared. Rechecking…';void loadCameraHealth({background:true,consistencyRetry:true});return;}if(boardDataReady){render();if(selectedUnitKey)renderCurrentUnitEvidence();}}});
   return placementView.refresh();
 }
 // Placement is a second protected read.  Never publish a health receipt beside
@@ -1226,8 +1226,8 @@ async function readPlacementVersion(){
   try{
     const pair=await CameraPlacementControls.readFleetSources({db,session,signal:controller.signal,share:false});
     const snap=pair?.snapshot||{},healthRead=pair?.health||{};
-    const rows=Array.isArray(snap.inventoryItems)?snap.inventoryItems.map(r=>[r.id,r.updatedAt||r.placementUpdatedAt||r.addressUpdatedAt||r.sourceVerifiedAt||null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
-    return JSON.stringify([snap.generatedAt||null,snap.effectivePlacementVersion||null,snap.placementProjectionVersion||null,rows,healthRead.avigilonAuthority||null]);
+    const rows=Array.isArray(snap.inventoryItems)?snap.inventoryItems.map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
+    return JSON.stringify([snap.equipmentMasterVersion??snap.inventoryVersion??snap.placementVersion??null,snap.effectivePlacementVersion??null,snap.placementProjectionVersion??null,rows,healthRead.avigilonAuthority||null]);
   }finally{controller.abort();}
 }
 let boardDataReady=false;
@@ -1251,6 +1251,7 @@ loadCameraHealth=async function(options={}){
   const before=await readPlacementVersion().catch(()=>null);
   await loadCameraHealthRead(options);
   const after=await readPlacementVersion().catch(()=>null);
+  if(after)healthPlacementVersion=after;
   if(before&&after&&before!==after&&!options.consistencyRetry){
     health={};
     placementView?.clear();

@@ -231,7 +231,14 @@ function sourceDetailText(){const group=cameraGroup(device),st=effectiveHealth(d
 function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),vig=(sourceFresh(device)?String(device?.source_status||'unknown'):'stale').toLowerCase();if(group==='Witness')return 'Witness status not checked. Use Witness to verify camera video and recording; service ports are separate.';if(st==='online')return'';if(st==='degraded')return group==='Vigilant'?(vig==='online'?'Vigilant reports ONLINE, but the direct public-IP/port check is NOT RESPONDING. Overall status is DEGRADED.':'The direct connection is responding, but Vigilant reports OFFLINE. Overall status is DEGRADED because the sources disagree.'):'Health sources disagree. Verify this camera.';if(st==='offline')return group==='Vigilant'?'Star4Live reports this resource OFFLINE.':group==='Reconeyez'?'Reconeyez cloud currently reports this detector OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return group==='Reconeyez'?'Waiting for a definitive Reconeyez cloud health event.':'No definitive ONLINE/OFFLINE result is available yet.';return''}
 function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
 function interfaceLinks(){return CameraHealthHistory.connections(device,current,effectivePublicIP())}
-let placementView=null,detailLoadRevision=0;
+let placementView=null,detailLoadRevision=0,detailPlacementVersion=null;
+async function readPlacementVersion(){
+  const s=await db.auth.getSession(),session=s?.data?.session;if(s?.error||!session?.user?.id||!session?.access_token)throw new Error('Current account unavailable.');
+  const controller=new AbortController();try{const pair=await CameraPlacementControls.readFleetSources({db,session,signal:controller.signal,share:false}),snap=pair?.snapshot||{},h=pair?.health||{};
+    const rows=Array.isArray(snap.inventoryItems)?snap.inventoryItems.map(r=>[r.id,r.updatedAt??null,r.placement??null,r.currentLocationType??null,r.site??null,r.address??null,r.placementAuditId??null,r.placementUnitKey??null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
+    return JSON.stringify([snap.equipmentMasterVersion??snap.inventoryVersion??snap.placementVersion??null,snap.effectivePlacementVersion??null,snap.placementProjectionVersion??null,rows,h.avigilonAuthority||null]);
+  }finally{controller.abort();}
+}
 function renderEffectivePlacement(){
   if(!device)return;
   const value=CameraEffectivePlacement.get(device);
@@ -255,7 +262,7 @@ function renderEffectivePlacement(){
 }
 function placementActionAtShop(){const value=window.CameraEffectivePlacement?.get(device);return value?.status==='ready'||value?.lastRead?value.scope==='shop':isShopDevice(device)||String(device?.activation_state||'').toLowerCase()==='deactivated';}
 function refreshEffectivePlacement(){
-  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:renderEffectivePlacement});
+  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:()=>{const v=placementView?.version?.();if(detailPlacementVersion&&v&&v!==detailPlacementVersion){current={};detailPlacementVersion=null;placementView.clear();render();void load({consistencyRetry:true});return;}renderEffectivePlacement();}});
   return placementView.refresh();
 }
 function render(){
@@ -365,6 +372,9 @@ async function load(){
   if(hi)console.warn(hi);if(re)console.warn(re);
   if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   device=d;current=h||{};events=hist||[];unitRouters=rs||[];
+  const placementVersion=await readPlacementVersion().catch(()=>null);
+  if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
+  detailPlacementVersion=placementVersion;
   const witness=cameraGroup(device)==='Witness';$('verifyBtn').disabled=witness;$('verifyBtn').title=witness?'Witness status not checked. Use Witness to verify this unit.':'';
   $('verifyBtn').textContent=witness?'Witness check unavailable':cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
   $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();

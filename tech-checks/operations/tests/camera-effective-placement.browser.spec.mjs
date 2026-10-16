@@ -40,7 +40,7 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
  await expect(page.getByLabel('Current job / site')).toHaveValue('Approved mHelp job site');await expect(page.getByLabel('Current installation address (street, city, state and ZIP)')).toHaveValue('10 Source Road, Testville, TX 75001');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
- await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');await expect(page.locator('#interfaceActions a').first()).toBeVisible();
+ await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('VERIFYING');await expect(page.locator('#interfaceActions a').first()).toBeVisible();expect(await page.evaluate(()=>current)).toEqual({});
  await page.evaluate(async()=>{fixtureMode='owner';await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('99 Owner Road');await expect(page.locator('#effectivePlacement')).toContainText('Owner-confirmed placement');
  expect(await page.evaluate(()=>CameraEffectivePlacement.get(device).row.latitude)).toBe(32.123);expect(await page.evaluate(()=>JSON.stringify(fixtureDevices))).toBe(before);
  await page.evaluate(()=>sessionStorage.setItem('syntheticSourcePlacement','owner'));await page.reload();await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('99 Owner Road');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
@@ -48,6 +48,9 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
 test('Shop stays searchable and linked; approved alias keeps full variant; unresolved support stays separate',async({page},info)=>{
  const errors=await mount(page),search=page.getByLabel('Search units',{exact:true}),card=page.locator('.compact-unit[data-unit="RANGER 022"]');
  await expect(card.locator('[data-placement-status="ready"]')).toBeVisible();await expect.poll(()=>page.evaluate(()=>boardDataReady===true&&cameraLoadPromise===null)).toBe(true);
+ await expect(card.locator('.statuspill')).toHaveText('OFFLINE');
+ await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
+ await expect(card.locator('.statuspill')).not.toHaveText('OFFLINE');await expect(page.locator('#allOffline')).toHaveText('0');expect(await page.evaluate(()=>Object.keys(health||{}).length)).toBe(0);
  const before=await page.evaluate(()=>readRequests.filter(r=>r.path).length);
  await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
  expect(await page.evaluate(start=>readRequests.filter(r=>r.path).slice(start).map(r=>r.path).sort(),before)).toEqual(['/api/camera-health/summary-v3','/api/field-map']);
