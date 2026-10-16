@@ -22,6 +22,8 @@ const files = [
   'tech-checks/company-tools-theme.css',
   'tech-checks/cos-eye-branding.js',
   'tech-checks/cos-eye-branding.css',
+  'tech-checks/avigilon-managed-bridge.js',
+  'tech-checks/inventory-presentation-rules.js',
   'tech-checks/camera-health.html',
   'tech-checks/camera-placement-controls.js',
   'tech-checks/camera-placement-controls.css',
