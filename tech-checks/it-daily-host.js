@@ -1,9 +1,13 @@
+import {mountTransferDesk} from './transfers/desk.js';
+import {isPhoneSurface} from './transfers/model.js';
+import {transferReadiness,transferReadinessMessage} from './transfers/readiness.js';
 import {IT_DAILY_ONLY} from './it-feature-availability.js';
 import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
 window.COS_IT_DAILY_ONLY = IT_DAILY_ONLY;
 const context = () => window.TechCheckContext;
 const verifiedIT = new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911']);
+let disposeTransfer = null;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
 function fitDailyFrame() {
@@ -31,10 +35,10 @@ function scope() {
   const profileLive=p?.user_id===id && p?.active===true && !p?.archived_at;
   const effective = c?.getEffectiveRole();
   if (role !== 'it' && !(role === 'owner' && (effective === 'it' || effective === 'owner' && visible(document.getElementById('view-it'))))) return null;
-  return {id, role, profileLive, preview: document.body.classList.contains('owner-test-role-preview'), effective};
+  return {id, role, profileLive, phone:role==='it'&&isPhoneSurface(), preview: document.body.classList.contains('owner-test-role-preview'), effective};
 }
-function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive].join(':') : ''; }
-function clearFrame() { setFieldMapDisplay(frame,false); frame?.remove(); frame = null; }
+function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive,value.phone].join(':') : ''; }
+function clearFrame() { disposeTransfer?.(); disposeTransfer=null; setFieldMapDisplay(frame,false); frame?.remove(); frame = null; }
 function shield(node) {
   if (!node || node === root) return;
   if (!shielded.has(node)) shielded.set(node,{inert:node.inert,display:node.style.getPropertyValue('display'),priority:node.style.getPropertyPriority('display')});
@@ -69,17 +73,28 @@ async function verify(value) {
   let timer;
   try { const response = await Promise.race([context().db.rpc('cos_verified_fleet_capabilities_v1'),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),12000);})]); return response && !response.error && response.data?.fleetRead === true; } catch { return false; } finally {clearTimeout(timer);}
 }
-async function open(value, generation) {
+async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
   if (!permitted) { status(value.preview ? 'Exit the test persona to view the daily tools with your own authorized account. Other IT features are paused until further notice.' : 'Daily view access could not be verified. Other IT features are paused until further notice.', !value.preview); return; }
+  let handoffFallback = null;
+  if(value.phone){
+    const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
+    if(generation!==revision || key(scope())!==key(value) || !root)return;
+    if(readiness.ready){root.replaceChildren();const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Opening Camera Health…');void open(value,generation,reason);}});return;}
+    handoffFallback=document.createElement('section');handoffFallback.className='cos-it-daily-status';
+    handoffFallback.setAttribute('aria-label','Equipment handoff availability');
+    const note=document.createElement('p');note.setAttribute('role','status');
+    note.textContent=transferReadinessMessage(readiness.reason)+' Camera Health remains available below. This availability check does not check out or accept equipment.';
+    const retry=document.createElement('button');retry.type='button';retry.textContent='Check handoff availability';
+    retry.onclick=()=>{if(generation!==revision || key(scope())!==key(value))return;scopeKey='';present();};
+    handoffFallback.append(note,retry);
+  }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  const q = new URLSearchParams(location.search), unit = q.get('fieldUnit');
-  const route = q.get('fleetDashboard') === '1' && !unit ? '#fleet-dashboard' : q.get('cameraView') === '1' ? '#camera-health' : q.get('fieldView') === '1' || unit ? '#fleet-dashboard'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : location.hash === '#it-dashboard' ? '#it-dashboard' : '#fleet-dashboard';
-  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=unified-fleet-20261013'+route;
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#camera-health';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
-  root.replaceChildren(frame);
+  root.replaceChildren(...(handoffFallback?[handoffFallback,frame]:[frame]));
   scheduleFrameFit();
 }
 function present() {
@@ -102,7 +117,7 @@ function present() {
   if (value.role==='it') for (const id of ['view-owner','view-svc','view-morning']) shield(document.getElementById(id));
   scheduleFrameFit();
   if (next===scopeKey) return;
-  revision++;scopeKey=next;clearFrame();status('Opening Camera Health, Fleet Dashboard, Victron View and the 2027 Unit Tracker…');void open(value,revision);
+  revision++;scopeKey=next;clearFrame();status(value.phone?'Opening IT equipment check-in and check-out…':'Opening Camera Health…');void open(value,revision);
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
@@ -134,7 +149,7 @@ if (IT_DAILY_ONLY) {
   let scheduled=false;
   new MutationObserver(()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;present();});}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
   for(const name of ['techcheck:view-changed','pageshow','popstate','hashchange'])window.addEventListener(name,present);
-  window.addEventListener('resize',scheduleFrameFit);
+  window.addEventListener('resize',()=>{scheduleFrameFit();present();});
   window.addEventListener('scroll',scheduleFrameFit,{passive:true});
   window.visualViewport?.addEventListener('resize',scheduleFrameFit);
   window.visualViewport?.addEventListener('scroll',scheduleFrameFit);
