@@ -73,6 +73,9 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
    :call.path==='/api/tech/session'?{authorized:true,legacyTechnician:true,department:'it'}
    :call.path==='/api/field-map'?{items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:now}
    :call.path==='/api/camera-health/summary-v3'?{...snapshot([]),refreshedAt:now}
+   // Fleet health uses an authorized, read-only router snapshot even in a
+   // Camera Health / Fleet-only IT workspace. Never synthesize router writes.
+   :call.path==='/api/routers'?{items:[],source:'camera_health',generatedAt:now}
    :call.path==='/api/vrm-fleet'?{items:[],sync:{state:'current',scheduleActive:true}}:undefined;
   if(!payload){unexpected.push(call);return route.fulfill({status:403,headers,json:{error:'Unavailable in synthetic fixture'}});}return route.fulfill({headers,json:payload});
  }
