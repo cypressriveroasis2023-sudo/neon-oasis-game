@@ -112,7 +112,8 @@ async function open(value, generation, handoffFailure = null) {
     for(const label of ['Check Out / Hand Off','Check In / Return']){
       const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=true;actions.append(button);
     }
-    handoffFallback.append(actions,note,retry);
+    const title=document.createElement('h1');title.textContent='Equipment Check Out / Check In';
+    handoffFallback.append(title,actions,note,retry);
   }
   if(value.phone) {
     // A failed rollout must not display a substitute workflow on the phone.
@@ -152,7 +153,7 @@ function present() {
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
-  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;font-weight:700;border-radius:10px;white-space:normal}.cos-it-handoff-actions button:disabled{opacity:.6;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
+  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px;padding:10px 14px;background:#303a44;color:#fff;border:1px solid #6b7785;border-radius:9px}.cos-it-daily-status h1{font-size:24px;line-height:1.25;margin:0 0 12px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;padding:12px;font-size:16px;font-weight:700;border:1px solid #66717d;border-radius:10px;white-space:normal;background:#252d36;color:#fff}.cos-it-handoff-actions button:disabled{opacity:1;background:#252d36;color:#cbd4dd;border-color:#566371;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
   document.head.append(style);
   // Runs before protected legacy delegated/inline handlers; inert also blocks keyboard entry.
   for (const type of ['click','submit','change','input']) window.addEventListener(type,event=>{

@@ -7,6 +7,7 @@ for(const rollout of ['missing','disabled','missing-submit','reports-held']){
   await page.setViewportSize({width:390,height:844});f=await mountTransfers(page,{rollout});
   await expect(page.getByRole('region',{name:'Equipment handoff availability'})).toContainText('Check Out and Check In remain unavailable');
   await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+  await expect(page.getByRole('heading',{name:'Equipment Check Out / Check In',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Check In / Return',exact:true})).toBeDisabled();
   await expect(page.locator('#legacy')).toBeHidden();
