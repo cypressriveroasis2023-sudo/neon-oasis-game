@@ -3,6 +3,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {itHomeFixture} from './it-home-fixture.mjs';
+import {snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_TRACKER_TEST_ORIGIN||'http://127.0.0.1:4173',dist=resolve(process.env.COS_TRACKER_TEST_DIST||fileURLToPath(new URL('../dist',import.meta.url)));
 const host=readFileSync(new URL('../../verified-it-fleet-host.js',import.meta.url),'utf8'),workbook='1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA';
 async function mount(page,{role='it',linked=true,feature=true,held=false,...options}={}){
@@ -19,17 +20,50 @@ async function mount(page,{role='it',linked=true,feature=true,held=false,...opti
   if(!url.pathname.endsWith('/functions/v1/cos-operations-pages'))return route.abort();
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();state.calls.push(request);if(held&&request.path==='/api/session')await hold;
-  const data=request.path==='/api/session'?{authorized:true,legacyOwner:false,role:'IT',name:'Synthetic IT',features:{fleetAccess:true,unitTracker:feature,importedUnitAddressEdit:false}}:request.path==='/api/unit-tracker'?{contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:workbook,connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,availability:'unavailable',sources:[],requests:[],sourcesHeld:0,sourcesTruncated:false,requestsTruncated:false}:request.path==='/api/field-map'?{items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-09T04:00:00Z'}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,legacyOwner:false,role:'IT',name:'Synthetic IT',features:{fleetAccess:true,unitTracker:feature,importedUnitAddressEdit:false}}:request.path==='/api/unit-tracker'?{contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:workbook,connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,availability:'unavailable',sources:[],requests:[],sourcesHeld:0,sourcesTruncated:false,requestsTruncated:false}:request.path==='/api/camera-health/summary-v3'?snapshot([]):request.path==='/api/field-map'?{items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-09T04:00:00Z'}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/tracker-home');await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);return state;
 }
-for(const secondVerified of [false,true])test('verified IT '+(secondVerified?'second':'first')+' Home has one tracker entry with exact close focus and safe default-off workspace',async({page},info)=>{
+async function expectCameraOnly(frame){
+ await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+ await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+ await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:/Unit Tracker|Add unit request|Save pending request/})).toHaveCount(0);
+ await expect(frame.getByRole('alert')).toHaveCount(0);
+}
+function expectCameraOnlyReads(state){
+ expect(state.calls.some(call=>call.path==='/api/session')).toBe(true);
+ expect(state.calls.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(call.path))).toBe(true);
+ expect(state.errors).toEqual([]);
+}
+for(const secondVerified of [false,true])test('verified IT '+(secondVerified?'second':'first')+' legacy tracker launch respects Camera Health-only routing and exact close focus',async({page},info)=>{
  const state=await mount(page,{secondVerified}),entry=page.locator('#wlItHome [data-cos-unit-tracker]');await expect(entry).toBeVisible();await expect(page.locator('[data-cos-field-view]')).toBeVisible();
- for(let n=0;n<2;n++){await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(1);await entry.evaluate(button=>{button.click();button.click();});await expect(page.locator('dialog')).toHaveCount(1);const frame=page.frameLocator('iframe');await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();await expect(frame.getByRole('button',{name:'+ Add unit request'})).toBeDisabled();await expect(frame).not.toBeNull();if(n===0)await page.screenshot({path:info.outputPath('verified-it-unit-tracker.png')});await page.keyboard.press('Escape');await expect(page.locator('iframe,dialog')).toHaveCount(0);await expect(entry).toBeFocused();}
- expect(state.calls.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/unit-tracker'].includes(call.path))).toBe(true);expect(state.errors).toEqual([]);
+ expect(state.calls).toHaveLength(1);expect(state.calls[0]).toMatchObject({method:'GET',path:'/api/session'});
+ for(let n=0;n<2;n++){
+  await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(1);
+  await entry.evaluate(button=>{button.click();button.click();});await expect(page.locator('dialog')).toHaveCount(1);await expect(page.locator('iframe')).toHaveCount(1);
+  await expectCameraOnly(page.frameLocator('iframe'));
+  if(n===0)await page.screenshot({path:info.outputPath('verified-it-tracker-launch-camera-only.png')});
+  await page.keyboard.press('Escape');await expect(page.locator('iframe,dialog')).toHaveCount(0);await expect(entry).toBeFocused();
+ }
+ expect(state.calls.some(call=>call.path==='/api/camera-health/summary-v3')).toBe(true);expectCameraOnlyReads(state);
 });
-for(const options of [{role:'service'},{linked:false},{active:false},{archived:true},{effectiveRole:'owner'}])test('restricted account '+JSON.stringify(options)+' receives no tracker entry or new session request',async({page})=>{const state=await mount(page,options);await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(0);expect(state.calls).toEqual([]);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
-test('older backend keeps Fleet Dashboard but hides unsupported tracker entry',async({page})=>{const state=await mount(page,{feature:false});await expect(page.locator('[data-cos-field-view]')).toBeVisible();await expect.poll(()=>state.calls.length).toBe(1);await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(0);});
-test('late capability response after role change cannot restore tracker button or frame',async({page})=>{const state=await mount(page,{held:true});await expect.poll(()=>state.calls.length).toBe(1);await page.evaluate(()=>{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');});state.release();await expect(page.locator('[data-cos-unit-tracker],[data-cos-field-view],dialog,iframe')).toHaveCount(0);});
-test('role loss closes an open tracker and removes both Home entries',async({page})=>{await mount(page);await page.locator('[data-cos-unit-tracker]').click();await expect(page.frameLocator('iframe').getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();await page.evaluate(()=>{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');});await expect(page.locator('[data-cos-unit-tracker],[data-cos-field-view],dialog,iframe')).toHaveCount(0);});
+for(const options of [{role:'service'},{linked:false},{active:false},{archived:true},{effectiveRole:'owner'},{capability:false}])test('restricted account '+JSON.stringify(options)+' receives no tracker entry or new session request',async({page})=>{const state=await mount(page,options);await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(0);expect(state.calls).toEqual([]);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
+test('older backend keeps the legacy Fleet launch but hides unsupported tracker entry and opens only Camera Health',async({page})=>{
+ const state=await mount(page,{feature:false});await expect(page.locator('[data-cos-field-view]')).toBeVisible();await expect.poll(()=>state.calls.length).toBe(1);await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(0);
+ await page.locator('[data-cos-field-view]').click();await expectCameraOnly(page.frameLocator('iframe'));await expect(page.locator('[data-cos-unit-tracker]')).toHaveCount(0);expectCameraOnlyReads(state);
+});
+for(const revoked of ['role','sign-out'])test('late capability response after '+revoked+' cannot restore tracker button or frame',async({page})=>{
+ const state=await mount(page,{held:true});await expect.poll(()=>state.calls.length).toBe(1);
+ await page.evaluate(revoked=>{if(revoked==='role')window.fixtureRole='service';else{window.fixtureSubject=null;window.fixtureAuthChanged('SIGNED_OUT');}document.getElementById('appView').classList.add('role-changed');},revoked);
+ const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST');state.release();await (await response).finished();
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await expect(page.locator('[data-cos-unit-tracker],[data-cos-field-view],dialog,iframe')).toHaveCount(0);expect(state.calls).toHaveLength(1);expectCameraOnlyReads(state);
+});
+for(const revoked of ['role','sign-out'])test(revoked+' closes a legacy tracker launch and removes both Home entries',async({page})=>{
+ const state=await mount(page);await page.locator('[data-cos-unit-tracker]').click();await expectCameraOnly(page.frameLocator('iframe'));
+ await page.evaluate(revoked=>{if(revoked==='role')window.fixtureRole='service';else{window.fixtureSubject=null;window.fixtureAuthChanged('SIGNED_OUT');}document.getElementById('appView').classList.add('role-changed');},revoked);
+ await expect(page.locator('[data-cos-unit-tracker],[data-cos-field-view],dialog,iframe')).toHaveCount(0);expectCameraOnlyReads(state);
+});

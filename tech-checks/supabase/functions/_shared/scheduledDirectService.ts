@@ -1,3 +1,4 @@
+import {reviewedAvigilonRuntime} from './avigilonReviewedRuntime.ts';
 /** Owned saved-endpoint checks only. Placement and camera/channel health are never inferred. */
 export const DIRECT_FAMILIES=['CAMV','Sniper','Sniper 2','Sniper 4'];
 type Row=Record<string,any>;
@@ -94,6 +95,7 @@ function failureCount(previous:Row,c:DirectCandidate,observedAt:number):number {
 
 /** Scheduled checks produce saved service/port evidence, never camera/channel health. */
 export async function collectScheduledDirect(db:any,probe:(host:string,port:number,timeout:number)=>Promise<Probe>,options:{startedAt?:number;now?:()=>number;deadlineMs?:number;ioTimeoutMs?:number}={}) {
+ const managed=reviewedAvigilonRuntime();if(managed)return managed.checkManaged();
  const now=options.now||(()=>Date.now()),startedAt=options.startedAt??now(),deadline=startedAt+(options.deadlineMs??SWEEP_DEADLINE_MS),ioTimeout=options.ioTimeoutMs??IO_TIMEOUT_MS;
  const request=<T>(make:(signal:AbortSignal)=>PromiseLike<T>)=>boundedRequest(make,deadline,now,ioTimeout);
  const inventory=async(wave?:DirectCandidate[])=>{

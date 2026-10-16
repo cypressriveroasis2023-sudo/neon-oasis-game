@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {snapshot as cameraSnapshot} from './fixtures/camera-evidence-fixtures.mjs';
 import {existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -19,13 +20,21 @@ async function mount(page,{role='owner',configured=false,fail=false,malformed=fa
   const req=route.request().postDataJSON();requests.push(req);
   const answer=(data,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
   if(req.path==='/api/session')return answer({authorized:true,legacyOwner:role==='owner',role:role==='owner'?'Owner':'IT',name:'Synthetic',features:{fleetAccess:true,unitTracker:true}});
-  if(req.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-09T19:00:00Z'});
+  if(req.path==='/api/camera-health/summary-v3')return answer(cameraSnapshot([]));
+  if(req.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:cameraSnapshot([]).refreshedAt});
   if(req.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:workbook,connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,availability:'unavailable',sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
   if(req.path==='/api/unit-tracker/sheets/status')return answer(status(configured));
   if(req.path==='/api/unit-tracker/sheets/check'){if(hold)await held;return fail?answer({error:'Enable the Google Sheets API and share the 2027 tracker with the service-account email shown here.'},503):answer(malformed?{...checked(),tabs:[]}:checked());}
   return answer({items:[]});
  });
- await page.goto('/sheets-fixture');const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace',exact:true});await expect(workspace).toBeVisible();
+ await page.goto('/sheets-fixture');const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace',exact:true});
+ if(role==='it'){
+  await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+  await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('alert')).toHaveCount(0);
+ }else await expect(workspace).toBeVisible();
  return {frame,panel:workspace.getByRole('region',{name:'Sheets connection status',exact:true}),requests,errors,release};
 }
 test('missing Google authorization shows actionable setup without pretending to be connected',async({page})=>{
@@ -37,6 +46,6 @@ test('verified read access displays all equipment tabs and keeps publishing paus
 for(const fail of [true,false])test('failed or incomplete checks retain the sharing email without a connected state '+fail,async({page})=>{
  const f=await mount(page,{configured:true,fail,malformed:!fail});await f.panel.getByRole('button',{name:'Check Sheets connection',exact:true}).click();await expect(f.panel.getByRole('alert')).toBeVisible();await expect(f.panel).toContainText(email);await expect(f.panel).not.toContainText('read access verified');expect(f.errors).toEqual([]);
 });
-test('verified IT users keep their tracker access without an Owner Google setup control',async({page})=>{
- const f=await mount(page,{role:'it'});await expect(f.panel.getByRole('link',{name:'Open 2027 tracker'})).toBeVisible();await expect(f.panel.getByRole('button',{name:'Check Sheets connection'})).toHaveCount(0);expect(f.requests.filter(r=>r.path.includes('/sheets/'))).toHaveLength(0);expect(f.errors).toEqual([]);
+test('verified IT stays in Camera Health without tracker or Owner Google setup controls',async({page})=>{
+ const f=await mount(page,{role:'it'});await expect(f.panel).toHaveCount(0);await expect(f.frame.getByRole('link',{name:'Open 2027 tracker'})).toHaveCount(0);await expect(f.frame.getByRole('button',{name:'Check Sheets connection'})).toHaveCount(0);expect(f.requests.filter(r=>r.path.includes('/sheets/'))).toHaveLength(0);expect(f.requests.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(call.path))).toBe(true);expect(f.errors).toEqual([]);
 });

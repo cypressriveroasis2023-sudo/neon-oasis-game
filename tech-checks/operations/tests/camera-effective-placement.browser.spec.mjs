@@ -10,7 +10,8 @@ async function mount(page,path='camera-health.html?q=RANGER%20022'){
   if(url.pathname==='/functions/v1/cos-operations-pages'){
    const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-   const body=route.request().postDataJSON();expect(body.method).toBe('GET');expect(['/api/field-map','/api/camera-health/summary-v3']).toContain(body.path);expect(route.request().headers().authorization).toBe('Bearer synthetic-only');
+   const body=route.request().postDataJSON();expect(route.request().method()).toBe('POST');expect(body.method).toBe('GET');expect(['/api/session','/api/field-map','/api/camera-health/summary-v3']).toContain(body.path);expect(route.request().headers().authorization).toBe('Bearer synthetic-only');
+   if(body.path==='/api/session')return route.fulfill({headers,json:{features:{freshAvigilonChecks:false,avigilonSourceWrites:false}}});
    const state=await page.evaluate(path=>{readRequests.push({path});if(window.denyPlacement)return {deny:true};return {data:path==='/api/field-map'?snapshotFixture():healthFixture()};},body.path);
    if(state.deny)return route.fulfill({status:403,headers,contentType:'application/json',body:'{"error":"Synthetic denied"}'});
    return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(state.data)});
@@ -39,7 +40,7 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
  await expect(page.getByLabel('Current job / site')).toHaveValue('Approved mHelp job site');await expect(page.getByLabel('Current installation address (street, city, state and ZIP)')).toHaveValue('10 Source Road, Testville, TX 75001');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
- await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');await expect(page.locator('#interfaceActions a').first()).toBeVisible();
+ await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');await expect(page.locator('#interfaceActions a').first()).toBeVisible();expect(await page.evaluate(()=>current.native_publication_receipt)).toBeUndefined();
  await page.evaluate(async()=>{fixtureMode='owner';await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('99 Owner Road');await expect(page.locator('#effectivePlacement')).toContainText('Owner-confirmed placement');
  expect(await page.evaluate(()=>CameraEffectivePlacement.get(device).row.latitude)).toBe(32.123);expect(await page.evaluate(()=>JSON.stringify(fixtureDevices))).toBe(before);
  await page.evaluate(()=>sessionStorage.setItem('syntheticSourcePlacement','owner'));await page.reload();await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('99 Owner Road');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
@@ -47,6 +48,9 @@ test('real cards, modal and resource page use effective source FIELD/SHOP, prese
 test('Shop stays searchable and linked; approved alias keeps full variant; unresolved support stays separate',async({page},info)=>{
  const errors=await mount(page),search=page.getByLabel('Search units',{exact:true}),card=page.locator('.compact-unit[data-unit="RANGER 022"]');
  await expect(card.locator('[data-placement-status="ready"]')).toBeVisible();await expect.poll(()=>page.evaluate(()=>boardDataReady===true&&cameraLoadPromise===null)).toBe(true);
+ await expect(card.locator('.statuspill')).toHaveText('OFFLINE');
+ await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
+ await expect(card.locator('.statuspill')).not.toHaveText('OFFLINE');await expect(page.locator('#allOffline')).toHaveText('0');expect(await page.evaluate(()=>Object.values(health||{}).every(row=>!row.native_publication_receipt))).toBe(true);
  const before=await page.evaluate(()=>readRequests.filter(r=>r.path).length);
  await page.evaluate(async()=>{fixtureMode='shop';await refreshEffectivePlacement();});
  expect(await page.evaluate(start=>readRequests.filter(r=>r.path).slice(start).map(r=>r.path).sort(),before)).toEqual(['/api/camera-health/summary-v3','/api/field-map']);
@@ -59,7 +63,7 @@ test('Shop stays searchable and linked; approved alias keeps full variant; unres
 });
 test('warning, denied refresh, and source revisions cannot falsely confirm placement or clear saved fields',async({page},info)=>{
  const errors=await mount(page,'camera-detail.html?id=11');await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();
- await page.evaluate(async()=>{window.denyPlacement=true;await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('Last read: FIELD');await expect(page.locator('#effectivePlacement')).toContainText('current placement is unavailable');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');
+ await page.evaluate(async()=>{window.denyPlacement=true;await refreshEffectivePlacement();});await expect(page.locator('#organization')).toContainText('Last read: FIELD');await expect(page.locator('#effectivePlacement')).toContainText('current placement is unavailable');await expect(page.locator('#statusPill')).toHaveText('UNVERIFIED');expect(await page.evaluate(()=>current)).toEqual({});
  await page.screenshot({path:info.outputPath('placement-denied-preserves-last-read.png'),fullPage:true});
  await page.evaluate(async()=>{window.denyPlacement=false;fixtureMode='warning';await refreshEffectivePlacement();});await expect(page.locator('#effectivePlacement [data-placement-status="unresolved"]')).toContainText('Source revision changed');await expect(page.locator('#organization')).not.toContainText('10 Source Road');
  await page.evaluate(async()=>{fixtureMode='field';const old=healthFixture;window.healthFixture=()=>{const h=old();h.unitIdentities.push({...h.unitIdentities[0]});return h};await refreshEffectivePlacement();});await expect(page.locator('#effectivePlacement')).toContainText('Conflicting equipment links');expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
@@ -68,11 +72,11 @@ test('abort-honoring same-document supersession fences the old resource and reco
  const errors=await mount(page,'camera-detail.html?id=11');await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();
  await page.evaluate(()=>{const real=window.fetch;let first=true;window.placementTransportStarts=[];window.activePlacementTransports=0;window.maxPlacementTransports=0;window.fetch=async(...args)=>{const path=JSON.parse(args[1].body).path;window.placementTransportStarts.push(path);window.activePlacementTransports++;window.maxPlacementTransports=Math.max(window.maxPlacementTransports,window.activePlacementTransports);let settled=false;const settle=()=>{if(!settled){settled=true;window.activePlacementTransports--;}};try{if(first&&path==='/api/field-map'){first=false;window.heldPlacementStarted=true;const signal=args[1].signal;await new Promise((resolve,reject)=>{const abort=()=>{window.placementAbortObserved=true;reject(new DOMException('Synthetic cancelled transport','AbortError'));};window.releasePlacement=()=>{signal.removeEventListener('abort',abort);resolve();};if(signal.aborted)abort();else signal.addEventListener('abort',abort,{once:true});});}const response=await real(...args),json=response.json.bind(response);response.json=async()=>{try{return await json();}finally{settle();}};return response;}catch(error){settle();throw error;}};window.oldPlacementRead=refreshEffectivePlacement();});
  await expect.poll(()=>page.evaluate(()=>window.heldPlacementStarted===true)).toBe(true);
- await page.evaluate(()=>{history.replaceState({},'','?id=12');return load();});
+ await page.evaluate(()=>{history.replaceState({},'','?id=12');return load().catch(()=>{});});
  await expect.poll(()=>page.evaluate(()=>window.placementAbortObserved===true)).toBe(true);
  await expect(page.locator('#cameraName')).toContainText('SNIPER 00312.2');await expect(page.locator('#organization')).not.toContainText('10 Source Road');
  await expect.poll(()=>page.evaluate(()=>window.activePlacementTransports)).toBe(0);
- const before=await page.evaluate(()=>placementTransportStarts.length);expect([2,4]).toContain(before);expect(await page.evaluate(()=>maxPlacementTransports)).toBeLessThanOrEqual(2);
+ const before=await page.evaluate(()=>placementTransportStarts.length);expect([2,4,6,8]).toContain(before);expect(await page.evaluate(()=>maxPlacementTransports)).toBeLessThanOrEqual(2);
  // Supersession may observe the draining barrier before abort cleanup finishes. An explicit post-drain retry is supported.
  await page.evaluate(async()=>{window.releasePlacement?.();await window.oldPlacementRead;await refreshEffectivePlacement();});
  await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('22 Alias Road');await expect(page.locator('#organization')).not.toContainText('10 Source Road');expect(await page.evaluate(()=>device.id)).toBe(12);
@@ -89,26 +93,26 @@ test('actual resource-link navigation opens the new document while the old place
  await expect.poll(()=>page.evaluate(()=>window.oldSummaryBodySettled===true)).toBe(true);
  await page.locator('#unitDetailMain a[href="./camera-detail.html?id=12"]').click();await expect(page).toHaveURL(origin+'/tech-checks/camera-detail.html?id=12');
  await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#cameraName')).toContainText('SNIPER 00312.2');await expect(page.locator('#organization')).toContainText('22 Alias Road');await expect(page.locator('#organization')).not.toContainText('10 Source Road');
- expect(await page.evaluate(()=>window.heldPlacementStarted)).toBeUndefined();expect(await page.evaluate(()=>device.id)).toBe(12);expect(await page.evaluate(()=>readRequests.filter(r=>r.path).map(r=>r.path).sort())).toEqual(['/api/camera-health/summary-v3','/api/field-map']);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
+ expect(await page.evaluate(()=>window.heldPlacementStarted)).toBeUndefined();expect(await page.evaluate(()=>device.id)).toBe(12);expect(await page.evaluate(()=>readRequests.filter(r=>r.path).map(r=>r.path).sort())).toEqual(['/api/camera-health/summary-v3','/api/camera-health/summary-v3','/api/camera-health/summary-v3','/api/field-map','/api/field-map','/api/field-map']);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
 });
 
-test('an unabortable old body blocks duplicate reads until drain and cannot repaint the new resource',async({page})=>{
+test('an unabortable old body allows bounded independent fences and cannot repaint the new resource',async({page})=>{
  const errors=await mount(page,'camera-detail.html?id=11');await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();
  await page.evaluate(()=>{const real=window.fetch;let first=true;window.placementTransportStarts=[];window.fetch=async(...args)=>{const path=JSON.parse(args[1].body).path;window.placementTransportStarts.push(path);if(first&&path==='/api/field-map'){first=false;const body=JSON.stringify(snapshotFixture());window.heldPlacementStarted=true;await new Promise(resolve=>window.releasePlacement=resolve);const response=new Response(body,{status:200,headers:{'Content-Type':'application/json'}}),json=response.json.bind(response);response.json=async()=>{try{return await json();}finally{window.heldPlacementBodySettled=true;}};return response;}return real(...args);};window.oldPlacementRead=refreshEffectivePlacement();});
  await expect.poll(()=>page.evaluate(()=>window.heldPlacementStarted===true)).toBe(true);
- await page.evaluate(()=>{history.replaceState({},'','?id=12');return load();});await expect(page.locator('#cameraName')).toContainText('SNIPER 00312.2');
+ await page.evaluate(()=>{history.replaceState({},'','?id=12');return load().catch(()=>{});});await expect(page.locator('#cameraName')).toContainText('SNIPER 00312.2');
  await expect(page.locator('#effectivePlacement')).toContainText('Current physical placement unavailable');await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toHaveCount(0);await expect(page.locator('#organization')).not.toContainText('10 Source Road');
- expect(await page.evaluate(()=>placementTransportStarts)).toEqual(['/api/field-map','/api/camera-health/summary-v3']);expect(await page.evaluate(()=>writes)).toEqual([]);
+ expect(await page.evaluate(()=>placementTransportStarts)).toEqual(Array.from({length:7},()=>['/api/field-map','/api/camera-health/summary-v3']).flat());expect(await page.evaluate(()=>current)).toEqual({});expect(await page.evaluate(()=>writes)).toEqual([]);
  await page.evaluate(()=>window.releasePlacement());await expect.poll(()=>page.evaluate(()=>window.heldPlacementBodySettled===true)).toBe(true);
  // The cancelled consumer settles before the producer; observe the body drain in a later browser turn before retrying.
  await page.evaluate(async()=>{await window.oldPlacementRead;await Promise.resolve();await refreshEffectivePlacement();});
  await expect(page.locator('#effectivePlacement [data-placement-status="ready"]')).toBeVisible();await expect(page.locator('#organization')).toContainText('22 Alias Road');await expect(page.locator('#organization')).not.toContainText('10 Source Road');expect(await page.evaluate(()=>device.id)).toBe(12);
- expect(await page.evaluate(()=>placementTransportStarts)).toEqual(['/api/field-map','/api/camera-health/summary-v3','/api/field-map','/api/camera-health/summary-v3']);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
+ expect(await page.evaluate(()=>placementTransportStarts)).toEqual(Array.from({length:8},()=>['/api/field-map','/api/camera-health/summary-v3']).flat());expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
 });
 
 test('initial network denial preserves source context and camera-opening links with an explicit unavailable state',async({page})=>{
  await page.addInitScript(()=>window.denyPlacement=true);const errors=await mount(page,'camera-detail.html?id=11');
- await expect(page.locator('#effectivePlacement [data-placement-status="unavailable"]')).toContainText('unavailable');await expect(page.locator('#organization')).toContainText('source organization: ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#interfaceActions a').first()).toBeVisible();await expect(page.locator('#statusPill')).toHaveText('OFFLINE');expect(errors).toEqual([]);
+ await expect(page.locator('#error')).toBeVisible();await expect(page.locator('#organization')).toContainText('ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#interfaceActions a').first()).toBeVisible();await expect(page.locator('#statusPill')).not.toHaveText('OFFLINE');expect(await page.evaluate(()=>current)).toEqual({});expect(errors).toEqual([]);
 });
 
 test('existing unique full-family fallback remains available without claiming an Owner or provider identity proof',async({page})=>{

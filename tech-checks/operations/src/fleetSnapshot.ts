@@ -1,3 +1,4 @@
+import {sameAuthority} from '../../supabase/functions/_shared/avigilonReadBoundary';
 import {validateCameraHealth,canonicalCameraUnit,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {resolveVerifiedUnitIdentity} from './verifiedUnitIdentity';
 import {checkedFieldMap} from './gpsPersistence';
@@ -13,7 +14,15 @@ export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
  * This never changes a health observation, a source identity, or a saved location. */
 export function reconcileFleetSnapshot(rawHealth:unknown,rawMap:unknown,now=Date.now()):FleetSnapshot{
  const health=validateCameraHealth(rawHealth),fieldMap=checkedFieldMap(rawMap);
+ const ht=(rawHealth as any)?.avigilonAuthority,mt=(rawMap as any)?.avigilonAuthority;
+ if(ht||mt)sameAuthority(ht,mt);
  const inventory=(Array.isArray((fieldMap as any).inventoryItems)?(fieldMap as any).inventoryItems:fieldMap.items) as Unit[];
+ for(const row of health.rows){const receipt=row.avigilonPublication;if(!receipt)continue;
+  if(!ht||!mt)throw Error('Receipt requires matching fleet authority');
+  const units=inventory.filter(u=>u.id===receipt.unitId);
+  const claims=[...(health.unitIdentities||[]),...(health.ownerConfirmedUnitIdentities||[])].filter(i=>i.deviceIds.includes(String(row.id)));
+  if(units.length!==1||inventoryPlacement(units[0])!=='field'||units[0].activeInventoryEligible===false||claims.length!==1||claims[0].unitId!==receipt.unitId)throw Error('Receipt does not belong to current Field inventory');
+ }
  if(new Set(inventory.map(r=>r.id)).size!==inventory.length)throw Error('Fleet inventory contains duplicate equipment identities.');
  if(fieldMap.effectivePlacementVersion===1){
   if(inventory.some(r=>r.effectivePlacement?.contract!=='COS_EFFECTIVE_FLEET_PLACEMENT_V1'||!['field','shop','unknown'].includes(r.effectivePlacement.state)))throw Error('Fleet placement evidence is incomplete.');

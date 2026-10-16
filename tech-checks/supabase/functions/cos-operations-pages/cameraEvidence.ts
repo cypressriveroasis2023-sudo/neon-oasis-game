@@ -1,4 +1,5 @@
 /** Private bridge projection. Presentation semantics are mirrored by the public pure helper and contract-tested. */
+import {inventoryTrackerAlias,solarCompatibleSpotterKey,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
 export const CAMERA_FRESH_MS = 20 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
@@ -135,6 +136,7 @@ export function cameraEvidence(device:SourceRecord):CameraEvidence {
   const resource=['ipc','camera'].includes(type)?'camera':['detector','reconeyez detector'].includes(type)?'detector':type==='nvr'?'recorder':'unknown';
   const provider=device.source==='vigilant_control_center'?'Star4Live':device.source==='reconeyez'?'Reconeyez':null;
   const active=normalized(device.activation_state)==='ACTIVE';
+  if(witnessStatusNotChecked(device.unit_key))return {kind:'unknown',source:'Witness status not checked',resource,active,status:'unknown',observedAt:null,lastOnlineAt:null};
   return {kind:provider&&resource!=='unknown'?'provider':'unknown',source:provider||'Unverified provider source',resource,active,status:['online','offline'].includes(device.source_status)?device.source_status:'unknown',observedAt:sourceText(device.source_last_seen_at),lastOnlineAt:sourceText(device.last_online_at)};
 }
 export function serviceEvidence(device:SourceRecord,health:SourceRecord={},witness=false,now=Date.now()):CameraEvidence {
@@ -151,7 +153,7 @@ export function serviceEvidence(device:SourceRecord,health:SourceRecord={},witne
   const supported=witness||bound;
   const reported=witness?health.status:bound?proof!.status:health.overall_status;
   const reachability=witness?health.reachable:bound?proof!.reachable:health.ip_reachable;
-  return {kind:'service_port',source:witness?'Witness service-port check':'Direct service-port check',resource:'service',active:normalized(device.activation_state)==='ACTIVE',status:supported&&['online','offline','degraded'].includes(reported)?reported:'unknown',observedAt:supported?sourceText(bound?proof!.checkedAt:health.checked_at):null,lastOnlineAt:!witness&&supported?sourceText(device.last_probe_online_at):null,reachable:supported&&typeof reachability==='boolean'?reachability:null,confirmedOutage:supported&&(bound?proof!.confirmedOutage===true:health.confirmed_outage===true),consecutiveFailures:supported?(bound?(Number.isSafeInteger(proof!.consecutiveFailures)?proof!.consecutiveFailures:null):failures):null};
+  return {kind:'service_port',source:witness?'Direct service-port check (Witness inventory)':'Direct service-port check',resource:'service',active:normalized(device.activation_state)==='ACTIVE',status:supported&&['online','offline','degraded'].includes(reported)?reported:'unknown',observedAt:supported?sourceText(bound?proof!.checkedAt:health.checked_at):null,lastOnlineAt:!witness&&supported?sourceText(device.last_probe_online_at):null,reachable:supported&&typeof reachability==='boolean'?reachability:null,confirmedOutage:supported&&(bound?proof!.confirmedOutage===true:health.confirmed_outage===true),consecutiveFailures:supported?(bound?(Number.isSafeInteger(proof!.consecutiveFailures)?proof!.consecutiveFailures:null):failures):null};
 }
 export function validateCameraSources(devices:SourceRecord[],health:SourceRecord[],tracker:TrackerPlacement[]) {
   if(![devices,health,tracker].every(Array.isArray))throw new Error('Camera Health source records are unavailable.');
@@ -195,7 +197,15 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     if(device.source==='reconeyez')row.batteryEvidence=reconBatteryEvidence(device.recon_battery_percent,device.recon_battery_updated_at,device.recon_battery_status,device.recon_battery_status_updated_at);
     row.status=['field','unknown'].includes(row.scope!)?currentCameraStatus(evidence,now):'review';return row;
   });
-  const linked=new Set(devices.map(device=>deviceTrackerKey(device.unit_key)).filter(Boolean));
+  const linked=new Set(devices.map(device=>{
+    const key=deviceTrackerKey(device.unit_key);
+    // A plain Spotter alias must pass the same master-side restriction guard;
+    // the generic family parser cannot hide a renamed or restricted master.
+    return key&&key===solarCompatibleSpotterKey(device.unit_key)?inventoryTrackerAlias(device.unit_key,tracker):key;
+  }).filter(Boolean));
+  // An explicitly approved provider display alias suppresses only a duplicate
+  // inventory placeholder. It never rewrites source rows or health identities.
+  for(const device of devices){const key=inventoryTrackerAlias(device.unit_key,tracker);if(key)linked.add(key);}
   for(const device of devices)for(const record of tracker.filter(row=>normalized(row.source_label)===normalized(device.unit_key))){const key=canonicalTrackerKey(record);if(key)linked.add(key);}
   const synthesized=new Set<string>();
   for(const record of tracker){
@@ -206,7 +216,9 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     const observed=identitySafe&&String(record.health_provider||'').toLowerCase()==='witness'&&Object.hasOwn(witness,key)&&object(witness[key])?witness[key]:{};
     // Each DTO is an allowlist. Unknown metadata, IP addresses, tokens and provider payloads cannot escape.
     const service=serviceEvidence({activation_state:'active'},observed,true,now);
-    rows.push({id:'tracker:'+key,name:record.source_label||record.canonical_family+' '+record.unit_tag,unit:record.source_label||record.canonical_family+' '+record.unit_tag,type:'tracker_unit',organization:'TRACKER · SITE NOT LINKED',activationState:'active',scope:'unknown',trackerOnly:true,status:'review',checkedAt:service.observedAt,serviceEvidence:service});
+    const label=record.source_label||record.canonical_family+' '+record.unit_tag;
+    const evidence=witnessStatusNotChecked(label)?cameraEvidence({unit_key:label,activation_state:'active'}):undefined;
+    rows.push({id:'tracker:'+key,name:label,unit:label,type:'tracker_unit',organization:'TRACKER · SITE NOT LINKED',activationState:'active',scope:'unknown',trackerOnly:true,status:'review',checkedAt:evidence?null:service.observedAt,...(evidence?{evidence}:{}),serviceEvidence:service});
   }
   rows.sort((a,b)=>a.name.localeCompare(b.name));
   const fields=rows.filter(row=>row.scope==='field');

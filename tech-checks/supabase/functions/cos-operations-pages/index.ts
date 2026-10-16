@@ -1,3 +1,7 @@
+import {withStableAvigilonRead} from '../_shared/avigilonReadBoundary.ts';
+import {projectAvigilonHealth} from '../_shared/avigilonHealthProjection.ts';
+import {createAvigilonCheckRuns} from '../_shared/avigilonCheckRun.ts';
+import {auditedAvigilonRoster} from '../_shared/avigilonAuditedRoster.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
@@ -131,6 +135,8 @@ function gps(body) {
 
 /** Dependencies can be injected for meaningful authentication/contract regression tests. */
 export function createOperationsHandler(options) {
+  const authorityReads=new WeakMap<Request,any>();
+  const sourceContexts=new WeakMap<Request,any>();
   const requestFetch = options.fetch || fetch;
   const serviceKey = options.serviceKey;
   const platformUrl = options.platformUrl;
@@ -422,7 +428,7 @@ export function createOperationsHandler(options) {
   // Share one large-transfer slot across imports, original PDF downloads, and private evidence.
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
-  return async function handle(request) {
+  const handle=async function handle(request) {
     const ownerProofDeadlineMs=Date.now()+75000;
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
@@ -478,7 +484,7 @@ export function createOperationsHandler(options) {
       if (!['GET', 'POST'].includes(request.method)) fail('Method not supported.', 405);
       let path = new URL(request.url).pathname.replace(/^.*\/cos-operations-(?:pages|bridge)(?=\/|$)/, '').replace(/\/$/, '');
       let method = request.method, body = null;
-      const context = await authenticate(request);
+      const context = sourceContexts.get(request)||await authenticate(request);
       if (!path && request.method === 'POST') {
         const { body: envelope, byteLength: envelopeBytes } = await readMhelpAwareJsonWithSize(request, context.legacyOwner && context.actorId ? MHELP_JSON_LIMIT : 65536, admitLargeBody);
         const envelopeLimit = envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
@@ -577,20 +583,72 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
-      if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
+      const avigilonRoute=options.avigilonChecks && (method==='POST'&&path==='/api/avigilon-check-runs'||method==='GET'&&/^\/api\/avigilon-check-runs\/[a-f0-9-]{36}$/i.test(path));
+      if (!context.legacyOwner && !(verifiedFleetIt && (fleetRouteAllowed(method,path)||avigilonRoute))) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,
-        features:fleetFeatures(), productionOwnerUserId:null, provisioningNeeded:null, reason:null,
+        features:{...fleetFeatures(),avigilonSourceWrites:Boolean(options.avigilonSources),freshAvigilonChecks:Boolean(options.avigilonChecks)}, productionOwnerUserId:null, provisioningNeeded:null, reason:null,
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
+        features: { avigilonSourceWrites:Boolean(options.avigilonSources),freshAvigilonChecks:Boolean(options.avigilonChecks), unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      // Internal recursive dispatch reuses the already captured envelope. Requests
+      // cannot supply this WeakMap entry or bypass the read bracket with headers.
+      if(options.avigilonChecks&&method==='GET'&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)&&!authorityReads.has(request)){
+        const actor={tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true};
+        if(!options.avigilonChecks.readHealth)fail('Current authority reader unavailable.',503);
+        const result=await withStableAvigilonRead(ORGANIZATION_ID,()=>options.avigilonChecks.readHealth(actor),async envelope=>{
+          const nested=new Request(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({method,path,body})});
+          authorityReads.set(nested,envelope);
+          const response=await handle(nested);
+          if(!response.ok)fail('Dependent fleet read unavailable.',503);
+          return response.json();
+        });
+        return json({...result.value,avigilonAuthority:result.token});
+      }
+      if(path==='/api/avigilon-source-write'){
+        if(method!=='POST'||!options.avigilonSources)fail('Reviewed source writer unavailable.',503);
+        if(body===null)body=await requestBody(request);
+        allowedFields(body,['name','args','requestId']);
+        const names=['set_camera_unit_connection_v2','owner_set_camera_unit_placement_v2','owner_add_camera_unit_v1','owner_remove_camera_unit_v1'];
+        if(!names.includes(body.name)||!body.args||typeof body.args!=='object'||Array.isArray(body.args)||!UUID.test(String(body.requestId||'')))fail('Invalid source operation.');
+        const actor={tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true};
+        const result=await options.avigilonSources(actor).mutate([{action:'rpc',name:body.name,args:body.args,legacyActorId:context.legacyId}],body.requestId);
+        if(!result.receipt||result.receipt.cancelled)fail('Source operation did not apply. Reload its durable result.',409);
+        return json({result:result.receipt.results[0],admission:result.admission});
+      }
+      if(avigilonRoute){
+        if(method==='POST' && body===null)body=await requestBody(request);
+        if(body&&Object.keys(body).length)fail('Check run inputs are server-derived.');
+        const actor={tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true};
+        let pendingRoster=null;
+        const readRoster=()=>{
+          if(pendingRoster)return pendingRoster;
+          const work=withStableAvigilonRead(ORGANIZATION_ID,()=>options.avigilonChecks.readHealth(actor),async envelope=>{
+            const fresh=await authenticate(request);
+            if(fresh.actorId!==actor.actorId||(!fresh.legacyOwner&&!verifiedItFleet(fresh)))fail('Fresh check authorization changed.',403);
+            const [response,bundle,endpoints]=await Promise.all([
+              handle(new Request(new URL(request.url).origin+'/functions/v1/cos-operations-pages',{method:'POST',headers:request.headers,body:JSON.stringify({method:'GET',path:'/api/field-map'})})),
+              readIdentitySources(fresh),
+              legacyAll('camera_devices?select=id,public_ip,expected_ports,connection_revision,monitoring_profile,monitoring_enabled,activation_state&order=id.asc',fresh.headers),
+            ]);
+            if(!response.ok)fail('Audited Field roster is unavailable.',503);
+            const roster=await auditedAvigilonRoster(ORGANIZATION_ID,await response.json(),[...(bundle.identity.unitIdentities||[]),...(bundle.identity.ownerConfirmedUnitIdentities||[])],endpoints);
+            if(roster.revision!==envelope.authority.rosterRevision)fail('Admitted roster differs from source mapping.',503);return roster;
+          }).then(result=>result.value);pendingRoster=work;void work.finally(()=>{if(pendingRoster===work)pendingRoster=null;}).catch(()=>{});return work;
+        };
+        const runs=createAvigilonCheckRuns({authorize:async()=>actor,roster:readRoster,
+          store:options.avigilonChecks.store(actor),probe:(a,e,signal)=>options.avigilonChecks.probe(a,e,signal),
+          background:options.avigilonChecks.background,id:()=>crypto.randomUUID()});
+        const result=method==='POST'?await runs.start(request):await runs.read(request,path.split('/').at(-1));
+        return json(result,method==='POST'?202:200);
+      }
       const censusOnce=/^\/api\/field-map\/([^/]+)\/(owner-census-once|owner-census-proof|owner-census-prepare)$/.exec(path);
       if(censusOnce){
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
@@ -1022,7 +1080,11 @@ export function createOperationsHandler(options) {
             .catch(()=>projectReconProviderIdentities([],devices,[]));
           const mhelpReceipt=await readMhelpCameraPlacements(actorPayload);
           const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
-          const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          let summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          if(options.avigilonChecks){
+            if(!options.avigilonChecks.readHealth)fail('Current Avigilon publication reader unavailable.',503);
+            summary=projectAvigilonHealth(summary,authorityReads.get(request),ORGANIZATION_ID,devices);
+          }
           // Current guarded source placement only classifies synthetic PDF inventory.
           // This is optional, bounded, read-only and never changes a camera resource.
           const shopRead=(inventory,current,mhelpReceipt)=>({inventory,mhelpReceipt:mhelpReceipt??(options.mhelpPlacementEnabled===true?{}:null),nativeUnits:current.sources.units,devices:current.sources.devices,audits:current.sources.audits,identity:current.identity,matches:current.sources.matches,ownerClaims:current.sources.ownerCrosswalk.claims});
@@ -1227,4 +1289,16 @@ export function createOperationsHandler(options) {
       if (!responseOwnsPermit) releaseLargeBody();
     }
   };
+  // Server-only readback path. Not an HTTP route and never accepts browser
+  // headers, actor or roster input as authority. Native RPC rechecks the actor.
+  return Object.assign(handle,{readAuthorityRoster:async(actor,legacyHeaders)=>{
+    if(actor.tenantId!==ORGANIZATION_ID||!actor.canCheck)throw Error('Source actor unavailable');
+    await rpc('cos_avigilon_source_control',{p_actor_user_id:actor.actorId,p_organization_id:actor.tenantId,p_action:'state',p_payload:{}});
+    const context={actorId:actor.actorId,legacyOwner:true,department:'owner',headers:legacyHeaders};
+    const request=new Request('https://internal.invalid/functions/v1/cos-operations-pages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method:'GET',path:'/api/field-map'})});
+    sourceContexts.set(request,context);authorityReads.set(request,{});
+    const [response,bundle,endpoints]=await Promise.all([handle(request),readIdentitySources(context),legacyAll('camera_devices?select=id,public_ip,expected_ports,connection_revision,monitoring_profile,monitoring_enabled,activation_state&order=id.asc',legacyHeaders)]);
+    if(!response.ok)throw Error('Trusted inventory readback unavailable');
+    return auditedAvigilonRoster(actor.tenantId,await response.json(),[...(bundle.identity.unitIdentities||[]),...(bundle.identity.ownerConfirmedUnitIdentities||[])],endpoints);
+  }});
 }

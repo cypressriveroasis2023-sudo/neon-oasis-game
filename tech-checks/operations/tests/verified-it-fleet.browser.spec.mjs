@@ -31,26 +31,19 @@ async function mount(page,role='it',linked=true,options={}){
  });
  await page.goto(role==='owner'?'/owner-fixture':'/fleet-fixture'+(options.deepLink?'?fieldView=1':''));return requests;
 }
-test('verified IT host authenticates fleet frame, limits navigation and avoids Owner GPS history',async({page})=>{
+test('verified IT host authenticates camera-only frame and avoids Owner history',async({page})=>{
  const calls=await mount(page);await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');
- await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();
- await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);
- expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
- await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
- await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
- await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
- // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
- const routerReads=calls.filter(c=>c.path==='/api/routers').length;
- expect(routerReads).toBeGreaterThan(0);
- await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
- expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers','/api/vrm-fleet','/api/equipment'].includes(c.path))).toBe(true);
+ await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+ await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);await expect(frame.locator('.cos-fleet-dashboard')).toHaveCount(0);expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
+ await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});await expect(nav.getByRole('button')).toHaveCount(1);await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch|InHand Routers|Fleet Dashboard/})).toHaveCount(0);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ expect(calls.some(c=>c.path==='/api/routers')).toBe(false);expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(c.path))).toBe(true);
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });
 for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
 test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
 
 for(const role of ['it','owner'])test(role+' fullscreen fallback fills host and restores its original frame',async({page})=>{
- await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');if(role==='it'){await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(frame.getByRole('button',{name:'Fullscreen fleet map',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);return;}await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  const original=await page.locator('iframe').getAttribute('style')||'';
  // Force the supported presentation fallback; this does not grant a permission.
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=()=>Promise.reject(new Error('Fixture unsupported'));});
@@ -68,7 +61,7 @@ test('IT Home keeps one clear entry through real legacy redraws, keyboard, retur
  await page.screenshot({path:testInfo.outputPath('verified-it-home-field-view.png'),fullPage:true});
  for(let i=0;i<3;i++){
   await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('[data-cos-field-view]')).toHaveCount(1);
-  await entry.focus();await page.keyboard.press('Enter');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+  await entry.focus();await page.keyboard.press('Enter');const frame=page.frameLocator('iframe');await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
   if(i===0)await page.screenshot({path:testInfo.outputPath('verified-it-open-field-map.png'),fullPage:true});
   if(i===1){await page.evaluate(()=>window.renderITHome());await expect(entry).toHaveCount(1);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();}
   else await page.keyboard.press('Escape');
@@ -83,13 +76,12 @@ test('IT Home keeps one clear entry through real legacy redraws, keyboard, retur
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThanOrEqual(issued);
 });
 
-for(const action of ['role change','logout'])test(`IT ${action} during fullscreen restores the parent and removes stale access`,async({page})=>{
+for(const action of ['role change','logout'])test(`IT ${action} during camera-only modal restores the parent and removes stale access`,async({page})=>{
  await mount(page);const entry=page.locator('[data-cos-field-view]');await expect(entry).toBeVisible();
  const readParent=()=>page.evaluate(()=>({overflow:document.body.style.overflow,visibility:document.getElementById('appView').style.visibility,pointerEvents:document.getElementById('appView').style.pointerEvents,inert:document.getElementById('appView').inert}));
- const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});
- await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
- await expect(page.locator('body')).toHaveCSS('overflow','hidden');await expect(page.locator('#appView')).toHaveCSS('visibility','hidden');expect((await readParent()).inert).toBe(true);
+ await expect(frame.getByRole('button',{name:'Fullscreen fleet map',exact:true})).toHaveCount(0);await expect(page.locator('dialog')).toHaveCount(1);
  await page.evaluate(action=>{if(action==='logout'){window.fixtureSubject=null;window.fixtureAuthChanged();}else{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');}},action);
  await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);await expect.poll(readParent).toEqual(original);
  await expect(page.locator('#appView')).toBeVisible();await page.keyboard.press('Tab');expect(await page.locator('body').evaluate(()=>document.activeElement?.closest('dialog,iframe')===null)).toBe(true);
@@ -112,10 +104,10 @@ test('Owner Home Fleet Dashboard supports keyboard, browser Back and repeated en
 
 test('IT entry uses touch activation and daily views without paused Tech Checks',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,baseURL:origin});const page=await context.newPage();
- try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
   await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
   await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Camera Health',exact:true}).tap();
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
   await page.getByRole('button',{name:'Return to IT Tech Checks'}).tap();await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(entry).toBeFocused();
  }finally{await context.close();}
 });
@@ -123,7 +115,7 @@ test('IT entry uses touch activation and daily views without paused Tech Checks'
 
 test('second verified IT identity keeps deep-link entry one-time through redraws and repeated clicks',async({page})=>{
  await mount(page,'it',true,{secondVerified:true,deepLink:true});const entry=page.locator('[data-cos-field-view]');
- await expect(page.frameLocator('iframe').locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await expect(page.frameLocator('iframe').getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(entry).toBeFocused();
  await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('dialog,iframe')).toHaveCount(0);
  await entry.evaluate(button=>{button.click();button.click();});await expect(page.locator('dialog')).toHaveCount(1);await expect(page.locator('iframe')).toHaveCount(1);

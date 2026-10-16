@@ -65,7 +65,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
       fixture.geocodes.push(request.postDataJSON());return route.fulfill({headers,contentType:'application/json',body:'{"ok":true}'});
     }
     if(url.pathname==='/functions/v1/cos-operations-pages'){
-      const body=request.postDataJSON();fixture.reads.push({body,headers:request.headers()});
+      const body=request.postDataJSON();if(body.path==='/api/session'&&body.method==='GET')return route.fulfill({headers,contentType:'application/json',body:JSON.stringify({features:{freshAvigilonChecks:false,avigilonSourceWrites:false}})});fixture.reads.push({body,headers:request.headers()});
       if(!['/api/field-map','/api/camera-health/summary-v3'].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:fixture.health),status=fixture.status;
       if(fixture.editorReadsArmed&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
@@ -75,7 +75,9 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
     return route.abort('blockedbyclient');
   });
   await page.goto(origin+'/tech-checks/camera-detail.html?id=11');
+  if(!token){await expect(page.locator('#error')).toContainText('Sign in again');await expect(page.locator('#content')).not.toBeVisible();return fixture;}
   await expect(page.locator('#content')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>detailLoadPromise===null)).toBe(true);
   // The shared physical-placement display now performs its own initial read.
   // Settle that real entry-path read before counting or delaying editor reads.
   await expect(page.locator('#effectivePlacement [data-placement-status]')).toHaveAttribute('data-placement-status',/^(ready|unresolved|unavailable)$/);
@@ -131,8 +133,8 @@ for(const [name,native,status] of [
 });
 
 test('missing bearer cannot create an editable native source',async({page})=>{
-  const fixture=await mount(page,{token:false});await open(page);await expect(inputs(page).save).toBeDisabled();
-  await expect(page.locator('.placement-feedback')).toContainText(/unavailable|sign in|verified|session/i);expect(fixture.reads).toEqual([]);await assertNoWrites(page,fixture);
+  const fixture=await mount(page,{token:false});await expect(page.locator('#editFieldBtn')).not.toBeVisible();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+  expect(fixture.reads).toEqual([]);await assertNoWrites(page,fixture);
 });
 
 for(const [role,verifiedIt] of [['it',false],['service',false]])test(role+' without existing verified edit authority has no field editor',async({page})=>{

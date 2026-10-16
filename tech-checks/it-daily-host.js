@@ -19,7 +19,10 @@ function fitDailyFrame() {
   const frameTop = frame.getBoundingClientRect().top;
   if (![viewportTop,viewportHeight,frameTop].every(Number.isFinite) || viewportHeight <= 0) return;
   const remaining = viewportTop + viewportHeight - Math.max(frameTop,viewportTop) - 12;
-  const height = Math.max(1, Math.floor(Math.min(viewportHeight,remaining))) + 'px';
+  // Keep Camera Health usable below the phone fallback notice. If the header
+  // consumes the viewport, retain enough frame height for normal page scrolling.
+  const minimumHeight = Math.min(360, Math.max(1, Math.floor(viewportHeight - 24)));
+  const height = Math.max(minimumHeight, Math.floor(Math.min(viewportHeight,remaining))) + 'px';
   if (frame.style.height !== height) frame.style.height = height;
 }
 function scheduleFrameFit() {

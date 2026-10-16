@@ -1,0 +1,24 @@
+import {test,expect} from '@playwright/test';
+import {mountFleet,field,fresh} from './fleet-dashboard-fixtures.mjs';
+import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
+import {projectAvigilonHealth} from '../../supabase/functions/_shared/avigilonHealthProjection.ts';
+import {readFile} from 'node:fs/promises';
+for(const hash of ['#fleet-dashboard','#camera-health'])test(hash+' receipt-backed reachability agrees in Fleet, details, report and CSV; failed read retains location without current health',async({page})=>{
+ const unit={...field.items[0],unitNumber:'Sniper 1',modelName:'Snipers'};
+ const authority={contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'fixture',generation:'1',rosterRevision:'r1',admitted:true};
+ const map={avigilonAuthority:authority,...field,items:[unit],inventoryItems:[unit],summary:{...field.summary,fieldUnits:1}};
+ const endpoint={deviceId:'10',revision:'1',ip:'8.8.8.8',ports:[443],profile:'sniper'};
+ const raw=snapshot([resource(10,'Sniper 1',{type:'Sniper',evidence:undefined,connection:{publicIp:endpoint.ip,ports:endpoint.ports}})]);
+ raw.identityVersion=1;raw.identityWarnings=[];raw.unitIdentities=[];raw.ownerConfirmedIdentityVersion=1;raw.ownerConfirmedUnitIdentities=[{unitId:unit.id,unitNumber:unit.unitNumber,kind:'owner_confirmed_native',deviceIds:['10'],unitKeys:[raw.rows[0].unit],proof:'a'.repeat(64)}];
+ const envelope={authority,roster:{tenantId:'fixture',revision:'r1',units:[{id:'u1',nativeUnitId:unit.id,placement:'FIELD',restricted:false,identityVerified:true,endpoint}]},contract:'COS_AVIGILON_PUBLICATIONS_V1',tenantId:'fixture',items:[{deviceId:'10',endpoint,placement:'FIELD',restricted:false,receipt:{unitId:'u1',publicationReceipt:'73',endpointRevision:'1',outcome:'online',completedAt:fresh,confirmedOutage:false},health:{checked_at:fresh,ip_reachable:true,confirmed_outage:false,consecutive_failures:0}}]};
+ let fail=false;const {app,state}=await mountFleet(page,false,{hash,field:map,respond:request=>request.path==='/api/camera-health/summary-v3'?fail?{status:503,json:{error:'Publication read unavailable'}}:{json:projectAvigilonHealth(raw,envelope,'fixture')}:null});
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await (hash==='#camera-health'?app.getByRole('button',{name:'Details →'}):app.locator('.cos-fleet-unit-row')).click();await expect(app.locator('.camera-unit-state')).toContainText('IP / PORT');await expect(app.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('video');
+ await expect(app.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('73');
+ await app.locator('summary').filter({hasText:'Review report text'}).click();const report=app.getByRole('textbox',{name:'Unit diagnostic report text'});await expect(report).toBeVisible();await expect(report).toHaveValue(/Native health publication receipt: 73/);
+ await app.getByRole('button',{name:'Close unit details'}).click();
+ await app.getByRole('button',{name:'Fleet health',exact:false}).click();
+ const download=page.waitForEvent('download');await app.getByRole('button',{name:'Export linked unit CSV'}).click();const csv=await readFile(await (await download).path(),'utf8');expect(csv).toContain('Health basis');expect(csv).toContain('"connection"');expect(csv).toContain('"73"');expect(csv).toContain('video not verified');
+ fail=true;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-table-wrap')).toContainText('Sniper 1');
+ const failedDownload=page.waitForEvent('download');await app.getByRole('button',{name:'Export linked unit CSV'}).click();const failedCsv=await readFile(await (await failedDownload).path(),'utf8');expect(failedCsv).toContain('"unknown"');expect(failedCsv).not.toContain('"73"');expect(failedCsv).toContain(unit.address);expect(state.errors).toEqual([]);
+});

@@ -44,7 +44,10 @@ test('daily frame follows available viewport height without resizing fullscreen 
   const frame={isConnected:true,style:{},getBoundingClientRect:()=>({top:142})};
   fit(frame,{innerHeight:844});assert.equal(frame.style.height,'690px');
   fit(frame,{innerHeight:640});assert.equal(frame.style.height,'486px');
-  fit(frame,{innerHeight:844,visualViewport:{offsetTop:30,height:420}});assert.equal(frame.style.height,'296px');
+  fit(frame,{innerHeight:844,visualViewport:{offsetTop:30,height:420}});assert.equal(frame.style.height,'360px');
+  frame.getBoundingClientRect=()=>({top:355});fit(frame,{innerHeight:390});assert.equal(frame.style.height,'360px');
+  frame.getBoundingClientRect=()=>({top:0});fit(frame,{innerHeight:390});assert.equal(frame.style.height,'378px');
+  frame.getBoundingClientRect=()=>({top:355});fit(frame,{innerHeight:240});assert.equal(frame.style.height,'216px');
   frame.getBoundingClientRect=()=>({top:-90});fit(frame,{innerHeight:640});assert.equal(frame.style.height,'628px');
   frame.getBoundingClientRect=()=>({top:NaN});fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
   frame.style.position='fixed';fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');

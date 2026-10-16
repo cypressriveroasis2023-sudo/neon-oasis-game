@@ -1,5 +1,6 @@
 /** Private bridge projection. Presentation semantics are mirrored by the public pure helper and contract-tested. */
 import {CAMERA_FRESH_MS, serviceEvidence, savedCameraConnection} from './cameraEvidence.ts';
+import {inventoryTrackerAlias,solarCompatibleSpotterKey,witnessStatusNotChecked} from './inventoryPresentationRules.ts';
 export {CAMERA_FRESH_MS, serviceEvidence} from './cameraEvidence.ts';
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
@@ -128,6 +129,7 @@ export function cameraEvidence(device:SourceRecord):CameraEvidence {
   const resource=['ipc','camera'].includes(type)?'camera':['detector','reconeyez detector'].includes(type)?'detector':type==='nvr'?'recorder':'unknown';
   const provider=device.source==='vigilant_control_center'?'Star4Live':device.source==='reconeyez'?'Reconeyez':null;
   const active=normalized(device.activation_state)==='ACTIVE';
+  if(witnessStatusNotChecked(device.unit_key))return {kind:'unknown',source:'Witness status not checked',resource,active,status:'unknown',observedAt:null,lastOnlineAt:null};
   return {kind:provider&&resource!=='unknown'?'provider':'unknown',source:provider||'Unverified provider source',resource,active,status:['online','offline'].includes(device.source_status)?device.source_status:'unknown',observedAt:sourceText(device.source_last_seen_at),lastOnlineAt:sourceText(device.last_online_at)};
 }
 export function validateCameraSources(devices:SourceRecord[],health:SourceRecord[],tracker:TrackerPlacement[]) {
@@ -172,7 +174,12 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     if(device.source==='reconeyez')row.batteryEvidence=reconBatteryEvidence(device.recon_battery_percent,device.recon_battery_updated_at,device.recon_battery_status,device.recon_battery_status_updated_at);
     row.status=['field','unknown'].includes(row.scope!)?currentCameraStatus(evidence,now):'review';return row;
   });
-  const linked=new Set(devices.map(device=>deviceTrackerKey(device.unit_key)).filter(Boolean));
+  const linked=new Set(devices.map(device=>{
+    const key=deviceTrackerKey(device.unit_key);
+    return key&&key===solarCompatibleSpotterKey(device.unit_key)?inventoryTrackerAlias(device.unit_key,tracker):key;
+  }).filter(Boolean));
+  // Presentation deduplication cannot establish equipment-to-resource proof.
+  for(const device of devices){const key=inventoryTrackerAlias(device.unit_key,tracker);if(key)linked.add(key);}
   for(const device of devices)for(const record of tracker.filter(row=>normalized(row.source_label)===normalized(device.unit_key))){const key=canonicalTrackerKey(record);if(key)linked.add(key);}
   const synthesized=new Set<string>();
   for(const record of tracker){
@@ -183,7 +190,9 @@ export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=D
     const observed=identitySafe&&String(record.health_provider||'').toLowerCase()==='witness'&&Object.hasOwn(witness,key)&&object(witness[key])?witness[key]:{};
     // Each DTO is an allowlist. Unknown metadata, IP addresses, tokens and provider payloads cannot escape.
     const service=serviceEvidence({activation_state:'active'},observed,true,now);
-    rows.push({id:'tracker:'+key,name:record.source_label||record.canonical_family+' '+record.unit_tag,unit:record.source_label||record.canonical_family+' '+record.unit_tag,type:'tracker_unit',organization:'TRACKER · SITE NOT LINKED',activationState:'active',scope:'unknown',trackerOnly:true,status:'review',checkedAt:service.observedAt,serviceEvidence:service});
+    const label=record.source_label||record.canonical_family+' '+record.unit_tag;
+    const evidence=witnessStatusNotChecked(label)?cameraEvidence({unit_key:label,activation_state:'active'}):undefined;
+    rows.push({id:'tracker:'+key,name:label,unit:label,type:'tracker_unit',organization:'TRACKER · SITE NOT LINKED',activationState:'active',scope:'unknown',trackerOnly:true,status:'review',checkedAt:evidence?null:service.observedAt,...(evidence?{evidence}:{}),serviceEvidence:service});
   }
   rows.sort((a,b)=>a.name.localeCompare(b.name));
   const fields=rows.filter(row=>row.scope==='field');

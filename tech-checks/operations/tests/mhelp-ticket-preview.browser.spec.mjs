@@ -1,5 +1,6 @@
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
+import {snapshot as cameraSnapshot} from './fixtures/camera-evidence-fixtures.mjs';
 import {privateTicketSampleFixture,privateSampleNow,privateSampleRequest} from './fixtures/mhelpTicketPrivateSample.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {ticketPreviewAppointmentFixture} from './fixtures/mhelpAppointmentTicketPreview.mjs';
@@ -28,7 +29,8 @@ async function mount(page,{role='owner',privateClock=false}={}){
     const request=route.request().postDataJSON();calls.push(request);const answer=data=>route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
     if(request.path==='/api/session')return answer({authorized:true,legacyOwner:role==='owner',role:role==='owner'?'Owner':'IT',features:{unitTracker:true,fleetAccess:true}});
     if(request.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
-    if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}});
+    if(request.path==='/api/camera-health/summary-v3')return answer(cameraSnapshot([]));
+    if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:cameraSnapshot([]).refreshedAt});
     if(request.path===path){
       // Capture this request's response before waiting, so later fixture changes
       // cannot accidentally turn a stale-response test into a fresh response.
@@ -43,7 +45,13 @@ async function mount(page,{role='owner',privateClock=false}={}){
   });
   await page.goto(origin+'/ticket-preview-fixture');
   const frame=page.frameLocator('iframe'),preview=frame.getByRole('region',{name:'mHelpDesk ticket type preview'});
-  await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
+  if(role==='it'){
+    await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+    await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+    await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+    await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+    await expect(frame.getByRole('alert')).toHaveCount(0);
+   }else await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
   return {frame,preview,calls,state};
 }
 test('today ticket preview is explicit, aggregate-only and preserves equipment controls',async({page})=>{
@@ -134,7 +142,7 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'appointment_variants_v1'}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
-  const {frame,preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true})).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
+  const {frame,preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true})).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);expect(calls.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(call.path))).toBe(true);
 });
 test('legacy success explicitly marks operational evidence unavailable and replacement evidence stays bounded',async({page})=>{
   const {preview,calls,state}=await mount(page);state.preview=ticketPreviewFixture();

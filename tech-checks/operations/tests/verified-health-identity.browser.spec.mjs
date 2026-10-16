@@ -24,11 +24,20 @@ function fixture({sourceCases=false}={}){
  }
  return {units,rows,identities};
 }
-async function mount(page,{sourceCases=false,overview=false,diagnostics=false}={}){
+async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pausedClock=false,authority=false}={}){
  const data=fixture({sourceCases});
- const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0};
- state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings});
- await page.clock.install({time:new Date(now)});
+ const state={...data,warnings:[],writes:[],requests:[],blockedExternal:[],summaryError:0,placementReads:0,placementVersion:1,healthGeneration:1,mapGeneration:1};
+ const token=generation=>({contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'synthetic-fleet',generation:String(generation),rosterRevision:'synthetic-roster-'+generation,admitted:true});
+ state.health=()=>({...snapshot(state.rows),identityVersion:1,unitIdentities:state.identities,identityWarnings:state.warnings,...(authority?{avigilonAuthority:token(state.healthGeneration)}:{})});
+ // Match projectEffectiveFleetPlacement's complete v1 saved-inventory DTO. A
+ // version flag without per-unit placement evidence must fail closed.
+ state.fieldUnits=()=>state.units.map(unit=>({...unit,updatedAt:String(state.placementVersion),readOnly:false,placement:'FIELD',currentLocationType:'field',activeInventoryEligible:true,
+  ...(unit.placementAuditId?{placementSource:'owner',placementUpdatedAt:fresh}:{}),
+  effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:'field',source:unit.placementAuditId?'owner':'recorded_inventory',observedAt:unit.placementAuditId?fresh:null,freshness:'recorded',reason:null}}));
+ // Pause before loading the app, with a future pause target so the clock's
+ // initial real-time advancement cannot make pauseAt reject a past instant.
+ await page.clock.install({time:new Date(pausedClock?Date.parse(now)-60000:now)});
+ if(pausedClock)await page.clock.pauseAt(new Date(now));
  if(diagnostics)await page.addInitScript(()=>{
   if(parent===window)return;
   window.fixtureSessionDiagnostics={invalidations:[]};
@@ -49,7 +58,7 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false}={
   if(body.method!=='GET'){state.writes.push(body);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic test rejects writes'})});}
   if(body.path==='/api/camera-health/summary-v3'&&state.summaryError)return route.fulfill({status:state.summaryError,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic saved summary unavailable'})});
   const result=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',legacyOwner:true,productionOwnerUserId:uuid(101),features:{fieldLocationVerification:true,fleetAccess:true,fleetPlacementEdit:true,fleetConnectionEdit:true}}
-   :body.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now}
+   :body.path==='/api/field-map'?(state.placementReads++,{items:state.fieldUnits(),inventoryItems:state.fieldUnits(),summary:{fieldUnits:state.units.length,mappedUnits:state.units.length,unitGps:state.units.length,missingGps:0},generatedAt:now,effectivePlacementVersion:1,placementProjectionVersion:1,...(authority?{avigilonAuthority:token(state.mapGeneration)}:{})})
    :body.path==='/api/camera-health/summary-v3'?state.health()
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
    :body.path==='/api/equipment'?{items:state.units,models:[]}
@@ -70,6 +79,18 @@ async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollI
 async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
+function pollingReads(state){return Object.fromEntries(['health','map','routers','power'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/vrm-fleet'][index]).length]));}
+async function settlePollingMinute(page,frame,state,baseline,minute){
+ // Stop at each real scheduling boundary. A multi-minute runFor can run the
+ // 15-minute source tick and its 10-second auth timeout before the parent's
+ // posted token response gets an event-loop turn. That creates a synthetic
+ // expired session even though the parent responds immediately.
+ await page.clock.runFor(60000);
+ await expect.poll(()=>pollingReads(state)).toEqual({health:baseline.health+Math.floor(minute/4),map:baseline.map+Math.floor(minute/4),routers:baseline.routers+Math.floor(minute/15),power:baseline.power+Math.floor(minute/15)});
+ await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ expect(await frame.locator('body').evaluate(()=>Date.now())).toBe(Date.parse(now)+minute*60000);
+ expect(await frame.locator('body').evaluate(()=>window.fixtureSessionDiagnostics.invalidations)).toEqual([]);
+}
 
 test('Owner proof colors only its exact four IPCs; shared HDC label remains gray and stand blue',async({page},info)=>{
  const {frame,state}=await mount(page);
@@ -135,6 +156,25 @@ test('saved-data reload repaints identity status without changing expanded map p
  const {frame,state}=await mount(page);await expand(frame);const viewport=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect.poll(viewport).toEqual(before);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'online'}}));await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(labels.stand);await frame.getByRole('button',{name:'Close unit details'}).click();noWrites(state);
 });
 
+test('mismatched fleet authority clears saved colors and a coherent new generation recovers',async({page})=>{
+ const {frame,state}=await mount(page,{authority:true});await expand(frame);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ state.mapGeneration=2;state.rows=state.rows.map(row=>({...row,evidence:{...row.evidence,status:'offline'}}));
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.getByRole('alert').filter({hasText:'Avigilon authority changed during read'})).toBeVisible();
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
+ state.healthGeneration=2;
+ await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.getByRole('alert').filter({hasText:'Avigilon authority changed during read'})).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
+ await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ noWrites(state);
+});
+
 for(const mutation of ['partial resource set','extra resource in source group','changed Owner audit','changed Owner key','changed native label','explicit identity warning','duplicate resource ownership','duplicate equipment proof'])test(mutation+' never turns a mismatched unit green',async({page})=>{
  const {frame,state}=await mount(page);await expand(frame);
  if(mutation==='partial resource set')state.rows=state.rows.slice(0,3);
@@ -164,7 +204,7 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
 });
 
 test('four-minute saved-data polling preserves the 20-minute source expiry',async({page},info)=>{
- const {frame,state}=await mount(page,{diagnostics:true});
+ const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
  const samples=[];
  const sample=async label=>{
   const browser=await frame.locator('body').evaluate(()=>{
@@ -173,17 +213,13 @@ test('four-minute saved-data polling preserves the 20-minute source expiry',asyn
   });
   samples.push({label,...browser,elapsed:browser.at-Date.parse(now),requests:state.requests.map(({path,method,at})=>({path,method,at})),writes:state.writes.length});
  };
- const pairedReads=()=>Object.fromEntries(['health','map'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map'][index]).length]));
  try{
-  await expand(frame);await sample('expanded');
-  const baseline=pairedReads();await page.clock.runFor(3*60*1000);await sample('after three minutes');expect(pairedReads()).toEqual(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
-  for(let tick=1;tick<=4;tick++){
-   await sample('before poll '+tick);
-   await page.clock.runFor((tick===1?1:4)*60*1000);
-   await sample('after clock advance '+tick);
-   await expect.poll(pairedReads).toEqual({health:baseline.health+tick,map:baseline.map+tick});
-   await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
-   await sample('settled poll '+tick);
+  await expand(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await sample('expanded');
+  const baseline=pollingReads(state);
+  for(let minute=1;minute<=16;minute++){
+   await settlePollingMinute(page,frame,state,baseline,minute);
+   await sample('settled minute '+minute);
+   if(minute===3)await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
   }
   // Saved observations begin five minutes old and remain unchanged by reads:
   // after sixteen elapsed minutes they must be gray despite four reloads.
@@ -196,6 +232,21 @@ test('four-minute saved-data polling preserves the 20-minute source expiry',asyn
   await writeFile(path,JSON.stringify({project:info.project.name,retry:info.retry,samples},null,2));
   await info.attach('saved-polling-session-diagnostics',{path,contentType:'application/json'});
  }
+});
+
+test('scheduled supporting-source refresh rejects a revoked parent before the next camera poll',async({page})=>{
+ const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
+ await expand(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ const baseline=pollingReads(state);
+ for(let minute=1;minute<=14;minute++)await settlePollingMinute(page,frame,state,baseline,minute);
+ await page.evaluate(()=>{window.fixtureAuth=false;});
+ await page.clock.runFor(60000);
+ await expect(frame.getByRole('alert')).toContainText('Your session changed. Reload COS Operations to verify your account and permissions.');
+ expect(await frame.locator('body').evaluate(()=>window.fixtureSessionDiagnostics.invalidations.map(event=>event.reason))).toEqual(['authentication-denied']);
+ await page.clock.runFor(60000);
+ expect(pollingReads(state)).toEqual({health:baseline.health+3,map:baseline.map+3,routers:baseline.routers,power:baseline.power});
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);
+ noWrites(state);
 });
 
 for(const conflict of ['scoped identity warning','duplicate resource ownership'])test(conflict+' removes overview unit proof without hiding independent source records',async({page})=>{

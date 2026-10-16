@@ -2,8 +2,9 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {openWorkspace} from './navigation-helper.mjs';
 
-for(const it of [false,true])test(`${it?'Verified IT':'Owner'} opens Fleet first inside the existing COS shell`,async({page},info)=>{
+for(const it of [false,true])test(`${it?'Verified IT opens Camera Health only':'Owner opens Fleet first'} inside the existing COS shell`,async({page},info)=>{
  const {app,state}=await mountFleet(page,it,{hash:''});
+ if(it){await expect(app.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect(app.locator('.cos-fleet-dashboard,.cos-fleet-map-canvas')).toHaveCount(0);await app.getByRole('button',{name:'More',exact:true}).first().click();const nav=app.getByRole('navigation',{name:'COS Operations',exact:true});await expect(nav.getByRole('button')).toHaveCount(1);await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toHaveAttribute('aria-current','page');expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);return;}
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(1);
  await expect(app.locator('.cos-fleet-map-canvas')).toHaveCount(1);
  await expect(app.locator('.cos-fleet-brand')).toHaveCount(0);

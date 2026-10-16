@@ -24,7 +24,8 @@ const pendingReads = new Map<string, Promise<ApiResponse>>();
 const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
 type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
 const pendingFleetSnapshots=new Map<string,FleetReads>();
-let fleetRevision=0,privateSessionRevision=0;
+let fleetRevision=0,privateSessionRevision=0,publicationRevision=0;
+function invalidatePublicationReads(){publicationRevision++;fleetSnapshots.clear();pendingFleetSnapshots.clear();window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}
 // Reasons contain no token or identity. Missing/unknown reasons remain hard stops.
 function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide') {
  window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason}}));
@@ -100,6 +101,11 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
+  if (method === 'POST' && path === '/api/avigilon-check-runs') {
+    invalidatePublicationReads();
+    try { return await sendRequest<T>(method,path,session.token,body,options?.signal); }
+    finally { invalidatePublicationReads(); }
+  }
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
@@ -180,14 +186,14 @@ async function readFleet(force=false):Promise<FleetReads>{
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
     const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
-    const revision=fleetRevision;
+    const revision=fleetRevision,publication=publicationRevision;
     const current=()=>{
       if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
     };
-    const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
+    const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();if(publication!==publicationRevision)throw new OperationsApiError('A new health publication is pending. Reload saved results.',409);return validateCameraHealth(result.data);});
     const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
-      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
+      current();if(publication!==publicationRevision)throw new OperationsApiError('A new health publication is pending. Reload saved results.',409);const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
     // A source-only caller must not leave the optional pair's rejection unhandled.
     void read.paired.catch(()=>{});

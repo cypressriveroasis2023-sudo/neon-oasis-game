@@ -19,6 +19,7 @@ export function reconBatteryEvidence(percent:unknown,percentAt:unknown,status:un
 export type CameraRow = {
   id:string|number; name:string; unit:string; type?:string; organization?:string; status:string;
   activationState?:string; scope?:PlacementScope; trackerOnly?:boolean;
+  avigilonPublication?:{receiptId:string;unitId:string;rosterUnitId?:string;endpointRevision:string}|null;
   connection?:{publicIp:string;ports:number[]};
   checkedAt?:string|null; evidence?:CameraEvidence; serviceEvidence?:CameraEvidence; batteryEvidence?:ReconBatteryEvidence;
 };

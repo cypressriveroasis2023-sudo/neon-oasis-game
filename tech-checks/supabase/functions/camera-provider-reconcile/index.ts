@@ -1,3 +1,4 @@
+import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import { resolveStarResources, starResourceStatus } from "./star-resource-identity.js";
 import { unmappedResourceDiagnostics } from "./unmapped-resource-diagnostics.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -315,6 +316,7 @@ async function reconInventory(db:any){
   return {server:host+":"+port,inventory_total:list.length,detectors:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage};
 }
 async function avigilonInventory(db:any){
+  const managed=reviewedAvigilonRuntime();if(managed)return managed.checkManaged();
   const {data:master,error:me}=await db.from("equipment_master").select("canonical_family,unit_tag,source_label,tracker_state").in("canonical_family",["CAMV","Sniper","Sniper 2","Sniper 4"]);
   if(me)throw me;
   const {data:devices,error:de}=await db.from("camera_devices").select("id,unit_key,device_name,public_ip,expected_ports,monitoring_profile,activation_state,organization,last_health_checked_at").in("monitoring_profile",["sniper","camv"]);
@@ -392,7 +394,7 @@ Deno.serve(async(req)=>{
   const requestStarted=Date.now();
   if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
   if(req.method!=="POST")return json({error:"POST required"},405);
-  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const db=guardedAvigilonClient(createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!));
   const {data:valid}=await db.rpc("verify_camera_health_cron_secret",{candidate:req.headers.get("x-camera-cron-secret")});
   if(valid!==true){
     const bearer=String(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");

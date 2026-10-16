@@ -40,7 +40,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
+ if(role==='IT'){await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();}else if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
  return {frame,state};
 }
 const prepare=frame=>frame.getByRole('button',{name:'Prepare approved lookup',exact:true});

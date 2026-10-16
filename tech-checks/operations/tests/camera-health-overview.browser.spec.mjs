@@ -17,11 +17,17 @@ async function mount(page){
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON(),result=await page.evaluate(path=>{
-    if(path==='/api/camera-health/summary-v3')return {evidenceVersion:2,identityVersion:1,unitIdentities:[],identityWarnings:[],rows:fixtureDevices.map(device=>({id:device.id,unit:device.unit_key}))};
+    if(path==='/api/session')return {features:{freshAvigilonChecks:false,avigilonSourceWrites:false}};
+    // Explicit inventory proofs; provider organization alone never supplies placement authority.
+    const groups=[...(window.fixtureShopKeys||[]).map(key=>({key,shop:true})),...(window.fixtureFieldKeys||[]).map(key=>({key,shop:false}))].map(group=>({...group,devices:fixtureDevices.filter(device=>device.unit_key===group.key)}));
+    const groupId=group=>'22222222-2222-4222-8222-'+String(group.devices[0].id).padStart(12,'0');
+    const inventoryRows=groups.map(group=>({id:groupId(group),unitNumber:group.key,readOnly:false,status:group.shop?'available':'field',currentLocationType:group.shop?'shop':'field',site:group.shop?'Synthetic shop':'Synthetic field',address:group.shop?'':'20 Synthetic Road'}));
+    if(path==='/api/camera-health/summary-v3')return {evidenceVersion:2,identityVersion:1,unitIdentities:[],ownerConfirmedIdentityVersion:1,ownerConfirmedUnitIdentities:groups.map(group=>({unitId:groupId(group),unitNumber:group.key,kind:'owner_confirmed_native',deviceIds:group.devices.map(device=>String(device.id)),unitKeys:[group.key],proof:'a'.repeat(64)})),identityWarnings:[],rows:fixtureDevices.map(device=>({id:device.id,unit:device.unit_key}))};
     const state=window.placementState||{unitKey:'RANGER 022',placement:'FIELD',siteLabel:'Synthetic site',streetAddress:'10 Synthetic Road',auditId:null};
     const row={id:'11111111-1111-4111-8111-111111111111',unitNumber:state.unitKey,readOnly:false,status:state.placement==='FIELD'?'field':'available',currentLocationType:state.placement.toLowerCase(),site:state.siteLabel||'Synthetic site',address:state.streetAddress||'10 Synthetic Road'};
     if(state.auditId)Object.assign(row,{placement:state.placement,placementSource:'owner',placementUnitKey:state.unitKey,placementAuditId:state.auditId});
-    return {items:state.placement==='FIELD'?[row]:[],inventoryItems:[row],summary:{fieldUnits:state.placement==='FIELD'?1:0},placementReviews:[],generatedAt:new Date().toISOString()};
+    const fieldRows=[...(state.placement==='FIELD'?[row]:[]),...inventoryRows.filter(row=>row.currentLocationType==='field')];
+    return {items:fieldRows,inventoryItems:[row,...inventoryRows],summary:{fieldUnits:fieldRows.length},placementReviews:[],generatedAt:new Date(Date.now()).toISOString()};
   },request.path);
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(result)});
  });
@@ -98,11 +104,33 @@ test('interrupted diagnostics and failed history never leak another unit’s res
  await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await page.locator('#eventsArea summary').click();await expect(page.locator('#unitHistoryStatus')).toContainText('Synthetic history failure');await expect(page.locator('#recentChanges')).not.toContainText('Other unit only');
 });
 
+for(const superseding of ['report','manual reload','device identity change'])test('held diagnostic cannot restore old evidence after '+superseding,async({page})=>{
+ await mount(page);await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();
+ await page.evaluate(()=>{unitDiagnosticFailures.add('RANGER 022');window.holdChecks=true;window.pendingDiagnostic=runDiagnostic('connectivity',document.querySelector('[data-diag=connectivity]'));});
+ await page.waitForFunction(()=>typeof window.releaseCheck==='function');
+ const before=await page.evaluate(()=>unitDiagnosticRequest);
+ if(superseding==='report'){
+  await page.locator('[data-diag="report"]').click();await expect(page.getByRole('textbox',{name:'Unit diagnostic report'})).toHaveValue(/Unit: RANGER 022/);
+ }else if(superseding==='manual reload')await page.evaluate(()=>load());
+ else await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,unit_key:'RANGER 099',device_name:'Replacement identity'}:d);});
+ await page.evaluate(async()=>{window.releaseCheck();await window.pendingDiagnostic;});
+ expect(await page.evaluate(()=>unitDiagnosticRequest)).toBeGreaterThan(before);expect(await page.evaluate(()=>unitDiagnosticFailures.has('RANGER 022'))).toBe(true);
+ await expect(page.locator('#troubleResult')).not.toContainText('configured devices respond');
+ if(superseding==='report')await expect(page.getByRole('textbox',{name:'Unit diagnostic report'})).toHaveValue(/Unit: RANGER 022/);
+ else if(superseding==='manual reload'){
+  await expect(page.locator('#unitDetailTitle')).toHaveText('RANGER 022');await expect(page.locator('.compact-unit')).toHaveCount(3);
+ }else{
+  expect(await page.evaluate(()=>devices.find(d=>d.id===11)?.unit_key)).toBe('RANGER 099');
+  await expect(page.locator('#troubleResult')).not.toContainText('RANGER 022 · Connectivity');
+ }
+});
+
 test('offline totals exclude shop, inactive, port-only and unmapped records while conflicts remain visible',async({page},info)=>{
  await mount(page);
  await page.evaluate(async()=>{
   const base={device_type:'IPC',source:'vigilant_control_center',source_status:'offline',source_last_seen_at:'2026-10-06T12:29:00Z',activation_state:'active',organization:'Customer site'};
   window.fixtureDevices=[{...base,id:1,unit_key:'FIELD 001'},{...base,id:2,unit_key:'FIELD 001'},{...base,id:3,unit_key:'RANGER 901'},{...base,id:4,unit_key:'SHOP 001',organization:'ROOT'},{...base,id:5,unit_key:'INACTIVE 001',activation_state:'deactivated'},{...base,id:6,unit_key:'SNIPER 903',source:'2026_unit_tracker',source_status:null,source_last_seen_at:null,device_type:'Sniper'},{...base,id:7,unit_key:'SPOTTER 902',device_type:'NVR'}];
+  window.fixtureShopKeys=['SHOP 001'];window.fixtureFieldKeys=['FIELD 001'];
   window.fixtureTracker=[{source_label:'RANGER 901',canonical_family:'Ranger',unit_tag:'901',tracker_state:'shop'},{source_label:'SPOTTER 902',canonical_family:'Spotter',unit_tag:'902',tracker_state:'shop'},{source_label:'SPOTTER 904',canonical_family:'Spotter',unit_tag:'904',tracker_state:'field_or_unknown',health_provider:'witness'}];
   window.fixtureHealth=[{camera_device_id:6,overall_status:'offline',ip_reachable:false,confirmed_outage:true,consecutive_failures:3,checked_at:'2026-10-06T12:29:00Z'}];
   window.fixtureIntegrations=[{provider:'witness',metadata:{units:{'spotter|904':{status:'offline',checked_at:'2026-10-06T12:29:00Z'}}}}];
@@ -122,7 +150,7 @@ test('current evidence expires in both overview and open details without fresh r
  await expect(page.locator('#allOffline')).toHaveText('0');await expect(page.locator('#unitDetailSubtitle')).toContainText('NOT VERIFIED');expect(await page.evaluate(()=>window.reads.length)).toBe(reads);
 });
 test('duplicate source refresh clears totals and cannot be revived by freshness timer',async({page})=>{
- await mount(page);await page.evaluate(async()=>{window.fixtureDevices.push(window.fixtureDevices[0]);await load()});
+ await mount(page);await page.evaluate(async()=>{window.fixtureDevices.push(window.fixtureDevices[0]);await load().then(()=>{throw Error('Duplicate source unexpectedly accepted')},error=>{if(!/duplicate identities/.test(error.message))throw error})});
  await expect(page.locator('#allOffline')).toHaveText('—');await expect(page.locator('#empty')).toContainText('duplicate identities');await expect(page.locator('.provider-breakdown b')).toHaveText(Array(8).fill('—'));
  await page.evaluate(()=>window.freshnessCheck());await expect(page.locator('#allOffline')).toHaveText('—');await expect(page.locator('#unitCards')).not.toBeVisible();
 });
@@ -189,11 +217,16 @@ test('front placement confirmation moves shop and field without changing health'
 
 test('visible folders and global search include deactivated ROOT units without family collisions',async({page})=>{
  await mount(page);await page.evaluate(async()=>{fixtureDevices.push({id:999,unit_key:'SNIPER 312',device_name:'Shop camera 312',organization:'ROOT',activation_state:'deactivated',device_type:'Sniper',source:'2026_unit_tracker'});await load();});
+ await page.getByLabel('Search units').fill('312');
+ await expect(page.locator('.compact-unit .effective-placement')).toContainText(/No verified equipment link|physical placement unavailable/i);
+ expect(await page.evaluate(()=>CameraEffectivePlacement.get(devices.find(d=>d.id===999))?.status)).toBe('unresolved');
+ await expect(page.locator('.compact-unit .statuspill')).not.toHaveText('SHOP');
+ await page.evaluate(async()=>{window.fixtureShopKeys=['SNIPER 312'];await load();});await page.getByLabel('Search units').fill('');
  await page.getByRole('button',{name:'Shop / ROOT folder',exact:true}).click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 312');
  await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await page.getByLabel('Search units').fill('312');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('#boardTitle')).toContainText('Search all inventory');const card=page.locator('.compact-unit');
  await expect(card.locator('.statuspill')).toHaveText('SHOP');await expect(card.locator('.compact-unit-site')).toHaveText('SHOP');
  await expect(card.locator('.effective-placement')).toContainText('Provider organization: ROOT');await expect(card.locator('.effective-placement')).toContainText('Activation: deactivated');
- await expect(card.locator('.effective-placement')).toContainText(/No verified equipment link|physical placement unavailable/i);
+ await expect(card.locator('.effective-placement')).toContainText('Current Field Map record');expect(await page.evaluate(()=>CameraEffectivePlacement.get(devices.find(d=>d.id===999))?.status)).toBe('ready');
  await expect(card.locator('.compact-unit-summary')).toContainText('Shop inventory; excluded from operational outage totals');
  await expect(card.locator('.compact-unit-summary')).not.toContainText(/online|offline|active shop|verified physical placement|owner-confirmed placement/i);
  // Existing integration readiness is read-only; no probe, sync or mutation is allowed.
@@ -206,7 +239,7 @@ test('online and offline edges stay bright without selection while stale and sho
  await page.locator('#unitCards').screenshot({path:info.outputPath('bright-card-edges-and-front-actions.png')});
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});const bounds=await page.locator('#unitCards').evaluate(el=>({page:document.documentElement.scrollWidth,view:innerWidth}));expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);}
  await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:51:00Z');window.freshnessCheck();});await expect(online).toHaveCSS('border-top-color','rgb(83, 97, 116)');await expect(offline).toHaveCSS('border-top-color','rgb(83, 97, 116)');
- await page.evaluate(async()=>{fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
+ await page.evaluate(async()=>{window.fixtureShopKeys=['RANGER 023'];fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
 });
 
 

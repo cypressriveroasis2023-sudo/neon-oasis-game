@@ -260,19 +260,19 @@ test('The mounted visible workspace polls saved data every minute without discov
 for(const capability of ['omitted','denied'])test('IT with '+capability+' Victron capability never requests or exposes Victron data',async({page})=>{
  const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:capability==='denied'?{vrmRead:false}:{},initialHash:'#victron-vrm',onVrmRequest:async()=>{throw Error('IT without explicit Victron capability must never request Victron data');}});
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
- await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+ await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
  await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
  expect(requests.some(request=>request.path.startsWith('/api/vrm-'))).toBeFalsy();
  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
-test('IT with an explicit Victron capability retains its authorized read-only daily view',async({page})=>{
+test('IT with an explicit Victron capability stays in Camera Health without a standalone power workspace',async({page})=>{
  const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:{vrmRead:true},config:fleet([syntheticUnit(3000101,'Synthetic authorized IT installation')])});
- await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toBeVisible();
- await expect(selectedId(frame)).toHaveText('3000101');
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#victron-vrm');
- expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet']);
+ await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+ await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
@@ -395,9 +395,9 @@ async function captureNativePower(page,panel,testInfo,prefix){
   await capture(captions.nth(index),key);
  }
 }
-for(const role of ['owner','it'])test(`${role} sees read-only power for 010, 011 and a newly discovered installation without sharing`,async({page},testInfo)=>{
+for(const role of ['owner','it'])test(`${role==='it'?'IT cannot open standalone power or discovery even with read capability':'Owner sees read-only power for 010, 011 and a newly discovered installation without sharing'}`,async({page},testInfo)=>{
  let items=[syntheticUnit(3000010,'HELIOS 010'),syntheticUnit(3000011,'HELIOS 011')];
- const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});await openVrm(frame);
+ const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});if(role==='it'){await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);await expect(frame.getByRole('button',{name:'Refresh fleet',exact:true})).toHaveCount(0);expect(requests.every(r=>r.method==='GET'&&r.path!=='/api/vrm-fleet/refresh')).toBe(true);return;}await openVrm(frame);
  for(const item of items){
   await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:item.name+' Read-only power',exact:true}).click();
   const panel=frame.getByRole('region',{name:item.name+' read-only power dashboard'});

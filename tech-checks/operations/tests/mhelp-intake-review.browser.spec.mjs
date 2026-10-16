@@ -1,6 +1,7 @@
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {test,expect} from '@playwright/test';
+import {snapshot as cameraSnapshot} from './fixtures/camera-evidence-fixtures.mjs';
 import {existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -25,7 +26,8 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
   const answer=(data,code=200)=>route.fulfill({status:code,headers,contentType:'application/json',body:JSON.stringify(data)});
   if(request.path==='/api/session')return answer({authorized:true,legacyOwner,role:role==='owner'?'Owner':role==='it'?'IT':'Service',features:{unitTracker:true,fleetAccess:true}});
   if(request.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
-  if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}});
+  if(request.path==='/api/camera-health/summary-v3')return answer(cameraSnapshot([]));
+  if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:cameraSnapshot([]).refreshedAt});
   if(request.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1'){
    const value=structuredClone(state.value),failure=state.failure;
    if(state.hold)await new Promise(resolve=>state.releases.push(resolve));
@@ -34,7 +36,13 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
   return answer({items:[]});
  });
  await page.goto(origin+'/intake-fixture');const frame=page.frameLocator('iframe');
- if(role!=='service')await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
+ if(role==='it'){
+  await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+  await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('alert')).toHaveCount(0);
+ }else if(role==='owner')await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
  else await expectOperationsReloadRequired(frame);
  return {frame,panel:frame.getByRole('region',{name:'mHelpDesk automatic intake status',exact:true}),state};
 }
@@ -102,7 +110,7 @@ test('bounded held list remains readable on mobile and clearly says it is trunca
  expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
 });
 for(const role of ['it','service'])test(`${role} session has no intake review or read even with forged Owner flag`,async({page})=>{
- const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);
+ const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);expect(state.calls.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(call.path))).toBe(true);expect(state.errors).toEqual([]);
 });
 
 test('a completed all-held scan never claims that Tech Check assignments were created',async({page})=>{

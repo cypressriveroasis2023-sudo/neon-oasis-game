@@ -1,3 +1,4 @@
+import {guardedAvigilonClient} from '../../supabase/functions/_shared/avigilonReviewedRuntime.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -13,7 +14,7 @@ async function handler(resources,locals=[local()],options={}){
  const rows=structuredClone(locals),writes=[],source=readFileSync(new URL('../../supabase/functions/vigilant-sync/index.ts',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');let handle;
  const db={from(table){return {select(){return this},eq(){return this},in(){return this},maybeSingle(){return {data:{metadata:{existing:'preserved'}}}},then(resolve){resolve({data:rows})},update(patch){return {eq:async(column,id)=>{const clean=JSON.parse(JSON.stringify(patch));writes.push({table,id,patch:clean});Object.assign(rows.find(row=>row.id===id),clean);return {error:null}}}},upsert:async(patch)=>{writes.push({table,patch});return {error:null}},insert:async(patch)=>{writes.push({table,patch});return {error:null}}}}};
  const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
- vm.runInNewContext(js,{
+ vm.runInNewContext(js,{guardedAvigilonClient,
   Deno:{env:{get:()=> 'synthetic-only'},serve:callback=>{handle=callback}},createClient:()=>db,crypto:{subtle:{digest:async()=>new Uint8Array(16).buffer}},TextEncoder,navigator:{userAgent:'synthetic-test',platform:'synthetic-test'},Response,Request,Error,resolveStarResources,console:{error:()=>{}},
   fetch:async(url,request)=>{
    if(options.failAuth)return new Response(JSON.stringify({message:'Synthetic authentication failure'}),{status:401});

@@ -2,9 +2,16 @@ import {test,expect} from '@playwright/test';
 import {mountFleet,units,field,fresh} from './fleet-dashboard-fixtures.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 
-for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible direct Fleet Dashboard entry and one operational map`,async({page})=>{
+async function assertITCameraOnly(app,state){
+ await expect(app.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+ await expect(app.locator('.cos-fleet-dashboard,.cos-fleet-map-canvas')).toHaveCount(0);
+ await expect(app.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveCount(0);
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+}
+
+for(const it of [false,true])test(`${it?'Verified IT stays in Camera Health':'Owner has a direct Fleet Dashboard entry and one operational map'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:it?'#it-dashboard':'#today'});
- if(it)await app.getByRole('region',{name:'IT daily dashboard',exact:true}).locator('[data-source="field"]').getByRole('button',{name:'Open Fleet Dashboard',exact:true}).click();
+ if(it){await assertITCameraOnly(app,state);await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');return;}
  else await app.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
  await expect(app.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
  const navigation=app.getByRole('navigation',{name:page.viewportSize().width<=700?'Mobile Operations navigation':'COS Operations',exact:true});
@@ -15,8 +22,9 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible dir
  expect(state.errors).toEqual([]);
 });
 
-for(const alias of ['field-map','field-view'])for(const it of [false,true])test(`${alias} redirects for ${it?'IT':'Owner'} and preserves a selected unit`,async({page})=>{
+for(const alias of ['field-map','field-view'])for(const it of [false,true])test(`${alias} ${it?'redirects IT to Camera Health without exposing Fleet':'preserves the selected Owner Fleet unit'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:'#'+alias+'?unit='+units[0].id});
+ if(it){await assertITCameraOnly(app,state);await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');await expect(app.getByRole('dialog')).toHaveCount(0);await app.getByRole('button',{name:'Reload saved results',exact:true}).click();await expect(app.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();return;}
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
  expect(await app.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+units[0].id);
  await app.getByRole('button',{name:'Close unit details',exact:true}).click();
@@ -96,8 +104,9 @@ test('installation workflows share the same canvas and retain unsaved pin coordi
  expect(state.errors).toEqual([]);
 });
 
-for(const it of [false,true])test(`${it?'IT':'Owner'} Camera Health and Field View reuse one workspace and selected-unit detail`,async({page})=>{
+for(const it of [false,true])test(`${it?'IT Camera Health details stay inside its authorized workspace':'Owner Camera Health and Field View reuse one workspace and selected-unit detail'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:'#camera-health'});
+ if(it){await assertITCameraOnly(app,state);const card=app.getByRole('button',{name:/Open Helios 1 unit details/i});await card.click();await expect(app.getByRole('dialog',{name:'Camera Health unit details'})).toBeVisible();await app.getByRole('button',{name:'Back to units',exact:true}).click();await expect(app.getByRole('dialog')).toHaveCount(0);await expect(card).toBeFocused();await assertITCameraOnly(app,state);return;}
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(1);
  await expect(app.locator('.camera-overview')).toHaveCount(0);
  const first=app.locator('.cos-fleet-table-wrap tbody tr').filter({hasText:'Helios 1'});
@@ -137,14 +146,15 @@ test('Owner advanced diagnostics remains a secondary authorized tool',async({pag
 test('daily IT has no Owner advanced-diagnostics launch or paused action',async({page})=>{
  const {app}=await mountFleet(page,true,{hash:'#camera-health'});
  await expect(app.getByRole('button',{name:'Advanced camera diagnostics',exact:true})).toHaveCount(0);
- await app.locator('.cos-fleet-table-wrap tbody tr').filter({hasText:'Helios 1'}).getByRole('button',{name:'Details →',exact:true}).click();
+ await app.getByRole('button',{name:/Open Helios 1 unit details/i}).click();
  await expect(app.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  await expect(app.getByRole('button',{name:'Review equipment identity',exact:true})).toHaveCount(0);
  await expect(app.getByRole('button',{name:'Register in COS inventory →',exact:true})).toHaveCount(0);
 });
 
-for(const it of [false,true])test(`${it?'IT':'Owner'} repeated Camera Health and Field View entries select their advertised modes`,async({page})=>{
+for(const it of [false,true])test(`${it?'IT repeated Fleet aliases remain Camera Health-only':'Owner repeated Camera Health and Field View entries select their advertised modes'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:'#camera-health'});
+ if(it){for(const hash of ['#fleet-dashboard','#camera-health','#field-map','#camera-health']){await app.locator('body').evaluate((_,hash)=>location.hash=hash,hash);await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');await assertITCameraOnly(app,state);}return;}
  const entries=app.getByRole('navigation',{name:'Fleet dashboard views'});
  const enter=async(label)=>{await app.getByRole('button',{name:'More',exact:true}).first().click();await app.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:label,exact:true}).click();};
  for(let repeat=0;repeat<2;repeat++){
@@ -165,8 +175,9 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} repeated Camera Health and
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });
 
-for(const it of [false,true])test(`${it?'IT':'Owner'} direct Camera Health unit link restores focus to its own table action`,async({page})=>{
+for(const it of [false,true])test(`${it?'IT direct Camera Health unit link uses inline camera details':'Owner direct Camera Health unit link restores focus to its table action'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:'#camera-health?unit='+units[0].id});
+ if(it){await assertITCameraOnly(app,state);await expect(app.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Helios 1');await expect(app.getByRole('dialog')).toHaveCount(0);return;}
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
  await app.getByRole('button',{name:'Close unit details',exact:true}).click();
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toHaveCount(0);

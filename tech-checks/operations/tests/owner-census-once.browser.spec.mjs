@@ -40,7 +40,7 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-once-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
+ if(role==='IT'){await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();}else if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
  return {frame,state};
 }
 test('complete enrolled Owner proof enables one deliberate lookup, duplicate clicks send once, reload reads consumed result',async({page})=>{
@@ -57,9 +57,9 @@ test('complete enrolled Owner proof enables one deliberate lookup, duplicate cli
 for(const role of ['IT','Service'])test(role+' cannot see or dispatch the Owner-only lookup',async({page})=>{
  const {frame,state}=await mount(page,{role});await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);expect(state.writes).toHaveLength(0);
 });
-test('existing IT map readers see a server-admitted building estimate without an execution action',async({page})=>{
+test('IT Camera Health cannot expose an Owner building-estimate workspace or execution action',async({page})=>{
  const {frame,state}=await mount(page,{role:'IT',initialOutcome:'success'});
- await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('suite and installed unit position remain unverified');
+ await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);
  await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toHaveCount(0);
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+id+'"]')).toHaveCount(0);

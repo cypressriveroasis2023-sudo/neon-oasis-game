@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {resolveStarResources,starResourceStatus} from '../../supabase/functions/camera-provider-reconcile/star-resource-identity.js';
 import {unmappedResourceDiagnostics} from '../../supabase/functions/camera-provider-reconcile/unmapped-resource-diagnostics.js';
+import * as inventoryPresentationRules from '../../supabase/functions/cos-operations-pages/inventoryPresentationRules.ts';
 
 const historical='2026-10-10T12:00:00.000Z';
 const local=(patch={})=>({id:901,device_serial:'synthetic-physical-alpha',external_device_id:'synthetic-external-beta',device_name:'Helios901 synthetic camera 3+4',device_type:'IPC',monitoring_profile:'helios',unit_key:'Helios901',activation_state:'active',organization:'Synthetic site',source:'vigilant_control_center',source_status:'online',source_last_seen_at:historical,last_online_at:historical,public_ip:'192.0.2.55',connection_revision:7,...patch});
@@ -120,7 +121,7 @@ test('quarantine stays unverified in detail, board, native frontend and backend 
  assert.equal(context.CameraHealthOverview.cameraState(device),'verifying');assert.equal(context.CameraHealthOverview.providerState(device),'verifying');
  const detail=read('tech-checks/camera-detail.html');vm.runInContext(detail.match(/^function sourceFresh\(.*$/m)[0]+'\n'+detail.match(/^function effectiveHealth\(.*$/m)[0],context);assert.equal(context.effectiveHealth(device,health),'verifying');
  for(const path of ['tech-checks/operations/src/cameraEvidence.ts','tech-checks/supabase/functions/cos-operations-pages/cameraEvidence.ts']){
-  const api=compile(read(path),{exports:{}}).exports;const row={id:device.id,activationState:'active',type:'IPC',evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:device.source_status,observedAt:device.source_last_seen_at}};
+  const api=compile(read(path),{exports:{},require:name=>{assert.equal(name,'./inventoryPresentationRules.ts');return inventoryPresentationRules;}}).exports;const row={id:device.id,activationState:'active',type:'IPC',evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:device.source_status,observedAt:device.source_last_seen_at}};
   assert.equal(api.cameraState(row),'verifying');assert.equal(api.providerState(row),'verifying');
  }
 });

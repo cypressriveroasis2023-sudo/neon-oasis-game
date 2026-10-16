@@ -1,0 +1,12 @@
+import {test,expect} from '@playwright/test';import {mountFleet} from './fleet-dashboard-fixtures.mjs';
+import {runReport} from '../../supabase/functions/_shared/avigilonCheckRun.ts';
+test('mounted fleet refresh checks Field, displays progress and shares exact completed report',async({page})=>{
+ let starts=0,current,failed=false,complete=false;const {app,state}=await mountFleet(page,false,{features:{freshAvigilonChecks:true},respond:request=>{
+  if(request.method==='POST'&&request.path==='/api/avigilon-check-runs'){
+   starts++;complete=false;const at=new Date().toISOString();current={id:'11111111-1111-4111-8111-'+String(starts).padStart(12,'0'),tenantId:'synthetic',rosterRevision:'audited',state:'pending',startedAt:at,completedAt:null,deadlineAt:at,rows:[{unitId:'field',name:'Sniper Field 1',outcome:'pending',reason:null,startedAt:at,completedAt:null,confirmedOutage:false,endpointRevision:'1'}]};return {json:{run:current,coalesced:false}};
+  }
+  if(request.method==='GET'&&request.path.startsWith('/api/avigilon-check-runs/')){if(!complete)return {json:current};current={...current,state:failed?'failed':'completed',completedAt:new Date().toISOString(),rows:current.rows.map(r=>({...r,outcome:failed?'unverified':'nonresponse',reason:failed?'checker_unavailable':null,...(!failed?{publicationReceipt:'1'}:{}),completedAt:new Date().toISOString()}))};return {json:current};}
+ }});
+ const checks=app.getByRole('region',{name:'Fresh Avigilon Field checks'});await expect(checks).toContainText('pending');await expect.poll(()=>starts).toBe(1);complete=true;await expect(checks).toContainText('completed');await checks.locator('summary').filter({hasText:'Report for this check run'}).click();await expect(checks.getByRole('textbox',{name:'Fresh Avigilon run report'})).toBeVisible();await expect(checks.getByRole('textbox',{name:'Fresh Avigilon run report'})).toHaveValue(runReport(current));await expect(checks).not.toContainText('Sniper 44');
+ failed=true;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect.poll(()=>starts).toBe(2);complete=true;await expect(checks).toContainText('checker_unavailable');await checks.locator('summary').filter({hasText:'Report for this check run'}).click();await expect(checks.getByRole('textbox',{name:'Fresh Avigilon run report'})).toBeVisible();await expect(checks.getByRole('textbox',{name:'Fresh Avigilon run report'})).toHaveValue(runReport(current));expect(state.errors).toEqual([]);
+});

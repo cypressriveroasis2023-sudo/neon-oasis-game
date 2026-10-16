@@ -1,3 +1,4 @@
+import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {archiveReconPayload} from '../_shared/reconEventArchive.ts';
@@ -127,10 +128,10 @@ function healthFromEvent(eventName: string) {
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "POST required" }, 405);
 
-  const db = createClient(
+  const db = guardedAvigilonClient(createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  ));
 
   const { data: secretRows, error: secretError } = await db.rpc("get_reconeyez_integration_secrets");
   if (secretError) return json({ error: "Integration security configuration unavailable" }, 503);

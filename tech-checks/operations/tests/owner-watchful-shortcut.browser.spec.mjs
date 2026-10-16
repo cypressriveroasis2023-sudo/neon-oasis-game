@@ -10,7 +10,8 @@ const shortcut = frame => frame.getByRole('region', {name: 'Watchful', exact: tr
 // Synthetic sessions and records only. Even the portal's new tab is intercepted.
 // This shortcut belongs to the explicit Owner overview, not the default Fleet landing.
 async function mount(page, context, {authorized = true, role = 'Owner', mode = ''} = {}) {
-  const state = {calls: [], portalRequests: []};
+  const state = {calls: [], portalRequests: [], errors: []};
+  page.on('pageerror', error => state.errors.push(error.message));
   await context.route('**/*', async route => {
     const request = route.request(), url = request.url();
     if (url === portal) {
@@ -62,6 +63,7 @@ test('Owner Watchful area opens the exact portal separately with keyboard and cl
     expect(request.headers.referer).toBeUndefined();
   }
   expect(state.calls.every(call => call.method === 'GET' && !call.path.toLowerCase().includes('watchful'))).toBe(true);
+  expect(state.errors).toEqual([]);
   const size = await frame.locator('body').evaluate(() => ({width: innerWidth, scroll: document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width + 1);
   expect((await auditDarkPresentation(area)).failures).toEqual([]);
@@ -69,28 +71,47 @@ test('Owner Watchful area opens the exact portal separately with keyboard and cl
 });
 
 test('Watchful stays on the Owner dashboard across workspace navigation', async ({page, context}) => {
-  const {frame} = await mount(page, context);
+  const {frame, state} = await mount(page, context);
   await expect(shortcut(frame)).toBeVisible();
   await openWorkspace(frame, 'Team');
   await expect(shortcut(frame)).toHaveCount(0);
   await openWorkspace(frame, 'Today');
   await expect(shortcut(frame)).toBeVisible();
+  expect(state.errors).toEqual([]);
 });
 
 for (const account of [
   {name: 'unauthorized Owner', authorized: false},
-  {name: 'IT daily dashboard', role: 'IT', mode: 'fleet'},
-  {name: 'Owner viewing IT daily tools', role: 'Owner', mode: 'fleet'},
+  {name: 'IT Camera Health', role: 'IT', mode: 'fleet'},
+  {name: 'Owner viewing IT Camera Health', role: 'Owner', mode: 'fleet'},
   {name: 'non-Owner session', role: 'Service'},
 ]) test('Watchful is absent for ' + account.name, async ({page, context}) => {
   const {frame, state} = await mount(page, context, account);
   if (account.mode) {
-    const daily = frame.getByRole('region', {name: 'IT daily dashboard', exact: true});
-    await expect(daily).toBeVisible();
-    await expect(daily.locator('[data-source]')).toHaveCount(4);
+    await expect(frame.getByRole('region', {name: 'Camera Health', exact: true})).toBeVisible();
+    await expect(frame.getByRole('button', {name: 'Reload saved results', exact: true})).toBeEnabled();
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#camera-health');
+    await expect(frame.getByRole('region', {name: 'IT daily dashboard', exact: true})).toHaveCount(0);
+    await expect(frame.getByRole('navigation', {name: 'Fleet dashboard views'})).toHaveCount(0);
+    await expect(frame.locator('.cos-fleet-dashboard,.cos-fleet-map-canvas')).toHaveCount(0);
+    await expect(frame.getByRole('button', {name: 'Fullscreen fleet map', exact: true})).toHaveCount(0);
+    await expect(frame.getByRole('button', {name: 'Register in COS inventory →', exact: true})).toHaveCount(0);
+    await frame.getByRole('button', {name: 'More', exact: true}).first().click();
+    const menu = frame.getByRole('dialog', {name: 'Operations navigation'});
+    await expect(menu).toBeVisible();
+    const nav = menu.getByRole('navigation', {name: 'COS Operations', exact: true});
+    await expect(nav.getByRole('button')).toHaveCount(1);
+    await expect(nav.getByRole('button', {name: 'Camera Health', exact: true})).toHaveAttribute('aria-current', 'page');
+    await expect(menu.getByRole('button', {name: /Fleet Dashboard|Victron Power|Unit Tracker|Tech Checks|MHelp|Team|Dispatch|Money|Vision assistant/})).toHaveCount(0);
+    await menu.getByRole('button', {name: /Close menu/}).click();
+    await expect(menu).toHaveCount(0);
+    expect(state.calls.every(call => ['/api/session', '/api/field-map', '/api/camera-health/summary-v3'].includes(call.path))).toBe(true);
+    await page.screenshot({path: test.info().outputPath('watchful-absent-camera-health.png'), fullPage: true});
   } else if (account.authorized === false) await expect(frame.getByRole('heading', {name: 'Operations access needs attention'})).toBeVisible();
   else await expect(frame.getByRole('region', {name: 'VISION dashboard'})).toBeVisible();
   await expect(shortcut(frame)).toHaveCount(0);
   await expect(frame.getByRole('link', {name: 'Open Watchful', exact: true})).toHaveCount(0);
   expect(state.portalRequests).toHaveLength(0);
+  expect(state.calls.every(call => call.method === 'GET' && !call.path.toLowerCase().includes('watchful'))).toBe(true);
+  expect(state.errors).toEqual([]);
 });

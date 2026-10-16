@@ -1,0 +1,227 @@
+PR177 continuation: candidate only, runtime disabled, no production changes
+
+Boundary and consistency
+The native project owns runs, the authoritative admitted roster generation, and
+health publications. commit_result locks the tenant lease, current authority and
+actor profile/role rows, validates current Field eligibility, identity uniqueness,
+restrictions, endpoint revision/IP/ports/profile and observation times, then writes
+the health outcome, monotonic failure count, receipt and run row in ONE native
+PostgreSQL transaction. save cannot invent successful outcomes or receipts.
+Repeated exact commit requests return the same receipt without incrementing the
+failure count. A lost response can be resolved by reading the run. Successful rows
+survive later stale worker saves. A failed/partial refresh never renews timestamps.
+
+This does NOT transact across the native and legacy Supabase projects. Native
+health is authoritative for managed Avigilon endpoints. Legacy health is neither
+written nor required for success. The shared summary reads native publications,
+not a legacy replica. No distributed-transaction guarantee is made. There is no
+legacy replication worker in this patch; replica_ack_at is reserved metadata,
+never a success signal. Any future legacy copy must carry the native receipt,
+be idempotent and reject older generations/receipts; it cannot drive these views.
+
+Cross-project source protocol (required before enablement)
+Every writer of placement, restrictions/DNU, activation/monitoring, resource
+identity, IP, port list, profile or connection revision must participate. This
+includes scheduled provider/import jobs and administrative SQL, not just UI edits.
+1. Acquire native fence(actor, tenant). This closes publication/health reads,
+   invalidates the current lease, and returns an exclusive generation token.
+2. Only after confirmed fence acquisition may that writer mutate remote/native
+   source records. withAvigilonAuthorityFence implements this ordering.
+3. Read back complete reconciled inventory, reviewed identity and endpoint state;
+   derive the roster with auditedAvigilonRoster. Recheck source revisions around
+   the read, with no competing source writers allowed.
+4. admit(actor, tenant, exact_generation, roster) reopens publication. The next
+   run binds its generation in a database trigger, never a client timestamp.
+
+Fence acquisition fails when already closed; there is no expiry/takeover. A crash,
+ambiguous write response or failed readback leaves authority closed. Recovery must
+quiesce the original writer, verify all source state, and explicitly admit the
+held generation through the reviewed administrative path. Merely copying source
+state asynchronously, or post-probe re-reading it, does NOT satisfy this protocol.
+Candidate native integration: avigilon_native_source_fences.sql installs BEFORE
+STATEMENT hooks on 25 authority tables (the exact list is in that file). Native
+inventory upload/scoped apply and rollback, equipment CRUD, tracker placement,
+MHelp/Sheets placement jobs and owner/provider identity writes invalidate native
+authority in their own source transaction. Transaction rollback restores the
+previous generation. Every committed statement increments generation even while
+closed, so a concurrent source write defeats stale admission. Missing tables
+abort installation. These hooks are NOT installed. Scheduled source jobs will
+conservatively close health until reviewed readback/admission; this availability
+cost is intentional. The cross-project helper's pre-write token cannot be reused
+for native mutations covered by these hooks: native orchestration must capture
+the resulting committed generation before beginning complete readback, then
+recheck that generation during admission. Never obtain a fresh token after
+unbracketed readback.
+The candidate coordinator below implements this admission orchestration; the
+trigger itself only closes authority and never performs remote readback.
+Shared PR178 functions are unchanged. After merging PR178,
+verify its final tables remain covered; its label-only/authority-time semantics
+are inputs to roster readback, never authority-token bypasses.
+
+Implemented continuation and rollout gate:
+The source-operation continuation below replaces the earlier adapter-only gap.
+Its schemas, guarded clients, verified readback/recovery and publisher dispatch
+remain candidate code. No installation, grants, deployment or enablement has been
+performed. Review the final source protocol and schema compatibility before rollout.
+
+Readers
+Native read_health returns one authority generation, admitted roster revision,
+roster membership and receipts from one statement snapshot. The handler reads
+this envelope BEFORE identity/placement/endpoint reads and rechecks the token
+AFTER them. A closed or changed generation/roster fails the whole read. Receipt
+membership must match exactly one admitted roster unit and one current native
+identity claim for the device. Fleet requires the same token on health and field
+map and verifies receipt membership against current Field inventory. A change
+between the two HTTP reads therefore fails closed. Generation increments prevent
+ABA even when a roster revision is reused. This requires all source writers to
+participate; it does not make cross-project reads serializable by themselves.
+
+Consumers
+Operations summary-v3 uses projectAvigilonHealth whenever the optional run runtime
+is provided; an unavailable/malformed native read fails the refresh. The existing
+shared fleet pair feeds Fleet, Camera Health, details and CSV. Pending/new runs,
+closed fences, changed endpoints, Shop, inactive and restricted units suppress
+old service health. Managed identity tombstones prevent removed mappings from
+reviving old legacy observations. Provider health, placement, activation, IPs,
+router, power and video remain separate. CSV adds basis, observation time, explicit
+unknown channel/video coverage and receipt IDs. Run reports name receipts too.
+Failure retains inventory/location; current health becomes unknown. Historical
+report rows remain historical evidence and never move inventory.
+
+Exact permission / rollout requirements (NOT authorized by this coding task)
+- Review and approve installing candidate SQL in the native project as postgres:
+  avigilon_check_runs.sql; avigilon_health_publication.sql;
+  avigilon_check_run_boundary.sql; avigilon_health_boundary.sql;
+  avigilon_native_source_fences.sql and avigilon_source_operations.sql; install
+  avigilon_legacy_source_guard.sql separately in the legacy project. No grants.
+  They are local candidates, not production migration history. If any candidate
+  is already installed, produce/review an ALTER migration against that exact DDL;
+  these CREATE scripts are not intended to be rerun over installed objects.
+- Existing PR177 boundary proposes EXECUTE to service_role only on
+  public.cos_avigilon_run_claim(uuid,uuid,jsonb),
+  public.cos_avigilon_run_read(uuid,uuid,uuid),
+  public.cos_avigilon_run_save(uuid,uuid,jsonb).
+- Additional individually approved EXECUTE grants would be required for the
+  existing service_role on public.cos_avigilon_run_commit(uuid,uuid,jsonb) and
+  public.cos_avigilon_health_read(uuid,uuid). The new SQL intentionally grants
+  neither. Both wrappers require the service JWT role and recheck native actor.
+- No PUBLIC/anon/authenticated EXECUTE, private-schema USAGE, direct table or
+  sequence grants, role memberships, new credentials or browser capabilities.
+  Private RLS remains enabled with no public policies. postgres owns the fixed
+  SECURITY DEFINER wrappers, each with empty search_path.
+- fence(uuid,uuid) and admit(uuid,uuid,bigint,jsonb) remain private administrative
+  operations. Review the existing administrative writer transport and all writer
+  integrations separately. No public fence/admit wrappers/grants are supplied.
+- Approve deployment and explicit runtime wiring only after writer coverage,
+  actor/tenant mapping, endpoint inventory and readback have been reviewed.
+  Existing service credentials must remain server-side. No new secret needed.
+- Rollback: disable runtime first; close/quiesce authority; revoke service EXECUTE
+  on all nine public functions (including the four continuation boundaries below).
+  Retain runs/publications/managed identities for
+  audit. Do not drop evidence or reopen source writers automatically.
+
+Scope preservation
+Main 916129fcc09049cffdd2c519f67b2ef95e5d3587; PR177 starting head
+8f4c3ffafd685ca1f885055fee4efc6c7135c646. PR176 is not reapplied. No tracker,
+scoped_inventory_overlay.sql, source rows or IPs changed. Parent's saved revision
+1 batch b32682c5-ec8d-49f0-9c53-103473837e2e remains untouched. Supplied counts
+(135 Avigilon / 41 Field / 94 Shop / 24 DNU; 517 inventory = 194 Field + 323 Shop;
+480 provider devices) are separate baselines, not recomputed or reconciled here.
+User's 230 SHOP no SIM/no IP, Ranger 007 SHOP as of 18:00 Central Oct 15, and Ranger
+024 FIELD Metro Park Square remain source-authority inputs. This patch contains
+only synthetic test identities and endpoints and does not overwrite corrections.
+
+Validation procedure (synthetic/local only)
+- Aggregate: NODE_OPTIONS=--max-old-space-size=4096 npm test. The larger heap
+  avoids the earlier default-heap failure in source-admission-continuity tests.
+  The PR validation receipt reports the complete final run, not a failed run plus
+  an isolated rerun as an aggregate success.
+- Native PGlite tests include publication receipt/authorization/rollback and all
+  25 source-table hooks, stale readback rejection and rollback preservation.
+- Independent PostgreSQL 17: COS_AVIGILON_LOCAL_POSTGRES=1 node
+  tests/avigilon-postgres-concurrency.local.mjs and
+  tests/avigilon-source-postgres.local.mjs (network-disabled containers).
+- Browser: avigilon-run, avigilon-shared-health and fleet-dashboard suites at
+  mobile 390 and desktop 1024/1440. System Chromium with temporary executablePath
+  configuration; Node 24 requires PW_DISABLE_TS_ESM=1 and --import tsx.
+  Both Fleet and Camera Health routes check receipt 73 in visible details,
+  accessible report textbox and CSV, then verify failed refresh retains location
+  while receipt/current health is cleared. The run panel opens report details.
+- npm run typecheck; npm run build; git diff --check. Generated dist excluded.
+- Exact final-head counts and remote CI links belong in the PR check receipt.
+
+Source-operation continuation (candidate, NOT installed or enabled)
+The remaining protocol is implemented by avigilon_source_operations.sql in the
+native project and avigilon_legacy_source_guard.sql in the legacy project.
+A native source operation stores immutable commands and holds authority closed.
+Legacy apply locks its gate, executes the allowlisted source commands and records
+an immutable sealed receipt in ONE legacy transaction. There is no open remote
+permit, time lease, or permit expiration. A retry returns the exact saved receipt;
+it cannot reopen the operation or mutate after native admission. A new legacy
+operation requires a newer native generation from a new, committed native hold.
+These are two independent database transactions, NOT a distributed transaction.
+The trusted service coordinator is responsible for carrying the committed native
+ticket and reading the committed legacy seal; neither browser can issue tickets.
+
+Ambiguous/lost responses retain a durable pending operation. Reconciliation
+resumes its exact stored commands, reuses the sealed result and brackets trusted
+readback with both the native generation and legacy operation seal. Native finish
+rechecks generation and actor/tenant inside its transaction before admission.
+The original unverified admit entrypoint is disabled by the candidate SQL.
+Explicit cancellation serializes on the same legacy gate: if a writer committed,
+it returns the actual outcome; otherwise it records a permanent cancellation
+receipt so a delayed writer cannot execute. It then performs verified readback
+before reopening health. Cancellation is not rollback and is not automatic.
+Revoked initiating actors remain closed pending separately authorized recovery.
+
+Routine native source hooks leave a durable dirty authority. The configured
+checks.readHealth and managed checker run reconciliation before reading/checking.
+The server-only readAuthorityRoster method reuses the actual field-map and identity
+projection with fixed trusted source headers. There is no browser bypass header.
+This handles inventory apply/rollback, tracker/native placement and native identity
+updates without modifying PR178 functions. The production candidate resumes the
+stored initiating actor (rechecking current authorization), not the page visitor.
+
+Legacy guards cover camera_devices, equipment_master and camera_inventory_audit.
+Raw event ingress stays in legacy storage; only its ordered projection runs in a
+fenced operation, so raw provider event bodies are not copied into native tickets. Guarded server clients integrate provider reconcile,
+Vigilant sync, Recon connect and Recon webhook, including ordered event projection.
+Direct unguarded source writes are rejected, including administrative SQL unless
+it explicitly uses the reviewed operation path. Routine integration heartbeats,
+provider health, credential references and credential configuration are not
+Avigilon roster inputs and are deliberately outside this gate; authoritative
+camera identity, endpoint and activation changes still go through camera_devices.
+The native audited Avigilon roster does not derive identity from integration
+heartbeat metadata. Credential access/storage is unchanged.
+
+Manual connection, placement, add/remove RPCs use the authenticated native bridge
+and the original legacy RPC with the verified legacy actor, retaining original
+role checks and revision guards. Arbitrary RPC names and actor overrides are not
+accepted. Scheduled direct checks and provider direct mode dispatch to native
+receipt-backed runs in the reviewed runtime. Browser manual managed checks do the
+same; successful outcomes without receipts are rejected. Legacy current-health
+reads for managed rows use native receipt data; no old port detail is fabricated.
+A missing publication clears current service health while retaining device/source
+records. Database guards reject legacy health writes for sniper/camv resources.
+
+Bootstrap is code-gated and disabled: no serve entrypoint calls
+createAvigilonProductionCandidate(enabled:true) or configureReviewedAvigilonRuntime.
+A reviewed server bootstrap supplies existing project transports and an existing
+active Owner/IT actor and an explicit host background lifecycle callback (for
+example the existing EdgeRuntime.waitUntil), creates the candidate, configures
+provider workers, and
+passes checks plus sourcesForActor as the Operations handler's avigilonChecks and
+avigilonSources. No new credential is minted, requested or provisioned here.
+All guarded writer entrypoints must be deployed together before enabling readers;
+otherwise the database rejects unmigrated writers instead of accepting stale health.
+
+Additional exact permission review (NOT granted): native service_role EXECUTE on
+public.cos_avigilon_source_control(uuid,uuid,text,jsonb); legacy service_role EXECUTE
+on public.cos_avigilon_source_apply(jsonb), public.cos_avigilon_source_seal(), and
+public.cos_avigilon_source_cancel(jsonb). These are four additional boundaries,
+not covered by the earlier five grants. No PUBLIC/anon/authenticated grants or
+private schema/table grants. Schema/trigger installation requires reviewed database
+owner DDL in each named project. Keep all runtime configuration disabled until
+schema compatibility, original manual RPC signatures and all deployments are
+reviewed. Rollback must first disable runtime and revoke these boundaries; retain
+operation/seal evidence. Do not silently remove guards while delayed requests exist.

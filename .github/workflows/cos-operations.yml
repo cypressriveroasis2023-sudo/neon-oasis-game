@@ -17,6 +17,8 @@ on:
       - 'tech-checks/index.html'
       - 'tech-checks/company-*.css'
       - 'tech-checks/cos-eye-branding.*'
+      - 'tech-checks/avigilon-managed-bridge.js'
+      - 'tech-checks/inventory-presentation-rules.js'
       - 'tech-checks/camera-health.html'
       - 'tech-checks/camera-placement-controls.js'
       - 'tech-checks/camera-placement-controls.css'
@@ -67,6 +69,8 @@ on:
       - 'tech-checks/index.html'
       - 'tech-checks/company-*.css'
       - 'tech-checks/cos-eye-branding.*'
+      - 'tech-checks/avigilon-managed-bridge.js'
+      - 'tech-checks/inventory-presentation-rules.js'
       - 'tech-checks/camera-health.html'
       - 'tech-checks/camera-placement-controls.js'
       - 'tech-checks/camera-placement-controls.css'
@@ -139,6 +143,15 @@ jobs:
         run: git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../app.js ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
       - run: npm install --no-audit --no-fund
       - run: npm test
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - name: Verify Avigilon publication and source cancellation ordering
+        timeout-minutes: 5
+        env:
+          COS_AVIGILON_LOCAL_POSTGRES: '1'
+        run: |
+          node tests/avigilon-postgres-concurrency.local.mjs
+          node tests/avigilon-source-postgres.local.mjs
       - name: Verify real PostgreSQL intake concurrency
         timeout-minutes: 5
         env:

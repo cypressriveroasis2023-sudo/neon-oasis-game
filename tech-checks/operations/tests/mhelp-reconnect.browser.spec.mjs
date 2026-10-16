@@ -1,5 +1,6 @@
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
+import {snapshot as cameraSnapshot} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.MHELP_RECONNECT_TEST_ORIGIN||'http://127.0.0.1:4173',root='/api/mhelpdesk/partner/reconnect';
 const ready={contract:'cos-mhelpdesk-reconnect-v1',state:'ready',portalId:'224643',revision:2,renewalVerified:false};
 async function mount(page,{role='owner'}={}){
@@ -13,7 +14,8 @@ async function mount(page,{role='owner'}={}){
   const answer=data=>route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
   if(request.path==='/api/session')return answer({authorized:true,legacyOwner:role==='owner',role:role==='owner'?'Owner':'IT',features:{unitTracker:true,fleetAccess:true}});
   if(request.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
-  if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}});
+  if(request.path==='/api/camera-health/summary-v3')return answer(cameraSnapshot([]));
+  if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:cameraSnapshot([]).refreshedAt});
   if(request.path===root+'/status'&&state.statusDelay)await state.statusDelay;
   if(request.path===root+'/status')return answer(request.body.requestId?{...ready,state:state.saved?'committed':'pending',renewalVerified:state.saved,revision:state.saved?3:2,requestId:request.body.requestId}:ready);
   if(request.path===root){
@@ -26,7 +28,13 @@ async function mount(page,{role='owner'}={}){
  });
  await page.goto(origin+'/reconnect-fixture');
  const frame=page.frameLocator('iframe'),form=frame.getByRole('region',{name:'Secure mHelpDesk reconnect'});
- await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
+ if(role==='it'){
+  await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
+  await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('alert')).toHaveCount(0);
+ }else await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
  return {frame,form,calls,state};
 }
 async function openAndFill(form){
@@ -74,7 +82,7 @@ test('malformed response cannot display private values or successful connection'
  await expect(form.getByRole('status')).toContainText('could not be confirmed');await expect(form).not.toContainText('synthetic-private-should-not-display');
 });
 test('IT cannot see reconnect and initiates no reconnect request',async({page})=>{
- const {form,calls}=await mount(page,{role:'it'});await expect(form).toHaveCount(0);expect(calls.some(x=>x.path.startsWith(root))).toBe(false);
+ const {form,calls}=await mount(page,{role:'it'});await expect(form).toHaveCount(0);expect(calls.some(x=>x.path.startsWith(root))).toBe(false);expect(calls.every(call=>call.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3'].includes(call.path))).toBe(true);
 });
 
 test('only verified parent hide clears secret fields; a late status cannot reopen a closed form',async({page})=>{

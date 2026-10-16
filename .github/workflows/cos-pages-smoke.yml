@@ -6,6 +6,8 @@ on:
       - 'tech-checks/index.html'
       - 'tech-checks/company-*.css'
       - 'tech-checks/cos-eye-branding.*'
+      - 'tech-checks/avigilon-managed-bridge.js'
+      - 'tech-checks/inventory-presentation-rules.js'
       - 'tech-checks/camera-health.html'
       - 'tech-checks/camera-placement-controls.js'
       - 'tech-checks/camera-placement-controls.css'
