@@ -1,3 +1,4 @@
+import '../_shared/avigilonDeployment.ts';
 import {guardedAvigilonClient,reviewedAvigilonRuntime} from '../_shared/avigilonReviewedRuntime.ts';
 import { resolveStarResources } from "./star-resource-identity.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";

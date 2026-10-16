@@ -1,8 +1,11 @@
+import {avigilonDeployment} from '../_shared/avigilonDeployment.ts';
 import {createOperationsHandler} from './index.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {signSheetsAssertion} from './googleSheetsRuntime.ts';
 const mhelpTokens=nativeMhelpTokens(name=>Deno.env.get(name));
 Deno.serve(createOperationsHandler({
+  avigilonChecks:avigilonDeployment?.checks,
+  avigilonSources:avigilonDeployment?.sourcesForActor,
   fetch:mhelpTokens.fetch,
   platformUrl:Deno.env.get('SUPABASE_URL'),
   serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
