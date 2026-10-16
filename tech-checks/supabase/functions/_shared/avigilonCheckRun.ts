@@ -3,7 +3,7 @@ import type {Publication} from './avigilonEndpointCheck.ts';
  * from trusted adapters, never request bodies. No network or database defaults. */
 export type Actor={tenantId:string;actorId:string;canCheck:boolean};
 export type Endpoint={deviceId:string;revision:string;ip:string;ports:number[];profile:'sniper'|'camv'};
-export type AuditUnit={id:string;name:string;family:string;placement:'FIELD'|'SHOP'|'UNKNOWN';restricted:boolean;identityVerified:boolean;endpoint:Endpoint|null};
+export type AuditUnit={id:string;nativeUnitId?:string|null;name:string;family:string;placement:'FIELD'|'SHOP'|'UNKNOWN';restricted:boolean;identityVerified:boolean;endpoint:Endpoint|null};
 export type Roster={tenantId:string;revision:string;units:AuditUnit[]};
 export type Outcome='pending'|'online'|'nonresponse'|'unverified';
 export type Row={unitId:string;name:string;outcome:Outcome;reason:string|null;startedAt:string|null;completedAt:string|null;confirmedOutage:boolean;endpointRevision:string|null;publicationReceipt?:string};

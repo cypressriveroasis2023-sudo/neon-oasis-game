@@ -136,17 +136,20 @@ declare result jsonb;
 begin
  perform cos_avigilon_checks_private.assert_actor(p_actor,p_tenant);
  if not exists(select 1 from cos_avigilon_checks_private.authority where tenant_id=p_tenant and units is not null) then raise exception 'Authority not installed';end if;
- select jsonb_build_object('contract','COS_AVIGILON_PUBLICATIONS_V1','tenantId',p_tenant,'items',coalesce(jsonb_agg(jsonb_build_object(
+ select jsonb_build_object('contract','COS_AVIGILON_PUBLICATIONS_V1','tenantId',p_tenant,
+ 'authority',jsonb_build_object('contract','COS_AVIGILON_AUTHORITY_V1','tenantId',p_tenant,'generation',a.generation::text,'rosterRevision',a.roster_revision,'admitted',a.admitted),
+ 'roster',jsonb_build_object('tenantId',p_tenant,'revision',a.roster_revision,'units',a.units),
+ 'items',coalesce((select jsonb_agg(jsonb_build_object(
  'deviceId',m.device_id,'endpoint',u->'endpoint','placement',u->>'placement','restricted',u->'restricted',
  'receipt',case when a.admitted and r.roster_revision=a.roster_revision and r.authority_generation=a.generation and u->>'placement'='FIELD' and u->'restricted'='false'::jsonb and u->'identityVerified'='true'::jsonb then p.row_result else null end,
  'health',case when a.admitted and r.roster_revision=a.roster_revision and r.authority_generation=a.generation and u->>'placement'='FIELD' and u->'restricted'='false'::jsonb and u->'identityVerified'='true'::jsonb then p.health else null end
- )) filter(where m.device_id is not null),'[]'::jsonb)) into result
- from cos_avigilon_checks_private.managed_devices m join cos_avigilon_checks_private.authority a on a.tenant_id=m.tenant_id
+ )) from cos_avigilon_checks_private.managed_devices m
  left join lateral jsonb_array_elements(a.units) u on u->'endpoint'->>'deviceId'=m.device_id
  left join cos_avigilon_checks_private.heads heads on heads.tenant_id=a.tenant_id
  left join cos_avigilon_checks_private.runs r on r.id=heads.run_id
  left join cos_avigilon_checks_private.publications p on p.run_id=r.id and p.unit_id=u->>'id' and p.generation=a.generation
- where a.tenant_id=p_tenant;
+ where m.tenant_id=a.tenant_id),'[]'::jsonb)) into result
+ from cos_avigilon_checks_private.authority a where a.tenant_id=p_tenant;
  return result;
 end $$;
 revoke all on all functions in schema cos_avigilon_checks_private from public,anon,authenticated,service_role;

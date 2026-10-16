@@ -38,10 +38,55 @@ ambiguous write response or failed readback leaves authority closed. Recovery mu
 quiesce the original writer, verify all source state, and explicitly admit the
 held generation through the reviewed administrative path. Merely copying source
 state asynchronously, or post-probe re-reading it, does NOT satisfy this protocol.
-The adapter is implemented but existing production source writers are NOT wired
-by this isolated patch. Until every writer is integrated or quiesced, leave
-runtime disabled. In particular do not modify the parallel scoped inventory work
-or silently treat its currently deployed snapshot as transactionally protected.
+Candidate native integration: avigilon_native_source_fences.sql installs BEFORE
+STATEMENT hooks on 25 authority tables (the exact list is in that file). Native
+inventory upload/scoped apply and rollback, equipment CRUD, tracker placement,
+MHelp/Sheets placement jobs and owner/provider identity writes invalidate native
+authority in their own source transaction. Transaction rollback restores the
+previous generation. Every committed statement increments generation even while
+closed, so a concurrent source write defeats stale admission. Missing tables
+abort installation. These hooks are NOT installed. Scheduled source jobs will
+conservatively close health until reviewed readback/admission; this availability
+cost is intentional. The cross-project helper's pre-write token cannot be reused
+for native mutations covered by these hooks: native orchestration must capture
+the post-write generation inside its source transaction, then bracket complete
+readback with that token. Never obtain a fresh token after unbracketed readback.
+This admission orchestration is still a blocker, not an automatic trigger action.
+Shared PR178 functions are unchanged. After merging PR178,
+verify its final tables remain covered; its label-only/authority-time semantics
+are inputs to roster readback, never authority-token bypasses.
+
+Remaining exact implementation blockers before enablement:
+- Legacy camera_devices writers of public_ip, expected_ports, connection_revision,
+  monitoring_profile, monitoring_enabled, activation_state, organization and unit
+  identity must acquire the native fence BEFORE mutation. This includes manual
+  endpoint/activation edits, imports/admin SQL and camera-provider-reconcile or
+  reconeyez-connect/webhook wherever they mutate these fields. Implement a
+  reviewed server-only transport for fence/admit (not present in five run RPCs),
+  serialize remote writers, read back all source revisions, and recover ambiguous
+  writes closed. Native statement hooks cannot protect the other project.
+- _shared/scheduledDirectService.ts (publish_camera_connection_v1), manual legacy
+  verification and camera-provider-reconcile direct mode still publish legacy
+  health. Migrate managed Avigilon checks to native claim/commit/read receipts,
+  or explicitly retire these managed-endpoint publishers in a separately approved
+  rollout. They cannot supply current health to the new shared projection.
+- Inventory/source jobs need explicit verified roster readback/admission after
+  native hooks close authority. The helper alone is not a production orchestrator.
+  Audit every deployed writer/signature and administrative access path; repository
+  enumeration is not proof no other writer exists. No production jobs were stopped.
+Until those blockers are resolved, keep serve.ts unwired and runtime disabled.
+
+Readers
+Native read_health returns one authority generation, admitted roster revision,
+roster membership and receipts from one statement snapshot. The handler reads
+this envelope BEFORE identity/placement/endpoint reads and rechecks the token
+AFTER them. A closed or changed generation/roster fails the whole read. Receipt
+membership must match exactly one admitted roster unit and one current native
+identity claim for the device. Fleet requires the same token on health and field
+map and verifies receipt membership against current Field inventory. A change
+between the two HTTP reads therefore fails closed. Generation increments prevent
+ABA even when a roster revision is reused. This requires all source writers to
+participate; it does not make cross-project reads serializable by themselves.
 
 Consumers
 Operations summary-v3 uses projectAvigilonHealth whenever the optional run runtime
@@ -58,7 +103,8 @@ report rows remain historical evidence and never move inventory.
 Exact permission / rollout requirements (NOT authorized by this coding task)
 - Review and approve installing candidate SQL in the native project as postgres:
   avigilon_check_runs.sql; avigilon_health_publication.sql;
-  avigilon_check_run_boundary.sql; avigilon_health_boundary.sql.
+  avigilon_check_run_boundary.sql; avigilon_health_boundary.sql;
+  avigilon_native_source_fences.sql (native trigger installation, no grants).
   They are local candidates, not production migration history. If any candidate
   is already installed, produce/review an ALTER migration against that exact DDL;
   these CREATE scripts are not intended to be rerun over installed objects.
@@ -95,27 +141,20 @@ User's 230 SHOP no SIM/no IP, Ranger 007 SHOP as of 18:00 Central Oct 15, and Ra
 024 FIELD Metro Park Square remain source-authority inputs. This patch contains
 only synthetic test identities and endpoints and does not overwrite corrections.
 
-Validation in this continuation (2026-10-16, synthetic/local only)
-- Focused node suite: 167 passed, 0 failed. Covers Avigilon coordinator, native
-  SQL publication/permissions/rollback, API read races, fleet classifier, Camera
-  Health and diagnostic report consumers.
-  node --import tsx --test --test-concurrency=1 tests/avigilon-*.test.mjs
-    tests/api-inflight-reads.test.mjs tests/fleet-dashboard-model.test.mjs
-    tests/field-camera-health.test.mjs tests/camera-health-native-overview.test.mjs
-    tests/unit-diagnostic-report.test.mjs
-- Independent PostgreSQL 17 sessions: passed refresh/save and claim/save lock
-  waits, lease supersession/expiry, fence-before-publication rejection and
-  publication-before-fence serialization. Network-disabled disposable container.
-  COS_AVIGILON_LOCAL_POSTGRES=1 node tests/avigilon-postgres-concurrency.local.mjs
-- Browser: 9 passed (desktop 1440), covering new shared receipt/CSV/failure test,
-  run panel/report and existing Fleet dashboard Owner/IT, Shop, stale health,
-  location retention and session invalidation checks. Used installed Chromium
-  154 with a temporary executablePath config. Node 24 needed PW_DISABLE_TS_ESM=1
-  and --import tsx for Playwright 1.51.1. Bundled browser download was blocked;
-  no package/dependency upgrade or repository test-config change was made.
-- npm run typecheck and npm run build passed. Existing Vite large-chunk warning.
-- Broad npm test run: 4,049 passed, 3 skipped, one file process failed from a
-  JavaScript heap limit (source-admission-continuity.test.mjs). That unchanged
-  file was rerun with --max-old-space-size=4096: all 27 passed. Do not describe
-  the first broad run as green. Final changes were covered by the focused suite.
-- git diff --check passed. Built dist artifacts are deliberately excluded.
+Validation procedure (synthetic/local only)
+- Aggregate: NODE_OPTIONS=--max-old-space-size=4096 npm test. The larger heap
+  avoids the earlier default-heap failure in source-admission-continuity tests.
+  The PR validation receipt reports the complete final run, not a failed run plus
+  an isolated rerun as an aggregate success.
+- Native PGlite tests include publication receipt/authorization/rollback and all
+  25 source-table hooks, stale readback rejection and rollback preservation.
+- Independent PostgreSQL 17: COS_AVIGILON_LOCAL_POSTGRES=1 node
+  tests/avigilon-postgres-concurrency.local.mjs (network-disabled container).
+- Browser: avigilon-run, avigilon-shared-health and fleet-dashboard suites at
+  mobile 390 and desktop 1024/1440. System Chromium with temporary executablePath
+  configuration; Node 24 requires PW_DISABLE_TS_ESM=1 and --import tsx.
+  Both Fleet and Camera Health routes check receipt 73 in visible details,
+  accessible report textbox and CSV, then verify failed refresh retains location
+  while receipt/current health is cleared. The run panel opens report details.
+- npm run typecheck; npm run build; git diff --check. Generated dist excluded.
+- Exact final-head counts and remote CI links belong in the PR check receipt.

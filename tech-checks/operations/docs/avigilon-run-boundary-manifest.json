@@ -42,7 +42,8 @@
     "db/avigilon_health_publication.sql",
     "db/avigilon_health_boundary.sql",
     "docs/avigilon-publication-protocol.txt",
-    "db/avigilon_health_boundary_rollback.sql"
+    "db/avigilon_health_boundary_rollback.sql",
+    "db/avigilon_native_source_fences.sql"
   ],
   "readerEvidence": {
     "provenance": "Earlier authorized read-only Supabase get-function-definition query, cached privately before cancellation notice; no later cancelled read repeated or bypassed.",
@@ -54,7 +55,7 @@
   "rollback": "Disable runtime, quiesce/fence writers and revoke service execution on all five boundary functions; retain durable evidence.",
   "releaseBlockers": [
     "Production SQL/grants/deployment/enablement require separate approval; new health wrappers intentionally have no service EXECUTE grants.",
-    "All source writers must use the exclusive native fence before mutation and admit after verified readback; existing production writers are not wired in this isolated task.",
+    "Native source statement hooks are candidate-only; legacy cross-project source fencing, native readback/admission orchestrators, and scheduled/manual publisher migration remain blocked as enumerated in the protocol. Runtime stays disabled.",
     "Native health is authoritative; no legacy replication or cross-project transaction is claimed."
   ],
   "reviewRegressionEvidence": [

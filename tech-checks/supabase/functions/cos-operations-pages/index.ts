@@ -1,3 +1,4 @@
+import {withStableAvigilonRead} from '../_shared/avigilonReadBoundary.ts';
 import {projectAvigilonHealth} from '../_shared/avigilonHealthProjection.ts';
 import {createAvigilonCheckRuns} from '../_shared/avigilonCheckRun.ts';
 import {auditedAvigilonRoster} from '../_shared/avigilonAuditedRoster.ts';
@@ -134,6 +135,7 @@ function gps(body) {
 
 /** Dependencies can be injected for meaningful authentication/contract regression tests. */
 export function createOperationsHandler(options) {
+  const authorityReads=new WeakMap<Request,any>();
   const requestFetch = options.fetch || fetch;
   const serviceKey = options.serviceKey;
   const platformUrl = options.platformUrl;
@@ -595,6 +597,20 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      // Internal recursive dispatch reuses the already captured envelope. Requests
+      // cannot supply this WeakMap entry or bypass the read bracket with headers.
+      if(options.avigilonChecks&&method==='GET'&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)&&!authorityReads.has(request)){
+        const actor={tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true};
+        if(!options.avigilonChecks.readHealth)fail('Current authority reader unavailable.',503);
+        const result=await withStableAvigilonRead(ORGANIZATION_ID,()=>options.avigilonChecks.readHealth(actor),async envelope=>{
+          const nested=new Request(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({method,path,body})});
+          authorityReads.set(nested,envelope);
+          const response=await handle(nested);
+          if(!response.ok)fail('Dependent fleet read unavailable.',503);
+          return response.json();
+        });
+        return json({...result.value,avigilonAuthority:result.token});
+      }
       if(avigilonRoute){
         if(method==='POST' && body===null)body=await requestBody(request);
         if(body&&Object.keys(body).length)fail('Check run inputs are server-derived.');
@@ -602,7 +618,7 @@ export function createOperationsHandler(options) {
         let pendingRoster=null;
         const readRoster=()=>{
           if(pendingRoster)return pendingRoster;
-          const work=(async()=>{
+          const work=withStableAvigilonRead(ORGANIZATION_ID,()=>options.avigilonChecks.readHealth(actor),async envelope=>{
             const fresh=await authenticate(request);
             if(fresh.actorId!==actor.actorId||(!fresh.legacyOwner&&!verifiedItFleet(fresh)))fail('Fresh check authorization changed.',403);
             const [response,bundle,endpoints]=await Promise.all([
@@ -611,8 +627,9 @@ export function createOperationsHandler(options) {
               legacyAll('camera_devices?select=id,public_ip,expected_ports,connection_revision,monitoring_profile,monitoring_enabled,activation_state&order=id.asc',fresh.headers),
             ]);
             if(!response.ok)fail('Audited Field roster is unavailable.',503);
-            return auditedAvigilonRoster(ORGANIZATION_ID,await response.json(),[...(bundle.identity.unitIdentities||[]),...(bundle.identity.ownerConfirmedUnitIdentities||[])],endpoints);
-          })();pendingRoster=work;void work.finally(()=>{if(pendingRoster===work)pendingRoster=null;}).catch(()=>{});return work;
+            const roster=await auditedAvigilonRoster(ORGANIZATION_ID,await response.json(),[...(bundle.identity.unitIdentities||[]),...(bundle.identity.ownerConfirmedUnitIdentities||[])],endpoints);
+            if(roster.revision!==envelope.authority.rosterRevision)fail('Admitted roster differs from source mapping.',503);return roster;
+          }).then(result=>result.value);pendingRoster=work;void work.finally(()=>{if(pendingRoster===work)pendingRoster=null;}).catch(()=>{});return work;
         };
         const runs=createAvigilonCheckRuns({authorize:async()=>actor,roster:readRoster,
           store:options.avigilonChecks.store(actor),probe:(a,e,signal)=>options.avigilonChecks.probe(a,e,signal),
@@ -1054,7 +1071,7 @@ export function createOperationsHandler(options) {
           let summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
           if(options.avigilonChecks){
             if(!options.avigilonChecks.readHealth)fail('Current Avigilon publication reader unavailable.',503);
-            summary=projectAvigilonHealth(summary,await options.avigilonChecks.readHealth({tenantId:ORGANIZATION_ID,actorId:context.actorId,canCheck:true}),ORGANIZATION_ID,devices);
+            summary=projectAvigilonHealth(summary,authorityReads.get(request),ORGANIZATION_ID,devices);
           }
           // Current guarded source placement only classifies synthetic PDF inventory.
           // This is optional, bounded, read-only and never changes a camera resource.

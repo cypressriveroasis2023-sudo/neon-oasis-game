@@ -24,3 +24,12 @@ test('known shop inventory with no provider resource appears in Shop and never b
 test('complete multiple source keys become one verified native unit in both views',()=>{
  const rows=[resource(1,'Helios 1'),resource(2,'Helios secondary')],h=health(rows),pair=reconcileFleetSnapshot(h,map([unit]),now),overview=cameraOverview(pair.health,now,[unit]);assert.equal(overview.groups.length,1);assert.equal(overview.groups[0].name,'Helios 1');assert.equal(cameraUnitDisplayState(overview.groups[0]),fieldCameraHealth(unit,[unit],pair.health,now).state);
 });
+test('Fleet and field-map reject different generations and reassigned receipt membership',()=>{
+ const token={contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:'tenant',generation:'1',rosterRevision:'r1',admitted:true};
+ const raw={...health([resource(1,'Helios 1')]),avigilonAuthority:token};raw.rows[0].avigilonPublication={receiptId:'73',unitId:id,rosterUnitId:'r1'};
+ const field={...map([unit]),avigilonAuthority:token};assert.equal(reconcileFleetSnapshot(raw,field,now).health.rows[0].avigilonPublication.receiptId,'73');
+ assert.throws(()=>reconcileFleetSnapshot(raw,{...field,avigilonAuthority:{...token,generation:'2'}},now),/authority changed/);
+ assert.throws(()=>reconcileFleetSnapshot(raw,map([unit]),now),/authority unavailable/);
+ assert.throws(()=>reconcileFleetSnapshot(raw,{...map([{...unit,placement:'SHOP'}]),avigilonAuthority:token},now),/current Field/);
+ assert.throws(()=>reconcileFleetSnapshot({...raw,unitIdentities:[{...raw.unitIdentities[0],unitId:other}]},field,now),/current Field/);
+});

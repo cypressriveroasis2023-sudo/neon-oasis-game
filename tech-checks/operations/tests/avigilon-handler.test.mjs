@@ -1,15 +1,15 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
+import test from 'node:test';import assert from 'node:assert/strict';import {auditedAvigilonRoster} from '../../supabase/functions/_shared/avigilonAuditedRoster.ts';import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const response=data=>Response.json(data),at=new Date().toISOString();
 test('authenticated mounted route derives actual projection; capability defaults closed and client data rejected',async()=>{
- const jobs=[],runs=new Map();let probes=0,denied=false;
+ const jobs=[],runs=new Map();let probes=0,denied=false,generation=1,changeDuringRead=false;
  const fetch=async(url)=>{const name=new URL(url).pathname.split('/').at(-1);
   if(name==='user')return denied?Response.json({error:'Denied'},{status:401}):response({id:owner});
   if(name==='profiles')return response([{user_id:owner,full_name:'Synthetic Owner',role:'owner',active:true,archived_at:null}]);
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:actor,roles:{code:'owner',organization_id:org}}]);
   if(name==='cos_owner_identity_snapshot')return response({revision:'a'.repeat(64),claims:[],nativeEpochs:[]});
-  if(name==='appdeploy_field_map_snapshot')return response({inventoryItems:[],items:[],summary:{fieldUnits:0},generatedAt:at});
+  if(name==='appdeploy_field_map_snapshot'){if(changeDuringRead)generation++;return response({inventoryItems:[],items:[],summary:{fieldUnits:0},generatedAt:at});}
   if(name==='cos_mhelp_placement_snapshot')return response({contract:'COS_MHELP_PLACEMENT_V1',enabled:true,items:[],upload:{contract:'COS_MHELP_UPLOAD_V1',reviewed:true,sourceSha256:'a'.repeat(64),payloadSha256:'b'.repeat(64),receivedAt:at,receivedAtPrecision:'second',exportAsOf:null,records:[{productId:'1001',unitNumber:'Sniper 1 - DO NOT USE',category:'Sniper ES',customerId:'2001',customer:'Synthetic client',sourceAddress:{},sourceRow:2,placement:'FIELD',lifecycle:'DO_NOT_USE',binding:null}]}});
   if(name==='cos_mhelp_location_snapshot')return response({contract:'COS_MHELP_FLEET_LOCATIONS_V1',items:[]});
   if(['equipment_units','camera_devices','vision_vigilant_unit_matches','vision_vigilant_devices','cos_fleet_placement_evidence_v1','cos_geocode_sources_map_projection','cos_archived_representation_projection','cos_source_recorded_coordinates_read_many'].includes(name))return response([]);
@@ -18,9 +18,11 @@ test('authenticated mounted route derives actual projection; capability defaults
  const options={platformUrl:'https://native.invalid',serviceKey:'synthetic-only',fetch,mhelpPlacementEnabled:true};
  const request=(path,method='GET',body={})=>new Request('https://bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-only','Content-Type':'application/json'},body:JSON.stringify({path,method,body})});
  const closed=createOperationsHandler(options);assert.equal((await (await closed(request('/api/session'))).json()).features.freshAvigilonChecks,false);
- const handler=createOperationsHandler({...options,avigilonChecks:{store:a=>{assert.equal(a.actorId,actor);assert.equal(a.tenantId,org);return {claim:async run=>{runs.set(run.id,run);return {run,claimed:true};},read:async(tenant,id)=>{assert.equal(tenant,org);return runs.get(id);},save:async run=>{runs.set(run.id,run);return true;}};},probe:async()=>{probes++;throw Error('Forbidden fixture probe');},background:p=>jobs.push(p)}});
+ const baseMap=await (await closed(request('/api/field-map'))).json();const roster=await auditedAvigilonRoster(org,baseMap,[],[]);
+ const handler=createOperationsHandler({...options,avigilonChecks:{readHealth:async()=>({contract:'COS_AVIGILON_PUBLICATIONS_V1',tenantId:org,authority:{contract:'COS_AVIGILON_AUTHORITY_V1',tenantId:org,generation:String(generation),rosterRevision:roster.revision,admitted:true},roster,items:[]}),store:a=>{assert.equal(a.actorId,actor);assert.equal(a.tenantId,org);return {claim:async run=>{runs.set(run.id,run);return {run,claimed:true};},read:async(tenant,id)=>{assert.equal(tenant,org);return runs.get(id);},save:async run=>{runs.set(run.id,run);return true;}};},probe:async()=>{probes++;throw Error('Forbidden fixture probe');},background:p=>jobs.push(p)}});
  const invalid=await handler(request('/api/avigilon-check-runs','POST',{tenantId:'other'}));assert.equal(invalid.status,400);assert.equal(runs.size,0);
  const mapResponse=await handler(request('/api/field-map'));assert.equal(mapResponse.status,200,JSON.stringify(await mapResponse.clone().json()));
  const start=await handler(request('/api/avigilon-check-runs','POST'));assert.equal(start.status,202,JSON.stringify(await start.clone().json()));const {run}=await start.json();await Promise.all(jobs);const saved=await (await handler(request('/api/avigilon-check-runs/'+run.id))).json();assert.equal(saved.rows.length,1);assert.equal(saved.rows[0].reason,'restricted');assert.equal(probes,0);assert.equal(saved.id,run.id);
+ changeDuringRead=true;const torn=await handler(request('/api/field-map'));assert.notEqual(torn.status,200);assert.match(JSON.stringify(await torn.json()),/unavailable/);changeDuringRead=false;
  denied=true;assert.equal((await handler(request('/api/avigilon-check-runs/'+run.id))).status,401);
 });
