@@ -27,6 +27,7 @@ jobs:
           --health-retries 10
     defaults:
       run:
+        shell: bash
         working-directory: tech-checks/operations
     steps:
       - uses: actions/checkout@v4
@@ -40,11 +41,15 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix legacy/tests/recon-ordering
       - name: Scoped regression receipt
-        run: node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/scoped*test.mjs | tee scoped-tests.txt
+        run: |
+          set -o pipefail
+          node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/scoped*test.mjs | tee scoped-tests.txt
       - name: Actual PR176 upgrade and independent PostgreSQL sessions
         env:
           COS_SCOPED_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_scoped_test_ci
-        run: node tests/scoped-inventory-postgres-concurrency.mjs | tee scoped-postgres.txt
+        run: |
+          set -o pipefail
+          node tests/scoped-inventory-postgres-concurrency.mjs | tee scoped-postgres.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
