@@ -13,3 +13,6 @@ test('Radar and Thermal stay distinct, exact labels survive and identity holds s
 test('incomplete or duplicate source census cannot supply inventory totals',()=>{
  const v=value([row('1')]);assert.equal(sniperInventory({...v,summary:{totalRecords:2}}),null);assert.equal(sniperInventory(value([row('1'),row('1')])),null);assert.equal(sniperInventory(value([row('1',{placement:'unknown'})])),null);
 });
+test('inventory-only Shop has no current IP or SIM and cannot carry a linked health identity',()=>{
+ const r=row('1',{inventoryOnlyReason:'no_sim',binding:{state:'held'}}),v=value([r]);const html=renderToStaticMarkup(React.createElement(SniperInventory,{value:v}));assert.match(html,/No SIM \/ no current IP/);assert.match(html,/>SHOP</);assert.doesNotMatch(html,/online|offline|203\.0\.113|href=/i);assert.equal(sniperInventory(value([{...r,binding:{state:'linked'}}])),null);assert.equal(sniperInventory(value([{...r,placement:'FIELD'}])),null);
+});

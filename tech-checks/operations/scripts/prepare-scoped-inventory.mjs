@@ -29,3 +29,30 @@ export function prepareScopedInventory({activeSha256,before,source,sourceEvidenc
   invariants:{globalReceiptUnchanged:true,unaffectedRowsUnchanged:true,ipsEndpointsHealthHistoryUnchanged:true,noDeletes:true,noActivationChanges:true},
   requiredExecutionChecks:['Existing actor and tenant authorization','Exact expected active revision and before-record equality','Fresh authority-graph guard and no competing ProductId','Reject newer Owner or source edits','Append scoped evidence with its own timestamp; retain all other row authority timestamps','Append rollback evidence; restore only if scoped revision still matches']};
 }
+
+/** Explicit source replacement pairs hold identity; they never transfer a binding.
+ * Returns private parameter data for review, not a database connection. */
+export function scopedExecutionRequest({plan,before,source,replacements=[],actorId,organizationId,revision,requestId,evidence}){
+ const uuid=/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+ if(![actorId,organizationId,requestId].every(v=>uuid.test(v))||!Number.isSafeInteger(revision)||revision<0||plan.contract!=='COS_SCOPED_INVENTORY_REVIEW_V1')throw Error('Reviewed actor, tenant and scoped revision required');
+ if(evidence?.kind!=='derived_mapping'||!/^libfile_[a-zA-Z0-9]+$/.test(evidence.libraryFileId)||!['sha256','authorizationSha256'].every(k=>/^[a-f0-9]{64}$/.test(evidence[k]))||!/(Z|[+-]\d\d:\d\d)$/.test(evidence.receivedAt)||!Number.isFinite(Date.parse(evidence.receivedAt)))throw Error('Derived source evidence required');
+ const targets=new Map(source.map(r=>[r.productId,r])),old=new Map(before.map(r=>[r.productId,r]));
+ const pick=r=>Object.fromEntries(['productId',...fields].map(k=>[k,r[k]]));
+ const operations=plan.operations.map(op=>({mode:'assignment',expectedRecord:op.expectedRecord,after:pick(targets.get(op.productId))}));
+ const used=new Set(operations.map(op=>op.expectedRecord.productId));
+ for(const pair of replacements){
+  const previous=old.get(pair.previousProductId),target=targets.get(pair.productId);
+  if(!previous||!target||old.has(pair.productId)||targets.has(pair.previousProductId)||used.has(pair.previousProductId)||used.has(pair.productId)||!families.has(previous.category)||['unitNumber','category','lifecycle'].some(k=>previous[k]!==target[k]))throw Error('Invalid source-only replacement review');
+  if(pair.inventoryOnlyReason!==undefined&&(pair.inventoryOnlyReason!=='no_sim'||target.placement!=='SHOP'))throw Error('Invalid inventory-only restriction');
+  used.add(pair.previousProductId);used.add(pair.productId);operations.push({mode:'replace_source_hold',expectedRecord:previous,after:pick(target),...(pair.inventoryOnlyReason?{inventoryOnlyReason:pair.inventoryOnlyReason}:{})});
+ }
+ return {actorId,organizationId,baseSha256:plan.expectedActiveSha256,revision,requestId,evidence,operations};
+}
+/** SQL literals use PostgreSQL quoting, never shell interpolation. */
+export function scopedStatements(request){
+ const literal=value=>value===null?'null':"'"+String(value).replaceAll("'","''")+"'";
+ const args=[request.actorId,request.organizationId,request.baseSha256,request.revision,request.requestId,JSON.stringify(request.evidence),JSON.stringify(request.operations)].map(literal).join(',');
+ return {'dry-run.sql':`begin;\nselect cos_mhelp_placement_private.review_scoped_inventory(${args},false);\nrollback;\n`,
+ 'apply.sql':`begin;\nselect cos_mhelp_placement_private.review_scoped_inventory(${args},true);\ncommit;\n`,
+ 'rollback.sql':`begin;\nselect cos_mhelp_placement_private.rollback_scoped_inventory(${[request.actorId,request.organizationId,request.baseSha256,request.revision+1,request.requestId,request.evidence.authorizationSha256].map(literal).join(',')});\ncommit;\n`};
+}

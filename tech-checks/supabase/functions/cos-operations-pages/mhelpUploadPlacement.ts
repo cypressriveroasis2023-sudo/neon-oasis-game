@@ -19,7 +19,12 @@ function checked(receipt:unknown,now:number):Row|null{
   if(!object(r)||!id(r.productId)||seen.has(r.productId)||!safe(r.unitNumber,250)||!r.unitNumber||!safe(r.category,250)||!id(r.customerId)||!safe(r.customer,250)||!r.customer
    ||!['FIELD','SHOP'].includes(r.placement)||!['UNFLAGGED','DO_NOT_USE','MISSING'].includes(r.lifecycle)||!object(r.sourceAddress)
    ||Object.values(r.sourceAddress).some(v=>typeof v!=='string'||v.length>600||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/.test(v))||!Number.isInteger(r.sourceRow)||r.sourceRow<2)throw Error('Invalid mHelp upload source record');
+  if(r.scopedAuthority!=null){const a=r.scopedAuthority;
+   if(!object(a)||a.contract!=='COS_SCOPED_INVENTORY_AUTHORITY_V1'||!uuid(a.revisionId)||a.evidenceKind!=='derived_mapping'||!hash(a.evidenceSha256)
+    ||!Number.isSafeInteger(receipt.scopedRevision)||receipt.scopedRevision<1||!Number.isFinite(stamp(a.receivedAt))||stamp(a.receivedAt)<stamp(receipt.receivedAt)||stamp(a.receivedAt)>now)throw Error('Invalid scoped inventory authority');
+  }
   seen.add(r.productId);
+  if(r.inventoryOnlyReason!==undefined&&(r.inventoryOnlyReason!=='no_sim'||r.placement!=='SHOP'||r.binding!==null||r.placementHeld!==true))throw Error('Invalid inventory-only connection restriction');
   if(r.displayUnitNumber!=null&&(!safe(r.displayUnitNumber,250)||!r.displayUnitNumber||!hash(r.displayAuthorizationSha256)))throw Error('Invalid approved display alias');
   if(r.binding!=null){const b=r.binding;
    if(!object(b)||b.productId!==r.productId||!['reviewed_product_id','exact_family_unit','archived_alias','owner_confirmed_alias'].includes(b.matchMethod)||!hash(b.evidenceSha256)||!hash(b.expectedGuard)
@@ -102,9 +107,10 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
  const byId=new Map<string,Row>();for(const row of snapshot.inventoryItems){if(!object(row)||!uuid(row.id)||byId.has(row.id))throw Error('Invalid upload target inventory');byId.set(row.id,row);}
- const changes=new Map<string,Row>(),authorities:Row[]=[],cutoff=stamp(receipt.receivedAt),customerIds=new Map<string,Set<string>>();
+ const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
  for(const r of receipt.records){const key=r.customer.trim().replace(/\s+/g,' ').toLowerCase();customerIds.set(key,new Set([...(customerIds.get(key)||[]),r.customerId]));}
  const records=receipt.records.map((r:Row)=>{
+  const observedAt=r.scopedAuthority?.receivedAt||receipt.receivedAt,cutoff=stamp(observedAt),evidenceSha256=r.scopedAuthority?.evidenceSha256||receipt.sourceSha256;
   const b=r.binding;let state=!b&&r.possibleAliasUnitIds?.length?'held':'unlinked',reason=r.holdReason||'no_reviewed_inventory_binding',applied=false;const unitIds:string[]=[];
   if(b){
    const expected=[{id:b.trackerId,label:b.trackerLabel},{id:b.nativeUnitId,label:b.nativeLabel}].filter(t=>t.id);
@@ -120,16 +126,16 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
     if(groupBlock){reason=groupBlock;if(groupBlock==='identity_conflict')state='held';}
     for(const target of groupBlock?[]:targets){
      const row=byId.get(target.id)!,preserved=retainedLocation(row,r,b,options.validatedLocationProofs?.get(row.id),customerIds);
-     const evidence={source,productId:r.productId,sourceSha256:receipt.sourceSha256,observedAt:receipt.receivedAt,timestampKind:'upload_received',timestampPrecision:receipt.receivedAtPrecision,state:'recorded',fresh:false,reason:'owner_supplied_export_not_live_api'};
+     const evidence={source,...(r.scopedAuthority?{evidenceKind:'derived_mapping',scopedRevisionId:r.scopedAuthority.revisionId}:{}),productId:r.productId,sourceSha256:evidenceSha256,observedAt,timestampKind:r.scopedAuthority?'scoped_source_received':'upload_received',timestampPrecision:r.scopedAuthority?'second':receipt.receivedAtPrecision,state:'recorded',fresh:false,reason:'owner_supplied_export_not_live_api'};
      changes.set(row.id,{...row,...(preserved?preserved.locationFields:historicalOnly(row)),placement:r.placement,currentLocationType:r.placement.toLowerCase(),placementSource:'mhelpdesk_upload',
       customer:r.customer,site:r.placement==='SHOP'?'SHOP':preserved?.site||null,address:preserved?.address||null,addressSource:preserved?(preserved.locationFields.addressSource||row.addressSource):'Uploaded customer address is source-only; verify installation',
       uploadLifecycle:r.lifecycle,uploadActiveInventoryEligible:r.lifecycle==='UNFLAGGED',uploadProductId:r.productId,uploadSourceAddress:r.sourceAddress,...(r.displayUnitNumber?{uploadDisplayUnitNumber:r.displayUnitNumber}:{}),
       placementEvidence:preserved?.ownerPlacementFields?(preserved.ownerPlacementFields.placementEvidence||{source:'owner',state:'recorded',observedAt:preserved.ownerPlacementFields.placementUpdatedAt||row.placementUpdatedAt||null,fresh:false}):evidence,uploadPlacementEvidence:evidence,mhelpPlacementReview:null,mhelpLocationReview:!preserved,...(preserved?.ownerPlacementFields||{})});
-     if(!preserved?.ownerPlacementFields)authorities.push({unitId:row.id,unitNumber:row.unitNumber,productId:r.productId,placement:r.placement,sourceSha256:receipt.sourceSha256,observedAt:receipt.receivedAt,source});applied=true;
+     if(!preserved?.ownerPlacementFields)authorities.push({unitId:row.id,unitNumber:row.unitNumber,productId:r.productId,placement:r.placement,sourceSha256:evidenceSha256,observedAt,source});applied=true;
     }
    }
   }
-  return {recordId:'mhelp_product:'+r.productId,productId:r.productId,unitNumber:r.displayUnitNumber||r.unitNumber,sourceUnitNumber:r.unitNumber,category:r.category,placement:r.placement,uploadLifecycle:r.lifecycle,
+  return {recordId:'mhelp_product:'+r.productId,productId:r.productId,unitNumber:r.displayUnitNumber||r.unitNumber,sourceUnitNumber:r.unitNumber,observedAt,category:r.category,placement:r.placement,uploadLifecycle:r.lifecycle,...(r.inventoryOnlyReason?{inventoryOnlyReason:r.inventoryOnlyReason}:{}),
    customer:r.customer,sourceAddress:r.sourceAddress,binding:{state,unitIds,candidateUnitIds:[...new Set([...(r.possibleAliasUnitIds||[]),...(state==='held'&&b?[b.trackerId,b.nativeUnitId].filter(Boolean):[])])],placementHeld:r.placementHeld===true||reason==='newer_or_undated_source_assignment',matchMethod:b?.matchMethod||null,reason},overlayApplied:applied};
  });
  const inventoryItems=snapshot.inventoryItems.map((r:Row)=>changes.get(r.id)||r),priorField=new Set(snapshot.items.map((r:Row)=>r.id));

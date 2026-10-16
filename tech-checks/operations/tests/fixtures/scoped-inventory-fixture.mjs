@@ -1,0 +1,23 @@
+import {PGlite} from '@electric-sql/pglite';import {readFile} from 'node:fs/promises';import {schema} from './mhelp-placement-schema.mjs';
+export const tracker='11111111-1111-4111-8111-111111111111',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',actor='22222222-2222-4222-8222-222222222222',requestId='33333333-3333-4333-8333-333333333333',hash='a'.repeat(64);
+export async function fixture(){
+ const db=new PGlite();await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
+ await db.exec(`create function app_private.cos_owner_identity_assert_actor(a uuid,o uuid,w boolean) returns void language plpgsql as $$begin if a is distinct from '${actor}'::uuid or o is distinct from '${org}'::uuid or w is distinct from true then raise exception 'Owner required';end if;end$$;`);
+ for(const file of ['20261012173408_cos_mhelp_placement_sync.sql','mhelp_upload_overlay.sql','scoped_inventory_overlay.sql'])await db.exec(await readFile(new URL('../../db/'+file,import.meta.url),'utf8'));
+ await db.query(`insert into app_private.vision_tracker_locations values($1,$2,'Sniper 80','sniper80','SNIPERS','SHOP','Company',null,null,null,null)`,[tracker,org]);
+ const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) g',[tracker])).rows[0].g;
+ const records=[{productId:'101',unitNumber:'Sniper 80',category:'Sniper 2',customerId:'11',customer:'Company',placement:'SHOP',lifecycle:'UNFLAGGED',sourceAddress:{street:'Old customer postal address'},sourceRow:2,binding:{productId:'101',trackerId:tracker,nativeUnitId:null,trackerLabel:'Sniper 80',nativeLabel:null,fullLabel:'Sniper 80',matchMethod:'exact_family_unit',representedUnitIds:[tracker],representationEvidenceSha256:hash,canonicalKey:'SNIPER:80',reviewEvidence:{method:'synthetic'},evidenceSha256:hash,expectedGuard:guard}},
+ {productId:'102',unitNumber:'Sniper 81 - DO NOT USE',category:'Sniper ES',customerId:'12',customer:'Client',placement:'FIELD',lifecycle:'DO_NOT_USE',sourceAddress:{},sourceRow:3,binding:null},
+ {productId:'103',unitNumber:'Helios 90',category:'Helios',customerId:'11',customer:'Company',placement:'SHOP',lifecycle:'UNFLAGGED',sourceAddress:{},sourceRow:4,binding:null}];
+ const receipt={contract:'COS_MHELP_UPLOAD_V1',sourceSha256:hash,libraryFileId:'libfile_synthetic',receivedAt:'2026-01-01T00:00:00Z',receivedAtPrecision:'second',receivedMessageId:'synthetic',exportAsOf:null,authorizationSha256:hash,recordCount:records.length,companyCustomerIds:['11']};
+ receipt.trackerSource={contract:'COS_CURRENT_TRACKER_CENSUS_V1',complete:true,sourceSha256:hash,observedAt:receipt.receivedAt,totalSourceRecords:1};
+ receipt.trackerRecords=[{recordId:'tracker:synthetic:row2',unitNumber:'Sniper 80',placement:'SHOP',lifecycle:'ACTIVE',matchedProductId:'101',binding:{state:'linked',trackerId:tracker,nativeUnitId:null,unitIds:[tracker],representedUnitIds:[tracker],unitLabels:{[tracker]:'Sniper 80'},expectedGuard:guard}}];
+ await db.query('select cos_mhelp_placement_private.review_upload($1,$2,null,true)',[receipt,records]);
+ const evidence={kind:'derived_mapping',libraryFileId:'libfile_syntheticMap',sha256:'b'.repeat(64),receivedAt:'2026-01-02T00:00:00Z',authorizationSha256:hash};
+ const target=r=>Object.fromEntries(['productId','unitNumber','category','customerId','customer','placement','lifecycle'].map(k=>[k,r[k]]));
+ const op={mode:'assignment',expectedRecord:records[0],after:{...target(records[0]),customerId:'12',customer:'Client',placement:'FIELD'}};
+ const call=async(extra={})=>(await db.query('select cos_mhelp_placement_private.review_scoped_inventory($1,$2,$3,$4,$5,$6,$7,$8) v',[extra.actor??actor,extra.org??org,extra.base??hash,extra.revision??0,extra.requestId??requestId,extra.evidence??evidence,extra.operations??[op],extra.apply??false])).rows[0].v;
+ const snapshot=async()=>(await db.query('select cos_mhelp_placement_private.upload_snapshot() v')).rows[0].v;
+ const preserved=async()=>(await db.query(`select jsonb_build_object('base',(select jsonb_agg(to_jsonb(b)) from cos_mhelp_placement_private.upload_batches b),'baseControl',(select jsonb_agg(to_jsonb(c)) from cos_mhelp_placement_private.upload_control c),'tracker',(select jsonb_agg(to_jsonb(t)) from app_private.vision_tracker_locations t),'native',(select jsonb_agg(to_jsonb(t)) from public.equipment_units t),'history',(select jsonb_agg(to_jsonb(t)) from public.equipment_unit_location_history t),'links',(select jsonb_agg(to_jsonb(t)) from cos_mhelp_placement_private.links t)) v`)).rows[0].v;
+ return {db,records,receipt,evidence,op,call,snapshot,preserved,target};
+}

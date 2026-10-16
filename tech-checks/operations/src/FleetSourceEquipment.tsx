@@ -1,3 +1,4 @@
+import {sniperShopDisplay} from './sniperShopDisplay';
 import {recordedAddressText} from './fleetDisplayAddress';
 import {cameraTime} from './fieldCameraHealth';
 import {recordedSourceLabel,type RecordedEquipment} from './fleetRecordedRoster';
@@ -7,7 +8,7 @@ export default function FleetSourceEquipment({record,now,estimate,onSelect}:{rec
  return <article className='cos-fleet-source-record' data-record-id={record.id}>
   <strong>{record.displayUnitNumber||record.unitNumber}</strong><small>{record.customer||'Customer not supplied'}</small>
   <p className='cos-fleet-recorded-address'>{record.source==='owner_supplied_mhelp_export'?'MHelp address':'Recorded source address'}: {recordedAddressText(record.sourceAddress)||'Not supplied in this source'}</p>
-  <p>{record.placement==='field'?'Recorded FIELD':record.placement==='shop'?'SHOP / ROOT':'Placement review'} · {lifecycle[record.lifecycle]}</p>
+  <p>{record.placement==='field'?'Recorded FIELD':record.placement==='shop'?(sniperShopDisplay(record.placement,record.unitNumber)?'SHOP':'SHOP / ROOT'):'Placement review'} · {lifecycle[record.lifecycle]}</p>
   {record.recordedSourcePlacement&&<p>Source assignment: {record.recordedSourcePlacement.toUpperCase()} · excluded from confirmed placement totals pending identity review.</p>}
   <span className='cos-fleet-badge cos-signal-unknown'>{record.kind==='identity_review'?'Identity review':'Health unlinked'}</span>
   <small>{recordedSourceLabel(record)} · Recorded {cameraTime(record.observedAt,now)}</small>
