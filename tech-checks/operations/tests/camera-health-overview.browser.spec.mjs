@@ -196,7 +196,8 @@ test('visible folders and global search include deactivated ROOT units without f
  await expect(card.locator('.effective-placement')).toContainText(/No verified equipment link|physical placement unavailable/i);
  await expect(card.locator('.compact-unit-summary')).toContainText('Shop inventory; excluded from operational outage totals');
  await expect(card.locator('.compact-unit-summary')).not.toContainText(/online|offline|active shop|verified physical placement|owner-confirmed placement/i);
- expect(await page.evaluate(()=>functionCalls)).toEqual([]);
+ // Existing integration readiness is read-only; no probe, sync or mutation is allowed.
+ for(const call of await page.evaluate(()=>functionCalls))expect(call).toEqual({name:'reconeyez-connect',args:{body:{action:'status'}}});
 });
 
 test('online and offline edges stay bright without selection while stale and shop stay neutral',async({page},info)=>{
