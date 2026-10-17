@@ -1,0 +1,59 @@
+name: Verify Owner camera identity inventory continuity
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/owner_identity_upload_continuity.sql'
+      - 'tech-checks/operations/tests/owner-identity-upload-*'
+      - 'tech-checks/operations/tests/fixtures/owner-identity-upload-fixture.mjs'
+      - '.github/workflows/cos-owner-identity-binding-proof.yml'
+permissions:
+  contents: read
+jobs:
+  owner-identity-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix legacy/tests/recon-ordering
+      - name: Guard and inventory regression tests
+        run: |
+          set -o pipefail
+          node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/owner-identity-upload-continuity.test.mjs tests/owner-identity-crosswalk.test.mjs tests/owner-identity-route.test.mjs tests/mhelp-upload-database.test.mjs tests/scoped-inventory-database.test.mjs | tee owner-identity-binding-tests.txt
+      - name: Independent PostgreSQL sessions and real role gates
+        env:
+          COS_IDENTITY_BINDING_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_identity_binding_test_ci
+        run: |
+          set -o pipefail
+          node tests/owner-identity-upload-postgres.mjs | tee owner-identity-binding-postgres.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owner-camera-identity-inventory-receipts
+          path: |
+            tech-checks/operations/owner-identity-binding-tests.txt
+            tech-checks/operations/owner-identity-binding-postgres.txt

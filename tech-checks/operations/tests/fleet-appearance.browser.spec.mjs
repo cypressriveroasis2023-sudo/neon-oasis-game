@@ -212,6 +212,29 @@ test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
 });
 
 
+test.describe('mobile Fleet map quick access',()=>{
+ test.use({hasTouch:true});
+ for(const [width,height] of [[390,844],[844,390]]){
+  test(`map quick access is usable at ${width}x${height}`,async({page})=>{
+   await page.setViewportSize({width,height});
+   const {app,state}=await mount(page);
+   const jump=app.getByRole('button',{name:'Jump to Fleet map'});
+   await expect(jump).toBeVisible();
+   await expect(jump).toHaveCSS('min-height','44px');
+   await jump.click();
+   await expect.poll(()=>app.locator('.cos-fleet-map-panel').evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(220);
+   await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
+   await noPageOverflow(app);onlySavedReads(state);
+  });
+ }
+});
+test('desktop layout does not show a mobile map shortcut',async({page})=>{
+ await page.setViewportSize({width:932,height:430});
+ const {app,state}=await mount(page);
+ await expect(app.getByRole('button',{name:'Jump to Fleet map'})).toBeHidden();
+ onlySavedReads(state);
+});
+
 test('short desktop viewport preserves sidebar and desktop Fleet map columns',async({page})=>{
  await page.setViewportSize({width:932,height:430});
  const {app,state}=await mount(page);

@@ -321,3 +321,22 @@
   #root#root .cos-fleet-drawer h3 { margin: 12px 0 7px; }
   #root#root .cos-fleet-drawer .camera-health-native { margin: 10px 0; padding: 12px; }
 }
+
+/* Quick map access on short touch screens; no Fleet data or pin changes. */
+#root#root .cos-fleet-dashboard .cos-fleet-map-jump { display: none; }
+@media (max-width: 750px),
+  (orientation: landscape) and (pointer: coarse) and (min-width: 701px) and (max-width: 1000px) and (max-height: 560px) {
+  #root#root .cos-fleet-dashboard .cos-fleet-map-jump {
+    display: block;
+    min-height: 44px;
+    width: calc(100% - 24px);
+    margin: 8px 12px 0;
+    padding: 9px 12px;
+    border: 1px solid var(--fleet-line);
+    border-radius: 8px;
+    color: var(--fleet-text);
+    background: var(--cos-vision-raised);
+    font-weight: 700;
+  }
+  #root#root .cos-fleet-map-panel { scroll-margin-top: 64px; }
+}
