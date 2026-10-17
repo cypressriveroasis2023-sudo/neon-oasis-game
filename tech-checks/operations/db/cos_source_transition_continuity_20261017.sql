@@ -134,7 +134,7 @@ begin
   or upper(btrim(regexp_replace(new_tracker->>'unitNumber','[[:space:]]+',' ','g'))) is distinct from normal_new
   or regexp_replace(upper(btrim(old_tracker->>'unitNumber')),'HDC2$','') is distinct from normal_new
   or new_tracker->>'customer' is distinct from new_row->>'customer'
-  or (old_tracker->>'customer'||': '||old_tracker->>'site') is distinct from new_tracker->>'customer'
+  or ((old_tracker->>'customer')||': '||(old_tracker->>'site')) is distinct from new_tracker->>'customer'
   or new_tracker->'sourceAddress' is distinct from old_tracker->'sourceAddress'
   or old_tracker->'binding'->>'state' is distinct from 'linked'
   or old_tracker->'binding'->>'matchMethod' is distinct from 'exact_canonical_family_unit'
