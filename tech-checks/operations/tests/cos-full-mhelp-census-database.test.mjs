@@ -32,6 +32,7 @@ test('complete Census enrollment retains exactly 1001 immutable Product IDs and 
    await f.db.exec('reset role');
   }
   await assert.rejects(()=>f.db.exec(synthetic),'Duplicate enrollment must not silently reimport');
+  await f.db.exec('rollback');
   await f.db.exec("create schema net;create table net._http_response(id bigint,status_code integer,error_msg text,content text);");
   await f.db.exec(await src('cos_full_mhelp_census_processing_20261017.sql'));
   const classify=async (content,httpCode=200,error=null)=>(await f.db.query(
