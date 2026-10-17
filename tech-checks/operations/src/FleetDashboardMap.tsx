@@ -77,7 +77,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    marker.getElement()?.setAttribute('aria-label',label);
    if(count===1){
     const tooltip=document.createElement('span');
-    tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS)'+(review?' · Census address differs':'');
+    tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS)'+(review?' · Address match needs review':'');
     marker.bindTooltip(tooltip);
    }
    if(selectAddressGroup.current){marker.on('click',()=>{if(picker.current)return;if(count===1)selectAddress.current?.(first.productId);else selectAddressGroup.current?.(siblings.map(p=>p.productId));});continue;}
@@ -93,7 +93,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     const source=document.createElement('small');source.textContent='MHelp: '+unit.address;item.appendChild(source);
     if(unit.state==='address_review'){
      const warning=document.createElement('small');warning.className='cos-mhelp-address-warning';
-     warning.textContent='Census location differs: '+unit.matchedAddress+' · Check before dispatch';item.appendChild(warning);
+     warning.textContent='Returned address differs: '+unit.matchedAddress+' · Check before dispatch';item.appendChild(warning);
     }
     popup.appendChild(item);
    }
@@ -110,10 +110,10 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
   {locationsReady&&!pins.length&&!mhelpAddressPins.length&&!pickLocation&&<p className='cos-fleet-map-note'>{rows.length?'These units have no currently verified pins or approved address estimates. Open Location verification.':'No linked unit pins match these filters. Recorded equipment can remain in the list without a verified location.'}</p>}
-  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>⌖ Amber: Census address differs</span><small>EST / SRC: installation needs verification{expandedIds.length>0?' · Expanded pins are display offsets; saved GPS stays unchanged.':''}</small></div>
+  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>⌖ Amber: address match needs review</span><small>EST / SRC: installation needs verification{expandedIds.length>0?' · Expanded pins are display offsets; saved GPS stays unchanged.':''}</small></div>
   {locationsReady&&mhelpAddressReviews.length>0&&<details className='cos-mhelp-address-followups'>
-   <summary>{mhelpAddressReviews.length} MHelp Field addresses need map coordinates (no GPS required)</summary>
-   <p>These equipment records are still in mHelpDesk Field. Their exact service addresses did not produce usable Census coordinates; no guessed marker is placed.</p>
+   <summary>{mhelpAddressReviews.length} MHelp Field equipment records need address coordinates (no GPS required)</summary>
+   <p>These equipment records are still in mHelpDesk Field. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>
    <ul>{mhelpAddressReviews.map(item=><li key={item.id}>
     <strong>{item.unitNumber}</strong> · Product {item.productId} · {item.customer} · {item.address||'Address incomplete'}
     <small>{item.state==='no_match'?'Census did not match the recorded street address':item.reason}</small>
