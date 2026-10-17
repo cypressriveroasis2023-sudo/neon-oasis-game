@@ -1,3 +1,7 @@
+// 2026-10-17 reviewed shared Camera Health entry, explicit diagnostics/return links,
+// provider-group wording and removal of historical 2026 synthetic tracker rows (#197).
+// Navigation and saved-only diagnostics are covered by camera-health-overview and
+// camera-diagnostics-access browser regressions; retain exact script/markup checks.
 // 2026-10-15 reviewed four-minute saved-only scheduling and shared placement-read helper cache keys; normalize only these URLs.
 // 2026-10-14 reviewed static eye image/icon cache keys; script hashes stay unchanged.
 // 2026-10-12 canonical fleet dashboard entry; all provider diagnostics scripts remain byte-for-byte unchanged.
@@ -24,13 +28,13 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "70cb43e5a1b27b8565abe4b02f64fd105b8604dd5fe9829f3c918e957d5e39ec",
+  "camera-health": "df0faa354d971edf8cf31278e4279ef5f1ec9f74b6447b99ef2b92f04ae35fce",
   "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "f1e980d25ad2b397f1ea894e54cd3a38bf4fdf92cf1474782f441dd0c69a6d1a",
+  "camera-health": "1381cf75182b5112df464febd16bb95f26a6ba288fc983c8d119392f6a71f947",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"

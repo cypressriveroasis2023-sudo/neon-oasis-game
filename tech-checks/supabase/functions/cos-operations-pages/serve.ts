@@ -13,6 +13,8 @@ Deno.serve(createOperationsHandler({
   mhelpReconnect:mhelpTokens.reconnect,
   mhelpPlacementEnabled:true,
   handoffLocation:{getSecret:()=>Deno.env.get('COS_HANDOFF_LOCATION_HMAC_V1')},
+  // Deny Owner equipment commits until SQL, source authority, and full CI are approved.
+  ownerEquipmentImportEnabled:Deno.env.get('COS_OWNER_EQUIPMENT_IMPORT_ENABLED')==='true',
   googleSheets: { getServiceAccountJson:()=>Deno.env.get('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion:signSheetsAssertion },
 }));
 

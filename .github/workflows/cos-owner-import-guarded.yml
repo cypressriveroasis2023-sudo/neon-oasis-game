@@ -1,0 +1,60 @@
+name: COS Owner equipment guarded import tests
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/tests/mhelp-*.test.mjs'
+      - 'tech-checks/operations/docs/drafts/cos-owner-equipment-stage-commit-20261016.sql'
+      - 'tech-checks/supabase/functions/cos-operations-pages/mhelp*Equipment*.ts'
+      - 'tech-checks/supabase/functions/cos-operations-pages/mhelp2027ProductCensus.ts'
+      - '.github/workflows/cos-owner-import-guarded.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cos-owner-guarded-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  guarded-owner-source:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: cos_owner_import_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_owner_import_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package.json
+      - run: npm install --no-audit --no-fund
+      - name: Test private source validation and draft transactional admission
+        run: |
+          node --import tsx --test --test-concurrency=1 \
+            tests/mhelp-equipment-csv-preview.test.mjs \
+            tests/mhelp-equipment-admission-plan.test.mjs \
+            tests/mhelp-2027-product-census.test.mjs \
+            tests/mhelp-owner-review.test.mjs \
+            tests/mhelp-equipment-write-bridge.test.mjs \
+            tests/mhelp-owner-staging-pglite.test.mjs
+      - name: Verify real PostgreSQL 17 Owner equipment transaction
+        timeout-minutes: 4
+        env:
+          COS_OWNER_POSTGRES_CI: '1'
+        run: |
+          command -v psql
+          node tests/mhelp-owner-postgres.ci.mjs
+      - name: Typecheck COS Owner importer and existing app
+        run: npm run typecheck
