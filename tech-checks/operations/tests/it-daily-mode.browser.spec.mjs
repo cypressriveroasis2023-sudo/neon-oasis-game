@@ -20,7 +20,8 @@ const daily = frame => frame.getByRole('region', { name: 'IT daily dashboard', e
 const card = (frame, id) => daily(frame).locator('[data-source="' + id + '"]');
 
 function fixture({ role = 'it', linked = true, holdCapability = false, slowLegacy = false, preview = false, ...options } = {}) {
-  let html = itHomeFixture(role, linked, { dashboard: true, ...options });
+  // The synthetic capability RPC must honor the real legacy IT allowlist.
+  let html = itHomeFixture(role, linked, { dashboard: true, ...options, capability:linked&&options.capability!==false });
   if (slowLegacy) html = html.replace('async function loadITManagedTickets(){return []};', 'async function loadITManagedTickets(){return new Promise(()=>{});};');
   const setup = `<script>(() => {
     window.fixtureEffectiveRole = ${JSON.stringify(preview ? 'it' : role)};
@@ -151,7 +152,11 @@ async function assertReadBoundary(page,state) {
   expect(state.unexpected).toEqual([]);
   expect(state.calls.every(call=>call.method==='GET'&&call.body===null)).toBe(true);
   const rpc=await page.evaluate(()=>window.fixtureRpcCalls.map(call=>call.name));
-  expect(rpc.every(name=>name==='cos_verified_fleet_capabilities_v1')).toBe(true);
+  // The synthetic missing-backend probe is read-only. No private context,
+  // equipment submission, technician queue or identity mutation is permitted.
+  const allowed=new Set(['cos_verified_fleet_capabilities_v1','techcheck_transfer_readiness_v1']);
+  expect(rpc.every(name=>allowed.has(name)),JSON.stringify(rpc)).toBe(true);
+  expect(rpc.some(name=>name==='techcheck_transfer_context_v1'||name==='submit_techcheck_transfer_v1')).toBe(false);
 }
 async function navMenu(frame) {
   await frame.getByRole('button',{name:'More',exact:true}).first().click();
@@ -174,9 +179,10 @@ async function choose(frame,name) {
 
 for(const view of ['Fleet Dashboard','Camera Health'])test('verified desktop IT opens '+view+' without extra workspaces',async({page},info)=>{
   await desktop(page);
-  const {frame,state}=await mount(page,options({deepLink:view==='Camera Health'?'#camera-health':''}));
-  if(view==='Fleet Dashboard')await readyFleet(frame);
-  else {
+  const {frame,state}=await mount(page,options());
+  await readyFleet(frame); // The phone/desktop host deliberately starts Fleet.
+  if(view==='Camera Health'){
+    await choose(frame,'Camera Health');
     await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
     await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(0);
   }

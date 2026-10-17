@@ -37,7 +37,10 @@ function scope() {
   const profileLive=p?.user_id===id && p?.active===true && !p?.archived_at;
   const effective = c?.getEffectiveRole();
   if (role !== 'it' && !(role === 'owner' && (effective === 'it' || effective === 'owner' && visible(document.getElementById('view-it'))))) return null;
-  return {id, role, profileLive, phone:role==='it'&&isPhoneSurface(), preview: document.body.classList.contains('owner-test-role-preview'), effective};
+  const preview=document.body.classList.contains('owner-test-role-preview');
+  // An Owner's IT phone preview shows the intended actions as disabled; preview
+  // remains unauthorized by verify() and cannot mount or submit transfers.
+  return {id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
 }
 function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive,value.phone].join(':') : ''; }
 function clearFrame() { disposeTransfer?.(); disposeTransfer=null; setFieldMapDisplay(frame,false); frame?.remove(); frame = null; }
