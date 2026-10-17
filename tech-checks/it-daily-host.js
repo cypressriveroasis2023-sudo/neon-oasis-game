@@ -65,8 +65,19 @@ function status(message, retry = false) {
   const panel = document.createElement('section'); panel.className = 'cos-it-daily-status';
   const title = document.createElement('h1'); title.textContent = scope()?.phone?'Equipment Check Out / Check In':'Camera Health and Fleet Map';
   const note = document.createElement('p'); note.textContent = message; note.setAttribute('role','status');
-  panel.append(title,note);
-  if (retry) { const button = document.createElement('button'); button.type='button'; button.textContent='Retry daily views'; button.onclick=()=>{scopeKey='';present();}; panel.append(button); }
+  panel.append(title);
+  // Show the two safe, disabled phone actions immediately while the live
+  // account and backend readiness checks run; this is not a custody form.
+  if (scope()?.phone) {
+    const actions=document.createElement('div');actions.className='cos-it-handoff-actions';
+    for (const label of ['Check Out / Hand Off','Check In / Return']) {
+      const button=document.createElement('button');button.type='button';button.textContent=label;
+      button.disabled=true;actions.append(button);
+    }
+    panel.append(actions);
+  }
+  panel.append(note);
+  if (retry) { const button = document.createElement('button'); button.type='button'; button.textContent='Retry access check'; button.onclick=()=>{scopeKey='';present();}; panel.append(button); }
   root.append(panel);
 }
 async function verify(value) {
@@ -81,13 +92,7 @@ async function open(value, generation, handoffFailure = null) {
   if (!permitted) {
     status(value.preview ? 'Test IT is a preview persona, not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
     // An unverified actor cannot mount transfer controls or request private data.
-    if(value.phone){
-      const actions=document.createElement('div');actions.className='cos-it-handoff-actions';
-      for(const label of ['Check Out / Hand Off','Check In / Return']){
-        const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=true;actions.append(button);
-      }
-      root.querySelector('.cos-it-daily-status')?.append(actions);
-    } else {
+    if(!value.phone){
       const link=document.createElement('a');link.href='./camera-health.html?itDaily=1';
       link.textContent='Open Camera Health sign-in';link.className='btn';
       root.querySelector('.cos-it-daily-status')?.append(link);
