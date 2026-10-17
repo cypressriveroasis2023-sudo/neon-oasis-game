@@ -38,3 +38,9 @@ test('mismatched database stage and commit receipts fail closed',async()=>{
  await assert.rejects(stageOwnerEquipmentCsv({...options,requestId:UUID,rpc:stageRpc}),/Field\/Shop count disagrees/);
  await assert.rejects(commitOwnerEquipmentCsv({...options,stageId:UUID,confirmationText:'I approve the complete current 2027 equipment source.',rpc:async()=>({contract:'COS_OWNER_EQUIPMENT_COMMIT_V1',applied:true,sourceReceiptsApplied:true,records:2,recordedField:2,recordedShop:0,sourceSha256:'x'.repeat(64)})}),/complete verified commit receipt/);
 });
+test('unexpected source fields and malformed expected hashes are denied before the database RPC',async()=>{
+ let calls=0;const rpc=async()=>{calls++;throw Error('no database access expected')};
+ await assert.rejects(stageOwnerEquipmentCsv({...options,requestId:UUID,rpc,body:{...body,expectedSha256:17}}),/invalid expected original SHA-256/);
+ await assert.rejects(stageOwnerEquipmentCsv({...options,requestId:UUID,rpc,body:{...body,unexpected:true}}),/unexpected source request field/);
+ assert.equal(calls,0);
+});
