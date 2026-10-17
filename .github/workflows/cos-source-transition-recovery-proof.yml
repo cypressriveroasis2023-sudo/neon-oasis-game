@@ -1,0 +1,37 @@
+name: Verify COS Source Transition Recovery
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/cos_source_transition_continuity_20261017.sql'
+      - 'tech-checks/operations/tests/cos-source-transition-*.mjs'
+      - 'tech-checks/operations/tests/helpers/source-transition-eligibility.mjs'
+      - '.github/workflows/cos-source-transition-recovery-proof.yml'
+permissions:
+  contents: read
+jobs:
+  source-transition-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test source-transition graph, identity and database reader
+        run: |
+          set -o pipefail
+          node --no-wasm-code-gc --import tsx --test --test-concurrency=1             tests/cos-source-transition-review.test.mjs             tests/cos-source-transition-database.test.mjs             | tee source-transition-focused-test-receipt.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-source-transition-focused-receipt
+          path: tech-checks/operations/source-transition-focused-test-receipt.txt
