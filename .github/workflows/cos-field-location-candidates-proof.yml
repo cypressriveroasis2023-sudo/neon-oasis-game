@@ -4,13 +4,15 @@ on:
     paths:
       - 'tech-checks/operations/tests/helpers/field-saved-location-audit.mjs'
       - 'tech-checks/operations/tests/field-saved-location-audit.test.mjs'
+      - 'tech-checks/operations/tests/cos-source-estimate-optional-holds.test.mjs'
+      - 'tech-checks/operations/db/cos_source_estimate_optional_holds_20261017.sql'
       - '.github/workflows/cos-field-location-candidates-proof.yml'
 permissions:
   contents: read
 jobs:
   location-candidate-regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     defaults:
       run:
         shell: bash
@@ -22,10 +24,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Test candidate-vs-accepted-pin safeguards
         run: |
           set -o pipefail
-          node --test tests/field-saved-location-audit.test.mjs | tee field-location-candidate-receipt.txt
+          node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/field-saved-location-audit.test.mjs tests/cos-source-estimate-optional-holds.test.mjs | tee field-location-candidate-receipt.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
