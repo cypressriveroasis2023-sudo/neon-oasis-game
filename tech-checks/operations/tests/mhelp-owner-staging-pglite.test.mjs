@@ -19,7 +19,7 @@ const census=records.map(r=>({productId:r.productId,family:r.category,unitLabel:
 const draft=readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8');
 async function setup(){
  const db=new PGlite();
- await db.exec("create schema app_private;create schema cos_mhelp_placement_private;");
+ await db.exec("create role anon; create role authenticated; create role service_role; create schema app_private; create schema cos_mhelp_placement_private;");
  await db.exec("create table cos_mhelp_placement_private.upload_control(singleton boolean primary key,active_sha256 text);");
  await db.exec("create table cos_mhelp_placement_private.upload_batches(source_sha256 text primary key,payload_sha256 text not null,receipt jsonb not null,records jsonb not null,admitted_at timestamptz not null default clock_timestamp());");
  await db.query("insert into cos_mhelp_placement_private.upload_control values(true,$1)",[previous]);
