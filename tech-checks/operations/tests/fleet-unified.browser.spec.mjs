@@ -3,8 +3,8 @@ import {mountFleet,units,field,fresh} from './fleet-dashboard-fixtures.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 
 for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible direct Fleet Dashboard entry and one operational map`,async({page})=>{
- const {app,state}=await mountFleet(page,it,{hash:it?'#it-dashboard':'#today'});
- if(it)await app.getByRole('region',{name:'IT daily dashboard',exact:true}).locator('[data-source="field"]').getByRole('button',{name:'Open Fleet Dashboard',exact:true}).click();
+ const {app,state}=await mountFleet(page,it,{hash:it?'#fleet-dashboard':'#today'});
+ if(it)await expect(app.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  else await app.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
  await expect(app.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
  const navigation=app.getByRole('navigation',{name:page.viewportSize().width<=700?'Mobile Operations navigation':'COS Operations',exact:true});

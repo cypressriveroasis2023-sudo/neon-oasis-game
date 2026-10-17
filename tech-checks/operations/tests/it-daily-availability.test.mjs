@@ -56,7 +56,7 @@ test('daily landing has no extra Fleet launch and shared modes preserve existing
  const daily=read('operations/src/ITDailyDashboard.tsx'),app=read('operations/src/App.tsx');
  assert.doesNotMatch(daily,/cos-fleet-launch|Open Fleet Dashboard/);
  assert.match(daily,/Verified camera evidence, recorded locations, and authorized camera editing/);
- assert.match(app,/active==='Fleet Dashboard'\|\|active==='Camera Health'&&!route.diagnostics/);
+ assert.match(app,/active==='Fleet Dashboard'\|\|active==='Camera Health'&&\(!route.diagnostics\|\|dailyOnly\)/);
  assert.match(app,/initialView=\{active==='Camera Health'\?'fleet':'map'\}/);
  assert.match(app,/openAdvancedDiagnostics=\{!fleetOnly&&!dailyOnly\?/);
 });

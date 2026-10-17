@@ -267,13 +267,14 @@ for(const capability of ['omitted','denied'])test('IT with '+capability+' Victro
  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
-test('IT with an explicit Victron capability retains its authorized read-only daily view',async({page})=>{
- const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:{vrmRead:true},config:fleet([syntheticUnit(3000101,'Synthetic authorized IT installation')])});
- await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toBeVisible();
- await expect(selectedId(frame)).toHaveText('3000101');
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#victron-vrm');
- expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet']);
+test('IT with explicit Victron read capability keeps a read-only Fleet entry without separate power administration',async({page})=>{
+ const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:{vrmRead:true},initialHash:'#victron-vrm',config:fleet([syntheticUnit(3000101,'Synthetic authorized IT installation')])});
+ await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
  expect(requests.every(request=>request.method==='GET')).toBe(true);
+ expect(requests.some(request=>request.path==='/api/vrm-fleet/refresh')).toBe(false);
 });
 
 test('Legacy numeric shortcuts resolve only a unique full Helios name and then retain its ID',async({page})=>{
@@ -395,7 +396,7 @@ async function captureNativePower(page,panel,testInfo,prefix){
   await capture(captions.nth(index),key);
  }
 }
-for(const role of ['owner','it'])test(`${role} sees read-only power for 010, 011 and a newly discovered installation without sharing`,async({page},testInfo)=>{
+for(const role of ['owner'])test(`${role} sees read-only power for 010, 011 and a newly discovered installation without sharing`,async({page},testInfo)=>{
  let items=[syntheticUnit(3000010,'HELIOS 010'),syntheticUnit(3000011,'HELIOS 011')];
  const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});await openVrm(frame);
  for(const item of items){

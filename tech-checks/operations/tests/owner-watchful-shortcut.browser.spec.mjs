@@ -85,9 +85,10 @@ for (const account of [
 ]) test('Watchful is absent for ' + account.name, async ({page, context}) => {
   const {frame, state} = await mount(page, context, account);
   if (account.mode) {
-    const daily = frame.getByRole('region', {name: 'IT daily dashboard', exact: true});
-    await expect(daily).toBeVisible();
-    await expect(daily.locator('[data-source]')).toHaveCount(4);
+    await expect(frame.getByRole('region', {name: 'COS Fleet Dashboard', exact: true})).toBeVisible();
+    const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
+    await expect(nav.getByRole('button')).toHaveCount(2);
+    await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
   } else if (account.authorized === false) await expect(frame.getByRole('heading', {name: 'Operations access needs attention'})).toBeVisible();
   else await expect(frame.getByRole('region', {name: 'VISION dashboard'})).toBeVisible();
   await expect(shortcut(frame)).toHaveCount(0);
