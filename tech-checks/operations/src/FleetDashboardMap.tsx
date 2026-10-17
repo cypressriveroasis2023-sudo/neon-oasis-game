@@ -18,8 +18,10 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
  select.current=onSelect;picker.current=pickLocation;
  pinRef.current=pins;
- useEffect(()=>{if(!node.current)return;const instance=L.map(node.current,{zoomControl:true,trackResize:false}).setView(restored.current.center||[31,-99],restored.current.zoom||5);map.current=instance;addFieldMapBasemap(instance);markers.current=L.layerGroup().addTo(instance);const stopResize=observeFleetMapResize(instance);
-  instance.on('zoomend moveend',()=>{viewportChanged.current=true;const center=instance.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:instance.getZoom()});setRevision(v=>v+1);});instance.on('click',(event:L.LeafletMouseEvent)=>{if(picker.current)picker.current([event.latlng.lat,event.latlng.lng]);else setExpandedIds([]);});
+ useEffect(()=>{if(!node.current)return;const instance=L.map(node.current,{zoomControl:true,trackResize:false}).setView(restored.current.center||[31,-99],restored.current.zoom||5);map.current=instance;addFieldMapBasemap(instance);markers.current=L.layerGroup().addTo(instance);let resizing=false;const stopResize=observeFleetMapResize(instance,active=>{resizing=active;});
+  // A layout-only reset must not suppress the first location fit or replace a
+  // restored viewport. Keep marker projection current without recording a move.
+  instance.on('zoomend moveend',()=>{if(!resizing){viewportChanged.current=true;const center=instance.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:instance.getZoom()});}setRevision(v=>v+1);});instance.on('click',(event:L.LeafletMouseEvent)=>{if(picker.current)picker.current([event.latlng.lat,event.latlng.lng]);else setExpandedIds([]);});
   return()=>{stopResize();instance.remove();map.current=null;markers.current=null;};},[]);
  useEffect(()=>{const instance=map.current,group=markers.current;if(!instance||!group)return;group.clearLayers();
   const groups=clusterMapPoints(pins.map(pin=>{const p=instance.latLngToContainerPoint(pin.point);return {item:pin,x:p.x,y:p.y};}),48,16);

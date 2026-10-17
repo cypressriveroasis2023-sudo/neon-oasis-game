@@ -62,7 +62,8 @@ test('plain colored circles stay compact and clusters expand to accessible selec
  await page.screenshot({path:info.outputPath('compact-expanded-fleet-markers.png'),fullPage:true});
  await app.locator('.cos-dashboard-peer[data-unit-id="'+units[1].id+'"]').click();
  await expect(app.getByRole('dialog',{name:'Spotter 1 unit intelligence'})).toBeVisible();
- await expect(app.locator('.camera-unit-state')).toHaveCSS('color','rgb(255, 39, 52)');
+ await expect(app.locator('.camera-unit-state')).toHaveClass(/camera-status-offline/);
+ await expect(app.locator('.camera-unit-state')).toHaveCSS('color','rgb(255, 101, 112)');
  expect(state.errors).toEqual([]);
 });
 

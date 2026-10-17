@@ -43,7 +43,7 @@ async function mount(page,{role='owner',privateClock=false}={}){
   });
   await page.goto(origin+'/ticket-preview-fixture');
   const frame=page.frameLocator('iframe'),preview=frame.getByRole('region',{name:'mHelpDesk ticket type preview'});
-  await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
+  await expect(frame.getByRole('region',{name:role==='it'?'COS Fleet Dashboard':'Unit Tracker workspace',exact:true})).toBeVisible();
   return {frame,preview,calls,state};
 }
 test('today ticket preview is explicit, aggregate-only and preserves equipment controls',async({page})=>{
@@ -134,7 +134,7 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'appointment_variants_v1'}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
-  const {frame,preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true})).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
+  const {frame,preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true})).toHaveCount(0);expect(calls.some(call=>call.path===path||call.path==='/api/unit-tracker'||call.method!=='GET')).toBe(false);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
 });
 test('legacy success explicitly marks operational evidence unavailable and replacement evidence stays bounded',async({page})=>{
   const {preview,calls,state}=await mount(page);state.preview=ticketPreviewFixture();

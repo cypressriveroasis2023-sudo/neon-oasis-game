@@ -33,6 +33,27 @@ test('readiness retry switches to check-in/out only after all server gates pass'
  await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeEnabled();await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
  expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v1')).toHaveLength(0);expect(f.errors).toEqual([]);
 });
+for (const width of [390, 430]) test('direct Test IT phone stays in held equipment actions without a blank Camera Health frame at '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:844});
+ f=await mountTransfers(page,{rollout:'missing'});
+ await page.evaluate(()=>changeActor('05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'));
+ await expect(page.getByRole('region',{name:'Equipment handoff availability'})).toContainText('not installed');
+ await expect(page.getByRole('heading',{name:'Equipment Check Out / Check In',exact:true})).toBeVisible();
+ for(const name of ['Check Out / Hand Off','Check In / Return']){
+  const action=page.getByRole('button',{name,exact:true});
+  await expect(action).toBeVisible();await expect(action).toBeDisabled();
+ }
+ await expect(page.getByRole('button',{name:'Check handoff availability',exact:true})).toBeEnabled();
+ await expect(page.locator('iframe')).toHaveCount(0);
+ await expect(page.getByText('Camera Health remains available below.')).toHaveCount(0);
+ await expect(page.locator('#legacy')).toBeHidden();
+ expect(f.calls.every(call=>call.name==='techcheck_transfer_readiness_v1')).toBe(true);
+ expect(f.paths.size).toBe(0);expect(f.errors).toEqual([]);
+ await page.screenshot({path:info.outputPath('direct-Test-IT-held-phone-'+width+'.png'),fullPage:true});
+ await page.evaluate(()=>logout());
+ await expect(page.locator('#cosITDailyHost,iframe')).toHaveCount(0);
+ expect(f.calls.some(call=>call.name==='submit_techcheck_transfer_v1')).toBe(false);
+});
 test('desktop never probes or mounts transfers even when backend is missing',async({page})=>{
  await page.setViewportSize({width:1440,height:900});f=await mountTransfers(page,{rollout:'missing'});
  await expect(page.frameLocator('#cosITDailyFrame').getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();

@@ -18,14 +18,15 @@ export function resizeFleetMap(instance:Map) {
 }
 
 /** Let requested motion finish before reconciling a concurrently changed size. */
-export function observeFleetMapResize(instance:Map) {
+export function observeFleetMapResize(instance:Map,onReconcile:(active:boolean)=>void=()=>{}) {
   let ready=false,moving=false,pending=false,reconciling=false,disposed=false;
   const reconcile=()=>{
     if(disposed)return;
     pending=true;
     if(!ready||moving||reconciling)return;
     pending=false;reconciling=true;
-    try{resizeFleetMap(instance);}finally{reconciling=false;}
+    onReconcile(true);
+    try{resizeFleetMap(instance);}finally{reconciling=false;onReconcile(false);}
   };
   const moveStart=()=>{if(!reconciling)moving=true;};
   const moveEnd=()=>{if(reconciling)return;moving=false;if(pending)reconcile();};
