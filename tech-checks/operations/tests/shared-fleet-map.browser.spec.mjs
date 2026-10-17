@@ -21,10 +21,23 @@ async function mount(page,role='owner'){
  });await page.goto('/shared-fleet-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(4);return {frame,state};
 }
 for(const role of ['owner','it'])test(role+' gets an explicit operational field view, simple numbered status markers, and the same camera-card status',async({page})=>{
- const {frame,state}=await mount(page,role);await expect(frame.getByLabel('Fleet status')).toHaveValue('all');await frame.getByLabel('Fleet status').selectOption('operational');await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Helios 004');await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Sniper 003');await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toBeVisible();const group=frame.locator('.cos-field-cluster-wrap');if(await group.count()){await expect(group).toHaveCount(1);await group.click();}await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-map-status-dot')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ const {frame,state}=await mount(page,role);await expect(frame.getByLabel('Fleet status')).toHaveValue('all');await frame.getByLabel('Fleet status').selectOption('operational');await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Helios 004');await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Sniper 003');await expect(frame.locator('.cos-fleet-map-toolbar')).toContainText('3 unit pins');await expect(frame.locator('.leaflet-pan-anim,.leaflet-zoom-anim')).toHaveCount(0);await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toBeVisible();const group=frame.locator('.cos-field-cluster-wrap');if(await group.count()){await expect(group).toHaveCount(1);await group.click();}await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-map-status-dot')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  await expect(frame.locator('.cos-map-status-dot')).toHaveCount(3);await expect(frame.locator('.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas [data-cos-eye]')).toHaveCount(0);await expect(frame.locator('.cos-field-pin[data-health="online"] circle')).toHaveCSS('fill','rgb(43, 255, 53)');
  await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('unknown');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-list')).toContainText('Sniper 003');
- await frame.locator('body').evaluate(()=>location.hash='#camera-health?diagnostics=1');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);
+ await frame.locator('body').evaluate(()=>location.hash='#camera-health?diagnostics=1');
+ if(role==='it'){
+  await expect(frame.getByRole('heading',{name:/Fleet health/})).toBeVisible();
+  await expect(frame.locator('.camera-overview-card')).toHaveCount(0);
+  await expect(frame.getByRole('button',{name:'Advanced camera diagnostics'})).toHaveCount(0);
+  await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');
+  const rows=frame.locator('.cos-fleet-table-wrap tbody tr');await expect(rows).toHaveCount(4);
+  await expect(rows.filter({hasText:'Helios 001'}).locator('td').nth(2).locator('.cos-fleet-badge')).toHaveClass(/cos-signal-online/);
+  await expect(rows.filter({hasText:'Recon II 002'}).locator('td').nth(2).locator('.cos-fleet-badge')).toHaveClass(/cos-signal-offline/);
+  await frame.getByLabel('Fleet placement',{exact:true}).selectOption('shop');await expect(rows).toHaveCount(1);await expect(rows).toContainText('SHOP / ROOT');
+  await frame.getByLabel('Fleet placement',{exact:true}).selectOption('field');await frame.getByLabel('Fleet status',{exact:true}).selectOption('unknown');await expect(rows).toHaveCount(1);await expect(rows).toContainText('Sniper 003');
+  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);return;
+ }
+ await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);
  await frame.getByLabel('Camera Health unit filter').selectOption('shop');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('SHOP / ROOT');
  await frame.getByLabel('Camera Health unit filter').selectOption('unknown');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('provider');expect(state.errors).toEqual([]);
 });

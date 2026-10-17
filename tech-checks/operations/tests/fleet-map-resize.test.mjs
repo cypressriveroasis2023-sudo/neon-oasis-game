@@ -106,6 +106,17 @@ test('resize waits for an ongoing user drag and preserves its final position',()
  assert.deepEqual(center(map),expected);assert.deepEqual(map.getSize(),L.point(507,402));stop();
 });
 
+test('layout reset events are distinguishable from a later user move',()=>{
+ const map=fixture(507,425);let resizing=false;
+ const events=[],stop=observeFleetMapResize(map,active=>{resizing=active;});
+ map.on('moveend',()=>events.push({resizing,center:center(map)}));
+ const before=center(map);map._container.clientHeight=402;observers.at(-1).callback();
+ assert.ok(events.length>0);assert.ok(events.every(event=>event.resizing));
+ assert.deepEqual(center(map),before);assert.equal(resizing,false);
+ events.length=0;map.panBy(L.point(45,-25),{animate:false});
+ assert.ok(events.some(event=>!event.resizing));assert.notDeepEqual(center(map),before);stop();
+});
+
 test('resize waits for an active zoom and keeps the exact target center and level',()=>{
  const map=fixture(507,425),control=fixture(507,425),stop=observeFleetMapResize(map),observer=observers.at(-1);
  for(const value of [map,control]){value._zoomAnimated=true;value.setView([29.761,-95.371],16,{animate:true});}

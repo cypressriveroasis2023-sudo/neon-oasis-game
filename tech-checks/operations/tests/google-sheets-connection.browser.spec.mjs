@@ -25,7 +25,7 @@ async function mount(page,{role='owner',configured=false,fail=false,malformed=fa
   if(req.path==='/api/unit-tracker/sheets/check'){if(hold)await held;return fail?answer({error:'Enable the Google Sheets API and share the 2027 tracker with the service-account email shown here.'},503):answer(malformed?{...checked(),tabs:[]}:checked());}
   return answer({items:[]});
  });
- await page.goto('/sheets-fixture');const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace',exact:true});await expect(workspace).toBeVisible();
+ await page.goto('/sheets-fixture');const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace',exact:true});await expect(frame.getByRole('region',{name:role==='it'?'COS Fleet Dashboard':'Unit Tracker workspace',exact:true})).toBeVisible();
  return {frame,panel:workspace.getByRole('region',{name:'Sheets connection status',exact:true}),requests,errors,release};
 }
 test('missing Google authorization shows actionable setup without pretending to be connected',async({page})=>{
@@ -37,6 +37,13 @@ test('verified read access displays all equipment tabs and keeps publishing paus
 for(const fail of [true,false])test('failed or incomplete checks retain the sharing email without a connected state '+fail,async({page})=>{
  const f=await mount(page,{configured:true,fail,malformed:!fail});await f.panel.getByRole('button',{name:'Check Sheets connection',exact:true}).click();await expect(f.panel.getByRole('alert')).toBeVisible();await expect(f.panel).toContainText(email);await expect(f.panel).not.toContainText('read access verified');expect(f.errors).toEqual([]);
 });
-test('verified IT users keep their tracker access without an Owner Google setup control',async({page})=>{
- const f=await mount(page,{role:'it'});await expect(f.panel.getByRole('link',{name:'Open 2027 tracker'})).toBeVisible();await expect(f.panel.getByRole('button',{name:'Check Sheets connection'})).toHaveCount(0);expect(f.requests.filter(r=>r.path.includes('/sheets/'))).toHaveLength(0);expect(f.errors).toEqual([]);
+test('verified IT tracker links resolve to Fleet without tracker or Owner Google setup controls',async({page})=>{
+ const f=await mount(page,{role:'it'});
+ await expect.poll(()=>f.frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(f.frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+ await expect(f.panel).toHaveCount(0);
+ await expect(f.frame.getByRole('link',{name:'Open 2027 tracker'})).toHaveCount(0);
+ await expect(f.frame.getByRole('button',{name:'Check Sheets connection'})).toHaveCount(0);
+ expect(f.requests.some(r=>r.path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(f.requests.every(r=>r.method==='GET')).toBe(true);expect(f.errors).toEqual([]);
 });

@@ -10,7 +10,8 @@ const shortcut = frame => frame.getByRole('region', {name: 'Watchful', exact: tr
 // Synthetic sessions and records only. Even the portal's new tab is intercepted.
 // This shortcut belongs to the explicit Owner overview, not the default Fleet landing.
 async function mount(page, context, {authorized = true, role = 'Owner', mode = ''} = {}) {
-  const state = {calls: [], portalRequests: []};
+  const state = {calls: [], portalRequests: [], errors: []};
+  page.on('pageerror', error => state.errors.push(error.message));
   await context.route('**/*', async route => {
     const request = route.request(), url = request.url();
     if (url === portal) {
@@ -27,6 +28,7 @@ async function mount(page, context, {authorized = true, role = 'Owner', mode = '
     const data = call.path === '/api/session' ? {authorized, name: 'Synthetic account', role, legacyOwner: role === 'Owner', features: {fleetAccess: role !== 'Service', vrmRead: true, unitTracker: true}}
       : call.path === '/api/field-map' ? {items: [], inventoryItems: [], summary: {fieldUnits: 0, mappedUnits: 0, unitGps: 0, missingGps: 0}, generatedAt: stamp}
       : call.path === '/api/camera-health/summary-v3' ? snapshot([resource(1)])
+      : call.path === '/api/routers' ? {items: [], source: 'camera_health', gpsAvailable: false, generatedAt: stamp}
       : call.path === '/api/daily-board' ? {jobs: [], tasks: [], readiness: [], asOf: stamp}
       : {items: []};
     return route.fulfill({headers, contentType: 'application/json', body: JSON.stringify(data)});
@@ -65,6 +67,7 @@ test('Owner Watchful area opens the exact portal separately with keyboard and cl
   const size = await frame.locator('body').evaluate(() => ({width: innerWidth, scroll: document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width + 1);
   expect((await auditDarkPresentation(area)).failures).toEqual([]);
+  expect(state.errors).toEqual([]);
   await area.screenshot({path: testInfo.outputPath('owner-watchful-shortcut.png')});
 });
 
@@ -79,18 +82,24 @@ test('Watchful stays on the Owner dashboard across workspace navigation', async 
 
 for (const account of [
   {name: 'unauthorized Owner', authorized: false},
-  {name: 'IT daily dashboard', role: 'IT', mode: 'fleet'},
+  {name: 'IT Fleet workspace', role: 'IT', mode: 'fleet'},
   {name: 'Owner viewing IT daily tools', role: 'Owner', mode: 'fleet'},
   {name: 'non-Owner session', role: 'Service'},
 ]) test('Watchful is absent for ' + account.name, async ({page, context}) => {
   const {frame, state} = await mount(page, context, account);
   if (account.mode) {
-    const daily = frame.getByRole('region', {name: 'IT daily dashboard', exact: true});
-    await expect(daily).toBeVisible();
-    await expect(daily.locator('[data-source]')).toHaveCount(4);
+    await expect(frame.getByRole('region', {name: 'COS Fleet Dashboard', exact: true})).toBeVisible();
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#fleet-dashboard');
+    if (page.viewportSize().width <= 700) await frame.getByRole('button', {name: 'More', exact: true}).click();
+    const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
+    await expect(nav.getByRole('button')).toHaveCount(2);
+    await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toBeVisible();
+    await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
+    await expect(frame.getByRole('button',{name:'Register in COS inventory →',exact:true})).toHaveCount(0);
   } else if (account.authorized === false) await expect(frame.getByRole('heading', {name: 'Operations access needs attention'})).toBeVisible();
   else await expect(frame.getByRole('region', {name: 'VISION dashboard'})).toBeVisible();
   await expect(shortcut(frame)).toHaveCount(0);
   await expect(frame.getByRole('link', {name: 'Open Watchful', exact: true})).toHaveCount(0);
   expect(state.portalRequests).toHaveLength(0);
+  expect(state.errors).toEqual([]);
 });

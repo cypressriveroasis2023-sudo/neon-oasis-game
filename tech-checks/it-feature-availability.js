@@ -1,7 +1,8 @@
 // Deliberate, reversible product availability switch. Never tied to mHelp health.
 // Existing authorization, records and Owner controls remain unchanged.
 export const IT_DAILY_ONLY = true;
-export const IT_DAILY_WORKSPACES = Object.freeze(['Camera Health']);
+// Camera Health and Fleet Map only; other IT modules remain paused.
+export const IT_DAILY_WORKSPACES = Object.freeze(['Fleet Dashboard','Camera Health']);
 export const itDailyLabel = name => ({'Field Map':'Fleet Dashboard','Fleet Dashboard':'Fleet Dashboard','Victron VRM':'Victron Power','Unit Tracker':'2027 Unit Tracker'}[name] || name);
 
 // Keep the explicit daily context across the existing camera tools, including new tabs.

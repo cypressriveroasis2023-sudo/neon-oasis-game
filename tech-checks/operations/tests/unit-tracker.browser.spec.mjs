@@ -35,13 +35,23 @@ async function mount(page,{role='owner',queue=true,feature=true,unavailable=fals
   return answer({items:[]});
  });
  await page.goto('/tracker-fixture');const frame=page.frameLocator('iframe');
- if(role!=='service'&&feature&&!home)await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
+ if(role==='owner'&&feature&&!home)await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
+ if(role==='it')await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  return {frame,state,workspace:frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})};
 }
 async function add(workspace){await workspace.getByRole('button',{name:'+ Add unit request',exact:true}).click();const form=workspace.getByRole('region',{name:'Add unit request',exact:true});await form.getByLabel('Family',{exact:true}).fill('SOLAR POLES & SKIDS');await form.getByLabel('Full model / variant',{exact:true}).fill('Solar Pole 72');await form.getByLabel('Unit label',{exact:true}).fill('004');return form;}
 async function confirm(form){await form.getByRole('checkbox',{name:/I reviewed this exact unit/}).check();await form.getByRole('button',{name:'Save pending request',exact:true}).click();}
-for(const role of ['owner','it'])test(role+' can browse full unit identities and save a durable pending addition with truthful status',async({page},info)=>{
+test('Owner can browse full unit identities and save a durable pending addition with truthful status',async({page},info)=>{
+ const role='owner';
  const {workspace,state}=await mount(page,{role});await expect(workspace.locator('tbody tr')).toHaveCount(2);await expect(workspace).toContainText('Sheets connection required');const form=await add(workspace);await expect(form.getByRole('button',{name:'Save pending request',exact:true})).toBeDisabled();await confirm(form);await expect(workspace).toContainText('Request saved in COS and verified');const pending=workspace.getByRole('region',{name:'Saved pending tracker requests'});await expect(pending).toContainText('Solar Pole 72 004');await pending.locator('summary').click();await expect(pending).toContainText('not been sent to Google Sheets or applied to fleet records');expect(state.writes).toHaveLength(1);expect(state.writes[0].body.kind).toBe('add');expect(state.writes[0].body.changes).toEqual({placement:'SHOP'});expect(state.writes[0].body.unitId).toBeUndefined();expect(state.errors).toEqual([]);const widths=await workspace.evaluate(e=>({scroll:e.scrollWidth,width:e.clientWidth}));expect(widths.scroll).toBeLessThanOrEqual(widths.width+1);await workspace.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:info.outputPath('unit-tracker-'+role+'.png')});
+});
+test('IT tracker bookmark resolves to Fleet without tracker reads or pending writes',async({page})=>{
+ const {frame,workspace,state}=await mount(page,{role:'it'});
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(workspace).toHaveCount(0);await expect(frame.getByRole('button',{name:'+ Add unit request',exact:true})).toHaveCount(0);
+ await expect(frame.getByRole('link',{name:'Open 2027 tracker'})).toHaveCount(0);
+ expect(state.reads.some(path=>path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(state.writes).toEqual([]);expect(state.errors).toEqual([]);
 });
 test('update prefill uses exact tracker row, displays newer COS data separately and preserves untouched blanks',async({page})=>{
  const {workspace,state}=await mount(page,{address:true});await workspace.getByRole('button',{name:'Solar Pole 72 003',exact:true}).first().click();const detail=workspace.getByRole('region',{name:'Unit Tracker details',exact:true});await expect(detail).toContainText('200 New Road');await expect(detail).toContainText('100 Example Road');await detail.getByRole('button',{name:'Request tracker change',exact:true}).click();const form=workspace.getByRole('region',{name:'Edit tracker request',exact:true});await expect(form.getByLabel('Street',{exact:true})).toHaveValue('100 Example Road');await expect(form.getByLabel('ZIP',{exact:true})).toHaveValue('');await form.getByLabel('Site label',{exact:true}).fill('');await confirm(form);await expect(workspace).toContainText('Request saved in COS and verified');expect(state.writes).toHaveLength(1);expect(state.writes[0].body).toMatchObject({kind:'update',unitId:id,expectedSourceRevision:revision,changes:{siteLabel:null}});expect(Object.keys(state.writes[0].body.changes)).toEqual(['siteLabel']);expect(state.source.fields.street).toBe('100 Example Road');expect(state.source.fields.siteLabel).toBe('Source yard');

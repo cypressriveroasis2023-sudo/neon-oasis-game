@@ -79,15 +79,28 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await frame.getByLabel('Interactive fleet installation map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('Interactive fleet installation map').boundingBox();
  await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
- await page.mouse.down();await page.mouse.move(canvas.x+canvas.width/2+120,canvas.y+canvas.height/2,{steps:8});await page.mouse.up();
+ // Give each drag step elapsed fake time so Leaflet calculates realistic inertia.
+ await page.mouse.down();
+ for(let step=1;step<=8;step++){
+  await page.clock.runFor(25);
+  await page.mouse.move(canvas.x+canvas.width/2+step*15,canvas.y+canvas.height/2);
+ }
+ await page.mouse.up();
  await page.clock.runFor(1000);
- const transform=await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform);
+ await expect(frame.locator('.leaflet-pan-anim')).toHaveCount(0);
+ // Judge geographic continuity from a unit marker's screen position. Leaflet
+ // may legitimately normalize its internal map-pane transform on resize.
+ const before=await frame.locator('.cos-field-pin-wrap').first().boundingBox();
+ expect(before).not.toBeNull();
  const readsBefore=state.requests.filter(r=>r.path==='/api/routers').length;
  await page.clock.fastForward(61000);
  expect(state.requests.filter(r=>r.path==='/api/routers').length).toBe(readsBefore);
  await page.clock.fastForward(15*60*1000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
- expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
+ const after=await frame.locator('.cos-field-pin-wrap').first().boundingBox();
+ expect(after).not.toBeNull();
+ expect(Math.abs(after.x-before.x)).toBeLessThanOrEqual(2);
+ expect(Math.abs(after.y-before.y)).toBeLessThanOrEqual(2);
  await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-map-status-dot')).toHaveCount(1);await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(0);
