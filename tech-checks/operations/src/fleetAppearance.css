@@ -261,7 +261,7 @@
   #root#root .cos-fleet-content { padding-top: 10px; }
   #root#root .cos-fleet-heading { gap: 9px; margin-bottom: 10px; }
   #root#root .cos-fleet-heading p { margin-top: 3px; }
-  #root#root .cos-fleet-count-note { line-height: 1.45; margin-bottom: 8px; }
+  #root#root .cos-fleet-count-note { line-height: 1.45; margin-bottom: 8px !important; }
   #root#root .cos-fleet-count-note h2 { margin-bottom: 3px; }
   #root#root .cos-fleet-count-note p { margin-top: 4px; }
   #root#root .cos-fleet-stats { gap: 7px; margin-bottom: 10px; }
@@ -283,7 +283,7 @@
 }
 /* iPhone landscape falls between the 700px shell and 750px Fleet breakpoints.
    Restrict the stack to short viewports; normal desktops retain two columns. */
-@media (orientation: landscape) and (min-width: 701px) and (max-width: 1000px) and (max-height: 560px) {
+@media (orientation: landscape) and (pointer: coarse) and (min-width: 701px) and (max-width: 1000px) and (max-height: 560px) {
   #root#root .company-shell:has(.cos-fleet-dashboard) { grid-template-columns: minmax(0,1fr) !important; }
   #root#root .company-shell:has(.cos-fleet-dashboard) > .operations-sidebar:not(.operations-sidebar-open) { display: none !important; }
   #root#root .company-shell:has(.cos-fleet-dashboard) > .operations-sidebar-open {
@@ -301,7 +301,7 @@
   #root#root .cos-fleet-heading { gap: 10px; margin-bottom: 10px; }
   #root#root .cos-fleet-heading h1 { font-size: 24px; }
   #root#root .cos-fleet-heading p { margin-top: 4px; }
-  #root#root .cos-fleet-count-note { font-size: 12px; line-height: 1.45; margin-bottom: 8px; }
+  #root#root .cos-fleet-count-note { font-size: 12px; line-height: 1.45; margin-bottom: 8px !important; }
   #root#root .cos-fleet-count-note p { margin-top: 4px; }
   #root#root .cos-fleet-stats { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }
   #root#root .cos-fleet-stats .cos-fleet-stat { padding: 9px 11px; }
