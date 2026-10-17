@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {reviewSourceTransition as review} from './helpers/source-transition-eligibility.mjs';
+const old={productId:'2258987',unitNumber:'SOLAR SPOTTER 018',customer:'Urban',customerId:'11',sourceAddress:{street:'20720 Clay Center Dr',city:'Katy',state:'TX',zip:'77449'},placement:'FIELD',lifecycle:'UNFLAGGED',binding:{nativeUnitId:'n',trackerId:'t',nativeLabel:'Solar Spotter 018HDC2',trackerLabel:'Solar Spotter 018HDC2'}};
+const now={...old,binding:null};
+const proof={beforeGuard:'before',afterGuard:'after',currentGuard:'after',onlyGeocodeAdded:true,sourceChanged:true,payloadCurrent:true,registryIdentityCurrent:true,representedIdentityCurrent:true};
+const check=(a=old,b=now,p=proof)=>review(a,b,p);
+test('qualified transition is preflight only, never automatic admission',()=>assert.deepEqual(check(),{eligible:true,reason:'preflight_only_requires_transactional_source_transition_review'}));
+test('Product IDs cannot cross',()=>assert.equal(check(old,{...now,productId:'changed'}).reason,'product_id_changed_or_missing'));
+test('protected graph drift blocks transition',()=>assert.equal(check(old,now,{...proof,currentGuard:'other'}).reason,'protected_graph_unproven_or_drifted'));
+test('source payload fence blocks stale transition',()=>assert.equal(check(old,now,{...proof,payloadCurrent:false}).eligible,false));
+test('service address change blocks transition',()=>assert.equal(check(old,{...now,sourceAddress:{street:'Other Rd'}}).reason,'customer_or_service_address_changed'));
+test('shop transition blocks old field link',()=>assert.equal(check(old,{...now,placement:'SHOP'}).reason,'placement_or_lifecycle_hold'));
+test('hold and alias protection retained',()=>assert.equal(check(old,{...now,possibleAliasUnitIds:['u']}).reason,'current_identity_or_placement_hold'));
+test('Ranger 029.2 cannot inherit Ranger 029 without serial proof',()=>{const a={...old,productId:'2301876',unitNumber:'RANGER 029 .2',binding:{...old.binding,nativeLabel:'Ranger 029',trackerLabel:'Ranger 029'}};assert.equal(check(a,{...a,binding:null}).reason,'decimal_identity_needs_serial_proof');});
+test('Spotter HDC2/HDC4 discrepancy remains held',()=>{const a={...old,productId:'2242588',unitNumber:'Spotter 304',binding:{...old.binding,nativeLabel:'Spotter 304HDC2',trackerLabel:'Spotter 304HDC4'}};assert.equal(check(a,{...a,binding:null}).reason,'native_tracker_variant_or_representation_dispute');});
+test('Solar Spotter 034 disputed membership remains held',()=>assert.equal(check(old,now,{...proof,representedIdentityCurrent:false}).reason,'native_tracker_variant_or_representation_dispute'));
+test('ST 044 malformed current address never silently changed',()=>{const a={...old,sourceAddress:{street:'',city:'1001 I-35 Frontage Rd Kyle',state:'TX',zip:'78640'}};assert.equal(check(a,{...a,sourceAddress:{street:'1001 I-35 Frontage Rd',city:'Kyle',state:'TX',zip:'78640'},binding:null}).reason,'customer_or_service_address_changed');});
