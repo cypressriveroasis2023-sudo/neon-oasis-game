@@ -40,6 +40,7 @@ try {
   query:(sql,values)=>db.query(sql,jsonValues(values))
  };
  const f=await fixture({database:adapter,recordCount:1001});
+ await db.query('create table app_private.cos_archived_representation_revocations (id uuid)');
  const original=await f.snapshot(),preserved=await f.preserved();
  const continuity=await readSql('mhelp-source-continuity.sql');
  await db.query(continuity.slice(continuity.indexOf('-- Same complete graph'),continuity.indexOf('create function cos_mhelp_placement_private.continuity_unchanged')));
