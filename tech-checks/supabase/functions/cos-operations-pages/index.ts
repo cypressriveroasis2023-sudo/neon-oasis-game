@@ -23,7 +23,7 @@ import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from '.
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
 // Keep the verified production reader until the V3 database rollout passes its live map check.
 import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjectionV2.ts';
-import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
+import {verifiedItFleet, fleetRouteAllowed, fleetFeatures,ITTECH_LEGACY_ID,configuredIttechActor} from './fleetAccess.ts';
 import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
 import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';
 import {OWNER_CENSUS_NATIVE_FIELDS,OWNER_CENSUS_SITE_FIELDS,readOwnerCensusEvidence,readOwnerCensusPreparation,readOwnerCensusJson,matchesOwnerCensusProof} from './ownerCensusProof.ts';
@@ -33,6 +33,7 @@ import { createMhelpImportHandler, readMhelpAwareJson, readMhelpAwareJsonWithSiz
 import { cameraSummary } from './cameraEvidence.ts';
 import { cameraSummary as placementCameraSummary } from './cameraPlacementEvidence.ts';
 import {currentTrackerShopScope} from './cameraTrackerShopScope.ts';
+import {issueHandoffLocationProof,HandoffLocationError} from './handoffLocationProof.ts';
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
@@ -236,7 +237,7 @@ export function createOperationsHandler(options) {
     const profiles = await readJson(LEGACY_URL + '/rest/v1/profiles?select=user_id,full_name,role,active,archived_at&user_id=eq.' + user.id + '&limit=1', { headers }, 'Tech Check account access could not be verified.');
     const profile = Array.isArray(profiles) ? profiles[0] : null;
     if (!profile || profile.user_id !== user.id || !['owner', 'it', 'service'].includes(profile.role) || profile.active !== true || profile.archived_at) fail('An active COS account is required.', 403);
-    const technicianLink = TECHNICIAN_LINKS[user.id.toLowerCase()];
+    const technicianLink = TECHNICIAN_LINKS[user.id.toLowerCase()] || (user.id.toLowerCase()===ITTECH_LEGACY_ID&&configuredIttechActor(options.ittechNativeActorId)?{actorId:configuredIttechActor(options.ittechNativeActorId),name:'Test IT',department:'it',roleCode:'it_technician'}:null);
     const legacyOwner = profile.role === 'owner';
     const link = legacyOwner ? null : technicianLink;
     const actorId = legacyOwner ? OWNER_LINKS[user.id.toLowerCase()] : link?.actorId;
@@ -493,6 +494,23 @@ export function createOperationsHandler(options) {
         if (method === 'GET' && Object.keys(body).length) fail('GET endpoints do not accept a request body.');
       }
       if (!path.startsWith('/api/')) fail('COS endpoint not found.', 404);
+      if(path==='/api/techcheck/location-proof'){
+        if(method!=='POST'||!context.actorId||!(context.legacyOwner||verifiedItFleet(context,options.ittechNativeActorId)))fail('Verified IT or Owner access required.',403);
+        if(new URL(request.url).search)fail('Shop verification query parameters are unsupported.');
+        const proofBody=body||await requestBody(request);
+        const read=async()=>{
+          // Reuse the complete current placement pipeline, including Owner,
+          // imported-source, MHelp and identity-conflict precedence. The fixed
+          // internal route performs its usual fresh authentication again.
+          const headers=new Headers(request.headers);headers.set('Content-Type','application/json');headers.delete('content-length');
+          const response=await handle(new Request(new URL('/functions/v1/cos-operations-pages',request.url),{method:'POST',headers,body:JSON.stringify({path:'/api/field-map',method:'GET',body:{}}),signal:request.signal}));
+          if(!response.ok)fail('Current Shop placement is unavailable.',503);
+          const [map,mhelp,equipment]=await Promise.all([response.json(),readMhelpPlacements({p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID}),legacyAll('equipment_master?select=equipment_key,unit_tag,canonical_family,tracker_state,updated_at&order=equipment_key.asc',context.headers)]);
+          return {map,mhelp,equipment};
+        };
+        try{return json(await issueHandoffLocationProof(context,proofBody,read,options.handoffLocation?.getSecret||(()=>undefined)));}
+        catch(error){if(error instanceof HandoffLocationError)fail(error.message,error.status);throw error;}
+      }
       if (path.startsWith('/api/tech/')) {
         if (context.legacyOwner || !['it', 'service'].includes(context.department)) fail('A signed-in technician account is required for the production queue.', 403);
         const claimRoute = /^\/api\/tech\/it-queue\/([^/]+)\/claim$/.exec(path);
@@ -576,7 +594,7 @@ export function createOperationsHandler(options) {
         fail('COS technician endpoint not found.', 404);
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
-      const verifiedFleetIt = verifiedItFleet(context);
+      const verifiedFleetIt = verifiedItFleet(context,options.ittechNativeActorId);
       if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,

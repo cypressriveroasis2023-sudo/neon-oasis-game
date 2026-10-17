@@ -1,0 +1,32 @@
+[
+  {
+    "schema": "app_private",
+    "name": "complete_service_daily_report_v4",
+    "arguments": "p_report_id uuid, p_units jsonb, p_sims jsonb, p_stock jsonb, p_photos jsonb, p_signature jsonb",
+    "sha256": "5b424b3f72ebf98231f66b290ab00c80b574c759ed064c3f17a7094862999860"
+  },
+  {
+    "schema": "app_private",
+    "name": "cos_verified_fleet_actor",
+    "arguments": "p_user_id uuid",
+    "sha256": "764bf0b8ba83e537aa05af977842e25d3cd296510507aeff6ae3ebfc645791ef"
+  },
+  {
+    "schema": "app_private",
+    "name": "service_daily_actor",
+    "arguments": "",
+    "sha256": "d2506b2736e84cfc18a4c184f8294d6ff28a3e25deaab1817ea4c5efe79c8ae3"
+  },
+  {
+    "schema": "public",
+    "name": "actor_display_name",
+    "arguments": "",
+    "sha256": "916eab9b408a5c27c707810b00a05c7d8cd08dd4c362e410e7b43d9c59b5af6a"
+  },
+  {
+    "schema": "public",
+    "name": "normalize_unit_key",
+    "arguments": "p_tag text",
+    "sha256": "e89632146d3262ae140bbf434012099f6319b78b3906539bc7624a6642fec92d"
+  }
+]

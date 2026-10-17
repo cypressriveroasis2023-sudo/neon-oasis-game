@@ -35,10 +35,11 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   const relevant=data.transfers.filter(t=>role==='it'||['awaiting_service','discrepancy','accepted','partial_return'].includes(t.state));
   root.append(element('h2',role==='it'?'Handoffs and returns':'Your equipment handoffs'));
   if(!relevant.length)root.append(element('p','No handoffs in the current saved view.'));
-  for(const t of relevant){const c=element('article','','tc-card');c.append(element('h3',t.manifest.map(i=>i.family+' '+i.unit_tag).join(' · ')),element('p',`${t.it_name} → ${t.service_name}`),element('strong',transferTitle(t.state)),element('small','Handoff '+t.id));
+  for(const t of relevant){const c=element('article','','tc-card');c.append(element('h3',t.manifest.map(i=>i.family+' '+i.unit_tag).join(' · ')),element('p',`${t.it_name} → ${t.service_name}`),element('strong',t.inventory_review_complete?'Returned — inventory review completed':transferTitle(t.state)),element('small','Handoff '+t.id));
    if(role==='service'&&['awaiting_service','discrepancy'].includes(t.state))c.append(button('Verify equipment received',()=>start('receipt',t)));
    if(role==='it'&&['accepted','partial_return'].includes(t.state))c.append(button('Check in this handoff',()=>start('return',t)));
-   if(t.returned_items?.length)c.append(element('p','Returned and held for review: '+t.returned_items.map(i=>i.equipment_key+(i.passed?'':' · needs repair')).join(', ')),element('p','Still assigned: '+t.remaining.map(i=>i.family+' '+i.unit_tag).join(', ')));
+   if(role==='it'&&t.returned_items?.some(i=>!i.passed))c.append(button('Recheck repaired equipment',()=>start('return',t,true)));
+   if(t.returned_items?.length){const held=t.returned_items.filter(i=>!i.inventory_released),released=t.returned_items.filter(i=>i.inventory_released);if(held.length)c.append(element('p','Returned and held for review: '+held.map(i=>i.equipment_key+(i.passed?'':' · needs repair')).join(', ')));if(released.length)c.append(element('p','Released to Shop after Owner review: '+released.map(i=>i.equipment_key).join(', ')));if(t.remaining.length)c.append(element('p','Still assigned: '+t.remaining.map(i=>i.family+' '+i.unit_tag).join(', ')));}
    const details=element('details');details.append(element('summary','Saved checks, notes and evidence'));
    for(const e of t.events||[]){const block=element('div');block.append(element('p',`${e.actor_name} · ${e.kind} · ${new Date(e.signed_at).toLocaleString('en-US',{timeZone:'America/Chicago',hour12:false})} Central`),element('p',e.snapshot?.notes||''),element('p',e.delivery==='sent'?'Report and evidence archived and emailed.':e.delivery==='review'?'Report saved; delivery needs review.':'Report saved; delivery pending.'));
     if(e.snapshot?.differences?.length)block.append(element('pre',JSON.stringify(e.snapshot.differences,null,2),'tc-expected'));
@@ -49,16 +50,18 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   if(notice)message(notice);
  }
  function chooseReturns(){reset();heading('Check In / Return','Choose a handoff accepted by Service. Select only the equipment physically returned now.');root.append(button('Back',()=>home(),true));const rows=data.transfers.filter(t=>['accepted','partial_return'].includes(t.state));if(!rows.length)root.append(element('p','No accepted handoffs are available for return.'));for(const t of rows)root.append(button(t.service_name+' · '+(t.remaining||t.manifest).map(i=>i.family+' '+i.unit_tag).join(', '),()=>start('return',t)));}
- async function start(kind,transfer=null){
-  if(busy)return;const turn=++revision;storageKey=client.actor+':'+kind+':'+(transfer?.id||'new');
+ async function start(kind,transfer=null,recheck=false){
+  if(busy)return;const turn=++revision;storageKey=client.actor+':'+kind+':'+(transfer?.id||'new')+(recheck?':recheck':'');
   try{const saved=await deviceDraft(storageKey);guard();if(turn!==revision)return;
-   draft=saved||{kind,id:crypto.randomUUID(),transferId:transfer?.id||null,revision:transfer?.revision||0,serviceActor:transfer?.service_actor||'',items:((kind==='return'?transfer?.remaining:transfer?.manifest)||transfer?.manifest||[]).map(i=>({...i,family:kind==='receipt'?'':i.family,unit_tag:kind==='receipt'?'':i.unit_tag,simText:kind==='receipt'?'':i.sims.join('\n'),batteryText:kind==='receipt'?'':String(i.battery_count),partsText:kind==='receipt'?'':i.parts.map(p=>p.name+' | '+p.quantity).join('\n'),checks:{},missing:false})),photos:[],signature:newSignature(),notes:'',request:null};
+   const candidates=recheck?transfer.manifest.filter(i=>transfer.returned_items.some(r=>r.equipment_key===i.equipment_key&&!r.passed)):((kind==='return'?transfer?.remaining:transfer?.manifest)||transfer?.manifest||[]);
+   draft=saved||{kind,recheck,id:crypto.randomUUID(),transferId:transfer?.id||null,revision:transfer?.revision||0,serviceActor:transfer?.service_actor||'',items:candidates.map(i=>({...i,family:kind==='receipt'?'':i.family,unit_tag:kind==='receipt'?'':i.unit_tag,simText:kind==='receipt'?'':i.sims.join('\n'),batteryText:kind==='receipt'?'':String(i.battery_count),partsText:kind==='receipt'?'':i.parts.map(p=>p.name+' | '+p.quantity).join('\n'),checks:{},missing:false})),photos:[],signature:newSignature(),notes:'',request:null};
    if(transfer&&draft.revision!==transfer.revision&&!draft.request)throw new Error('Your saved draft refers to an older handoff. Reload and review before continuing.');
    await persist();render(transfer);
   }catch(e){message(e.message,true);}
  }
  function render(transfer){
   reset();heading({checkout:'Check Out / Hand Off',receipt:'Verify equipment received',return:'Check In / Return'}[draft.kind]);root.append(button('Back to handoffs',()=>load(),true));
+  if(draft.recheck)root.append(element('p','Inspect the repaired equipment again. Record the repair, every current check and a new photo. The original failure remains in the signed history. Owner inventory review is still required.'));
   if(draft.request){root.append(element('p','This submission may already be saved. Retry exactly the same submission to verify it; do not create a duplicate.'),button('Retry same submission',()=>complete(transfer)));return;}
   const form=element('form');form.setAttribute('aria-label','Equipment transfer form');form.onsubmit=e=>{e.preventDefault();void complete(transfer);};
   if(draft.kind==='checkout'){

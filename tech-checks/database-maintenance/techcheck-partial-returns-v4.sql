@@ -86,10 +86,11 @@ begin
    end loop;
    next_state:=case when jsonb_array_length(differences)=0 then 'accepted' else 'discrepancy' end;
   elsif p_kind='return' then
-   if t.state not in ('accepted','partial_return') then raise exception 'Only accepted outstanding equipment can be checked back in.';end if;
+   if t.state not in ('accepted','partial_return','returned_repair') then raise exception 'Only accepted outstanding equipment or a repair-held item can be checked back in.';end if;
    for item in select value from jsonb_array_elements(items) loop
     if not exists(select 1 from jsonb_array_elements(t.manifest) original where original=item) then raise exception 'Return the exact equipment and accessories recorded in this handoff.';end if;
-    if exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and r.equipment_key=item->>'equipment_key') then raise exception 'This equipment item has already been returned.';end if;
+    if exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and r.equipment_key=item->>'equipment_key' and r.passed) then raise exception 'This equipment item has already been returned.';end if;
+    if exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and r.equipment_key=item->>'equipment_key') and length(btrim(p_notes))<10 then raise exception 'Record the repair and physical reinspection details.';end if;
     foreach field in array array['physical_condition_ok','accessories_ok','batteries_ok','sd_cards_ok','electronics_ok','power_functions_ok'] loop
      if jsonb_typeof(p_checks->(item->>'equipment_key')->field) is distinct from 'boolean' then raise exception 'Answer every intake condition check.';end if;
      pass:=pass and (p_checks->(item->>'equipment_key')->>field)::boolean;
@@ -98,7 +99,7 @@ begin
    if not pass and length(btrim(p_notes))=0 then raise exception 'Explain the failed intake check.';end if;
    next_state:=case
     when exists(select 1 from jsonb_array_elements(t.manifest) original where not exists(select 1 from jsonb_array_elements(items) returned where returned->>'equipment_key'=original->>'equipment_key') and not exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and r.equipment_key=original->>'equipment_key')) then 'partial_return'
-    when not pass or exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and not r.passed) then 'returned_repair'
+    when not pass or exists(select 1 from app_private.techcheck_transfer_item_returns r where r.transfer_id=t.id and not r.passed and not exists(select 1 from jsonb_array_elements(items) checked where checked->>'equipment_key'=r.equipment_key)) then 'returned_repair'
     else 'returned_review' end;
    -- No automatic shelf availability: retain reservation until legacy inventory review is reconciled.
   else
@@ -129,7 +130,8 @@ begin
  insert into app_private.techcheck_transfer_events(id,transfer_id,actor_id,actor_name,kind,request,snapshot,photos) values(p_request_id,t.id,actor,actor_name,p_kind,request,snapshot,p_photos);
  if p_kind='return' then
   insert into app_private.techcheck_transfer_item_returns(transfer_id,equipment_key,event_id,passed)
-  select t.id,row_item.value->>'equipment_key',p_request_id,(select bool_and((p_checks->(row_item.value->>'equipment_key')->>check_field.name)::boolean) from unnest(array['physical_condition_ok','accessories_ok','batteries_ok','sd_cards_ok','electronics_ok','power_functions_ok']) check_field(name)) from jsonb_array_elements(items) row_item(value);
+  select t.id,row_item.value->>'equipment_key',p_request_id,(select bool_and((p_checks->(row_item.value->>'equipment_key')->>check_field.name)::boolean) from unnest(array['physical_condition_ok','accessories_ok','batteries_ok','sd_cards_ok','electronics_ok','power_functions_ok']) check_field(name)) from jsonb_array_elements(items) row_item(value)
+  on conflict(transfer_id,equipment_key) do update set event_id=excluded.event_id,passed=excluded.passed,returned_at=now();
  end if;
  insert into app_private.techcheck_transfer_outbox(event_id,transfer_id) values(p_request_id,t.id);
  return snapshot||jsonb_build_object('event_id',p_request_id,'replayed',false,'delivery',coalesce((select status from app_private.techcheck_transfer_outbox where event_id=p_request_id),'queued'));

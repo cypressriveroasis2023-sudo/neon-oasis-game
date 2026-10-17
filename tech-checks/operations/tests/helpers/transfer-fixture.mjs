@@ -47,7 +47,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  if(name==='cos_verified_fleet_capabilities_v1')return {data:{fleetRead:fixture.role==='it'}};
  if(fixture.rpcFail)return {error:{message:'Synthetic connection interrupted'}};
  const response=await fetch('/synthetic/rpc',{method:'POST',headers:{'Content-Type':'application/json','x-actor':fixture.actor},body:JSON.stringify({name,args})});const result=await response.json();
- if(name==='submit_techcheck_transfer_v1'&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
+ if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v7'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
  },storage:{from:bucket=>({upload:async(path,blob)=>{if(fixture.uploadFail)return {error:{statusCode:503}};const r=await fetch('/synthetic/storage?name='+encodeURIComponent(path),{method:'POST',headers:{'x-actor':fixture.actor},body:blob});return r.ok?{}:{error:{statusCode:r.status}};},createSignedUrl:async path=>({data:{signedUrl:'/synthetic/photo?name='+encodeURIComponent(path)}})})}};
  window.TechCheckContext={db,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getProfile:()=>({full_name:name(),username:name(),user_id:fixture.actor,role:fixture.role,active:true,archived_at:null}),getSession:session};
  window.show=key=>{for(const v of ['it','svc','owner','morning'])document.getElementById('view-'+v).classList.toggle('hidden',key!==v);dispatchEvent(new Event('techcheck:view-changed'));};
@@ -59,7 +59,13 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  const req=route.request(),url=new URL(req.url());
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:html});
  if(url.pathname==='/synthetic/rpc'){
-  const {name,args}=req.postDataJSON();calls.push({name,args});
+  let {name,args}=req.postDataJSON();calls.push({name,args});
+  if(name==='submit_techcheck_transfer_v7'){
+   if(args.p_location_proof?.signature!=='a'.repeat(64))return route.fulfill({json:{error:{code:'P0001',message:'Synthetic Shop proof required'}}});
+   // Browser fixture tests transport binding; the exact v7 HMAC and custody
+   // SQL run separately in disposable real PostgreSQL, with no production keys.
+   args={...args};delete args.p_location_proof;name='submit_techcheck_transfer_v1';
+  }
   if(name==='techcheck_transfer_readiness_v1'&&readinessDelay)await new Promise(resolve=>setTimeout(resolve,readinessDelay));
   if(name==='techcheck_transfer_context_v1'&&rollout==='read-cache-missing')return route.fulfill({json:{error:{code:'PGRST202',message:'Synthetic missing schema cache'}}});
   if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
@@ -73,6 +79,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
   const headers={'access-control-allow-origin':'http://127.0.0.1:4173','access-control-allow-headers':'*'};
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
   const call=req.postDataJSON();calls.push(call);const now=new Date().toISOString();
+  if(call.path==='/api/techcheck/location-proof')return route.fulfill({headers,json:{payload:JSON.stringify({request_id:call.body.request_id,purpose:call.body.purpose,items:call.body.items}),signature:'a'.repeat(64)}});
   const payload=call.path==='/api/session'?{authorized:true,legacyOwner:false,role:'IT',name:'Synthetic IT',features:{fleetAccess:true,unitTracker:true,vrmRead:true,fleetPlacementEdit:true,fleetConnectionEdit:true,cameraHealthV2:true}}
    :call.path==='/api/tech/session'?{authorized:true,legacyTechnician:true,department:'it'}
    :call.path==='/api/field-map'?{items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:now}

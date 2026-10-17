@@ -13,12 +13,28 @@ export function transferClient(context) {
    assert();if(!accepted){const {error}=await context.db.storage.from('techcheck-transfer-evidence').upload(args.p_photos[i].path,photos[i].blob,{contentType:'image/jpeg',upsert:false});assert();if(error&&String(error.statusCode)!=='409')throw new Error('Photo upload failed. Your draft is retained; reconnect and retry.');}
    onProgress(i+1,photos.length);
   }
-  const result=await rpc('submit_techcheck_transfer_v1',args);
+  const proof=args.p_kind==='checkout'&&!accepted?await requestLocationProof(context,args.p_request_id,'checkout',args.p_items):null;assert();
+  const result=await rpc(proof?'submit_techcheck_transfer_v7':'submit_techcheck_transfer_v1',proof?{...args,p_location_proof:proof}:args);
   if(result?.event_id!==args.p_request_id||result?.transfer_id!==args.p_transfer_id||!Number.isInteger(result.revision))throw new Error('The submission result could not be verified. Retry the same request.');
   return result;
  }
  async function paths(id,photos){const result=[];for(const p of photos){assert();const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await p.blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('');result.push({equipment_key:p.equipment_key||'',kind:p.kind,path:actor+'/'+id+'/'+hash+'.jpg'});}return result;}
  return {actor,current,assert,read,submit,paths,photoUrl:async path=>{assert();const {data,error}=await context.db.storage.from('techcheck-transfer-evidence').createSignedUrl(path,300);assert();if(error||!data?.signedUrl)throw new Error('Saved photo unavailable.');return data.signedUrl;}};
+}
+export async function requestLocationProof(context,requestId,purpose,items){
+ const actor=context.getSession()?.user?.id;
+ const current=()=>actor&&context.getSession()?.user?.id===actor&&context.getProfile()?.user_id===actor&&context.getProfile()?.active===true&&!context.getProfile()?.archived_at;
+ if(!current())throw new Error('Your session changed. Sign in again.');
+ const fresh=context.db.auth?.getSession?await context.db.auth.getSession():{data:{session:context.getSession()}};
+ if(!current()||fresh?.data?.session?.user?.id!==actor||!fresh.data.session.access_token)throw new Error('Your session changed. Sign in again.');
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
+ try{
+  const response=await fetch('https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer '+fresh.data.session.access_token,'Content-Type':'application/json'},body:JSON.stringify({path:'/api/techcheck/location-proof',method:'POST',body:{request_id:requestId,purpose,items:items.map(({equipment_key,family,unit_tag})=>({equipment_key,family,unit_tag}))}}),cache:'no-store',redirect:'error',signal:controller.signal});
+  const proof=await response.json();if(!current())throw new Error('Your session changed. Sign in again.');
+  if(!response.ok)throw new Error(typeof proof?.error==='string'?proof.error:'Current Shop placement could not be verified.');
+  if(typeof proof?.payload!=='string'||proof.payload.length>30000||typeof proof.signature!=='string'||!/^[a-f0-9]{64}$/.test(proof.signature))throw new Error('Shop verification returned an invalid proof.');
+  return proof;
+ }finally{clearTimeout(timer);controller.abort();}
 }
 let storePromise;
 function database(){if(!storePromise)storePromise=new Promise((resolve,reject)=>{const r=indexedDB.open('techcheck-transfer-drafts-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new Error('Device storage is unavailable. Enable storage before starting a handoff.'));});return storePromise;}

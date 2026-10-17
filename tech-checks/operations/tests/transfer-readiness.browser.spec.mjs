@@ -81,16 +81,15 @@ test('sign-out during readiness removes private views and ignores late success',
  expect(f.calls.some(c=>c.name==='techcheck_transfer_context_v1')).toBe(false);expect(f.errors).toEqual([]);
 });
 
-test('direct ittech desktop session opens COS Camera Health without the native account linkage',async({page})=>{
+test('direct ittech desktop session uses the same authorized Fleet and Camera Health workspace as other IT',async({page})=>{
  await page.setViewportSize({width:1440,height:900});
  f=await mountTransfers(page,{rollout:'missing'});
- await page.route('**/tech-checks/camera-health.html?itDaily=1',route=>route.fulfill({
-  contentType:'text/html',
-  body:'<!doctype html><html><body><main role="region" aria-label="Camera Health"><h1>Camera Health</h1><p>Authorized synthetic COS session</p></main></body></html>',
- }));
  await page.evaluate(()=>changeActor('05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'));
- await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src','./camera-health.html?itDaily=1');
- await expect(page.frameLocator('#cosITDailyFrame').getByRole('region',{name:'Camera Health'})).toBeVisible();
+ await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/operations\/dist\/index\.html\?mode=fleet.*#fleet-dashboard/);
+ const frame=page.frameLocator('#cosITDailyFrame');
+ await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ await expect(frame.locator('nav[aria-label="COS Operations"]').getByRole('button')).toHaveCount(2);
+ await expect(frame.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
  await expect(page.locator('#legacy')).toBeHidden();
  await expect(page.getByText('Daily view access could not be verified')).toHaveCount(0);
  expect(f.calls.filter(call=>call.name?.startsWith('techcheck_transfer'))).toHaveLength(0);

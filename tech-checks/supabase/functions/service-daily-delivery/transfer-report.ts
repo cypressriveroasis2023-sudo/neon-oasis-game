@@ -2,7 +2,7 @@ import {escapeHtml, RECIPIENT} from './report.ts';
 
 export type TransferPhoto = {kind: 'unit'|'tag'|'signature'; equipment_key?: string; path: string};
 export type TransferEvent = {id: string; kind: 'checkout'|'receipt'|'return'|'cancel'; actor_id: string; actor_name: string; signed_at: string; snapshot: any; photos: TransferPhoto[]};
-export type TransferDelivery = {version: 1; event_id: string; transfer_id: string; revision: number; kind: TransferEvent['kind']; it_actor: string; service_actor: string; it_name: string; service_name: string; events: TransferEvent[]};
+export type TransferDelivery = {version: 1; event_id: string; transfer_id: string; revision: number; kind: TransferEvent['kind']; it_actor: string; service_actor: string; it_name: string; service_name: string; events: TransferEvent[]; location_verification?: {proof_sha256:string;verified_at:string;observation:{request_id:string;actor_id:string;purpose:string;items:any[]}}};
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const labels = {checkout: 'IT equipment check out', receipt: 'Service equipment receipt', return: 'IT equipment check in', cancel: 'Cancelled equipment handoff'};
 const invalid = () => {throw new Error('Invalid immutable handoff delivery.');};
@@ -13,6 +13,7 @@ export function transferDelivery(value: unknown): TransferDelivery {
  const d = structuredClone(value) as TransferDelivery;
  if (!d || d.version !== 1 || ![d.event_id,d.transfer_id,d.it_actor,d.service_actor].every(v=>typeof v==='string'&&uuid.test(v)) || !labels[d.kind] || !Number.isSafeInteger(d.revision) || d.revision<1 || !Array.isArray(d.events) || d.events.length<1 || d.events.length>3) invalid();
  if (typeof d.it_name!=='string'||typeof d.service_name!=='string'||!d.it_name||!d.service_name) invalid();
+ if(d.location_verification){const v=d.location_verification;if(!/^[a-f0-9]{64}$/.test(v.proof_sha256)||!Number.isFinite(Date.parse(v.verified_at))||v.observation?.request_id!==d.transfer_id||v.observation.actor_id!==d.it_actor||v.observation.purpose!=='checkout'||!Array.isArray(v.observation.items))invalid();}
  const ids = new Set<string>();
  let prior = 0;
  for (const e of d.events) {
@@ -58,7 +59,7 @@ export function transferReportHtml(value: TransferDelivery, links: Record<string
  return '<!doctype html><html lang="en"><meta charset="utf-8"><title>'+e(labels[d.kind])+'</title><body><h1>'+e(labels[d.kind])+'</h1><p>Handoff '+e(d.transfer_id)+' · Event '+e(d.event_id)+' · Revision '+d.revision+'</p><p>IT: '+e(d.it_name)+' · Named Service technician: '+e(d.service_name)+'</p>'+d.events.map(event=>{
   const s=event.snapshot, sig=s.signature;
   return '<section><h2>'+e(labels[event.kind])+' · Revision '+s.revision+'</h2><p>Event '+e(event.id)+' · '+e(event.signed_at)+' · '+e(s.state)+'</p><h3>Expected equipment</h3>'+manifest(s.expected)+'<h3>Equipment physically recorded</h3>'+manifest(s.actual)+'<h3>Checks and differences</h3><pre>'+e(JSON.stringify({checks:s.checks,differences:s.differences,...(event.kind==='return'?{remaining:s.remaining,previous_returns:s.previous_returns}:{})},null,2))+'</pre><p>'+e(s.notes)+'</p><h3>Evidence</h3>'+event.photos.map(p=>'<p>'+e(p.equipment_key||'Sign-off')+' · '+e(p.kind)+(links[p.path]?'<a href="'+e(links[p.path])+'"> View saved image</a>':'')+'</p>').join('')+'<h3>Authenticated sign-off</h3><p>'+e(sig.statement)+'</p><p>'+e(sig.name)+' · '+e(sig.signed_by)+' · '+e(sig.signed_at)+' · '+e(sig.method)+'</p></section>';
- }).join('')+'<p>Returned equipment remains held for inventory review. This report does not release stock or change placement or health.</p></body></html>';
+ }).join('')+(d.location_verification?'<p>Shop placement verified before checkout at '+e(d.location_verification.verified_at)+'. Observation receipt '+e(d.location_verification.proof_sha256)+'. This records the observation at handoff time.</p>':'')+'<p>Returned equipment remains held for inventory review. This report does not release stock or change placement or health.</p></body></html>';
 }
 
 export type PdfLine = {text: string; bold?: boolean; image?: string};
@@ -75,6 +76,7 @@ export function transferReportPdf(value: TransferDelivery, signatures: Record<st
   if(sig.method==='drawn'){if(!signatures[sig.path])throw new Error('Saved handoff signature required.');lines.push({text:'',image:sig.path});}
   lines.push({text:event.photos.length+' supporting images in the verified archive.'});
  }
+ if(d.location_verification)lines.push({text:'Shop placement verified before checkout: '+d.location_verification.verified_at},{text:'Observation receipt: '+d.location_verification.proof_sha256});
  lines.push({text:'Returned equipment remains held for inventory review. No stock release or placement / health change.'});
  return paginatedPdf(lines,signatures);
 }

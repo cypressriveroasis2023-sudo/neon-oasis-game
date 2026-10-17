@@ -28,6 +28,7 @@ create function app_private.complete_service_daily_report_v4(p_report_id uuid,p_
 returns jsonb language plpgsql security definer set search_path='' as $$
 begin
  if not app_private.service_daily_actor() then raise exception 'Active Service Tech required.' using errcode='42501';end if;
+ perform pg_advisory_xact_lock(hashtextextended('techcheck-shared-custody-v6',6));
  if app_private.techcheck_transfer_ready_v1() and not exists(select 1 from app_private.service_daily_reports where id=p_report_id and service_tech_id=auth.uid()) then raise exception 'Reopen your daily check to review and sign the linked equipment receipts.';end if;
  return app_private.complete_service_daily_report_core_v4(p_report_id,p_units,p_sims,p_stock,p_photos,p_signature);
 end$$;
@@ -45,6 +46,7 @@ declare actor uuid:=auth.uid();previous app_private.service_daily_reports%rowtyp
 begin
  if not app_private.service_daily_actor() then raise exception 'Active Service Tech required.' using errcode='42501';end if;
  if p_report_id is null then raise exception 'Report ID required.';end if;
+ perform pg_advisory_xact_lock(hashtextextended('techcheck-shared-custody-v6',6));
  perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
  select * into previous from app_private.service_daily_reports where id=p_report_id;
  if found then

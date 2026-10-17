@@ -6,9 +6,6 @@ import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
 window.COS_IT_DAILY_ONLY = IT_DAILY_ONLY;
 const context = () => window.TechCheckContext;
-// Legacy COS account has no separate native-platform identity. The server RPC below
-// remains the authority for IT camera access; this ID only selects the camera UI.
-const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
@@ -128,11 +125,9 @@ async function open(value, generation, handoffFailure = null) {
     root.replaceChildren(handoffFallback);
     return;
   }
-  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
+  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='Fleet Dashboard and Camera Health';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
-    ? './camera-health.html?itDaily=1'
-    : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
   root.replaceChildren(frame);
   scheduleFrameFit();
