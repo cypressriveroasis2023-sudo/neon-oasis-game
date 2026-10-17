@@ -33,7 +33,12 @@ function rows(v:unknown,range:string):string[][]{
  if(!object(v))fail('an expected range was unavailable');
  const response=v as ObjectRow,expected=spec(range),got=typeof response.range==='string'?spec(response.range):null;
  if(!expected||!got||got.sheet!==expected.sheet||got.a!==expected.a||got.b!==expected.b||got.from!==expected.from||got.to>expected.to||got.to<got.from||response.majorDimension!=='ROWS'||!Array.isArray(response.values))fail('an expected range was unavailable');
- return (response.values as unknown[]).map((r:unknown)=>{if(!Array.isArray(r)||r.some(x=>typeof x!=='string'||x.length>600))fail('an equipment row is invalid');return r as string[];});
+ return (response.values as unknown[]).map((r:unknown)=>{
+  if(!Array.isArray(r)||r.some(x=>x!==null&&(typeof x!=='string'||x.length>600)))fail('an equipment row is invalid');
+  // A blank display cell may be null. Required identity/customer/placement
+  // cells are still checked at their exact column positions below.
+  return r.map(x=>x===null?'':x) as string[];
+ });
 }
 
 /** Validates a mockable Google `values:batchGet` response with fixed response order.
@@ -50,7 +55,7 @@ export async function verify2027CensusRanges(valueRanges:unknown,rangeNames:read
  for(let i=1;i<size;i++){
   const a=info[i]||[],b=productColumn[i]||[],c=placements[i]||[];
   if(![...a,...b,...c].some(v=>v.trim()))continue;
-  if(!a[0]||!a[1]||!a[2]||!a[4]||!b[0]||!c[0]||!c[1])fail('the 2027 overview has a missing or shifted source row');
+  if(!a[0]||!a[1]||!a[2]||!a[4]||!b[0]||!c[0])fail('the 2027 overview has a missing or shifted source row');
   list.push(a);ids.push(b);placed.push(c);
  }
  const indexedSize=Math.max(indexProducts.length,indexNames.length,indexExports.length);
@@ -69,10 +74,16 @@ export async function verify2027CensusRanges(valueRanges:unknown,rangeNames:read
  let field=0,shop=0;const canonical:string[]=[],productRows:{productId:string;family:string;unitLabel:string;placement:'FIELD'|'SHOP';customer:string}[]=[];
  for(let i=0;i<list.length;i++){
   const [family,label,placement,,customer]=list[i];const [trackerPlacement,mhelpPlacement]=placed[i];const product=overviewProducts[i],source=candidates.get(product)!;
-  if(!family||!label||!customer||!['FIELD','SHOP'].includes(placement)||trackerPlacement!==placement||mhelpPlacement!==placement||placement!==source.placement||normalized(customer)!==normalized(source.customer)||equipmentCustomerPlacement(customer)!==placement)fail('current placement or customer assignment disagrees with mHelp');
+   // C is current physical placement. Q also carries legacy retirement labels;
+   // those are restrictions, never evidence to move or activate equipment.
+   // R is a redundant mHelp comparison display and is blank for some current
+   // families. Exact source Product ID/customer/current placement and the full
+   // source-export index remain mandatory; a populated R may not contradict them.
+   const protectedTracker=['DECOMMISSIONED','RETIRED','MISSING','DO_NOT_USE'].includes(trackerPlacement)&&source.lifecycle!=='UNFLAGGED';
+   if(!family||!label||!customer||!['FIELD','SHOP'].includes(placement)||trackerPlacement!==placement&&!protectedTracker||Boolean(mhelpPlacement)&&mhelpPlacement!==placement||placement!==source.placement||normalized(customer)!==normalized(source.customer)||equipmentCustomerPlacement(customer)!==placement)fail('current placement or customer assignment disagrees with mHelp');
   if(placement==='FIELD')field++;else shop++;
   productRows.push({productId:product,family,unitLabel:label,placement:placement as 'FIELD'|'SHOP',customer});
-  canonical.push(product+'|'+family+'|'+label+'|'+placement+'|'+normalized(customer));
+   canonical.push(product+'|'+family+'|'+label+'|'+placement+'|'+normalized(customer)+'|'+trackerPlacement+'|'+(mhelpPlacement||''));
  }
  const detailsById=new Map<string,{key:string;model:string;customer:string}>();for(let i=0;i<indexIds.length;i++){
   const pid=lookupProducts[i],model=details[i][0],customer=details[i][1],exportName=exportRows[i][0];

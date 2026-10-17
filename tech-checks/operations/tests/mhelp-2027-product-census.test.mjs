@@ -32,6 +32,25 @@ test('Rejects a stale copied MHELP MATCH INDEX even if row totals equal',async()
  const data=mockRangeData(candidate());data[3].values[2][1]='987654';
  await assert.rejects(verify(data),/index is inconsistent/);
 });
+test('blank non-authority display cells retain complete Product-ID and current-placement proof',async()=>{
+ const data=mockRangeData(candidate());data[0].values[1][3]=null;
+ data[2].values[1][1]=null;data[2].values[2]=['SHOP'];
+ const v=await verify(data);assert.equal(v.total,2);assert.equal(v.field,1);assert.equal(v.shop,1);
+ const bad=mockRangeData(candidate());bad[1].values[1][0]=null;
+ await assert.rejects(verify(bad),/missing or shifted/);
+ const badCustomer=mockRangeData(candidate());badCustomer[0].values[1][4]=null;
+ await assert.rejects(verify(badCustomer),/missing or shifted/);
+});
+test('retirement labels stay separate from placement and require a protected mHelp lifecycle',async()=>{
+ const rows=candidate();rows[1]={...rows[1],lifecycle:'DO_NOT_USE'};
+ const data=mockRangeData(rows);data[2].values[2][0]='DECOMMISSIONED';
+ const v=await verify(data,rows);assert.equal(v.shop,1);assert.equal(v.productRows[1].placement,'SHOP');
+ await assert.rejects(verify(data,candidate()),/placement or customer/);
+ const conflict=mockRangeData(rows);conflict[2].values[2]=['DECOMMISSIONED','FIELD'];
+ await assert.rejects(verify(conflict,rows),/placement or customer/);
+ const changed=mockRangeData(rows);changed[2].values[2][0]='RETIRED';
+ assert.notEqual((await verify(changed,rows)).sourceSha256,v.sourceSha256);
+});
 test('Rejects changed Shop/Field/Customer without using IP or geographical guesses',async()=>{
  const rows=candidate(),data=mockRangeData(rows);data[0].values[1][2]='SHOP';
  await assert.rejects(verify(data),/placement or customer/);
