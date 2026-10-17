@@ -18,7 +18,8 @@ const records=[
 ];
 const census=records.map(r=>({productId:r.productId,family:r.category,unitLabel:r.unitNumber,placement:r.placement,customer:r.customer}));
 const draft=readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8');
-async function setup(){
+const timeoutSql=readFileSync(new URL('../docs/drafts/cos-owner-equipment-timeout-20261017.sql',import.meta.url),'utf8');
+async function setup({withTimeout=true}={}){
  const db=new PGlite();
  await db.exec("create role anon; create role authenticated; create role service_role; create schema app_private; create schema cos_mhelp_placement_private;");
  await db.exec("create table cos_mhelp_placement_private.upload_control(singleton boolean primary key,active_sha256 text);");
@@ -36,8 +37,25 @@ async function setup(){
  await db.exec(scoped.slice(start,scoped.indexOf('$$;',start)+3));
  await db.exec("create function cos_mhelp_placement_private.upload_binding_guard(uuid,uuid) returns text language sql stable as $$select repeat('d',64)$$;");
  await db.exec(draft);
+ if(withTimeout)await db.exec(timeoutSql);
  return db;
 }
+test('bounded import timeout preserves function bodies, permissions and session limits',async()=>{
+ const db=await setup({withTimeout:false});
+ try{
+  const query="select proname,prosrc,proacl::text privileges,prosecdef,proconfig from pg_proc where pronamespace='public'::regnamespace and proname in ('cos_owner_mhelp_equipment_stage_v1','cos_owner_mhelp_equipment_commit_v1') order by proname";
+  const before=(await db.query(query)).rows;
+  const session=(await db.query('show statement_timeout')).rows;
+  await db.exec(timeoutSql);
+  const after=(await db.query(query)).rows;
+  assert.deepEqual(after.map(({proconfig,...row})=>row),before.map(({proconfig,...row})=>row));
+  for(const row of after){
+   assert.ok(row.proconfig.includes('statement_timeout=60s'));
+   assert.ok(row.proconfig.includes('search_path=""'));
+  }
+  assert.deepEqual((await db.query('show statement_timeout')).rows,session);
+ }finally{await db.close();}
+});
 const params=(requestId=randomUUID(),overrides={})=>[actor,org,requestId,'ServiceItem_List_20261016131754.csv',overrides.sourceSha||digest,overrides.prevSha||previous,censusSha,JSON.stringify(overrides.census||census),source.toString('base64'),JSON.stringify(records)];
 const stage=(db,args)=>db.query("select public.cos_owner_mhelp_equipment_stage_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::text,$8::jsonb,$9::text,$10::jsonb) result",args).then(r=>r.rows[0].result);
 const commit=(db,id,note='I reviewed and approve the current COS Field and Shop inventory.',sha=censusSha)=>db.query("select public.cos_owner_mhelp_equipment_commit_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text) result",[actor,org,id,previous,sha,note]).then(r=>r.rows[0].result);
