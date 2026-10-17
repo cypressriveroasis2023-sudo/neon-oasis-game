@@ -27,6 +27,8 @@ test('proof requires same 2027 Product IDs, exact Field/Shop and source filename
  const rows=candidate(),r=await verify(mockRangeData(rows));
  assert.equal(r.total,2);assert.equal(r.field,1);assert.equal(r.shop,1);assert.equal(r.contract,'COS_VERIFIED_2027_PRODUCT_CENSUS_V1');
  assert.equal(r.verifiedBy,'cos_sheets_service');assert.equal(r.productIds.length,2);
+ assert.deepEqual(r.productRows.map(x=>x.productId),['11','12']);
+ assert.deepEqual(r.productRows.map(x=>x.placement),['FIELD','SHOP']);
 });
 test('Rejects a stale copied MHELP MATCH INDEX even if row totals equal',async()=>{
  const data=mockRangeData(candidate());data[3].values[2][1]='987654';
