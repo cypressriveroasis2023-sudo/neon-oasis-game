@@ -151,7 +151,7 @@ begin
   or new_tracker->'binding'->>'state' is distinct from 'held'
   or new_tracker->'binding'->'unitIds' is distinct from '[]'::jsonb
   or new_tracker->'binding'->'unitLabels' is distinct from '{}'::jsonb
-  or (new_tracker->'binding'-array['state','unitIds','unitLabels','guardCurrent']) is distinct from '{}'::jsonb then
+  or ((new_tracker->'binding')-array['state','unitIds','unitLabels','guardCurrent']) is distinct from '{}'::jsonb then
   return jsonb_build_object('eligible',false,'reason','2027_tracker_membership_or_variant_unproven');end if;
  if exists(select 1 from cos_mhelp_placement_private.upload_batches b
   cross join lateral jsonb_array_elements(coalesce(b.receipt->'trackerRecords','[]'::jsonb)) r
