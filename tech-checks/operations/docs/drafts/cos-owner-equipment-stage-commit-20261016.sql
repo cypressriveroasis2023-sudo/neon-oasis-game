@@ -152,9 +152,14 @@ begin
    where value->>'matchedProductId'=row_data->>'productId' limit 1;
   select value into old_row from jsonb_array_elements(adjusted) value
    where value->>'productId'=row_data->>'productId' limit 1;
-  if old_tracker is not null
+  if old_row->>'placementHeld'='true' then
+    -- The current mHelp customer/placement changed; a tracker-side binding
+    -- must not silently reintroduce the old native camera/location identity.
+    binding:=jsonb_build_object('state','held','unitIds','[]'::jsonb,
+      'unitLabels','{}'::jsonb,'guardCurrent',null);
+  elsif old_tracker is not null
     and old_tracker->>'unitNumber'=row_data->>'unitLabel'
-    and old_tracker->'binding'->>'state' in('linked','bound','owner_confirmed_alias') then
+    and old_tracker->'binding'->>'state'='linked' then
       binding:=old_tracker->'binding';
   else binding:=jsonb_build_object('state','unlinked','unitIds','[]'::jsonb,
       'unitLabels','{}'::jsonb,'guardCurrent',null);end if;
