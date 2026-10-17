@@ -1,0 +1,33 @@
+name: Verify COS Field Location Candidate Audit
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/tests/helpers/field-saved-location-audit.mjs'
+      - 'tech-checks/operations/tests/field-saved-location-audit.test.mjs'
+      - '.github/workflows/cos-field-location-candidates-proof.yml'
+permissions:
+  contents: read
+jobs:
+  location-candidate-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test candidate-vs-accepted-pin safeguards
+        run: |
+          set -o pipefail
+          node --test tests/field-saved-location-audit.test.mjs | tee field-location-candidate-receipt.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-field-location-candidate-receipt
+          path: tech-checks/operations/field-location-candidate-receipt.txt
