@@ -32,7 +32,8 @@ definitions are code fixtures, not production inventory records. Legacy bare-tag
 collisions veto checkout; they never supply a positive equipment identity.
 
 Checkout and Owner release require a server HMAC attestation from two complete
-authenticated reads of the existing current map and guarded MHelp placement.
+scoped reads of guarded current MHelp placement and legacy equipment/evidence,
+with fresh legacy principal/capability checks before signing.
 The native identity, exact family/tag, active inventory status and current Shop
 observation must agree. Unknown, ambiguous, stale, installed, field or conflicting
 records remain held. Proofs are bound to the legacy actor, request, purpose and
@@ -52,10 +53,13 @@ deployment order, activation, rollback and remaining evidence gaps.
 Native ITTECH provisioning is **not requested** for legacy phone handoffs. The
 existing active legacy account already passes the verified IT capability. The
 optional native identity configuration was removed and the existing desktop
-Camera Health entry preserved. Fresh checkout still exposes a design blocker:
-the current Shop-proof adapter needs an existing native link. Resolve that with
-a narrow legacy-actor proof path before activation; do not create broader native
-access to work around it. This supersedes the earlier bc693891 parity proposal.
+Camera Health entry preserved. The narrow legacy-authorized Shop proof path is
+implemented and tested locally. Its exact service-only native RPC grant and
+remaining production decisions are described in
+[NATIVE_SHOP_ATTESTATION_APPROVAL.md](NATIVE_SHOP_ATTESTATION_APPROVAL.md).
+No new native account or broader desktop access is requested. Live checkout and
+inventory eligibility are unverified. This supersedes the earlier bc693891 parity
+proposal and the proposal-only status in commit 9229fa7.
 
 The held SQL explicitly revokes inherited service-role access to its eight new
 browser RPCs. Effective permissions are recorded in

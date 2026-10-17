@@ -2,44 +2,74 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import {issueHandoffLocationProof} from '../../supabase/functions/cos-operations-pages/handoffLocationProof.ts';
-const actor='00000000-0000-4000-8000-000000000001',native='00000000-0000-4000-8000-000000000011',tracker='00000000-0000-4000-8000-000000000012',request='00000000-0000-4000-8000-000000000013',now=Date.parse('2026-10-17T08:00:00Z'),at='2026-10-17T07:59:00Z',secret='12'.repeat(32);
-const context={legacyId:actor,actorId:native,department:'it',legacyOwner:false};
-const body={request_id:request,purpose:'checkout',items:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001'}]};
-export function locationRead(){return {equipment:[{equipment_key:'sniper:001',canonical_family:'Sniper',unit_tag:'001',tracker_state:'shop',updated_at:at}],map:{effectivePlacementVersion:1,items:[],inventoryItems:[{id:native,unitNumber:'Sniper 001',readOnly:false,placement:'SHOP',effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:'shop',source:'mhelpdesk',observedAt:at,reason:null},activeInventoryEligible:true}]},mhelp:{contract:'COS_MHELP_PLACEMENT_V1',enabled:true,lastSuccessAt:at,items:[{trackerId:tracker,nativeUnitId:native,trackerLabel:'Sniper 001',nativeLabel:'Sniper 001',state:'confirmed',guardCurrent:true,placement:'SHOP',customerLabel:'Shop',siteLabel:'Shop',observedAt:at,locationReview:false,assignmentChanged:false}]}};}
-const issue=(read=()=>locationRead(),who=context,requestBody=body,key=secret)=>issueHandoffLocationProof(who,requestBody,async()=>read(),()=>key,()=>now);
-test('server proof uses two complete current reads, exact identity and a 30-second actor/request HMAC binding',async()=>{
- let reads=0;const result=await issue(()=>{reads++;return locationRead();});assert.equal(reads,2);assert.equal(createHmac('sha256',Buffer.from(secret,'hex')).update(result.payload).digest('hex'),result.signature);
- const p=JSON.parse(result.payload);assert.equal(p.actor_id,actor);assert.equal(p.request_id,request);assert.equal(p.expires_at-p.issued_at,30);assert.equal(p.items[0].equipment_key,'sniper:001');assert.equal(p.items[0].legacy_updated_at,at);assert.match(p.items[0].authority_sha256,/^[a-f0-9]{64}$/);
+import {actor,native,tracker,request,now,at,secret,context,body,locationRead,ownerRoot} from './fixtures/handoff-proof-fixtures.mjs';
+const issue=(read=()=>locationRead(),who=context,requestBody=body,key=secret,revalidate=async()=>who,options={})=>issueHandoffLocationProof(who,requestBody,async()=>read(),()=>key,revalidate,{now:()=>now,...options});
+test('unlinked legacy IT gets a scoped proof after two reads and three current capability checks',async()=>{
+ let reads=0,auth=0;const result=await issue(()=>{reads++;return locationRead();},context,body,secret,async()=>{auth++;return context;});
+ assert.equal(reads,2);assert.equal(auth,3);assert.equal(createHmac('sha256',Buffer.from(secret,'hex')).update(result.payload).digest('hex'),result.signature);
+ const p=JSON.parse(result.payload);assert.equal(p.actor_id,actor);assert.equal(p.request_id,request);assert.equal(p.expires_at-p.issued_at,30);assert.equal(Date.parse(p.items[0].legacy_updated_at),Date.parse(at));
+ assert.match(p.items[0].authority_sha256,/^[a-f0-9]{64}$/);assert.equal(p.items[0].authority,undefined);
 });
-test('unlinked, Service, invalid scope, duplicate identity and missing key cannot issue proof',async()=>{
- for(const who of [{...context,actorId:null},{...context,department:'service'}])await assert.rejects(issue(undefined,who),/verified IT or Owner/);
+test('Service, invalid action/scope, duplicate identity and missing key issue no proof',async()=>{
+ await assert.rejects(issue(undefined,{...context,department:'service'}),/verified IT or Owner/);
  await assert.rejects(issue(undefined,context,{...body,purpose:'inventory_release'}),/verified IT or Owner/);
- await assert.rejects(issue(undefined,context,{...body,organization_id:'foreign'}),/verified IT or Owner/);
- await assert.rejects(issue(undefined,context,{...body,items:[body.items[0],body.items[0]]}),/Exact equipment/);
- await assert.rejects(issue(undefined,context,body,''),/held for installation/);
- assert.equal(JSON.parse((await issue(undefined,{...context,legacyOwner:true,department:'owner'},{...body,purpose:'inventory_release'})).payload).purpose,'inventory_release');
+ for(const requestBody of [{...body,actor_id:native},{...body,organization_id:native},{...body,purpose:'arbitrary'}])await assert.rejects(issue(undefined,context,requestBody));
+ for(const items of [[],Array(21).fill(body.items[0]),[body.items[0],body.items[0]],[{...body.items[0],unit_tag:' 001'}],[{...body.items[0],family:1}],[{...body.items[0],native_id:native}]])await assert.rejects(issue(undefined,context,{...body,items}),/Exact equipment/);
+ let reads=0;await assert.rejects(issue(()=>{reads++;return locationRead();},context,body,''),/held for installation/);assert.equal(reads,0);
+ const who={...context,legacyOwner:true,department:'owner'},requestBody={...body,purpose:'inventory_release'};
+ assert.equal(JSON.parse((await issue(()=>locationRead({requestBody}),who,requestBody)).payload).purpose,'inventory_release');
 });
 for(const [name,change] of Object.entries({
- 'newer field placement':r=>r.map.inventoryItems[0].placement='FIELD',
- 'field membership contradiction':r=>r.map.items.push(r.map.inventoryItems[0]),
- 'identity review':r=>r.map.inventoryItems[0].placementStatus='needs_identity_review',
- 'retired or inactive unit':r=>r.map.inventoryItems[0].activeInventoryEligible=false,
- 'installed native site':r=>r.map.inventoryItems[0].installedSiteId=native,
- 'native GPS evidence':r=>r.map.inventoryItems[0].hasUnitGps=true,
- 'unqualified native label':r=>r.map.inventoryItems[0].unitNumber='001',
- 'duplicate qualified label':r=>r.map.inventoryItems.push({...r.map.inventoryItems[0],id:tracker}),
- 'held MHelp guard':r=>r.mhelp.items[0].guardCurrent=false,
- 'field MHelp observation':r=>r.mhelp.items[0].placement='FIELD',
- 'MHelp assignment change':r=>r.mhelp.items[0].assignmentChanged=true,
- 'MHelp location review':r=>r.mhelp.items[0].locationReview=true,
- 'stale MHelp observation':r=>r.mhelp.items[0].observedAt='2026-10-17T06:00:00Z',
- 'future MHelp observation':r=>r.mhelp.items[0].observedAt='2026-10-17T09:00:00Z',
- 'missing MHelp coverage':r=>r.mhelp.items=[],
- 'disabled MHelp feed':r=>r.mhelp.enabled=false,
- 'source refresh failure':r=>r.mhelp.errorCode='unavailable',
- 'changed native binding':r=>r.mhelp.items[0].nativeUnitId=tracker,
+ 'wrong contract':r=>r.attestation.contract='legacy',
+ 'wrong organization':r=>r.attestation.organization_id=native,
+ 'foreign actor':r=>r.attestation.legacy_actor_id=native,
+ 'wrong request':r=>r.attestation.request_id=native,
+ 'wrong purpose':r=>r.attestation.purpose='inventory_release',
+ 'unexpected disclosure':r=>r.attestation.customer='private',
+ 'missing requested unit':r=>r.attestation.items=[],
+ 'extra unrequested unit':r=>r.attestation.items.push({...r.attestation.items[0]}),
+ 'changed family':r=>r.attestation.items[0].family='Ranger',
+ 'native identity mismatch':r=>r.attestation.items[0].native_unit_id=tracker,
+ 'invalid tracker':r=>r.attestation.items[0].tracker_id='bad',
+ 'Field placement':r=>r.attestation.items[0].placement='FIELD',
+ 'unbound authority':r=>r.attestation.items[0].authority_sha256='',
+ 'stale observation':r=>r.attestation.items[0].observed_at='2026-10-17T06:00:00Z',
+ 'future observation':r=>r.attestation.items[0].observed_at='2026-10-17T09:00:00Z',
+ 'source success before observation':r=>r.attestation.items[0].source_success_at='2026-10-17T07:58:00Z',
+ 'stale attestation':r=>r.attestation.checked_at='2026-10-17T07:59:00Z',
+ 'expired attestation':r=>r.attestation.valid_until='2026-10-17T07:59:00Z',
+ 'overlong validity':r=>r.attestation.valid_until='2026-10-17T08:01:00Z',
  'changed legacy family':r=>r.equipment[0].canonical_family='Ranger',
  'duplicate legacy identity':r=>r.equipment.push({...r.equipment[0],equipment_key:'duplicate-key'}),
- 'legacy field placement':r=>r.equipment[0].tracker_state='field_or_unknown'
-}))test(name+' denies checkout proof',async()=>{await assert.rejects(issue(()=>{const r=locationRead();change(r);return r;}));});
-test('changed source between the two observations cannot reuse older Shop proof',async()=>{let reads=0;await assert.rejects(issue(()=>{const r=locationRead();if(++reads===2)r.equipment[0].updated_at='2026-10-17T07:59:30Z';return r;}),/Current Shop/);});
+ 'legacy Field state':r=>r.equipment[0].tracker_state='field_or_unknown',
+ 'ambiguous camera label':r=>r.devices=[{id:1,unit_key:'Sniper 1'}],
+ 'Owner Field':r=>{ownerRoot(r);r.audits[0]={...r.audits[0],placement:'FIELD',action:'MOVE_TO_FIELD',site_label:'Synthetic site',street_address:'Synthetic address'};},
+ 'changed Owner camera identity':r=>{ownerRoot(r);r.devices=[];},
+ 'later unmarked camera edit':r=>{ownerRoot(r);r.audits.unshift({...r.audits[0],id:'2',contract:null});}
+}))test(name+' denies issuance',async()=>{await assert.rejects(issue(()=>{const r=locationRead();change(r);return r;}));});
+test('current reviewed ROOT can corroborate Shop, while its private detail remains out of proof',async()=>{
+ const result=await issue(()=>ownerRoot());assert.equal(JSON.parse(result.payload).items[0].equipment_key,'sniper:001');assert.doesNotMatch(result.payload,/device_ids|control_id|MOVE_TO_ROOT/);
+});
+for(const step of [1,2,3])for(const [name,change] of Object.entries({capability:c=>c.fleetRead=false,actor:c=>c.legacyId=native,role:c=>c.department='service'}))test(name+' revocation at authorization step '+step+' denies issuance',async()=>{
+ let auth=0;await assert.rejects(issue(undefined,context,body,secret,async()=>{const c={...context};if(++auth===step)change(c);return c;}),/access changed/);
+});
+for(const [name,change] of Object.entries({
+ 'native authority':r=>r.attestation.items[0].authority_sha256='b'.repeat(64),
+ 'legacy revision':r=>r.equipment[0].updated_at='2026-10-17T07:59:30Z',
+ 'Owner evidence':r=>ownerRoot(r)
+}))test(name+' change between observations rejects the earlier proof',async()=>{
+ let n=0;await assert.rejects(issue(()=>{const r=locationRead();if(++n===2)change(r);return r;}),/Current Shop/);
+});
+test('proof expiration is capped by the earlier native attestation and freshness boundary',async()=>{
+ let n=0;const r=await issue(()=>{const x=locationRead();x.attestation.valid_until=new Date(now+(++n===1?5000:20000)).toISOString();return x;});
+ assert.equal(JSON.parse(r.payload).expires_at,now/1000+5);
+});
+test('deadline and caller abort stop issuance even when an upstream ignores cancellation',async()=>{
+ await assert.rejects(issue(()=>new Promise(()=>{}),context,body,secret,async()=>context,{deadlineMs:now+20}),/deadline/);
+ const c=new AbortController();c.abort();await assert.rejects(issue(undefined,context,body,secret,async()=>context,{signal:c.signal}),/deadline/);
+ let clock=now;await assert.rejects(issue(undefined,context,body,secret,async()=>{clock+=4000;return context;},{now:()=>clock}),/deadline/);
+});
+test('a post-read native change is outside this read-only protocol; no distributed-lock claim',async()=>{
+ let laterPlacement='SHOP',auth=0;const result=await issue(undefined,context,body,secret,async()=>{if(++auth===3)laterPlacement='FIELD';return context;});
+ assert.equal(laterPlacement,'FIELD');assert.ok(result.signature);assert.ok(JSON.parse(result.payload).expires_at<=now/1000+30);
+});

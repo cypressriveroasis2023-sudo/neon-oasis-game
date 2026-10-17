@@ -1,9 +1,10 @@
 # Equipment check-in/out: exact installation and access proposal
 
-This is a held draft for Parent review. No item below has action-time approval.
+This is a held production draft for Parent review. Local implementation and
+synthetic testing are authorized; no production item below has action-time approval.
 Do not install, deploy, create a secret, grant access, publish the frontend or
-activate from a generic earlier approval. PR creation is the only authorized
-external write in this review step. PR187 and other owners' branches are excluded.
+activate from a generic earlier approval. Parent owns integration and remote
+publication. PR187 and other owners' branches are excluded.
 
 ## Decision requested
 
@@ -13,11 +14,10 @@ custody locks below with all four release flags false and no key. It does affect
 the lock order of existing writers even while the feature is held.
 
 **Do not approve native ITTECH provisioning as part of phone handoffs.** Do not
-approve activation yet: the current Shop-proof adapter still requires a linked
-native identity. That avoidable dependency must be replaced by an exact,
-read-only legacy-actor proof path and reviewed before ITTECH can make a fresh
-checkout. This draft deliberately records that unresolved blocker rather than
-granting broader native rights to work around it.
+approve activation yet: the narrow legacy-authorized Shop-attestation path is
+implemented and tested locally, but its exact native service-role EXECUTE grant,
+deployment, paired key and live verification remain held. Review the separate
+[native approval bundle](NATIVE_SHOP_ATTESTATION_APPROVAL.md) for that boundary.
 
 ## ITTECH finding and scope correction
 
@@ -29,10 +29,12 @@ RPCs, signed receipt/return/cancel operations and daily linkage use that existin
 legacy identity. They do not inherently require native Auth provisioning.
 
 The candidate's fresh checkout path calls `/api/techcheck/location-proof` before
-the legacy v7 submission. That adapter currently uses the native-authorized
-Field Map/MHelp pipeline and therefore denies unlinked ITTECH. A regression test
-demonstrates the denial and that no other person's native actor is borrowed.
-This is an implementation blocker, not a justification for a new account.
+the legacy v7 submission. The locally tested adapter validates the actual legacy
+bearer/profile and existing verified-fleet capability, then uses a narrow current
+native Shop attestation. It does not need a new native ITTECH account or borrow
+another person's actor. Linked native accounts retain their existing gates;
+other routes still require their native actor. Synthetic success does not prove
+the live ITTECH session or current inventory eligibility.
 
 The optional `COS_ITTECH_NATIVE_ACTOR_ID` configuration/link code and the proposed
 native parity test were removed from this draft. The existing ITTECH desktop
@@ -162,18 +164,19 @@ No new recipient, folder, provider credential, scope or fabricated test event.
 
 ### Native placement proof adapter
 
-Project `tughscoxralhofrckvxy`, Edge function `cos-operations-pages` (observed
-baseline **v96**, SHA256
-`1b6c1b449fb97a7005c28b176c8f7abbdfa07689d8a4e907b84da5788a199fc7`).
-Current candidate adds POST `/api/techcheck/location-proof`, exact purpose/item
-validation and two complete authenticated current placement observations. It
-uses existing native read RPCs and the existing server key; **no native database
-grant or user role is proposed**. It does not write placement, GPS or health.
-It currently requires the existing exact linked native IT/Owner actor; fixing
-the unlinked ITTECH path is a prerequisite to approving this deployment for the
-requested complete workflow. No other actor's ID may be substituted.
+Project `tughscoxralhofrckvxy`, Edge function `cos-operations-pages`. Recheck the
+deployed version/hash immediately before any separately approved deployment;
+historical deployment receipts are not a fresh baseline.
+The candidate adds POST `/api/techcheck/location-proof`, exact purpose/item
+validation, two complete scoped observations and three principal/capability
+rechecks within a ten-second issuance budget. The separately held native SQL
+grants existing service_role EXECUTE on exactly
+`public.cos_techcheck_shop_attestation_v1(uuid,uuid,text,jsonb)`. No user role,
+account, schema/table grant or placement/GPS/health write is added. The
+[native approval bundle](NATIVE_SHOP_ATTESTATION_APPROVAL.md) contains exact
+installation/rollback hashes, fields disclosed, trust boundary and timing limits.
 
-After that blocker is resolved and separately approved, generate 32 random bytes
+Only after specific signing-key approval, generate 32 random bytes
 and store their lowercase hex as native Edge secret
 `COS_HANDOFF_LOCATION_HMAC_V1` and the same bytes in legacy private
 `techcheck_location_keys_v7`, key ID `v1`. Keep the secret out of artifacts/logs.
@@ -225,8 +228,8 @@ Synthetic browser success is not authenticated production verification.
 
 Remaining activation blockers/gaps:
 
-1. Unlinked ITTECH cannot yet obtain the fresh Shop proof. No provisioning workaround
-   is approved; implement a narrow legacy-actor path without extra native rights.
+1. The locally tested legacy-actor proof path still needs specific native SQL/grant,
+   deployment and key approvals, independent review and live eligibility verification.
 2. No authenticated live role smoke, genuine first-event email/archive readback,
    or production workload/lock-contention observation has occurred.
 3. This workspace uses Chromium 154; the pinned Playwright download was blocked.

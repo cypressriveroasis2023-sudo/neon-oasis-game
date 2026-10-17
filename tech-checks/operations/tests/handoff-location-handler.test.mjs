@@ -1,38 +1,65 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
-const org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',unit='00000000-0000-4000-8000-000000000011',tracker='00000000-0000-4000-8000-000000000012';
+import {org,native,body,locationRead,secret} from './fixtures/handoff-proof-fixtures.mjs';
 const actors={it:{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc',native:'d0757b64-9623-4adc-afff-21cc7853e88a',name:'Teddy Hopper'},ittech:{id:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',name:'Test IT'},owner:{id:'e4abc521-1ef3-45a6-9829-b87faff78210',native:'3f073784-96e7-43d8-b9e0-33ab31c3c8b1',name:'Synthetic Owner'},service:{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285',native:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',name:'Abel Cervantes'}};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status});
-function fixture({role='it',revoked=false,field=false,missingKey=false}={}){
- const actor=actors[role],at=new Date(Date.now()-60000).toISOString(),calls=[];
- const native={id:unit,unitNumber:'Sniper 001',readOnly:false,placement:'SHOP',currentLocationType:'shop',status:'shop',hasUnitGps:false,...(field?{installedSiteId:tracker}:{}),_sourceField:false};
+function fixture({role='ittech',revoked=false,missingKey=false,capability=true,denyNative=false,mutate,requestBody=body,path='/api/techcheck/location-proof',method='POST',direct=false,authorization='Bearer synthetic-legacy-only',authStatus=200}={}){
+ const actor=actors[role],calls=[],state={auth:0,cap:0,native:0,active:true,archived:null,role:role==='ittech'?'it':role,capability,revoked},at=new Date(Date.now()-60000).toISOString();
  const transport=async(url,init={})=>{
-  const name=new URL(url).pathname.split('/').at(-1);calls.push(name);
-  if(name==='user')return json({id:actor.id});
-  if(name==='profiles')return json([{user_id:actor.id,full_name:actor.name,role:role==='ittech'?'it':role,active:true,archived_at:null}]);
+  const u=new URL(url),name=u.pathname.split('/').at(-1),payload=init.body?JSON.parse(init.body):null;calls.push({name,url,method:init.method||'GET',payload});
+  if(name==='user'){state.auth++;mutate?.(state,'auth');assert.equal(u.origin,'https://goqrnolcvqnirjmzaeyk.supabase.co');assert.equal(init.headers.Authorization,authorization);return json(authStatus===200?{id:actor.id}:{error:'Synthetic invalid, expired or foreign-project bearer'},authStatus);}
+  if(name==='profiles')return json([{user_id:actor.id,full_name:actor.name,role:state.role,active:state.active,archived_at:state.archived}]);
   if(name==='user_profiles')return json([{user_id:actor.native,display_name:actor.name,department:role,active:true}]);
-  if(name==='user_roles')return json(revoked?[]:[{role_id:unit,roles:{code:role==='owner'?'owner':role+'_technician',organization_id:org}}]);
-  if(name==='cos_owner_identity_snapshot')return json({revision:'a'.repeat(64),claims:[],nativeEpochs:[]});
-  if(name==='appdeploy_field_map_snapshot')return json({items:[],inventoryItems:[native],summary:{fieldUnits:0},generatedAt:at});
-  if(name==='equipment_units')return json([{id:unit,organization_id:org,unit_number:'Sniper 001',status:'shop'}]);
+  if(name==='user_roles')return json(state.revoked?[]:[{role_id:native,roles:{code:role==='owner'?'owner':role+'_technician',organization_id:org}}]);
+  if(name==='cos_verified_fleet_capabilities_v1'){state.cap++;mutate?.(state,'cap');assert.equal(init.headers.Authorization,'Bearer synthetic-legacy-only');assert.deepEqual(payload,{});return json({fleetRead:state.capability});}
   if(name==='equipment_master')return json([{equipment_key:'sniper:001',canonical_family:'Sniper',unit_tag:'001',tracker_state:'shop',updated_at:at}]);
-  if(name==='cos_mhelp_placement_snapshot')return json({contract:'COS_MHELP_PLACEMENT_V1',enabled:true,lastSuccessAt:at,items:[{trackerId:tracker,nativeUnitId:unit,trackerLabel:'Sniper 001',nativeLabel:'Sniper 001',state:'confirmed',guardCurrent:true,placement:'SHOP',customerLabel:'Shop',siteLabel:'Shop',observedAt:at,locationReview:false,assignmentChanged:false}]});
-  if(name==='cos_mhelp_location_snapshot')return json({contract:'COS_MHELP_FLEET_LOCATIONS_V1',items:[]});
-  if(['camera_devices','vision_vigilant_unit_matches','vision_vigilant_devices','cos_fleet_placement_evidence_v1','cos_geocode_sources_map_projection','cos_archived_representation_projection','cos_source_recorded_coordinates_read_many'].includes(name))return json([]);
+  if(name==='camera_devices'||name==='cos_fleet_placement_evidence_v1'){assert.equal(init.headers.Authorization,'Bearer synthetic-legacy-only');return json([]);}
+  if(name==='cos_techcheck_shop_attestation_v1'){
+   state.native++;mutate?.(state,'native');assert.equal(init.headers.Authorization,'Bearer synthetic-native-server-only');
+   assert.deepEqual(payload,{p_legacy_actor_id:actor.id,p_request_id:requestBody.request_id,p_purpose:requestBody.purpose,p_items:requestBody.items});
+   if(denyNative)return json({message:'permission denied'},403);
+   const r=locationRead({time:Date.now(),who:actor.id,requestBody}).attestation;r.items[0].observed_at=at;r.items[0].source_success_at=at;return json(r);
+  }
   throw Error('Unexpected non-approved route '+name);
  };
- const handler=createOperationsHandler({platformUrl:'https://native.invalid',serviceKey:'synthetic-only',fetch:transport,mhelpPlacementEnabled:true,handoffLocation:{getSecret:()=>missingKey?undefined:'12'.repeat(32)}});
- const request=new Request('https://native.invalid/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-only','Content-Type':'application/json',Origin:'https://cos-vision-integration-preview.pages.dev'},body:JSON.stringify({path:'/api/techcheck/location-proof',method:'POST',body:{request_id:unit,purpose:'checkout',items:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001'}]}})});
- return {calls,run:()=>handler(request),actor};
+ const handler=createOperationsHandler({platformUrl:'https://native.invalid',serviceKey:'synthetic-native-server-only',fetch:transport,mhelpPlacementEnabled:true,handoffLocation:{getSecret:()=>missingKey?undefined:secret}});
+ const request=()=>new Request('https://native.invalid/functions/v1/cos-operations-pages'+(direct?path:''),{method:direct?method:'POST',headers:{Authorization:authorization,'Content-Type':'application/json',Origin:'https://cos-vision-integration-preview.pages.dev'},...((direct&&method==='GET')?{}:{body:JSON.stringify(direct?requestBody:{path,method,body:requestBody})})});
+ return {calls,state,actor,run:()=>handler(request())};
 }
-for(const role of ['it','owner'])test(role+' receives a bound proof through the complete authenticated current map pipeline',async()=>{
- const f=fixture({role}),r=await f.run(),body=await r.json();assert.equal(r.status,200,JSON.stringify({body,calls:f.calls}));assert.equal(JSON.parse(body.payload).actor_id,f.actor.id);assert.match(body.signature,/^[a-f0-9]{64}$/);assert.equal(f.calls.filter(n=>n==='appdeploy_field_map_snapshot').length,4);assert.equal(f.calls.filter(n=>n==='user').length,3);
+for(const role of ['ittech','it','owner'])test(role+' obtains an own-actor scoped proof with fresh legacy capability and no native actor borrowed',async()=>{
+ const f=fixture({role}),r=await f.run(),proof=await r.json();assert.equal(r.status,200,JSON.stringify(proof));
+ assert.equal(JSON.parse(proof.payload).actor_id,f.actor.id);assert.equal(f.state.native,2);assert.equal(f.state.cap,3);assert.equal(f.state.auth,4);
+ assert.equal(f.calls.some(c=>['appdeploy_field_map_snapshot','cos_mhelp_placement_snapshot','cos_owner_identity_snapshot'].includes(c.name)),false);
+ if(role==='ittech')assert.equal(f.calls.some(c=>['user_profiles','user_roles'].includes(c.name)),false);
+ assert.equal(f.calls.some(c=>c.method!=='GET'&&!['cos_verified_fleet_capabilities_v1','cos_fleet_placement_evidence_v1','cos_techcheck_shop_attestation_v1'].includes(c.name)),false);
 });
-for(const [name,options,status] of [['Service',{role:'service'},403],['revoked IT',{revoked:true},403],['missing secret',{missingKey:true},503],['native installed-site conflict',{field:true},409]])test(name+' cannot obtain a Shop proof',async()=>{
- const f=fixture(options),r=await f.run(),body=await r.json();assert.equal(r.status,status,JSON.stringify(body));assert.equal(body.signature,undefined);if(status===403||options.missingKey)assert.equal(f.calls.includes('appdeploy_field_map_snapshot'),false);
+for(const [name,options,status] of [['Service',{role:'service'},403],['revoked linked native role',{role:'it',revoked:true},403],['unverified IT',{capability:false},403],['missing key',{missingKey:true},503],['native EXECUTE revoked',{denyNative:true},403]])test(name+' cannot obtain a proof',async()=>{
+ const f=fixture(options),r=await f.run();assert.equal(r.status,status,JSON.stringify(await r.clone().json()));assert.equal((await r.json()).signature,undefined);
+ if(!options.denyNative)assert.equal(f.state.native,0);
 });
-test('activation blocker: legacy ITTECH has no native proof path and never borrows another actor',async()=>{
- const f=fixture({role:'ittech'}),response=await f.run();assert.equal(response.status,403);assert.equal((await response.json()).signature,undefined);
- assert.deepEqual(f.calls,['user','profiles']);
+for(const step of [1,2,3])test('current legacy fleet capability revoked on check '+step+' stops signing',async()=>{
+ const f=fixture({mutate:(s,event)=>{if(event==='cap'&&s.cap===step)s.capability=false;}}),r=await f.run();assert.equal(r.status,403);assert.equal((await r.json()).signature,undefined);assert.equal(f.state.native,step-1);
+});
+for(const [name,change] of Object.entries({inactive:s=>s.active=false,archived:s=>s.archived='2026-01-01Z',role:s=>s.role='service'}))test(name+' legacy actor before final signing is denied',async()=>{
+ const f=fixture({mutate:(s,event)=>{if(event==='auth'&&s.auth===4)change(s);}}),r=await f.run();assert.equal(r.status,403);assert.equal((await r.json()).signature,undefined);
+});
+test('purpose and body scope remain exact; Owner release uses own legacy identity',async()=>{
+ for(const requestBody of [{...body,actor_id:native},{...body,organization_id:org},{...body,purpose:'inventory_release'}]){
+  const f=fixture({requestBody}),r=await f.run();assert.equal(r.status,403);assert.equal(f.state.native,0);
+ }
+ const f=fixture({role:'owner',requestBody:{...body,purpose:'inventory_release'}}),r=await f.run();assert.equal(r.status,200);assert.equal(JSON.parse((await r.json()).payload).purpose,'inventory_release');
+});
+test('direct transport is equivalent and GET cannot issue proofs',async()=>{
+ assert.equal((await fixture({direct:true}).run()).status,200);const f=fixture({direct:true,method:'GET'});assert.equal((await f.run()).status,403);assert.equal(f.state.native,0);
+});
+test('unlinked ITTECH still cannot use native Fleet/map endpoints through this route change',async()=>{
+ const f=fixture({path:'/api/field-map',method:'GET',requestBody:{}}),r=await f.run();assert.equal(r.status,403);assert.equal(f.state.native,0);
+});
+for(const authorization of ['', 'Basic synthetic-only', 'Bearer forged', 'Bearer expired', 'Bearer wrong-project'])test('unverified bearer '+(authorization||'missing')+' cannot reach native reads',async()=>{
+ const f=fixture({authorization,authStatus:401}),r=await f.run();assert.equal(r.status,401);assert.equal(f.state.native,0);assert.equal(f.state.cap,0);
+});
+test('oversized request and query overrides are denied before native access',async()=>{
+ const large=fixture({requestBody:{...body,notes:'x'.repeat(70000)}});assert.equal((await large.run()).status,413);assert.equal(large.state.native,0);
+ const query=fixture({direct:true,path:'/api/techcheck/location-proof?actor_id=foreign'});assert.equal((await query.run()).status,400);assert.equal(query.state.native,0);
 });
