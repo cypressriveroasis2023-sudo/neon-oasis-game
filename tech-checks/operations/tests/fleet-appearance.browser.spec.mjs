@@ -200,7 +200,7 @@ test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
  await app.getByLabel('Fleet family',{exact:true}).selectOption('SPOTTER');
  await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(2);
  await page.setViewportSize({width:844,height:390});
- await expect(app.getByLabel('Fleet family',{exact:true})).toHaveValue('Spotter');
+ await expect(app.getByLabel('Fleet family',{exact:true})).toHaveValue('SPOTTER');
  const layout=await app.locator('.cos-fleet-workspace').evaluate(el=>({display:getComputedStyle(el).display,mapY:el.querySelector('.cos-fleet-map-panel').getBoundingClientRect().y,listY:el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect().y,overflow:document.documentElement.scrollWidth-innerWidth}));
  expect(layout.display).toBe('flex');
  expect(layout.mapY).toBeLessThan(layout.listY);
