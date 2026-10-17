@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {auditFieldSavedLocations as audit} from './helpers/field-saved-location-audit.mjs';
+const sha='a'.repeat(64),address={street:'19777 Clay Rd',city:'Katy',state:'TX',zip:'77449'};
+const row=(id,unit='Solar Stand 72 019',a=address,placement='FIELD')=>({productId:id,unitNumber:unit,sourceAddress:a,placement,lifecycle:'UNFLAGGED',placementHeld:false});
+const lookup=(id,extra={})=>({productId:id,sourceSha256:sha,status:'success',sourceAddress:address,latitude:29,longitude:-95,geocodedAt:'2026-10-16T10:00:00Z',...extra});
+const run=(rows,pins=[],lookups=[],identities=[])=>audit({sourceSha256:sha,records:rows,acceptedProductPins:pins,savedLookups:lookups,identityProofProductIds:identities,now:Date.parse('2026-10-17T18:00:00Z')});
+test('mapped record excluded from missing candidates',()=>{const r=run([row('1')],['1'],[lookup('1')],['1']);assert.equal(r.unmappedActiveProductIds,0);assert.equal(r.review[0].reason,'already_mapped')});
+test('83 saved lookups can include existing pins; none are automatically repaired',()=>{const rows=Array.from({length:83},(_,i)=>row(String(i+1),'Solar Stand '+i));const r=run(rows,['1','2','3'],rows.map(x=>lookup(x.productId)),rows.map(x=>x.productId));assert.equal(r.unmappedActiveProductIds,80);assert.equal(r.review.filter(x=>x.reason==='saved_lookup_candidate_only').length,80)});
+test('Shop excluded and Field solar stand included',()=>{const r=run([row('1'),row('2','Spotter 120',address,'SHOP')]);assert.equal(r.fieldProductRecords,1)});
+test('malformed Kyle address blocks lookup',()=>{const a={street:'',city:'1001 I-35 Frontage Rd Kyle',state:'TX',zip:'78640'};assert.equal(run([row('1947767','ST 044',a)],[],[lookup('1947767')],['1947767']).review[0].reason,'invalid_service_address')});
+test('identity hold outranks successful cache',()=>{const r={...row('2229349','Solar Spotter 006'),placementHeld:true};assert.equal(run([r],[],[lookup(r.productId)],[r.productId]).review[0].reason,'identity_or_placement_held')});
+test('unmatched Product ID cannot inherit address',()=>assert.equal(run([row('3')],[],[lookup('3')]).review[0].reason,'product_identity_unproven'));
+test('other source or other Product ID cannot supply coordinates',()=>assert.equal(run([row('4')],[],[lookup('4',{sourceSha256:'b'.repeat(64)}),lookup('5')],['4']).review[0].reason,'no_current_proven_saved_lookup'));
+test('conflicting coordinates stay in review',()=>assert.equal(run([row('4')],[],[lookup('4'),lookup('4',{latitude:30})],['4']).review[0].reason,'conflicting_saved_coordinates'));
+test('decimal unit number remains untouched',()=>assert.equal(run([row('2301876','Ranger 029.2')],[],[lookup('2301876')],['2301876']).review[0].unitNumber,'Ranger 029.2'));
+test('duplicate source Product IDs fail closed',()=>assert.throws(()=>run([row('1'),row('1')]),/Duplicate/));
+test('count basis is not the Fleet missing-map total',()=>assert.equal(run([row('1')]).countBasis,'distinct_mhelp_product_ids_not_combined_fleet_locations'));
