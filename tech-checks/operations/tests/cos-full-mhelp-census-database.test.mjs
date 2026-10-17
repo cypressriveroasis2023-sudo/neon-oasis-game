@@ -32,5 +32,21 @@ test('complete Census enrollment retains exactly 1001 immutable Product IDs and 
    await f.db.exec('reset role');
   }
   await assert.rejects(()=>f.db.exec(synthetic),'Duplicate enrollment must not silently reimport');
+  await f.db.exec("create schema net;create table net._http_response(id bigint,status_code integer,error_msg text,content text);");
+  await f.db.exec(await src('cos_full_mhelp_census_processing_20261017.sql'));
+  const classify=async (content,httpCode=200,error=null)=>(await f.db.query(
+   'select cos_mhelp_placement_private.census_mhelp_classify_response($1,$2,$3,$4,$5,$6,$7) v',
+   [httpCode,error,content,'123 Main St','HOUSTON','TX','77002'])).rows[0].v;
+  const positive={result:{input:{benchmark:{benchmarkName:'Public_AR_Current'}},
+   addressMatches:[{matchedAddress:'123 MAIN ST, HOUSTON, TX, 77002',
+    coordinates:{x:-95.3,y:29.7},addressComponents:{zip:'77002',city:'HOUSTON',state:'TX'}}]}};
+  assert.equal((await classify(JSON.stringify(positive))).status,'matched');
+  assert.equal((await classify(JSON.stringify({...positive,result:{...positive.result,addressMatches:[]}}))).status,'no_match');
+  assert.equal((await classify(JSON.stringify({...positive,result:{...positive.result,addressMatches:[positive.result.addressMatches[0],positive.result.addressMatches[0]]}}))).status,'ambiguous');
+  const offCity=structuredClone(positive);offCity.result.addressMatches[0].addressComponents.city='KATY';
+  assert.equal((await classify(JSON.stringify(offCity))).status,'address_review');
+  assert.equal((await classify('not-json')).status,'provider_error');
+  assert.equal((await classify('{}',503,'upstream error')).status,'provider_error');
+  assert.deepEqual(await f.preserved(),before,'Response classification cannot update native records');
  }finally{await f.db.close();}
 });
