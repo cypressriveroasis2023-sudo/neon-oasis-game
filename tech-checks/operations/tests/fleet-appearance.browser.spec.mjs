@@ -159,7 +159,9 @@ test('narrow screens retain every view tab and filter without page overflow',asy
 });
 
 
-for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['wide landscape',932,430]]){
+test.describe('touch iPhone Fleet presentation',()=>{
+ test.use({hasTouch:true});
+ for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['wide landscape',932,430]]){
  test('iPhone '+label+' keeps Fleet map first without a sidebar or overflow',async({page},info)=>{
   await page.setViewportSize({width,height});
   const {app,state}=await mount(page);
@@ -205,5 +207,27 @@ test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
  expect(layout.overflow).toBeLessThanOrEqual(1);
  await app.getByLabel('Fleet family',{exact:true}).selectOption('all');
  await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
+ onlySavedReads(state);
+});
+});
+
+
+test('short desktop viewport preserves sidebar and desktop Fleet map columns',async({page})=>{
+ await page.setViewportSize({width:932,height:430});
+ const {app,state}=await mount(page);
+ const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
+  const shell=el.closest('.company-shell');
+  const map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect();
+  const list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
+  return {pointer:matchMedia('(pointer:coarse)').matches,
+   sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,
+   layout:getComputedStyle(el.querySelector('.cos-fleet-workspace')).display,
+   mapX:map.x,listX:list.x,overflow:document.documentElement.scrollWidth-innerWidth};
+ });
+ expect(geometry.pointer).toBe(false);
+ expect(geometry.sidebar).not.toBe('none');
+ expect(geometry.layout).toBe('grid');
+ expect(geometry.listX).toBeLessThan(geometry.mapX);
+ expect(geometry.overflow).toBeLessThanOrEqual(1);
  onlySavedReads(state);
 });
