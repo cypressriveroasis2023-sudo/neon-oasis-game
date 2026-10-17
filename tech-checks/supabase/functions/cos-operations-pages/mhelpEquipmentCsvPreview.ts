@@ -141,7 +141,8 @@ export function compareMhelpEquipmentRows(rows:EquipmentCsvRow[],previous:unknow
 export async function previewMhelpEquipmentCsv(body:unknown,prior:unknown):Promise<EquipmentPreview>{
   if(!body||typeof body!=='object'||Array.isArray(body))reject('invalid request');
   const data=body as Record<string,unknown>;
-  if(Object.keys(data).some(k=>!['bytesBase64','expectedSha256'].includes(k))||typeof data.bytesBase64!=='string'||data.bytesBase64.length>Math.ceil(EQUIPMENT_CSV_MAX_BYTES/3)*4+4||data.bytesBase64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(data.bytesBase64))reject('invalid CSV bytes');
+  if(Object.keys(data).some(k=>!['bytesBase64','expectedSha256','sourceFilename'].includes(k))||typeof data.bytesBase64!=='string'||data.bytesBase64.length>Math.ceil(EQUIPMENT_CSV_MAX_BYTES/3)*4+4||data.bytesBase64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(data.bytesBase64))reject('invalid CSV bytes');
+  if(data.sourceFilename!==undefined&&(typeof data.sourceFilename!=='string'||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(data.sourceFilename)))reject('invalid mHelp source filename');
   const decoded=atob(data.bytesBase64);if(decoded.length> EQUIPMENT_CSV_MAX_BYTES||decoded.length===0||btoa(decoded)!==data.bytesBase64)reject('non-canonical CSV bytes');
   const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
   const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
