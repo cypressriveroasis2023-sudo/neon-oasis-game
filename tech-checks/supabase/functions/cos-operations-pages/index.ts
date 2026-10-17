@@ -2,7 +2,8 @@ import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
 import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
-import {previewMhelpEquipmentCsv,EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
+import {EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
+import {ownerEquipmentCsvReview} from './mhelpEquipmentOwnerReview.ts';
 import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from './combinedFleetRoster.ts';
 import {sourceEquipmentAddressCandidates,projectSourceEquipmentAddressEstimates} from './sourceEquipmentAddressEstimates.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
@@ -750,7 +751,7 @@ export function createOperationsHandler(options) {
         if (body === null) body = await readMhelpAwareJson(request,Math.ceil(EQUIPMENT_CSV_MAX_BYTES / 3) * 4 + 8192,admitLargeBody);
         const current = await readMhelpPlacements(actorPayload);
         if (!current?.upload) fail('The previous reviewed mHelp equipment source is unavailable. No records were changed.',503);
-        try {return json(await previewMhelpEquipmentCsv(body,current.upload));}
+        try {return json(await ownerEquipmentCsvReview({body,previous:current.upload,google:{getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion,fetch:requestFetch}}));}
         catch(e){
           if(e instanceof Error && e.message.startsWith('Invalid mHelpDesk equipment CSV:'))fail(e.message,422);
           fail('The equipment comparison is unavailable. No records were changed.',503);
