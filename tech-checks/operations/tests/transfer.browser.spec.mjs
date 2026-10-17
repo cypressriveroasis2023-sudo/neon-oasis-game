@@ -18,6 +18,8 @@ for(const width of [390,430])test('IT returns one selected unit and leaves the o
 });
 let f;test.afterEach(async()=>{await f?.close();f=null;});
 test('IT repair reinspection records a new signature and photo while preserving the original failure and hold',async({page})=>{
+ // Repair handoffs use the phone workflow; the desktop Fleet workspace is covered separately.
+ await page.setViewportSize({width:390,height:844});
  f=await mountTransfers(page,{seedHandoff:true});const manifest=f.handoff.expected;
  for(const [kind,actor,name,revision] of [['receipt',SERVICE,'Synthetic Service',1],['return',IT,'Synthetic IT',2]]){
   const id=randomUUID(),path=actor+'/'+id+'/'+'b'.repeat(64)+'.jpg';await f.db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);

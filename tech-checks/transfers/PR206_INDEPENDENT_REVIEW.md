@@ -80,3 +80,28 @@ The stronger legacy install has SHA256
 Native install/rollback hashes and all existing caller grants are unchanged.
 All production installation, grants, signing keys, deployment, activation and
 merge remain held. PR206 remains draft; PR187 is untouched.
+
+## Full-browser follow-up
+
+Head `bd830ecfb9c9458c16d66917de576212a2024973` reached terminal CI: seven
+workflows passed. The operations workflow passed 4,297 Node cases (18 skips),
+all targeted browser groups, typechecking and build, then its full browser suite
+passed 2,940 cases, skipped 178 and failed two desktop-project executions of the
+repair-reinspection test. Both retries waited for the phone-only Reload handoffs
+control. The dedicated transfer workflow passed 66 regressions, 67 authorization
+cases, 68 real-PostgreSQL cases and 73 browser cases without skips; its browser
+configuration defaults to a phone viewport.
+
+The repair test omitted the explicit phone viewport used by the other phone
+handoff scenarios. A local desktop reproduction failed at the same control, and
+its screenshot showed the expected desktop Fleet workspace. The test now selects
+390 by 844 before mounting. Every repair, signature/photo, history, reservation
+and page-error assertion is unchanged; the separate desktop restriction test is
+also unchanged. No runtime, SQL or permissions change was needed.
+
+The native/bridge reviewer independently inspected this narrow test correction
+and confirmed the diagnosis. The complete transfer spec then passed all 33 cases
+under the three project settings with no retries, including each scenario's
+explicit phone or desktop viewport. This is not a claim that phone repair controls
+exist on desktop. The subsequent exact-head hosted CI result is recorded
+separately. The activation limits above remain open.
