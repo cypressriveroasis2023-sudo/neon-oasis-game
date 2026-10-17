@@ -1,4 +1,7 @@
 -- DESIGN CANDIDATE ONLY. Do not apply to production without independent DB/Owner review.
+-- The historic libraryFileId/receivedMessageId fields are compatibility tokens only;
+-- the immutable COS-private stage bytes + sourceEvidence contract provide actual
+-- source provenance. This alternative must be approved before any production use.
 -- This private source-file stage is an evidence store, not a unit, camera, IP, GPS,
 -- address or mHelpDesk write. The existing administrator review_upload() stays authoritative.
 -- Current 2027 source census is authenticated by the COS Edge Function, never by browser JSON.
@@ -159,6 +162,13 @@ begin
     'receivedAtPrecision','second','exportAsOf',null,
     'recordCount',n,'libraryFileId','libfile_'||replace(p_request_id::text,'-',''),
     'receivedMessageId','cos_owner_equipment_stage:'||p_request_id::text,
+    -- A new COS-private source byte record is the durable authority. These
+    -- legacy receipt compatibility fields are NOT external Library/email proof.
+    'sourceEvidence',jsonb_build_object(
+      'contract','COS_PRIVATE_OWNER_EQUIPMENT_SOURCE_V1',
+      'stageId',p_request_id::text,
+      'byteLength',octet_length(bytes),
+      'sha256',p_source_sha256),
     'companyCustomerIds',company_ids,
     'authorizationSha256',encode(pg_catalog.sha256(pg_catalog.convert_to(
       p_actor_user_id::text||':'||p_request_id::text||':'||p_source_sha256||':'||
@@ -222,7 +232,11 @@ begin
  if stage.expires_at<clock_timestamp() or
   stage.expected_active_sha256 is distinct from p_expected_previous_source_sha256 or
   stage.verified_2027_sha256 is distinct from p_current_2027_sha256 or
-  encode(pg_catalog.sha256(stage.source_bytes),'hex') is distinct from stage.source_sha256
+  encode(pg_catalog.sha256(stage.source_bytes),'hex') is distinct from stage.source_sha256 or
+  stage.receipt->'sourceEvidence'->>'contract' is distinct from 'COS_PRIVATE_OWNER_EQUIPMENT_SOURCE_V1' or
+  stage.receipt->'sourceEvidence'->>'stageId' is distinct from stage.id::text or
+  stage.receipt->'sourceEvidence'->>'sha256' is distinct from stage.source_sha256 or
+  (stage.receipt->'sourceEvidence'->>'byteLength')::integer is distinct from octet_length(stage.source_bytes)
  then raise exception 'Equipment source review is stale' using errcode='40001';end if;
  applied:=cos_mhelp_placement_private.review_upload(
   stage.receipt,stage.records,stage.expected_active_sha256,true);
