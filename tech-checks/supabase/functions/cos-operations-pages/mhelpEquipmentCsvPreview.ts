@@ -87,7 +87,9 @@ export function parseEquipmentCsv(text:string):EquipmentCsvRow[] {
 }
 
 function sameAddress(a:EquipmentCsvRow['sourceAddress'],b:EquipmentCsvRow['sourceAddress']):boolean {
-  return (['street','city','state','zip'] as const).every(k=>normalize(a[k])===normalize(b[k]));
+  // Reviewed scoped corrections can intentionally leave address cells unknown.
+  // Unknown is a comparison difference; it never supplies location authority.
+  return (['street','city','state','zip'] as const).every(k=>typeof a[k]==='string'&&typeof b[k]==='string'&&normalize(a[k])===normalize(b[k]));
 }
 function validPrior(v:unknown):{sourceSha256:string;records:PreviousRecord[]}{
   if(!v||typeof v!=='object'||Array.isArray(v))reject('reviewed previous upload missing');
