@@ -178,12 +178,14 @@ for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['
   expect(Math.abs(geometry.firstY-geometry.secondY)).toBeLessThan(1);
   expect(geometry.overflow).toBeLessThanOrEqual(1);
   for(const target of geometry.targets){expect(target.width).toBeGreaterThanOrEqual(44);expect(target.height).toBeGreaterThanOrEqual(44);}
+  if(width>700){await app.getByRole('button',{name:'More',exact:true}).click();await expect(app.locator('.operations-sidebar-open')).toBeVisible();await app.getByRole('button',{name:/Close menu/}).click();}
   await page.screenshot({path:info.outputPath('iphone-'+label.replace(' ','-')+'-fleet.png'),fullPage:true});
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const detail=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
   for(const title of ['Camera health','InHand router','Camera troubleshooting'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
   await detail.getByRole('heading',{name:'Camera troubleshooting',exact:true}).scrollIntoViewIfNeeded();
-  expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  await detail.evaluate(el=>el.scrollTop=el.scrollHeight);
+  expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
   expect(await detail.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await detail.getByRole('button',{name:'Close unit details'}).click();
   await noPageOverflow(app);onlySavedReads(state);
@@ -192,7 +194,8 @@ for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['
 test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  const {app,state}=await mount(page);
- await app.getByLabel('Fleet family',{exact:true}).selectOption('Spotter');
+ await app.getByLabel('Fleet status',{exact:true}).selectOption('all');
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('SPOTTER');
  await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(2);
  await page.setViewportSize({width:844,height:390});
  await expect(app.getByLabel('Fleet family',{exact:true})).toHaveValue('Spotter');
@@ -200,7 +203,7 @@ test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
  expect(layout.display).toBe('flex');
  expect(layout.mapY).toBeLessThan(layout.listY);
  expect(layout.overflow).toBeLessThanOrEqual(1);
- await app.getByLabel('Fleet family',{exact:true}).selectOption('All unit families');
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('all');
  await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
  onlySavedReads(state);
 });
