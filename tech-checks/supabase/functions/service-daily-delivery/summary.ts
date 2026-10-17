@@ -1,4 +1,5 @@
-import {escapeHtml} from './report.ts';
+import {escapeHtml,receiptLinksHtml} from './report.ts';
+import {paginatedPdf,type PdfLine} from './transfer-report.ts';
 export function summaryLines(r:any){
  const s=r.snapshot,i=s.inventory, sig=s.signature;
  const count=(answers:any,prefix:string,n:number)=>Array.from({length:n},(_,k)=>answers?.[prefix+(k+1)]===true).filter(Boolean).length;
@@ -9,11 +10,13 @@ export function summaryLines(r:any){
 export function summaryHtml(r:any,folderId:string,pdfUrl:string){
  const s=summaryLines(r),e=escapeHtml;
  const rows=(items:string[])=>items.map(v=>'<div style="padding:3px 0">'+e(v)+'</div>').join('');
- return `<!doctype html><html><meta charset="utf-8"><body style="font:16px Arial,sans-serif;color:#17212b;background:#fff;max-width:720px;margin:20px auto;padding:20px"><h1 style="font-size:26px">TechCheck Daily Summary</h1><p><b>${e(s.name)}</b><br>${e(s.time)} Central Time</p><p><b>Truck:</b> ${e(s.truck)}<br><b>Trailer:</b> ${e(s.trailer)}</p><h2 style="font-size:18px">Equipment on truck</h2>${rows(s.units)}<h2 style="font-size:18px">SIM cards</h2>${rows(s.sims)}<h2 style="font-size:18px">Battery quantities</h2>${rows(s.batteries)}<p>${s.photos} supporting photos saved in Drive.</p><h2 style="font-size:18px">Technician sign-off</h2>${s.signature?`<p>${e(s.signature.statement)}</p>${s.signature.method==='drawn'?'<img src="cid:techcheck-signature" alt="Technician handwritten signature" style="width:300px;max-width:100%;height:90px;object-fit:contain">':`<p style="font:italic 24px Georgia">${e(s.name)}</p>`}<p><b>${e(s.name)}</b> · ${e(s.time)} Central Time</p>`:'<p>No signature captured in this earlier report.</p>'}<p><a href="${e(pdfUrl)}">Open one-page PDF with signature</a> · <a href="https://drive.google.com/drive/folders/${e(folderId)}">Open all photos and full answers</a></p></body></html>`;
+ return `<!doctype html><html><meta charset="utf-8"><body style="font:16px Arial,sans-serif;color:#17212b;background:#fff;max-width:720px;margin:20px auto;padding:20px"><h1 style="font-size:26px">TechCheck Daily Summary</h1><p><b>${e(s.name)}</b><br>${e(s.time)} Central Time</p><p><b>Truck:</b> ${e(s.truck)}<br><b>Trailer:</b> ${e(s.trailer)}</p><h2 style="font-size:18px">Equipment on truck</h2>${rows(s.units)}<h2 style="font-size:18px">SIM cards</h2>${rows(s.sims)}<h2 style="font-size:18px">Battery quantities</h2>${rows(s.batteries)}<p>${s.photos} supporting photos saved in Drive.</p>${receiptLinksHtml(r)}<h2 style="font-size:18px">Technician sign-off</h2>${s.signature?`<p>${e(s.signature.statement)}</p>${s.signature.method==='drawn'?'<img src="cid:techcheck-signature" alt="Technician handwritten signature" style="width:300px;max-width:100%;height:90px;object-fit:contain">':`<p style="font:italic 24px Georgia">${e(s.name)}</p>`}<p><b>${e(s.name)}</b> · ${e(s.time)} Central Time</p>`:'<p>No signature captured in this earlier report.</p>'}<p><a href="${e(pdfUrl)}">${r.snapshot.receipt_links?.length?'Open signed PDF with linked receipts':'Open one-page PDF with signature'}</a> · <a href="https://drive.google.com/drive/folders/${e(folderId)}">Open all photos and full answers</a></p></body></html>`;
 }
 // Self-contained one-page PDF; JPEG signature bytes remain embedded privately.
 export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
- const s=summaryLines(r),enc=new TextEncoder(),parts:Uint8Array[]=[],offsets=[0];let length=0;
+ const s=summaryLines(r);
+ if(r.snapshot.receipt_links?.length)return linkedDailyPdf(r,s,signature);
+ const enc=new TextEncoder(),parts:Uint8Array[]=[],offsets=[0];let length=0;
  const put=(v:string|Uint8Array)=>{const b=typeof v==='string'?enc.encode(v):v;parts.push(b);length+=b.length;};
  const ascii=(v:string)=>v.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'-');
  const safe=(v:string)=>ascii(v).replace(/[\\()]/g,'\\$&');
@@ -53,4 +56,20 @@ export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
  if(dimensions){offsets[7]=length;put(`7 0 obj\n<< /Type /XObject /Subtype /Image /Width ${dimensions[0]} /Height ${dimensions[1]} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${signature!.length} >>\nstream\n`);put(signature!);put('\nendstream\nendobj\n');}
  const start=length,n=dimensions?8:7;put(`xref\n0 ${n}\n0000000000 65535 f \n`);for(let k=1;k<n;k++)put(String(offsets[k]).padStart(10,'0')+' 00000 n \n');put(`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`);
  const bytes=new Uint8Array(length);let pos=0;for(const b of parts){bytes.set(b,pos);pos+=b.length;}return bytes;
+}
+function linkedDailyPdf(r:any,s:ReturnType<typeof summaryLines>,signature?:Uint8Array){
+ const lines:PdfLine[]=[{text:'TechCheck Daily Summary',bold:true},{text:s.name+' / '+s.time+' Central Time'},{text:'Report '+r.id},{text:'Truck: '+s.truck},{text:'Trailer: '+s.trailer}];
+ for(const [heading,items] of [['Equipment on truck',s.units],['SIM cards',s.sims],['Battery quantities',s.batteries]] as [string,string[]][]){lines.push({text:heading,bold:true},...items.map(text=>({text})));}
+ lines.push({text:s.photos+' supporting photos saved in Drive.'});
+ for(const receipt of r.snapshot.receipt_links){
+  lines.push({text:'Reviewed receipt '+receipt.event_id,bold:true},{text:'Receipt revision '+receipt.receipt_revision+' / Handoff '+receipt.transfer_id+' / Handoff revision '+receipt.transfer_revision},{text:'IT: '+receipt.snapshot.it_name+' / Service: '+receipt.snapshot.service_name});
+  for(const [label,items] of [['Original received equipment',receipt.snapshot.actual],['Equipment still assigned at daily sign-off',receipt.remaining]] as [string,any[]][]){
+   lines.push({text:label,bold:true});for(const i of items)lines.push({text:i.family+' '+i.unit_tag+' ['+i.equipment_key+']'},{text:'SIMs: '+i.sims.join(', ')+' / Batteries: '+i.battery_count+' / Parts: '+i.parts.map((p:any)=>p.name+': '+p.quantity).join(', ')});
+  }
+  lines.push({text:'Receipt signature: '+receipt.snapshot.signature.name+' / '+receipt.snapshot.signature.signed_by+' / '+receipt.snapshot.signature.signed_at},{text:receipt.snapshot.signature.statement});
+ }
+ lines.push({text:'Daily technician sign-off',bold:true},{text:s.signature.statement},{text:s.name+' / '+s.signature.signed_by+' / '+s.signature.signed_at});
+ const images:Record<string,Uint8Array>={};
+ if(s.signature.method==='drawn'){if(!signature)throw new Error('Handwritten signature required for summary.');images.daily=signature;lines.push({text:'',image:'daily'});}
+ return paginatedPdf(lines,images);
 }

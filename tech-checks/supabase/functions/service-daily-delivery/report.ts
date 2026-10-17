@@ -20,6 +20,10 @@ const trailer=[
   'No visible structural damage or unsafe condition',
 ];
 export const escapeHtml=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+export function receiptLinksHtml(report:any){
+ const rows=report.snapshot.receipt_links;if(!Array.isArray(rows))return '';
+ return '<h2>Reviewed equipment receipts</h2>'+(rows.length?rows.map((r:any)=>'<section><h3>Receipt '+escapeHtml(r.event_id)+'</h3><p>Receipt revision '+escapeHtml(r.receipt_revision)+' · Handoff '+escapeHtml(r.transfer_id)+' · Handoff revision '+escapeHtml(r.transfer_revision)+'</p><p>IT: '+escapeHtml(r.snapshot.it_name)+' · Service: '+escapeHtml(r.snapshot.service_name)+'</p><h4>Equipment still assigned at sign-off</h4><pre>'+escapeHtml(JSON.stringify(r.remaining,null,2))+'</pre><h4>Original signed receipt</h4><pre>'+escapeHtml(JSON.stringify(r.snapshot,null,2))+'</pre></section>').join(''):'<p>No accepted equipment receipts were assigned at this sign-off.</p>');
+}
 function signoffHtml(report:any,links:Record<string,string>){
  const signature=report.snapshot.signature;
  if(!signature)return '<h2>Technician signature</h2><p>No signature captured in this earlier report version.</p>';
@@ -39,7 +43,7 @@ export function reportHtml(report:any,photoLinks:Record<string,string>={}) {
  '<h2>SIM cards</h2><table>'+inventory.sims.map((v:any)=>row('SIM slot '+v.slot_no,v.sim_number)).join('')+'</table>'+
  '<h2>Battery stock</h2><table>'+[['Recon batteries','recon_battery_qty'],['AGM 12V 110Ah','agm_12v_110ah_qty'],['LiTime 12V 100Ah','litime_12v_100ah_qty'],['12V 35Ah','battery_12v_35ah_qty']].map(([label,key])=>row(label,inventory.stock[key])).join('')+'</table>'+
  '<h2>Photos and image attachments</h2>'+report.photos.filter((p:any)=>p.category!=='Technician signature').map((p:any)=>{const url=photoLinks[p.category+':'+p.view];return `<p>${escapeHtml(p.category)} · ${escapeHtml(p.view)}${p.filename?' · '+escapeHtml(p.filename):''}${url?` · <a href="${escapeHtml(url)}">View photo</a>`:''}</p>`;}).join('')+
- '<p>The required inspection and inventory passed server validation.</p>'+signoffHtml(report,photoLinks)+'</body></html>';
+ '<p>The required inspection and inventory passed server validation.</p>'+receiptLinksHtml(report)+signoffHtml(report,photoLinks)+'</body></html>';
 }
 export function rawEmail(report:any,html:string,folderId:string,signature?:Uint8Array,pdf?:Uint8Array) {
  const subject=`TechCheck ${report.check_date} — ${report.actor_name}`.replace(/[\r\n]/g,' ');

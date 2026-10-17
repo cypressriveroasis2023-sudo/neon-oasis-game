@@ -61,7 +61,7 @@ export function transferReportHtml(value: TransferDelivery, links: Record<string
  }).join('')+'<p>Returned equipment remains held for inventory review. This report does not release stock or change placement or health.</p></body></html>';
 }
 
-type PdfLine = {text: string; bold?: boolean; image?: string};
+export type PdfLine = {text: string; bold?: boolean; image?: string};
 export function transferReportPdf(value: TransferDelivery, signatures: Record<string,Uint8Array> = {}): Uint8Array {
  const d=transferDelivery(value), lines:PdfLine[]=[{text:labels[d.kind],bold:true},{text:'Handoff '+d.transfer_id},{text:'Event '+d.event_id+' / Revision '+d.revision},{text:'IT: '+d.it_name},{text:'Named Service: '+d.service_name}];
  const items=(heading:string,items:any[])=>{lines.push({text:heading,bold:true});for(const i of items)lines.push({text:i.family+' '+i.unit_tag+' ['+i.equipment_key+']'},{text:'SIMs: '+i.sims.join(', ')},{text:'Batteries: '+i.battery_count+'; Parts: '+i.parts.map((p:any)=>p.name+': '+p.quantity).join(', ')});};
@@ -77,7 +77,7 @@ export function transferReportPdf(value: TransferDelivery, signatures: Record<st
  return paginatedPdf(lines,signatures);
 }
 
-function paginatedPdf(lines:PdfLine[],signatures:Record<string,Uint8Array>) {
+export function paginatedPdf(lines:PdfLine[],signatures:Record<string,Uint8Array>) {
  const enc=new TextEncoder(), ascii=(v:string)=>v.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'-');
  const safe=(v:string)=>ascii(v).replace(/[\\()]/g,'\\$&');
  const pages:string[]=[''],images:{key:string;bytes:Uint8Array;width:number;height:number}[]=[];
