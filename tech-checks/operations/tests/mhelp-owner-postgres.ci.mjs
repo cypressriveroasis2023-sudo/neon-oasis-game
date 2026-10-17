@@ -45,6 +45,18 @@ pg("CREATE FUNCTION cos_mhelp_placement_private.review_upload(receipt jsonb,reco
 const oldReceipt={contract:'COS_MHELP_UPLOAD_V1',reviewed:true,sourceSha256:previous,filename:'ServiceItem_List_20261013141848.csv',recordCount:3,trackerRecords:[{recordId:'old:ranger7',unitNumber:'Ranger 007',matchedProductId:'11',binding:{state:'linked',trackerId:'00000000-0000-4000-8000-000000000011',unitIds:['00000000-0000-4000-8000-000000000011'],unitLabels:{'00000000-0000-4000-8000-000000000011':'Ranger 007'},guardCurrent:true}}],companyCustomerIds:['200']};
 const oldRows=[{...records[0],placement:'SHOP',customerId:'200',customer:'Cameras OnSite',sourceAddress:{street:'Old Shop',city:'Houston',state:'TX',zip:'77064'},binding:{productId:'11',fullLabel:'Ranger 007',trackerId:'00000000-0000-4000-8000-000000000011'}},{...records[1],binding:null},{...records[2],productId:'99',binding:null},{...records[3],binding:null}];
 pg("INSERT INTO cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) VALUES("+quote(previous)+",'b',"+quote(JSON.stringify(oldReceipt))+"::jsonb,"+quote(JSON.stringify(oldRows))+"::jsonb)");
+// Exercise the deployed reviewed-upload implementation, rather than the setup
+// stand-in above. Empty native tables provide its source-only locking surface;
+// this is deliberately not proof of linked identity-graph admission.
+for(const table of ['app_private.vision_tracker_locations','public.equipment_units',
+ 'app_private.cos_geocode_sources','public.equipment_unit_location_history',
+ 'app_private.cos_owner_identity_claims','app_private.cos_archived_representations']){
+ pg(`CREATE TABLE ${table}(id uuid)`);
+}
+pg('CREATE TABLE cos_mhelp_placement_private.upload_audit(id bigint generated always as identity,action text,source_sha256 text,previous_sha256 text,authorization_sha256 text)');
+pg('DROP FUNCTION cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
+const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
+pg(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
 pg(readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8'));
 
 const id=randomUUID(),staged=stage(id);
@@ -80,5 +92,10 @@ const applied=commit(id);
 assert.equal(applied.applied,true);
 assert.equal(applied.contract,'COS_OWNER_EQUIPMENT_COMMIT_V1');
 assert.equal(pg('SELECT active_sha256 FROM cos_mhelp_placement_private.upload_control'),sourceHash);
-assert.equal(commit(id).idempotent,true);
+const repeated=commit(id);
+assert.equal(repeated.idempotent,true);
+assert.equal(repeated.contract,applied.contract);
+assert.equal(repeated.stageId,applied.stageId);
+assert.equal(repeated.sourceReceiptsApplied,true);
+assert.equal(pg('SELECT count(*) FROM cos_mhelp_placement_private.upload_audit'),'1');
 console.log('PostgreSQL 17 Owner guarded stage/commit: source CAS, 2027 membership, Owner denial, held identities and byte evidence verified.');

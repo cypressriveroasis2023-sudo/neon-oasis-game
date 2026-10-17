@@ -36,6 +36,32 @@ const params=(requestId=randomUUID(),overrides={})=>[actor,org,requestId,'Servic
 const stage=(db,args)=>db.query("select public.cos_owner_mhelp_equipment_stage_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::text,$8::jsonb,$9::text,$10::jsonb) result",args).then(r=>r.rows[0].result);
 const commit=(db,id,note='I reviewed and approve the current COS Field and Shop inventory.',sha=censusSha)=>db.query("select public.cos_owner_mhelp_equipment_commit_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text) result",[actor,org,id,previous,sha,note]).then(r=>r.rows[0].result);
 
+test('source-only stage and retry exercise the actual reviewed-upload validator',async()=>{
+ const db=await setup();
+ try{
+  // Empty native tables establish the real validator's locking dependencies.
+  // This case admits source-only rows; linked identity graphs need separate proof.
+  for(const table of ['app_private.vision_tracker_locations','public.equipment_units',
+   'app_private.cos_geocode_sources','public.equipment_unit_location_history',
+   'app_private.cos_owner_identity_claims','app_private.cos_archived_representations']){
+   await db.exec(`create table ${table}(id uuid)`);
+  }
+  await db.exec("create table cos_mhelp_placement_private.upload_audit(id bigint generated always as identity,action text,source_sha256 text,previous_sha256 text,authorization_sha256 text)");
+  await db.exec('drop function cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
+  const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
+  await db.exec(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
+  const id=randomUUID(),preview=await stage(db,params(id));
+  assert.equal(preview.recordedField,1);
+  assert.equal(preview.recordedShop,2);
+  assert.equal(preview.boundRecords,0);
+  const applied=await commit(db,id),repeated=await commit(db,id);
+  assert.equal(applied.sourceReceiptsApplied,true);
+  assert.equal(repeated.contract,applied.contract);
+  assert.equal(repeated.sourceReceiptsApplied,true);
+  assert.equal((await db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
+ }finally{await db.close();}
+});
+
 test('private Owner stage preserves original bytes and source-only holds, then commits atomically',async()=>{
  const db=await setup();
  try{
@@ -55,7 +81,11 @@ test('private Owner stage preserves original bytes and source-only holds, then c
   assert.equal(applied.applied,true);
   assert.equal(applied.contract,'COS_OWNER_EQUIPMENT_COMMIT_V1');
   assert.equal((await db.query("select active_sha256 from cos_mhelp_placement_private.upload_control")).rows[0].active_sha256,digest);
-  assert.equal((await commit(db,id)).idempotent,true);
+  const repeated=await commit(db,id);
+  assert.equal(repeated.idempotent,true);
+  assert.equal(repeated.contract,applied.contract);
+  assert.equal(repeated.stageId,applied.stageId);
+  assert.equal(repeated.sourceReceiptsApplied,true);
  }finally{await db.close();}
 });
 test('source checksum, source CAS, changed current 2027 ID, and weak Owner confirmation are rejected',async()=>{
