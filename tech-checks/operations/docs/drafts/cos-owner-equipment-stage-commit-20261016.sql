@@ -250,7 +250,9 @@ begin
  then raise exception 'Explicit source approval is required' using errcode='22023';end if;
  select * into strict stage from cos_mhelp_placement_private.owner_equipment_stages
  where id=p_stage_id and actor_id=p_actor_user_id and organization_id=p_organization_id for update;
- if stage.applied_at is not null then return stage.applied_receipt||jsonb_build_object('idempotent',true);end if;
+ if stage.applied_at is not null then return stage.applied_receipt||jsonb_build_object(
+  'contract','COS_OWNER_EQUIPMENT_COMMIT_V1','stageId',stage.id,
+  'sourceReceiptsApplied',true,'idempotent',true);end if;
  if stage.expires_at<clock_timestamp() or
   stage.expected_active_sha256 is distinct from p_expected_previous_source_sha256 or
   stage.verified_2027_sha256 is distinct from p_current_2027_sha256 or
