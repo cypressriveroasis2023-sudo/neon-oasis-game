@@ -39,3 +39,11 @@ export function readMhelpInventoryAuthority(value:unknown,now=Date.now()):MhelpI
   // The saved upload is historical evidence, not proof of a live vendor read.
   stale:now-Date.parse(value.receivedAt)>24*60*60*1000};
 }
+
+/** The whole mHelp Product-ID census is a headline only on the unfiltered
+ * default Field view; a filtered COS map cannot claim the whole 287 units. */
+export function showMhelpProductHeadline(filters:{placement?:string;query?:string;family?:string;provider?:string;nearbyId?:string;installationStatus?:string;retired?:boolean},hasRoster:boolean,hasCensus:boolean):boolean{
+ return hasRoster&&hasCensus&&filters.placement==='field'&&!String(filters.query||'').trim()
+  &&filters.family==='all'&&filters.provider==='all'&&!filters.nearbyId
+  &&(!filters.installationStatus||filters.installationStatus==='all')&&filters.retired!==true;
+}
