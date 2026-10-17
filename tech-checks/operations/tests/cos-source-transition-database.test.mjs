@@ -51,14 +51,23 @@ test('guarded source transition is read-only until Owner admission and fails shu
   await db.query("update app_private.vision_tracker_locations set unit_number='Solar Spotter 006HDC2',unit_key='solarspotter006hdc2' where id=$1",[tracker]);
   const beforeGuard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,$2) v',[tracker,native])).rows[0].v;
   const beforeGraph=(await db.query('select cos_mhelp_placement_private.continuity_graph($1,$2) v',[tracker,native])).rows[0].v;
-  const old={...f.records[0],productId:'2229349',unitNumber:'Solar Spotter 006  ',category:'Solar Spotter',
+  const old={...f.records[0],productId:'2229349',unitNumber:'Solar Spotter 006  ',category:'Solar Spotter',customer:'Synthetic customer: Synthetic job',
    sourceAddress:{street:'19777 Clay Rd',city:'Katy',state:'TX',zip:'77449'},
    possibleAliasUnitIds:[],placementHeld:false,
    binding:{...f.records[0].binding,productId:'2229349',fullLabel:'Solar Spotter 006  ',
     trackerLabel:'Solar Spotter 006HDC2',nativeLabel:'Solar Spotter 006HDC2',
     canonicalKey:'SOLAR SPOTTER:6',representedUnitIds:[native],expectedGuard:beforeGuard}};
   const beforeRecords=[old,...f.records.slice(1)];
-  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1::jsonb where source_sha256=$2',[beforeRecords,hash]);
+  const trackerRowId='tracker:synthetic:SOLAR SPOTTER:6';
+  const oldTracker={recordId:trackerRowId,unitNumber:'Solar Spotter 006HDC2',matchedProductId:'2229349',category:'SOLAR SPOTTERS',
+   placement:'FIELD',lifecycle:'ACTIVE',customer:'Synthetic customer',site:'Synthetic job',sourceAddress:null,
+   binding:{state:'linked',unitIds:[native,tracker],unitLabels:{[native]:'Solar Spotter 006HDC2',[tracker]:'Solar Spotter 006HDC2'},
+    matchMethod:'exact_canonical_family_unit',trackerId:tracker,nativeUnitId:native,expectedGuard:beforeGuard,
+    representedUnitIds:[native],placementHeld:false}};
+  const newTracker={...oldTracker,unitNumber:'Solar Spotter 006',customer:'Synthetic customer: Synthetic job',site:null,
+   binding:{state:'held',unitIds:[],unitLabels:{},guardCurrent:null}};
+  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1::jsonb,receipt=receipt||$3::jsonb where source_sha256=$2',
+   [beforeRecords,hash,{trackerRecords:[oldTracker]}]);
   await db.exec('alter table app_private.cos_geocode_sources add column source_file_sha256 text');
   await db.query('insert into app_private.cos_geocode_sources(tracker_id,entity_kind,native_unit_id,product_id,source_system,source_revision,unit_number,tracker_unit_number,active,source_file_sha256) values($1,$2,$3,$4,$5,$6,$7,$8,true,$9)',[tracker,'equipment_unit',native,'2229349','mhelpdesk_product_import','77777777-7777-4777-8777-777777777777','Solar Spotter 006HDC2','Solar Spotter 006HDC2',hash]);
   const afterGuard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,$2) v',[tracker,native])).rows[0].v;
@@ -69,7 +78,7 @@ test('guarded source transition is read-only until Owner admission and fails shu
   const next={...old,unitNumber:'Solar Spotter 006',binding:null,placementHeld:true,holdReason:'Native identity or location evidence changed; fresh association review required'};
   delete next.possibleAliasUnitIds;
   const nextRecords=[next,...f.records.slice(1)];
-  const receipt={...f.receipt,sourceSha256:currentSha,receivedAt:'2026-10-17T10:00:00Z'};
+  const receipt={...f.receipt,sourceSha256:currentSha,receivedAt:'2026-10-17T10:00:00Z',trackerRecords:[newTracker]};
   await db.query('insert into cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) values($1,$2,$3,$4)',[currentSha,payload,receipt,nextRecords]);
   await db.query('update cos_mhelp_placement_private.upload_control set active_sha256=$1 where singleton',[currentSha]);
   await db.query("insert into cos_mhelp_placement_private.upload_audit(action,source_sha256,previous_sha256,authorization_sha256) values('activate',$1,$2,$3)",[currentSha,hash,hash]);
@@ -85,9 +94,16 @@ test('guarded source transition is read-only until Owner admission and fails shu
   const admitted=(await f.snapshot()).records[0];
   assert.equal(admitted.binding.nativeUnitId,native);assert.equal(admitted.binding.guardCurrent,true);
   assert.equal(admitted.holdReason,null);assert.equal(admitted.placementHeld,false);
+  const reconciled=(await f.snapshot()).trackerRecords;
+  assert.equal(reconciled[0].matchedProductId,'2229349');
+  assert.equal(reconciled[0].binding.state,'linked');
+  assert.equal(reconciled[0].binding.guardCurrent,true);
+  assert.deepEqual(reconciled[0].binding.unitIds,[native,tracker]);
   assert.equal((await f.snapshot()).records.length,2);
   await db.query("update app_private.vision_tracker_locations set customer='Concurrent correction' where id=$1",[tracker]);
-  const stale=(await f.snapshot()).records[0];assert.equal(stale.binding,null);assert.equal(stale.placementHeld,true);
+  const afterDrift=await f.snapshot(),stale=afterDrift.records[0];
+  assert.equal(stale.binding,null);assert.equal(stale.placementHeld,true);
+  assert.equal(afterDrift.trackerRecords[0].binding.state,'held');
   await assert.rejects(()=>db.query('select cos_mhelp_placement_private.admit_source_transition($1,$2,$3,$4,$5,$6,$7,$8,$9)',[actor,org,currentSha,payload,hash,'2229349',proof.currentRowSha256,'88888888-8888-4888-8888-888888888888',true]),/changed/);
  }finally{await f.db.close();}
 });
