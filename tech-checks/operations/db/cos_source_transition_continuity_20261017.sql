@@ -20,6 +20,10 @@ create table cos_mhelp_placement_private.source_transition_receipts (
  previous_row_sha256 text not null check(previous_row_sha256 ~ '^[a-f0-9]{64}$'),
  current_graph_guard text not null check(current_graph_guard ~ '^[a-f0-9]{64}$'),
  reviewed_binding jsonb not null,
+ tracker_record_id text not null,
+ current_tracker_row_sha256 text not null check(current_tracker_row_sha256 ~ '^[a-f0-9]{64}$'),
+ previous_tracker_row_sha256 text not null check(previous_tracker_row_sha256 ~ '^[a-f0-9]{64}$'),
+ reviewed_tracker_binding jsonb not null,
  actor_user_id uuid not null,
  created_at timestamptz not null default clock_timestamp(),
  unique(active_source_sha256,product_id)
@@ -37,6 +41,7 @@ create function cos_mhelp_placement_private.source_transition_review(
  p_active text,p_payload text,p_previous text,p_product text)
 returns jsonb language plpgsql stable set search_path='' as $$
 declare old_row jsonb; new_row jsonb; binding jsonb; receipt cos_mhelp_placement_private.source_continuity;
+         old_tracker jsonb; new_tracker jsonb; old_tracker_count integer; new_tracker_count integer;
          source_rows integer; previous_rows integer; source_no text; canonical text; normal_old text; normal_new text;
          active_payload text; new_hash text; old_hash text;
 begin
@@ -92,6 +97,70 @@ begin
  if not exists(select 1 from public.equipment_units u where u.id=(binding->>'nativeUnitId')::uuid and u.unit_number=binding->>'nativeLabel')
  or not exists(select 1 from app_private.vision_tracker_locations t where t.id=(binding->>'trackerId')::uuid and t.unit_number=binding->>'trackerLabel') then
   return jsonb_build_object('eligible',false,'reason','registry_unit_changed');end if;
+ -- Full current-source collision veto, not a family/name-based positive join.
+ -- Any other Product ID claiming either physical identity blocks recovery.
+ if exists (
+  select 1 from jsonb_array_elements(cos_mhelp_placement_private.scoped_records(p_active)) r
+  where r->>'productId'<>p_product and
+  (r->'binding'->>'nativeUnitId'=binding->>'nativeUnitId'
+   or r->'binding'->>'trackerId'=binding->>'trackerId'
+   or coalesce(r->'possibleAliasUnitIds','[]'::jsonb) ? (binding->>'nativeUnitId')
+   or coalesce(r->'possibleAliasUnitIds','[]'::jsonb) ? (binding->>'trackerId'))
+ ) or exists(
+  select 1 from cos_mhelp_placement_private.links l where l.equipment_id<>p_product
+   and (l.native_unit_id=(binding->>'nativeUnitId')::uuid or l.tracker_id=(binding->>'trackerId')::uuid)
+ ) or exists (
+  select 1 from app_private.cos_geocode_sources s where s.active and s.product_id is distinct from p_product
+   and (s.native_unit_id=(binding->>'nativeUnitId')::uuid or s.tracker_id=(binding->>'trackerId')::uuid)
+ ) or exists (
+  select 1 from app_private.cos_owner_identity_claims c where c.native_unit_id=(binding->>'nativeUnitId')::uuid
+ ) then
+  return jsonb_build_object('eligible',false,'reason','competing_registry_or_product_identity');end if;
+ -- The 2027 tracker is a second independent authority: a recovered Product ID
+ -- cannot coexist with the same tracker row still held. Require exact old/new
+ -- recordId, family, placement, membership and HDC2 variant continuity.
+ select count(*),(jsonb_agg(r)->0) into old_tracker_count,old_tracker
+ from cos_mhelp_placement_private.upload_batches b cross join lateral jsonb_array_elements(coalesce(b.receipt->'trackerRecords','[]'::jsonb)) r
+ where b.source_sha256=p_previous and r->>'matchedProductId'=p_product;
+ select count(*),(jsonb_agg(r)->0) into new_tracker_count,new_tracker
+ from cos_mhelp_placement_private.upload_batches b cross join lateral jsonb_array_elements(coalesce(b.receipt->'trackerRecords','[]'::jsonb)) r
+ where b.source_sha256=p_active and r->>'matchedProductId'=p_product;
+ if old_tracker_count<>1 or new_tracker_count<>1 or new_tracker->>'recordId' is distinct from old_tracker->>'recordId'
+  or old_tracker->>'category' is distinct from 'SOLAR SPOTTERS'
+  or new_tracker->>'category' is distinct from old_tracker->>'category'
+  or old_tracker->>'placement' is distinct from 'FIELD' or new_tracker->>'placement' is distinct from 'FIELD'
+  or old_tracker->>'lifecycle' is distinct from 'ACTIVE' or new_tracker->>'lifecycle' is distinct from 'ACTIVE'
+  or new_tracker->>'unitNumber' is null
+  or upper(btrim(regexp_replace(new_tracker->>'unitNumber','[[:space:]]+',' ','g'))) is distinct from normal_new
+  or regexp_replace(upper(btrim(old_tracker->>'unitNumber')),'HDC2$','') is distinct from normal_new
+  or new_tracker->>'customer' is distinct from new_row->>'customer'
+  or (old_tracker->>'customer'||': '||old_tracker->>'site') is distinct from new_tracker->>'customer'
+  or new_tracker->'sourceAddress' is distinct from old_tracker->'sourceAddress'
+  or old_tracker->'binding'->>'state' is distinct from 'linked'
+  or old_tracker->'binding'->>'matchMethod' is distinct from 'exact_canonical_family_unit'
+  or old_tracker->'binding'->>'nativeUnitId' is distinct from binding->>'nativeUnitId'
+  or old_tracker->'binding'->>'trackerId' is distinct from binding->>'trackerId'
+  or old_tracker->'binding'->>'expectedGuard' is distinct from binding->>'expectedGuard'
+  or old_tracker->'binding'->'unitLabels'->>(binding->>'nativeUnitId') is distinct from binding->>'nativeLabel'
+  or old_tracker->'binding'->'unitLabels'->>(binding->>'trackerId') is distinct from binding->>'trackerLabel'
+  or jsonb_array_length(coalesce(old_tracker->'binding'->'unitIds','[]'::jsonb))<>2
+  or not (old_tracker->'binding'->'unitIds' ? (binding->>'nativeUnitId'))
+  or not (old_tracker->'binding'->'unitIds' ? (binding->>'trackerId'))
+  or old_tracker->'binding'->'representedUnitIds' is distinct from binding->'representedUnitIds'
+  or old_tracker->'binding'->>'placementHeld' is distinct from 'false'
+  or new_tracker->'binding'->>'state' is distinct from 'held'
+  or new_tracker->'binding'->'unitIds' is distinct from '[]'::jsonb
+  or new_tracker->'binding'->'unitLabels' is distinct from '{}'::jsonb
+  or (new_tracker->'binding'-array['state','unitIds','unitLabels','guardCurrent']) is distinct from '{}'::jsonb then
+  return jsonb_build_object('eligible',false,'reason','2027_tracker_membership_or_variant_unproven');end if;
+ if exists(select 1 from cos_mhelp_placement_private.upload_batches b
+  cross join lateral jsonb_array_elements(coalesce(b.receipt->'trackerRecords','[]'::jsonb)) r
+  where b.source_sha256=p_active and r->>'matchedProductId'<>p_product
+  and (coalesce(r->'binding'->'unitIds','[]'::jsonb) ? (binding->>'nativeUnitId')
+   or coalesce(r->'binding'->'unitIds','[]'::jsonb) ? (binding->>'trackerId')
+   or coalesce(r->'binding'->'candidateUnitIds','[]'::jsonb) ? (binding->>'nativeUnitId')
+   or coalesce(r->'binding'->'candidateUnitIds','[]'::jsonb) ? (binding->>'trackerId'))) then
+  return jsonb_build_object('eligible',false,'reason','competing_2027_tracker_membership');end if;
  select s.* into receipt from cos_mhelp_placement_private.source_continuity s
  where s.source_sha256=p_previous and s.action='admit'
   and s.tracker_id=(binding->>'trackerId')::uuid and s.native_id=(binding->>'nativeUnitId')::uuid
@@ -112,7 +181,10 @@ begin
  return jsonb_build_object('eligible',true,'reason','guarded_source_transition_only',
   'productId',p_product,'priorContinuityId',receipt.id,'currentRowSha256',new_hash,
   'previousRowSha256',old_hash,'currentGraphGuard',receipt.after_guard,
-  'reviewedBinding',binding);
+  'reviewedBinding',binding,'trackerRecordId',new_tracker->>'recordId',
+  'currentTrackerRowSha256',encode(sha256(convert_to(new_tracker::text,'UTF8')),'hex'),
+  'previousTrackerRowSha256',encode(sha256(convert_to(old_tracker::text,'UTF8')),'hex'),
+  'reviewedTrackerBinding',old_tracker->'binding');
 end$$;
 revoke all on function cos_mhelp_placement_private.source_transition_review(text,text,text,text) from public,anon,authenticated,service_role;
 
@@ -147,16 +219,21 @@ begin
    or current_receipt.previous_source_sha256 is distinct from p_previous
    or current_receipt.product_id is distinct from p_product
    or current_receipt.current_row_sha256 is distinct from p_current_row_sha
-   or current_receipt.current_graph_guard is distinct from proof->>'currentGraphGuard' then
+   or current_receipt.current_graph_guard is distinct from proof->>'currentGraphGuard'
+   or current_receipt.actor_user_id is distinct from p_actor
+   or current_receipt.tracker_record_id is distinct from proof->>'trackerRecordId'
+   or current_receipt.current_tracker_row_sha256 is distinct from proof->>'currentTrackerRowSha256' then
    raise exception 'Transition request changed' using errcode='40001';end if;
   return jsonb_build_object('applied',p_apply,'idempotent',true,'productId',p_product);
  end if;
  if p_apply then
   insert into cos_mhelp_placement_private.source_transition_receipts
    (request_id,active_source_sha256,active_payload_sha256,previous_source_sha256,product_id,
-    prior_continuity_id,current_row_sha256,previous_row_sha256,current_graph_guard,reviewed_binding,actor_user_id)
+    prior_continuity_id,current_row_sha256,previous_row_sha256,current_graph_guard,reviewed_binding,
+    tracker_record_id,current_tracker_row_sha256,previous_tracker_row_sha256,reviewed_tracker_binding,actor_user_id)
   values(p_request_id,p_active,p_payload,p_previous,p_product,(proof->>'priorContinuityId')::bigint,
-   p_current_row_sha,proof->>'previousRowSha256',proof->>'currentGraphGuard',proof->'reviewedBinding',p_actor);
+   p_current_row_sha,proof->>'previousRowSha256',proof->>'currentGraphGuard',proof->'reviewedBinding',
+   proof->>'trackerRecordId',proof->>'currentTrackerRowSha256',proof->>'previousTrackerRowSha256',proof->'reviewedTrackerBinding',p_actor);
  end if;
  return jsonb_build_object('applied',p_apply,'idempotent',false,'productId',p_product,'reason','guarded_source_transition_only');
 end$$;
@@ -171,7 +248,7 @@ create function cos_mhelp_placement_private.upload_snapshot() returns jsonb
 language sql stable set search_path='' as $$
  with original as materialized(select cos_mhelp_placement_private.source_transition_base_upload_snapshot() j),
  accepted as materialized(
-  select i.product_id,i.reviewed_binding from cos_mhelp_placement_private.source_transition_receipts i
+  select i.product_id,i.reviewed_binding,i.tracker_record_id,i.reviewed_tracker_binding from cos_mhelp_placement_private.source_transition_receipts i
   join cos_mhelp_placement_private.upload_control c on c.singleton and c.active_sha256=i.active_source_sha256
   join cos_mhelp_placement_private.upload_batches b on b.source_sha256=c.active_sha256 and b.payload_sha256=i.active_payload_sha256
   cross join lateral cos_mhelp_placement_private.source_transition_review(i.active_source_sha256,i.active_payload_sha256,i.previous_source_sha256,i.product_id) AS q(proof)
@@ -180,6 +257,10 @@ language sql stable set search_path='' as $$
     and q.proof->>'previousRowSha256'=i.previous_row_sha256
     and q.proof->>'currentGraphGuard'=i.current_graph_guard
     and q.proof->'reviewedBinding'=i.reviewed_binding
+    and q.proof->>'trackerRecordId'=i.tracker_record_id
+    and q.proof->>'currentTrackerRowSha256'=i.current_tracker_row_sha256
+    and q.proof->>'previousTrackerRowSha256'=i.previous_tracker_row_sha256
+    and q.proof->'reviewedTrackerBinding'=i.reviewed_tracker_binding
     and (q.proof->>'priorContinuityId')::bigint=i.prior_continuity_id
  )
  select case when o.j is null then null else o.j||jsonb_build_object('records',(
@@ -189,6 +270,17 @@ language sql stable set search_path='' as $$
       'holdReason',null,'placementHeld',false,'possibleAliasUnitIds','[]'::jsonb) end
     order by (r->>'sourceRow')::integer)
   from jsonb_array_elements(o.j->'records') r left join accepted a on a.product_id=r->>'productId'
+ ),'trackerRecords',(
+  select coalesce(jsonb_agg(case when a.tracker_record_id is null
+     or t->>'matchedProductId' is distinct from a.product_id
+     or t->'binding'->>'state' is distinct from 'held'
+     or t->'binding'->'unitIds' is distinct from '[]'::jsonb
+     or t->'binding'->'unitLabels' is distinct from '{}'::jsonb then t
+   else t||jsonb_build_object('binding',
+     (a.reviewed_tracker_binding-'reviewEvidence')||jsonb_build_object('state','linked','reason',null,'guardCurrent',true))
+   end order by t->>'recordId'),'[]'::jsonb)
+  from jsonb_array_elements(coalesce(o.j->'trackerRecords','[]'::jsonb)) t
+  left join accepted a on a.tracker_record_id=t->>'recordId'
  )) end from original o
 $$;
 revoke all on function cos_mhelp_placement_private.upload_snapshot() from public,anon,authenticated,service_role;
