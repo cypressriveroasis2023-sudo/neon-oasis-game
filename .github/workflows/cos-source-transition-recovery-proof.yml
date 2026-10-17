@@ -12,6 +12,19 @@ jobs:
   source-transition-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         shell: bash
@@ -26,12 +39,21 @@ jobs:
           cache: npm
           cache-dependency-path: tech-checks/operations/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix legacy/tests/recon-ordering --ignore-scripts --no-audit --no-fund
       - name: Test source-transition graph, identity and database reader
         run: |
           set -o pipefail
           node --no-wasm-code-gc --import tsx --test --test-concurrency=1             tests/cos-source-transition-review.test.mjs             tests/cos-source-transition-database.test.mjs             | tee source-transition-focused-test-receipt.txt
+      - name: Verify real PostgreSQL source lock and private ACLs
+        env:
+          COS_SOURCE_TRANSITION_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_source_transition_test_ci
+        run: |
+          set -o pipefail
+          node tests/cos-source-transition-postgres.mjs | tee source-transition-postgres-receipt.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cos-source-transition-focused-receipt
-          path: tech-checks/operations/source-transition-focused-test-receipt.txt
+          path: |
+            tech-checks/operations/source-transition-focused-test-receipt.txt
+            tech-checks/operations/source-transition-postgres-receipt.txt
