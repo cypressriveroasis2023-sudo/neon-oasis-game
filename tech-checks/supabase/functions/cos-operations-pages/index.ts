@@ -1,3 +1,4 @@
+import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
@@ -947,15 +948,19 @@ export function createOperationsHandler(options) {
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
           const combined=projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity);
+          // MHelp Field address is a presentation location by Product ID, never
+          // a native GPS or camera association. This optional authenticated
+          // read must not stop camera health, Fleet, Shop, or existing GPS pins.
+          const withMhelpAddress=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{
-            const candidates=await sourceEquipmentAddressCandidates(combined,mhelpReceipt?.upload);
-            if(!candidates.length)return json(combined);
+            const candidates=await sourceEquipmentAddressCandidates(withMhelpAddress,mhelpReceipt?.upload);
+            if(!candidates.length)return json(withMhelpAddress);
             // This optional receipt read and projection have a two-second added-latency ceiling.
             // Race explicitly: a transport that ignores abort must not hold the map open.
             const controller=new AbortController(),deadline=Date.now()+2000;
-            const unavailable=()=>({...combined,sourceEquipmentEstimates:undefined,sourceEquipmentEstimatesStatus:'unavailable'});
+            const unavailable=()=>({...withMhelpAddress,sourceEquipmentEstimates:undefined,sourceEquipmentEstimatesStatus:'unavailable'});
             let cancel=()=>{};let timer:ReturnType<typeof setTimeout>|undefined;
             const stopped=new Promise(resolve=>{
               cancel=()=>{controller.abort();resolve(unavailable());};
@@ -968,13 +973,13 @@ export function createOperationsHandler(options) {
                 if(controller.signal.aborted)return unavailable();
                 const reviewed=await rpc('cos_source_equipment_estimates_snapshot',actorPayload,controller.signal);
                 if(controller.signal.aborted||Date.now()>=deadline)return unavailable();
-                const projected=await projectSourceEquipmentAddressEstimates(combined,mhelpReceipt.upload,reviewed?.records,reviewed);
+                const projected=await projectSourceEquipmentAddressEstimates(withMhelpAddress,mhelpReceipt.upload,reviewed?.records,reviewed);
                 return controller.signal.aborted||Date.now()>=deadline?unavailable():projected;
               })().catch(()=>unavailable());
               const result=await Promise.race([operation,stopped]);
               return json(controller.signal.aborted||Date.now()>=deadline?unavailable():result);
             }finally{clearTimeout(timer);request.signal.removeEventListener('abort',cancel);controller.abort();}
-          }catch{return json({...combined,sourceEquipmentEstimatesStatus:'unavailable'});}
+          }catch{return json({...withMhelpAddress,sourceEquipmentEstimatesStatus:'unavailable'});}
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {
