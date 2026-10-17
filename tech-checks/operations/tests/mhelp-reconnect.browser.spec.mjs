@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test';
 const origin=process.env.MHELP_RECONNECT_TEST_ORIGIN||'http://127.0.0.1:4173',root='/api/mhelpdesk/partner/reconnect';
 const ready={contract:'cos-mhelpdesk-reconnect-v1',state:'ready',portalId:'224643',revision:2,renewalVerified:false};
 async function mount(page,{role='owner'}={}){
- const calls=[],state={fail:false,delay:null,saved:false,bad:false};
+ const calls=[],state={fail:false,delay:null,saved:false,bad:false,errors:[]};page.on('pageerror',error=>state.errors.push(error.message));
  await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  await page.route(origin+'/reconnect-fixture',route=>route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/${role==='it'?'?mode=fleet':''}#unit-tracker"></iframe><script>window.holdTokenReplies=false;window.pendingTokenReply=null;window.tokenValue='synthetic-only';addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST'){const respond=()=>e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${role}',accessToken:window.tokenValue},location.origin);if(window.holdTokenReplies)window.pendingTokenReply=respond;else respond();}})</script>`}));
  await page.route('**/functions/v1/cos-operations-pages',async route=>{
@@ -26,7 +26,7 @@ async function mount(page,{role='owner'}={}){
  });
  await page.goto(origin+'/reconnect-fixture');
  const frame=page.frameLocator('iframe'),form=frame.getByRole('region',{name:'Secure mHelpDesk reconnect'});
- await expect(frame.getByRole('region',{name:'Unit Tracker workspace'})).toBeVisible();
+ await expect(frame.getByRole('region',{name:role==='it'?'COS Fleet Dashboard':'Unit Tracker workspace',exact:true})).toBeVisible();
  return {frame,form,calls,state};
 }
 async function openAndFill(form){
@@ -74,7 +74,12 @@ test('malformed response cannot display private values or successful connection'
  await expect(form.getByRole('status')).toContainText('could not be confirmed');await expect(form).not.toContainText('synthetic-private-should-not-display');
 });
 test('IT cannot see reconnect and initiates no reconnect request',async({page})=>{
- const {form,calls}=await mount(page,{role:'it'});await expect(form).toHaveCount(0);expect(calls.some(x=>x.path.startsWith(root))).toBe(false);
+ const {frame,form,calls,state}=await mount(page,{role:'it'});
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+ await expect(form).toHaveCount(0);await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toHaveCount(0);
+ expect(calls.some(x=>x.path.startsWith(root)||x.path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(calls.every(x=>x.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 
 test('only verified parent hide clears secret fields; a late status cannot reopen a closed form',async({page})=>{

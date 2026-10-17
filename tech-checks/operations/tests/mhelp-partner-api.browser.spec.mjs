@@ -3,7 +3,7 @@ const origin='http://127.0.0.1:4173';
 const status={contract:'cos-mhelpdesk-partner-review-v1',docsUrl:'https://www.mhelpdesk.com/partner-api/index.html',mode:'read_only_review',state:'setup_required',portalConfigured:false,tokenConfigured:false,automaticSync:false,sheetsPublisher:false,liveAccessVerified:false};
 const item={equipmentId:'1001',portalId:'224643',name:'Sniper 2 023.1',model:'Sniper 2',equipmentTypeId:'20',customerId:'21',serviceLocationId:'22',active:true,updatedAt:'2026-10-09T01:00:00Z',identity:{state:'review_needed',nativeUnitId:null,candidateUnitIds:[]}};
 async function mount(page,{configured=false,tokenOnly=false,role='owner'}={}){
- const calls=[],state={bad:false};
+ const calls=[],state={bad:false,errors:[]};page.on('pageerror',error=>state.errors.push(error.message));
  await page.route(origin+'/partner-fixture',route=>route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/${role==='it'?'?mode=fleet':''}#unit-tracker"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${role}',accessToken:'synthetic-only'},location.origin)})</script>`}));
  await page.route('**/functions/v1/cos-operations-pages',async route=>{
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
@@ -19,7 +19,7 @@ async function mount(page,{configured=false,tokenOnly=false,role='owner'}={}){
  });
  await page.goto(origin+'/partner-fixture');
  const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace'});
- await expect(workspace).toBeVisible();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
+ await expect(role==='it'?frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true}):workspace).toBeVisible();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
 }
 test('setup requires an explicit check and never claims live sync or calls equipment preview',async({page})=>{
  const {review,calls}=await mount(page);await expect(review).toBeVisible();
@@ -58,5 +58,10 @@ test('invalid preview is rejected without leaving stale verified results',async(
  state.bad=true;await review.getByRole('button',{name:'Preview mHelpDesk equipment'}).click();await expect(review.getByRole('alert')).toContainText('could not be verified');await expect(review.locator('tbody')).toHaveCount(0);
 });
 test('verified IT has no Partner API connection controls',async({page})=>{
- const {review,calls}=await mount(page,{role:'it'});await expect(review).toHaveCount(0);expect(calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner/'))).toBe(false);
+ const {frame,review,calls,state}=await mount(page,{role:'it'});
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+ await expect(review).toHaveCount(0);
+ expect(calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner/')||x.path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(calls.every(x=>x.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });

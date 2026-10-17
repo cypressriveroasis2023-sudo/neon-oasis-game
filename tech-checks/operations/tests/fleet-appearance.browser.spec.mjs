@@ -99,7 +99,8 @@ test('circle colors, clustering, fullscreen and unit selection retain their beha
   await app.locator('.cos-dashboard-peer[data-unit-id="'+units[1].id+'"]').click();
   const dialog=app.getByRole('dialog',{name:'Spotter 1 unit intelligence'});
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.camera-unit-state')).toHaveCSS('color','rgb(255, 39, 52)');
+  await expect(dialog.locator('.camera-unit-state')).toHaveClass(/cos-signal-offline/);
+  await expect(dialog.locator('.camera-unit-state')).toHaveCSS('color','rgb(255, 101, 112)');
   await dialog.getByRole('button',{name:'Close unit details'}).click();
   await app.getByRole('button',{name:'Exit fullscreen fleet map'}).press('Escape');
   await expect(app.locator('.cos-fleet-map-expanded')).toHaveCount(0);
