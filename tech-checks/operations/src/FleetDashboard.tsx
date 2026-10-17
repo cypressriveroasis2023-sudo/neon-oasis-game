@@ -12,7 +12,7 @@ import {sniperShopDisplay} from './sniperShopDisplay';
 import {fleetDisplayAddress} from './fleetDisplayAddress';
 import {filterSourceEquipment,readRecordedRoster,recordedFamily,recordedSourceLabel,type RecordedEquipment} from './fleetRecordedRoster';
 import MhelpPlacementStatus from './MhelpPlacementStatus';
-import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
+import {readMhelpInventoryAuthority,showMhelpProductHeadline} from './mhelpInventoryAuthority';
 import OwnerEquipmentCsvPreview from './OwnerEquipmentCsvPreview';
 import LocationEstimatePreview from './LocationEstimatePreview';
 import FleetLocationEditor from './FieldMap';
@@ -74,7 +74,7 @@ export default function FleetDashboard({entryRevision=0,initialView='map',openAd
  const scope=filterFleetDashboard(rows,{...filters,status:'all'},'fleet'),counts=fleetDashboardSummary(scope),discoveries=discoveryNeedsSetup(vrm?.items||[],rows);
  // Only the unfiltered default Field view may show a whole-source Product-ID
  // census as a headline. Search/family/nearby views retain scoped COS counts.
- const fullInventoryHeadline=Boolean(recorded.roster&&mhelpPhysical&&filters.placement==='field'&&!filters.query.trim()&&filters.family==='all'&&filters.provider==='all'&&!filters.nearbyId&&(filters.installationStatus||'all')==='all'&&!filters.retired);
+ const fullInventoryHeadline=showMhelpProductHeadline(filters,Boolean(recorded.roster),Boolean(mhelpPhysical));
  const scopedUnitIds=new Set(scope.map(row=>row.id)),scopedSourceIds=new Set(sourceScope.map(row=>row.id)),recordedScope=sourceItems.filter(item=>item.kind==='unit'?scopedUnitIds.has(item.unitId!):scopedSourceIds.has(item.id));
  if(recorded.roster)counts.field=recordedScope.filter(item=>item.placement==='field').length;
  const queueSources=filterSourceEquipment(sourceItems,{...sourceFilters,status:effective.status},'fleet').filter(item=>item.kind==='source_equipment'&&item.active&&item.lifecycle==='active'&&item.placement==='field'&&locationsReady&&(locationQueue==='missing'?!pinIds.has(item.id):pinIds.has(item.id)));
