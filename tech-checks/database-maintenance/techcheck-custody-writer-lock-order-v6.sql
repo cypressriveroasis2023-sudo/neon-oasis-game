@@ -754,7 +754,7 @@ begin
  end loop;
  -- Catch a newly introduced writer instead of silently omitting it.
  if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','app_private') and p.prokind='f'
-  and p.prosrc ~ '(unit_registry|prep_items|prep_tickets|unit_returns|asset_inventory|service_truck_units|service_truck_restock_requests)'
+  and p.prosrc ~* '(equipment_master|unit_registry|prep_items|prep_tickets|unit_returns|asset_inventory|service_truck_units|service_truck_restock_requests)'
   and p.prosrc ~* '(insert[[:space:]]+into|update[[:space:]]+|delete[[:space:]]+from|for[[:space:]]+update)'
   and p.proname not like '%techcheck%' and p.proname not like '%service_daily_report%'
   and not exists(select 1 from techcheck_reviewed_writers_v6 e where e.schema_name=n.nspname and e.name=p.proname and e.arguments=pg_get_function_identity_arguments(p.oid))) then raise exception 'An unreviewed inventory writer was introduced.';end if;

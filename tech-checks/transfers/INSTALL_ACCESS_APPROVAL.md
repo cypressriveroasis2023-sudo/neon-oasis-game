@@ -48,7 +48,7 @@ reset or email is requested. Broader native desktop parity is a separate decisio
 using the existing migration/install role. No browser or service-role install.
 
 The reviewed assembled SQL SHA256 is
-`dee5f33444ac90106718e434c95cf9923eb21fd3bb12b6c65d2ec40faf898db4`.
+`f0b057870a4a50f89cf4f6255eedbf6f75e7fce030562490812df8727e43d31e`.
 The single transaction from `assemble-backend.mjs` applies eight ordered files:
 named handoffs v1, rollout v2, delivery v3, partial returns v4, daily receipt links
 v5, writer lock order v6, shared custody v6, location proof v7. It refuses an
@@ -124,6 +124,12 @@ row guard on each table) protect `equipment_master`, `unit_registry`, `prep_item
 `prep_tickets`, `unit_returns`, `asset_inventory`, `service_truck_units`, and
 `service_truck_restock_requests`. Named reservations block conflicting legacy
 writes and truncation. Legacy custody also blocks a new named checkout.
+
+The new-writer preflight scans all eight table names case-insensitively and
+rejects an unreviewed direct DML/row-locking function before changing any reviewed
+definition. This source-text scan is not exhaustive call-graph analysis: indirect
+or dynamic writers, package-family exclusions and future trigger changes still
+need review. Do not infer complete future-writer coverage from the 105 seals.
 
 Owner release reuses `owner_add_inventory_asset` and
 `owner_set_inventory_asset_status` with their existing gates/history. It adds an
@@ -209,9 +215,29 @@ An installation failure aborts the single transaction. Preserve a pre-action
 catalog/definition receipt. Do not run a fresh-install package over an existing
 install or blindly restore old writer functions.
 
-After installation, the safe hold operation is to set all four flags false.
-It stops new accepted handoffs, storage-policy access and new transfer claims;
-it does **not** cancel an already-running provider send. Reconcile/drain any
+After installation, use the complete transaction below for an approved hold on
+the final v7 installation. A bare settings update is not an in-flight custody
+barrier. Acquire the same transaction gate first, then set **all four** flags
+false and commit. Do not substitute a single readiness flag or key disable.
+
+```sql
+begin;
+select pg_advisory_xact_lock(hashtextextended('techcheck-shared-custody-v6',6));
+update app_private.techcheck_transfer_settings
+set enabled=false,reports_ready=false,receipt_link_ready=false,custody_ready=false
+where singleton;
+commit;
+select enabled,reports_ready,receipt_link_ready,custody_ready
+from app_private.techcheck_transfer_settings where singleton;
+```
+
+This waits for admitted custody transactions to finish before the hold commits;
+final v7 checkout and Owner release calls queued behind it then reject. If the
+lock times out or the transaction fails, the hold has **not** completed. Preserve
+the readback and reconcile transactions that completed before the barrier.
+The hold closes fresh handoff calls, storage-policy access and transfer claims;
+storage and delivery operations do not share the custody barrier, and it does
+**not** cancel an already-running provider send. Reconcile/drain any
 in-flight lease before reverting the worker, and preserve exact provider IDs.
 Keep reservations, custody guards, signed events, evidence, delivery checkpoints
 and release history. Do not drop tables/bucket/guards or free assigned/repair-held
@@ -234,11 +260,16 @@ Remaining activation blockers/gaps:
    or production workload/lock-contention observation has occurred.
 3. This workspace uses Chromium 154; the pinned Playwright download was blocked.
    New PR CI is separate evidence and must finish before review completion.
-4. The local fixture compiles all 105 exact writer definitions and tests shared
-   custody categories/concurrency, but does not execute every historical workflow
-   branch against full production data.
+4. The local fixture loads all 105 exact writer definitions with body checking
+   disabled for missing historical dependencies, then tests selected actual
+   custody paths/concurrency. This proves definition preservation, not complete
+   compilation or execution of every historical workflow branch/trigger.
 5. A 30-second proof cannot guarantee that native placement never changes after
    observation. This remains an explicit design limit.
+6. Legacy Owner camera placement/device evidence is bound into the signed hash,
+   but v7 consumption directly rereads only equipment_master. The exact existing
+   Owner placement writer/trigger effects were unavailable to the offline review;
+   post-issuance and post-reservation placement behavior needs verification.
 
 Storage semantics reviewed against [Supabase Storage access control](https://supabase.com/docs/guides/storage/security/access-control).
 The requested changelog index was blocked by this environment (403); no new SDK

@@ -8,8 +8,25 @@ on:
       - 'tech-checks/service-signoff-ui.js'
       - 'tech-checks/it-daily-host.js'
       - 'tech-checks/it-feature-availability.js'
-      - 'tech-checks/database-maintenance/techcheck-named-handoffs-v1.sql'
-      - 'tech-checks/database-maintenance/techcheck-transfer-rollout-v2.sql'
+      - 'tech-checks/database-maintenance/techcheck-*.sql'
+      - 'tech-checks/database-maintenance/service-daily-receipt-links-v5.sql'
+      - 'tech-checks/operations/db/techcheck-shop-attestation-*.sql'
+      - 'tech-checks/operations/db/owner_identity_crosswalk.sql'
+      - 'tech-checks/operations/db/20261012173408_cos_mhelp_placement_sync.sql'
+      - 'tech-checks/operations/db/mhelp_upload_overlay.sql'
+      - 'tech-checks/operations/db/mhelp-source-continuity.sql'
+      - 'tech-checks/operations/db/scoped_inventory_overlay.sql'
+      - 'tech-checks/operations/db/owner_identity_upload_continuity.sql'
+      - 'tech-checks/supabase/functions/cos-operations-pages/handoffLocationProof.ts'
+      - 'tech-checks/supabase/functions/cos-operations-pages/index.ts'
+      - 'tech-checks/operations/tests/handoff-location*'
+      - 'tech-checks/operations/tests/shop-attestation*'
+      - 'tech-checks/operations/tests/fixtures/handoff-proof*'
+      - 'tech-checks/operations/tests/fixtures/shop-attestation*'
+      - 'tech-checks/operations/tests/fixtures/custody*'
+      - 'tech-checks/operations/tests/fixtures/owner-identity-upload-fixture.mjs'
+      - 'tech-checks/operations/tests/helpers/custody*'
+      - 'tech-checks/operations/tests/helpers/shop-attestation*'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
       - 'tech-checks/operations/tests/helpers/service-basics-fixture.mjs'
@@ -21,6 +38,20 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - name: Preserve exact review source
@@ -42,6 +73,24 @@ jobs:
         working-directory: tech-checks/operations
       - name: PostgreSQL, transfer and existing Service regressions
         run: node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
+        working-directory: tech-checks/operations
+      - name: Install existing pinned PostgreSQL test client
+        run: npm ci --ignore-scripts
+        working-directory: tech-checks/operations/legacy/tests/recon-ordering
+      - name: Native attestation and bridge authorization
+        run: node --import tsx --test tests/handoff-location-handler.test.mjs tests/handoff-location-proof.test.mjs
+        working-directory: tech-checks/operations
+      - name: Real PostgreSQL handoff assembly, custody, revocation and hold races
+        env:
+          COS_HANDOFF_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_handoff_test_ci
+        # Fixtures create/drop synthetic API roles: keep files sequential.
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          tests/shop-attestation-sql.test.mjs tests/shop-attestation-integration.test.mjs
+          tests/transfer-assembly.test.mjs tests/transfer-writer-preflight.test.mjs
+          tests/transfer-custody.test.mjs tests/transfer-custody-boundaries.test.mjs
+          tests/transfer-delivery-sql.test.mjs tests/transfer-location-sql.test.mjs
+          tests/transfer-partial-returns.test.mjs
         working-directory: tech-checks/operations
       - name: TypeScript
         run: npm run typecheck
