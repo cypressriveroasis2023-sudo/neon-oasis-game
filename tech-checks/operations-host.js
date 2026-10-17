@@ -182,7 +182,7 @@ function navigate(route, updateHistory = true) {
   if (!owner() || context()?.getEffectiveRole() !== 'owner' || document.getElementById('appView')?.classList.contains('hidden')) return;
   if (route === 'logout') { window.logout?.(); return; }
   if (route === 'vision' || route === 'camera-health') {
-    window.location.assign(route === 'vision' ? './onsite-vision.html' : './camera-health.html');
+    window.location.assign(route === 'vision' ? './onsite-vision.html' : './camera-health.html?diagnostics=1');
     return;
   }
   // Old dashboard/More links lead back to the single Tech Checks front door.

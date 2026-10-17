@@ -182,7 +182,7 @@ if (IT_DAILY_ONLY) {
       target.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:data.requestId,accessToken:token,role:token?value.role:null},location.origin);
       if (!token) status('Your current daily-view access could not be verified. Refresh or sign in again.',true);
     } else if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE' && typeof data.active==='boolean') {setFieldMapDisplay(frame,data.active);scheduleFrameFit();}
-    else if(data?.type==='COS_OPERATIONS_NAVIGATE' && data.route==='camera-health') location.assign('./camera-health.html?itDaily=1');
+    else if(data?.type==='COS_OPERATIONS_NAVIGATE' && data.route==='camera-health') location.assign('./camera-health.html?itDaily=1&diagnostics=1');
     else if(data?.type==='COS_OPERATIONS_NAVIGATE' && data.route==='logout') window.logout?.();
     // Only the allowed Camera Health tool and sign-out can leave this frame.
   });
