@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {fixture,hash,org,native,tracker} from './fixtures/owner-identity-upload-fixture.mjs';
+import {fixture,hash,org,native,tracker,actor} from './fixtures/owner-identity-upload-fixture.mjs';
 
 const sql=async file=>readFile(new URL('../db/'+file,import.meta.url),'utf8');
 
