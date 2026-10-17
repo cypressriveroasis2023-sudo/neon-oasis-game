@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {createHash,randomUUID} from 'node:crypto';
+import {schema as nativeSchema} from './fixtures/mhelp-placement-schema.mjs';
 
 // Synthetic PostgreSQL 17 execution only. Never connect to COS production.
 if(process.env.COS_OWNER_POSTGRES_CI!=='1')throw Error('Synthetic PostgreSQL CI opt-in required');
@@ -48,14 +49,11 @@ pg("INSERT INTO cos_mhelp_placement_private.upload_batches(source_sha256,payload
 // Exercise the deployed reviewed-upload implementation, rather than the setup
 // stand-in above. Empty native tables provide its source-only locking surface;
 // this is deliberately not proof of linked identity-graph admission.
-for(const table of ['app_private.vision_tracker_locations','public.equipment_units',
- 'app_private.cos_geocode_sources','public.equipment_unit_location_history',
- 'app_private.cos_owner_identity_claims','app_private.cos_archived_representations']){
- pg(`CREATE TABLE ${table}(id uuid)`);
-}
+pg(nativeSchema.slice(nativeSchema.indexOf(' create table '),nativeSchema.indexOf(' create function ')));
 pg('CREATE TABLE cos_mhelp_placement_private.upload_audit(id bigint generated always as identity,action text,source_sha256 text,previous_sha256 text,authorization_sha256 text)');
 pg('DROP FUNCTION cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
 const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
+pg(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.upload_binding_guard('),overlay.indexOf('create function cos_mhelp_placement_private.review_upload(')));
 pg(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
 pg('CREATE TABLE cos_mhelp_placement_private.scoped_control(base_sha256 text primary key,revision bigint,active_id uuid);CREATE TABLE cos_mhelp_placement_private.scoped_batches(id uuid primary key,base_sha256 text,records jsonb)');
 const scoped=readFileSync(new URL('../db/scoped_inventory_overlay.sql',import.meta.url),'utf8');

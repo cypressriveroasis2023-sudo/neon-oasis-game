@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
+import {schema as nativeSchema} from './fixtures/mhelp-placement-schema.mjs';
 
 /** Disposable in-memory PostgreSQL-style proof. Never connects to COS production. */
 const actor='22222222-2222-4222-8222-222222222222';
@@ -33,12 +34,50 @@ async function setup(){
  const scoped=readFileSync(new URL('../db/scoped_inventory_overlay.sql',import.meta.url),'utf8');
  const start=scoped.indexOf('create function cos_mhelp_placement_private.scoped_records(');
  await db.exec(scoped.slice(start,scoped.indexOf('$$;',start)+3));
+ await db.exec("create function cos_mhelp_placement_private.upload_binding_guard(uuid,uuid) returns text language sql stable as $$select repeat('d',64)$$;");
  await db.exec(draft);
  return db;
 }
 const params=(requestId=randomUUID(),overrides={})=>[actor,org,requestId,'ServiceItem_List_20261016131754.csv',overrides.sourceSha||digest,overrides.prevSha||previous,censusSha,JSON.stringify(overrides.census||census),source.toString('base64'),JSON.stringify(records)];
 const stage=(db,args)=>db.query("select public.cos_owner_mhelp_equipment_stage_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::text,$8::jsonb,$9::text,$10::jsonb) result",args).then(r=>r.rows[0].result);
 const commit=(db,id,note='I reviewed and approve the current COS Field and Shop inventory.',sha=censusSha)=>db.query("select public.cos_owner_mhelp_equipment_commit_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text) result",[actor,org,id,previous,sha,note]).then(r=>r.rows[0].result);
+async function installActualReview(db){
+ await db.exec("create table cos_mhelp_placement_private.upload_audit(id bigint generated always as identity,action text,source_sha256 text,previous_sha256 text,authorization_sha256 text)");
+ await db.exec('drop function cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
+ const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
+ await db.exec(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
+}
+
+for(const productLink of [true,false])test(`actual native GPS changes fence commit and stale ${productLink?'product':'tracker-only'} links are held on fresh stage`,async()=>{
+ const db=await setup();
+ try{
+  await db.exec(nativeSchema.slice(nativeSchema.indexOf(' create table '),nativeSchema.indexOf(' create function ')));
+  await db.exec('create table cos_mhelp_placement_private.links(equipment_id text,tracker_id uuid,native_unit_id uuid,full_label text,observation jsonb,observed_at timestamptz)');
+  await db.exec('drop function cos_mhelp_placement_private.upload_binding_guard(uuid,uuid)');
+  const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
+  await db.exec(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.upload_binding_guard('),overlay.indexOf('create function cos_mhelp_placement_private.review_upload(')));
+  await installActualReview(db);
+  const tracker=randomUUID();
+  await db.query("insert into app_private.vision_tracker_locations values($1,$2,'Ranger 007','ranger007','RANGERS','FIELD','Domain Builders','Saved Site','Saved Address',30,-95)",[tracker,org]);
+  const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,null) value',[tracker])).rows[0].value;
+  const old=(await db.query('select records,receipt from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[previous])).rows[0];
+  if(productLink)old.records[0].binding={productId:'11',trackerId:tracker,nativeUnitId:null,trackerLabel:'Ranger 007',nativeLabel:null,fullLabel:'Ranger 007',matchMethod:'exact_family_unit',representedUnitIds:[tracker],representationEvidenceSha256:previous,canonicalKey:'RANGER:7',reviewEvidence:{method:'synthetic'},evidenceSha256:previous,expectedGuard:guard};
+  old.receipt.trackerRecords[0].binding={state:'linked',trackerId:tracker,nativeUnitId:null,unitIds:[tracker],representedUnitIds:[tracker],unitLabels:{[tracker]:'Ranger 007'},expectedGuard:guard};
+  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1,receipt=$2 where source_sha256=$3',[JSON.stringify(old.records),JSON.stringify(old.receipt),previous]);
+  const first=randomUUID();await stage(db,params(first));
+  await db.query("update app_private.vision_tracker_locations set latitude=31,site='Newer approved site' where id=$1",[tracker]);
+  const preserved=(await db.query('select to_jsonb(t) value from app_private.vision_tracker_locations t where id=$1',[tracker])).rows[0].value;
+  await assert.rejects(commit(db,first),/identity graph changed/);
+  assert.equal((await db.query('select active_sha256 from cos_mhelp_placement_private.upload_control')).rows[0].active_sha256,previous);
+  const fresh=randomUUID();await stage(db,params(fresh));
+  const held=(await db.query('select records,receipt from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[fresh])).rows[0];
+  assert.equal(held.records[0].binding,null);assert.equal(held.records[0].placementHeld,true);
+  assert.equal(held.receipt.trackerRecords[0].binding.state,'held');
+  await commit(db,fresh);
+  assert.deepEqual((await db.query('select to_jsonb(t) value from app_private.vision_tracker_locations t where id=$1',[tracker])).rows[0].value,preserved);
+  assert.equal((await db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
+ }finally{await db.close();}
+});
 
 test('current scoped holds and label corrections cannot inherit raw bindings, and later revisions fence commit',async()=>{
  const db=await setup();
@@ -76,10 +115,7 @@ test('source-only stage and retry exercise the actual reviewed-upload validator'
    'app_private.cos_owner_identity_claims','app_private.cos_archived_representations']){
    await db.exec(`create table ${table}(id uuid)`);
   }
-  await db.exec("create table cos_mhelp_placement_private.upload_audit(id bigint generated always as identity,action text,source_sha256 text,previous_sha256 text,authorization_sha256 text)");
-  await db.exec('drop function cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
-  const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
-  await db.exec(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
+  await installActualReview(db);
   const id=randomUUID(),preview=await stage(db,params(id));
   assert.equal(preview.recordedField,1);
   assert.equal(preview.recordedShop,2);

@@ -123,10 +123,28 @@ begin
   old_row:=null;
   select value into old_row from jsonb_array_elements(prior_rows) value
   where value->>'productId'=row_data->>'productId' limit 1;
+  old_tracker:=null;
+  select value into old_tracker from jsonb_array_elements(
+    coalesce(old_batch.receipt->'trackerRecords','[]'::jsonb)) value
+   where value->>'matchedProductId'=row_data->>'productId' limit 1;
   if old_row is not null and (old_row ? 'scopedAuthority' or old_row ? 'sourceLabelAuthority') then
     adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
       'binding','null'::jsonb,'placementHeld',true,
       'holdReason','Prior reviewed scoped identity or assignment requires Owner installation review'));
+  elsif old_row is not null and (
+    (old_row->'binding' is not null and old_row->'binding'<>'null'::jsonb
+      and old_row->'binding'->>'expectedGuard' is distinct from
+       cos_mhelp_placement_private.upload_binding_guard(
+        (old_row->'binding'->>'trackerId')::uuid,(old_row->'binding'->>'nativeUnitId')::uuid))
+    or (old_tracker->'binding'->>'state'='linked'
+      and old_tracker->'binding'->>'expectedGuard' is distinct from
+       cos_mhelp_placement_private.upload_binding_guard(
+        (old_tracker->'binding'->>'trackerId')::uuid,(old_tracker->'binding'->>'nativeUnitId')::uuid))) then
+    -- Preserve newer native GPS/history/identity exactly. A stale link is held,
+    -- never repaired by copying the current digest over its old authorization.
+    adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
+      'binding','null'::jsonb,'placementHeld',true,
+      'holdReason','Native identity or location evidence changed; fresh association review required'));
   elsif old_row is not null and old_row->>'unitNumber'=row_data->>'unitNumber'
      and old_row->>'category'=row_data->>'category' then
     -- A newer CSV receipt has no independently authenticated installation
