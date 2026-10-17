@@ -157,3 +157,100 @@ test('narrow screens retain every view tab and filter without page overflow',asy
   for(const label of ['Installation status','Nearby unit center','Nearby radius miles'])await expect(app.getByLabel(label,{exact:true})).toBeVisible();
   await noPageOverflow(app);onlySavedReads(state);
 });
+
+
+test.describe('touch iPhone Fleet presentation',()=>{
+ test.use({hasTouch:true});
+ for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['wide landscape',932,430]]){
+ test('iPhone '+label+' keeps Fleet map first without a sidebar or overflow',async({page},info)=>{
+  await page.setViewportSize({width,height});
+  const {app,state}=await mount(page);
+  const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
+   const shell=el.closest('.company-shell'),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect(),list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
+   const cards=[...el.querySelectorAll('.cos-fleet-stats .cos-fleet-stat')].map(x=>x.getBoundingClientRect());
+   const controls=[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-map-toolbar button,.cos-fleet-filter-row select,.cos-fleet-search input')].map(x=>x.getBoundingClientRect());
+   return {width:innerWidth,mapY:map.y,listY:list.y,mainWidth:shell.querySelector('.owner-it-main').getBoundingClientRect().width,
+    sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,firstY:cards[0].y,secondY:cards[1].y,
+    targets:controls.map(({width,height})=>({width,height})),overflow:document.documentElement.scrollWidth-innerWidth};
+  });
+  expect(geometry.width).toBe(width);
+  expect(geometry.mapY).toBeLessThan(geometry.listY);
+  expect(geometry.mainWidth).toBeGreaterThan(width*.85);
+  expect(geometry.sidebar).toBe('none');
+  expect(Math.abs(geometry.firstY-geometry.secondY)).toBeLessThan(1);
+  expect(geometry.overflow).toBeLessThanOrEqual(1);
+  for(const target of geometry.targets){expect(target.width).toBeGreaterThanOrEqual(44);expect(target.height).toBeGreaterThanOrEqual(44);}
+  if(width>700){await app.getByRole('button',{name:'More',exact:true}).click();await expect(app.locator('.operations-sidebar-open')).toBeVisible();await app.getByRole('button',{name:/Close menu/}).click();}
+  await page.screenshot({path:info.outputPath('iphone-'+label.replace(' ','-')+'-fleet.png'),fullPage:true});
+  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+  const detail=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
+  for(const title of ['Camera health','InHand router','Camera troubleshooting'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await detail.getByRole('heading',{name:'Camera troubleshooting',exact:true}).scrollIntoViewIfNeeded();
+  await detail.evaluate(el=>el.scrollTop=el.scrollHeight);
+  expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+  expect(await detail.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await detail.getByRole('button',{name:'Close unit details'}).click();
+  await noPageOverflow(app);onlySavedReads(state);
+ });
+}
+test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ const {app,state}=await mount(page);
+ await app.getByLabel('Fleet status',{exact:true}).selectOption('all');
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('SPOTTER');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(2);
+ await page.setViewportSize({width:844,height:390});
+ await expect(app.getByLabel('Fleet family',{exact:true})).toHaveValue('SPOTTER');
+ const layout=await app.locator('.cos-fleet-workspace').evaluate(el=>({display:getComputedStyle(el).display,mapY:el.querySelector('.cos-fleet-map-panel').getBoundingClientRect().y,listY:el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect().y,overflow:document.documentElement.scrollWidth-innerWidth}));
+ expect(layout.display).toBe('flex');
+ expect(layout.mapY).toBeLessThan(layout.listY);
+ expect(layout.overflow).toBeLessThanOrEqual(1);
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('all');
+ await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
+ onlySavedReads(state);
+});
+});
+
+
+test.describe('mobile Fleet map quick access',()=>{
+ test.use({hasTouch:true});
+ for(const [width,height] of [[390,844],[844,390]]){
+  test(`map quick access is usable at ${width}x${height}`,async({page})=>{
+   await page.setViewportSize({width,height});
+   const {app,state}=await mount(page);
+   const jump=app.getByRole('button',{name:'Jump to Fleet map'});
+   await expect(jump).toBeVisible();
+   await expect(jump).toHaveCSS('min-height','44px');
+   await jump.click();
+   await expect.poll(()=>app.locator('.cos-fleet-map-panel').evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(220);
+   await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
+   await noPageOverflow(app);onlySavedReads(state);
+  });
+ }
+});
+test('desktop layout does not show a mobile map shortcut',async({page})=>{
+ await page.setViewportSize({width:932,height:430});
+ const {app,state}=await mount(page);
+ await expect(app.getByRole('button',{name:'Jump to Fleet map'})).toBeHidden();
+ onlySavedReads(state);
+});
+
+test('short desktop viewport preserves sidebar and desktop Fleet map columns',async({page})=>{
+ await page.setViewportSize({width:932,height:430});
+ const {app,state}=await mount(page);
+ const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
+  const shell=el.closest('.company-shell');
+  const map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect();
+  const list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
+  return {pointer:matchMedia('(pointer:coarse)').matches,
+   sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,
+   layout:getComputedStyle(el.querySelector('.cos-fleet-workspace')).display,
+   mapX:map.x,listX:list.x,overflow:document.documentElement.scrollWidth-innerWidth};
+ });
+ expect(geometry.pointer).toBe(false);
+ expect(geometry.sidebar).not.toBe('none');
+ expect(geometry.layout).toBe('grid');
+ expect(geometry.listX).toBeLessThan(geometry.mapX);
+ expect(geometry.overflow).toBeLessThanOrEqual(1);
+ onlySavedReads(state);
+});
