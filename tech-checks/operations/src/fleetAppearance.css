@@ -246,5 +246,5 @@
 }
 
 /* Readable labels only. Camera/map status colors and classification remain unchanged. */
-#root#root .cos-fleet-dashboard .cos-fleet-signals > .cos-signal-offline { color: #ff6570; }
+#root#root .cos-fleet-dashboard .cos-fleet-signals > .cos-signal-offline { color: #ff6570 !important; }
 #root#root .cos-fleet-dashboard .cos-fleet-map-canvas .leaflet-control-attribution a { color: #004e70; }
