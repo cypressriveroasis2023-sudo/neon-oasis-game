@@ -2,6 +2,7 @@ import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
 import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
+import {previewMhelpEquipmentCsv,EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
 import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from './combinedFleetRoster.ts';
 import {sourceEquipmentAddressCandidates,projectSourceEquipmentAddressEstimates} from './sourceEquipmentAddressEstimates.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
@@ -481,7 +482,7 @@ export function createOperationsHandler(options) {
       const context = await authenticate(request);
       if (!path && request.method === 'POST') {
         const { body: envelope, byteLength: envelopeBytes } = await readMhelpAwareJsonWithSize(request, context.legacyOwner && context.actorId ? MHELP_JSON_LIMIT : 65536, admitLargeBody);
-        const envelopeLimit = envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
+        const envelopeLimit = envelope.path === '/api/mhelpdesk/equipment/preview' ? Math.ceil(EQUIPMENT_CSV_MAX_BYTES / 3) * 4 + 8192 : envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
         if (envelopeBytes > envelopeLimit) fail('Request body is too large.', 413);
         if (Object.keys(envelope).some(k => !['path', 'method', 'body'].includes(k))) fail('Unsupported transport fields.');
         if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path) && !(envelope.method==='GET' && envelope.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1')) fail('COS endpoint not found.', 404);
@@ -740,6 +741,20 @@ export function createOperationsHandler(options) {
         return json(await createOwnerIdentityReview({actorId:context.actorId,organizationId:ORGANIZATION_ID,rpc,
           read:async key=>{const result=await readIdentitySources(context,key);return {sources:result.reviewSources,identity:result.identity};},
         })(path,method,body));
+      }
+      if (path === '/api/mhelpdesk/equipment/preview') {
+        // Source preview only. No equipment commit, activation, map or IP write.
+        // Keep it independent from the existing mHelp service-ticket PDF importer.
+        if (!context.legacyOwner || !context.actorId) fail('An active COS Owner account is required.',403);
+        if (method !== 'POST') fail('Method not supported.',405);
+        if (body === null) body = await readMhelpAwareJson(request,Math.ceil(EQUIPMENT_CSV_MAX_BYTES / 3) * 4 + 8192,admitLargeBody);
+        const current = await readMhelpPlacements(actorPayload);
+        if (!current?.upload) fail('The previous reviewed mHelp equipment source is unavailable. No records were changed.',503);
+        try {return json(await previewMhelpEquipmentCsv(body,current.upload));}
+        catch(e){
+          if(e instanceof Error && e.message.startsWith('Invalid mHelpDesk equipment CSV:'))fail(e.message,422);
+          fail('The equipment comparison is unavailable. No records were changed.',503);
+        }
       }
       if (path.startsWith('/api/mhelpdesk/imports')) {
         if (method === 'GET' && /^\/api\/mhelpdesk\/imports\/attachments\/[^/]+\/download$/.test(path)) {
