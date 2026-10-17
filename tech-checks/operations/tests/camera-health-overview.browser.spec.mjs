@@ -264,3 +264,14 @@ for(const query of ['q=RANGER%20022','unit=RANGER%20022','unit=RANGER%20022&acti
  await expect(page).toHaveURL(new RegExp('camera-health\\.html\\?'+query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'));
  expect(await page.evaluate(()=>reads.some(row=>row.table==='equipment_master'))).toBe(false);
 });
+
+test('returning from resource diagnostics restores its saved unit search before ordinary entries resume shared Fleet',async({page})=>{
+ await mount(page);await page.getByLabel('Search units',{exact:true}).fill('RANGER 022');
+ await page.evaluate(()=>{saveCameraHealthReturnState();sessionStorage.setItem('cameraHealthReturnRequested','1');});
+ await page.goto('/tech-checks/camera-health.html');
+ await expect(page.getByLabel('Search units',{exact:true})).toHaveValue('RANGER 022');
+ await expect(page.locator('.compact-unit')).toHaveCount(1);
+ expect(await page.evaluate(()=>sessionStorage.getItem('cameraHealthReturnRequested'))).toBe(null);
+ await page.goto('/tech-checks/camera-health.html');
+ await expect(page.getByRole('heading',{name:'Shared Camera Health and Field Map'})).toBeVisible();
+});
