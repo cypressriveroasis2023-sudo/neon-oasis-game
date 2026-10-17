@@ -76,7 +76,7 @@ function fixture({ role = 'it', linked = true, holdCapability = false, slowLegac
     c.getSession = window.fixtureSession;
     c.getOwnerTestSession = () => window.fixturePreview ? {preview_role: 'it', target_role: 'it', ticket: 'SYN-TEST', persona_id: 'synthetic-persona'} : null;
     c.getEffectiveIdentity = () => ({id: window.fixturePreview ? 'synthetic-persona' : window.fixtureSubject, role: window.fixtureEffectiveRole, owner_test: window.fixturePreview});
-    c.db.rpc = async (name, args) => { window.fixtureRpcCalls.push({name, args}); if (name === 'cos_verified_fleet_capabilities_v1' && window.fixtureHeldCapability) await window.fixtureCapabilityGate; return originalRpc(name, args); };
+    c.db.rpc = async (name, args) => { window.fixtureRpcCalls.push({name, args}); if (name === 'techcheck_transfer_readiness_v1') return {error:{code:'PGRST202',message:'Synthetic transfer backend absent'}}; if (name.startsWith('techcheck_transfer_') || name === 'submit_techcheck_transfer_v1') throw new Error('Synthetic transfer writes prohibited'); if (name === 'cos_verified_fleet_capabilities_v1' && window.fixtureHeldCapability) await window.fixtureCapabilityGate; return originalRpc(name, args); };
     c.db.auth.onAuthStateChange = fn => { window.fixtureAuthListeners.push(fn); return {data: {subscription: {unsubscribe() {}}}}; };
     c.db.auth.getSession = async () => { window.fixtureTokens++; return {data: {session: window.fixtureSession()}}; };
     window.addEventListener('message', event => { if (event.data?.type === 'COS_OPERATIONS_TOKEN_RESPONSE') window.fixtureTokenResponses.push(event.data); });
@@ -97,7 +97,7 @@ async function mount(page, options = {}) {
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === origin && url.pathname === '/it-daily-fixture') return route.fulfill({contentType: 'text/html', body: fixture(options)});
-    if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js'].includes(url.pathname)) {
+    if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js', '/transfers/desk.js', '/transfers/model.js', '/transfers/readiness.js', '/transfers/client.js', '/service-signoff-ui.js', '/tech-check-rules.js'].includes(url.pathname)) {
       return route.fulfill({contentType: 'text/javascript', body: readHost(url.pathname.slice(1))});
     }
     if (url.origin === origin && url.pathname.startsWith('/resources/fonts/')) return route.fulfill({path: new URL('../../resources/fonts/' + url.pathname.split('/').pop(), import.meta.url).pathname});
