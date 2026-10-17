@@ -1,13 +1,13 @@
 import {useRef,useState} from 'react';
 import {api} from './api';
-import type {EquipmentPreview} from '../../supabase/functions/cos-operations-pages/mhelpEquipmentCsvPreview';
+import type {OwnerEquipmentReview} from '../../supabase/functions/cos-operations-pages/mhelpEquipmentOwnerReview';
 
 /** Existing Owner session only; the server repeats the Owner permission check.
  * This is a read-only PREVIEW. It has deliberately no commit action until an
  * independently reviewed current-guarded database admission exists. */
 export default function OwnerEquipmentCsvPreview(){
  const fileRef=useRef<HTMLInputElement>(null);
- const [pending,setPending]=useState(false),[failure,setFailure]=useState(''),[preview,setPreview]=useState<EquipmentPreview|null>(null);
+ const [pending,setPending]=useState(false),[failure,setFailure]=useState(''),[preview,setPreview]=useState<OwnerEquipmentReview|null>(null);
  const [expected,setExpected]=useState('');
  const run=async()=>{
   if(pending)return;
@@ -21,8 +21,8 @@ export default function OwnerEquipmentCsvPreview(){
    // Read original bytes; File.text() could discard BOM and change the source hash.
    const bytes=new Uint8Array(await file.arrayBuffer()),parts:string[]=[];
    for(let i=0;i<bytes.length;i+=8192)parts.push(String.fromCharCode(...bytes.subarray(i,i+8192)));
-   const result=(await api.post<EquipmentPreview>('/api/mhelpdesk/equipment/preview',{
-    bytesBase64:btoa(parts.join('')),...(expected.trim()?{expectedSha256:expected.trim()}:{})
+   const result=(await api.post<OwnerEquipmentReview>('/api/mhelpdesk/equipment/preview',{
+    bytesBase64:btoa(parts.join('')),sourceFilename:file.name,...(expected.trim()?{expectedSha256:expected.trim()}:{})
    })).data;
    if(result.contract!=='COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1'||result.previewOnly!==true||result.readyToCommit!==false)throw Error('The equipment preview was not verified.');
    setPreview(result);
@@ -46,6 +46,8 @@ export default function OwnerEquipmentCsvPreview(){
    {preview.samples.length>0&&<details><summary>Source differences ({preview.samples.length} displayed)</summary>
     <ul>{preview.samples.map((item,i)=><li key={item.productId+'-'+item.kind+'-'+i}><strong>{item.unitNumber}</strong> · {item.kind.replaceAll('_',' ')} · {item.previousPlacement||'New'} → {item.proposedPlacement||'Not in export'} · {item.reason}</li>)}</ul>
    </details>}
+   <p><strong>2027 Product ID proof:</strong> {preview.censusStatus==='verified'?'Verified against current 2027 workbook':'Unavailable — no equipment writes permitted'}.</p>
+   <p><strong>Admission review:</strong> {preview.admission.counts.unchanged} unchanged · {preview.admission.counts.assignment_change} assignment changes · {preview.admission.counts.new_source_only} new source records · {preview.admission.totalHeld} held for protected identity or placement review. No commit is enabled.</p>
    <p role='status'>{preview.guardNotice}</p>
   </div>}
  </section>;
