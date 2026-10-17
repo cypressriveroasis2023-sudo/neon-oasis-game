@@ -12,7 +12,8 @@ export function reviewSourceTransition(previous,current,{beforeGuard,afterGuard,
  if(!previous||!current||!text(previous.productId)||current.productId!==previous.productId)return {eligible:false,reason:'product_id_changed_or_missing'};
  if(current.binding!==null)return {eligible:false,reason:'current_binding_not_null'};
  if(previous.placement!=='FIELD'||current.placement!=='FIELD'||current.lifecycle!=='UNFLAGGED'||previous.lifecycle!=='UNFLAGGED')return {eligible:false,reason:'placement_or_lifecycle_hold'};
- if(current.holdReason||current.placementHeld||current.possibleAliasUnitIds?.length||previous.holdReason||previous.placementHeld)return {eligible:false,reason:'current_identity_or_placement_hold'};
+ const generated='Native identity or location evidence changed; fresh association review required';
+ if(current.holdReason!==generated||current.placementHeld!==true||current.possibleAliasUnitIds?.length||previous.holdReason||previous.placementHeld)return {eligible:false,reason:'source_guard_hold_not_exclusively_proven'};
  if(label(previous.unitNumber)!==label(current.unitNumber))return {eligible:false,reason:'unit_identity_changed'};
  if(canonical(previous.sourceAddress)!==canonical(current.sourceAddress)||previous.customerId!==current.customerId||previous.customer!==current.customer||previous.category!==current.category)return {eligible:false,reason:'customer_or_service_address_changed'};
  if(!previous.binding?.nativeUnitId||!previous.binding?.trackerId||!registryIdentityCurrent)return {eligible:false,reason:'registry_identity_unproven'};
