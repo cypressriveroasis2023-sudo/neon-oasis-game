@@ -70,7 +70,8 @@ test('IT desktop lands on Fleet Map while phone mounts named handoffs without le
  assert.match(host,/root.replaceChildren\(handoffFallback\)/);
  assert.match(host,/button.disabled=true/);
  assert.match(app,/setRouteLocation\(\{workspace:'Fleet Dashboard'/);
- assert.match(app,/active==='Camera Health'&&dailyOnly\?<CameraHealthWorkspace/);
+ assert.doesNotMatch(app,/active==='Camera Health'&&dailyOnly\?<CameraHealthWorkspace/);
+ assert.match(app,/active==='Camera Health'&&\(!route.diagnostics\|\|dailyOnly\)/);
  assert.doesNotMatch(app,/dailyOnly\?\[...IT_DAILY_WORKSPACES,'IT Dashboard'\]/);
 });
 
