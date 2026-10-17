@@ -37,3 +37,12 @@ test('a changed source payload hides only the address overlay and preserves exis
  const value=addressFixture();value.mhelpAddressMap.payloadSha256='f'.repeat(64);const {app,state}=await mountFleet(page,false,{field:value});
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Field address layer could not be validated');await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');expect(state.calls.every(c=>c.method==='GET')).toBe(true);
 });
+test('restored viewport survives initial address and native marker validation',async({page})=>{
+ await page.addInitScript(()=>history.replaceState({...history.state,cosFieldMapView:{status:'field',health:'all',center:[28,-94],zoom:6}},''));
+ const {app,state}=await mountFleet(page,false,{field:addressFixture()});
+ await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(1);
+ await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
+ const view=await app.locator('body').evaluate(()=>history.state.cosFieldMapView);
+ expect(view.center).toEqual([28,-94]);expect(view.zoom).toBe(6);
+ expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
