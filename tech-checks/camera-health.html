@@ -1206,7 +1206,13 @@ async function loadFleetCapabilities(){fleetCapabilities={fleetRead:false,fleetP
 function openSharedCameraHealth(){
   const params=new URLSearchParams(location.search);
   const diagnostics=params.get('diagnostics')==='1'||['q','unit','action','folder'].some(key=>params.get(key)?.trim());
-  if(diagnostics||!(profile?.role==='owner'||fleetCapabilities.fleetRead===true))return false;
+  let returning=false;
+  try{
+    const state=JSON.parse(sessionStorage.getItem('cameraHealthReturnState')||'null');
+    const age=Date.now()-Number(state?.savedAt);
+    returning=sessionStorage.getItem('cameraHealthReturnRequested')==='1'&&Number.isFinite(age)&&age>=0&&age<=60*60*1000;
+  }catch{}
+  if(diagnostics||returning||!(profile?.role==='owner'||fleetCapabilities.fleetRead===true))return false;
   const target=new URL('./',location.href);
   target.searchParams.set('cameraView','1');
   if(params.get('itDaily')==='1')target.searchParams.set('itDaily','1');
