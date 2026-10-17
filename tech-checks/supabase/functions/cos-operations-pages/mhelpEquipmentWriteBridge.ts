@@ -18,13 +18,15 @@ function invalid(message:string):never{throw new Error('Protected COS equipment 
 function input(body:unknown):EquipmentSourceInput{
  if(!body||typeof body!=='object'||Array.isArray(body))invalid('source file is required');
  const b=body as Record<string,unknown>;
+ if(Object.keys(b).some(key=>!['bytesBase64','sourceFilename','expectedSha256'].includes(key)))invalid('unexpected source request field');
+ if(b.expectedSha256!==undefined&&(typeof b.expectedSha256!=='string'||!HASH.test(b.expectedSha256)))invalid('invalid expected original SHA-256');
  if(typeof b.bytesBase64!=='string'||typeof b.sourceFilename!=='string'||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(b.sourceFilename))invalid('original mHelp CSV required');
  return {bytesBase64:b.bytesBase64,sourceFilename:b.sourceFilename,
   ...(typeof b.expectedSha256==='string'?{expectedSha256:b.expectedSha256}:{})};
 }
 async function currentSource(o:BridgeOptions){
  if(!UUID.test(o.actorId)||!UUID.test(o.organizationId))invalid('authenticated actor required');
- const source=input(o.body),preview=await previewMhelpEquipmentCsv({bytesBase64:source.bytesBase64,...(source.expectedSha256?{expectedSha256:source.expectedSha256}:{})},o.previous);
+ const source=input(o.body),preview=await previewMhelpEquipmentCsv(source,o.previous);
  const bytes=Uint8Array.from(atob(source.bytesBase64),v=>v.charCodeAt(0));
  const rows=parseEquipmentCsv(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
  let census:VerifiedProductCensus;
