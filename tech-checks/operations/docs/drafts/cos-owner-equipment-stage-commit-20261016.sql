@@ -109,8 +109,23 @@ begin
   where value->>'productId'=row_data->>'productId' limit 1;
   if old_row is not null and old_row->>'unitNumber'=row_data->>'unitNumber'
      and old_row->>'category'=row_data->>'category' then
-    binding:=coalesce(old_row->'binding','null'::jsonb);
-    adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object('binding',binding));
+    -- A newer CSV receipt has no independently authenticated installation
+    -- observation timestamp. Never let its stage/received time displace a
+    -- technician's subsequent Owner/GPS change. Changed assignments stay in
+    -- source inventory, but their previous device/location link is HELD.
+    if old_row->>'placement' is distinct from row_data->>'placement'
+       or old_row->>'customerId' is distinct from row_data->>'customerId'
+       or old_row->>'customer' is distinct from row_data->>'customer'
+       or old_row->'sourceAddress' is distinct from row_data->'sourceAddress'
+       or old_row->>'lifecycle' is distinct from row_data->>'lifecycle'
+       or old_row->>'placementHeld'='true' then
+      adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
+       'binding','null'::jsonb,'placementHeld',true,
+       'holdReason','Source assignment or protection changed; Owner installation review required'));
+    else
+      binding:=coalesce(old_row->'binding','null'::jsonb);
+      adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object('binding',binding));
+    end if;
   elsif old_row is not null then
     adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
       'binding','null'::jsonb,'placementHeld',true,
