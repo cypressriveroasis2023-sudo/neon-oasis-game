@@ -35,3 +35,15 @@ test('changed assignment is held even if the 2027 source confirms it',async()=>{
  assert.equal(out.admission.totalHeld,1);
  assert.equal(out.admission.gates.canCommit,false);
 });
+test('scoped Owner corrections with unknown address cells remain readable and held',async()=>{
+ for(const sourceAddress of [{},{street:'113 Main St'},{street:null,city:'Houston',state:'TX',zip:'77064'}]){
+  const previous={...receipt,records:records.map((row,i)=>i?row:{...row,sourceAddress,placementHeld:true,scopedAuthority:{reviewed:true}})};
+  const before=JSON.stringify(previous);
+  const out=await ownerEquipmentCsvReview({body,previous,google,verifyCensus:validVerifier});
+  assert.equal(out.changes.address,1);
+  assert.equal(out.admission.counts.held_existing_guard,1);
+  assert.equal(out.admission.gates.current2027CensusVerified,true);
+  assert.equal(out.admission.gates.canCommit,false);
+  assert.equal(JSON.stringify(previous),before);
+ }
+});
