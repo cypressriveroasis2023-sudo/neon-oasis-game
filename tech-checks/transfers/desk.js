@@ -32,26 +32,27 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
  function home(notice=''){
   reset();draft=null;heading(role==='it'?'Check equipment. Hand it over.':'Equipment received from IT',role==='it'?'Check only the equipment being transferred. Service completes their own truck inventory.':'Physically verify the equipment assigned to you. IT sending it does not mean you accepted it.');
   if(role==='it'){const actions=element('div','','tc-actions');actions.append(button('Check Out / Hand Off',()=>start('checkout')),button('Check In / Return',()=>chooseReturns(),true));root.append(actions);}
-  const relevant=data.transfers.filter(t=>role==='it'||['awaiting_service','discrepancy','accepted'].includes(t.state));
+  const relevant=data.transfers.filter(t=>role==='it'||['awaiting_service','discrepancy','accepted','partial_return'].includes(t.state));
   root.append(element('h2',role==='it'?'Handoffs and returns':'Your equipment handoffs'));
   if(!relevant.length)root.append(element('p','No handoffs in the current saved view.'));
   for(const t of relevant){const c=element('article','','tc-card');c.append(element('h3',t.manifest.map(i=>i.family+' '+i.unit_tag).join(' · ')),element('p',`${t.it_name} → ${t.service_name}`),element('strong',transferTitle(t.state)),element('small','Handoff '+t.id));
    if(role==='service'&&['awaiting_service','discrepancy'].includes(t.state))c.append(button('Verify equipment received',()=>start('receipt',t)));
-   if(role==='it'&&t.state==='accepted')c.append(button('Check in this handoff',()=>start('return',t)));
+   if(role==='it'&&['accepted','partial_return'].includes(t.state))c.append(button('Check in this handoff',()=>start('return',t)));
+   if(t.returned_items?.length)c.append(element('p','Returned and held for review: '+t.returned_items.map(i=>i.equipment_key+(i.passed?'':' · needs repair')).join(', ')),element('p','Still assigned: '+t.remaining.map(i=>i.family+' '+i.unit_tag).join(', ')));
    const details=element('details');details.append(element('summary','Saved checks, notes and evidence'));
-   for(const e of t.events||[]){const block=element('div');block.append(element('p',`${e.actor_name} · ${e.kind} · ${new Date(e.signed_at).toLocaleString('en-US',{timeZone:'America/Chicago',hour12:false})} Central`),element('p',e.snapshot?.notes||''));
+   for(const e of t.events||[]){const block=element('div');block.append(element('p',`${e.actor_name} · ${e.kind} · ${new Date(e.signed_at).toLocaleString('en-US',{timeZone:'America/Chicago',hour12:false})} Central`),element('p',e.snapshot?.notes||''),element('p',e.delivery==='sent'?'Report and evidence archived and emailed.':e.delivery==='review'?'Report saved; delivery needs review.':'Report saved; delivery pending.'));
     if(e.snapshot?.differences?.length)block.append(element('pre',JSON.stringify(e.snapshot.differences,null,2),'tc-expected'));
     for(const p of e.photos||[])block.append(button('View '+(p.kind==='signature'?'signature':'equipment photo'),async()=>{try{const url=await client.photoUrl(p.path);guard();const a=element('a','Open saved photo');a.href=url;a.target='_blank';a.rel='noopener noreferrer';block.append(a);}catch(err){message(err.message,true);}},true));details.append(block);
    }c.append(details);root.append(c);
   }
-  root.append(button('Reload handoffs',()=>load(),true),element('p','Transfer reports are queued in COS. The Drive/email adapter is not enabled in this review candidate.','tc-draft-note'));
+  root.append(button('Reload handoffs',()=>load(),true),element('p','Each saved event shows its report delivery status. Returned equipment stays held until inventory review is complete.','tc-draft-note'));
   if(notice)message(notice);
  }
- function chooseReturns(){reset();heading('Check In / Return','Choose a handoff accepted by Service. Returns remain held for inventory review or repair.');root.append(button('Back',()=>home(),true));const rows=data.transfers.filter(t=>t.state==='accepted');if(!rows.length)root.append(element('p','No accepted handoffs are available for return.'));for(const t of rows)root.append(button(t.service_name+' · '+t.manifest.map(i=>i.family+' '+i.unit_tag).join(', '),()=>start('return',t)));}
+ function chooseReturns(){reset();heading('Check In / Return','Choose a handoff accepted by Service. Select only the equipment physically returned now.');root.append(button('Back',()=>home(),true));const rows=data.transfers.filter(t=>['accepted','partial_return'].includes(t.state));if(!rows.length)root.append(element('p','No accepted handoffs are available for return.'));for(const t of rows)root.append(button(t.service_name+' · '+(t.remaining||t.manifest).map(i=>i.family+' '+i.unit_tag).join(', '),()=>start('return',t)));}
  async function start(kind,transfer=null){
   if(busy)return;const turn=++revision;storageKey=client.actor+':'+kind+':'+(transfer?.id||'new');
   try{const saved=await deviceDraft(storageKey);guard();if(turn!==revision)return;
-   draft=saved||{kind,id:crypto.randomUUID(),transferId:transfer?.id||null,revision:transfer?.revision||0,serviceActor:transfer?.service_actor||'',items:(transfer?.manifest||[]).map(i=>({...i,family:kind==='receipt'?'':i.family,unit_tag:kind==='receipt'?'':i.unit_tag,simText:kind==='receipt'?'':i.sims.join('\n'),batteryText:kind==='receipt'?'':String(i.battery_count),partsText:kind==='receipt'?'':i.parts.map(p=>p.name+' | '+p.quantity).join('\n'),checks:{},missing:false})),photos:[],signature:newSignature(),notes:'',request:null};
+   draft=saved||{kind,id:crypto.randomUUID(),transferId:transfer?.id||null,revision:transfer?.revision||0,serviceActor:transfer?.service_actor||'',items:((kind==='return'?transfer?.remaining:transfer?.manifest)||transfer?.manifest||[]).map(i=>({...i,family:kind==='receipt'?'':i.family,unit_tag:kind==='receipt'?'':i.unit_tag,simText:kind==='receipt'?'':i.sims.join('\n'),batteryText:kind==='receipt'?'':String(i.battery_count),partsText:kind==='receipt'?'':i.parts.map(p=>p.name+' | '+p.quantity).join('\n'),checks:{},missing:false})),photos:[],signature:newSignature(),notes:'',request:null};
    if(transfer&&draft.revision!==transfer.revision&&!draft.request)throw new Error('Your saved draft refers to an older handoff. Reload and review before continuing.');
    await persist();render(transfer);
   }catch(e){message(e.message,true);}
@@ -69,7 +70,8 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    const expected=transfer?.manifest.find(i=>i.equipment_key===item.equipment_key),group=element('fieldset');group.append(element('legend',(expected?.family||item.family)+' '+(expected?.unit_tag||item.unit_tag)));
    if(expected)group.append(element('pre','IT sent:\n'+expectedText(expected),'tc-expected'));
    if(draft.kind==='receipt'){const missing=element('input');missing.type='checkbox';missing.checked=item.missing;missing.onchange=()=>{item.missing=missing.checked;changed();render(transfer);};group.append(label('I did not receive this item',missing));}
-   if(!item.missing){
+   if(draft.kind==='return'){const selected=element('input');selected.type='checkbox';selected.checked=item.returnNow!==false;selected.onchange=()=>{item.returnNow=selected.checked;changed();render(transfer);};group.append(label('Return this unit now',selected));}
+   if(!item.missing&&(draft.kind!=='return'||item.returnNow!==false)){
     for(const [field,caption,type] of [['family','Unit family / name','text'],['unit_tag','Unit number','text'],['simText','Exact SIM numbers (one per line; blank only when none)','textarea'],['batteryText','Batteries / battery boxes on this unit','number'],['partsText','Additional parts (one per line: name | quantity)','textarea']]){
      const n=input(type,item[field],value=>{item[field]=value;changed();});n.setAttribute('aria-label',caption+' '+(index+1));if(['family','unit_tag','batteryText'].includes(field))n.required=true;if(draft.kind==='return')n.readOnly=true;if(type==='number'){n.min='0';n.max='9999';n.step='1';}group.append(label(caption,n));
     }
@@ -94,7 +96,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    guard();if(pending)throw new Error('Wait for the photo to finish saving.');if(!navigator.onLine)throw new Error('Offline. Your draft stays on this device; reconnect and retry.');
    let photos;
    if(!draft.request){
-    const items=normalizeManifest(draft.items.filter(i=>!i.missing).map(itemInput),{allowEmpty:draft.kind==='receipt'});
+    const items=normalizeManifest(draft.items.filter(i=>!i.missing&&(draft.kind!=='return'||i.returnNow!==false)).map(itemInput),{allowEmpty:draft.kind==='receipt'});
     if(!draft.signature.confirmed)throw new Error('Sign and confirm the accuracy statement.');
     const name=context.getProfile()?.full_name||context.getProfile()?.username||'';const sig={method:draft.signature.method,name:draft.signature.method==='typed'?draft.signature.typedName:name,confirmed:true};
     if(sig.name.trim().replace(/\s+/g,' ').toLowerCase()!==name.trim().replace(/\s+/g,' ').toLowerCase())throw new Error('Use the name on your signed-in account.');

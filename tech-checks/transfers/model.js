@@ -35,5 +35,5 @@ export function receiptDifferences(expected,actual) {
   return diff;
 }
 export function transferTitle(state) {
-  return {awaiting_service:'Awaiting Service verification',discrepancy:'Discrepancy — not accepted',accepted:'Received by Service',returned_review:'Returned — inventory review required',returned_repair:'Returned — repair required',cancelled:'Cancelled — history retained'}[state] || 'Status unavailable';
+  return {awaiting_service:'Awaiting Service verification',discrepancy:'Discrepancy — not accepted',accepted:'Received by Service',partial_return:'Partially returned — remaining equipment assigned to Service',returned_review:'Returned — inventory review required',returned_repair:'Returned — repair required',cancelled:'Cancelled — history retained'}[state] || 'Status unavailable';
 }

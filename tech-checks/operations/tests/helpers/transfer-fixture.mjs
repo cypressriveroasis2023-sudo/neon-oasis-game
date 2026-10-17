@@ -5,7 +5,8 @@ import {randomUUID} from 'node:crypto';
 import {snapshot,resource} from '../fixtures/camera-evidence-fixtures.mjs';
 export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',SERVICE='00000000-0000-4000-8000-000000000002',OTHER='00000000-0000-4000-8000-000000000003';
 const root=new URL('../../../',import.meta.url).pathname;
-export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false,rollout='ready',readinessDelay=0}={}){
+const operationsDist=process.env.COS_IT_DAILY_TEST_DIST?resolve(process.env.COS_IT_DAILY_TEST_DIST):resolve(root,'operations/dist');
+export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false,seedPair=false,rollout='ready',readinessDelay=0}={}){
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
@@ -20,6 +21,8 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  `);
  await db.exec(await readFile(root+'database-maintenance/techcheck-named-handoffs-v1.sql','utf8'));
  await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-rollout-v2.sql','utf8'));
+ await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-delivery-v3.sql','utf8'));
+ await db.exec(await readFile(root+'database-maintenance/techcheck-partial-returns-v4.sql','utf8'));
  await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
  // Serialize fixture connections exactly; roles cannot bleed between HTTP requests.
  let pending=Promise.resolve();
@@ -27,6 +30,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  let handoff=null;
  if(seedHandoff){const rules=JSON.parse(await readFile(root+'transfers/checklist-contract.json','utf8'));const id=randomUUID(),path=IT+'/'+id+'/'+'a'.repeat(64)+'.jpg';await db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);
  const args={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:serviceActor,p_items:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:['00123456789012345670'],battery_count:2,parts:[{name:'SD card',quantity:1}]}],p_checks:{'sniper:001':Object.fromEntries(rules.families.Sniper.bool_fields.map(field=>[field,true]))},p_signature:{method:'typed',name:'Synthetic IT',confirmed:true},p_photos:[{equipment_key:'sniper:001',kind:'unit',path}],p_notes:'Synthetic equipment checked for the named Service technician.'};
+ if(seedPair){const item={equipment_key:'ranger:002',family:'Ranger',unit_tag:'002',sims:['00123456789012345671'],battery_count:1,parts:[]};args.p_items.push(item);args.p_checks[item.equipment_key]=Object.fromEntries(rules.families.Ranger.bool_fields.map(field=>[field,true]));args.p_photos.push({equipment_key:item.equipment_key,kind:'unit',path});}
  handoff=(await run(IT,`select submit_techcheck_transfer_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args))).rows[0].result;
  }
  if(rollout==='missing')await db.exec('drop function public.techcheck_transfer_readiness_v1()');
@@ -79,7 +83,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
    :call.path==='/api/vrm-fleet'?{items:[],sync:{state:'current',scheduleActive:true}}:undefined;
   if(!payload){unexpected.push(call);return route.fulfill({status:403,headers,json:{error:'Unavailable in synthetic fixture'}});}return route.fulfill({headers,json:payload});
  }
- if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const path=resolve(root,'.'+url.pathname.slice('/tech-checks'.length));if(path.startsWith(root)){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
+ if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const built=url.pathname.startsWith('/tech-checks/operations/dist/'),base=built?operationsDist:resolve(root),path=resolve(base,'.'+url.pathname.slice(built?'/tech-checks/operations/dist'.length:'/tech-checks'.length));if(path.startsWith(base+'/')||path===base){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
  unexpected.push(url.pathname);return route.abort();
  });
  await page.goto('http://127.0.0.1:4173/tech-checks/');

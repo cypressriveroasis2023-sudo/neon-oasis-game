@@ -57,7 +57,7 @@ export function transferReportHtml(value: TransferDelivery, links: Record<string
  const manifest=(items:any[])=>items.map(i=>'<h4>'+e(i.family)+' '+e(i.unit_tag)+'</h4><table>'+cell('Exact equipment key',i.equipment_key)+cell('SIMs',i.sims.join(', '))+cell('Batteries',i.battery_count)+cell('Parts',i.parts.map((p:any)=>p.name+': '+p.quantity).join(', '))+'</table>').join('') || '<p>No equipment recorded.</p>';
  return '<!doctype html><html lang="en"><meta charset="utf-8"><title>'+e(labels[d.kind])+'</title><body><h1>'+e(labels[d.kind])+'</h1><p>Handoff '+e(d.transfer_id)+' · Event '+e(d.event_id)+' · Revision '+d.revision+'</p><p>IT: '+e(d.it_name)+' · Named Service technician: '+e(d.service_name)+'</p>'+d.events.map(event=>{
   const s=event.snapshot, sig=s.signature;
-  return '<section><h2>'+e(labels[event.kind])+' · Revision '+s.revision+'</h2><p>Event '+e(event.id)+' · '+e(event.signed_at)+' · '+e(s.state)+'</p><h3>Expected equipment</h3>'+manifest(s.expected)+'<h3>Equipment physically recorded</h3>'+manifest(s.actual)+'<h3>Checks and differences</h3><pre>'+e(JSON.stringify({checks:s.checks,differences:s.differences},null,2))+'</pre><p>'+e(s.notes)+'</p><h3>Evidence</h3>'+event.photos.map(p=>'<p>'+e(p.equipment_key||'Sign-off')+' · '+e(p.kind)+(links[p.path]?'<a href="'+e(links[p.path])+'"> View saved image</a>':'')+'</p>').join('')+'<h3>Authenticated sign-off</h3><p>'+e(sig.statement)+'</p><p>'+e(sig.name)+' · '+e(sig.signed_by)+' · '+e(sig.signed_at)+' · '+e(sig.method)+'</p></section>';
+  return '<section><h2>'+e(labels[event.kind])+' · Revision '+s.revision+'</h2><p>Event '+e(event.id)+' · '+e(event.signed_at)+' · '+e(s.state)+'</p><h3>Expected equipment</h3>'+manifest(s.expected)+'<h3>Equipment physically recorded</h3>'+manifest(s.actual)+'<h3>Checks and differences</h3><pre>'+e(JSON.stringify({checks:s.checks,differences:s.differences,...(event.kind==='return'?{remaining:s.remaining,previous_returns:s.previous_returns}:{})},null,2))+'</pre><p>'+e(s.notes)+'</p><h3>Evidence</h3>'+event.photos.map(p=>'<p>'+e(p.equipment_key||'Sign-off')+' · '+e(p.kind)+(links[p.path]?'<a href="'+e(links[p.path])+'"> View saved image</a>':'')+'</p>').join('')+'<h3>Authenticated sign-off</h3><p>'+e(sig.statement)+'</p><p>'+e(sig.name)+' · '+e(sig.signed_by)+' · '+e(sig.signed_at)+' · '+e(sig.method)+'</p></section>';
  }).join('')+'<p>Returned equipment remains held for inventory review. This report does not release stock or change placement or health.</p></body></html>';
 }
 
@@ -69,7 +69,9 @@ export function transferReportPdf(value: TransferDelivery, signatures: Record<st
   const s=event.snapshot,sig=s.signature;
   lines.push({text:labels[event.kind]+' / Revision '+s.revision+' / '+s.state,bold:true},{text:'Event '+event.id});
   items('Expected equipment',s.expected);items('Equipment physically recorded',s.actual);
-  lines.push({text:'Checks: '+JSON.stringify(s.checks)},{text:'Differences: '+JSON.stringify(s.differences)},{text:'Notes: '+s.notes},{text:'Signed by '+sig.name+' ('+sig.signed_by+')',bold:true},{text:sig.signed_at+' / '+sig.method},{text:sig.statement});
+  lines.push({text:'Checks: '+JSON.stringify(s.checks)},{text:'Differences: '+JSON.stringify(s.differences)},{text:'Notes: '+s.notes});
+  if(event.kind==='return'){items('Equipment still assigned after this return',s.remaining||[]);lines.push({text:'Earlier returned items and event references: '+JSON.stringify(s.previous_returns||[])});}
+  lines.push({text:'Signed by '+sig.name+' ('+sig.signed_by+')',bold:true},{text:sig.signed_at+' / '+sig.method},{text:sig.statement});
   if(sig.method==='drawn'){if(!signatures[sig.path])throw new Error('Saved handoff signature required.');lines.push({text:'',image:sig.path});}
   lines.push({text:event.photos.length+' supporting images in the verified archive.'});
  }
