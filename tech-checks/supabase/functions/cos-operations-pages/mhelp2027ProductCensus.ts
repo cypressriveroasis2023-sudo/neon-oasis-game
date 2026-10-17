@@ -21,6 +21,7 @@ export type VerifiedProductCensus={
   contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1';sourceSha256:string;
   observedAt:string;verifiedBy:'cos_sheets_service';productIds:readonly string[];
   total:number;field:number;shop:number;sourceExport:string;
+  productRows:readonly {productId:string;family:string;unitLabel:string;placement:'FIELD'|'SHOP';customer:string}[];
 };
 function exactIds(cells:unknown[],name:string){
   const ids=[] as string[];for(const value of cells){if(typeof value!=='string'||!ID.test(value))fail(name+' contains invalid Product ID');ids.push(value);}
@@ -65,11 +66,12 @@ export async function verify2027CensusRanges(valueRanges:unknown,rangeNames:read
  const set=new Set(overviewProducts);if(lookupProducts.some(x=>!set.has(x)))fail('the mHelp index is inconsistent with the current overview');
  const candidates=new Map<string,EquipmentCsvRow>();for(const r of candidate){if(!ID.test(r.productId)||candidates.has(r.productId))fail('source Product IDs are invalid');candidates.set(r.productId,r);}
  if(candidates.size!==overviewProducts.length||overviewProducts.some(id=>!candidates.has(id)))fail('2027 workbook does not match the uploaded mHelp Product IDs');
- let field=0,shop=0;const canonical:string[]=[];
+ let field=0,shop=0;const canonical:string[]=[],productRows:{productId:string;family:string;unitLabel:string;placement:'FIELD'|'SHOP';customer:string}[]=[];
  for(let i=0;i<list.length;i++){
   const [family,label,placement,,customer]=list[i];const [trackerPlacement,mhelpPlacement]=placed[i];const product=overviewProducts[i],source=candidates.get(product)!;
   if(!family||!label||!customer||!['FIELD','SHOP'].includes(placement)||trackerPlacement!==placement||mhelpPlacement!==placement||placement!==source.placement||normalized(customer)!==normalized(source.customer)||equipmentCustomerPlacement(customer)!==placement)fail('current placement or customer assignment disagrees with mHelp');
   if(placement==='FIELD')field++;else shop++;
+  productRows.push({productId:product,family,unitLabel:label,placement:placement as 'FIELD'|'SHOP',customer});
   canonical.push(product+'|'+family+'|'+label+'|'+placement+'|'+normalized(customer));
  }
  const detailsById=new Map<string,{key:string;model:string;customer:string}>();for(let i=0;i<indexIds.length;i++){
@@ -88,7 +90,7 @@ export async function verify2027CensusRanges(valueRanges:unknown,rangeNames:read
  const bytes=new TextEncoder().encode(data);
  const sourceSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
  if(!HASH.test(sourceSha256))fail('source checksum was unavailable');
- return {contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1',sourceSha256,observedAt:at,verifiedBy:'cos_sheets_service',productIds:overviewProducts,total:list.length,field,shop,sourceExport:sourceFilename};
+ return {contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1',sourceSha256,observedAt:at,verifiedBy:'cos_sheets_service',productIds:overviewProducts,total:list.length,field,shop,sourceExport:sourceFilename,productRows};
 }
 
 /** Enforces server-only Google Viewer credentials and bounded native Sheets APIs. */
