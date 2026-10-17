@@ -29,7 +29,7 @@ const fail=(message:string,status=503):never=>{throw new SheetsConnectionError(m
 function account(raw:unknown):Account|null {
  if(raw===undefined||raw===null||raw==='')return null;
  if(typeof raw!=='string'||raw.length>32768)return fail('The Google service-account secret needs correction in Supabase.');
- let v:Row;try{v=JSON.parse(raw);}catch{fail('The Google service-account secret must be the complete JSON key file.');}
+ let v:Row;try{v=JSON.parse(raw);}catch{return fail('The Google service-account secret must be the complete JSON key file.');}
  if(!object(v)||v.type!=='service_account'||typeof v.client_email!=='string'||v.client_email.length>254
   ||!/^[a-z0-9][a-z0-9._-]*@[a-z0-9][a-z0-9.-]*\.iam\.gserviceaccount\.com$/.test(v.client_email)
   ||v.token_uri!==TOKEN_URL||typeof v.private_key_id!=='string'||!/^[a-zA-Z0-9_-]{8,128}$/.test(v.private_key_id)
@@ -43,13 +43,13 @@ async function boundedJson(response:Response,limit:number,signal:AbortSignal):Pr
  if(signal.aborted)fail('The Sheets connection check timed out. Retry the check.');
  const declared=Number(response.headers.get('Content-Length'));
  if(Number.isFinite(declared)&&declared>limit){await response.body?.cancel();fail('Google returned an oversized connection response.');}
- const reader=response.body?.getReader();if(!reader)fail('Google returned an incomplete connection response.');
+ const reader=response.body?.getReader();if(!reader)return fail('Google returned an incomplete connection response.');
  const chunks:Uint8Array[]=[];let size=0;
  const abort=()=>{void reader.cancel().catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
  try{
   while(true){const {value,done}=await reader.read();if(signal.aborted)fail('The Sheets connection check timed out. Retry the check.');if(done)break;size+=value.byteLength;if(size>limit)fail('Google returned an oversized connection response.');chunks.push(value);}
   const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.byteLength;}
-  let v;try{v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{fail('Google returned an unreadable connection response.');}
+  let v;try{v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{return fail('Google returned an unreadable connection response.');}
   if(!object(v))fail('Google returned an incomplete connection response.');return v;
  }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});}
 }
@@ -109,12 +109,12 @@ export function createSheetsConnection(options:{getServiceAccountJson:()=>unknow
    if(!token){
     const issuedAt=Math.floor(now()/1000);let assertion;
     try{
-     if(!options.signAssertion)fail('The Google signing service is unavailable.');
+     if(!options.signAssertion)return fail('The Google signing service is unavailable.');
      assertion=await options.signAssertion(a.private_key,{alg:'RS256',typ:'JWT',kid:a.private_key_id},
       {iss:a.client_email,aud:TOKEN_URL,iat:issuedAt,exp:issuedAt+3600,scope:SCOPE});
      if(typeof assertion!=='string'||assertion.length>16384||!/^[-A-Za-z0-9_]+\.[-A-Za-z0-9_]+\.[-A-Za-z0-9_]+$/.test(assertion))fail('Invalid Google assertion.');
-    }catch{fail('The Google private key could not be used. Check the protected JSON secret.');}
-    let response;try{response=await requestFetch(TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}).toString(),signal:controller.signal,redirect:'error',cache:'no-store'});}catch{fail('Google authorization is unavailable. Retry the connection check.');}
+    }catch{return fail('The Google private key could not be used. Check the protected JSON secret.');}
+    let response;try{response=await requestFetch(TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}).toString(),signal:controller.signal,redirect:'error',cache:'no-store'});}catch{return fail('Google authorization is unavailable. Retry the connection check.');}
     if(!response.ok){await response.body?.cancel();cached=null;fail(response.status===429?'Google limited authorization requests. Wait and retry.':'Google rejected the service-account authorization. Check its JSON key and account.',response.status===429?429:503);}
     const data=await boundedJson(response,32768,controller.signal);
     if(typeof data.access_token!=='string'||!data.access_token||data.access_token.length>16384||/\s/.test(data.access_token)||data.token_type!=='Bearer'||!Number.isSafeInteger(data.expires_in)||data.expires_in<60||data.expires_in>3600)fail('Google returned incomplete authorization.');
@@ -123,7 +123,7 @@ export function createSheetsConnection(options:{getServiceAccountJson:()=>unknow
    // First verify tab IDs, names, dimensions and visibility before selecting ranges.
    const base='https://sheets.googleapis.com/v4/spreadsheets/'+UNIT_TRACKER_WORKBOOK;
    const read=async(url:string)=>{
-    let response;try{response=await requestFetch(url,{method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'},signal:controller.signal,redirect:'error',cache:'no-store'});}catch{fail('The Google Sheets read failed. Retry the connection check.');}
+    let response;try{response=await requestFetch(url,{method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'},signal:controller.signal,redirect:'error',cache:'no-store'});}catch{return fail('The Google Sheets read failed. Retry the connection check.');}
     if(!response.ok){await response.body?.cancel();if(response.status===401)cached=null;
      fail(response.status===403||response.status===404?'Enable the Google Sheets API and share the 2027 tracker with the service-account email shown here.':response.status===429?'Google limited Sheets requests. Wait and retry.':'The Google Sheets connection could not be verified.',response.status===429?429:503);}
     return boundedJson(response,2*1024*1024,controller.signal);
