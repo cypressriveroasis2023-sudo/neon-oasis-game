@@ -5,8 +5,9 @@
 -- This private source-file stage is an evidence store, not a unit, camera, IP, GPS,
 -- address or mHelpDesk write. The existing administrator review_upload() stays authoritative.
 -- Current 2027 source census is authenticated by the COS Edge Function, never by browser JSON.
--- Shop is ONLY the company inventory customer account; the distinct customer
--- CAMERAS ONSITE - TEST UNITS is treated as Field under the Oct 16 mHelp rule.
+-- Shop uses exact known internal company accounts only. The current 2027
+-- overview explicitly places ST 239 / CAMERAS ONSITE - TEST UNITS in Shop,
+-- matching the corrected Oct 16 complete-source census (287 Field / 714 Shop).
 create table if not exists cos_mhelp_placement_private.owner_equipment_stages (
  id uuid primary key,
  organization_id uuid not null,
@@ -87,7 +88,7 @@ begin
        or jsonb_typeof(r->'sourceAddress') is distinct from 'object'
        or (r->>'placement'='SHOP') is distinct from
           (regexp_replace(lower(r->>'customer'),'[^a-z0-9]','','g') in
-          ('camerasonsite','camerasonsitellc')))
+          ('camerasonsite','camerasonsitellc','camerasonsitetestunits')))
    or exists(select 1 from jsonb_array_elements(p_current_2027_rows) r
       where coalesce(r->>'productId','')!~'^[1-9][0-9]{0,14}$'
        or coalesce(r->>'unitLabel','')='' or coalesce(r->>'family','')=''

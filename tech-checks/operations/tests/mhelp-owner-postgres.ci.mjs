@@ -13,12 +13,12 @@ const records=[
  {productId:'11',unitNumber:'Ranger 007',customerId:'100',customer:'Domain Builders',category:'Ranger',placement:'FIELD',lifecycle:'UNFLAGGED',sourceRow:2,sourceAddress:{street:'Site',city:'Houston',state:'TX',zip:'77064'}},
  {productId:'12',unitNumber:'Ranger 024',customerId:'200',customer:'Cameras OnSite',category:'Ranger',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:3,sourceAddress:{street:'Shop',city:'Houston',state:'TX',zip:'77064'}},
  {productId:'13',unitNumber:'Sniper 230',customerId:'200',customer:'Cameras OnSite',category:'Sniper',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:4,sourceAddress:{street:'Shop',city:'Houston',state:'TX',zip:'77064'}},
- {productId:'14',unitNumber:'ST 239',customerId:'300',customer:'CAMERAS ONSITE - TEST UNITS',category:'Stand',placement:'FIELD',lifecycle:'UNFLAGGED',sourceRow:5,sourceAddress:{street:'Test Yard',city:'Houston',state:'TX',zip:'77064'}}
+ {productId:'14',unitNumber:'ST 239',customerId:'300',customer:'CAMERAS ONSITE - TEST UNITS',category:'Stand',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:5,sourceAddress:{street:'Test Yard',city:'Houston',state:'TX',zip:'77064'}}
 ];
 const census=records.map(r=>({productId:r.productId,family:r.category,unitLabel:r.unitNumber,placement:r.placement,customer:r.customer}));
 function pg(sql){
- return execFileSync('psql',['-X','-qAt','-v','ON_ERROR_STOP=1','-h','127.0.0.1','-U','postgres','-d',db,'-c',sql],{
-  env:{...process.env,PGPASSWORD:'synthetic-ci-only'},encoding:'utf8',timeout:45000,stdio:['ignore','pipe','pipe'],
+ return execFileSync('psql',['-X','-qAt','-v','ON_ERROR_STOP=1','-h','127.0.0.1','-U','postgres','-d',db,'-f','-'],{
+  input:sql,env:{...process.env,PGPASSWORD:'synthetic-ci-only'},encoding:'utf8',timeout:45000,stdio:['pipe','pipe','pipe'],
  }).trim();
 }
 const quote=s=>"'"+String(s).replaceAll("'","''")+"'";
@@ -66,8 +66,8 @@ pg(readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-2026101
 const id=randomUUID(),staged=stage(id);
 assert.equal(staged.contract,'COS_OWNER_EQUIPMENT_STAGE_V1');
 assert.equal(staged.productIdsMatched,4);
-assert.equal(staged.recordedField,2);
-assert.equal(staged.recordedShop,2);
+assert.equal(staged.recordedField,1);
+assert.equal(staged.recordedShop,3);
 assert.equal(staged.readyToCommit,false);
 assert.equal(pg("SELECT encode(source_bytes,'hex') FROM cos_mhelp_placement_private.owner_equipment_stages WHERE id="+quote(id)+"::uuid"),source.toString('hex'));
 const r=JSON.parse(pg("SELECT records::text FROM cos_mhelp_placement_private.owner_equipment_stages WHERE id="+quote(id)+"::uuid"));
@@ -78,7 +78,7 @@ assert.equal(r.find(x=>x.productId==='13').placementHeld,true);
 assert.equal(r.find(x=>x.productId==='11').binding,null);
 assert.equal(r.find(x=>x.productId==='11').placementHeld,true);
 assert.equal(r.find(x=>x.productId==='11').placement,'FIELD');
-assert.equal(r.find(x=>x.productId==='14').placement,'FIELD');
+assert.equal(r.find(x=>x.productId==='14').placement,'SHOP');
 assert.equal(r.find(x=>x.productId==='14').customer,'CAMERAS ONSITE - TEST UNITS');
 const stagedSource=JSON.parse(pg("SELECT receipt::text FROM cos_mhelp_placement_private.owner_equipment_stages WHERE id="+quote(id)+"::uuid"));
 const heldTracker=stagedSource.trackerRecords.find(x=>x.matchedProductId==='11');
@@ -107,4 +107,22 @@ assert.equal(repeated.contract,applied.contract);
 assert.equal(repeated.stageId,applied.stageId);
 assert.equal(repeated.sourceReceiptsApplied,true);
 assert.equal(pg('SELECT count(*) FROM cos_mhelp_placement_private.upload_audit'),'1');
+// Full-size synthetic admission: exercise the same 1001 / 287 / 714 shape
+// without committing the private customer CSV or using a live Sheets proof.
+const loadRows=Array.from({length:1001},(_,i)=>({productId:String(i+1),unitNumber:'ST '+String(i+1),
+ customerId:i<287?'100':i===287?'300':'200',customer:i<287?'Synthetic Builder':i===287?'CAMERAS ONSITE - TEST UNITS':'Cameras OnSite',
+ category:'Stand',placement:i<287?'FIELD':'SHOP',lifecycle:'UNFLAGGED',sourceRow:i+2,
+ sourceAddress:{street:'Synthetic Site',city:'Houston',state:'TX',zip:'77064'}}));
+const loadBytes=Buffer.from('ProductId,ProductModel,CustomerId,CustomerName,Category,Address,City,State,Zip\n'+loadRows.map(r=>[r.productId,r.unitNumber,r.customerId,r.customer,r.category,'Synthetic Site','Houston','TX','77064'].join(',')).join('\n')+'\n');
+const loadHash=createHash('sha256').update(loadBytes).digest('hex'),loadId=randomUUID();
+const loadCensus=loadRows.map(r=>({productId:r.productId,family:r.category,unitLabel:r.unitNumber,placement:r.placement,customer:r.customer}));
+const loadPreview=call('cos_owner_mhelp_equipment_stage_v1',[
+ quote(actor)+'::uuid',quote(org)+'::uuid',quote(loadId)+'::uuid',quote('ServiceItem_List_20261016131754.csv'),
+ quote(loadHash),quote(sourceHash),quote(censusHash),quote(JSON.stringify(loadCensus))+'::jsonb',
+ quote(loadBytes.toString('base64')),quote(JSON.stringify(loadRows))+'::jsonb']);
+assert.equal(loadPreview.productIdsMatched,1001);assert.equal(loadPreview.recordedField,287);assert.equal(loadPreview.recordedShop,714);
+const loadCommit=()=>call('cos_owner_mhelp_equipment_commit_v1',[quote(actor)+'::uuid',quote(org)+'::uuid',quote(loadId)+'::uuid',quote(sourceHash),quote(censusHash),quote('I approve the complete synthetic 1001-product source-only load test.')]);
+const full=loadCommit();assert.equal(full.records,1001);assert.equal(full.recordedField,287);assert.equal(full.recordedShop,714);
+assert.equal(loadCommit().idempotent,true);assert.equal(pg('SELECT count(*) FROM cos_mhelp_placement_private.upload_audit'),'2');
 console.log('PostgreSQL 17 Owner guarded stage/commit: source CAS, 2027 membership, Owner denial, held identities and byte evidence verified.');
+console.log('PostgreSQL 17 full-size synthetic stage/commit/retry: 1001 products, 287 Field, 714 Shop, exact internal Test Units account verified.');
