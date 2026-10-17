@@ -16,13 +16,14 @@ export async function ownerEquipmentCsvReview(args:{
   google:{getServiceAccountJson:()=>unknown;signAssertion?:SheetsAssertionSigner;fetch?:typeof fetch};
   verifyCensus?:typeof read2027CensusFromGoogle;
 }):Promise<OwnerEquipmentReview>{
- const preview=await previewMhelpEquipmentCsv(args.body,args.previous);
- const request=args.body as {bytesBase64:string;sourceFilename?:string};
+ const request=args.body as {bytesBase64:string;sourceFilename?:string;expectedSha256?:string};
+ const filename=request?.sourceFilename;
+ if(typeof filename!=='string'||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(filename))throw Error('Invalid mHelpDesk equipment CSV: source filename required');
+ const preview=await previewMhelpEquipmentCsv({bytesBase64:request.bytesBase64,...(request.expectedSha256?{expectedSha256:request.expectedSha256}:{})},args.previous);
  // Parsing twice for the same bounded bytes does not create authority; the
  // first parse includes SHA-256 validation against unmodified source bytes.
  const bytes=Uint8Array.from(atob(request.bytesBase64),x=>x.charCodeAt(0));
  const rows=parseEquipmentCsv(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
- const filename=request.sourceFilename;
  let census:VerifiedProductCensus|undefined;
  if(filename){
   try{census=await (args.verifyCensus??read2027CensusFromGoogle)({
