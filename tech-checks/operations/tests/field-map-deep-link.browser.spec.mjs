@@ -268,9 +268,9 @@ test('hardware-suffixed field pin shows its number and unit cards keep dark high
  const {frame}=await mount(page,'Spotter211HDC2S',units);
  await expect(frame.locator('.cos-pin-unit-number')).toHaveText('211');
  const card=frame.locator('.cos-fleet-unit-row').first();
- await expect(card).toHaveCSS('background-color','rgb(32, 52, 86)');
- await expect(card.locator('strong')).toHaveCSS('color','rgb(230, 237, 247)');
- await expect(card.locator('small').first()).toHaveCSS('color','rgb(163, 179, 202)');
+ await expect(card).toHaveCSS('background-color','rgb(32, 59, 86)');
+ await expect(card.locator('strong')).toHaveCSS('color','rgb(245, 247, 250)');
+ await expect(card.locator('small').first()).toHaveCSS('color','rgb(194, 200, 209)');
  const contrast=await card.evaluate(el=>{
   const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
   const background=luminance(getComputedStyle(el).backgroundColor);

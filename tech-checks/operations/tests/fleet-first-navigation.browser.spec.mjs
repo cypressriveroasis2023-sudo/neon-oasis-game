@@ -14,13 +14,14 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} opens Fleet first
  await expect(nav.getByRole('button').first()).toHaveText('Fleet Dashboard');
  await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
  if(it){
-  await expect(nav.getByRole('button')).toHaveCount(4);
+  await expect(nav.getByRole('button')).toHaveCount(2);
   await expect(nav.getByRole('button',{name:'IT Dashboard',exact:true})).toHaveCount(0);
-  for(const name of ['Camera Health','Victron Power','2027 Unit Tracker'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(1);
+  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toHaveCount(1);
+  for(const name of ['Victron Power','2027 Unit Tracker'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);
  }
  if(mobile)await app.getByRole('button',{name:/Close menu/}).click();
  const design=await app.locator('.cos-fleet-dashboard').evaluate(el=>({font:getComputedStyle(el).fontFamily,border:getComputedStyle(el).borderTopWidth,panel:getComputedStyle(el.querySelector('.cos-fleet-stats button')).backgroundColor,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
- expect(design.font).toContain('Open Sans');expect(design.border).toBe('0px');expect(design.panel).toBe('rgb(17, 27, 42)');expect(design.scroll).toBeLessThanOrEqual(design.viewport+1);
+ expect(design.font).toContain('Open Sans');expect(design.border).toBe('0px');expect(design.panel).toBe('rgb(32, 38, 45)');expect(design.scroll).toBeLessThanOrEqual(design.viewport+1);
  await page.screenshot({path:info.outputPath((it?'it':'owner')+'-fleet-first-native.png'),fullPage:true});
  expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });

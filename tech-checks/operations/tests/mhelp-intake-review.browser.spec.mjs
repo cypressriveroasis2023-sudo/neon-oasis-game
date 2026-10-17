@@ -34,7 +34,8 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
   return answer({items:[]});
  });
  await page.goto(origin+'/intake-fixture');const frame=page.frameLocator('iframe');
- if(role!=='service')await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
+ if(role==='owner')await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
+ else if(role==='it'){await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');}
  else await expectOperationsReloadRequired(frame);
  return {frame,panel:frame.getByRole('region',{name:'mHelpDesk automatic intake status',exact:true}),state};
 }
@@ -102,7 +103,7 @@ test('bounded held list remains readable on mobile and clearly says it is trunca
  expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
 });
 for(const role of ['it','service'])test(`${role} session has no intake review or read even with forged Owner flag`,async({page})=>{
- const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);
+ const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);expect(state.calls.some(x=>x.path==='/api/unit-tracker'||x.method!=='GET')).toBe(false);expect(state.errors).toEqual([]);
 });
 
 test('a completed all-held scan never claims that Tech Check assignments were created',async({page})=>{
