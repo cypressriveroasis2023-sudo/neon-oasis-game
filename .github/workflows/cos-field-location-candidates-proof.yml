@@ -5,6 +5,7 @@ on:
       - 'tech-checks/operations/tests/helpers/field-saved-location-audit.mjs'
       - 'tech-checks/operations/tests/field-saved-location-audit.test.mjs'
       - 'tech-checks/operations/tests/cos-source-estimate-optional-holds.test.mjs'
+      - 'tech-checks/operations/tests/cos-address-compat-postgres.mjs'
       - 'tech-checks/operations/db/cos_source_estimate_optional_holds_20261017.sql'
       - '.github/workflows/cos-field-location-candidates-proof.yml'
 permissions:
@@ -12,7 +13,21 @@ permissions:
 jobs:
   location-candidate-regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: cos_address_compat_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_address_compat_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         shell: bash
@@ -27,12 +42,22 @@ jobs:
           cache: npm
           cache-dependency-path: tech-checks/operations/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix legacy/tests/recon-ordering --ignore-scripts --no-audit --no-fund
       - name: Test candidate-vs-accepted-pin safeguards
         run: |
           set -o pipefail
           node --no-wasm-code-gc --import tsx --test --test-concurrency=1 tests/field-saved-location-audit.test.mjs tests/cos-source-estimate-optional-holds.test.mjs | tee field-location-candidate-receipt.txt
+      - name: Prove guarded optional-hold migration with real PostgreSQL 17.11
+        env:
+          COS_ADDRESS_COMPAT_PG_CI: '1'
+          COS_ADDRESS_COMPAT_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_address_compat_test_ci
+        run: |
+          set -o pipefail
+          node tests/cos-address-compat-postgres.mjs | tee field-address-compat-postgres-receipt.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cos-field-location-candidate-receipt
-          path: tech-checks/operations/field-location-candidate-receipt.txt
+          path: |
+            tech-checks/operations/field-location-candidate-receipt.txt
+            tech-checks/operations/field-address-compat-postgres-receipt.txt
