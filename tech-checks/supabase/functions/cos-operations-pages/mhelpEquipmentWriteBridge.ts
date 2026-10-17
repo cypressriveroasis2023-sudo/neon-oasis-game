@@ -18,6 +18,8 @@ function invalid(message:string):never{throw new Error('Protected COS equipment 
 function input(body:unknown):EquipmentSourceInput{
  if(!body||typeof body!=='object'||Array.isArray(body))invalid('source file is required');
  const b=body as Record<string,unknown>;
+ if(Object.keys(b).some(key=>!['bytesBase64','sourceFilename','expectedSha256'].includes(key)))invalid('unexpected source request field');
+ if(b.expectedSha256!==undefined&&(typeof b.expectedSha256!=='string'||!HASH.test(b.expectedSha256)))invalid('invalid expected original SHA-256');
  if(typeof b.bytesBase64!=='string'||typeof b.sourceFilename!=='string'||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(b.sourceFilename))invalid('original mHelp CSV required');
  return {bytesBase64:b.bytesBase64,sourceFilename:b.sourceFilename,
   ...(typeof b.expectedSha256==='string'?{expectedSha256:b.expectedSha256}:{})};
