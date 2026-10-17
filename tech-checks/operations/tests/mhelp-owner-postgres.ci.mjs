@@ -7,12 +7,13 @@ import {createHash,randomUUID} from 'node:crypto';
 if(process.env.COS_OWNER_POSTGRES_CI!=='1')throw Error('Synthetic PostgreSQL CI opt-in required');
 const db='cos_owner_import_ci',actor='22222222-2222-4222-8222-222222222222';
 const org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',previous='a'.repeat(64),censusHash='c'.repeat(64);
-const source=Buffer.from('ProductId,ProductModel,CustomerId,CustomerName,Category,Address,City,State,Zip\n11,Ranger 007,100,Domain Builders,Ranger,Site,Houston,TX,77064\n12,Ranger 024,200,Cameras OnSite,Ranger,Shop,Houston,TX,77064\n13,Sniper 230,200,Cameras OnSite,Sniper,Shop,Houston,TX,77064\n');
+const source=Buffer.from('ProductId,ProductModel,CustomerId,CustomerName,Category,Address,City,State,Zip\n11,Ranger 007,100,Domain Builders,Ranger,Site,Houston,TX,77064\n12,Ranger 024,200,Cameras OnSite,Ranger,Shop,Houston,TX,77064\n13,Sniper 230,200,Cameras OnSite,Sniper,Shop,Houston,TX,77064\n14,ST 239,300,CAMERAS ONSITE - TEST UNITS,Stand,Test Yard,Houston,TX,77064\n');
 const sourceHash=createHash('sha256').update(source).digest('hex');
 const records=[
  {productId:'11',unitNumber:'Ranger 007',customerId:'100',customer:'Domain Builders',category:'Ranger',placement:'FIELD',lifecycle:'UNFLAGGED',sourceRow:2,sourceAddress:{street:'Site',city:'Houston',state:'TX',zip:'77064'}},
  {productId:'12',unitNumber:'Ranger 024',customerId:'200',customer:'Cameras OnSite',category:'Ranger',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:3,sourceAddress:{street:'Shop',city:'Houston',state:'TX',zip:'77064'}},
- {productId:'13',unitNumber:'Sniper 230',customerId:'200',customer:'Cameras OnSite',category:'Sniper',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:4,sourceAddress:{street:'Shop',city:'Houston',state:'TX',zip:'77064'}}
+ {productId:'13',unitNumber:'Sniper 230',customerId:'200',customer:'Cameras OnSite',category:'Sniper',placement:'SHOP',lifecycle:'UNFLAGGED',sourceRow:4,sourceAddress:{street:'Shop',city:'Houston',state:'TX',zip:'77064'}},
+ {productId:'14',unitNumber:'ST 239',customerId:'300',customer:'CAMERAS ONSITE - TEST UNITS',category:'Stand',placement:'FIELD',lifecycle:'UNFLAGGED',sourceRow:5,sourceAddress:{street:'Test Yard',city:'Houston',state:'TX',zip:'77064'}}
 ];
 const census=records.map(r=>({productId:r.productId,family:r.category,unitLabel:r.unitNumber,placement:r.placement,customer:r.customer}));
 function pg(sql){
@@ -42,14 +43,14 @@ pg("CREATE FUNCTION app_private.appdeploy_assume_actor(p uuid,o uuid) RETURNS vo
 pg("CREATE FUNCTION app_private.has_permission(o uuid,p text) RETURNS boolean LANGUAGE sql AS $f$ SELECT o='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid AND p='equipment.manage' $f$;");
 pg("CREATE FUNCTION cos_mhelp_placement_private.review_upload(receipt jsonb,records jsonb,expected text,apply_it boolean default false) RETURNS jsonb LANGUAGE plpgsql AS $f$ DECLARE old text;total int;field int;shop int;BEGIN SELECT active_sha256 INTO old FROM cos_mhelp_placement_private.upload_control WHERE singleton FOR UPDATE;IF old IS DISTINCT FROM expected THEN RAISE EXCEPTION 'Active source changed' USING ERRCODE='40001';END IF;SELECT count(*),count(*) FILTER(WHERE r->>'placement'='FIELD'),count(*) FILTER(WHERE r->>'placement'='SHOP') INTO total,field,shop FROM jsonb_array_elements(records) r; IF total::text IS DISTINCT FROM receipt->>'recordCount' OR jsonb_array_length(receipt->'trackerRecords')<>total OR receipt->>'libraryFileId' !~ '^libfile_[a-z0-9]+$' THEN RAISE EXCEPTION 'incomplete source receipt';END IF;IF apply_it THEN INSERT INTO cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) VALUES(receipt->>'sourceSha256','b',receipt,records);UPDATE cos_mhelp_placement_private.upload_control SET active_sha256=receipt->>'sourceSha256' WHERE singleton;END IF;RETURN jsonb_build_object('sourceSha256',receipt->>'sourceSha256','applied',apply_it,'records',total,'recordedField',field,'recordedShop',shop);END $f$;");
 const oldReceipt={contract:'COS_MHELP_UPLOAD_V1',reviewed:true,sourceSha256:previous,filename:'ServiceItem_List_20261013141848.csv',recordCount:3,trackerRecords:[{recordId:'old:ranger7',unitNumber:'Ranger 007',matchedProductId:'11',binding:{state:'unlinked',unitIds:[],unitLabels:{},guardCurrent:null}}],companyCustomerIds:['200']};
-const oldRows=[{...records[0],placement:'SHOP',customerId:'200',customer:'Cameras OnSite',sourceAddress:{street:'Old Shop',city:'Houston',state:'TX',zip:'77064'},binding:{productId:'11',fullLabel:'Ranger 007',trackerId:'00000000-0000-4000-8000-000000000011'}},{...records[1],binding:null},{...records[2],productId:'99',binding:null}];
+const oldRows=[{...records[0],placement:'SHOP',customerId:'200',customer:'Cameras OnSite',sourceAddress:{street:'Old Shop',city:'Houston',state:'TX',zip:'77064'},binding:{productId:'11',fullLabel:'Ranger 007',trackerId:'00000000-0000-4000-8000-000000000011'}},{...records[1],binding:null},{...records[2],productId:'99',binding:null},{...records[3],binding:null}];
 pg("INSERT INTO cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) VALUES("+quote(previous)+",'b',"+quote(JSON.stringify(oldReceipt))+"::jsonb,"+quote(JSON.stringify(oldRows))+"::jsonb)");
 pg(readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8'));
 
 const id=randomUUID(),staged=stage(id);
 assert.equal(staged.contract,'COS_OWNER_EQUIPMENT_STAGE_V1');
-assert.equal(staged.productIdsMatched,3);
-assert.equal(staged.recordedField,1);
+assert.equal(staged.productIdsMatched,4);
+assert.equal(staged.recordedField,2);
 assert.equal(staged.recordedShop,2);
 assert.equal(staged.readyToCommit,false);
 assert.equal(pg("SELECT encode(source_bytes,'hex') FROM cos_mhelp_placement_private.owner_equipment_stages WHERE id="+quote(id)+"::uuid"),source.toString('hex'));
@@ -61,6 +62,8 @@ assert.equal(r.find(x=>x.productId==='13').placementHeld,true);
 assert.equal(r.find(x=>x.productId==='11').binding,null);
 assert.equal(r.find(x=>x.productId==='11').placementHeld,true);
 assert.equal(r.find(x=>x.productId==='11').placement,'FIELD');
+assert.equal(r.find(x=>x.productId==='14').placement,'FIELD');
+assert.equal(r.find(x=>x.productId==='14').customer,'CAMERAS ONSITE - TEST UNITS');
 assert.equal(pg('SELECT active_sha256 FROM cos_mhelp_placement_private.upload_control'),previous);
 assert.throws(()=>stage(randomUUID(),{sourceHash:'d'.repeat(64)}),/checksum mismatch/);
 assert.throws(()=>stage(randomUUID(),{oldSource:'d'.repeat(64)}),/source changed/);
