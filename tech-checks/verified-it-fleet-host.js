@@ -92,7 +92,7 @@ window.addEventListener('message',async event=>{if(event.origin!==location.origi
  if(d.type==='COS_OPERATIONS_TOKEN_REQUEST'&&typeof d.requestId==='string'&&d.requestId.length<=100){const requested=subject,target=frame.contentWindow,revision=epoch;let token=null;try{const s=await context().db.auth.getSession();if(await verify()&&active()===requested&&s.data?.session?.user?.id===requested&&target===frame?.contentWindow)token=s.data.session.access_token;}catch{}
   if(revision!==epoch||requested!==subject||target!==frame?.contentWindow||active()!==requested)return;
   target.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:d.requestId,accessToken:token,role:token?'it':null},location.origin);if(!token){allowed=false;close();}return;}
- if(d.type==='COS_OPERATIONS_NAVIGATE'){if(d.route==='camera-health')location.assign('./camera-health.html');else if(['it','production-return','operations'].includes(d.route))close();else if(d.route==='logout'){close();window.logout?.();}}
+ if(d.type==='COS_OPERATIONS_NAVIGATE'){if(d.route==='camera-health')location.assign('./camera-health.html?diagnostics=1');else if(['it','production-return','operations'].includes(d.route))close();else if(d.route==='logout'){close();window.logout?.();}}
 });
 let scheduled=false;new MutationObserver(()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;void present();});}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
 void present();

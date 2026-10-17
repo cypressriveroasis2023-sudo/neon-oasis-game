@@ -1,0 +1,41 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+test('every Field Product ID appears once in a complete partition; Shop never enters it',()=>{
+ const f=fieldProductFixture(),before=structuredClone(f),view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
+ assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,unverified:1,support:1,unlinked:1,review:1,inactive:1});
+ assert.equal(new Set(view.items.map(item=>item.productId)).size,7);assert(!view.items.some(item=>item.productId==='1008'));assert.deepEqual(f,before);
+});
+test('possible candidate matches cannot inherit healthy native evidence',()=>{
+ const f=fieldProductFixture();f.upload.records[0].binding.placementHeld=true;
+ let view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);assert.equal(view.counts.review,2);assert.equal(view.items[0].unitId,null);
+ f.upload.records[0].binding.placementHeld=false;f.upload.records[0].binding.candidateUnitIds=[f.units[1].id];view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);
+});
+test('inactive source lifecycle stays separate even when a linked service responds',()=>{
+ const f=fieldProductFixture();f.upload.records[0].uploadLifecycle='MISSING';f.upload.summary.unflaggedFieldRecords--;f.upload.summary.missingRecords++;
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);assert.equal(view.counts.inactive,2);
+});
+test('missing, duplicate or inconsistent unit associations never assign an online product',()=>{
+ for(const change of [f=>f.rows.shift(),f=>f.rows.push({...f.rows[0]}),f=>f.upload.records[0].binding.unitIds=[],f=>f.rows[0].placement='shop']){
+  const f=fieldProductFixture();change(f);const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);assert.equal(view.counts.review,2);
+ }
+});
+test('malformed, incomplete or duplicate-source receipts cannot produce a certified count',()=>{
+ const f=fieldProductFixture();assert.equal(mhelpFieldHealth({...f.upload,records:[...f.upload.records,f.upload.records[0]]},f.roster,f.rows,f.now),null);
+ assert.equal(mhelpFieldHealth(f.upload,{...f.roster,summary:{...f.roster.summary,field:99}},f.rows,f.now),null);assert.equal(mhelpFieldHealth(f.upload,null,f.rows,f.now),null);
+});
+test('service reachability retains its basis and never claims verified video',()=>{
+ const f=fieldProductFixture();f.rows[0].camera={...f.rows[0].camera,basis:'connection',observation:undefined,reason:'A service port responded; video is unverified.'};
+ const item=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0];assert.equal(item.state,'online');assert.match(item.reason,/IP \/ PORT ONLINE/);assert.match(item.reason,/video is unverified/);
+});
+test('all 287 Field Product IDs reconcile without importing the 714 Shop records into health',()=>{
+ const f=fieldProductFixture();
+ for(let i=0;i<993;i++){
+  const field=i<280,id=String(2001+i),base=f.upload.records[4],item=f.roster.items[4];
+  f.upload.records.push({...base,recordId:'mhelp_product:'+id,productId:id,unitNumber:'Unlinked '+id,placement:field?'FIELD':'SHOP'});
+  f.roster.items.push({...item,id:'mhelp_product:'+id,unitNumber:'Unlinked '+id,productIds:[id],sourceRecordIds:['mhelp_product:'+id],placement:field?'field':'shop'});
+ }
+ Object.assign(f.upload.summary,{totalRecords:1001,fieldRecords:287,shopRecords:714,unflaggedFieldRecords:286,unflaggedShopRecords:714});
+ Object.assign(f.roster.summary,{totalRecords:1001,activeRecords:1000,field:285,shop:714,sourceOnlyRecords:997});
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.total,287);assert.equal(view.items.length,287);assert.equal(view.counts.unlinked,281);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),287);
+});
