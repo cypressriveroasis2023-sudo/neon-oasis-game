@@ -17,7 +17,7 @@ begin
  if not app_private.techcheck_transfer_ready_v1() then raise exception 'Named handoffs are held for release review.';end if;
  return jsonb_build_object('version',5,'actor_id',auth.uid(),'receipts',app_private.techcheck_daily_receipts_current_v5(auth.uid()));
 end$$;
-revoke all on function public.techcheck_daily_receipts_v5() from public,anon;
+revoke all on function public.techcheck_daily_receipts_v5() from public,anon,service_role;
 grant execute on function public.techcheck_daily_receipts_v5() to authenticated;
 
 -- Preserve the complete inspection, photo, truck-stock and signature validation.
@@ -69,6 +69,6 @@ begin
  where id=p_report_id;
  return result;
 end$$;
-revoke all on function public.complete_service_daily_report_v5(uuid,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,boolean) from public,anon;
+revoke all on function public.complete_service_daily_report_v5(uuid,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,boolean) from public,anon,service_role;
 grant execute on function public.complete_service_daily_report_v5(uuid,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,boolean) to authenticated;
 commit;

@@ -1,0 +1,476 @@
+{
+  "source": "Exact held assembly on disposable PostgreSQL 17.6 with observed production postgres/public default function grants",
+  "functions": [
+    {
+      "schema": "app_private",
+      "name": "complete_service_daily_report_core_v4",
+      "arguments": "p_report_id uuid, p_units jsonb, p_sims jsonb, p_stock jsonb, p_photos jsonb, p_signature jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "complete_service_daily_report_v4",
+      "arguments": "p_report_id uuid, p_units jsonb, p_sims jsonb, p_stock jsonb, p_photos jsonb, p_signature jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "owner_release_techcheck_return_v6",
+      "arguments": "p_request_id uuid, p_transfer_id uuid, p_equipment_key text, p_return_event_id uuid, p_inventory_confirmed boolean, p_notes text",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "submit_techcheck_transfer_core_v1",
+      "arguments": "p_request_id uuid, p_transfer_id uuid, p_kind text, p_expected_revision integer, p_service_actor uuid, p_items jsonb, p_checks jsonb, p_signature jsonb, p_photos jsonb, p_notes text",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_consume_location_v7",
+      "arguments": "p_request_id uuid, p_purpose text, p_items jsonb, p_proof jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_custody_available_v6",
+      "arguments": "p_key text",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_custody_gate_v6",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_daily_receipts_current_v5",
+      "arguments": "p_actor uuid",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_legacy_custody_guard_v6",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_release_immutable_v6",
+      "arguments": "",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_reservation_guard_v6",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_capture_delivery_v3",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_context_core_v1",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_context_returns_v4",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_delivery_immutable_v3",
+      "arguments": "",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_delivery_v3",
+      "arguments": "p_action text, p_id uuid, p_actor uuid, p_lease uuid, p_data jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": true
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_file",
+      "arguments": "p_name text, p_write boolean",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_location_delivery_v7",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_manifest",
+      "arguments": "p_items jsonb, p_empty boolean",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_ready_v1",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_role",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "complete_service_daily_report_v4",
+      "arguments": "p_report_id uuid, p_units jsonb, p_sims jsonb, p_stock jsonb, p_photos jsonb, p_signature jsonb",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": true
+    },
+    {
+      "schema": "public",
+      "name": "complete_service_daily_report_v5",
+      "arguments": "p_report_id uuid, p_units jsonb, p_sims jsonb, p_stock jsonb, p_photos jsonb, p_signature jsonb, p_receipts jsonb, p_receipts_reviewed boolean",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "owner_release_techcheck_return_v7",
+      "arguments": "p_request_id uuid, p_transfer_id uuid, p_equipment_key text, p_return_event_id uuid, p_inventory_confirmed boolean, p_notes text, p_location_proof jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "owner_techcheck_return_reviews_v6",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "submit_techcheck_transfer_v1",
+      "arguments": "p_request_id uuid, p_transfer_id uuid, p_kind text, p_expected_revision integer, p_service_actor uuid, p_items jsonb, p_checks jsonb, p_signature jsonb, p_photos jsonb, p_notes text",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "submit_techcheck_transfer_v7",
+      "arguments": "p_request_id uuid, p_transfer_id uuid, p_kind text, p_expected_revision integer, p_service_actor uuid, p_items jsonb, p_checks jsonb, p_signature jsonb, p_photos jsonb, p_notes text, p_location_proof jsonb",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "techcheck_daily_receipts_v5",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "techcheck_transfer_context_v1",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    },
+    {
+      "schema": "public",
+      "name": "techcheck_transfer_delivery_v3",
+      "arguments": "p_action text, p_id uuid, p_actor uuid, p_lease uuid, p_data jsonb",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service_role": true
+    },
+    {
+      "schema": "public",
+      "name": "techcheck_transfer_readiness_v1",
+      "arguments": "",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service_role": false
+    }
+  ],
+  "tables": [
+    {
+      "schema": "app_private",
+      "name": "techcheck_inventory_permits_v6",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_inventory_releases_v6",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_location_keys_v7",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_location_receipts_v7",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_events",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_item_returns",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_outbox",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_reservations",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_rules",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfer_settings",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    },
+    {
+      "schema": "app_private",
+      "name": "techcheck_transfers",
+      "rls": true,
+      "acl": "{postgres=arwdDxtm/postgres}"
+    }
+  ],
+  "policies": [
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "techcheck_transfer_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'techcheck-transfer-evidence'::text) AND app_private.techcheck_transfer_file(name, true))"
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "techcheck_transfer_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "((bucket_id = 'techcheck-transfer-evidence'::text) AND app_private.techcheck_transfer_file(name, false))",
+      "with_check": null
+    }
+  ],
+  "settings": [
+    {
+      "singleton": true,
+      "enabled": false,
+      "reports_ready": false,
+      "receipt_link_ready": false,
+      "custody_ready": false
+    }
+  ]
+}

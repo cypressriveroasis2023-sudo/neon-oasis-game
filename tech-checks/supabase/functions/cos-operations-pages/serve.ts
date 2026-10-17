@@ -6,7 +6,6 @@ Deno.serve(createOperationsHandler({
   fetch:mhelpTokens.fetch,
   platformUrl:Deno.env.get('SUPABASE_URL'),
   serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-  ittechNativeActorId:Deno.env.get('COS_ITTECH_NATIVE_ACTOR_ID'),
   vrmEmbeds:Deno.env.get('COS_VRM_EMBEDS'),
   vrm: { getAccessToken: () => Deno.env.get('COS_VRM_ACCESS_TOKEN') },
   inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },

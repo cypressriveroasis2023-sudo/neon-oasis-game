@@ -92,10 +92,11 @@ test('direct ittech profile uses server fleet capability instead of the old two-
  assert.deepEqual(calls,Array(3).fill('cos_verified_fleet_capabilities_v1'));
  assert.doesNotMatch(host,/verifiedIT\.has\(value\.id\)/);
 });
-test('all verified IT accounts use the same Fleet and Camera Health entry with server authorization',()=>{
+test('direct ittech routes only to existing COS-authenticated Camera Health; other IT route remains unchanged',()=>{
  const host=read('it-daily-host.js');
- assert.doesNotMatch(host,/legacyCameraOnlyIT|05bf20fe/);
- assert.match(host,/frame\.src='\.\/operations\/dist\/index\.html\?mode='/);
+ assert.match(host,/const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'/);
+ assert.match(host,/frame\.src=value\.role==='it'&&value\.id===legacyCameraOnlyIT\s*\? '\.\/camera-health\.html\?itDaily=1'/);
+ assert.match(host,/\: '\.\/operations\/dist\/index\.html\?mode='/);
  assert.match(host,/const permitted = await verify\(value\)/);
  assert.match(host,/key\(scope\(\)\) !== key\(value\)/);
  const app=read('app.js'),legacy=read('camera-health.html');

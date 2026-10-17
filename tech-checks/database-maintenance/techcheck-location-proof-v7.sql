@@ -106,4 +106,23 @@ create or replace function app_private.techcheck_transfer_file(p_name text,p_wri
  and case when p_write then split_part(p_name,'/',1)=auth.uid()::text and not exists(select 1 from app_private.techcheck_transfer_events e where e.id::text=split_part(p_name,'/',2))
  else split_part(p_name,'/',1)=auth.uid()::text or exists(select 1 from app_private.techcheck_transfer_events e join app_private.techcheck_transfers t on t.id=e.transfer_id where e.id::text=split_part(p_name,'/',2) and (app_private.techcheck_transfer_role()='it' or t.service_actor=auth.uid()) and exists(select 1 from jsonb_array_elements(e.photos) p where p->>'path'=p_name)) end
 $$;
+-- Close inherited public-schema default grants explicitly. Production defaults
+-- grant service_role execution on new public functions; only the delivery
+-- wrapper is a server API. Browser entry points retain their own actor gates.
+revoke all on function
+ public.techcheck_transfer_readiness_v1(),
+ public.techcheck_transfer_context_v1(),
+ public.submit_techcheck_transfer_v1(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text),
+ public.submit_techcheck_transfer_v7(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text,jsonb),
+ public.owner_techcheck_return_reviews_v6(),
+ public.owner_release_techcheck_return_v7(uuid,uuid,text,uuid,boolean,text,jsonb)
+from public,anon,authenticated,service_role;
+grant execute on function
+ public.techcheck_transfer_readiness_v1(),
+ public.techcheck_transfer_context_v1(),
+ public.submit_techcheck_transfer_v1(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text),
+ public.submit_techcheck_transfer_v7(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text,jsonb),
+ public.owner_techcheck_return_reviews_v6(),
+ public.owner_release_techcheck_return_v7(uuid,uuid,text,uuid,boolean,text,jsonb)
+to authenticated;
 commit;
