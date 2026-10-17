@@ -21,7 +21,7 @@ export default function OwnerEquipmentCsvPreview(){
    // Read original bytes; File.text() could discard BOM and change the source hash.
    const bytes=new Uint8Array(await file.arrayBuffer()),parts:string[]=[];
    for(let i=0;i<bytes.length;i+=8192)parts.push(String.fromCharCode(...bytes.subarray(i,i+8192)));
-   const result=(await api.post<EquipmentPreview>('/api/mhelpdesk/equipment/preview',{
+   const result=(await api.post<OwnerEquipmentReview>('/api/mhelpdesk/equipment/preview',{
     bytesBase64:btoa(parts.join('')),sourceFilename:file.name,...(expected.trim()?{expectedSha256:expected.trim()}:{})
    })).data;
    if(result.contract!=='COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1'||result.previewOnly!==true||result.readyToCommit!==false)throw Error('The equipment preview was not verified.');
