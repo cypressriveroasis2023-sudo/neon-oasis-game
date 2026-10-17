@@ -57,6 +57,10 @@ pg('CREATE TABLE cos_mhelp_placement_private.upload_audit(id bigint generated al
 pg('DROP FUNCTION cos_mhelp_placement_private.review_upload(jsonb,jsonb,text,boolean)');
 const overlay=readFileSync(new URL('../db/mhelp_upload_overlay.sql',import.meta.url),'utf8');
 pg(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.review_upload('),overlay.indexOf('create function cos_mhelp_placement_private.rollback_upload(')));
+pg('CREATE TABLE cos_mhelp_placement_private.scoped_control(base_sha256 text primary key,revision bigint,active_id uuid);CREATE TABLE cos_mhelp_placement_private.scoped_batches(id uuid primary key,base_sha256 text,records jsonb)');
+const scoped=readFileSync(new URL('../db/scoped_inventory_overlay.sql',import.meta.url),'utf8');
+const scopedStart=scoped.indexOf('create function cos_mhelp_placement_private.scoped_records(');
+pg(scoped.slice(scopedStart,scoped.indexOf('$$;',scopedStart)+3));
 pg(readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8'));
 
 const id=randomUUID(),staged=stage(id);
@@ -88,11 +92,16 @@ assert.throws(()=>stage(randomUUID(),{census:[{...census[0],productId:'999'},...
 assert.throws(()=>stage(randomUUID(),{actor:'33333333-3333-4333-8333-333333333333'}),/actor denied/);
 assert.throws(()=>commit(id,'yes'),/Explicit source approval/);
 assert.throws(()=>commit(id,'I reviewed all source changes but have an obsolete census.','d'.repeat(64)),/Equipment source review is stale/);
-const applied=commit(id);
+// A scoped correction can advance without changing the raw upload SHA.
+pg('INSERT INTO cos_mhelp_placement_private.scoped_control VALUES('+quote(previous)+',1,NULL)');
+assert.throws(()=>commit(id),/scoped source changed/);
+assert.equal(pg('SELECT active_sha256 FROM cos_mhelp_placement_private.upload_control'),previous);
+const refreshedId=randomUUID();stage(refreshedId);
+const applied=commit(refreshedId);
 assert.equal(applied.applied,true);
 assert.equal(applied.contract,'COS_OWNER_EQUIPMENT_COMMIT_V1');
 assert.equal(pg('SELECT active_sha256 FROM cos_mhelp_placement_private.upload_control'),sourceHash);
-const repeated=commit(id);
+const repeated=commit(refreshedId);
 assert.equal(repeated.idempotent,true);
 assert.equal(repeated.contract,applied.contract);
 assert.equal(repeated.stageId,applied.stageId);

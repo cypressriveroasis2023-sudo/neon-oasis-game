@@ -17,6 +17,8 @@ create table if not exists cos_mhelp_placement_private.owner_equipment_stages (
  source_sha256 text not null,
  expected_active_sha256 text not null,
  verified_2027_sha256 text not null,
+ expected_scoped_revision bigint not null,
+ expected_scoped_sha256 text not null,
  source_bytes bytea not null,
  records jsonb not null,
  receipt jsonb not null,
@@ -25,7 +27,8 @@ create table if not exists cos_mhelp_placement_private.owner_equipment_stages (
  applied_receipt jsonb,
  constraint owner_equipment_stage_hashes check(
   source_sha256~'^[a-f0-9]{64}$' and expected_active_sha256~'^[a-f0-9]{64}$'
-  and verified_2027_sha256~'^[a-f0-9]{64}$'),
+  and verified_2027_sha256~'^[a-f0-9]{64}$'
+  and expected_scoped_sha256~'^[a-f0-9]{64}$' and expected_scoped_revision>=0),
  constraint owner_equipment_stage_source check(octet_length(source_bytes)>0 and octet_length(source_bytes)<=2097152),
  constraint owner_equipment_stage_state check(applied_at is null or applied_receipt is not null)
 );
@@ -49,6 +52,7 @@ declare bytes bytea; prior_sha text; n integer; distinct_n integer;
   row_data jsonb; old_row jsonb; old_tracker jsonb; tracker_row jsonb;
   binding jsonb; adjusted jsonb:='[]'::jsonb; tracker_rows jsonb:='[]'::jsonb;
   receipt jsonb; company_ids jsonb; received timestamptz:=clock_timestamp();
+  prior_rows jsonb; scoped_revision bigint; scoped_sha text;
 begin
  perform app_private.appdeploy_assume_actor(p_actor_user_id,p_organization_id);
  if p_organization_id<>'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid
@@ -102,14 +106,27 @@ begin
   raise exception 'Previously reviewed source changed' using errcode='40001';end if;
  select * into strict old_batch from cos_mhelp_placement_private.upload_batches
  where source_sha256=prior_sha for share;
+ -- Scoped Owner corrections are part of the current identity authority, even
+ -- when the raw upload pointer has not changed. All scoped writers take this
+ -- same upload_control lock before changing their revision or effective rows.
+ select coalesce(max(revision),0) into scoped_revision
+ from cos_mhelp_placement_private.scoped_control where base_sha256=prior_sha;
+ prior_rows:=cos_mhelp_placement_private.scoped_records(prior_sha);
+ if jsonb_typeof(prior_rows) is distinct from 'array' then
+  raise exception 'Current scoped source authority unavailable' using errcode='40001';end if;
+ scoped_sha:=encode(pg_catalog.sha256(pg_catalog.convert_to(prior_rows::text,'UTF8')),'hex');
  -- All business-readable identities are matched ONLY on Product ID. A changed
  -- label, a missing product or an ambiguous previous Product ID never inherits
  -- a native camera, router, site, GPS or tracker association.
  for row_data in select value from jsonb_array_elements(p_records) loop
   old_row:=null;
-  select value into old_row from jsonb_array_elements(old_batch.records) value
+  select value into old_row from jsonb_array_elements(prior_rows) value
   where value->>'productId'=row_data->>'productId' limit 1;
-  if old_row is not null and old_row->>'unitNumber'=row_data->>'unitNumber'
+  if old_row is not null and (old_row ? 'scopedAuthority' or old_row ? 'sourceLabelAuthority') then
+    adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
+      'binding','null'::jsonb,'placementHeld',true,
+      'holdReason','Prior reviewed scoped identity or assignment requires Owner installation review'));
+  elsif old_row is not null and old_row->>'unitNumber'=row_data->>'unitNumber'
      and old_row->>'category'=row_data->>'category' then
     -- A newer CSV receipt has no independently authenticated installation
     -- observation timestamp. Never let its stage/received time displace a
@@ -132,7 +149,7 @@ begin
     adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
       'binding','null'::jsonb,'placementHeld',true,
       'holdReason','Product ID identity label changed; confirm before linking'));
-  elsif exists(select 1 from jsonb_array_elements(old_batch.records) other
+  elsif exists(select 1 from jsonb_array_elements(prior_rows||old_batch.records) other
           where other->>'category'=row_data->>'category'
            and other->>'unitNumber'=row_data->>'unitNumber') then
     adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(
@@ -208,6 +225,8 @@ begin
       or existing.source_sha256 is distinct from p_source_sha256
       or existing.expected_active_sha256 is distinct from p_expected_active_sha256
       or existing.verified_2027_sha256 is distinct from p_current_2027_sha256
+      or existing.expected_scoped_revision is distinct from scoped_revision
+      or existing.expected_scoped_sha256 is distinct from scoped_sha
    then raise exception 'Conflicting source stage request' using errcode='40001';end if;
    return existing.review_receipt;
  end if;
@@ -221,10 +240,10 @@ begin
   'expiresInMinutes',60,'productIdsMatched',n);
  insert into cos_mhelp_placement_private.owner_equipment_stages(
   id,organization_id,actor_id,expires_at,source_filename,source_sha256,
-  expected_active_sha256,verified_2027_sha256,source_bytes,records,receipt,review_receipt)
+  expected_active_sha256,verified_2027_sha256,expected_scoped_revision,expected_scoped_sha256,source_bytes,records,receipt,review_receipt)
  values(p_request_id,p_organization_id,p_actor_user_id,clock_timestamp()+interval '60 minutes',
   p_filename,p_source_sha256,p_expected_active_sha256,p_current_2027_sha256,
-  bytes,adjusted,receipt,stage_response);
+  scoped_revision,scoped_sha,bytes,adjusted,receipt,stage_response);
  return stage_response;
 end $function$;
 
@@ -238,6 +257,7 @@ create or replace function public.cos_owner_mhelp_equipment_commit_v1(
 ) returns jsonb
 language plpgsql security definer set search_path='' as $function$
 declare stage cos_mhelp_placement_private.owner_equipment_stages; applied jsonb; current_sha text;
+ scoped_revision bigint; scoped_sha text;
 begin
  perform app_private.appdeploy_assume_actor(p_actor_user_id,p_organization_id);
  if p_organization_id<>'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid
@@ -248,11 +268,22 @@ begin
     or length(btrim(coalesce(p_confirmation_text,'')))<24
     or length(p_confirmation_text)>800
  then raise exception 'Explicit source approval is required' using errcode='22023';end if;
+ -- Match the scoped writer/stage lock order, including the first scoped edit
+ -- where no scoped_control row exists yet.
+ select active_sha256 into strict current_sha from cos_mhelp_placement_private.upload_control
+ where singleton for update;
  select * into strict stage from cos_mhelp_placement_private.owner_equipment_stages
  where id=p_stage_id and actor_id=p_actor_user_id and organization_id=p_organization_id for update;
  if stage.applied_at is not null then return stage.applied_receipt||jsonb_build_object(
   'contract','COS_OWNER_EQUIPMENT_COMMIT_V1','stageId',stage.id,
   'sourceReceiptsApplied',true,'idempotent',true);end if;
+ select coalesce(max(revision),0) into scoped_revision
+ from cos_mhelp_placement_private.scoped_control where base_sha256=stage.expected_active_sha256;
+ scoped_sha:=encode(pg_catalog.sha256(pg_catalog.convert_to(
+  cos_mhelp_placement_private.scoped_records(stage.expected_active_sha256)::text,'UTF8')),'hex');
+ if stage.expected_scoped_revision is distinct from scoped_revision
+  or stage.expected_scoped_sha256 is distinct from scoped_sha then
+  raise exception 'Reviewed scoped source changed after staging' using errcode='40001';end if;
  if stage.expires_at<clock_timestamp() or
   stage.expected_active_sha256 is distinct from p_expected_previous_source_sha256 or
   stage.verified_2027_sha256 is distinct from p_current_2027_sha256 or

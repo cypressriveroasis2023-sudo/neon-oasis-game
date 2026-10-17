@@ -29,12 +29,42 @@ async function setup(){
  const oldReceipt={contract:'COS_MHELP_UPLOAD_V1',reviewed:true,sourceSha256:previous,filename:'ServiceItem_List_20261013141848.csv',recordCount:3,trackerRecords:[{recordId:'old:ranger7',unitNumber:'Ranger 007',matchedProductId:'11',binding:{state:'unlinked',unitIds:[],unitLabels:{},guardCurrent:null}}],companyCustomerIds:['200']};
  const oldRows=[{...records[0],binding:null},{...records[1],binding:null},{...records[2],productId:'99',binding:null}];
  await db.query("insert into cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) values($1,'b',$2,$3)",[previous,JSON.stringify(oldReceipt),JSON.stringify(oldRows)]);
+ await db.exec("create table cos_mhelp_placement_private.scoped_control(base_sha256 text primary key,revision bigint,active_id uuid);create table cos_mhelp_placement_private.scoped_batches(id uuid primary key,base_sha256 text,records jsonb);");
+ const scoped=readFileSync(new URL('../db/scoped_inventory_overlay.sql',import.meta.url),'utf8');
+ const start=scoped.indexOf('create function cos_mhelp_placement_private.scoped_records(');
+ await db.exec(scoped.slice(start,scoped.indexOf('$$;',start)+3));
  await db.exec(draft);
  return db;
 }
 const params=(requestId=randomUUID(),overrides={})=>[actor,org,requestId,'ServiceItem_List_20261016131754.csv',overrides.sourceSha||digest,overrides.prevSha||previous,censusSha,JSON.stringify(overrides.census||census),source.toString('base64'),JSON.stringify(records)];
 const stage=(db,args)=>db.query("select public.cos_owner_mhelp_equipment_stage_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::text,$8::jsonb,$9::text,$10::jsonb) result",args).then(r=>r.rows[0].result);
 const commit=(db,id,note='I reviewed and approve the current COS Field and Shop inventory.',sha=censusSha)=>db.query("select public.cos_owner_mhelp_equipment_commit_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text) result",[actor,org,id,previous,sha,note]).then(r=>r.rows[0].result);
+
+test('current scoped holds and label corrections cannot inherit raw bindings, and later revisions fence commit',async()=>{
+ const db=await setup();
+ try{
+  const raw=(await db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[previous])).rows[0].records;
+  raw[0].binding={productId:'11',fullLabel:raw[0].unitNumber,marker:'old reviewed binding'};
+  raw[1].binding={productId:'12',fullLabel:raw[1].unitNumber,marker:'old reviewed binding'};
+  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1 where source_sha256=$2',[JSON.stringify(raw),previous]);
+  const effective=structuredClone(raw),revisionId=randomUUID();
+  effective[0]={...effective[0],binding:null,placementHeld:true,scopedAuthority:{revisionId}};
+  effective[1]={...effective[1],sourceLabelAuthority:{revisionId}};
+  await db.query('insert into cos_mhelp_placement_private.scoped_batches values($1,$2,$3)',[revisionId,previous,JSON.stringify(effective)]);
+  await db.query('insert into cos_mhelp_placement_private.scoped_control values($1,1,$2)',[previous,revisionId]);
+  const id=randomUUID();await stage(db,params(id));
+  const staged=(await db.query('select records,expected_scoped_revision from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[id])).rows[0];
+  assert.equal(Number(staged.expected_scoped_revision),1);
+  for(const productId of ['11','12']){
+   assert.equal(staged.records.find(r=>r.productId===productId).binding,null);
+   assert.equal(staged.records.find(r=>r.productId===productId).placementHeld,true);
+  }
+  await db.query('update cos_mhelp_placement_private.scoped_control set revision=2 where base_sha256=$1',[previous]);
+  await assert.rejects(commit(db,id),/scoped source changed/);
+  assert.equal((await db.query('select active_sha256 from cos_mhelp_placement_private.upload_control')).rows[0].active_sha256,previous);
+  assert.equal((await db.query('select applied_at from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[id])).rows[0].applied_at,null);
+ }finally{await db.close();}
+});
 
 test('source-only stage and retry exercise the actual reviewed-upload validator',async()=>{
  const db=await setup();
