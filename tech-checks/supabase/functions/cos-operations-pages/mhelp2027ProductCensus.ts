@@ -21,6 +21,7 @@ export type VerifiedProductCensus={
   contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1';sourceSha256:string;
   observedAt:string;verifiedBy:'cos_sheets_service';productIds:readonly string[];
   total:number;field:number;shop:number;sourceExport:string;
+  productRows:readonly {productId:string;family:string;unitLabel:string;placement:'FIELD'|'SHOP';customer:string}[];
 };
 function exactIds(cells:unknown[],name:string){
   const ids=[] as string[];for(const value of cells){if(typeof value!=='string'||!ID.test(value))fail(name+' contains invalid Product ID');ids.push(value);}
@@ -88,7 +89,8 @@ export async function verify2027CensusRanges(valueRanges:unknown,rangeNames:read
  const bytes=new TextEncoder().encode(data);
  const sourceSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
  if(!HASH.test(sourceSha256))fail('source checksum was unavailable');
- return {contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1',sourceSha256,observedAt:at,verifiedBy:'cos_sheets_service',productIds:overviewProducts,total:list.length,field,shop,sourceExport:sourceFilename};
+ return {contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1',sourceSha256,observedAt:at,verifiedBy:'cos_sheets_service',productIds:overviewProducts,total:list.length,field,shop,sourceExport:sourceFilename,
+  productRows:list.map((item,i)=>({productId:overviewProducts[i],family:item[0],unitLabel:item[1],placement:item[2] as 'FIELD'|'SHOP',customer:item[4]}))};
 }
 
 /** Enforces server-only Google Viewer credentials and bounded native Sheets APIs. */
