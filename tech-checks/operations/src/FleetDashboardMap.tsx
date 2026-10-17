@@ -12,13 +12,13 @@ import {useFieldMapDisplay} from './fieldMapDisplay';
 import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import 'leaflet/dist/leaflet.css';
-type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;};
-export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress}:Props){
- const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),addressMarkers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
+type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;onSelectMhelpAddressGroup?:(productIds:string[])=>void;};
+export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,onSelectMhelpAddressGroup}:Props){
+ const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),addressMarkers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),selectAddressGroup=useRef(onSelectMhelpAddressGroup),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0),[expandedIds,setExpandedIds]=useState<string[]>([]);
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
- select.current=onSelect;selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
+ select.current=onSelect;selectAddress.current=onSelectMhelpAddress;selectAddressGroup.current=onSelectMhelpAddressGroup;picker.current=pickLocation;
  pinRef.current=pins;
  useEffect(()=>{if(!node.current)return;const instance=L.map(node.current,{zoomControl:true,trackResize:false}).setView(restored.current.center||[31,-99],restored.current.zoom||5);map.current=instance;addFieldMapBasemap(instance);markers.current=L.layerGroup().addTo(instance);addressMarkers.current=L.layerGroup().addTo(instance);let resizing=false;const stopResize=observeFleetMapResize(instance,active=>{resizing=active;});
   // A layout-only reset must not suppress the first location fit or replace a
@@ -80,6 +80,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS)'+(review?' · Census address differs':'');
     marker.bindTooltip(tooltip);
    }
+   if(selectAddressGroup.current){marker.on('click',()=>{if(picker.current)return;if(count===1)selectAddress.current?.(first.productId);else selectAddressGroup.current?.(siblings.map(p=>p.productId));});continue;}
    const popup=document.createElement('div');popup.className='cos-mhelp-address-popup';
    const heading=document.createElement('strong');heading.textContent=count===1?'MHelp Field address':count+' Field units at this address';popup.appendChild(heading);
    const detail=document.createElement('small');detail.textContent='Address-based marker · GPS not required or inferred';popup.appendChild(detail);
@@ -105,7 +106,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=pins.map(fleetLocationPinId).join('|')+'|MHelp:'+mhelpAddressPins.map(p=>p.productId).join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,locationsReady]);
  const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14));}},[selectedId,pins]);
  return <div ref={panel} className={'cos-fleet-map-panel field-map-workspace'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
-  <div className='cos-fleet-map-toolbar'><div><strong>Fleet map</strong><small>{locationsReady?<>{pins.length} COS unit pins · {mhelpAddressPins.length} MHelp address pins · {pins.filter(p=>p.kind==='current').length} GPS verified · {pins.filter(p=>p.kind!=='current').length} COS estimated:'Checking saved map locations…'}</small></div><div><button onClick={fit} disabled={!pins.length&&!mhelpAddressPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
+  <div className='cos-fleet-map-toolbar'><div><strong>Fleet map</strong><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{mhelpAddressPins.length>0&&<> · {mhelpAddressPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small></div><div><button onClick={fit} disabled={!pins.length&&!mhelpAddressPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
   {locationsReady&&!pins.length&&!mhelpAddressPins.length&&!pickLocation&&<p className='cos-fleet-map-note'>{rows.length?'These units have no currently verified pins or approved address estimates. Open Location verification.':'No linked unit pins match these filters. Recorded equipment can remain in the list without a verified location.'}</p>}
@@ -114,7 +115,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    <summary>{mhelpAddressReviews.length} MHelp Field addresses need map coordinates (no GPS required)</summary>
    <p>These equipment records are still in mHelpDesk Field. Their exact service addresses did not produce usable Census coordinates; no guessed marker is placed.</p>
    <ul>{mhelpAddressReviews.map(item=><li key={item.id}>
-    <strong>{item.unitNumber}</strong> · Product {item.productId} · {item.address||'Address incomplete'}
+    <strong>{item.unitNumber}</strong> · Product {item.productId} · {item.customer} · {item.address||'Address incomplete'}
     <small>{item.state==='no_match'?'Census did not match the recorded street address':item.reason}</small>
     <button type='button' onClick={()=>onSelectMhelpAddress?.(item.productId)}>Open unit record</button>
     {item.address&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.address)} target='_blank' rel='noopener noreferrer'>Search address on map ↗</a>}

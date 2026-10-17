@@ -2,7 +2,7 @@
 -- Does NOT link Product IDs to COS native equipment, move Shop inventory,
 -- replace verified GPS, infer camera health or write a coordinate.
 begin;
-create function public.cos_mhelp_census_map_snapshot(
+create or replace function public.cos_mhelp_census_map_snapshot(
  p_actor_user_id uuid,p_organization_id uuid)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare response jsonb; source_count integer; field_count integer; shop_count integer;
@@ -21,7 +21,12 @@ begin
   from active cross join lateral jsonb_array_elements(active.records) with ordinality x(r,ordinality)
  ), products as materialized (
   select sr.r,sr.source_sha256,sr.payload_sha256,p.product_id,
-   a.status,a.reason,a.census_benchmark,a.matched_address,a.latitude,a.longitude,a.completed_at
+   coalesce(f.status,a.status) status,coalesce(f.reason,a.reason) reason,a.census_benchmark,
+   coalesce(f.matched_address,a.matched_address) matched_address,
+   coalesce(f.latitude,a.latitude) latitude,coalesce(f.longitude,a.longitude) longitude,
+   coalesce(f.geocoded_at,a.completed_at) completed_at,
+   coalesce(f.provider,'us_census_address_range') provider,f.lookup_address,
+   a.status original_status
   from source_rows sr
   join cos_mhelp_placement_private.census_mhelp_product p
     on p.source_sha256=sr.source_sha256 and p.payload_sha256=sr.payload_sha256
@@ -30,6 +35,13 @@ begin
    and p.placement=sr.r->>'placement'
   join cos_mhelp_placement_private.census_mhelp_address a
    on a.source_sha256=p.source_sha256 and a.address_sha256=p.address_sha256
+  left join lateral (
+   select f.* from cos_mhelp_placement_private.mhelp_address_resolution f
+   where f.source_sha256=p.source_sha256 and f.payload_sha256=p.payload_sha256
+    and f.address_sha256=p.address_sha256 and f.status in ('matched','address_review')
+    and a.status in ('no_match','invalid_address')
+   order by f.id desc limit 1
+  ) f on true
   where sr.r->>'placement'='FIELD'
  ), counts as materialized (
   select count(*) total,
@@ -57,10 +69,12 @@ begin
     'status',p.status,
     'reason',p.reason,
     'matchedAddress',p.matched_address,
-    'latitude',case when p.status in ('matched','address_review') and p.census_benchmark='Public_AR_Current' then p.latitude else null end,
-    'longitude',case when p.status in ('matched','address_review') and p.census_benchmark='Public_AR_Current' then p.longitude else null end,
+    'latitude',case when p.status in ('matched','address_review') and (p.provider<>'us_census_address_range' or p.census_benchmark='Public_AR_Current' or p.lookup_address is not null) then p.latitude else null end,
+    'longitude',case when p.status in ('matched','address_review') and (p.provider<>'us_census_address_range' or p.census_benchmark='Public_AR_Current' or p.lookup_address is not null) then p.longitude else null end,
     'geocodedAt',p.completed_at,
-    'geocodeSource','us_census_address_range',
+    'geocodeSource',p.provider,
+    'lookupAddress',p.lookup_address,
+    'originalStatus',p.original_status,
     'verified',false,
     'liveGps',false,
     'confidence','mhelpdesk_address_census_range_unverified')

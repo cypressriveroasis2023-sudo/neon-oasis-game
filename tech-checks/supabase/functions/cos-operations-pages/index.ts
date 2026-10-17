@@ -1,3 +1,4 @@
+import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
@@ -950,18 +951,7 @@ export function createOperationsHandler(options) {
           // MHelp Field address is a presentation location by Product ID, never
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
-          let withMhelpAddress=combined;
-          try{
-            const census=await rpc('cos_mhelp_census_map_snapshot',actorPayload,AbortSignal.timeout(2200));
-            if(census?.contract==='COS_MHELP_CENSUS_ADDRESS_MAP_V1'
-              &&census.sourceSha256===mhelpReceipt?.upload?.sourceSha256
-              &&census.payloadSha256===mhelpReceipt?.upload?.payloadSha256
-              &&census.totalProducts===1001&&census.fieldProducts===287&&census.shopProducts===714
-              &&census.verifiedGps===false&&census.liveGps===false
-              &&Array.isArray(census.items)&&census.items.length===287)
-              withMhelpAddress={...combined,mhelpAddressMap:census};
-            else withMhelpAddress={...combined,mhelpAddressMapStatus:'unavailable'};
-          }catch{withMhelpAddress={...combined,mhelpAddressMapStatus:'unavailable'};}
+          const withMhelpAddress=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{

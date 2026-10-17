@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readMhelpAddressMapPins} from '../src/mhelpAddressMapPins.ts';
-const source='a'.repeat(64),payload='b'.repeat(64),now=Date.parse('2026-10-17T21:00:00Z'),head={sourceSha256:source,payloadSha256:payload};
+const source='a'.repeat(64),payload='b'.repeat(64),now=Date.parse('2026-10-17T21:00:00Z'),head={sourceSha256:source,payloadSha256:payload,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
 const record=(index)=>{
  const productId=String(index+1);
  return {productId,sourceRowSha256:'c'.repeat(64),unitNumber:'Spotter '+index,customer:'Example customer '+index,category:'Spotter',
@@ -54,4 +54,17 @@ test('bad coordinates and forged GPS claims fail closed',()=>{
 });
 test('invalid and no-match rows cannot smuggle coordinates into pin map',()=>{
  const s=sample();s.items[0].status='no_match';assert.equal(parse(s),null);
+});
+
+test('street direction mismatch is visible even if upstream called the Census result matched',()=>{
+ const s=sample();s.items[0].matchedAddress='123 S Example Rd, Houston, TX 77064';
+ assert.equal(parse(s)?.pins[0].state,'address_review');
+});
+test('saved fallback evidence retains the original Field Product ID and its provider',()=>{
+ const s=sample();s.items[0].geocodeSource='geocodio';s.items[0].lookupAddress='123 Example Rd, Houston, TX 77064';
+ assert.equal(parse(s)?.pins[0].provider,'geocodio');
+ s.items[0].geocodeSource='municipal_address_point';assert.equal(parse(s)?.pins[0].provider,'municipal_address_point');
+});
+test('a valid count with a foreign or superseded Product ID cannot enter the current source map',()=>{
+ const s=sample();s.items[0].productId='9999999';assert.equal(parse(s),null);
 });

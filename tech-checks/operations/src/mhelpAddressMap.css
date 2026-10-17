@@ -1,0 +1,25 @@
+.cos-mhelp-address-marker{background:none;border:0}
+.cos-mhelp-address-pin{display:grid;place-items:center;width:38px;height:38px;border:3px solid #cffafe;border-radius:8px;background:#155e75;color:#fff;font:700 18px/1 system-ui;box-shadow:0 2px 8px #0009;outline:2px dashed #22d3ee;outline-offset:2px}
+.cos-mhelp-address-review{background:#78350f;border-color:#fde68a;outline-color:#fbbf24}
+.cos-mhelp-address-marker:focus-visible{outline:3px solid #fff;outline-offset:6px;border-radius:8px}
+.cos-mhelp-address-popup{font:14px/1.5 system-ui;min-width:210px;max-height: min(330px,55vh);overflow:auto;color:#172b3a}
+.cos-mhelp-address-popup small{display:block}
+.cos-mhelp-address-popup-item{border-top:1px solid #ccd6df;padding:10px 0}
+.cos-mhelp-address-popup button{width:100%;min-height:44px;text-align:left;border:1px solid #155e75;border-radius:6px;background:#ecfeff;color:#164e63;font:600 14px/1.35 system-ui;padding:8px}
+.cos-mhelp-address-warning{color:#fde68a}
+.cos-mhelp-address-popup .cos-mhelp-address-warning{color:#78350f}
+.cos-mhelp-address-coverage,.cos-mhelp-address-followups{margin:12px 0;padding:14px;border:1px solid #397184;border-radius:12px;background:#12252d;color:#e3f6fa}
+.cos-mhelp-address-coverage p{margin:5px 0}
+.cos-mhelp-address-coverage small{color:#bdd5df}
+.cos-mhelp-address-coverage button,.cos-mhelp-address-followups button,.cos-mhelp-address-followups a{min-height:44px;padding:10px 12px;border:1px solid #62858f;border-radius:8px;background:#193744;color:#e3f6fa;font:inherit;display:inline-flex;align-items:center;gap:6px}
+.cos-mhelp-address-followups summary{cursor:pointer;min-height:44px;line-height:1.5}
+.cos-mhelp-address-followups ul{list-style:none;margin:0;padding:0;max-height:380px;overflow:auto;overscroll-behavior:contain}
+.cos-mhelp-address-followups li{border-top:1px solid #39515e;padding:12px 0;overflow-wrap:anywhere}
+.cos-mhelp-address-followups small{display:block;color:#c8d8e0;margin:4px 0}
+.cos-mhelp-address-followups button{margin-right:8px}
+.cos-mhelp-address-followups a{color:#a5f3fc;text-decoration:underline}
+.cos-mhelp-address-drawer p,.cos-mhelp-address-drawer dd{overflow-wrap:anywhere}
+.cos-mhelp-address-drawer .cos-mhelp-address-warning{padding:12px;border:1px solid #b88c33;border-radius:8px;background:#3a2b13}
+@media(max-width:600px){.cos-mhelp-address-followups{padding:10px}.cos-mhelp-address-followups button,.cos-mhelp-address-followups a{width:100%;justify-content:center;margin:6px 0}.cos-mhelp-address-popup{min-width:180px;max-width:260px}.cos-mhelp-address-coverage{font-size:14px}}
+
+.cos-mhelp-address-group-item{padding:12px 0;border-top:1px solid #3b525f}.cos-mhelp-address-group-item button{width:100%;text-align:left;min-height:44px;padding:10px;border:1px solid #5d8c9b;border-radius:8px;background:#193744;color:#e3f6fa;font:inherit}.cos-mhelp-address-group-item p{margin:6px 0}.cos-mhelp-address-group-item small{color:#c7dae5}
