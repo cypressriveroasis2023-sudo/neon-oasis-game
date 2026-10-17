@@ -251,3 +251,73 @@
 #root#root .cos-fleet-dashboard .cos-fleet-map-legend .cos-signal-offline,
 #root#root .cos-fleet-dashboard .cos-fleet-badge.cos-signal-offline { color: #ff6570 !important; }
 #root#root .cos-fleet-dashboard .cos-fleet-map-canvas .leaflet-control-attribution a { color: #004e70; }
+
+
+/* October 17 Fleet-only short-screen presentation. No data, evidence or map marker changes. */
+#root#root .cos-fleet-source-extra { margin-top: 3px; }
+#root#root .cos-fleet-source-extra > summary { min-height: 44px; cursor: pointer; font-size: 12px; }
+#root#root .cos-fleet-source-warning { overflow-wrap: anywhere; }
+@media (max-width: 750px) {
+  #root#root .cos-fleet-content { padding-top: 10px; }
+  #root#root .cos-fleet-heading { gap: 9px; margin-bottom: 10px; }
+  #root#root .cos-fleet-heading p { margin-top: 3px; }
+  #root#root .cos-fleet-count-note { line-height: 1.45; margin-bottom: 8px; }
+  #root#root .cos-fleet-count-note h2 { margin-bottom: 3px; }
+  #root#root .cos-fleet-count-note p { margin-top: 4px; }
+  #root#root .cos-fleet-stats { gap: 7px; margin-bottom: 10px; }
+  #root#root .cos-fleet-stats .cos-fleet-stat { padding: 10px; }
+  #root#root .cos-fleet-stat strong { font-size: 26px; margin: 3px 0; }
+  #root#root .cos-fleet-stat small { font-size: 11px; line-height: 1.35; }
+  #root#root .cos-fleet-stats:has(> :nth-child(6)) .cos-fleet-stat:last-child { grid-column: auto; }
+  #root#root .cos-fleet-filters { padding: 10px; margin-bottom: 10px; }
+  #root#root .cos-fleet-filter-row { gap: 8px; margin-top: 8px; }
+  #root#root .cos-fleet-map-panel { min-height: 0; }
+  #root#root .cos-fleet-unit-health-grid { gap: 9px; margin: 12px 0 14px; }
+  #root#root .cos-fleet-unit-health-section { padding: 12px; }
+  #root#root .cos-fleet-drawer { padding: 12px 16px max(16px,env(safe-area-inset-bottom)); }
+  #root#root .cos-fleet-drawer > h2 { margin: 5px 0 7px; }
+  #root#root .cos-fleet-drawer h3 { margin: 12px 0 7px; }
+  #root#root .cos-fleet-drawer > section.cos-fleet-recorded-address { padding: 12px; }
+  #root#root .cos-fleet-drawer .camera-health-native { margin: 10px 0; padding: 12px; }
+  #root#root .cos-fleet-drawer .cos-fleet-detail-note { margin: 7px 0; }
+}
+/* iPhone landscape falls between the 700px shell and 750px Fleet breakpoints.
+   Restrict the stack to short viewports; normal desktops retain two columns. */
+@media (orientation: landscape) and (min-width: 701px) and (max-width: 1000px) and (max-height: 560px) {
+  #root#root .company-shell:has(.cos-fleet-dashboard) { grid-template-columns: minmax(0,1fr) !important; }
+  #root#root .company-shell:has(.cos-fleet-dashboard) > .operations-sidebar:not(.operations-sidebar-open) { display: none !important; }
+  #root#root .company-shell:has(.cos-fleet-dashboard) > .operations-sidebar-open {
+    display: flex !important; position: fixed !important; inset: 0 auto 0 0 !important;
+    width: min(330px,90vw) !important; height: 100dvh !important; z-index: 1100 !important;
+  }
+  #root#root .company-shell:has(.cos-fleet-dashboard) > .owner-it-main {
+    grid-column: 1 !important; min-width: 0 !important; width: 100% !important;
+    padding: 0 14px 20px !important;
+  }
+  #root#root .company-shell:has(.cos-fleet-dashboard) .company-utility-bar {
+    height: 56px; min-height: 56px; margin: 0 -14px 8px; padding: 0 14px;
+  }
+  #root#root .cos-fleet-content { padding-top: 10px; }
+  #root#root .cos-fleet-heading { gap: 10px; margin-bottom: 10px; }
+  #root#root .cos-fleet-heading h1 { font-size: 24px; }
+  #root#root .cos-fleet-heading p { margin-top: 4px; }
+  #root#root .cos-fleet-count-note { font-size: 12px; line-height: 1.45; margin-bottom: 8px; }
+  #root#root .cos-fleet-count-note p { margin-top: 4px; }
+  #root#root .cos-fleet-stats { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }
+  #root#root .cos-fleet-stats .cos-fleet-stat { padding: 9px 11px; }
+  #root#root .cos-fleet-stat strong { font-size: 25px; margin: 3px 0; }
+  #root#root .cos-fleet-stat small { font-size: 11px; line-height: 1.35; }
+  #root#root .cos-fleet-filters { padding: 10px; margin-bottom: 10px; }
+  #root#root .cos-fleet-filter-row { gap: 8px; margin-top: 8px; }
+  #root#root .cos-fleet-workspace { display: flex; flex-direction: column-reverse; min-height: 0; }
+  #root#root .cos-fleet-map-panel { min-height: 0; }
+  #root#root .cos-fleet-map-canvas { height: min(62dvh,320px); min-height: 225px; flex: 0 0 auto; }
+  #root#root .cos-fleet-unit-list { height: 340px; max-height: 65dvh; }
+  #root#root .cos-fleet-unit-panel { border-right: 0; border-top: 1px solid var(--fleet-line); }
+  #root#root .cos-fleet-unit-health-grid { gap: 10px; margin: 12px 0 14px; }
+  #root#root .cos-fleet-unit-health-section { padding: 12px; }
+  #root#root .cos-fleet-drawer { padding: 12px 20px max(16px,env(safe-area-inset-bottom)); }
+  #root#root .cos-fleet-drawer > h2 { margin: 5px 0 7px; }
+  #root#root .cos-fleet-drawer h3 { margin: 12px 0 7px; }
+  #root#root .cos-fleet-drawer .camera-health-native { margin: 10px 0; padding: 12px; }
+}

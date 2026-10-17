@@ -157,3 +157,50 @@ test('narrow screens retain every view tab and filter without page overflow',asy
   for(const label of ['Installation status','Nearby unit center','Nearby radius miles'])await expect(app.getByLabel(label,{exact:true})).toBeVisible();
   await noPageOverflow(app);onlySavedReads(state);
 });
+
+
+for(const [label,width,height] of [['portrait',390,844],['landscape',844,390],['wide landscape',932,430]]){
+ test('iPhone '+label+' keeps Fleet map first without a sidebar or overflow',async({page},info)=>{
+  await page.setViewportSize({width,height});
+  const {app,state}=await mount(page);
+  const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
+   const shell=el.closest('.company-shell'),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect(),list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
+   const cards=[...el.querySelectorAll('.cos-fleet-stats .cos-fleet-stat')].map(x=>x.getBoundingClientRect());
+   const controls=[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-map-toolbar button,.cos-fleet-filter-row select,.cos-fleet-search input')].map(x=>x.getBoundingClientRect());
+   return {width:innerWidth,mapY:map.y,listY:list.y,mainWidth:shell.querySelector('.owner-it-main').getBoundingClientRect().width,
+    sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,firstY:cards[0].y,secondY:cards[1].y,
+    targets:controls.map(({width,height})=>({width,height})),overflow:document.documentElement.scrollWidth-innerWidth};
+  });
+  expect(geometry.width).toBe(width);
+  expect(geometry.mapY).toBeLessThan(geometry.listY);
+  expect(geometry.mainWidth).toBeGreaterThan(width*.85);
+  expect(geometry.sidebar).toBe('none');
+  expect(Math.abs(geometry.firstY-geometry.secondY)).toBeLessThan(1);
+  expect(geometry.overflow).toBeLessThanOrEqual(1);
+  for(const target of geometry.targets){expect(target.width).toBeGreaterThanOrEqual(44);expect(target.height).toBeGreaterThanOrEqual(44);}
+  await page.screenshot({path:info.outputPath('iphone-'+label.replace(' ','-')+'-fleet.png'),fullPage:true});
+  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+  const detail=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
+  for(const title of ['Camera health','InHand router','Camera troubleshooting'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await detail.getByRole('heading',{name:'Camera troubleshooting',exact:true}).scrollIntoViewIfNeeded();
+  expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  expect(await detail.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await detail.getByRole('button',{name:'Close unit details'}).click();
+  await noPageOverflow(app);onlySavedReads(state);
+ });
+}
+test('rotating iPhone retains Fleet filters, map and units',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ const {app,state}=await mount(page);
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('Spotter');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(2);
+ await page.setViewportSize({width:844,height:390});
+ await expect(app.getByLabel('Fleet family',{exact:true})).toHaveValue('Spotter');
+ const layout=await app.locator('.cos-fleet-workspace').evaluate(el=>({display:getComputedStyle(el).display,mapY:el.querySelector('.cos-fleet-map-panel').getBoundingClientRect().y,listY:el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect().y,overflow:document.documentElement.scrollWidth-innerWidth}));
+ expect(layout.display).toBe('flex');
+ expect(layout.mapY).toBeLessThan(layout.listY);
+ expect(layout.overflow).toBeLessThanOrEqual(1);
+ await app.getByLabel('Fleet family',{exact:true}).selectOption('All unit families');
+ await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
+ onlySavedReads(state);
+});
