@@ -1,0 +1,28 @@
+
+> cos-operations-pages@1.0.0 build
+> vite build --outDir /workspace/cos-handoff-shop-implementation-evidence/dist
+
+vite v6.0.11 building for production...
+transforming...
+✓ 239 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../cos-handoff-shop-implementation-evidence/dist/index.html                                   0.50 kB │ gzip:   0.33 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/open-sans-regular-BAbx6DeE.woff     112.57 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/open-sans-semibold-BX6hcZqj.woff    114.98 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/open-sans-bold-CKNCUI0c.woff        115.45 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/pdf.worker.min-Dkey6ZUl.mjs       1,321.31 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/index-CeodyEYh.css                  340.29 kB │ gzip:  63.05 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/pdf-Au7fvAgB.js                     541.84 kB │ gzip: 164.71 kB
+../../../cos-handoff-shop-implementation-evidence/dist/assets/index-V3FCMeqn.js                 1,570.89 kB │ gzip: 641.19 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.12s
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

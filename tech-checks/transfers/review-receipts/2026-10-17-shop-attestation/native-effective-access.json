@@ -1,0 +1,89 @@
+{
+  "captured_at": "2026-10-17T21:04:36.945Z",
+  "environment": "Disposable loopback PostgreSQL 17.6; synthetic rows; observed native definitions loaded without production records",
+  "native_project": "tughscoxralhofrckvxy",
+  "install_sha256": "ffe44ce5d630ae2bcafb3dd54408fca7354a264c5e2850a1363f12ec402dd707",
+  "rollback_sha256": "c0d538d633de72c008a7eafb2628874fade74c192106470ea0223f2c1cd10786",
+  "functions": [
+    {
+      "nspname": "cos_mhelp_placement_private",
+      "proname": "techcheck_identity_concern_v1",
+      "arguments": "label text",
+      "result": "text",
+      "owner": "postgres",
+      "acl": "{postgres=X/postgres}",
+      "provolatile": "i",
+      "prosecdef": false,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false,
+      "public_execute": false,
+      "definition_sha256": "930500f2604393dc8f476e002ca7bf748e381fb668101b724b06d355f9cb1300"
+    },
+    {
+      "nspname": "public",
+      "proname": "cos_techcheck_shop_attestation_v1",
+      "arguments": "p_legacy_actor_id uuid, p_request_id uuid, p_purpose text, p_items jsonb",
+      "result": "jsonb",
+      "owner": "postgres",
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "provolatile": "s",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\"",
+        "jit=off"
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true,
+      "public_execute": false,
+      "definition_sha256": "2bc014491e318146c5d833404f111c7ffc9393fe6c77109c02c9ba5b01aa2866"
+    }
+  ],
+  "after_rollback": [
+    {
+      "nspname": "cos_mhelp_placement_private",
+      "proname": "techcheck_identity_concern_v1",
+      "arguments": "label text",
+      "result": "text",
+      "owner": "postgres",
+      "acl": "{postgres=X/postgres}",
+      "provolatile": "i",
+      "prosecdef": false,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false,
+      "public_execute": false,
+      "definition_sha256": "930500f2604393dc8f476e002ca7bf748e381fb668101b724b06d355f9cb1300"
+    },
+    {
+      "nspname": "public",
+      "proname": "cos_techcheck_shop_attestation_v1",
+      "arguments": "p_legacy_actor_id uuid, p_request_id uuid, p_purpose text, p_items jsonb",
+      "result": "jsonb",
+      "owner": "postgres",
+      "acl": "{postgres=X/postgres}",
+      "provolatile": "s",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\"",
+        "jit=off"
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false,
+      "public_execute": false,
+      "definition_sha256": "2bc014491e318146c5d833404f111c7ffc9393fe6c77109c02c9ba5b01aa2866"
+    }
+  ],
+  "existing_function_definition_owner_acl_count_unchanged": 37,
+  "relation_owner_acl_count_unchanged": 68,
+  "schema_owner_acl_count_unchanged": 3,
+  "production_modified": false
+}
