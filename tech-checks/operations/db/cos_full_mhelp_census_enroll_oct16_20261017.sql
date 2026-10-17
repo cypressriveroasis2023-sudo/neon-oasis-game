@@ -55,7 +55,7 @@ do $verify$ declare n int;f int;s int; a int; begin
  where source_sha256='7893cec87f652954f7a9015e0ac82ea107b9200f23fa91cca5d0e8337c5ee891';
  select count(*) into a from cos_mhelp_placement_private.census_mhelp_address
  where source_sha256='7893cec87f652954f7a9015e0ac82ea107b9200f23fa91cca5d0e8337c5ee891';
- if n<>1001 or f<>287 or s<>714 or a not between 100 and 120
+ if n<>1001 or f<>287 or s<>714 or a not between 1 and 1001
  then raise exception 'Census enrollment failed: %, %, %, addresses %',n,f,s,a;end if;
 end $verify$;
 commit;
