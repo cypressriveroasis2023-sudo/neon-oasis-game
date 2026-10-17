@@ -35,7 +35,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
  };
  const original=async()=>{
   const file=fileRef.current?.files?.[0];
-  if(!file||!/\\.csv$/i.test(file.name)||file.size<1||file.size>2*1024*1024)throw Error('Choose the full original mHelp equipment CSV.');
+  if(!file||!/\.csv$/i.test(file.name)||file.size<1||file.size>2*1024*1024)throw Error('Choose the full original mHelp equipment CSV.');
   const bytes=new Uint8Array(await file.arrayBuffer()),parts:string[]=[];
   for(let i=0;i<bytes.length;i+=8192)parts.push(String.fromCharCode(...bytes.subarray(i,i+8192)));
   return {bytesBase64:btoa(parts.join('')),sourceFilename:file.name,...(expected.trim()?{expectedSha256:expected.trim()}:{})};
@@ -83,7 +83,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
     <ul>{preview.samples.map((item,i)=><li key={item.productId+'-'+item.kind+'-'+i}><strong>{item.unitNumber}</strong> · {item.kind.replaceAll('_',' ')} · {item.previousPlacement||'New'} → {item.proposedPlacement||'Not in export'} · {item.reason}</li>)}</ul>
    </details>}
    <p><strong>2027 Product ID proof:</strong> {preview.censusStatus==='verified'?'Verified against current 2027 workbook':'Unavailable — no equipment writes permitted'}.</p>
-   <p><strong>Admission review:</strong> {preview.admission.counts.unchanged} unchanged · {preview.admission.counts.assignment_change} assignment changes · {preview.admission.counts.new_source_only} new source records · {preview.admission.totalHeld} held for protected identity or placement review. No commit is enabled.</p>
+   <p><strong>Admission review:</strong> {preview.admission.counts.unchanged} unchanged · {preview.admission.counts.assignment_change} assignment changes · {preview.admission.counts.new_source_only} new source records · {preview.admission.totalHeld} held for protected identity or placement review. An explicit guarded Owner commit is required.</p>
    <p role='status'>{preview.guardNotice}</p>
    {allowStage&&preview.censusStatus==='verified'&&!stage&&<button type='button' onClick={stageChanges} disabled={pending}>Stage reviewed inventory (no Fleet changes)</button>}
    {!allowStage&&<p>Protected equipment save is awaiting independently reviewed backend installation. Preview remains read-only.</p>}
@@ -94,7 +94,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
     <textarea id='cos-owner-equipment-approval-note' value={confirmationText} onChange={e=>setConfirmationText(e.target.value)} maxLength={800} disabled={pending} rows={3}/>
     <button type='button' disabled={pending||!approval||confirmationText.trim().length<24} onClick={commitChanges}>Apply reviewed source through protected COS backend</button>
    </section>}
-   {applied&&<p role='status'><strong>Committed source receipt verified:</strong> {applied.records} records · {applied.field} Field · {applied.shop} Shop. Live Fleet/map and camera status require separate readback.</p>
+   {applied&&<p role='status'><strong>Committed source receipt verified:</strong> {applied.records} records · {applied.field} Field · {applied.shop} Shop. Live Fleet/map and camera status require separate readback.</p>}
   </div>}
  </section>;
 }
