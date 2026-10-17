@@ -42,6 +42,7 @@ test('layered source transition migration installs on existing PR200 reader with
 
 test('guarded source transition is read-only until Owner admission and fails shut after later tracker change',async()=>{
  const f=await fixture();
+ let stage='fixture';
  try {
   const db=f.db, currentSha='b'.repeat(64),payload='c'.repeat(64),request='66666666-6666-4666-8666-666666666666';
   const continuity=await sql('mhelp-source-continuity.sql');
@@ -82,28 +83,35 @@ test('guarded source transition is read-only until Owner admission and fails shu
   await db.query('insert into cos_mhelp_placement_private.upload_batches(source_sha256,payload_sha256,receipt,records) values($1,$2,$3,$4)',[currentSha,payload,receipt,nextRecords]);
   await db.query('update cos_mhelp_placement_private.upload_control set active_sha256=$1 where singleton',[currentSha]);
   await db.query("insert into cos_mhelp_placement_private.upload_audit(action,source_sha256,previous_sha256,authorization_sha256) values('activate',$1,$2,$3)",[currentSha,hash,hash]);
+  stage='migration';
   await db.exec(await sql('cos_source_transition_continuity_20261017.sql'));
+  stage='source_transition_review';
   const proof=(await db.query('select cos_mhelp_placement_private.source_transition_review($1,$2,$3,$4) v',[currentSha,payload,hash,'2229349'])).rows[0].v;
   assert.deepEqual({eligible:proof.eligible,reason:proof.reason},{eligible:true,reason:'guarded_source_transition_only'});
+  stage='baseline_reader';
   const baseline=(await f.snapshot()).records[0];assert.equal(baseline.binding,null);assert.equal(baseline.placementHeld,true);
+  stage='dry_run';
   const preview=(await db.query('select cos_mhelp_placement_private.admit_source_transition($1,$2,$3,$4,$5,$6,$7,$8,$9) v',[actor,org,currentSha,payload,hash,'2229349',proof.currentRowSha256,'88888888-8888-4888-8888-888888888888',false])).rows[0].v;
   assert.equal(preview.applied,false);
   assert.equal((await f.snapshot()).records[0].binding,null);
+  stage='admission';
   const receiptResult=(await db.query('select cos_mhelp_placement_private.admit_source_transition($1,$2,$3,$4,$5,$6,$7,$8,$9) v',[actor,org,currentSha,payload,hash,'2229349',proof.currentRowSha256,'88888888-8888-4888-8888-888888888888',true])).rows[0].v;
   assert.equal(receiptResult.applied,true);
   const admitted=(await f.snapshot()).records[0];
   assert.equal(admitted.binding.nativeUnitId,native);assert.equal(admitted.binding.guardCurrent,true);
   assert.equal(admitted.holdReason,null);assert.equal(admitted.placementHeld,false);
+  stage='linked_reader';
   const reconciled=(await f.snapshot()).trackerRecords;
   assert.equal(reconciled[0].matchedProductId,'2229349');
   assert.equal(reconciled[0].binding.state,'linked');
   assert.equal(reconciled[0].binding.guardCurrent,true);
   assert.deepEqual(reconciled[0].binding.unitIds,[native,tracker]);
   assert.equal((await f.snapshot()).records.length,2);
+  stage='drift';
   await db.query("update app_private.vision_tracker_locations set customer='Concurrent correction' where id=$1",[tracker]);
   const afterDrift=await f.snapshot(),stale=afterDrift.records[0];
   assert.equal(stale.binding,null);assert.equal(stale.placementHeld,true);
   assert.equal(afterDrift.trackerRecords[0].binding.state,'held');
   await assert.rejects(()=>db.query('select cos_mhelp_placement_private.admit_source_transition($1,$2,$3,$4,$5,$6,$7,$8,$9)',[actor,org,currentSha,payload,hash,'2229349',proof.currentRowSha256,'88888888-8888-4888-8888-888888888888',true]),/changed/);
- }finally{await f.db.close();}
+ }catch(e){console.error('SOURCE_TRANSITION_STAGE',stage,'DETAIL',e.detail||'', 'CONTEXT',e.where||'','POSITION',e.position||'','QUERY',e.internalQuery||'');throw e;}finally{await f.db.close();}
 });
