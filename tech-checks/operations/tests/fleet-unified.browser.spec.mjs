@@ -6,7 +6,7 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible dir
  const {app,state}=await mountFleet(page,it,{hash:it?'#fleet-dashboard':'#today'});
  if(it)await expect(app.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  else await app.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
- await expect(app.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
+ await expect(app.getByRole('heading',{name:'Fleet Dashboard',exact:true})).toBeVisible();
  const navigation=app.getByRole('navigation',{name:page.viewportSize().width<=700?'Mobile Operations navigation':'COS Operations',exact:true});
  await expect(navigation.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
  await expect(navigation.getByRole('button',{name:'Field View',exact:true})).toHaveCount(0);

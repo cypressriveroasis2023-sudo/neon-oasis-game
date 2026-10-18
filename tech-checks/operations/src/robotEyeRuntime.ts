@@ -1,5 +1,4 @@
 import { robotEyeAtlas } from './eyeArtwork';
-import { drawMechanicalSocket } from './robotEyeMechanics';
 
 export type EyePose = { x: number; y: number };
 export type EyeMotion = {
@@ -36,18 +35,21 @@ export function stepRobotEye(state: EyeMotion, now: number, random = Math.random
 function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, pose: EyePose, time: number) {
   const c = canvas.getContext('2d');
   if (!c) return;
-  c.setTransform(canvas.width / 720, 0, 0, canvas.height / 720, 0, 0);
-  const background = c.createRadialGradient(360, 360, 20, 360, 360, 510);
-  background.addColorStop(0, '#141619'); background.addColorStop(1, '#060708');
-  c.fillStyle = background; c.fillRect(0, 0, 720, 720);
-  drawMechanicalSocket(c, pose, time);
-  const ratio = Math.min(1, Math.hypot(pose.x / 88, pose.y / 42));
-  const width = 312 * (1 - Math.abs(pose.x) / 88 * .12);
-  const height = 312 * (1 - Math.abs(pose.y) / 42 * .08);
-  c.save(); c.beginPath(); c.ellipse(359, 357, 222, 155, 0, 0, Math.PI * 2); c.clip();
-  c.drawImage(image, 1120, 195, 490, 490, 359 + pose.x - width / 2, 357 + pose.y - height / 2 + ratio * 1.5, width, height);
+  const full = canvas.dataset.companyLogo === 'full';
+  const width = full ? 1490 : 540, height = full ? 530 : 540;
+  c.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
+  c.fillStyle = '#111c2c'; c.fillRect(0, 0, width, height);
+  c.save();
+  // Full company lockup and eye-only artwork share the exact approved sensor.
+  c.translate(full ? -250 : 19 - 250, full ? -125 : 2 - 120);
+  if (full) c.drawImage(image, 0, 0, 1983, 793, 0, 0, 1983, 793);
+  else c.drawImage(image, 250, 120, 502, 535, 250, 120, 502, 535);
+  c.save(); c.beginPath(); c.arc(531, 401, 119, 0, Math.PI * 2); c.clip();
+  c.drawImage(image, 0, 793, 270, 270, 396 + pose.x * .28, 266 + pose.y * .4, 270, 270);
   c.restore();
-  c.drawImage(image, 45, 0, 900, 887, 45, 49.55, 630, 620.9);
+  // The white upper contour and all four sights stay fixed during every glance.
+  c.drawImage(image, 270, 793, 270, 270, 396, 266, 270, 270);
+  c.restore();
 }
 
 type EyeHandle = {
@@ -155,7 +157,9 @@ export function mountRobotEye(host: HTMLElement, canvas: HTMLCanvasElement): () 
   const eye: EyeHandle = { host, canvas, motion: createEyeMotion(visualTime()), visible: false, active: false, resize, destroyed: false };
   function resizeCanvas() {
     const size = Math.max(32, Math.min(512, Math.round((host.getBoundingClientRect().width || 72) * Math.min(2, window.devicePixelRatio || 1))));
-    if (canvas.width !== size || canvas.height !== size) { canvas.width = size; canvas.height = size; }
+    const height = host.dataset.companyLogo === 'full' ? Math.round(size * 530 / 1490) : size;
+    canvas.dataset.companyLogo = host.dataset.companyLogo || 'eye';
+    if (canvas.width !== size || canvas.height !== height) { canvas.width = size; canvas.height = height; }
     if (eye.image) paint(canvas, eye.image, printing || preference?.matches ? { x: 0, y: 0 } : eye.motion.position, 0);
   }
   handles.add(eye); resizeCanvas(); resize.observe(host); visibility!.observe(host);

@@ -18,7 +18,7 @@ for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Fiel
  await expect(app.getByRole('dialog')).toContainText('Protected identity hold');
  await app.getByRole('button',{name:'Close equipment details'}).click();
  await counts.getByLabel('Field inventory status').selectOption('online');await counts.getByRole('button',{name:'Unit details and troubleshooting'}).click();
- await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();await expect(app.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
+ await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();await app.locator('.cos-fleet-troubleshooting > summary').click();await expect(app.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
  await app.getByRole('button',{name:'Close unit details'}).click();
  const bounds=await counts.evaluate(element=>({width:element.clientWidth,scroll:element.scrollWidth}));expect(bounds.scroll).toBeLessThanOrEqual(bounds.width+1);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
