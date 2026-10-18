@@ -146,8 +146,7 @@ test('approved red eye branding stays readable through responsive navigation and
     const { frame } = await mount(page);
     const brand = frame.locator(width <= 700 ? '.company-mobile-brand' : '.company-brand');
     await expect(brand).toBeVisible();
-    await expect(brand.locator('strong')).toHaveText('VISION');
-    await expect(brand.locator('small')).toHaveText('COS Operations');
+    await expect(brand.locator('.cos-company-logo')).toHaveAttribute('data-company-logo','full');
     const geometry = await brand.evaluate(el => {
       const image = el.querySelector('.company-eye');
       const style = getComputedStyle(image);
@@ -163,19 +162,20 @@ test('approved red eye branding stays readable through responsive navigation and
         background: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(geometry).toMatchObject({ posters: 1, canvases: 1, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    expect(geometry).toMatchObject({ posters: 1, canvases: 1, label: 'Cameras Onsite', radius: '0px', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
     await expect(brand.locator('.company-eye')).toHaveAttribute('data-eye-ready', 'true');
     await brand.locator('img.cos-eye-poster').evaluateAll(async layers => { await Promise.all(layers.map(image => image.decode())); });
-    expect(geometry.width).toBe(width <= 700 ? 40 : 104);
-    expect(geometry.height).toBe(geometry.width);
+    expect(geometry.width).toBeGreaterThanOrEqual(100);
+    expect(geometry.width).toBeLessThanOrEqual(220);
+    expect(geometry.width/geometry.height).toBeCloseTo(1490/530,1);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });
     const more = frame.getByRole('button', { name: 'More', exact: true });
     await more.click();
     const menu = frame.getByRole('dialog', { name: 'Operations navigation' });
     await expect(menu.locator('.company-brand')).toBeVisible();
-    await expect(menu.locator('.company-brand strong')).toHaveText('VISION');
-    expect(await menu.locator('.company-brand-mark').evaluate(el => getComputedStyle(el).borderRadius)).toBe('50%');
+    await expect(menu.locator('.cos-company-logo')).toHaveAttribute('data-company-logo','full');
+    expect(await menu.locator('.company-brand-mark').evaluate(el => getComputedStyle(el).borderRadius)).toBe('0px');
     const close = menu.getByRole('button', { name: 'Close menu' });
     expect((await close.boundingBox()).height).toBeGreaterThanOrEqual(44);
     await page.keyboard.press('Escape');
@@ -197,8 +197,8 @@ test('robotic eye scans randomly while sights stay fixed and hidden/reduced-moti
   const eye=frame.locator('.company-mobile-brand .company-eye');
   await expect(eye).toHaveAttribute('data-eye-ready','true');await expect(eye).toHaveAttribute('data-motion-paused','false');
   const snapshot=async()=>eye.locator('canvas').evaluate(canvas=>{
-    const c=canvas.getContext('2d'),scale=canvas.width/720;
-    return {image:canvas.toDataURL(),sights:[[360,100],[80,356],[641,356],[359,620]].flatMap(([x,y])=>[...c.getImageData(Math.round(x*scale),Math.round(y*scale),1,1).data])};
+    const c=canvas.getContext('2d'),scale=canvas.width/1490;
+    return {image:canvas.toDataURL(),sights:[[281,30],[42,261],[489,261],[281,495]].flatMap(([x,y])=>[...c.getImageData(Math.round(x*scale),Math.round(y*scale),1,1).data])};
   });
   const original=await snapshot();await expect.poll(async()=>(await snapshot()).image).not.toBe(original.image);
   expect((await snapshot()).sights).toEqual(original.sights);
@@ -217,10 +217,10 @@ test('robotic eye scans randomly while sights stay fixed and hidden/reduced-moti
     const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
     const sample=document.createElement('canvas');sample.width=image.width;sample.height=image.height;
     const c=sample.getContext('2d');c.drawImage(image,0,0);
-    return [[360,100],[80,356],[641,356],[359,620]].map(([x,y])=>{
-      const sx=Math.round(x*image.width/720),sy=Math.round(y*image.height/720);
+    return [[281,30],[42,261],[489,261],[281,495]].map(([x,y])=>{
+      const sx=Math.round(x*image.width/1490),sy=Math.round(y*image.height/530);
       const pixels=c.getImageData(sx-2,sy-2,5,5).data;
-      for(let i=0;i<pixels.length;i+=4)if(pixels[i]>=120&&pixels[i]-pixels[i+1]>=40&&pixels[i]-pixels[i+2]>=40)return true;
+      for(let i=0;i<pixels.length;i+=4)if(pixels[i]>=120&&pixels[i+1]>=120&&pixels[i+2]>=120)return true;
       return false;
     });
   },rendered);
@@ -256,8 +256,8 @@ test('advancing operational timers does not replay thousands of eye frames', asy
 test('enlarged eye never overlaps sidebar labels at short desktop heights',async({page},info)=>{
   for(const [width,height] of [[1180,757],[1024,600],[1440,600],[768,600]]){
     await page.setViewportSize({width,height});const{frame}=await mount(page);
-    const facts=await frame.locator('.company-brand').evaluate(el=>{const eye=el.querySelector('.company-eye').getBoundingClientRect();const copy=el.querySelector('.company-brand-copy').getBoundingClientRect();const label=document.querySelector('.company-nav-heading').getBoundingClientRect();return{eyeBottom:eye.bottom,copyTop:copy.top,copyBottom:copy.bottom,labelTop:label.top,brandHeight:el.getBoundingClientRect().height};});
-    expect(facts.copyTop).toBeGreaterThanOrEqual(facts.eyeBottom);expect(facts.labelTop).toBeGreaterThan(facts.copyBottom);expect(facts.brandHeight).toBeGreaterThan(140);
+    const facts=await frame.locator('.company-brand').evaluate(el=>{const eye=el.querySelector('.company-eye').getBoundingClientRect();const label=document.querySelector('.company-nav-heading').getBoundingClientRect();return{eyeBottom:eye.bottom,labelTop:label.top,brandHeight:el.getBoundingClientRect().height};});
+    expect(facts.labelTop).toBeGreaterThan(facts.eyeBottom);expect(facts.brandHeight).toBeGreaterThan(35);
     await page.screenshot({path:info.outputPath('short-sidebar-'+width+'x'+height+'.png')});
   }
 });
