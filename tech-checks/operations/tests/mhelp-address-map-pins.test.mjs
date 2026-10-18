@@ -78,3 +78,12 @@ test('saved fallback evidence retains the original Field Product ID and its prov
 test('a valid count with a foreign or superseded Product ID cannot enter the current source map',()=>{
  const s=sample();s.items[0].productId='9999999';assert.equal(parse(s),null);
 });
+
+test('new accepted files supply counts, including all-Shop, without weakening Product-ID guards',()=>{
+ for(const [fields,shops] of [[3,2],[300,750],[0,4]]){
+  const h={sourceSha256:source,payloadSha256:payload,recordCount:fields+shops,records:Array.from({length:fields+shops},(_,i)=>({productId:String(i+1),placement:i<fields?'FIELD':'SHOP'}))};
+  const s={...sample(),totalProducts:fields+shops,fieldProducts:fields,shopProducts:shops,items:Array.from({length:fields},(_,i)=>record(i))};
+  assert.equal(readMhelpAddressMapPins(s,h,now)?.totalField,fields);s.fieldProducts++;assert.equal(readMhelpAddressMapPins(s,h,now),null);s.fieldProducts--;
+  h.records[0].placement='UNKNOWN';assert.equal(readMhelpAddressMapPins(s,h,now),null);
+ }
+});
