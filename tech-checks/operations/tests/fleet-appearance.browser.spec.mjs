@@ -254,3 +254,22 @@ test('short desktop viewport preserves sidebar and desktop Fleet map columns',as
  expect(geometry.overflow).toBeLessThanOrEqual(1);
  onlySavedReads(state);
 });
+
+test('compact map overview keeps filters and accounting after the map without changing saved reads',async({page})=>{
+ const {app,state}=await mount(page);
+ const order=await app.locator('.cos-fleet-dashboard').evaluate(root=>{
+  const workspace=root.querySelector('.cos-fleet-workspace'),filters=root.querySelector('.cos-fleet-filters');
+  return Boolean(workspace.compareDocumentPosition(filters)&Node.DOCUMENT_POSITION_FOLLOWING);
+ });
+ expect(order).toBe(true);
+ await expect(app.locator('.cos-fleet-heading h1')).toBeVisible();
+ await expect(app.locator('.cos-fleet-heading .cos-fleet-clock')).toBeHidden();
+ await expect(app.locator('.cos-fleet-stat-online')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-offline')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-unknown')).toBeVisible();
+ await app.getByLabel('Fleet status',{exact:true}).selectOption('offline');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await expect(app.locator('.cos-fleet-unit-row')).toContainText('Spotter 1');
+ await noPageOverflow(app);
+ onlySavedReads(state);
+});
