@@ -1,3 +1,4 @@
+// 2026-10-18 provider count markup folds into a disclosure; script hashes are unchanged.
 // 2026-10-17 reviewed shared Camera Health entry, explicit diagnostics/return links,
 // provider-group wording and removal of historical 2026 synthetic tracker rows (#197).
 // Navigation and saved-only diagnostics are covered by camera-health-overview and
@@ -34,7 +35,7 @@ const scriptHashes = {
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "1381cf75182b5112df464febd16bb95f26a6ba288fc983c8d119392f6a71f947",
+  "camera-health": "6c17cc0bded1a86c9efb9550d219b3771a1ac6b42020c34d9d50fb01c363935d",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"

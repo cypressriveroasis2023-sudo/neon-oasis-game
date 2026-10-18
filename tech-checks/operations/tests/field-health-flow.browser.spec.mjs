@@ -1,5 +1,5 @@
 import {showAllFieldHealth} from './field-map-controls.mjs';
-import {revealMapFilters,revealMapInfo} from './field-map-controls.mjs';
+import {revealMapFilters,revealMapInfo,revealUnitTroubleshooting} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
@@ -61,8 +61,8 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-field-pin').nth(0)).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-field-pin').nth(1)).toHaveAttribute('data-health','offline');await expect(frame.locator('.cos-field-pin').nth(2)).toHaveAttribute('data-health','unknown');
  await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await expect(frame.getByLabel('Nearby radius miles')).toBeVisible();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);
- await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);
- await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await revealUnitTroubleshooting(frame);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);
+ await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
  expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
@@ -72,8 +72,8 @@ test('a uniquely resolved label deep link returns a cancelled ticket to the same
  const label='Solar Spotter 52',hash='#fleet-dashboard?'+new URLSearchParams({unitLabel:label});
  const {frame,state}=await mount(page,{entryLabel:label});
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
- await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText(label);
- await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
+ await revealUnitTroubleshooting(frame);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText(label);
+ await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=SERVICE&unit='+id2);
  expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);
  await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
@@ -107,8 +107,8 @@ test('closing and reopening unit diagnostics preserves search, nearby center and
 
 test('native Camera Health shows units and individual cameras separately with filter and accessible drill-down',async({page},testInfo)=>{
  const {frame,state}=await mount(page,{nativeOverview:true});
- const stats=frame.locator('.camera-unit-kpis');await expect(stats.locator('button b')).toHaveText(['2','1','1','1']);await expect(stats.locator('.camera-status-online')).toHaveCSS('color','rgb(43, 255, 53)');await expect(stats.locator('.camera-status-offline')).toHaveCSS('color','rgb(255, 39, 52)');await expect(frame.locator('.camera-actual-count>b')).toHaveText('3');await expect(frame.locator('.camera-record-breakdown')).toContainText('Reported camera records');
- await stats.getByRole('button',{name:/Field units offline/}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);const card=frame.locator('.camera-overview-card');await expect(card).toContainText('SOLARSPOTTER 52');await card.locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('Fixture camera 2');await expect(detail.locator('.camera-device-cards article')).toHaveCount(1);await page.keyboard.press('Escape');await expect(detail).toHaveCount(0);await expect(card.locator('.camera-card-main')).toBeFocused();await card.locator('.camera-card-main').click();await detail.getByRole('button',{name:'Back to units',exact:true}).click();await expect(detail).toHaveCount(0);await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.getByLabel('Search Camera Health units').fill('53');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Camera status unverified');await frame.getByLabel('Search Camera Health units').fill('');await frame.locator('body').evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:testInfo.outputPath('camera-health-unit-overview.png'),fullPage:true});await frame.locator('.camera-record-breakdown summary').click();await frame.locator('.camera-record-breakdown').evaluate(el=>el.scrollIntoView({block:'start'}));await page.screenshot({path:testInfo.outputPath('camera-health-reconciliation.png'),fullPage:true});expect(state.writes).toHaveLength(0);
+ const stats=frame.locator('.camera-unit-kpis');await expect(stats.locator('button b')).toHaveText(['3','1','1','1']);await expect(stats.locator('.camera-status-online')).toHaveCSS('color','rgb(43, 255, 53)');await expect(stats.locator('.camera-status-offline')).toHaveCSS('color','rgb(255, 39, 52)');await expect(frame.locator('.camera-actual-count>b')).toHaveText('3');await expect(frame.locator('.camera-record-breakdown')).toContainText('Reported camera records');
+ await stats.getByRole('button',{name:/Offline/}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);const card=frame.locator('.camera-overview-card');await expect(card).toContainText('SOLARSPOTTER 52');await card.locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('Fixture camera 2');await expect(detail.locator('.camera-device-cards article')).toHaveCount(1);await page.keyboard.press('Escape');await expect(detail).toHaveCount(0);await expect(card.locator('.camera-card-main')).toBeFocused();await card.locator('.camera-card-main').click();await detail.getByRole('button',{name:'Back to units',exact:true}).click();await expect(detail).toHaveCount(0);await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.getByLabel('Search Camera Health units').fill('53');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Camera status unverified');await frame.getByLabel('Search Camera Health units').fill('');await frame.locator('body').evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:testInfo.outputPath('camera-health-unit-overview.png'),fullPage:true});await frame.locator('.camera-record-breakdown > summary').click();await frame.locator('.camera-record-breakdown').evaluate(el=>el.scrollIntoView({block:'start'}));await page.screenshot({path:testInfo.outputPath('camera-health-reconciliation.png'),fullPage:true});expect(state.writes).toHaveLength(0);
 });
 test('native unit details can open Install Delivery draft without guessing record identity',async({page})=>{
  const {frame,state}=await mount(page,{nativeOverview:true});await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 52'}).locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await detail.getByLabel('Unit detail ticket type').selectOption('DELIVERY');await detail.getByRole('button',{name:'Create ticket',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=DELIVERY&unit='+id2);await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);expect(state.writes).toHaveLength(0);
@@ -119,7 +119,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
  const {frame,state}=await mount(page);
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await frame.locator('.cos-field-pin').nth(1).click();
- await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
+ await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
@@ -138,7 +138,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
 
 test('native recorder, service-only, and old Recon observations keep separate status dimensions',async({page})=>{
  const {frame,state}=await mount(page,{nativeOverview:true,evidenceCase:true});
- await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['0','0','0','3']);
+ await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','0','0','3']);
  const recorder=frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 51'});
  await expect(recorder).toContainText('Camera status unverified');await expect(recorder).toContainText('Camera channel status unavailable');
  await frame.getByLabel('Camera Health unit filter').selectOption('service');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Camera status unverified');await expect(frame.locator('.camera-overview-card')).toContainText('Camera channel status unavailable');
@@ -150,6 +150,7 @@ test('native recorder, service-only, and old Recon observations keep separate st
  await expect(unitSummary).toContainText('Camera status unverified');
  await expect(unitSummary).toContainText('Camera channel status unavailable. Recorder and service observations remain separate.');
  await expect(unitSummary.locator('.cos-signal-online')).toHaveCount(0);
+ await revealUnitTroubleshooting(frame);
  const recorderObservation=frame.locator('.camera-health-native .camera-device-cards article').filter({hasText:'Fixture recorder'});
  await expect(recorderObservation).toHaveCount(1);
  await expect(recorderObservation.getByText('RECORDER ONLINE',{exact:true})).toBeVisible();
@@ -160,16 +161,16 @@ test('native recorder, service-only, and old Recon observations keep separate st
 
 test('native location review stays visible while shop and inactive scopes reconcile separately',async({page})=>{
  const {frame,state}=await mount(page,{nativeOverview:true,scopeCase:true});
- await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['0','0','0','1']);await expect(frame.locator('.camera-overview-card')).toContainText('LOCATION REVIEW');
+ await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['0','0','0','0']);await expect(frame.locator('.camera-overview-card')).toContainText('LOCATION REVIEW');
  await frame.getByLabel('Camera Health unit filter').selectOption('shop');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('SHOP / ROOT');
  await frame.getByLabel('Camera Health unit filter').selectOption('inactive');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('INACTIVE');
- await frame.locator('.camera-record-breakdown summary').click();await expect(frame.locator('.camera-record-breakdown')).toContainText('0 confirmed-field records + 1 shop/root records + 1 inactive records + 1 location-review records');expect(state.writes).toHaveLength(0);
+ await frame.locator('.camera-record-breakdown > summary').click();await frame.getByText('How these totals add up',{exact:true}).click();await expect(frame.locator('.camera-record-breakdown')).toContainText('0 confirmed-field records + 1 shop/root records + 1 inactive records + 1 location-review records');expect(state.writes).toHaveLength(0);
 });
 
 
 test('Sniper and CAM V family navigation restores service views and exact saved-resource access',async({page},info)=>{
  const {frame,state}=await mount(page,{nativeOverview:true,accessCase:true});
- await expect(frame.locator('.camera-overview-card')).toHaveCount(3);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);
+ await expect(frame.locator('.camera-overview-card')).toHaveCount(3);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','1','1','1']);
  await frame.getByLabel('Camera Health unit filter').selectOption('online');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);
  await frame.getByLabel('Camera Health equipment family').selectOption('sniper');await expect(frame.getByLabel('Camera Health unit filter')).toHaveValue('operational');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('SNIPER 2 005');
  await frame.getByLabel('Camera Health unit filter').selectOption('service');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card .camera-status-pill')).toHaveText('IP / PORT ONLINE');await expect(frame.locator('.camera-overview-card .camera-status-pill')).toHaveCSS('color','rgb(43, 255, 53)');await frame.locator('.camera-overview-card').screenshot({path:info.outputPath('sniper-restored-online-card.png')});

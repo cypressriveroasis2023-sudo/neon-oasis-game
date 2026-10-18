@@ -47,7 +47,7 @@ for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live co
     const address=el.querySelector('.cos-fleet-unit-copy small:nth-of-type(2)');
     return {cards:cards.map(card=>({x:card.x,y:card.y,width:card.width})), list:{x:list.x,y:list.y},map:{x:map.x,y:map.y},
       address:{wrap:getComputedStyle(address).whiteSpace,overflow:address.scrollWidth-address.clientWidth,font:parseFloat(getComputedStyle(address).fontSize)},
-      targets:[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-filter-row select,.cos-fleet-search input,.cos-fleet-search button,.cos-fleet-map-toolbar button')].map(control=>({height:control.getBoundingClientRect().height,width:control.getBoundingClientRect().width})),width:innerWidth};
+      targets:[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-filter-row select,.cos-fleet-search input,.cos-fleet-search button,.cos-fleet-map-toolbar button')].filter(control=>control.getClientRects().length).map(control=>({height:control.getBoundingClientRect().height,width:control.getBoundingClientRect().width})),width:innerWidth};
   });
   expect(geometry.address.wrap).toBe('normal');
   expect(geometry.address.overflow).toBeLessThanOrEqual(1);
@@ -124,8 +124,10 @@ test('unit detail is readable, retains all evidence and has one scroll surface',
   expect(layout.overflow).toBeLessThanOrEqual(1);
   expect(layout.powerWidth).toBeGreaterThanOrEqual(layout.gridWidth-1);
   expect(layout.height).toBeLessThanOrEqual(layout.viewport);
-  if(layout.width<=750)expect(layout.router.y).toBeGreaterThan(layout.camera.y);
-  else expect(Math.abs(layout.router.y-layout.camera.y)).toBeLessThan(1);
+  expect(Math.abs(layout.router.y-layout.camera.y)).toBeLessThan(1);
+  await expect(dialog.locator('.cos-fleet-troubleshooting')).not.toHaveAttribute('open');
+  await dialog.locator('.cos-fleet-troubleshooting > summary').click();
+  await expect(dialog.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
   await dialog.getByText('3 reported charge sources',{exact:true}).click();
   await expect(dialog.locator('[aria-label="Battery charge source readings"]')).toBeVisible();
   await dialog.evaluate(el=>el.scrollTop=0);
@@ -152,8 +154,9 @@ test('narrow screens retain every view tab and filter without page overflow',asy
   await expect(app.getByRole('heading',{name:'How to read this board'})).toBeVisible();
   await noPageOverflow(app);
   await tabs.getByRole('button',{name:'Map',exact:true}).click();
-  for(const label of ['Fleet placement','Fleet family','Fleet health signal','Fleet status','Fleet provider'])await expect(app.getByLabel(label,{exact:true})).toBeVisible();
-  await app.getByText('Location and installation filters',{exact:true}).click();
+  for(const label of ['Fleet placement','Fleet family','Fleet health signal','Fleet status'])await expect(app.getByLabel(label,{exact:true})).toBeVisible();
+  await app.getByText('More filters',{exact:true}).click();
+  await expect(app.getByLabel('Fleet provider',{exact:true})).toBeVisible();
   for(const label of ['Installation status','Nearby unit center','Nearby radius miles'])await expect(app.getByLabel(label,{exact:true})).toBeVisible();
   await noPageOverflow(app);onlySavedReads(state);
 });
@@ -168,7 +171,7 @@ test.describe('touch iPhone Fleet presentation',()=>{
   const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
    const shell=el.closest('.company-shell'),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect(),list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
    const cards=[...el.querySelectorAll('.cos-fleet-stats .cos-fleet-stat')].map(x=>x.getBoundingClientRect());
-   const controls=[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-map-toolbar button,.cos-fleet-filter-row select,.cos-fleet-search input')].map(x=>x.getBoundingClientRect());
+   const controls=[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-map-toolbar button,.cos-fleet-filter-row select,.cos-fleet-search input')].filter(control=>control.getClientRects().length).map(x=>x.getBoundingClientRect());
    return {width:innerWidth,mapY:map.y,listY:list.y,mainWidth:shell.querySelector('.owner-it-main').getBoundingClientRect().width,
     sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,firstY:cards[0].y,secondY:cards[1].y,
     targets:controls.map(({width,height})=>({width,height})),overflow:document.documentElement.scrollWidth-innerWidth};
@@ -252,5 +255,24 @@ test('short desktop viewport preserves sidebar and desktop Fleet map columns',as
  expect(geometry.layout).toBe('grid');
  expect(geometry.listX).toBeLessThan(geometry.mapX);
  expect(geometry.overflow).toBeLessThanOrEqual(1);
+ onlySavedReads(state);
+});
+
+test('compact map overview keeps compact filters above the map and accounting below without changing saved reads',async({page})=>{
+ const {app,state}=await mount(page);
+ const order=await app.locator('.cos-fleet-dashboard').evaluate(root=>{
+  const workspace=root.querySelector('.cos-fleet-workspace'),filters=root.querySelector('.cos-fleet-filters');
+  return Boolean(filters.compareDocumentPosition(workspace)&Node.DOCUMENT_POSITION_FOLLOWING);
+ });
+ expect(order).toBe(true);
+ await expect(app.locator('.cos-fleet-heading h1')).toBeVisible();
+ await expect(app.locator('.cos-fleet-heading .cos-fleet-clock')).toBeHidden();
+ await expect(app.locator('.cos-fleet-stat-online')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-offline')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-unknown')).toBeVisible();
+ await app.getByLabel('Fleet status',{exact:true}).selectOption('offline');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(1);
+ await expect(app.locator('.cos-fleet-unit-row')).toContainText('Spotter 1');
+ await noPageOverflow(app);
  onlySavedReads(state);
 });

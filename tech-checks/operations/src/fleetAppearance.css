@@ -415,3 +415,135 @@
   }
   #root#root .cos-fleet-map-panel { scroll-margin-top: 64px; }
 }
+
+
+/* Compact Fleet overview: operational status and map first; explanations are disclosures. */
+#root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-clock,
+#root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-eyebrow,
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:first-child > p { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading { margin-bottom: 10px; align-items: center; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 24px; margin: 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-stats { gap: 6px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat { padding: 8px 10px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat strong { font-size: 25px; margin: 2px 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat small { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-count-note { margin-bottom: 8px !important; }
+#root#root .cos-fleet-simple-map .cos-fleet-count-note p { margin: 3px 0; }
+#root#root .cos-fleet-accounting,
+#root#root .cos-fleet-simple-map .cos-fleet-filters { margin-top: 12px; }
+#root#root .cos-fleet-accounting > summary,
+#root#root .cos-mhelp-address-coverage > details > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+#root#root .cos-fleet-accounting[open] { padding-bottom: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote { font-size: 12px; gap: 6px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote > span { flex-basis: 100%; }
+@media (max-width: 750px) {
+  #root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 21px; }
+  #root#root .cos-fleet-simple-map .cos-fleet-stat > span { font-size: 12px; line-height: 1.4; }
+  #root#root .cos-fleet-simple-map .cos-fleet-stat small { font-size: 10px; }
+}
+
+/* Approved Fleet reference: compact controls, map workspace and progressive details. */
+#root#root .cos-fleet-simple-map .cos-fleet-content { padding-top: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 30px; font-weight: 700; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child { display: flex; align-items: center; gap: 12px; max-width: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child > small { max-width: 245px; text-align: left; margin: 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-tabs { background: transparent; padding: 4px 0; gap: 4px; }
+#root#root .cos-fleet-simple-map .cos-fleet-tabs button { border: 1px solid var(--fleet-line); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
+#root#root .cos-fleet-simple-map .cos-fleet-tabs button > span { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-tabs button[aria-current=page] { background: #0759c8 !important; border-color: #3c91ed !important; }
+#root#root .cos-fleet-simple-map .cos-fleet-stats { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; margin-bottom: 6px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stats .cos-fleet-stat { padding: 12px 14px; border-radius: 8px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat > span { font-size: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat strong { font-size: 30px; margin: 4px 0 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat-explanation { display: none; }
+#root#root .cos-fleet-scope-caption { color: var(--fleet-muted); font-size: 12px; margin: 6px 0 10px; }
+#root#root .cos-fleet-simple-map .cos-fleet-filters { display: grid; grid-template-columns: minmax(200px,.7fr) minmax(0,1.7fr); gap: 8px 12px; padding: 0; margin: 10px 0 14px; background: transparent; border: 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; margin: 0; align-items: center; }
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row > label { min-width: 0; font-size: 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row select { margin: 0; font-size: 13px; }
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row > button,
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row > .cos-fleet-checkbox { grid-column: span 2; font-size: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-filter-row > button { justify-self: start; }
+#root#root .cos-fleet-simple-map .cos-fleet-advanced-filters { margin: 0; grid-column: 1/-1; }
+#root#root .cos-fleet-simple-map .cos-fleet-advanced-filters .cos-fleet-filter-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#root#root .cos-fleet-simple-map .cos-fleet-workspace { grid-template-columns: minmax(280px,.32fr) minmax(0,.68fr); gap: 12px; border: 0; border-radius: 0; }
+#root#root .cos-fleet-simple-map :is(.cos-fleet-unit-panel,.cos-fleet-map-panel) { border: 1px solid var(--fleet-line); border-radius: 9px; overflow: hidden; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-panel > div:first-child { padding: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-panel > div:first-child > small { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-list { padding: 8px; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-row { padding: 12px; gap: 10px; margin-bottom: 8px; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-row strong { font-size: 16px; display: flex; gap: 10px; align-items: baseline; }
+#root#root .cos-fleet-row-dot { font-style: normal; font-size: 22px; flex: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-unit-row small { margin-top: 3px; font-size: 12px; line-height: 1.45; }
+#root#root .cos-fleet-card-location { font-size: 11px; }
+#root#root .cos-fleet-simple-map .cos-fleet-signals { gap: 6px; padding-top: 9px; }
+#root#root .cos-fleet-simple-map .cos-fleet-signals b { font-size: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote { margin: 8px 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote button { padding: 7px 10px; font-size: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote > span { display: none; }
+#root#root .cos-fleet-map-legend { gap: 8px 14px; font-size: 12px; padding: 10px 12px; }
+#root#root .cos-fleet-map-legend > strong { display: none; }
+#root#root .cos-fleet-pin-key { flex-basis: 100%; min-width: 0; color: var(--fleet-muted); }
+#root#root .cos-fleet-pin-key summary { font-size: 12px; cursor: pointer; }
+#root#root .cos-fleet-pin-key span { display: block; margin: 6px 0; }
+#root#root .cos-mhelp-address-coverage > summary { cursor: pointer; min-height: 44px; align-content: center; }
+#root#root .cos-fleet-drawer { width: min(900px,100%); padding: 22px; }
+#root#root .cos-fleet-drawer .cos-fleet-drawer-close { position: sticky; top: 0; right: auto; float: right; z-index: 2; width: 44px; height: 44px; margin: 0 0 8px 12px; padding: 0; background: var(--cos-vision-raised); }
+#root#root .cos-fleet-drawer > h2 { padding-right: 0; overflow-wrap: anywhere; }
+#root#root .cos-fleet-troubleshooting,
+#root#root .cos-fleet-installation-evidence { padding: 12px; border: 1px solid var(--fleet-line); border-radius: 8px; margin: 12px 0; background: var(--fleet-panel); }
+#root#root .cos-fleet-troubleshooting > summary { cursor: pointer; }
+#root#root .cos-fleet-troubleshooting > summary h3 { display: inline; margin: 0; }
+#root#root .cos-fleet-troubleshooting > summary > span { display: block; font-size: 12px; color: var(--fleet-muted); margin-top: 5px; }
+#root#root .cos-fleet-installation-evidence > summary { cursor: pointer; font-weight: 600; }
+#root#root .cos-fleet-back { display: block; color: var(--cos-blue); margin-top: 12px; }
+@media (max-width: 750px) {
+ #root#root .cos-fleet-dashboard .cos-fleet-map-jump { width: 100%; margin: 6px 0; }
+ #root#root .cos-fleet-simple-map .cos-fleet-heading { gap: 8px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 24px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child { gap: 8px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child > small { font-size: 11px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ #root#root .cos-fleet-simple-map .cos-fleet-stat:last-child { grid-column: 1/-1; }
+ #root#root .cos-fleet-simple-map .cos-fleet-stats .cos-fleet-stat { padding: 8px 10px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-stat strong { font-size: 24px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-filters { grid-template-columns: minmax(0,1fr); }
+ #root#root .cos-fleet-simple-map .cos-fleet-filter-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ #root#root .cos-fleet-simple-map .cos-fleet-filter-row > button,
+ #root#root .cos-fleet-simple-map .cos-fleet-filter-row > .cos-fleet-checkbox { grid-column: auto; }
+ #root#root .cos-fleet-simple-map .cos-fleet-advanced-filters .cos-fleet-filter-row { grid-template-columns: minmax(0,1fr); }
+ #root#root .cos-fleet-simple-map .cos-fleet-workspace { display: flex; flex-direction: column-reverse; gap: 12px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-unit-list { height: auto; max-height: none; overflow: visible; }
+ #root#root .cos-fleet-drawer { padding: 16px; }
+ #root#root .cos-fleet-unit-health-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ #root#root .cos-fleet-unit-health-grid > .cos-fleet-power-card { order: 0; grid-column: 1/-1; }
+ #root#root .cos-fleet-unit-health-section { padding: 10px; }
+ #root#root .cos-fleet-drawer .cos-fleet-unit-health-section h3 { font-size: 14px; }
+}
+@media (orientation: landscape) and (pointer: coarse) and (min-width: 751px) and (max-width: 1000px) and (max-height: 560px) {
+ #root#root .cos-fleet-simple-map .cos-fleet-workspace { display: flex; flex-direction: column-reverse; }
+ #root#root .cos-fleet-simple-map .cos-fleet-stats { grid-template-columns: repeat(5,minmax(0,1fr)); }
+}
+
+#root#root .cos-fleet-troubleshooting .panelhead > div > h3 { display: none; }
+
+#root#root .cos-fleet-simple-map .cos-fleet-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px 10px; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child { display: contents; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-refresh { grid-column: 2; grid-row: 1; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:last-child > small { grid-column: 1/-1; grid-row: 2; max-width: none; font-size: 11px; }
+#root#root .cos-fleet-simple-map .cos-fleet-filters .cos-fleet-filter-row { grid-template-columns: repeat(4,minmax(0,1fr)); }
+#root#root .cos-fleet-simple-map .cos-fleet-filters .cos-fleet-advanced-filters .cos-fleet-filter-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
+@media(max-width:750px) {
+ #root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 22px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-refresh { padding: 8px; font-size: 12px; }
+ #root#root .cos-fleet-simple-map .cos-fleet-filters .cos-fleet-filter-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ #root#root .cos-fleet-simple-map .cos-fleet-filters .cos-fleet-advanced-filters .cos-fleet-filter-row { grid-template-columns: minmax(0,1fr); }
+}
+
+#root#root .cos-fleet-simple-map .cos-fleet-unit-row .cos-fleet-battery-compact { display: none; }
+#root#root .cos-fleet-unit-health-section details { margin-top: 10px; border-top: 1px solid var(--fleet-line); }
+#root#root .cos-fleet-unit-health-section summary { cursor: pointer; color: var(--cos-blue); font-size: 12px; }
+#root#root .cos-fleet-unit-health-section > small { margin-top: 8px; }
+
+#root#root .cos-fleet-camera-total { font-size:14px; line-height:1.6; margin:8px 0 14px; }
+#root#root .cos-fleet-accounting { font-size:14px; }

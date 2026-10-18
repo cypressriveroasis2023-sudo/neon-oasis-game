@@ -3,6 +3,11 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Field product and inspect held or linked records',async({page})=>{
  const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field});
+ const disclosure=app.locator('.cos-fleet-accounting');
+ await expect(disclosure).not.toHaveAttribute('open','');
+ await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
+ await disclosure.getByText('Field inventory details',{exact:true}).click();
+ await expect(disclosure).toHaveAttribute('open','');
  const counts=app.getByRole('region',{name:'Field inventory health breakdown'});
  await expect(counts).toContainText('All 7 Field equipment records accounted for');
  await expect(counts).toContainText('1 online + 1 offline + 1 health unverified + 1 solar / support');
@@ -13,7 +18,7 @@ for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Fiel
  await expect(app.getByRole('dialog')).toContainText('Protected identity hold');
  await app.getByRole('button',{name:'Close equipment details'}).click();
  await counts.getByLabel('Field inventory status').selectOption('online');await counts.getByRole('button',{name:'Unit details and troubleshooting'}).click();
- await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();await expect(app.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
+ await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();await app.locator('.cos-fleet-troubleshooting > summary').click();await expect(app.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
  await app.getByRole('button',{name:'Close unit details'}).click();
  const bounds=await counts.evaluate(element=>({width:element.clientWidth,scroll:element.scrollWidth}));expect(bounds.scroll).toBeLessThanOrEqual(bounds.width+1);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);

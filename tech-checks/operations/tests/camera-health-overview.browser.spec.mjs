@@ -71,7 +71,7 @@ test('actual timers reread saved status at the rephased four-minute deadline wit
 });
 test('overview is quiet; unit cards open scoped history and preserve Back and keyboard navigation',async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);
- await expect(page.locator('.health-kpis>.stat')).toHaveCount(4);await expect(page.locator('#diag')).not.toBeVisible();await expect(page.locator('#statAllOnline')).toContainText('PROVIDER GROUPS ONLINE');
+ await expect(page.locator('.provider-count-details')).not.toHaveAttribute('open','');await page.locator('.provider-count-details > summary').click();await expect(page.locator('.health-kpis>.stat')).toHaveCount(4);await expect(page.locator('#diag')).not.toBeVisible();await expect(page.locator('#statAllOnline')).toContainText('PROVIDER GROUPS ONLINE');
  for(const id of ['eventsArea','issuesArea','troubleArea','unitDetailDialog'])await expect(page.locator('#'+id)).not.toBeVisible();
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_health_history').length)).toBe(0);
  const east=page.getByRole('button',{name:'Open RANGER 022 unit details'});await east.focus();await page.keyboard.press('Enter');
@@ -109,7 +109,7 @@ test('provider diagnostics exclude stored outages and never synthesize units fro
   await load();
  });
  await expect(page.locator('#allOffline')).toHaveText('3');await expect(page.locator('#shopTotal')).toHaveText('2');await expect(page.locator('#inactiveTotal')).toHaveText('1');await expect(page.locator('#mappingTotal')).toHaveText('2');await page.screenshot({path:info.outputPath('camera-classification-hotfix.png'),fullPage:true});
- await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('Location unverified');expect(await page.evaluate(()=>reads.some(row=>row.table==='equipment_master'))).toBe(false);
+ await page.locator('.provider-count-details > summary').click();await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('Location unverified');expect(await page.evaluate(()=>reads.some(row=>row.table==='equipment_master'))).toBe(false);
  await page.locator('.compact-unit[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
  await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('.compact-unit[data-unit="SPOTTER 904"]')).toHaveCount(0);await expect(page.locator('.compact-unit[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
  await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="SHOP 001"] .statuspill')).toHaveText('SHOP / ROOT');await expect(page.locator('[data-unit="INACTIVE 001"] .statuspill')).toHaveText('INACTIVE');
@@ -166,7 +166,7 @@ test('fleet breakdown counts each unit once and exposes familiar provider groups
   fixtureHealth=[{camera_device_id:91,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:92,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:93,overall_status:'offline',ip_reachable:false,confirmed_outage:true,consecutive_failures:3,checked_at:'2026-10-06T12:29:00Z'}];await load();
  });
  await expect(page.locator('#fleetConnectedOnline')).toHaveText('2');await expect(page.locator('#fleetConnectedOffline')).toHaveText('2');await expect(page.locator('#vigilantOnline')).toHaveText('1');await expect(page.locator('#avigilonOnline')).toHaveText('1');await expect(page.locator('#avigilonOffline')).toHaveText('1');await expect(page.locator('#reconOffline')).toHaveText('1');
- await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
+ await page.locator('.provider-count-details > summary').click();await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
  await page.locator('[data-scope-filter="FleetOffline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);
 });
 
@@ -206,7 +206,7 @@ test('online and offline edges stay bright without selection while stale and sho
  await page.locator('#unitCards').screenshot({path:info.outputPath('bright-card-edges-and-front-actions.png')});
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});const bounds=await page.locator('#unitCards').evaluate(el=>({page:document.documentElement.scrollWidth,view:innerWidth}));expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);}
  await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:51:00Z');window.freshnessCheck();});await expect(online).toHaveCSS('border-top-color','rgb(83, 97, 116)');await expect(offline).toHaveCSS('border-top-color','rgb(83, 97, 116)');
- await page.evaluate(async()=>{fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
+ await page.evaluate(async()=>{fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('.provider-count-details > summary').click();await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
 });
 
 

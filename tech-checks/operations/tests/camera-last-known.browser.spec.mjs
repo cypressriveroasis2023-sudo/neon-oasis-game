@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {revealUnitTroubleshooting} from './field-map-controls.mjs';
 import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 
 // Hosted-only browser coverage. Every source is synthetic and every recorded
@@ -59,7 +60,7 @@ test('last-known evidence stays visible on list and drawer without restoring cur
  await expect(app.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);await expect(app.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
  await card.screenshot({path:testInfo.outputPath('last-known-stale-unit-card.png')});await page.screenshot({path:testInfo.outputPath('last-known-stale-list.png'),fullPage:true});
  await card.click();const drawer=app.getByRole('dialog',{name:unitNumber+' unit intelligence'}),camera=drawer.getByRole('region',{name:'Selected unit camera health',exact:true});
- await expect(drawer).toBeVisible();await expect(drawer.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
+ await expect(drawer).toBeVisible();await revealUnitTroubleshooting(app);await expect(drawer.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
  await expect(camera.locator('.camera-status-unknown')).toBeVisible();await expect(camera.locator('.camera-last-known')).toContainText(originalTime);await expect(camera.locator('.camera-last-known')).toContainText('Stale saved evidence; current status unverified');await expect(camera.locator('.camera-status-online,.cos-signal-online')).toHaveCount(0);
  await camera.screenshot({path:testInfo.outputPath('last-known-stale-drawer-card.png')});await page.screenshot({path:testInfo.outputPath('last-known-stale-drawer.png'),fullPage:true});assertReadOnly(state);
 });
@@ -67,6 +68,6 @@ test('last-known evidence stays visible on list and drawer without restoring cur
 test('cold-start saved-read failure has no invented historical result',async({page},testInfo)=>{
  const {app,card,state}=await mount(page,{failed:true});
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.camera-last-known')).toHaveCount(0);
- await card.click();const drawer=app.getByRole('dialog',{name:unitNumber+' unit intelligence'});await expect(drawer).toBeVisible();await expect(drawer.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
+ await card.click();const drawer=app.getByRole('dialog',{name:unitNumber+' unit intelligence'});await expect(drawer).toBeVisible();await revealUnitTroubleshooting(app);await expect(drawer.getByRole('button',{name:'Reload saved results',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
  await expect(drawer.locator('.camera-last-known')).toHaveCount(0);await expect(drawer.locator('.camera-status-online')).toHaveCount(0);await page.screenshot({path:testInfo.outputPath('last-known-cold-start-unverified.png'),fullPage:true});assertReadOnly(state);
 });

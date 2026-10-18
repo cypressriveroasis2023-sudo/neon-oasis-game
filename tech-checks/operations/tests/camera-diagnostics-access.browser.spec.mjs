@@ -30,6 +30,7 @@ for(const kind of ['owner','verified-it','daily-it'])test(kind+' troubleshooting
  });
  await page.goto('/diagnostics-host');if(kind==='verified-it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
  const app=page.frameLocator('iframe');await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+ await app.locator('.cos-fleet-troubleshooting > summary').click();
  await app.getByRole('button',{name:'Open Camera Health diagnostics',exact:true}).click();
  await expect(page).toHaveURL(/camera-health\.html\?(?:itDaily=1&)?diagnostics=1$/);
  await page.getByRole('button',{name:'Open RANGER 022 unit details',exact:true}).click();
