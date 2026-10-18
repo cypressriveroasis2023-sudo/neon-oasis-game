@@ -1,4 +1,4 @@
-/* Presentation only. Fleet data, signal colors, map symbols and action guards stay upstream. */
+/* Presentation only. Fleet data, signal colors and action guards stay upstream. */
 #root#root .cos-fleet-dashboard {
   --cos-vision-bg: #13171c;
   --cos-vision-panel: #20262d;
@@ -148,6 +148,81 @@
 /* Only raster tiles are toned down. Markers, locations, controls and attribution are untouched. */
 #root#root .cos-fleet-map-canvas .leaflet-tile-pane { filter: grayscale(.7) invert(.9) hue-rotate(180deg) brightness(.75) contrast(.9); }
 #root#root .cos-fleet-map-canvas .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+
+/* Compact address pins. The SVG tip matches Leaflet's [22,38] icon anchor;
+   coordinates, address grouping and health colors are untouched. */
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-marker {
+  min-width: 44px;
+  min-height: 58px;
+  background: transparent;
+  border: 0;
+}
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-pin {
+  --address-pin-edge: #67e8f9;
+  --address-pin-face: #103a4a;
+  position: absolute;
+  left: 7px;
+  top: 2px;
+  width: 30px;
+  height: 38px;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: 0;
+  box-shadow: none;
+  color: #f0fdff;
+  pointer-events: none;
+}
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-review {
+  --address-pin-edge: #fbbf24;
+  --address-pin-face: #593516;
+  color: #fffbeb;
+}
+#root#root .cos-fleet-map-canvas .cos-address-pin-art {
+  display: block;
+  width: 30px;
+  height: 38px;
+  overflow: visible;
+  filter: drop-shadow(0 2px 3px #000b);
+}
+#root#root .cos-fleet-map-canvas .cos-address-pin-art path {
+  fill: var(--address-pin-face);
+  stroke: var(--address-pin-edge);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+#root#root .cos-fleet-map-canvas .cos-address-pin-art circle {
+  fill: #081b29;
+  stroke: var(--address-pin-edge);
+  stroke-width: .6;
+  stroke-opacity: .55;
+}
+#root#root .cos-fleet-map-canvas .cos-address-pin-art .cos-address-pin-center {
+  fill: var(--address-pin-edge);
+  stroke: none;
+}
+#root#root .cos-fleet-map-canvas .cos-address-pin-count {
+  position: absolute;
+  inset: 4px 0 auto;
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: 800 12px/22px Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-marker:is(:hover, :focus) .cos-address-pin-art {
+  filter: drop-shadow(0 0 4px var(--address-pin-edge)) drop-shadow(0 2px 3px #000b);
+}
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-marker:focus-visible {
+  outline: 2px solid #f0fdff;
+  outline-offset: 2px;
+  border-radius: 50%;
+}
 #root#root .cos-fleet-map-canvas .leaflet-control-attribution { font-size: 11px; line-height: 1.5; }
 #root#root .cos-fleet-map-legend { gap: 10px 16px; padding: 14px 16px; font-size: 13px; }
 #root#root .cos-fleet-map-legend strong { font-size: 12px; }

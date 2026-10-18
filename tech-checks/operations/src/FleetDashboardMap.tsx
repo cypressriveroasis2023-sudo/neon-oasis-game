@@ -69,9 +69,9 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   for(const siblings of atPoint.values()){
    const first=siblings[0],review=siblings.some(x=>x.state==='address_review'),count=siblings.length;
    const label=count===1?first.unitNumber+' · MHelp customer address':count+' MHelp Field units at this address';
-   const html='<span class="cos-mhelp-address-pin'+(review?' cos-mhelp-address-review':'')+'">'+(count>1?String(count):'⌖')+'</span>';
+   const html='<span class="cos-mhelp-address-pin'+(review?' cos-mhelp-address-review':'')+'" aria-hidden="true"><svg class="cos-address-pin-art" viewBox="0 0 30 38" focusable="false"><path d="M15 36C12 31 2 23 2 15a13 13 0 1 1 26 0c0 8-10 16-13 21Z"/><circle cx="15" cy="15" r="9"/>'+(count>1?'':'<circle class="cos-address-pin-center" cx="15" cy="15" r="3"/>')+'</svg>'+(count>1?'<b class="cos-address-pin-count">'+String(count)+'</b>':'')+'</span>';
    const marker=L.marker(first.point,{bubblingMouseEvents:false,zIndexOffset:250,
-    icon:L.divIcon({className:'cos-mhelp-address-marker',html,iconSize:[42,42],iconAnchor:[21,21]}),
+    icon:L.divIcon({className:'cos-mhelp-address-marker',html,iconSize:[44,58],iconAnchor:[22,38]}),
     title:label,alt:label}).addTo(group);
    marker.getElement()?.setAttribute('data-mhelp-product-ids',JSON.stringify(siblings.map(p=>p.productId)));
    marker.getElement()?.setAttribute('aria-label',label);
