@@ -32,6 +32,31 @@ export function stepRobotEye(state: EyeMotion, now: number, random = Math.random
   return state.position;
 }
 
+// Remove only the dark blue matte from the approved full artwork once per atlas.
+// Red/white lettering and the black sensor remain untouched; the actual page
+// background shows through instead of a rectangular navy image plate.
+const transparentLockups = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+function transparentLockup(image: HTMLImageElement) {
+  const cached = transparentLockups.get(image);
+  if (cached) return cached;
+  const layer = document.createElement('canvas');
+  layer.width = 1983; layer.height = 793;
+  const context = layer.getContext('2d')!;
+  context.drawImage(image, 0, 0, 1983, 793, 0, 0, 1983, 793);
+  const pixels = context.getImageData(0, 0, layer.width, layer.height);
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const r = pixels.data[i], g = pixels.data[i + 1], b = pixels.data[i + 2];
+    // A soft colour key retains anti-aliased edges, glow and black lens detail.
+    if (b > r + 5 && g > r && r < 40 && g < 52 && b < 76) {
+      const opacity = Math.max(0, Math.min(1, Math.max(r - 22, g - 34, b - 54) / 18));
+      pixels.data[i + 3] = Math.round(pixels.data[i + 3] * opacity);
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  transparentLockups.set(image, layer);
+  return layer;
+}
+
 function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, pose: EyePose, time: number) {
   const c = canvas.getContext('2d');
   if (!c) return;
@@ -39,11 +64,10 @@ function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, pose: EyePose
   const width = full ? 1490 : 540, height = full ? 530 : 540;
   c.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
   c.clearRect(0, 0, width, height);
-  if (full) { c.fillStyle = '#111c2c'; c.fillRect(0, 0, width, height); }
   c.save();
   // Full company lockup and eye-only artwork share the exact approved sensor.
   c.translate(full ? -250 : -261, full ? -125 : -118);
-  if (full) c.drawImage(image, 0, 0, 1983, 793, 0, 0, 1983, 793);
+  if (full) c.drawImage(transparentLockup(image), 0, 0);
   else c.drawImage(image, 540, 793, 540, 540, 261, 118, 540, 540);
   c.save(); c.beginPath(); c.arc(531, 401, 119, 0, Math.PI * 2); c.clip();
   c.drawImage(image, 0, 793, 270, 270, 396 + pose.x * .28, 266 + pose.y * .4, 270, 270);
@@ -167,7 +191,12 @@ export function mountRobotEye(host: HTMLElement, canvas: HTMLCanvasElement): () 
   host.dataset.motionPaused = 'true';
   void atlas().then(image => {
     if (eye.destroyed) return;
-    eye.image = image; resizeCanvas(); host.dataset.eyeReady = 'true'; sync();
+    eye.image = image; resizeCanvas();
+    if (host.dataset.companyLogo === 'full') {
+      const poster = host.querySelector<HTMLImageElement>('.cos-eye-poster');
+      if (poster) poster.src = canvas.toDataURL('image/png');
+    }
+    host.dataset.eyeReady = 'true'; sync();
   }).catch(() => { if (!eye.destroyed) host.dataset.eyeReady = 'false'; });
   return () => {
     eye.destroyed = true; resize.disconnect(); visibility?.unobserve(host); handles.delete(eye); schedule();
