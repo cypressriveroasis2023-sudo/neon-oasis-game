@@ -10,7 +10,9 @@ The worker creates an immutable Product-ID/address census for that accepted
 source. An identical saved address reuses positive Census or reviewed fallback
 results, retaining the provider, point, date and review status. An owner's
 explicit corrected address is also reusable. Incomplete original addresses
-require the exact same Field Product-ID group before reusing an old reference.
+require every current Field Product ID to belong to the reviewed group and keep
+the same recorded customer/site. Returning one product to Shop preserves the
+remaining group; new products or changed customer/site context stay unresolved.
 A Product ID by itself never authorizes reuse of a previous location.
 
 Only unresolved Field addresses enter the persistent queue. Shared addresses
@@ -62,3 +64,7 @@ the private worker functions are invoker functions for the database cron owner.
 
 To pause, unschedule only `cos-mhelp-address-automation`. Keep accepted files,
 positive reference evidence and job history. No inventory rollback is needed.
+
+For an already installed worker, `db/mhelp-address-cache-continuity.sql` upgrades
+only the private cache-admission function. It preserves existing job state,
+source and point evidence and requires no table or inventory recreation.

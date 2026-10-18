@@ -5,8 +5,8 @@ import {readFile} from 'node:fs/promises';
 const sql=await readFile(new URL('../db/mhelp-address-automation.sql',import.meta.url),'utf8');
 const source='a'.repeat(64),payload='b'.repeat(64),nextSource='c'.repeat(64),nextPayload='d'.repeat(64);
 const address={street:'123 Main Road',city:'Houston',state:'Tx',zip:'77002-1234'};
-const rec=(id,placement='FIELD',a=address)=>({productId:String(id),unitNumber:'Synthetic '+id,category:'Other',customer:'Private customer must never leave database',placement,lifecycle:'UNFLAGGED',sourceAddress:a});
-async function fixture(){
+const rec=(id,placement='FIELD',a=address)=>({productId:String(id),unitNumber:'Synthetic '+id,category:'Other',customerId:placement==='SHOP'?'11':'12',customer:'Private customer must never leave database',placement,lifecycle:'UNFLAGGED',sourceAddress:a});
+async function fixture({legacyCache=false}={}){
  const db=new PGlite();
  await db.exec(`create role anon;create role authenticated;create role service_role;
  create schema cos_mhelp_placement_private;create schema net;create schema app_private;
@@ -23,7 +23,7 @@ async function fixture(){
  create table net._http_response(id bigint,status_code integer,content text,timed_out boolean,error_msg text);
  create function net.http_get(url text,params jsonb,headers jsonb,timeout_milliseconds integer) returns bigint language plpgsql as $$declare i bigint:=nextval('net.requests');begin insert into net.sent values(i,url,params,headers);return i;end$$;`);
  for(const name of ['cos_mhelp_address_resolutions_20261017.sql','20261018041534_cos_mhelp_public_site_reference.sql'])await db.exec(await readFile(new URL('../db/'+name,import.meta.url),'utf8'));
- await db.exec(sql);await db.exec(await readFile(new URL('../db/cos_mhelp_census_map_projection_20261017.sql',import.meta.url),'utf8'));
+ await db.exec(legacyCache?sql.replace("   if current_group is null or prior_group is null or not current_group <@ prior_group then continue;end if;\n   -- A returned-to-Shop product may leave a reviewed group. Every remaining\n   -- Field product must still have the same recorded customer/site context.\n   if exists(\n    select 1 from jsonb_array_elements(b.records) current_record\n    where current_record->>'productId'=any(current_group)\n     and not exists(\n      select 1 from cos_mhelp_placement_private.upload_batches prior_batch\n      cross join lateral jsonb_array_elements(prior_batch.records) prior_record\n      where prior_batch.source_sha256=cached.source_sha256\n       and prior_record->>'productId'=current_record->>'productId'\n       and prior_record->>'placement'='FIELD'\n       and coalesce(current_record->>'customerId','')<>''\n       and prior_record->>'customerId'=current_record->>'customerId'\n       and upper(trim(regexp_replace(prior_record->>'customer','[[:space:]]+',' ','g')))\n        =upper(trim(regexp_replace(current_record->>'customer','[[:space:]]+',' ','g')))\n     )\n   ) then continue;end if;",'   if prior_group is distinct from current_group then continue;end if;'):sql);await db.exec(await readFile(new URL('../db/cos_mhelp_census_map_projection_20261017.sql',import.meta.url),'utf8'));
  const activate=async(records,s=source,p=payload)=>{
   await db.query('insert into cos_mhelp_placement_private.upload_batches values($1,$2,$3,$4)',[s,p,records,{recordCount:records.length}]);
   await db.query('insert into cos_mhelp_placement_private.upload_control values(true,$1) on conflict(singleton) do update set active_sha256=excluded.active_sha256',[s]);
@@ -69,7 +69,7 @@ test('superseded requests cannot publish; new Shop placement is excluded; one ti
   const result=await f.tick();assert.equal(result.sent,8);assert.equal(result.settled,0);assert.equal((await f.read()).items.length,10);assert.ok((await f.read()).items.every(i=>i.productId!=='1'));assert.equal((await f.db.query('select count(*) n from cos_mhelp_placement_private.mhelp_address_resolution')).rows[0].n,0);
  }finally{await f.db.close();}
 });
-test('incomplete owner-corrected address is reused only for the same exact Field Product-ID group',async()=>{
+test('incomplete owner-corrected address never spreads to an unknown Field Product ID',async()=>{
  const f=await fixture();try{
   const blank={street:'Lee Rd.',city:'Humble',state:'TX',zip:''};await f.activate([rec(1,'FIELD',blank),rec(2,'FIELD',blank)]);await f.tick();
   await f.db.exec(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256) select source_sha256,payload_sha256,address_sha256,'public_site_reference','18538 Lee Rd, Humble, TX 77032','address_review','18538 Lee Rd, Houston, TX 77032',29.9,-95.3,now(),'{}','${'e'.repeat(64)}' from cos_mhelp_placement_private.census_mhelp_product limit 1`);
@@ -95,5 +95,27 @@ test('a later file with an owner-corrected full address reuses the reviewed refe
   await f.activate([rec(1,'FIELD',original)]);await f.tick();
   await f.db.query(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256) select source_sha256,payload_sha256,address_sha256,'public_site_reference','18538 Lee Rd, Humble, TX 77032','address_review','18538 Lee Rd, Houston, TX 77032',29.9,-95.3,now(),$1,$2 from cos_mhelp_placement_private.census_mhelp_product limit 1`,[{ownerCorrectedAddress:corrected},'e'.repeat(64)]);
   await f.activate([rec(2,'FIELD',corrected)],nextSource,nextPayload);assert.equal((await f.tick()).sent,0);assert.equal((await f.read()).items[0].latitude,29.9);
+ }finally{await f.db.close();}
+});
+
+test('reviewed incomplete-address references survive returns to Shop but reject changed customer/site context',async()=>{
+ const f=await fixture();try{
+  const blank={street:'Lee Rd.',city:'Humble',state:'TX',zip:''};await f.activate([rec(1,'FIELD',blank),rec(2,'FIELD',blank)]);await f.tick();
+  await f.db.exec(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256) select source_sha256,payload_sha256,address_sha256,'public_site_reference','18538 Lee Rd, Humble, TX 77032','address_review','18538 Lee Rd, Houston, TX 77032',29.9,-95.3,now(),'{}','${'e'.repeat(64)}' from cos_mhelp_placement_private.census_mhelp_product limit 1`);
+  await f.activate([rec(1,'FIELD',blank),rec(2,'SHOP',blank)],nextSource,nextPayload);assert.equal((await f.tick()).sent,0);let output=await f.read();assert.equal(output.fieldProducts,1);assert.equal(output.shopProducts,1);assert.equal(output.items[0].latitude,29.9);
+  for(const [i,change] of [[0,{customerId:'99'}],[1,{customer:'Changed private site label'}]]){
+   await f.activate([{...rec(1,'FIELD',blank),...change},rec(2,'SHOP',blank)],String(7+i).repeat(64),String(5+i).repeat(64));await f.tick();assert.equal((await f.read()).items[0].latitude,null,'changed context cannot borrow the old point');
+  }
+ }finally{await f.db.close();}
+});
+test('upgrade of the installed cache function preserves all data and enables the guarded subset behavior',async()=>{
+ const f=await fixture({legacyCache:true});try{
+  const blank={street:'Lee Rd.',city:'Humble',state:'TX',zip:''};await f.activate([rec(1,'FIELD',blank),rec(2,'FIELD',blank)]);await f.tick();
+  await f.db.exec(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256) select source_sha256,payload_sha256,address_sha256,'public_site_reference','18538 Lee Rd, Humble, TX 77032','address_review','18538 Lee Rd, Houston, TX 77032',29.9,-95.3,now(),'{}','${'e'.repeat(64)}' from cos_mhelp_placement_private.census_mhelp_product limit 1`);
+  const before=await f.snapshot();await f.db.exec(await readFile(new URL('../db/mhelp-address-cache-continuity.sql',import.meta.url),'utf8'));assert.deepEqual(await f.snapshot(),before,'function upgrade cannot rewrite source or native data');
+  await f.activate([rec(1,'FIELD',blank),rec(2,'SHOP',blank)],nextSource,nextPayload);await f.tick();assert.equal((await f.read()).items[0].latitude,29.9);
+  for(const role of ['anon','authenticated','service_role']){
+   await f.db.exec('set role '+role);await assert.rejects(f.db.query('select cos_mhelp_placement_private.address_automation_sync_v1()'));await f.db.exec('reset role');
+  }
  }finally{await f.db.close();}
 });

@@ -80,7 +80,7 @@ begin
   n:=n+1;
  end loop;
  -- Reuse only positive evidence from an identical address. Incomplete addresses
- -- additionally require exactly the same Field Product-ID set (e.g. owner Lee Rd correction).
+ -- additionally require known Field Product IDs and the same customer/site context (e.g. owner Lee Rd correction).
  for existing_row in select distinct on(p.address_sha256) p.* from cos_mhelp_placement_private.census_mhelp_product p where p.source_sha256=b.source_sha256 and p.placement='FIELD' order by p.address_sha256,p.product_id loop
   if exists(select 1 from cos_mhelp_placement_private.mhelp_address_resolution f where f.source_sha256=b.source_sha256 and f.payload_sha256=b.payload_sha256 and f.address_sha256=existing_row.address_sha256 and f.status in ('matched','address_review'))
    or exists(select 1 from cos_mhelp_placement_private.census_mhelp_address a where a.source_sha256=b.source_sha256 and a.address_sha256=existing_row.address_sha256 and a.status in ('matched','address_review')) then continue;end if;
@@ -100,7 +100,24 @@ begin
    if not cos_mhelp_placement_private.address_sendable_v1(parts) then
     select array_agg(p.product_id order by p.product_id) into prior_group from cos_mhelp_placement_private.census_mhelp_product p where p.source_sha256=cached.source_sha256 and p.address_sha256=cached.address_sha256 and p.placement='FIELD';
     select array_agg(p.product_id order by p.product_id) into current_group from cos_mhelp_placement_private.census_mhelp_product p where p.source_sha256=b.source_sha256 and p.address_sha256=existing_row.address_sha256 and p.placement='FIELD';
-    if prior_group is distinct from current_group then continue;end if;
+    if current_group is null or prior_group is null or not current_group <@ prior_group then continue;end if;
+   -- A returned-to-Shop product may leave a reviewed group. Every remaining
+   -- Field product must still have the same recorded customer/site context.
+   if exists(
+    select 1 from jsonb_array_elements(b.records) current_record
+    where current_record->>'productId'=any(current_group)
+     and not exists(
+      select 1 from cos_mhelp_placement_private.upload_batches prior_batch
+      cross join lateral jsonb_array_elements(prior_batch.records) prior_record
+      where prior_batch.source_sha256=cached.source_sha256
+       and prior_record->>'productId'=current_record->>'productId'
+       and prior_record->>'placement'='FIELD'
+       and coalesce(current_record->>'customerId','')<>''
+       and prior_record->>'customerId'=current_record->>'customerId'
+       and upper(trim(regexp_replace(prior_record->>'customer','[[:space:]]+',' ','g')))
+        =upper(trim(regexp_replace(current_record->>'customer','[[:space:]]+',' ','g')))
+     )
+   ) then continue;end if;
    end if;
    evidence:=jsonb_build_object('automation','exact_address_cache_v1','reusedFromSourceSha256',cached.source_sha256,'reusedFromAddressSha256',cached.address_sha256,'reusedFromResolutionId',cached.id,'sourceSha256',b.source_sha256,'payloadSha256',b.payload_sha256,'addressSha256',existing_row.address_sha256,'verifiedGps',false,'liveGps',false,'originalSourcePreserved',true);
    insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,reason,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
