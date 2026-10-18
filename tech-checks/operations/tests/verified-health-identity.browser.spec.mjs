@@ -68,7 +68,7 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pa
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBeGreaterThan(0);
  return {frame,state};
 }
-const listUnit=(frame,label)=>frame.locator('.cos-fleet-unit-row').filter({has:frame.locator('strong').filter({hasText:new RegExp('^'+label+'$')})});
+const listUnit=(frame,label)=>{const key=Object.keys(labels).find(key=>labels[key]===label);if(!key)throw Error('Unknown fixture unit');return frame.locator('.cos-fleet-unit-row[data-unit-id="'+ids[key]+'"]');};
 async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
 async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
@@ -92,6 +92,7 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.cos-cluster-caption')).toHaveText('MIX');
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ await expect(listUnit(frame,labels.owner).locator('strong')).toContainText(labels.owner);
  await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');
 
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);

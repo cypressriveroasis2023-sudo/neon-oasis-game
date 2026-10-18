@@ -82,6 +82,6 @@ test('Camera Health publishes only a complete paired snapshot and retries both s
  const {frame,state}=await mount(page,{workspace:'camera-health?diagnostics=1'}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
  await expect(health.getByText('Loading Camera Health…')).toBeVisible();await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
  state.fail=true;state.release();await expect(health.getByRole('alert')).toContainText('Synthetic field read unavailable');await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
- state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();await expect(health.getByRole('button',{name:/Field units online/})).toContainText('2');
+ state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();await expect(health.getByRole('button',{name:/^Online/})).toContainText('2');
  await expect(health.locator('.camera-overview-card')).toHaveCount(2);expect(state.errors).toEqual([]);
 });

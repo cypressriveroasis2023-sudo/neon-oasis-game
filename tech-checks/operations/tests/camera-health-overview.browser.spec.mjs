@@ -166,7 +166,7 @@ test('fleet breakdown counts each unit once and exposes familiar provider groups
   fixtureHealth=[{camera_device_id:91,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:92,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:93,overall_status:'offline',ip_reachable:false,confirmed_outage:true,consecutive_failures:3,checked_at:'2026-10-06T12:29:00Z'}];await load();
  });
  await expect(page.locator('#fleetConnectedOnline')).toHaveText('2');await expect(page.locator('#fleetConnectedOffline')).toHaveText('2');await expect(page.locator('#vigilantOnline')).toHaveText('1');await expect(page.locator('#avigilonOnline')).toHaveText('1');await expect(page.locator('#avigilonOffline')).toHaveText('1');await expect(page.locator('#reconOffline')).toHaveText('1');
- await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
+ await page.locator('.provider-count-details > summary').click();await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
  await page.locator('[data-scope-filter="FleetOffline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);
 });
 
