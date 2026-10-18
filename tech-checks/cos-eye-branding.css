@@ -65,3 +65,6 @@ html body .health-eye>.cos-company-logo { width:100%!important; }
   html body .health-eye>.cos-company-logo { width:100%!important; }
 }
 @media(max-width:700px) { html body .vision-health-title:has(.cos-company-logo) { flex-wrap:wrap; } }
+/* The isolated eye has transparent outer padding and four symmetric sights. */
+html body .cos-static-eye:not(.cos-company-logo) { border-radius:0!important; background:transparent!important; }
+html body #sessionLoading .visionLaunchOrb { margin-left:auto!important; margin-right:auto!important; flex:none; }

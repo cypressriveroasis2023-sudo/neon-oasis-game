@@ -38,12 +38,13 @@ function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, pose: EyePose
   const full = canvas.dataset.companyLogo === 'full';
   const width = full ? 1490 : 540, height = full ? 530 : 540;
   c.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
-  c.fillStyle = '#111c2c'; c.fillRect(0, 0, width, height);
+  c.clearRect(0, 0, width, height);
+  if (full) { c.fillStyle = '#111c2c'; c.fillRect(0, 0, width, height); }
   c.save();
   // Full company lockup and eye-only artwork share the exact approved sensor.
-  c.translate(full ? -250 : 19 - 250, full ? -125 : 2 - 120);
+  c.translate(full ? -250 : -261, full ? -125 : -118);
   if (full) c.drawImage(image, 0, 0, 1983, 793, 0, 0, 1983, 793);
-  else c.drawImage(image, 250, 120, 502, 535, 250, 120, 502, 535);
+  else c.drawImage(image, 540, 793, 540, 540, 261, 118, 540, 540);
   c.save(); c.beginPath(); c.arc(531, 401, 119, 0, Math.PI * 2); c.clip();
   c.drawImage(image, 0, 793, 270, 270, 396 + pose.x * .28, 266 + pose.y * .4, 270, 270);
   c.restore();
