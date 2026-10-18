@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-cos-logo-20261018';
+const CACHE_NAME = 'tech-check-cos-centered-20261018';
 // The same worker is published at the GitHub subpath and Cloudflare root.
 const APP_SHELL = new URL('./', self.registration.scope).href;
 const VISION_SHELL = new URL('onsite-vision.html', APP_SHELL).href;
@@ -157,8 +157,8 @@ self.addEventListener('push', event => {
     } catch {}
     return self.registration.showNotification(title, {
       body: payload.body || 'You have a new Tech Check notification.',
-      icon: './techcheck-eye-192.png?v=20261018-cos-logo',
-      badge: './techcheck-eye-favicon-32.png?v=20261018-cos-logo',
+      icon: './techcheck-eye-192.png?v=20261018-cos-centered',
+      badge: './techcheck-eye-favicon-32.png?v=20261018-cos-centered',
       tag: assignmentId ? 'techcheck-assignment-' + assignmentId : 'techcheck-alert',
       renotify: true,
       data: { url: target, assignment_id: assignmentId },

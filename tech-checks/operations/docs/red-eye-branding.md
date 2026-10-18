@@ -20,3 +20,11 @@ permissions or workflow behavior changes are part of this branding update.
 
 Branding cache tokens and service-worker name advance together. Publish source
 through the existing verified-bundle workflow; do not commit local dist output.
+
+The isolated eye now has its own symmetric, transparent atlas tile, centered on
+the sight axes. Never crop it from the full company wordmark: that shifts the eye
+and can include a sliver of CAMERAS/NSITE. Standalone startup/AI slots use that
+tile and matching centered poster; the full lockup retains its original artwork.
+On phones the complete company logo is centered, with the connection badge on
+a separate row. Viewport and pixel tests cover 320/390/430px startup screens,
+all four sight marks, transparent wordmark corners, and actual host/iframe widths.

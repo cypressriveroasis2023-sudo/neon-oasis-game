@@ -60,13 +60,13 @@ test('the shared renderer preserves accessibility, pause/cleanup, print and docu
 test('every existing branding entrypoint and install icon has a fresh cache version',()=>{
   for(const name of ['index','onsite-vision','camera-health','camera-detail','it-send-repair']){
     const html=read('../../'+name+'.html');
-    assert.match(html,/cos-eye-branding\.css\?v=20261018-cos-logo/);assert.match(html,/cos-eye-branding\.js\?v=20261018-cos-logo/);
-    for(const [tag] of html.matchAll(/<link[^>]+rel=["'](?:icon|apple-touch-icon)["'][^>]*>/g))assert.match(tag,/techcheck-eye-(?:favicon-32|apple-180)\.png\?v=20261018-cos-logo/);
+    assert.match(html,/cos-eye-branding\.css\?v=20261018-cos-centered/);assert.match(html,/cos-eye-branding\.js\?v=20261018-cos-centered/);
+    for(const [tag] of html.matchAll(/<link[^>]+rel=["'](?:icon|apple-touch-icon)["'][^>]*>/g))assert.match(tag,/techcheck-eye-(?:favicon-32|apple-180)\.png\?v=20261018-cos-centered/);
   }
-  const worker=read('../../sw.js');assert.match(worker,/tech-check-cos-logo-20261018/);
-  assert.match(worker,/icon: '\.\/techcheck-eye-192\.png\?v=20261018-cos-logo'/);
-  assert.match(worker,/badge: '\.\/techcheck-eye-favicon-32\.png\?v=20261018-cos-logo'/);
-  assert.deepEqual(JSON.parse(read('../../manifest.webmanifest')).icons,[{src:'./techcheck-eye-192.png?v=20261018-cos-logo',sizes:'192x192',type:'image/png',purpose:'any'}]);
+  const worker=read('../../sw.js');assert.match(worker,/tech-check-cos-centered-20261018/);
+  assert.match(worker,/icon: '\.\/techcheck-eye-192\.png\?v=20261018-cos-centered'/);
+  assert.match(worker,/badge: '\.\/techcheck-eye-favicon-32\.png\?v=20261018-cos-centered'/);
+  assert.deepEqual(JSON.parse(read('../../manifest.webmanifest')).icons,[{src:'./techcheck-eye-192.png?v=20261018-cos-centered',sizes:'192x192',type:'image/png',purpose:'any'}]);
   for(const [name,size] of [['favicon-32',32],['192',192],['apple-180',180]]){
     const icon=readFileSync(new URL('../../techcheck-eye-'+name+'.png',import.meta.url));
     assert.equal(icon.readUInt32BE(16),size);assert.equal(icon.readUInt32BE(20),size);
