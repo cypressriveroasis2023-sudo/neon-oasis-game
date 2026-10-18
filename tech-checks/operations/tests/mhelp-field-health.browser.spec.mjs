@@ -5,7 +5,7 @@ for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Fiel
  const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field});
  const disclosure=app.locator('.cos-fleet-accounting');
  await expect(disclosure).not.toHaveAttribute('open','');
- await expect(app.locator('.cos-fleet-workspace')).toBeVisible();
+ await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
  await disclosure.getByText('Field inventory details',{exact:true}).click();
  await expect(disclosure).toHaveAttribute('open','');
  const counts=app.getByRole('region',{name:'Field inventory health breakdown'});

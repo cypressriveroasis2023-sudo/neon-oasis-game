@@ -265,8 +265,9 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner.locator('.camera-status-pill')).not.toContainText('ONLINE');
  await expect(owner).toContainText('3 camera/detector records online · 0 offline · 1 unverified');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Field units online$/})}).locator('b')).toHaveText('0');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Health \/ placement review$/})}).locator('b')).toHaveText('1');
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Online$/})}).locator('b')).toHaveText('0');
+ // Both the partially observed Owner unit and the unmatched HDC remain unverified, just as on the map.
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Unverified$/})}).locator('b')).toHaveText('2');
  await owner.locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
  await expect(detail.locator('.camera-device-cards article')).toHaveCount(4);

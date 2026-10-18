@@ -38,7 +38,7 @@ const shaped=(html:string)=>html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/,fleetPinA
 export function fleetUnitPinMarkup(...args:Parameters<typeof mapReticleMarkup>){return shaped(mapReticleMarkup(...args));}
 export function fleetSourcePinMarkup(label:string){return shaped(sourceEquipmentMarkerMarkup(label)).replace('--pin:#d6a84b','--pin:'+fieldReticleColors.unknown);}
 export function fleetGroupPinMarkup(...args:Parameters<typeof clusterReticleMarkup>){
- return clusterReticleMarkup(...args).replace('class="cos-field-cluster"','class="cos-field-cluster cos-status-shaped"').replace('<i class="cos-reticle-ring" aria-hidden="true"></i>',fleetPinArtwork);
+ return clusterReticleMarkup(...args).replace('class="cos-field-cluster"','class="cos-field-cluster cos-status-shaped"').replace('<i class="cos-reticle-ring" aria-hidden="true"></i>',fleetPinArtwork.replace(' cos-map-status-dot',''));
 }
 export function addressPinStatusLabel(counts:ReticleCounts):string{
  return order.filter(s=>counts[s]).map(s=>counts[s]+' '+({online:'online',offline:'offline',unknown:'unverified',support:'solar support'}[s])).join(', ');

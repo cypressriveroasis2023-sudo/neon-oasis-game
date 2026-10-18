@@ -1,3 +1,4 @@
+import {revealInstallationEvidence} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,field,vrm,now,fresh} from './fleet-dashboard-fixtures.mjs';
 const time=async(app,stamp)=>app.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)),stamp);
@@ -35,5 +36,5 @@ test('direct unitless navigation cancels a draft map pick without saving or leav
 
 
 test('saved mHelp rate-limit timing stays separate from current camera and battery readings',async({page})=>{
- const custom=structuredClone(field),retry=new Date(now+2*3600000).toISOString();custom.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:fresh,lastAttemptAt:new Date(now).toISOString(),errorCode:'source_rate_limited',nextReadAt:retry,sheetsPublisher:false};const {app,state}=await mountFleet(page,false,{field:custom});await open(app);const note=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(note).toContainText('MHelp update delayed');await expect(note).toContainText(await time(app,fresh));await expect(note).toContainText(await time(app,retry));await expect(app.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ const custom=structuredClone(field),retry=new Date(now+2*3600000).toISOString();custom.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:fresh,lastAttemptAt:new Date(now).toISOString(),errorCode:'source_rate_limited',nextReadAt:retry,sheetsPublisher:false};const {app,state}=await mountFleet(page,false,{field:custom});await open(app);await revealInstallationEvidence(app);const note=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(note).toContainText('MHelp update delayed');await expect(note).toContainText(await time(app,fresh));await expect(note).toContainText(await time(app,retry));await expect(app.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });

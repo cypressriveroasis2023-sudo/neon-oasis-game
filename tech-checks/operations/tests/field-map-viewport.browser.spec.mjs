@@ -48,7 +48,8 @@ async function bounded(frame) {
   });
   expect(size.mapHeight).toBeGreaterThanOrEqual(400);
   expect(size.mapHeight).toBeLessThanOrEqual(760);
-  expect(size.listHeight).toBeLessThanOrEqual(760);
+  if(size.width>750)expect(size.listHeight).toBeLessThanOrEqual(760);
+  else expect(size.listHeight).toBe(size.listContent);
   expect(size.detailHeight).toBeLessThanOrEqual(760);
   expect(size.documentWidth).toBeLessThanOrEqual(size.width + 1);
   return size;
@@ -56,7 +57,8 @@ async function bounded(frame) {
 test('large field fleet keeps map bounded through scrolling, filters, selection, and navigation', async ({ page }, testInfo) => {
   const { frame, requests } = await mount(page);
   const initial = await bounded(frame);
-  expect(initial.listContent).toBeGreaterThan(initial.listHeight * 10);
+  if(initial.width>750)expect(initial.listContent).toBeGreaterThan(initial.listHeight * 10);
+  else {await expect(frame.locator('.cos-fleet-unit-list')).toHaveCSS('overflow','visible');expect(initial.listContent).toBe(initial.listHeight);}
   const map = frame.locator('.cos-fleet-map-panel');
   await map.scrollIntoViewIfNeeded();
   const before = await map.boundingBox();

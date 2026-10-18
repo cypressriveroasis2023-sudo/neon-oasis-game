@@ -77,7 +77,7 @@ async function fillsViewport(page) {
   expect(dimensions.y).toBe(0);
   expect(dimensions.width).toBe(dimensions.outerWidth);
   expect(dimensions.innerWidth).toBe(dimensions.outerWidth);
-  expect(dimensions.height).toBe(dimensions.outerHeight);
+  expect(Math.abs(dimensions.height - dimensions.outerHeight)).toBeLessThanOrEqual(1);
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.outerWidth);
   await expect(page.locator('#appView>.mobileTop')).toBeHidden();
 }

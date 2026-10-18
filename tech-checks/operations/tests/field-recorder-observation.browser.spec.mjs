@@ -1,3 +1,4 @@
+import {revealUnitTroubleshooting} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 const now='2026-10-09T06:40:00Z',fresh='2026-10-09T06:35:00Z';
@@ -32,7 +33,7 @@ test('Field cards and selected troubleshooting retain recorder wording and separ
  const {frame,state}=await mount(page);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','1','2','0','3']);
  await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER ONLINE');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText('RECORDER OFFLINE');await expect(frame.locator('.cos-fleet-unit-row').nth(2)).toContainText('CAMERA RECORDS OFFLINE');
  await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Offline observations: 1 camera / detector, 1 recorder, 0 IP / port');await expect(frame.locator('.field-map-info')).toContainText('Recorder and service outages do not establish individual camera outages.');
- await frame.locator('.cos-fleet-unit-row').nth(1).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER OFFLINE');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('Individual camera channels and video are not verified');
+ await frame.locator('.cos-fleet-unit-row').nth(1).click();await revealUnitTroubleshooting(frame);await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER OFFLINE');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('Individual camera channels and video are not verified');
  await expect(frame.locator('.camera-unit-state')).toHaveText('RECORDER OFFLINE');await expect(frame.locator('.camera-unit-detail')).toContainText('Camera channel status unavailable');await expect(frame.locator('.camera-unit-detail')).not.toContainText('Excluded from field operational totals');await expect(frame.locator('.camera-device-cards article').first().locator('div>b')).toHaveText('RECORDER OFFLINE');
  expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);await frame.locator('.camera-unit-detail').screenshot({path:info.outputPath('verified-field-recorder-offline.png')});expect(state.writes).toEqual([]);expect(state.errors).toEqual([]);
 });
