@@ -87,3 +87,10 @@ test('new accepted files supply counts, including all-Shop, without weakening Pr
   h.records[0].placement='UNKNOWN';assert.equal(readMhelpAddressMapPins(s,h,now),null);
  }
 });
+
+
+test('the real browser inventory projection proves completeness through summary.totalRecords',()=>{
+ const projected={...head,contract:'COS_MHELP_UPLOAD_INVENTORY_V1',summary:{totalRecords:1001}};delete projected.recordCount;
+ assert.equal(readMhelpAddressMapPins(sample(),projected,now)?.totalField,287);
+ projected.summary.totalRecords=1000;assert.equal(readMhelpAddressMapPins(sample(),projected,now),null);
+});
