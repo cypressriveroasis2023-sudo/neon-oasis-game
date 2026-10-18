@@ -14,7 +14,7 @@ function addressFixture(){
 }
 for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared addresses, solar stands and unresolved records work independently of native GPS`,async({page},info)=>{
  const {app,state}=await mountFleet(page,it,{field:addressFixture()});
- await expect(app.getByRole('region',{name:'Current mHelpDesk Field address coverage'})).toContainText('287 mHelpDesk Field Product IDs · 161 units with address coordinates · 126 addresses awaiting coordinates');
+ await expect(app.getByRole('region',{name:'Current mHelpDesk Field address coverage'})).toContainText('Field locations · 161 of 287 equipment located · 126 need an address pin');
  const marker=app.locator('.cos-mhelp-address-marker');await expect(marker).toHaveCount(1);
  await expect(marker).toHaveAttribute('data-mhelp-product-ids',JSON.stringify(Array.from({length:161},(_,i)=>String(i+1))));
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');

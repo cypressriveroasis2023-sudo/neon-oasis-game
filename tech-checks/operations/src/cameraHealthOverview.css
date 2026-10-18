@@ -14,3 +14,5 @@
 .camera-identity-review label { display: grid; gap: 8px; }
 .camera-identity-review select, .camera-identity-review textarea { width: 100%; min-width: 0; box-sizing: border-box; }
 .camera-identity-review textarea { min-height: 80px; }
+
+.camera-field-equation{font-size:14px;line-height:1.6;margin:0}.camera-field-equation span{display:block;color:var(--muted)}.camera-record-breakdown>summary,.camera-overview-freshness>summary{font-size:14px;min-height:44px;align-content:center;cursor:pointer}.camera-record-breakdown[open]>.camera-actual-count{margin-top:14px}.camera-unit-kpi>span{font-size:14px}

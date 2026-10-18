@@ -415,3 +415,32 @@
   }
   #root#root .cos-fleet-map-panel { scroll-margin-top: 64px; }
 }
+
+
+/* Compact Fleet overview: operational status and map first; explanations are disclosures. */
+#root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-clock,
+#root#root .cos-fleet-simple-map .cos-fleet-heading .cos-fleet-eyebrow,
+#root#root .cos-fleet-simple-map .cos-fleet-heading > div:first-child > p { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading { margin-bottom: 10px; align-items: center; }
+#root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 24px; margin: 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-stats { gap: 6px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat { padding: 8px 10px; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat strong { font-size: 25px; margin: 2px 0; }
+#root#root .cos-fleet-simple-map .cos-fleet-stat small { display: none; }
+#root#root .cos-fleet-simple-map .cos-fleet-count-note { margin-bottom: 8px !important; }
+#root#root .cos-fleet-simple-map .cos-fleet-count-note p { margin: 3px 0; }
+#root#root .cos-fleet-accounting,
+#root#root .cos-fleet-simple-map .cos-fleet-filters { margin-top: 12px; }
+#root#root .cos-fleet-accounting > summary,
+#root#root .cos-mhelp-address-coverage > details > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+#root#root .cos-fleet-accounting[open] { padding-bottom: 12px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote { font-size: 12px; gap: 6px; }
+#root#root .cos-fleet-simple-map .cos-fleet-map-footnote > span { flex-basis: 100%; }
+@media (max-width: 750px) {
+  #root#root .cos-fleet-simple-map .cos-fleet-heading h1 { font-size: 21px; }
+  #root#root .cos-fleet-simple-map .cos-fleet-stat > span { font-size: 12px; line-height: 1.4; }
+  #root#root .cos-fleet-simple-map .cos-fleet-stat small { font-size: 10px; }
+}
+
+#root#root .cos-fleet-camera-total { font-size:14px; line-height:1.6; margin:8px 0 14px; }
+#root#root .cos-fleet-accounting { font-size:14px; }

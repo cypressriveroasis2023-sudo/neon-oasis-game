@@ -3,6 +3,11 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Field product and inspect held or linked records',async({page})=>{
  const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field});
+ const disclosure=app.locator('.cos-fleet-accounting');
+ await expect(disclosure).not.toHaveAttribute('open','');
+ await expect(app.locator('.cos-fleet-workspace')).toBeVisible();
+ await disclosure.getByText('Field inventory details',{exact:true}).click();
+ await expect(disclosure).toHaveAttribute('open','');
  const counts=app.getByRole('region',{name:'Field inventory health breakdown'});
  await expect(counts).toContainText('All 7 Field equipment records accounted for');
  await expect(counts).toContainText('1 online + 1 offline + 1 health unverified + 1 solar / support');
