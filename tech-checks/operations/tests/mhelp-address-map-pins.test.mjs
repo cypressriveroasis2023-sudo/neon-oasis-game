@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readMhelpAddressMapPins} from '../src/mhelpAddressMapPins.ts';
+import {readMhelpAddressMapPins,mhelpAddressProviderLabel} from '../src/mhelpAddressMapPins.ts';
 const source='a'.repeat(64),payload='b'.repeat(64),now=Date.parse('2026-10-17T21:00:00Z'),head={sourceSha256:source,payloadSha256:payload,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
 const record=(index)=>{
  const productId=String(index+1);
@@ -14,6 +14,16 @@ const sample=()=>({contract:'COS_MHELP_CENSUS_ADDRESS_MAP_V1',sourceSha256:sourc
   confidence:'mhelpdesk_customer_address_reference_only',totalProducts:1001,fieldProducts:287,shopProducts:714,
   items:Array.from({length:287},(_,i)=>record(i))});
 const parse=s=>readMhelpAddressMapPins(s,head,now);
+test('public project points always carry review status and their actual provenance',()=>{
+ const s=sample();s.items[0].geocodeSource='public_site_reference';
+ const pin=parse(s)?.pins[0];
+ assert.equal(pin?.provider,'public_site_reference');assert.equal(pin?.state,'address_review');
+ assert.equal(pin?.verified,false);assert.equal(pin?.liveGps,false);
+ assert.match(mhelpAddressProviderLabel(pin.provider),/Public project.*approximate/);
+ assert.equal(mhelpAddressProviderLabel('geocodio'),'Geocodio saved address result');
+ assert.equal(mhelpAddressProviderLabel('unknown'),'Unknown address provider');
+ s.items[0].geocodeSource='unreviewed_web_guess';assert.equal(parse(s),null);
+});
 test('all 287 current mHelp Field Product IDs become address reference markers even without any GPS',()=>{
  const s=sample(),p=parse(s);
  assert.equal(p?.pins.length,287);assert.equal(p?.totalField,287);assert.equal(p?.matched,287);

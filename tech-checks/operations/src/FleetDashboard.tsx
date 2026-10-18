@@ -14,7 +14,7 @@ import {filterSourceEquipment,readRecordedRoster,recordedFamily,recordedSourceLa
 import MhelpPlacementStatus from './MhelpPlacementStatus';
 import {readMhelpInventoryAuthority,showMhelpProductHeadline} from './mhelpInventoryAuthority';
 import {mhelpFieldHealth} from './mhelpFieldHealth';
-import {readMhelpAddressMapPins} from './mhelpAddressMapPins';
+import {readMhelpAddressMapPins,mhelpAddressProviderLabel} from './mhelpAddressMapPins';
 import FleetFieldHealthCounts from './FleetFieldHealthCounts';
 import OwnerEquipmentCsvPreview from './OwnerEquipmentCsvPreview';
 import LocationEstimatePreview from './LocationEstimatePreview';
@@ -171,7 +171,7 @@ export default function FleetDashboard({entryRevision=0,initialView='map',openAd
     <div className='cos-fleet-eyebrow'>MHELP CUSTOMER ADDRESS</div><h2>{selectedMhelpAddress.unitNumber}</h2>
     <p>Product {selectedMhelpAddress.productId} · {selectedMhelpAddress.customer||'Customer not supplied'}</p>
     <dl><div><dt>Placement</dt><dd>FIELD · current mHelpDesk source</dd></div><div><dt>Equipment</dt><dd>{selectedMhelpAddress.category||'Not supplied'}</dd></div><div><dt>Original mHelpDesk address</dt><dd>{selectedMhelpAddress.address||'Incomplete address'}</dd></div><div><dt>Address-match status</dt><dd>{selectedMhelpAddress.state.replaceAll('_',' ')}</dd></div>
-    {'point' in selectedMhelpAddress&&<><div><dt>Address provider</dt><dd>{selectedMhelpAddress.provider==='geocodio'?'Geocodio saved address result':selectedMhelpAddress.provider==='municipal_address_point'?'Municipal address point':'US Census address range'}</dd></div><div><dt>Returned address</dt><dd>{selectedMhelpAddress.matchedAddress}</dd></div><div><dt>Address coordinates</dt><dd>{selectedMhelpAddress.point.join(', ')}</dd></div></>}
+    {'point' in selectedMhelpAddress&&<><div><dt>Address provider</dt><dd>{mhelpAddressProviderLabel(selectedMhelpAddress.provider)}</dd></div><div><dt>Returned address</dt><dd>{selectedMhelpAddress.matchedAddress}</dd></div><div><dt>Address coordinates</dt><dd>{selectedMhelpAddress.point.join(', ')}</dd></div></>}
     </dl>
     {(selectedMhelpAddress.lifecycle!=='UNFLAGGED'||selectedMhelpAddress.placementHeld)&&<p className='cos-mhelp-address-warning'>{selectedMhelpAddress.lifecycle!=='UNFLAGGED'?'Equipment is marked '+selectedMhelpAddress.lifecycle.replaceAll('_',' ')+'. ':''}{selectedMhelpAddress.placementHeld?'Camera identity or placement has a separate review hold. ':''}Displaying the source address does not clear this warning or activate the equipment.</p>}
     {selectedMhelpAddress.state==='address_review'&&<p className='cos-mhelp-address-warning'>Approximate address location: the returned address differs from mHelpDesk. Compare both addresses before using this location.</p>}
