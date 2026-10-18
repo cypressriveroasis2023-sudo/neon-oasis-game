@@ -49,6 +49,7 @@ on:
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
+      - 'tech-checks/supabase/functions/cos-mhelp-address-geocodio/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
       - '.github/workflows/cos-operations.yml'
   pull_request:
@@ -99,6 +100,7 @@ on:
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
+      - 'tech-checks/supabase/functions/cos-mhelp-address-geocodio/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
       - '.github/workflows/cos-operations.yml'
 permissions:
@@ -152,6 +154,8 @@ jobs:
           COS_MHELP_POSTGRES_CI: '1'
         run: node --import tsx legacy/tests/mhelp-reconnect-postgres.ci.mjs
       - run: npm run typecheck
+      - name: Strictly typecheck the isolated MHelp address geocoder
+        run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-address-geocodio/index.ts
       - run: npm run build
         id: build
       - run: npx playwright install --with-deps chromium
@@ -398,4 +402,8 @@ jobs:
           name: owner-one-census-postgres-results
           path: tech-checks/operations/legacy/tests/recon-ordering/owner-one-census-receipt.json
           if-no-files-found: ignore
+      - name: Verify MHelp address geocoder quota with concurrent PostgreSQL clients
+        env:
+          COS_MHELP_GEOCODIO_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_mhelp_geocodio_test_ci
+        run: node ../../../tests/mhelp-geocodio-postgres-concurrency.mjs
 
