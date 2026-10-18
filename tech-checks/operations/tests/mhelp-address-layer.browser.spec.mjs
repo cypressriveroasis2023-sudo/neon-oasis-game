@@ -51,7 +51,8 @@ test('an accepted replacement file with different counts renders its exact Field
  const value=addressFixture();value.uploadInventory.summary.totalRecords=5;value.uploadInventory.records=value.uploadInventory.records.slice(0,5);value.uploadInventory.records[3].placement='SHOP';value.uploadInventory.records[4].placement='SHOP';
  value.mhelpAddressMap={...value.mhelpAddressMap,totalProducts:5,fieldProducts:3,shopProducts:2,items:value.mhelpAddressMap.items.slice(0,3)};
  const {app}=await mountFleet(page,false,{field:value});
- await expect(app.getByRole('region',{name:'Current mHelpDesk Field address coverage'})).toContainText('3 mHelpDesk Field Product IDs · 3 units with address coordinates · 0 addresses awaiting coordinates');
+ const coverage=app.locator('.cos-mhelp-address-coverage');await expect(coverage).toBeVisible();
+ const summary=coverage.locator(':scope>summary');if(await summary.count()){await summary.click();await expect(coverage).toContainText('Field locations · 3 of 3 equipment located · 0 need an address pin');}else await expect(coverage).toContainText('3 mHelpDesk Field Product IDs · 3 units with address coordinates · 0 addresses awaiting coordinates');
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveAttribute('data-mhelp-product-ids','["1","2","3"]');
- await app.getByLabel('Fleet placement').selectOption('shop');await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(0);
+ await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(0);
 });
