@@ -8,7 +8,7 @@ export async function withMhelpAddressMap(
  const head=upload as Record<string,any>|null;
  // Count and exact Product-ID membership are checked against this accepted file,
  // including files whose Field/Shop counts differ from the October 16 baseline.
- if(!head||!Array.isArray(head.records)||head.records.length<1||head.records.length>10000
+ if(!head||!Array.isArray(head.records)||head.records.length<1||head.records.length>10000||head.recordCount!==head.records.length
   ||!/^[a-f0-9]{64}$/.test(head.sourceSha256)||!/^[a-f0-9]{64}$/.test(head.payloadSha256))return unavailable();
  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
  let cancel=()=>{};

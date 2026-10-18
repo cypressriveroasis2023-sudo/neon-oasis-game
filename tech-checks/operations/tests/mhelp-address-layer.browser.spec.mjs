@@ -3,7 +3,7 @@ import {mountFleet,field,fresh} from './fleet-dashboard-fixtures.mjs';
 const source='a'.repeat(64),payload='b'.repeat(64);
 function addressFixture(){
  const value=structuredClone(field);
- value.uploadInventory={sourceSha256:source,payloadSha256:payload,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
+ value.uploadInventory={sourceSha256:source,payloadSha256:payload,recordCount:1001,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
  value.mhelpAddressMap={contract:'COS_MHELP_CENSUS_ADDRESS_MAP_V1',sourceSha256:source,payloadSha256:payload,totalProducts:1001,fieldProducts:287,shopProducts:714,verifiedGps:false,liveGps:false,confidence:'mhelpdesk_customer_address_reference_only',items:Array.from({length:287},(_,i)=>({
   productId:String(i+1),sourceRowSha256:'c'.repeat(64),unitNumber:i===0?'Solar Stand 72 001':'Field equipment '+(i+1),customer:'Synthetic service customer',category:i===0?'Solar Stand 72':'Other',placement:'FIELD',lifecycle:i===1?'DO_NOT_USE':'UNFLAGGED',placementHeld:i===2,
   sourceAddress:{street:'123 Example Rd',city:'Houston',state:'TX',zip:'77064'},
@@ -48,7 +48,7 @@ test('restored viewport survives initial address and native marker validation',a
 });
 
 test('an accepted replacement file with different counts renders its exact Field Product IDs',async({page})=>{
- const value=addressFixture();value.uploadInventory.records=value.uploadInventory.records.slice(0,5);value.uploadInventory.records[3].placement='SHOP';value.uploadInventory.records[4].placement='SHOP';
+ const value=addressFixture();value.uploadInventory.recordCount=5;value.uploadInventory.records=value.uploadInventory.records.slice(0,5);value.uploadInventory.records[3].placement='SHOP';value.uploadInventory.records[4].placement='SHOP';
  value.mhelpAddressMap={...value.mhelpAddressMap,totalProducts:5,fieldProducts:3,shopProducts:2,items:value.mhelpAddressMap.items.slice(0,3)};
  const {app}=await mountFleet(page,false,{field:value});
  await expect(app.getByRole('region',{name:'Current mHelpDesk Field address coverage'})).toContainText('3 mHelpDesk Field Product IDs · 3 units with address coordinates · 0 addresses awaiting coordinates');

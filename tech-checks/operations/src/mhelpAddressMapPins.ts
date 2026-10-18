@@ -53,7 +53,7 @@ export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now())
  const expected=new Set(head.records.filter((r:unknown)=>object(r)&&r.placement==='FIELD').map((r:Obj)=>r.productId));
  const shops=head.records.length-expected.size;
  if(raw.totalProducts!==head.records.length||raw.fieldProducts!==expected.size||raw.shopProducts!==shops
-  ||raw.items.length!==expected.size||head.recordCount!==undefined&&head.recordCount!==head.records.length)return null;
+  ||raw.items.length!==expected.size||head.recordCount!==head.records.length)return null;
  const ids=new Set<string>(),pins:MhelpAddressMapPin[]=[],reviews:MhelpAddressMapReview[]=[];
  for(const item of raw.items){
   if(!object(item)||!id(item.productId)||!expected.has(item.productId)||ids.has(item.productId)||!hash(item.sourceRowSha256)
