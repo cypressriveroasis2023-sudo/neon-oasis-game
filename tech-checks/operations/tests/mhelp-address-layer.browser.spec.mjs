@@ -19,7 +19,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared
  const marker=app.locator('.cos-mhelp-address-marker');await expect(marker).toHaveCount(1);
  await expect(marker).toHaveAttribute('data-mhelp-product-ids',JSON.stringify(Array.from({length:161},(_,i)=>String(i+1))));
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
- await marker.click();await app.getByRole('dialog',{name:'MHelp address group'}).getByRole('button',{name:'Solar Stand 72 001 · Product 1',exact:true}).click();
+ await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await app.locator('.leaflet-control-zoom-out').click();await marker.click();await app.getByRole('dialog',{name:'MHelp address group'}).getByRole('button',{name:'Solar Stand 72 001 · Product 1',exact:true}).click();
  const drawer=app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'});
  await expect(drawer).toBeVisible();await expect(drawer).toContainText('FIELD · current mHelpDesk source');await expect(drawer).toContainText('Original mHelpDesk address');
  await expect(drawer.locator('input,select,textarea')).toHaveCount(0);await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
