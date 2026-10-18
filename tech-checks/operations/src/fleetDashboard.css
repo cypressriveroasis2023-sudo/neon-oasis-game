@@ -115,3 +115,4 @@
 #root#root .cos-fleet-drawer .field-map-location-editor .field-map-detail{max-height:none!important;overflow:visible!important;overscroll-behavior:auto;}
 
 .cos-fleet-recorded-address{white-space:pre-line;overflow-wrap:anywhere;line-height:1.6}.cos-fleet-drawer>section.cos-fleet-recorded-address{margin:12px 0;padding:12px;border:1px solid var(--cos-border);border-radius:7px}.cos-fleet-drawer>section.cos-fleet-recorded-address h3{margin:0 0 7px;}
+.cos-mhelp-connection-alert{border-color:#ff5663;background:rgba(255,74,90,.1);font-size:14px;line-height:1.5}.cos-mhelp-connection-alert strong{font-size:16px}.cos-mhelp-connection-alert button{min-height:44px;margin-top:8px;white-space:normal;max-width:100%}
