@@ -148,6 +148,11 @@ test('Operations desktop and mobile use a complete animated company logo',async(
     await page.setViewportSize({width,height:900});
     const logo=frame.locator('.cos-company-logo:visible').first();
     await expect(logo).toHaveAttribute('data-eye-ready','true');
+    const alpha=await logo.locator('canvas').evaluate(c=>{
+      const ctx=c.getContext('2d');
+      return [[0,0],[c.width-1,0],[0,c.height-1],[c.width-1,c.height-1]].map(([x,y])=>ctx.getImageData(x,y,1,1).data[3]);
+    });
+    expect(alpha).toEqual([0,0,0,0]);
     const bounds=await logo.boundingBox();expect(bounds.width/bounds.height).toBeCloseTo(1490/530,1);
     expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(width);
     if(width<=700){
@@ -155,6 +160,7 @@ test('Operations desktop and mobile use a complete animated company logo',async(
       expect(bounds.x+bounds.width/2).toBeCloseTo(width/2,0);
       const status=await frame.locator('.company-connection').boundingBox();
       expect(status.y).toBeGreaterThanOrEqual(bounds.y+bounds.height);
+      await expect(frame.locator('.company-utility-bar')).toHaveCSS('border-bottom-width','0px');
       const bar=await frame.locator('.company-utility-bar').boundingBox();
       expect(status.y+status.height).toBeLessThanOrEqual(bar.y+bar.height+1);
     }

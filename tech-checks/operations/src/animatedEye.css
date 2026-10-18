@@ -49,3 +49,8 @@
   #root .company-utility-bar .company-connection { justify-self:center; margin:0; max-width:100%; white-space:normal; text-align:center; }
 }
 .company-eye:not(.cos-company-logo) { border-radius:0; background:transparent; }
+
+/* The phone brand sits directly on the workspace surface, without a divider. */
+@media(max-width:700px) {
+  #root .company-utility-bar:has(.cos-company-logo) { border-bottom:0; }
+}
