@@ -2,17 +2,18 @@
 const knownImage = 'img[src*="vision-ai.jpg"],img[src*="vision-eye-round.svg"],img[src*="techcheck-eye-favicon-32.png"],img[src*="techcheck-eye-192.png"],img[src*="cameras-on-site-logo.webp"]';
 const ignored = '.quote-doc,.quote-doc-header,.invoice-doc,.statement-doc,.print-document,.print-page,.document-preview,.pdf-preview,#printRoot,[data-document-output],[data-print-root]';
 const eyes = new Map();
-function makeEye(decorative = false, label = 'Cameras Onsite') {
+function makeEye(decorative = false, label = 'Cameras Onsite', full = false) {
   // Keep the canvas in normal HTML. SVG foreignObject can paint at its
   // unscaled viewBox size in Safari, cropping a close-up into the logo slot.
   const eye = document.createElement('span');
-  eye.className = 'cos-static-eye';
+  eye.className = 'cos-static-eye' + (full ? ' cos-company-logo' : '');
+  eye.dataset.companyLogo = full ? 'full' : 'eye';
   eye.dataset.cosEye = 'approved';
   if (decorative) eye.setAttribute('aria-hidden', 'true');
   else { eye.setAttribute('role', 'img'); eye.setAttribute('aria-label', label); }
   const poster = document.createElement('img');
   poster.setAttribute('class', 'cos-eye-housing cos-eye-poster');
-  poster.src = posterArtwork; poster.alt = ''; poster.setAttribute('aria-hidden', 'true');
+  poster.src = full ? companyArtwork : posterArtwork; poster.alt = ''; poster.setAttribute('aria-hidden', 'true');
   const live = document.createElement('span');
   live.className = 'cos-eye-live'; live.setAttribute('aria-hidden', 'true');
   const canvas = document.createElement('canvas');
@@ -26,21 +27,22 @@ function addBrand(parent) {
   const link = document.createElement('a');
   link.className = 'cos-added-brand'; link.href = './onsite-vision.html';
   link.setAttribute('aria-label', 'Open OnSite Vision');
-  link.append(makeEye(true));
-  const copy = document.createElement('span');
-  copy.innerHTML = '<strong>VISION</strong><small>CAMERAS ONSITE</small>';
-  link.append(copy); parent.prepend(link);
+  link.append(makeEye(true, 'Cameras Onsite', true));
+  parent.prepend(link);
 }
 function scan(root) {
   if (!(root instanceof Element)) return;
   const images = [...(root.matches(knownImage) ? [root] : []), ...root.querySelectorAll(knownImage)];
   for (const image of images) {
     if (!image.isConnected || image.closest(ignored)) continue;
-    const svg = makeEye(image.getAttribute('alt') === '', image.getAttribute('alt') || 'Cameras Onsite');
+    const eyeOnly = /onsite-vision\.html$/.test(location.pathname) || image.closest('#authView,#forcePasswordView,#sessionLoading,.authcard,.visionLaunchOrb,.vision-eye-stage,.vision-assistant-head');
+    const brandSlot = image.closest('.cos-vision-brand,.ownerAppBrand,.ownerAppSidebarUtility,.health-eye') || /cameras-on-site-logo/.test(image.getAttribute('src') || '');
+    const full = !!brandSlot && !eyeOnly;
+    const svg = makeEye(image.getAttribute('alt') === '', image.getAttribute('alt') || 'Cameras Onsite', full);
     if (image.id) svg.id = image.id;
     // Preserve compact inline-avatar slots rather than enlarging application controls.
     const width = image.getBoundingClientRect().width;
-    if (width > 0 && width < 64) { svg.style.width = width + 'px'; svg.style.height = width + 'px'; }
+    if (!full && width > 0 && width < 64) { svg.style.width = width + 'px'; svg.style.height = width + 'px'; }
     image.replaceWith(svg);
   }
   // Earlier Tech Check headers paint the eye as a CSS background instead of an img.

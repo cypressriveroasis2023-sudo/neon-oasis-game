@@ -28,7 +28,7 @@ export default function TechCheckTvBoard({ cards, names, readiness, scope, now, 
   const leave = () => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); exit(); };
   return <section className='tech-check-tv' aria-label='Tech Check TV Board' data-page={pageIndex + 1} data-section={page.section||'empty'}>
     <header className='tech-check-tv-header'>
-      <div className='tech-check-tv-brand'><span className='tech-check-tv-eye'><AnimatedEye variant='brand'/></span><div><small>CAMERAS ONSITE</small><h1>TECH CHECK <span>TV BOARD</span></h1></div></div>
+      <div className='tech-check-tv-brand'><span className='tech-check-tv-eye'><AnimatedEye variant='brand' full/></span><div><h1>TECH CHECK <span>TV BOARD</span></h1></div></div>
       <div className='tech-check-tv-clock'><b>{now.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' })}</b><span>{now.toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'short', day: 'numeric' })} · CT</span></div>
     </header>
     {page.kind==='work'&&<div className='tech-check-tv-totals' aria-label='TV work summary'>

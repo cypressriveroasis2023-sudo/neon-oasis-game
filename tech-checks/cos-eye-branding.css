@@ -52,3 +52,16 @@ html body .vision-orb { background:transparent!important; box-shadow:none!import
 html body .vision-orb-v36 { width:min(192px,var(--vision-hero-size,192px),60cqh)!important; height:min(192px,var(--vision-hero-size,192px),60cqh)!important; }
 html body .vision-orb-v36 .vision-eye-stage { width:100%!important; height:100%!important; inset:0!important; position:relative!important; }
 html body .vision-orb::before, html body .vision-orb::after, html body .vision-eye-stage::before, html body .vision-eye-stage::after { display:none!important; }
+
+/* Full company branding outside login/loading and VISION AI. */
+html body .cos-static-eye.cos-company-logo { width:230px!important; height:auto!important; aspect-ratio:1490/530; border-radius:0!important; background:transparent!important; }
+html body .cos-vision-brand:has(>.cos-company-logo)>div,
+html body .ownerAppBrand:has(>.cos-company-logo)>span:not(.cos-company-logo) { display:none!important; }
+html body .health-eye:has(>.cos-company-logo) { width:220px!important; height:auto!important; flex:0 1 220px!important; border:0!important; border-radius:0!important; box-shadow:none!important; }
+html body .health-eye>.cos-company-logo { width:100%!important; }
+@media(max-width:700px) {
+  html body .cos-static-eye.cos-company-logo { width:160px!important; height:auto!important; }
+  html body .health-eye:has(>.cos-company-logo) { width:150px!important; flex-basis:150px!important; }
+  html body .health-eye>.cos-company-logo { width:100%!important; }
+}
+@media(max-width:700px) { html body .vision-health-title:has(.cos-company-logo) { flex-wrap:wrap; } }

@@ -27,3 +27,17 @@
   .company-eye.cos-eye-brand { width:48px !important; height:48px !important; }
   .company-eye.cos-eye-hero { width:128px !important; height:128px !important; }
 }
+
+/* Full company lockup; login/AI keep the square eye-only view. */
+#root .company-eye.cos-company-logo { width:220px!important; height:auto!important; aspect-ratio:1490/530; border-radius:0; background:transparent; }
+#root .company-brand .company-eye.cos-company-logo { width:220px!important; height:auto!important; }
+#root .company-mobile-brand .company-eye.cos-company-logo { width:170px!important; height:auto!important; }
+#root .operations-sidebar-open .company-brand .company-eye.cos-company-logo { width:200px!important; height:auto!important; }
+#root .tech-check-tv-eye { width:auto; flex:none; }
+#root .tech-check-tv-eye .cos-company-logo { width:220px!important; height:auto!important; }
+@media(max-width:700px) {
+  #root .company-mobile-brand .company-eye.cos-company-logo { width:154px!important; height:auto!important; }
+  #root .tech-check-tv-eye .cos-company-logo { width:150px!important; height:auto!important; }
+}
+#root .company-brand { width:100%; min-width:0; }
+#root .company-brand .company-eye.cos-company-logo { max-width:100%!important; }
