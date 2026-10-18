@@ -43,6 +43,13 @@ test('current source exposes all 287 MHelp FIELD addresses independently of GPS,
   await db.query(insert,[output.sourceSha256,output.payloadSha256,unresolved.sourceRowSha256,29.8,-95.4,'f'.repeat(64)]);
   const recovered=(await read()).items.find(r=>r.productId===unresolved.productId);
   assert.equal(recovered.status,'matched');assert.equal(recovered.originalStatus,'no_match');assert.equal(recovered.geocodeSource,'geocodio');assert.equal(recovered.verified,false);assert.equal(recovered.latitude,29.8);
+  await db.exec(await readFile(new URL('../db/20261018041534_cos_mhelp_public_site_reference.sql',import.meta.url),'utf8'));
+  const publicInsert=insert.replace("'geocodio'","'public_site_reference'");
+  await assert.rejects(db.query(publicInsert,[output.sourceSha256,output.payloadSha256,unresolved.sourceRowSha256,29.81,-95.41,'1'.repeat(64)]),/check constraint/);
+  await db.query(publicInsert.replace("'matched'","'address_review'"),[output.sourceSha256,output.payloadSha256,unresolved.sourceRowSha256,29.81,-95.41,'2'.repeat(64)]);
+  const approximate=(await read()).items.find(r=>r.productId===unresolved.productId);
+  assert.equal(approximate.geocodeSource,'public_site_reference');assert.equal(approximate.status,'address_review');
+  assert.equal(approximate.verified,false);assert.equal(approximate.latitude,29.81);
   assert.deepEqual(await f.preserved(),before,'address result cannot mutate inventory or GPS');
   for(const role of ['anon','authenticated','service_role']){
    await db.exec('set role '+role);await assert.rejects(db.query('select * from cos_mhelp_placement_private.mhelp_address_resolution'));await db.exec('reset role');

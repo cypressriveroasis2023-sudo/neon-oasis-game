@@ -21,6 +21,12 @@ type Obj=Record<string,unknown>;
 const object=(v:unknown):v is Obj=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const text=(v:unknown,max=600):v is string=>typeof v==='string'&&v.length<=max&& !/[\x00-\x1f\x7f<>]/.test(v);
 const hash=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+export const mhelpAddressProviderLabel=(provider:string):string=>({
+ us_census_address_range:'US Census address range',
+ geocodio:'Geocodio saved address result',
+ municipal_address_point:'Municipal address point',
+ public_site_reference:'Public project / property site reference · approximate',
+}[provider]||'Unknown address provider');
 const id=(v:unknown):v is string=>typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v);
 const point=(lat:unknown,lon:unknown):lat is number=>typeof lat==='number'&&typeof lon==='number'&&Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&!(lat===0&&lon===0);
 const locationDate=(v:unknown,now:number)=>typeof v==='string'&&/^\d{4}-\d\d-\d\dT/.test(v)&&Number.isFinite(Date.parse(v))&&Date.parse(v)<=now;
@@ -56,7 +62,7 @@ export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now())
    ||!text(item.matchedAddress,600)&&item.matchedAddress!==null
    ||item.verified!==false||item.liveGps!==false
    ||item.confidence!=='mhelpdesk_address_census_range_unverified'
-   ||!['us_census_address_range','geocodio','municipal_address_point'].includes(String(item.geocodeSource))
+   ||!['us_census_address_range','geocodio','municipal_address_point','public_site_reference'].includes(String(item.geocodeSource))
    ||item.sourceAddress===null||!object(item.sourceAddress))return null;
   ids.add(item.productId);
   const address=formatAddress(item.sourceAddress),state=item.status;
@@ -68,7 +74,7 @@ export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now())
      ||!text(item.matchedAddress,600)||!(item.matchedAddress as string).trim())return null;
    const sourceParts=parseAddress(address),matchedParts=parseAddress(item.matchedAddress),
      discrepancy=sourceParts&&matchedParts&&!compareAddress(sourceParts,matchedParts);
-   pins.push({...common,state:discrepancy?'address_review':state,provider:String(item.geocodeSource),geocodedAt:String(item.geocodedAt),lookupAddress:typeof item.lookupAddress==='string'?item.lookupAddress:'',point:[item.latitude,item.longitude as number],matchedAddress:item.matchedAddress as string,verified:false,liveGps:false});
+   pins.push({...common,state:discrepancy||item.geocodeSource==='public_site_reference'?'address_review':state,provider:String(item.geocodeSource),geocodedAt:String(item.geocodedAt),lookupAddress:typeof item.lookupAddress==='string'?item.lookupAddress:'',point:[item.latitude,item.longitude as number],matchedAddress:item.matchedAddress as string,verified:false,liveGps:false});
   }else{
    if(item.latitude!==null||item.longitude!==null||item.matchedAddress!==null)return null;
    reviews.push({...common,state,reason:String(item.reason|| (state==='no_match'?'The Census did not locate this address.':'Service address needs correction.'))});
