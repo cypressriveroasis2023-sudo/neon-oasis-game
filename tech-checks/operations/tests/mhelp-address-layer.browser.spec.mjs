@@ -1,3 +1,4 @@
+import {revealMapFilters} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,field,fresh} from './fleet-dashboard-fixtures.mjs';
 const source='a'.repeat(64),payload='b'.repeat(64);
