@@ -41,3 +41,11 @@
 }
 #root .company-brand { width:100%; min-width:0; }
 #root .company-brand .company-eye.cos-company-logo { max-width:100%!important; }
+/* Keep the full company lockup on the phone's centerline at every width. */
+@media(max-width:700px) {
+  #root .company-utility-bar { display:grid; grid-template-columns:minmax(0,1fr); justify-items:center; height:auto; min-height:104px; padding-top:12px; padding-bottom:12px; row-gap:6px; }
+  #root .company-mobile-brand { justify-self:center; justify-content:center; width:188px; max-width:100%; }
+  #root .company-mobile-brand .company-eye.cos-company-logo { width:188px!important; max-width:100%!important; height:auto!important; }
+  #root .company-utility-bar .company-connection { justify-self:center; margin:0; max-width:100%; white-space:normal; text-align:center; }
+}
+.company-eye:not(.cos-company-logo) { border-radius:0; background:transparent; }

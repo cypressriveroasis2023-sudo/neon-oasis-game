@@ -144,9 +144,35 @@ test('Operations desktop and mobile use a complete animated company logo',async(
     await expect(logo).toHaveAttribute('data-eye-ready','true');
     const bounds=await logo.boundingBox();expect(bounds.width/bounds.height).toBeCloseTo(1490/530,1);
     expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(width);
+    if(width<=700)expect(bounds.x+bounds.width/2).toBeCloseTo(width/2,0);
     const sidebar=frame.locator('.operations-sidebar:visible');
     if(await sidebar.count()){const side=await sidebar.boundingBox();expect(bounds.x+bounds.width).toBeLessThanOrEqual(side.x+side.width);}
     expect(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width+1);
     if(width===390||width===1440)await page.screenshot({path:info.outputPath('operations-logo-'+width+'.png')});
+  }
+});
+
+
+test('startup eye is centered with symmetric sights and no wordmark fragments',async({page},info)=>{
+  await mount(page,'index');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const eye=page.locator('#sessionLoading .cos-static-eye');
+  await expect(eye).toHaveAttribute('data-eye-ready','true');
+  for(const width of [320,390,430]){
+    await page.setViewportSize({width,height:844});
+    const box=await eye.boundingBox();expect(box.x+box.width/2).toBeCloseTo(width/2,0);
+    const facts=await eye.locator('canvas').evaluate(canvas=>{
+      const c=canvas.getContext('2d'),d=c.getImageData(0,0,canvas.width,canvas.height).data;
+      let minX=canvas.width,minY=canvas.height,maxX=0,maxY=0;
+      for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){
+        const i=(y*canvas.width+x)*4;
+        if(d[i]>160&&d[i+1]>160&&d[i+2]>160&&d[i+3]>128){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}
+      }
+      const corner=c.getImageData(Math.floor(canvas.width*.93),Math.floor(canvas.height*.18),1,1).data;
+      return {x:(minX+maxX)/2/canvas.width,y:(minY+maxY)/2/canvas.height,cornerAlpha:corner[3]};
+    });
+    expect(Math.abs(facts.x-.5)).toBeLessThan(.012);expect(Math.abs(facts.y-.5)).toBeLessThan(.012);
+    expect(facts.cornerAlpha).toBe(0);
+    await page.screenshot({path:info.outputPath('startup-centered-'+width+'.png')});
   }
 });
