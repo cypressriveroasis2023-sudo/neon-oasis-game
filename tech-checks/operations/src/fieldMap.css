@@ -96,8 +96,8 @@
 }
 @media(max-width:700px){
  #root#root .operations-field-view>.owner-it-main{padding-left:12px!important;padding-right:12px!important}
- #root#root .operations-field-view .company-utility-bar{height:64px;min-height:64px;margin:0 -12px 10px;padding:0 12px}
- #root#root .operations-field-view .company-mobile-brand .company-brand-mark{width:40px!important;height:40px!important}
+ #root#root .operations-field-view .company-utility-bar{margin:0 -12px 10px;padding:12px}
+ #root#root .operations-field-view .company-mobile-brand .company-brand-mark:not(.cos-company-logo){width:40px!important;height:40px!important}
  #root#root .operations-field-view .command-page-header{margin:0 0 8px!important}
  #root#root .operations-field-view .command-page-header :is(label,p){display:none}
  #root#root .operations-field-view .command-page-header h1{font-size:22px!important;margin:0!important}

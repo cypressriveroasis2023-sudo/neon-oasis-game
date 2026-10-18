@@ -138,17 +138,31 @@ test('Operations desktop and mobile use a complete animated company logo',async(
   await page.goto('/logo-operations-fixture');
   const frame=page.frameLocator('iframe');
   await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
-  for(const width of [320,390,1024,1440]){
+  for(const workspace of ['Overview','Fleet Dashboard']){
+  if(workspace==='Fleet Dashboard'){
+    await page.setViewportSize({width:390,height:900});
+    await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
+    await expect(frame.locator('.operations-field-view')).toBeVisible();
+  }
+  for(const width of [320,390,430,1024,1440]){
     await page.setViewportSize({width,height:900});
     const logo=frame.locator('.cos-company-logo:visible').first();
     await expect(logo).toHaveAttribute('data-eye-ready','true');
     const bounds=await logo.boundingBox();expect(bounds.width/bounds.height).toBeCloseTo(1490/530,1);
     expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(width);
-    if(width<=700)expect(bounds.x+bounds.width/2).toBeCloseTo(width/2,0);
+    if(width<=700){
+      expect(bounds.width).toBeGreaterThanOrEqual(180);
+      expect(bounds.x+bounds.width/2).toBeCloseTo(width/2,0);
+      const status=await frame.locator('.company-connection').boundingBox();
+      expect(status.y).toBeGreaterThanOrEqual(bounds.y+bounds.height);
+      const bar=await frame.locator('.company-utility-bar').boundingBox();
+      expect(status.y+status.height).toBeLessThanOrEqual(bar.y+bar.height+1);
+    }
     const sidebar=frame.locator('.operations-sidebar:visible');
     if(await sidebar.count()){const side=await sidebar.boundingBox();expect(bounds.x+bounds.width).toBeLessThanOrEqual(side.x+side.width);}
     expect(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width+1);
-    if(width===390||width===1440)await page.screenshot({path:info.outputPath('operations-logo-'+width+'.png')});
+    if(width===390||width===1440)await page.screenshot({path:info.outputPath('operations-logo-'+workspace.replaceAll(' ','-')+'-'+width+'.png')});
+  }
   }
 });
 
