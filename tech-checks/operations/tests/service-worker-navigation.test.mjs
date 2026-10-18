@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 const source = await readFile(new URL('../../sw.js', import.meta.url), 'utf8');
-const cacheName = 'tech-check-robot-eye-mobile-20261014';
+const cacheName = 'tech-check-cos-logo-20261018';
 const scopes = [
   'https://cos.example/',
   'https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/tech-checks/',
