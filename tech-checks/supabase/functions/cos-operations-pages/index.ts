@@ -927,13 +927,12 @@ export function createOperationsHandler(options) {
           }catch{censusUnavailable=true;geocodes.length=0;fallbackGeocodes.length=0;}
           // Cross-project reads are not a distributed transaction. Re-read both authorities
           // after lookups, and never publish an imported overlay with a changed source guard.
-          const [freshSnapshot,freshBundle]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context)]);
+          const [freshSnapshot,freshBundle,mhelpReceipt]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context),readMhelpPlacements(actorPayload)]);
           const {audits:freshAudits,devices:freshDevices,units:freshUnits}=freshBundle.sources;
           const [freshSources,freshArchivedRepresentations,sourceRecorded]=await Promise.all([readSourceProjections(freshSnapshot.inventoryItems),readArchivedRepresentations(),readSourceRecordedCoordinates(freshSnapshot.inventoryItems,rpc)]);
           const archiveContext={nativeUnits:freshUnits,identity:freshBundle.identity,archivedRepresentations:freshArchivedRepresentations,previousArchivedRepresentations:archivedRepresentations};
           const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources)};
           const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
-          const mhelpReceipt=await readMhelpPlacements(actorPayload);
           const ownerCensusEvidence=await readOwnerCensusEvidence({actorId:context.actorId,records:context.legacyOwner?geocodes:geocodes.filter(r=>r.censusOnlyState==='consumed'&&r.status==='success'),rawSnapshot:freshSnapshot,snapshot:base,bundle:freshBundle,mhelpReceipt,
             readTarget:id=>readOwnerCensusTarget(context,geocodes.find(r=>r.censusOnlyGuard?.nativeUnitId===id)?.unitKey,id)},context.legacyOwner);
           let projected=await projectFieldGeocodes({...base,ownerCensusProofs:ownerCensusEvidence.proofs},geocodes,censusUnavailable,ownerCensusEvidence.receipts,context.legacyOwner);

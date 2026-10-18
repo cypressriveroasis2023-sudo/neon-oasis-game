@@ -563,3 +563,11 @@
 #root#root .cos-fleet-map-canvas .cos-status-shaped > b { transform:translateY(-4px)!important; }
 #root#root .cos-fleet-map-canvas .cos-status-shaped .cos-status-pin-art { filter:drop-shadow(0 2px 2px #0007); }
 #root#root .cos-fleet-map-canvas .cos-field-cluster.cos-status-shaped .cos-status-pin-art { position:absolute; inset:0; width:38px!important; height:38px!important; color:var(--pin); }
+
+/* A shared group opens a compact list; health colors stay distinct from address review. */
+#root#root .cos-fleet-map-canvas .leaflet-popup-content-wrapper { background:#17232e; color:#edf3fa; border:1px solid #53697b; border-radius:12px; }
+#root#root .cos-fleet-map-canvas .leaflet-popup-tip { background:#17232e; }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-popup { color:#edf3fa; }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-popup button { background:#223342; color:#edf3fa; border-color:#53697b; margin:4px 0; }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-popup .cos-mhelp-address-warning { color:#fbd17e; }
+#root#root .cos-mhelp-address-group-item .cos-fleet-badge { margin-top:8px; }
