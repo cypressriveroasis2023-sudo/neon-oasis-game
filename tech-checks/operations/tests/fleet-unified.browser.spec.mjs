@@ -32,7 +32,7 @@ test('legacy unit labels resolve uniquely, including Shop / ROOT without adding 
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(0);
 });
 
-test('plain colored circles stay compact and clusters expand to accessible selectable units',async({page},info)=>{
+test('colored Fleet pins stay compact and clusters expand to accessible selectable units',async({page},info)=>{
  const catalog=structuredClone(units);
  for(const unit of catalog.slice(0,3))Object.assign(unit,{latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:fresh,gpsRecordedAt:fresh});
  catalog.push({...catalog[0],id:'00000000-0000-4000-8000-000000000007',unitNumber:'ST 007',modelName:'Solar Stand'});
@@ -56,7 +56,7 @@ test('plain colored circles stay compact and clusters expand to accessible selec
   await expect(marker.locator('.cos-field-pin')).toHaveAttribute('data-health',status);
   await expect(marker.locator('circle')).toHaveCSS('fill',color);
   await expect(marker.locator('.cos-pin-unit-number')).toHaveCSS('color','rgb(7, 20, 33)');
-  const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-map-status-dot').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&Math.abs(circle.y+circle.height/2-label.y-label.height/2)<1;});
+  const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-status-pin-art circle').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&Math.abs(circle.y+circle.height/2-label.y-label.height/2)<1;});
   expect(centered).toBe(true);
  }
  await page.screenshot({path:info.outputPath('compact-expanded-fleet-markers.png'),fullPage:true});

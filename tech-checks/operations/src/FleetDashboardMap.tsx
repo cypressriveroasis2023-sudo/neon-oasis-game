@@ -1,19 +1,19 @@
+import {fleetUnitPinMarkup,fleetSourcePinMarkup,fleetGroupPinMarkup,addressGroupHealth,addressPinStatusLabel} from './fleetStatusPins';
 import {useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {fleetLocationPinId,type FleetMapPin as Pin} from './fleetLocationPins';
 import {recordedAddressText} from './fleetDisplayAddress';
-import {sourceEquipmentMarkerMarkup} from './sourceEquipmentMarker';
 import type {MhelpAddressMapPin,MhelpAddressMapReview} from './mhelpAddressMapPins';
 import './mhelpAddressMap.css';
-import {clusterMapPoints,clusterReticleMarkup,expandedGroupOffsets,mapReticleMarkup,type ReticleState} from './fieldMapMarkers';
+import {clusterMapPoints,expandedGroupOffsets,type ReticleState} from './fieldMapMarkers';
 import {readFieldMapView,saveFieldMapView} from './fieldMapViewState';
 import {useFieldMapDisplay} from './fieldMapDisplay';
 import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import 'leaflet/dist/leaflet.css';
-type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;onSelectMhelpAddressGroup?:(productIds:string[])=>void;};
-export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,onSelectMhelpAddressGroup}:Props){
+type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;onSelectMhelpAddressGroup?:(productIds:string[])=>void;};
+export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,onSelectMhelpAddressGroup}:Props){
  const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),addressMarkers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),selectAddressGroup=useRef(onSelectMhelpAddressGroup),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0),[expandedIds,setExpandedIds]=useState<string[]>([]);
@@ -31,22 +31,22 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   const individual=(pin:Pin,point:[number,number],peer=false)=>{
    if(pin.kind==='source_equipment_estimate'){
     const name=pin.record.displayUnitNumber||pin.record.unitNumber,address=recordedAddressText(pin.record.sourceAddress),label=name+' · Unlinked equipment · Estimated address'+(peer?' · expanded group position':'')+(address?' · MHelp address: '+address:'');
-    const html=sourceEquipmentMarkerMarkup(name);
-    const marker=L.marker(point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-field-pin-wrap cos-source-equipment-marker'+(peer?' cos-dashboard-peer':''),html,iconSize:[44,58],iconAnchor:[22,22]}),title:label,alt:label}).addTo(group);
+    const html=fleetSourcePinMarkup(name);
+    const marker=L.marker(point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-field-pin-wrap cos-source-equipment-marker'+(peer?' cos-dashboard-peer':''),html,iconSize:[44,58],iconAnchor:[22,39]}),title:label,alt:label}).addTo(group);
     marker.getElement()?.setAttribute('data-record-id',pin.record.id);marker.getElement()?.setAttribute('aria-label',label);
     const tooltip=document.createElement('span');tooltip.textContent=label;marker.bindTooltip(tooltip);marker.on('click',()=>{if(!picker.current)select.current(pin.record.id);});return marker;
    }
    const health=state(pin.row),healthLabel=health==='unknown'?'Unverified':health==='support'?'Solar support':health==='online'?'Online':'Offline',name=pin.row.displayName||pin.row.name;
    const address=pin.row.displayAddress,addressLabel=address?address.label+': '+(address.text||'Not supplied'):pin.row.unit.address?'Installation address: '+pin.row.unit.address:'';
    const label=name+' · '+healthLabel+(pin.kind==='current'?'':' · '+(pin.kind==='estimate'?'Estimated location':'Source-recorded location'))+(peer?' · expanded group position':'')+(addressLabel?' · '+addressLabel:'');
-   const marker=L.marker(point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-field-pin-wrap'+(peer?' cos-dashboard-peer':''),html:mapReticleMarkup(pin.row.displayName||pin.row.name,state(pin.row),pin.kind),iconSize:[44,58],iconAnchor:[22,22]}),title:label,alt:label}).addTo(group);
+   const marker=L.marker(point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-field-pin-wrap'+(peer?' cos-dashboard-peer':''),html:fleetUnitPinMarkup(pin.row.displayName||pin.row.name,state(pin.row),pin.kind),iconSize:[44,58],iconAnchor:[22,39]}),title:label,alt:label}).addTo(group);
    marker.getElement()?.setAttribute('data-unit-id',pin.row.id);marker.getElement()?.setAttribute('aria-label',label);marker.on('click',()=>{if(!picker.current)select.current(pin.row.id);});return marker;
   };
   for(const items of groups){const first=items[0].item,counts={online:0,offline:0,unknown:0,support:0};items.forEach(p=>{if(p.item.kind!=='source_equipment_estimate')counts[state(p.item.row)]++;});
    if(items.length===1){individual(first,first.point);continue;}
    const sourcePins=items.filter(p=>p.item.kind==='source_equipment_estimate'),nativePins=items.filter(p=>p.item.kind!=='source_equipment_estimate');
    const clusterLabel='Expand '+items.length+(sourcePins.length?' equipment records':' units')+(sourcePins.length?' · '+sourcePins.length+' Unlinked equipment · Estimated address':'');
-   const marker=L.marker(first.point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-dashboard-cluster cos-field-cluster-wrap',html:clusterReticleMarkup(counts,items.filter(p=>p.item.kind==='estimate'||p.item.kind==='source_equipment_estimate').length,0,items.filter(p=>p.item.kind==='recorded').length,sourcePins.length),iconSize:[44,58],iconAnchor:[22,22]}),title:clusterLabel,alt:clusterLabel}).addTo(group);
+   const marker=L.marker(first.point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-dashboard-cluster cos-field-cluster-wrap',html:fleetGroupPinMarkup(counts,items.filter(p=>p.item.kind==='estimate'||p.item.kind==='source_equipment_estimate').length,0,items.filter(p=>p.item.kind==='recorded').length,sourcePins.length),iconSize:[44,58],iconAnchor:[22,39]}),title:clusterLabel,alt:clusterLabel}).addTo(group);
    const ids=items.map(p=>fleetLocationPinId(p.item)),isExpanded=ids.length===expandedIds.length&&ids.every(id=>expandedIds.includes(id));
    marker.getElement()?.setAttribute('aria-label',clusterLabel);const element=marker.getElement();element?.setAttribute('aria-expanded',String(isExpanded));element?.classList.toggle('cos-field-cluster-expanded',isExpanded);element?.setAttribute('data-unit-ids',JSON.stringify(nativePins.map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-record-ids',JSON.stringify(sourcePins.map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-estimate-unit-ids',JSON.stringify(items.filter(p=>p.item.kind==='estimate').map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-recorded-unit-ids',JSON.stringify(items.filter(p=>p.item.kind==='recorded').map(p=>fleetLocationPinId(p.item))));if(nativePins.length)element?.setAttribute('data-health',sourcePins.length?'mixed':counts.offline?'offline':counts.unknown?'unknown':counts.online?'online':'support');
    marker.on('click',()=>{if(!picker.current)setExpandedIds(isExpanded?[]:ids);});
@@ -68,16 +68,18 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   }
   for(const siblings of atPoint.values()){
    const first=siblings[0],review=siblings.some(x=>x.state==='address_review'),count=siblings.length;
-   const label=count===1?first.unitNumber+' · MHelp customer address':count+' MHelp Field units at this address';
-   const html='<span class="cos-mhelp-address-pin'+(review?' cos-mhelp-address-review':'')+'" aria-hidden="true"><svg class="cos-address-pin-art" viewBox="0 0 30 38" focusable="false"><path d="M15 36C12 31 2 23 2 15a13 13 0 1 1 26 0c0 8-10 16-13 21Z"/><circle cx="15" cy="15" r="9"/>'+(count>1?'':'<circle class="cos-address-pin-center" cx="15" cy="15" r="3"/>')+'</svg>'+(count>1?'<b class="cos-address-pin-count">'+String(count)+'</b>':'')+'</span>';
+   const status=addressGroupHealth(siblings,mhelpAddressHealth||new Map()),statusLabel=addressPinStatusLabel(status.counts);
+   const label=(count===1?first.unitNumber+' · MHelp customer address':count+' MHelp Field units at this address')+' · '+statusLabel+(review?' · Address match needs review':'');
+   const html='<span class="cos-mhelp-address-pin cos-address-health-'+status.state+(review?' cos-mhelp-address-review':'')+'" aria-hidden="true"><svg class="cos-address-pin-art" viewBox="0 0 30 38" focusable="false"><path d="M15 36C12 31 2 23 2 15a13 13 0 1 1 26 0c0 8-10 16-13 21Z"/><circle cx="15" cy="15" r="9"/>'+(count>1?'':'<circle class="cos-address-pin-center" cx="15" cy="15" r="3"/>')+'</svg>'+(count>1?'<b class="cos-address-pin-count">'+String(count)+'</b>':'')+(review?'<b class="cos-address-review-flag">!</b>':'')+(status.state==='mixed'?'<span class="cos-address-status-dots">'+(['online','offline','unknown','support'] as const).filter(key=>status.counts[key]>0).map(key=>'<i class="cos-signal-'+key+'">●</i>').join('')+'</span>':'')+'</span>';
    const marker=L.marker(first.point,{bubblingMouseEvents:false,zIndexOffset:250,
     icon:L.divIcon({className:'cos-mhelp-address-marker',html,iconSize:[44,58],iconAnchor:[22,38]}),
     title:label,alt:label}).addTo(group);
+   marker.getElement()?.setAttribute('data-health',status.state);
    marker.getElement()?.setAttribute('data-mhelp-product-ids',JSON.stringify(siblings.map(p=>p.productId)));
    marker.getElement()?.setAttribute('aria-label',label);
    if(count===1){
     const tooltip=document.createElement('span');
-    tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS)'+(review?' · Address match needs review':'');
+    tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS) · '+statusLabel+(review?' · Address match needs review':'');
     marker.bindTooltip(tooltip);
    }
    if(selectAddressGroup.current){marker.on('click',()=>{if(picker.current)return;if(count===1)selectAddress.current?.(first.productId);else selectAddressGroup.current?.(siblings.map(p=>p.productId));});continue;}
@@ -100,7 +102,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    marker.bindPopup(popup,{maxWidth:340});
    marker.on('click',()=>{if(!picker.current&&count===1)selectAddress.current?.(first.productId);});
   }
- },[mhelpAddressPins]);
+ },[mhelpAddressPins,mhelpAddressHealth]);
  const fit=()=>{setExpandedIds([]);const values=[...pinRef.current.map(p=>p.point),...mhelpAddressPins.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
  // Pending proof validation hides markers, but is not a settled population change.
  const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pins.map(fleetLocationPinId),...mhelpAddressPins.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,locationsReady]);
@@ -110,7 +112,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
   {locationsReady&&!pins.length&&!mhelpAddressPins.length&&!pickLocation&&<p className='cos-fleet-map-note'>{rows.length?'These units have no currently verified pins or approved address estimates. Open Location verification.':'No linked unit pins match these filters. Recorded equipment can remain in the list without a verified location.'}</p>}
-  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>⌖ Amber: address match needs review</span><small>EST / SRC: installation needs verification{expandedIds.length>0?' · Expanded pins are display offsets; saved GPS stays unchanged.':''}</small></details></div>
+  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>! Amber badge: address match needs review</span><small>EST / SRC: installation needs verification{expandedIds.length>0?' · Expanded pins are display offsets; saved GPS stays unchanged.':''}</small></details></div>
   {locationsReady&&mhelpAddressReviews.length>0&&<details className='cos-mhelp-address-followups'>
    <summary>{mhelpAddressReviews.length} MHelp Field equipment records need address coordinates (no GPS required)</summary>
    <p>These equipment records are still in mHelpDesk Field. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>

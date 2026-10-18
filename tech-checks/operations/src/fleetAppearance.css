@@ -547,3 +547,19 @@
 
 #root#root .cos-fleet-camera-total { font-size:14px; line-height:1.6; margin:8px 0 14px; }
 #root#root .cos-fleet-accounting { font-size:14px; }
+
+/* A consistent pin silhouette; health and address review remain independent. */
+#root#root .cos-fleet-map-canvas .cos-address-health-online { --address-pin-face:#2bff35; --address-pin-edge:#071421; }
+#root#root .cos-fleet-map-canvas .cos-address-health-offline { --address-pin-face:#ff2734; --address-pin-edge:#071421; }
+#root#root .cos-fleet-map-canvas .cos-address-health-support { --address-pin-face:#15a8ff; --address-pin-edge:#071421; }
+#root#root .cos-fleet-map-canvas :is(.cos-address-health-unknown,.cos-address-health-mixed) { --address-pin-face:#94a3b8; --address-pin-edge:#071421; }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-pin .cos-address-pin-art { filter:drop-shadow(0 2px 3px #0008); }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-pin .cos-address-pin-art circle { fill:var(--address-pin-face); stroke:transparent; }
+#root#root .cos-fleet-map-canvas .cos-mhelp-address-pin .cos-address-pin-art .cos-address-pin-center { fill:#071421; }
+#root#root .cos-fleet-map-canvas .cos-address-pin-count { color:#071421; }
+#root#root .cos-fleet-map-canvas .cos-address-review-flag { position:absolute; top:-4px; right:-7px; display:grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#fbbf24; color:#071421; border:1px solid #071421; font:800 12px/1 Arial,sans-serif; }
+#root#root .cos-fleet-map-canvas .cos-address-status-dots { position:absolute; left:50%; top:38px; transform:translateX(-50%); display:flex; gap:1px; background:#071421; border-radius:6px; padding:1px 3px; }
+#root#root .cos-fleet-map-canvas .cos-address-status-dots i { font:normal 9px/1 Arial,sans-serif; }
+#root#root .cos-fleet-map-canvas .cos-status-shaped > b { transform:translateY(-4px)!important; }
+#root#root .cos-fleet-map-canvas .cos-status-shaped .cos-status-pin-art { filter:drop-shadow(0 2px 2px #0007); }
+#root#root .cos-fleet-map-canvas .cos-field-cluster.cos-status-shaped .cos-status-pin-art { position:absolute; inset:0; width:38px!important; height:38px!important; color:var(--pin); }
