@@ -82,11 +82,23 @@ begin
    from products p
   ),'[]'::jsonb)
  ) into response from active a cross join counts c;
- if response is null or (response->>'totalProducts')::integer<>1001
- or (response->>'fieldProducts')::integer<>287
- or (response->>'shopProducts')::integer<>714
- or jsonb_array_length(response->'items')<>287
- or (select count(distinct x->>'productId') from jsonb_array_elements(response->'items') x)<>287
+ if response is null or (response->>'totalProducts')::integer not between 1 and 10000
+ or (response->>'fieldProducts')::integer+(response->>'shopProducts')::integer<>(response->>'totalProducts')::integer
+ or jsonb_array_length(response->'items')<>(response->>'fieldProducts')::integer
+ or (select count(distinct x->>'productId') from jsonb_array_elements(response->'items') x)<>(response->>'fieldProducts')::integer
+ or not exists (
+  select 1 from cos_mhelp_placement_private.upload_batches b
+  where b.source_sha256=response->>'sourceSha256' and b.payload_sha256=response->>'payloadSha256'
+   and jsonb_array_length(b.records)=(b.receipt->>'recordCount')::integer
+   and (select count(*) from jsonb_array_elements(b.records) x
+    join cos_mhelp_placement_private.census_mhelp_product p on p.source_sha256=b.source_sha256
+     and p.payload_sha256=b.payload_sha256 and p.product_id=x->>'productId'
+     and p.placement=x->>'placement'
+     and p.source_row_sha256=encode(sha256(convert_to(x::text,'UTF8')),'hex')
+    join cos_mhelp_placement_private.census_mhelp_address a
+     on a.source_sha256=p.source_sha256 and a.address_sha256=p.address_sha256)=jsonb_array_length(b.records)
+   and (select count(distinct x->>'productId') from jsonb_array_elements(b.records) x)=jsonb_array_length(b.records)
+ )
  then raise exception 'Full current mHelpDesk source/address audit unavailable' using errcode='40001';end if;
  return response;
 end$$;

@@ -15,7 +15,7 @@ export type MhelpAddressMapReview={
 export type MhelpAddressMapResult={
   pins:MhelpAddressMapPin[];reviews:MhelpAddressMapReview[];
   sourceSha256:string;payloadSha256:string;
-  totalField:287;matched:number;addressReview:number;unlocated:number;
+  totalField:number;matched:number;addressReview:number;unlocated:number;
 };
 type Obj=Record<string,unknown>;
 const object=(v:unknown):v is Obj=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -38,19 +38,26 @@ const formatAddress=(v:unknown):string=>{
 };
 const validState=(s:unknown):s is MhelpAddressMapPin['state']|'no_match'|'invalid_address'=>
  ['matched','address_review','no_match','invalid_address'].includes(String(s));
-/** Return no overlay when the 287-item current-source proof is incomplete. */
+/** Every accepted file supplies its own complete Field/Shop membership proof. */
 export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now()):MhelpAddressMapResult|null{
  if(raw===undefined||raw===null)return null;
  if(!object(raw)||!object(head)||raw.contract!=='COS_MHELP_CENSUS_ADDRESS_MAP_V1'
   ||!hash(raw.sourceSha256)||!hash(raw.payloadSha256)
   ||raw.sourceSha256!==head.sourceSha256||raw.payloadSha256!==head.payloadSha256
-  ||raw.totalProducts!==1001||raw.fieldProducts!==287||raw.shopProducts!==714
   ||raw.verifiedGps!==false||raw.liveGps!==false
   ||raw.confidence!=='mhelpdesk_customer_address_reference_only'
-  ||!Array.isArray(head.records)||head.records.length!==1001
-  ||!Array.isArray(raw.items)||raw.items.length!==287)return null;
+  ||!Array.isArray(head.records)||head.records.length<1||head.records.length>10000
+  ||!Array.isArray(raw.items))return null;
+ if(head.records.some((r:unknown)=>!object(r)||!id(r.productId)||!['FIELD','SHOP'].includes(String(r.placement)))
+  ||new Set(head.records.map((r:Obj)=>r.productId)).size!==head.records.length)return null;
  const expected=new Set(head.records.filter((r:unknown)=>object(r)&&r.placement==='FIELD').map((r:Obj)=>r.productId));
- if(expected.size!==287||head.records.filter((r:unknown)=>object(r)&&r.placement==='SHOP').length!==714)return null;
+ const shops=head.records.length-expected.size;
+ // The raw accepted receipt declares recordCount; the existing browser
+ // inventory projection declares the same count as summary.totalRecords.
+ const acceptedCount=head.recordCount===undefined&&object(head.summary)?head.summary.totalRecords:head.recordCount;
+ if(raw.totalProducts!==head.records.length||raw.fieldProducts!==expected.size||raw.shopProducts!==shops
+  ||raw.items.length!==expected.size||acceptedCount!==head.records.length
+  ||object(head.summary)&&head.summary.totalRecords!==head.records.length)return null;
  const ids=new Set<string>(),pins:MhelpAddressMapPin[]=[],reviews:MhelpAddressMapReview[]=[];
  for(const item of raw.items){
   if(!object(item)||!id(item.productId)||!expected.has(item.productId)||ids.has(item.productId)||!hash(item.sourceRowSha256)
@@ -80,8 +87,8 @@ export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now())
    reviews.push({...common,state,reason:String(item.reason|| (state==='no_match'?'The Census did not locate this address.':'Service address needs correction.'))});
   }
  }
- if(ids.size!==287||pins.length+reviews.length!==287)return null;
- return {pins,reviews,sourceSha256:raw.sourceSha256 as string,payloadSha256:raw.payloadSha256 as string,totalField:287,
+ if(ids.size!==expected.size||pins.length+reviews.length!==expected.size)return null;
+ return {pins,reviews,sourceSha256:raw.sourceSha256 as string,payloadSha256:raw.payloadSha256 as string,totalField:expected.size,
   matched:pins.filter(p=>p.state==='matched').length,addressReview:pins.filter(p=>p.state==='address_review').length,
   unlocated:reviews.length};
 }

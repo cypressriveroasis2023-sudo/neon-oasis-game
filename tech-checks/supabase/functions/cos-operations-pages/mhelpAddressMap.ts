@@ -6,9 +6,9 @@ export async function withMhelpAddressMap(
 ):Promise<Record<string,any>>{
  const unavailable=()=>({...snapshot,mhelpAddressMapStatus:'unavailable'});
  const head=upload as Record<string,any>|null;
- // This release represents the complete reviewed October 16 file. A missing,
- // partial or different-size upload cannot authorize an address snapshot read.
- if(!head||!Array.isArray(head.records)||head.records.length!==1001
+ // Count and exact Product-ID membership are checked against this accepted file,
+ // including files whose Field/Shop counts differ from the October 16 baseline.
+ if(!head||!Array.isArray(head.records)||head.records.length<1||head.records.length>10000||head.recordCount!==head.records.length
   ||!/^[a-f0-9]{64}$/.test(head.sourceSha256)||!/^[a-f0-9]{64}$/.test(head.payloadSha256))return unavailable();
  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
  let cancel=()=>{};

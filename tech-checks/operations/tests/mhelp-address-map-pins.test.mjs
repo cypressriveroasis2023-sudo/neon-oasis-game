@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readMhelpAddressMapPins,mhelpAddressProviderLabel} from '../src/mhelpAddressMapPins.ts';
-const source='a'.repeat(64),payload='b'.repeat(64),now=Date.parse('2026-10-17T21:00:00Z'),head={sourceSha256:source,payloadSha256:payload,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
+const source='a'.repeat(64),payload='b'.repeat(64),now=Date.parse('2026-10-17T21:00:00Z'),head={sourceSha256:source,payloadSha256:payload,recordCount:1001,records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
 const record=(index)=>{
  const productId=String(index+1);
  return {productId,sourceRowSha256:'c'.repeat(64),unitNumber:'Spotter '+index,customer:'Example customer '+index,category:'Spotter',
@@ -77,4 +77,20 @@ test('saved fallback evidence retains the original Field Product ID and its prov
 });
 test('a valid count with a foreign or superseded Product ID cannot enter the current source map',()=>{
  const s=sample();s.items[0].productId='9999999';assert.equal(parse(s),null);
+});
+
+test('new accepted files supply counts, including all-Shop, without weakening Product-ID guards',()=>{
+ for(const [fields,shops] of [[3,2],[300,750],[0,4]]){
+  const h={sourceSha256:source,payloadSha256:payload,recordCount:fields+shops,records:Array.from({length:fields+shops},(_,i)=>({productId:String(i+1),placement:i<fields?'FIELD':'SHOP'}))};
+  const s={...sample(),totalProducts:fields+shops,fieldProducts:fields,shopProducts:shops,items:Array.from({length:fields},(_,i)=>record(i))};
+  assert.equal(readMhelpAddressMapPins(s,h,now)?.totalField,fields);s.fieldProducts++;assert.equal(readMhelpAddressMapPins(s,h,now),null);s.fieldProducts--;
+  h.records[0].placement='UNKNOWN';assert.equal(readMhelpAddressMapPins(s,h,now),null);
+ }
+});
+
+
+test('the real browser inventory projection proves completeness through summary.totalRecords',()=>{
+ const projected={...head,contract:'COS_MHELP_UPLOAD_INVENTORY_V1',summary:{totalRecords:1001}};delete projected.recordCount;
+ assert.equal(readMhelpAddressMapPins(sample(),projected,now)?.totalField,287);
+ projected.summary.totalRecords=1000;assert.equal(readMhelpAddressMapPins(sample(),projected,now),null);
 });
