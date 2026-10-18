@@ -8,7 +8,9 @@ const css=readFileSync(new URL('../../company-host-theme.css',import.meta.url),'
 test('dark host preserves script bodies and URLs except reviewed extensions and integration cache versions',()=>{
   assert.equal(html.split('service-basics-host.js?v=20261016e').length-1,1);
   assert.equal(html.split('service-basics-host.css?v=20261016e').length-1,1);
-  const originalHost=html.replace('<script type="module" src="./service-basics-host.js?v=20261016e"></script>','').replace('  <link rel="stylesheet" href="./service-basics-host.css?v=20261016e">\n','');
+  const ownerReviewModule='<script type="module" src="./owner-transfer-review-host.js?v=20261017"></script>';
+  assert.equal(html.split(ownerReviewModule).length-1,1);
+  const originalHost=html.replace('<script type="module" src="./service-basics-host.js?v=20261016e"></script>','').replace('  <link rel="stylesheet" href="./service-basics-host.css?v=20261016e">\n','').replace(ownerReviewModule,'');
   assert.equal(html.split('production-assignments-host.js?v=operations-assigned-prep-20261006').length-1,1);
   assert.equal(html.split('cos-eye-branding.js?v=20261018-cos-centered').length-1,1);
   assert.equal(html.split('verified-it-fleet-host.js?v=unified-fleet-20261013').length-1,1);

@@ -5,7 +5,8 @@ import {randomUUID} from 'node:crypto';
 import {snapshot,resource} from '../fixtures/camera-evidence-fixtures.mjs';
 export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',SERVICE='00000000-0000-4000-8000-000000000002',OTHER='00000000-0000-4000-8000-000000000003';
 const root=new URL('../../../',import.meta.url).pathname;
-export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false,rollout='ready',readinessDelay=0}={}){
+const operationsDist=process.env.COS_IT_DAILY_TEST_DIST?resolve(process.env.COS_IT_DAILY_TEST_DIST):resolve(root,'operations/dist');
+export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHandoff=false,seedPair=false,rollout='ready',readinessDelay=0}={}){
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
@@ -20,6 +21,8 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  `);
  await db.exec(await readFile(root+'database-maintenance/techcheck-named-handoffs-v1.sql','utf8'));
  await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-rollout-v2.sql','utf8'));
+ await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-delivery-v3.sql','utf8'));
+ await db.exec(await readFile(root+'database-maintenance/techcheck-partial-returns-v4.sql','utf8'));
  await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
  // Serialize fixture connections exactly; roles cannot bleed between HTTP requests.
  let pending=Promise.resolve();
@@ -27,6 +30,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  let handoff=null;
  if(seedHandoff){const rules=JSON.parse(await readFile(root+'transfers/checklist-contract.json','utf8'));const id=randomUUID(),path=IT+'/'+id+'/'+'a'.repeat(64)+'.jpg';await db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);
  const args={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:serviceActor,p_items:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:['00123456789012345670'],battery_count:2,parts:[{name:'SD card',quantity:1}]}],p_checks:{'sniper:001':Object.fromEntries(rules.families.Sniper.bool_fields.map(field=>[field,true]))},p_signature:{method:'typed',name:'Synthetic IT',confirmed:true},p_photos:[{equipment_key:'sniper:001',kind:'unit',path}],p_notes:'Synthetic equipment checked for the named Service technician.'};
+ if(seedPair){const item={equipment_key:'ranger:002',family:'Ranger',unit_tag:'002',sims:['00123456789012345671'],battery_count:1,parts:[]};args.p_items.push(item);args.p_checks[item.equipment_key]=Object.fromEntries(rules.families.Ranger.bool_fields.map(field=>[field,true]));args.p_photos.push({equipment_key:item.equipment_key,kind:'unit',path});}
  handoff=(await run(IT,`select submit_techcheck_transfer_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args))).rows[0].result;
  }
  if(rollout==='missing')await db.exec('drop function public.techcheck_transfer_readiness_v1()');
@@ -43,7 +47,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  if(name==='cos_verified_fleet_capabilities_v1')return {data:{fleetRead:fixture.role==='it'}};
  if(fixture.rpcFail)return {error:{message:'Synthetic connection interrupted'}};
  const response=await fetch('/synthetic/rpc',{method:'POST',headers:{'Content-Type':'application/json','x-actor':fixture.actor},body:JSON.stringify({name,args})});const result=await response.json();
- if(name==='submit_techcheck_transfer_v1'&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
+ if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v7'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
  },storage:{from:bucket=>({upload:async(path,blob)=>{if(fixture.uploadFail)return {error:{statusCode:503}};const r=await fetch('/synthetic/storage?name='+encodeURIComponent(path),{method:'POST',headers:{'x-actor':fixture.actor},body:blob});return r.ok?{}:{error:{statusCode:r.status}};},createSignedUrl:async path=>({data:{signedUrl:'/synthetic/photo?name='+encodeURIComponent(path)}})})}};
  window.TechCheckContext={db,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getProfile:()=>({full_name:name(),username:name(),user_id:fixture.actor,role:fixture.role,active:true,archived_at:null}),getSession:session};
  window.show=key=>{for(const v of ['it','svc','owner','morning'])document.getElementById('view-'+v).classList.toggle('hidden',key!==v);dispatchEvent(new Event('techcheck:view-changed'));};
@@ -55,7 +59,13 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  const req=route.request(),url=new URL(req.url());
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:html});
  if(url.pathname==='/synthetic/rpc'){
-  const {name,args}=req.postDataJSON();calls.push({name,args});
+  let {name,args}=req.postDataJSON();calls.push({name,args});
+  if(name==='submit_techcheck_transfer_v7'){
+   if(args.p_location_proof?.signature!=='a'.repeat(64))return route.fulfill({json:{error:{code:'P0001',message:'Synthetic Shop proof required'}}});
+   // Browser fixture tests transport binding; the exact v7 HMAC and custody
+   // SQL run separately in disposable real PostgreSQL, with no production keys.
+   args={...args};delete args.p_location_proof;name='submit_techcheck_transfer_v1';
+  }
   if(name==='techcheck_transfer_readiness_v1'&&readinessDelay)await new Promise(resolve=>setTimeout(resolve,readinessDelay));
   if(name==='techcheck_transfer_context_v1'&&rollout==='read-cache-missing')return route.fulfill({json:{error:{code:'PGRST202',message:'Synthetic missing schema cache'}}});
   if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
@@ -69,6 +79,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
   const headers={'access-control-allow-origin':'http://127.0.0.1:4173','access-control-allow-headers':'*'};
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
   const call=req.postDataJSON();calls.push(call);const now=new Date().toISOString();
+  if(call.path==='/api/techcheck/location-proof')return route.fulfill({headers,json:{payload:JSON.stringify({request_id:call.body.request_id,purpose:call.body.purpose,items:call.body.items}),signature:'a'.repeat(64)}});
   const payload=call.path==='/api/session'?{authorized:true,legacyOwner:false,role:'IT',name:'Synthetic IT',features:{fleetAccess:true,unitTracker:true,vrmRead:true,fleetPlacementEdit:true,fleetConnectionEdit:true,cameraHealthV2:true}}
    :call.path==='/api/tech/session'?{authorized:true,legacyTechnician:true,department:'it'}
    :call.path==='/api/field-map'?{items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:now}
@@ -79,7 +90,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
    :call.path==='/api/vrm-fleet'?{items:[],sync:{state:'current',scheduleActive:true}}:undefined;
   if(!payload){unexpected.push(call);return route.fulfill({status:403,headers,json:{error:'Unavailable in synthetic fixture'}});}return route.fulfill({headers,json:payload});
  }
- if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const path=resolve(root,'.'+url.pathname.slice('/tech-checks'.length));if(path.startsWith(root)){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
+ if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const built=url.pathname.startsWith('/tech-checks/operations/dist/'),base=built?operationsDist:resolve(root),path=resolve(base,'.'+url.pathname.slice(built?'/tech-checks/operations/dist'.length:'/tech-checks'.length));if(path.startsWith(base+'/')||path===base){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
  unexpected.push(url.pathname);return route.abort();
  });
  await page.goto('http://127.0.0.1:4173/tech-checks/');

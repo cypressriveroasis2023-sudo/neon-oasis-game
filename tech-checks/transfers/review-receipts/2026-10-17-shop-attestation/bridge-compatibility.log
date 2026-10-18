@@ -1,0 +1,34 @@
+✔ company tools camera-health preserves reviewed script bytes and loads final theme (5.242695ms)
+✔ company tools camera-detail preserves reviewed script bytes and loads final theme (0.689045ms)
+✔ company tools onsite-vision preserves reviewed script bytes and loads final theme (0.253801ms)
+✔ company tools it-send-repair preserves reviewed script bytes and loads final theme (0.29971ms)
+✔ company tools palette uses local Open Sans and leaves display state to legacy code (0.573501ms)
+✔ daily switch limits desktop to Camera Health and Fleet Dashboard (1.411761ms)
+✔ standalone repair pauses IT before any ticket read or release, including restored sessions (0.417066ms)
+✔ repair leaves verified Owner and Service availability unchanged and fails closed on unknown identity (0.420081ms)
+✔ legacy host adapters withhold extra IT entry points and their token bridges while preserving source modules (0.809046ms)
+✔ daily frame follows available viewport height without resizing fullscreen or detached frames (0.407572ms)
+✔ daily landing has no extra Fleet launch and shared modes preserve existing tool labels (0.380512ms)
+✔ IT desktop lands on Fleet Map while phone mounts named handoffs without legacy prep controls (0.490326ms)
+✔ direct ittech profile uses server fleet capability instead of the old two-ID browser allowlist (1.346723ms)
+✔ direct ittech routes only to existing COS-authenticated Camera Health; other IT route remains unchanged (1.986294ms)
+✔ Owner stage checks 2027 before invoking the dedicated guarded database action (10.237938ms)
+✔ Owner commit repeats source+Google verification before trusted transactional RPC (2.288087ms)
+✔ missing 2027 source, invalid Owner, or suspicious approval stop before RPC (1.316178ms)
+✔ mismatched database stage and commit receipts fail closed (1.117479ms)
+✔ unexpected source fields and malformed expected hashes are denied before the database RPC (0.299781ms)
+✔ it cannot access Owner identity GET route (45.393837ms)
+✔ it cannot access Owner identity POST route (4.116422ms)
+✔ service cannot access Owner identity GET route (1.933835ms)
+✔ service cannot access Owner identity POST route (1.494415ms)
+✔ Owner review exposes bounded exact choices; confirmation builds evidence server-side and independently re-reads (16.147396ms)
+✔ Owner cannot submit a fabricated provider proof or browser-selected actor (1.791621ms)
+✔ unknown suffix-compatible route cannot reach identity mutations (2.352764ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 895.969811

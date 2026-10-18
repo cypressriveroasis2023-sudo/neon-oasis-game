@@ -1,0 +1,140 @@
+{
+  "created_at": "2026-10-17T21:07:58.183525+00:00",
+  "repository": "cypressriveroasis2023-sudo/neon-oasis-game",
+  "branch": "review/cos-handoff-attestation-20261017",
+  "implementation_base_commit": "9229fa773f9a154d1bbd0391d18879e1e7767a72",
+  "implementation_base_tree": "03bc1e9b4c62f62dec39457b6ae341edff211caf",
+  "current_main": "ba1b7422b88de41ee2e4344857333aca7cbe0073",
+  "remote_main_readback": "ba1b7422b88de41ee2e4344857333aca7cbe0073\trefs/heads/main",
+  "tested_commit": "ec154c0765af7a90b5a01914fb781b662e8213b6",
+  "tested_tree": "1a9c434e72bc73d1a77b2146d585f891922a154f",
+  "preserved_backend_commit": "09be92ae74d5cb412d2f0000b39c38844a9b914f",
+  "patch_replays": [
+    {
+      "patch": "implementation.patch",
+      "base": "9229fa773f9a154d1bbd0391d18879e1e7767a72",
+      "replayed_tree": "1a9c434e72bc73d1a77b2146d585f891922a154f"
+    },
+    {
+      "patch": "candidate-vs-current-main.patch",
+      "base": "ba1b7422b88de41ee2e4344857333aca7cbe0073",
+      "replayed_tree": "1a9c434e72bc73d1a77b2146d585f891922a154f"
+    }
+  ],
+  "validation": [
+    {
+      "log": "native-scoped-recovered.log",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "34 actual native SQL PostgreSQL tests plus actual native SQL/PGlite to bridge to legacy PostgreSQL lifecycle integration; synthetic Auth only"
+    },
+    {
+      "log": "adapter-reviewed.log",
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "proof issuer and actual bridge handler; synthetic Auth responses, capability revocation and bearer rejection"
+    },
+    {
+      "log": "postgres-exact-final.log",
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "30 legacy PostgreSQL assembly/custody/location/delivery/partial-return tests plus earlier 33 native/integration tests; newer native checks superseded by native-scoped-recovered.log"
+    },
+    {
+      "log": "bridge-compatibility.log",
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "company tools, IT host, Owner import and Owner identity route compatibility"
+    },
+    {
+      "log": "node-exact-final.log",
+      "passed": 148,
+      "failed": 0,
+      "skipped": 2,
+      "scope": "broader Node/PGlite regression before last six handler and two scoped-evidence test additions; skipped native concurrency cases run on PostgreSQL above; affected files subsequently rerun in adapter-reviewed.log/native-scoped-recovered.log"
+    },
+    {
+      "log": "browser-transfers.log",
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "scope": "all six full handoff browser specs against fresh dist; Chromium 154; synthetic data/network; no frontend source changed afterward"
+    },
+    {
+      "logs": [
+        "operations-typecheck.log",
+        "proof-typecheck.log",
+        "build.log"
+      ],
+      "result": "passed",
+      "scope": "operations TypeScript, standalone strict proof issuer TypeScript, Vite production build"
+    },
+    {
+      "log": "access-export.log",
+      "catalog": "native-effective-access.json",
+      "result": "passed",
+      "scope": "2 new function effective ACLs; all 37 existing function definitions/owners/ACLs, 68 relation owners/ACLs and 3 schema owners/ACLs unchanged in local fixture; exact rollback executed and denial verified"
+    }
+  ],
+  "production": {
+    "native_project": "tughscoxralhofrckvxy",
+    "legacy_project": "goqrnolcvqnirjmzaeyk",
+    "function": "public.cos_techcheck_shop_attestation_v1(uuid,uuid,text,jsonb)",
+    "grant": "EXECUTE to existing service_role only",
+    "changed": false,
+    "accounts_or_keys_created": false,
+    "installed_or_granted": false,
+    "deployed_or_activated": false,
+    "pushed_or_pr_created": false,
+    "pr187_changed": false
+  },
+  "remaining_limits": [
+    "No fresh independent reviewer sign-off or hosted CI",
+    "No live authenticated ITTECH/IT/Owner/Service smoke, actual inventory eligibility or genuine handoff/provider/archive delivery verification",
+    "Read-only cross-project protocol has no distributed lock; native post-read changes and tracker/source ABA remain possible until expiry",
+    "Proof issuance budget 10 seconds; expiry <=30 seconds, bounded by earlier native validity/freshness",
+    "All 105 legacy writer bodies sealed, but not every historical branch exercised under full production workload",
+    "Browser fixture uses earlier handoff SQL; the new v7 path is covered separately by actual SQL/handler integration, not claimed as full browser-to-live-provider coverage"
+  ],
+  "artifact_sha256": {
+    "NATIVE_SHOP_ATTESTATION_APPROVAL.md": "05bc8c3bd16f5d117f888c19594ddc0e1ea579f122dd71a2f0b2eeb7abaf5368",
+    "REPRODUCE.md": "f7f26949abf8b8455199b4c87e99b1ab25fbcbac208a583cbd8617e57e623f25",
+    "access-export.log": "359d2a54e7afc3d56380fae24fba55b72a13e6204453668c2c06c224a822f11b",
+    "adapter-initial.log": "509ea59f00504a29298f0013a71a1182922870218003ae87c1e7257c06245107",
+    "adapter-reviewed.log": "bb03560701dbf5e4175b21f20e9e11013b0d28e6b0e369a9b3b956d0853d3b1e",
+    "bridge-compatibility.log": "d01088f57489c53a8ddefa0c5287afb6080361af4ff912240626134394be028f",
+    "browser-transfers.log": "9a338b674a0fce4ac63442ef9dea2a3d8b89b006e77939059d6ffc1c35a18eee",
+    "build.log": "d6e9e4f2c75a3b5e04fc0bd82575ef08b5fd842e269a296ad6a1b1d59baae51e",
+    "bundle-verification.log": "aaec09aa6d39b9b921f8b4acdf485e5f18266929257d3e8d3469b4904d3a0f8d",
+    "candidate-source.tar.gz": "7543c196f031c5abd4fd2380ed3655c8612cad5925caca5905d462eba6d1198f",
+    "candidate-vs-current-main.patch": "dbbd9e17d7aa6c88218658e1f4240bade7f128ad8aa61f403ab357711f4fe37a",
+    "export-native-access.mjs": "b64ca1d3e20518105ceadc79810ffe0c3b054aa48656c6543bd523c32af46392",
+    "implementation.bundle": "1faaae645e1dfe180698c93aa283cfbac6babb866f4c4800e8bf5aadfaf2d404",
+    "implementation.patch": "6a4e3a72826b9d49e3a76973f22015f5bbf834b02bf6ff654510055c3a832acc",
+    "integration-initial.log": "9d2bbcf5df4089bcbda8c81550e2ff4383650ee554131b60d9fb33f976690fb1",
+    "native-effective-access.json": "5c50254ce6b1876844c95fb2bdd1d2e3072853cf9be311252ace5dcb672bd208",
+    "native-install.sql": "ffe44ce5d630ae2bcafb3dd54408fca7354a264c5e2850a1363f12ec402dd707",
+    "native-integration-second.log": "e5a88699ec3a416bcf61db820216ac0e39dd2a1499576f388b01910710bf081b",
+    "native-reviewed.log": "44d32c03a761d0d419f486531e50945c1aa0bf894c87b596c640ec5629f66b8c",
+    "native-rollback.sql": "c0d538d633de72c008a7eafb2628874fade74c192106470ea0223f2c1cd10786",
+    "native-scoped-final.log": "b26478a3934006b490a2c19585abe54df520324d9968e440f647d5be730a29d7",
+    "native-scoped-recovered.log": "f86ccf8aedc8efb2e6e9ef698c68348bb4b848afabbff1349c702e9496d7a7b2",
+    "native-sql-fourth.log": "445aba7045c90ca3fea24b25e1bbbdef816ddda01ca816ce53d3014d5024861b",
+    "native-sql-initial.log": "605200a848306f3d0164583a78aa3960ae9fa9ae6d267f28102494cb014e9790",
+    "native-sql-second.log": "0841beb7d2ff1f7412798065a2f3ef55a84f515f1a1195d2e1618d5427b9dc65",
+    "native-sql-third.log": "999a758eb3bb920a8d05409fe4fe01d4859ef31cd51b524e1b5bf1a6b6e3657d",
+    "node-exact-final.log": "c20d1421427633c24cfa5e0e82ba3a7cb8407125250a74022fc97ce6f86feecd",
+    "node-final.log": "cdb8e505c821aa8b58697ac1527eea34ac5283a0ae61700b38f8b1cb3c103f96",
+    "operations-typecheck.log": "a7bb63d7f5a199a07b4582545730a7d2abb35ff2d7f90dc58da32b7cf6e74b81",
+    "package.py": "28781970a26dd9f7c8e03044cc3020a278bf6bedb2c11741d581af4ca62ca741",
+    "postgres-exact-final.log": "31f8b8bc24aac76ad8cfa079a9860a3e4655694f3e3fc73912534a15d7bc637f",
+    "postgres-final.log": "0d424a4a2094d4d6001c69d8f98737392d8328940be49bdf3d61fec4d47b6d7d",
+    "proof-initial.log": "004599a0e2b2d2b6cd2d4aae6f26fc8793dd9d56b7f1433c568c76a991df4aff",
+    "proof-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

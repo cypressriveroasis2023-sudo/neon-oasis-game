@@ -1,4 +1,5 @@
-import {createDailySignoff,newSignature,signatureJpeg} from './service-signoff-ui.js?v=20261016';
+import {newSignature,signatureJpeg} from './service-signoff-ui.js?v=20261016';
+import {mountDailyReceiptReview} from './service-receipts-ui.js';
 // Daily evidence and one atomic completion. Authorization stays on the server.
 const context = () => window.TechCheckContext;
 const types = ['Sniper','Ranger','Spotter','Solar Spotter'];
@@ -8,6 +9,7 @@ const counts = {recon_battery_qty:['wlTruckReconQty',25],agm_12v_110ah_qty:['wlT
 const day = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const actor = () => context()?.getRole()==='service' && !document.getElementById('appView')?.classList.contains('hidden') ? context()?.getSession()?.user?.id : null;
 let current = null, currentDay = '', draft = null, busy = false, photosPending = 0, changes = 0, statusKey = '', scheduled = false;
+let receiptReview=null;
 const previewUrls = new Map();
 const dbPromise = new Promise((resolve,reject) => {
   const request = indexedDB.open('techcheck-daily-evidence-v1',1);
@@ -137,7 +139,9 @@ function decorate(card) {
   }
   draft.signature ||= newSignature();
   const id=current,version=changes;
-  section.append(extraImages(),createDailySignoff({state:draft.signature,actorName:context()?.getProfile()?.full_name||context()?.getProfile()?.username||'Technician',isBusy:()=>busy,onChange:()=>{if(actor()===id&&changes===version)save().catch(error=>message(error.message,true));}}));
+  const receipts=document.createElement('section');receipts.className='cos-daily-receipts';
+  section.append(extraImages(),receipts);
+  receiptReview=mountDailyReceiptReview(receipts,{context:context(),draft,isCurrent:()=>actor()===id&&changes===version&&receipts.isConnected,isBusy:()=>busy,onChange:()=>{if(actor()===id&&changes===version)save().catch(error=>message(error.message,true));}});
   const button=card.querySelector('[data-wl-save-truck-inventory]');button.before(section);button.textContent='Complete & Send to Ops Manager';
   message('Complete saves your inspection, inventory and photos, then returns to the main screen. Delivery status appears there.');
 }
@@ -202,6 +206,8 @@ document.addEventListener('click',async event=>{
     for(const category of simCards)for(const view of ['front','back'])if(!draft.photos.some(p=>p.category===category&&p.view===view))throw new Error('Add the '+view+' photo for '+category+'.');
     for(const category of batteryTypes)if(!draft.photos.some(p=>p.category===category&&p.view==='1'))throw new Error('Add a photo of the '+category+'.');
     const signature=draft.signature;
+    const linked=receiptReview?.submission();
+    if(!linked)throw new Error('Reopen the daily check to review equipment receipts.');
     if(!signature?.confirmed)throw new Error('Sign and confirm that this report is accurate before completing.');
     const accountName=context()?.getProfile()?.full_name||context()?.getProfile()?.username||'';
     const normalize=name=>name.trim().replace(/\s+/g,' ').toLowerCase();
@@ -226,7 +232,7 @@ document.addEventListener('click',async event=>{
       photos.push({category:photo.category,view:photo.view,path,...(photo.filename?{filename:photo.filename}: {})});
     }
     assertIdentity();message('Completing your daily check…');
-    const saved=await rpc('complete_service_daily_report_v4',{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos,p_signature:{method:signature.method,name:signature.method==='typed'?signature.typedName.trim():accountName,confirmed:true,...(signature.method==='drawn'?{path:photos.find(p=>p.category==='Technician signature').path}:{})}});
+    const saved=await rpc(linked.endpoint,{p_report_id:draft.id,p_units:values.units,p_sims:values.sims,p_stock:values.stock,p_photos:photos,p_signature:{method:signature.method,name:signature.method==='typed'?signature.typedName.trim():accountName,confirmed:true,...(signature.method==='drawn'?{path:photos.find(p=>p.category==='Technician signature').path}:{})},...linked.args});
     if(!saved?.inventory_ready)throw new Error('The server has not confirmed truck readiness. Your draft is preserved.');
     assertIdentity();
     // Accepted submission remains authoritative even if device cleanup fails.

@@ -1,5 +1,6 @@
 import {summaryPdf,summaryHtml} from './summary.ts';
 import {DRIVE_FOLDER,RECIPIENT,reportHtml,rawEmail} from './report.ts';
+import {deliverTransfer} from './transfer-delivery.ts';
 const ORIGINS=new Set(['https://cypressriveroasis2023-sudo.github.io','https://cos-vision-integration-preview.pages.dev']);
 export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}:any) {
  const call=async(name:string,args:any)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new Error('Daily delivery database operation failed.');return data;};
@@ -24,9 +25,18 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
     actor=data.user.id;
    }
    let body;try{body=await req.json();}catch{return response({error:'Invalid request.'},400);}
+   if(!body||typeof body!=='object'||Array.isArray(body))return response({error:'Invalid request.'},400);
+   if(body.transfer_event_id!==undefined){
+    if(cron||body.report_id!==undefined||typeof body.transfer_event_id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(body.transfer_event_id))return response({error:'Handoff event ID required.'},400);
+    const result=await deliverTransfer({admin,env,request,actor,eventId:body.transfer_event_id});
+    return response(result,result.status==='unavailable'?503:result.status==='pending'?202:200);
+   }
    if(!cron && (typeof body.report_id!=='string'||!/^[a-f0-9-]{36}$/i.test(body.report_id)))return response({error:'Report ID required.'},400);
    report=await call('service_daily_delivery_v1',{p_action:'claim',p_id:cron?null:body.report_id,p_actor:actor});
-   if(!report)return response({accepted:true,status:'pending_or_finished'});
+   if(!report){
+    if(cron){const result=await deliverTransfer({admin,env,request});return response(result,result.status==='unavailable'?503:result.status==='pending'?202:200);}
+    return response({accepted:true,status:'pending_or_finished'});
+   }
    const queue=(action:string,data:any)=>call('service_daily_delivery_v1',{p_action:action,p_id:report.id,p_lease:report.lease_token,p_data:data});
    const finish=(status:string,error?:string)=>queue('finish',{status,error});
    const credentials=['TECHCHECK_GOOGLE_CLIENT_ID','TECHCHECK_GOOGLE_CLIENT_SECRET','TECHCHECK_GOOGLE_REFRESH_TOKEN'].map(name=>String(env(name)||''));

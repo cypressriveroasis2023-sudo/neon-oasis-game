@@ -1,0 +1,44 @@
+✔ real native SQL through the actual bridge produces a proof consumed by PostgreSQL checkout and Owner release; post-issue revocation still denies (2913.542471ms)
+✔ service-only attestation runs in a read-only transaction, returns exact scope and changes no relation (187.406585ms)
+✔ effective ACLs deny public/browser roles, private helpers and table reads; revoke rolls back only this boundary (19.463192ms)
+✔ existing authority reader definitions and actor-gated snapshot signatures are preserved (9.266556ms)
+✔ denial-only concern keys match existing placement rules, including numbered families and suffixes (5.632982ms)
+✔ invalid, extra, duplicate and cross-request scope is denied without partial results (41.319614ms)
+✔ disabled source denies the entire attestation (1.716441ms)
+✔ source error denies the entire attestation (1.268728ms)
+✔ stale observation denies the entire attestation (11.115047ms)
+✔ future observation denies the entire attestation (10.813212ms)
+✔ held current observation despite prior Shop denies the entire attestation (10.603628ms)
+✔ missing observed equipment identity denies the entire attestation (10.698721ms)
+✔ missing observed site denies the entire attestation (11.218783ms)
+✔ changed customer denies the entire attestation (10.572591ms)
+✔ changed service location denies the entire attestation (10.401494ms)
+✔ Field observation denies the entire attestation (10.490217ms)
+✔ native GPS denies the entire attestation (11.728169ms)
+✔ installed site denies the entire attestation (10.948978ms)
+✔ native status denies the entire attestation (10.968656ms)
+✔ native retirement denies the entire attestation (10.786263ms)
+✔ tracker mutation denies the entire attestation (10.457718ms)
+✔ deactivated imported source denies the entire attestation (10.297918ms)
+✔ changed source revision denies the entire attestation (10.590327ms)
+✔ archived representation denies the entire attestation (10.89761ms)
+✔ native placement history denies the entire attestation (10.492781ms)
+✔ no current upload denies the entire attestation (8.70323ms)
+✔ native label variants and conflicting provider membership veto a second identity (69.178813ms)
+✔ scoped source holds, lifecycle, wrong binding and stale continuity cannot be bypassed by a current MHelp link (87.327969ms)
+✔ valid scoped authority can corroborate Shop; malformed or future scoped metadata denies (51.165241ms)
+✔ related tracker evidence must be current active Shop, including candidate-only identity holds (64.846007ms)
+✔ tracker-only identity is supported and multiple exact requested units return bytewise order only (17.342573ms)
+✔ Owner identity claims including revoked history remain a hold; native epoch detects change and restore (41.694507ms)
+✔ real concurrent native mutation is seen by the next statement and denial has no write footprint (51.770742ms)
+✔ one native statement keeps a consistent snapshot during a concurrent status commit (51.213394ms)
+native attestation: 20 requested / 1001 source rows, 539 ms
+✔ 1001 source records stay private and 20 requested units remain bounded (605.768812ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5089.865825

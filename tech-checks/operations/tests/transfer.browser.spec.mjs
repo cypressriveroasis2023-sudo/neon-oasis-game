@@ -1,7 +1,36 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,SERVICE,OTHER} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,IT,SERVICE,OTHER} from './helpers/transfer-fixture.mjs';
+import {randomUUID} from 'node:crypto';
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
+for(const width of [390,430])test('IT returns one selected unit and leaves the other assigned at '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:900});f=await mountTransfers(page,{seedHandoff:true,seedPair:true});
+ const id=randomUUID(),items=f.handoff.expected,path=SERVICE+'/'+id+'/'+'b'.repeat(64)+'.jpg';
+ await f.db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);
+ const args={p_request_id:id,p_transfer_id:f.handoff.transfer_id,p_kind:'receipt',p_expected_revision:1,p_service_actor:SERVICE,p_items:items,p_checks:{},p_signature:{method:'typed',name:'Synthetic Service',confirmed:true},p_photos:items.map(i=>({equipment_key:i.equipment_key,kind:'unit',path})),p_notes:'Synthetic physical receipt'};
+ await f.run(SERVICE,`select submit_techcheck_transfer_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')})`,Object.values(args));
+ await page.getByRole('button',{name:'Reload handoffs',exact:true}).click();await page.getByRole('button',{name:'Check in this handoff',exact:true}).click();
+ await expect(page.getByLabel('Return this unit now')).toHaveCount(2);await page.getByLabel('Return this unit now').nth(1).uncheck();
+ for(const select of await page.locator('fieldset select').all())await select.selectOption('true');
+ await page.getByLabel('Equipment photo 1',{exact:true}).setInputFiles(photo);await expect(page.locator('.tc-evidence img')).toBeVisible();await sign(page,'Synthetic IT');await page.getByRole('button',{name:'Sign & record return',exact:true}).click();
+ await expect(page.getByText('Partially returned — remaining equipment assigned to Service',{exact:true})).toBeVisible();await expect(page.getByText('Still assigned: Sniper 001',{exact:true})).toBeVisible();
+ expect((await f.db.query('select * from app_private.techcheck_transfer_reservations')).rows).toHaveLength(2);expect((await f.db.query('select * from app_private.techcheck_transfer_item_returns')).rows).toHaveLength(1);
+ await page.screenshot({path:info.outputPath('partial-return-'+width+'.png'),fullPage:true});await page.getByRole('button',{name:'Check in this handoff',exact:true}).click();await expect(page.getByLabel('Return this unit now')).toHaveCount(1);await expect(page.locator('fieldset').filter({has:page.getByLabel('Return this unit now')})).toContainText('Sniper 001');expect(f.errors).toEqual([]);
+});
 let f;test.afterEach(async()=>{await f?.close();f=null;});
+test('IT repair reinspection records a new signature and photo while preserving the original failure and hold',async({page})=>{
+ // Repair handoffs use the phone workflow; the desktop Fleet workspace is covered separately.
+ await page.setViewportSize({width:390,height:844});
+ f=await mountTransfers(page,{seedHandoff:true});const manifest=f.handoff.expected;
+ for(const [kind,actor,name,revision] of [['receipt',SERVICE,'Synthetic Service',1],['return',IT,'Synthetic IT',2]]){
+  const id=randomUUID(),path=actor+'/'+id+'/'+'b'.repeat(64)+'.jpg';await f.db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);
+  const args={p_request_id:id,p_transfer_id:f.handoff.transfer_id,p_kind:kind,p_expected_revision:revision,p_service_actor:SERVICE,p_items:manifest,p_checks:kind==='receipt'?{}:{[manifest[0].equipment_key]:Object.fromEntries(['physical_condition_ok','accessories_ok','batteries_ok','sd_cards_ok','electronics_ok','power_functions_ok'].map(k=>[k,false]))},p_signature:{method:'typed',name,confirmed:true},p_photos:[{equipment_key:manifest[0].equipment_key,kind:'unit',path}],p_notes:kind==='return'?'Damaged equipment requires repair.':'Physically received.'};
+  await f.run(actor,`select submit_techcheck_transfer_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')})`,Object.values(args));
+ }
+ await page.getByRole('button',{name:'Reload handoffs',exact:true}).click();await page.getByRole('button',{name:'Recheck repaired equipment',exact:true}).click();
+ await expect(page.locator('fieldset select')).toHaveCount(6);
+ for(const select of await page.locator('fieldset select').all())await select.selectOption('true');await page.getByLabel('Equipment photo 1',{exact:true}).setInputFiles(photo);await expect(page.locator('.tc-evidence img')).toBeVisible();await page.getByLabel('Transfer notes',{exact:true}).fill('Repaired and physically reinspected the equipment and accessories.');await sign(page,'Synthetic IT');await page.getByRole('button',{name:'Sign & record return',exact:true}).click();
+ await expect(page.getByText('Returned — inventory review required',{exact:true})).toBeVisible();expect((await f.db.query('select count(*)::int n from app_private.techcheck_transfer_events')).rows[0].n).toBe(4);expect((await f.db.query('select count(*)::int n from app_private.techcheck_transfer_reservations')).rows[0].n).toBe(1);expect(f.errors).toEqual([]);
+});
 async function sign(page,name){await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill(name);await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();}
 async function fillUnit(page,tag='001',sim='00123456789012345670'){
  await page.getByLabel('Unit family / name 1',{exact:true}).fill('Sniper');await page.getByLabel('Unit number 1',{exact:true}).fill(tag);await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('2');await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('SD card | 1');

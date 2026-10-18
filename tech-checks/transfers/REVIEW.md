@@ -1,4 +1,10 @@
-# Named handoffs — PR 186 review checkpoint
+# Named handoffs — historical PR 186 review checkpoint
+
+The current backend implementation and exact held installation/access boundary
+are documented in [BACKEND_INSTALL_REVIEW.md](./BACKEND_INSTALL_REVIEW.md).
+The unfinished list below records the earlier PR186 checkpoint; delivery, daily
+receipt binding, custody, partial returns and Owner release are implemented in
+the new review candidate. Production installation and activation remain held.
 
 **Not ready to merge, enable, or deploy.** Base: `760eced55a47ebf36691159aa53c9bfdf5e9f6d4`.
 The additive migration installs disabled. There is no technician-accessible enable function.

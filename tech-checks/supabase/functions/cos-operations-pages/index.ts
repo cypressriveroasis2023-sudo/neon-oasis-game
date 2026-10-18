@@ -37,6 +37,7 @@ import { createMhelpImportHandler, readMhelpAwareJson, readMhelpAwareJsonWithSiz
 import { cameraSummary } from './cameraEvidence.ts';
 import { cameraSummary as placementCameraSummary } from './cameraPlacementEvidence.ts';
 import {currentTrackerShopScope} from './cameraTrackerShopScope.ts';
+import {issueHandoffLocationProof,validateHandoffLegacyItems,HandoffLocationError} from './handoffLocationProof.ts';
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
@@ -226,18 +227,18 @@ export function createOperationsHandler(options) {
     },
   });
 
-  const authenticate = async request => {
+  const authenticate = async (request, signal = undefined) => {
     const authorization = request.headers.get('Authorization') || '';
     if (!/^Bearer [^\s]+$/i.test(authorization) || authorization.length > 8192) fail('Sign in to Tech Check to continue.', 401);
     const headers = { apikey: LEGACY_PUBLISHABLE_KEY, Authorization: authorization, Accept: 'application/json' };
     let user;
-    try { user = await readJson(LEGACY_URL + '/auth/v1/user', { headers }, 'Your sign-in could not be verified.'); }
+    try { user = await readJson(LEGACY_URL + '/auth/v1/user', { headers, ...(signal ? {signal} : {}) }, 'Your sign-in could not be verified.'); }
     catch (cause) {
       if (cause.status === 503) throw cause;
       fail('Your sign-in has expired. Sign in again.', 401);
     }
     if (!user || typeof user.id !== 'string' || !UUID.test(user.id)) fail('A verified Tech Check account is required.', 401);
-    const profiles = await readJson(LEGACY_URL + '/rest/v1/profiles?select=user_id,full_name,role,active,archived_at&user_id=eq.' + user.id + '&limit=1', { headers }, 'Tech Check account access could not be verified.');
+    const profiles = await readJson(LEGACY_URL + '/rest/v1/profiles?select=user_id,full_name,role,active,archived_at&user_id=eq.' + user.id + '&limit=1', { headers, ...(signal ? {signal} : {}) }, 'Tech Check account access could not be verified.');
     const profile = Array.isArray(profiles) ? profiles[0] : null;
     if (!profile || profile.user_id !== user.id || !['owner', 'it', 'service'].includes(profile.role) || profile.active !== true || profile.archived_at) fail('An active COS account is required.', 403);
     const technicianLink = TECHNICIAN_LINKS[user.id.toLowerCase()];
@@ -248,13 +249,13 @@ export function createOperationsHandler(options) {
     if (!actorId) return context;
     if (link && (profile.role !== link.department || String(profile.full_name || '').trim().toLowerCase() !== link.name.toLowerCase())) fail('Your linked technician identity details have changed. Ask an Owner to review the link.', 403);
     if (!serviceKey || !platformUrl) fail('The COS production connection is not configured.', 503);
-    const actors = await platformRead('user_profiles?select=user_id,display_name,active,department&organization_id=eq.' + ORGANIZATION_ID + '&user_id=eq.' + actorId + '&limit=1');
+    const actors = await platformRead('user_profiles?select=user_id,display_name,active,department&organization_id=eq.' + ORGANIZATION_ID + '&user_id=eq.' + actorId + '&limit=1',signal);
     const actor = Array.isArray(actors) ? actors[0] : null;
     const expectedDepartment = legacyOwner ? 'owner' : link.department;
     if (!actor || actor.user_id !== actorId || actor.active !== true || actor.department !== expectedDepartment) fail('Your linked COS production account is inactive or has a different department.', 403);
     if (link && String(actor.display_name || '').trim().toLowerCase() !== link.name.toLowerCase()) fail('Your linked production technician identity details have changed.', 403);
     const roleCode = legacyOwner ? 'owner' : link.roleCode;
-    const roles = await platformRead('user_roles?select=role_id,roles!inner(code,organization_id)&user_id=eq.' + actorId + '&roles.organization_id=eq.' + ORGANIZATION_ID + '&roles.code=eq.' + roleCode + '&limit=1');
+    const roles = await platformRead('user_roles?select=role_id,roles!inner(code,organization_id)&user_id=eq.' + actorId + '&roles.organization_id=eq.' + ORGANIZATION_ID + '&roles.code=eq.' + roleCode + '&limit=1',signal);
     if (!Array.isArray(roles) || !roles.some(row => row.roles?.code === roleCode && row.roles?.organization_id === ORGANIZATION_ID)) fail('Your linked COS production role is not active.', 403);
     return {...context,ownerRoleId:legacyOwner?roles.find(row=>row.roles?.code==='owner'&&row.roles?.organization_id===ORGANIZATION_ID)?.role_id:null};
   };
@@ -427,6 +428,7 @@ export function createOperationsHandler(options) {
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
   return async function handle(request) {
+    const requestStartedAt=Date.now();
     const ownerProofDeadlineMs=Date.now()+75000;
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
@@ -497,6 +499,32 @@ export function createOperationsHandler(options) {
         if (method === 'GET' && Object.keys(body).length) fail('GET endpoints do not accept a request body.');
       }
       if (!path.startsWith('/api/')) fail('COS endpoint not found.', 404);
+      if(path==='/api/techcheck/location-proof'){
+        if(method!=='POST'||!['it','owner'].includes(context.department))fail('Verified IT or Owner access required.',403);
+        if(new URL(request.url).search)fail('Shop verification query parameters are unsupported.');
+        if(!serviceKey||!platformUrl)fail('The COS production connection is not configured.',503);
+        const proofBody=body||await requestBody(request);
+        const revalidate=async signal=>{
+          // The real legacy JWT and current verified-fleet capability authorize
+          // this route; it never borrows or provisions a native actor identity.
+          const fresh=await authenticate(request,signal);
+          if(!['it','owner'].includes(fresh.department))fail('Verified IT or Owner access required.',403);
+          const capability=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_verified_fleet_capabilities_v1',{method:'POST',headers:{...fresh.headers,'Content-Type':'application/json'},body:'{}',signal},'Verified fleet access could not be checked.');
+          if(capability?.fleetRead!==true)fail('Verified IT or Owner access required.',403);
+          return {...fresh,fleetRead:true};
+        };
+        const read=async(items,signal)=>{
+          const [equipment,audits,devices]=await Promise.all([
+            legacyAll('equipment_master?select=equipment_key,unit_tag,canonical_family,tracker_state,updated_at&order=equipment_key.asc',context.headers,signal),
+            fleetPlacementAudits(context,signal),legacyAll('camera_devices?select=id,unit_key&order=id.asc',context.headers,signal),
+          ]);
+          validateHandoffLegacyItems(items,equipment);
+          const attestation=await rpc('cos_techcheck_shop_attestation_v1',{p_legacy_actor_id:context.legacyId,p_request_id:proofBody.request_id,p_purpose:proofBody.purpose,p_items:items},signal);
+          return {attestation,equipment,audits,devices};
+        };
+        try{return json(await issueHandoffLocationProof(context,proofBody,read,options.handoffLocation?.getSecret||(()=>undefined),revalidate,{deadlineMs:requestStartedAt+10000,signal:request.signal}));}
+        catch(error){if(error instanceof HandoffLocationError)fail(error.message,error.status);throw error;}
+      }
       if (path.startsWith('/api/tech/')) {
         if (context.legacyOwner || !['it', 'service'].includes(context.department)) fail('A signed-in technician account is required for the production queue.', 403);
         const claimRoute = /^\/api\/tech\/it-queue\/([^/]+)\/claim$/.exec(path);
