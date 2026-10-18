@@ -390,7 +390,7 @@ function scan(root) {
     const eyeOnly = /onsite-vision\.html$/.test(location.pathname) || image.closest('#authView,#forcePasswordView,#sessionLoading,.authcard,.visionLaunchOrb,.vision-eye-stage,.vision-assistant-head');
     const brandSlot = image.closest('.cos-vision-brand,.ownerAppBrand,.ownerAppSidebarUtility,.health-eye') || /cameras-on-site-logo/.test(image.getAttribute('src') || '');
     const full = !!brandSlot && !eyeOnly;
-    const svg = makeEye(image.getAttribute('alt') === '', image.getAttribute('alt') || 'Cameras Onsite', full);
+    const svg = makeEye(!full && image.getAttribute('alt') === '', full ? 'Cameras Onsite' : image.getAttribute('alt') || 'Cameras Onsite', full);
     if (image.id) svg.id = image.id;
     // Preserve compact inline-avatar slots rather than enlarging application controls.
     const width = image.getBoundingClientRect().width;

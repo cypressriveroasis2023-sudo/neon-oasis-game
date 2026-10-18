@@ -105,6 +105,8 @@ test('company headers use the full lockup while login and AI keep only the eye',
   });
   const full=page.locator('#company-logo-fixture .cos-company-logo');
   await expect(full).toHaveAttribute('data-eye-ready','true');
+  await expect(full).toHaveAttribute('role','img');
+  await expect(full).toHaveAttribute('aria-label','Cameras Onsite');
   await expect(page.locator('#authView .cos-static-eye')).toHaveAttribute('data-company-logo','eye');
   await expect(page.locator('#company-logo-fixture>div')).toBeHidden();
   const canvas=full.locator('canvas');
