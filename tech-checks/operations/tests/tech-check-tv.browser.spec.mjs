@@ -236,9 +236,9 @@ test('TV reads the same complete mHelp Field address layer as Fleet, groups dens
  await expect(frame.locator('.tv-fleet-summary')).toContainText('287 mHelp address pins');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('1 GPS-verified');
  await expect(groups).toHaveCount(1);
- await expect(groups).toHaveAttribute('data-group-count','287');
+ await expect(groups).toHaveAttribute('data-group-count','288'); // 287 distinct Product IDs plus one unlinked native fixture unit.
  await groups.click();
- await expect(frame.locator('.cos-compact-group-popup')).toContainText('287 equipment at nearby locations');
+ await expect(frame.locator('.cos-compact-group-popup')).toContainText('288 equipment at nearby locations');
  await expect(frame.locator('.cos-compact-show-all')).toBeVisible();
  expect(state.writes).toEqual([]);
 });
