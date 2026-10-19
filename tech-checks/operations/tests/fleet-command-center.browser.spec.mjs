@@ -2,13 +2,20 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
-test('all mHelp Field Product IDs remain visible with searchable system and health lists',async({page})=>{
+test('all mHelp Field Product IDs remain visible with searchable system and health lists',async({page},testInfo)=>{
  const fixture=fieldProductFixture();
  const {app,state}=await mountFleet(page,false,{field:fixture.field});
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await expect(board).toBeVisible();
  await expect(board.locator('.cos-command-kpis>button')).toHaveCount(6);
  await expect(board.locator('.cos-command-provider')).toHaveCount(4);
+ await expect(board.locator('.cos-command-attention-actions>button')).toHaveCount(4);
+ await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
+ await page.screenshot({path:testInfo.outputPath('command-dashboard.png'),fullPage:true});
+ await board.getByRole('button',{name:/Support equipment · no cameras/}).click();
+ await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(1);
+ await expect(board.locator('.cos-command-rows')).toContainText('ST 001');
+ await board.getByRole('button',{name:'Clear filters'}).click();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
  await expect(board.locator('.cos-command-metadata')).toContainText('7 Field + 1 Shop = 8');
  await expect(board.getByRole('heading',{name:'Victron / Helios',exact:true})).toBeVisible();
