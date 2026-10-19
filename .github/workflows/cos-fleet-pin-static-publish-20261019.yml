@@ -1,7 +1,18 @@
-name: Publish reviewed COS Fleet individual pins
+name: Publish reviewed COS Fleet and TV map bundle
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
+      - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/src/FleetDashboardMap.tsx'
+      - 'tech-checks/operations/src/TvFleetView.tsx'
+      - 'tech-checks/operations/src/fleetCompactMap.ts'
+      - 'tech-checks/operations/src/fleetAppearance.css'
+      - 'tech-checks/operations/src/fleetCompactSheet.css'
+      - 'tech-checks/operations/src/fleetCommandCenter*'
+      - 'tech-checks/operations/src/FleetCommandCenter.tsx'
+  pull_request:
     paths:
       - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
 permissions:
@@ -33,8 +44,10 @@ jobs:
         run: npm run build
       - name: Install Chromium for focused Fleet verification
         run: npx playwright install --with-deps chromium
-      - name: Verify individual-pin and shared-address behavior
-        run: npm run test:browser -- tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs
+      - name: Verify individual and grouped map semantics
+        run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs
+      - name: Verify map and TV browser behavior
+        run: npm run test:browser -- tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
       - name: Prove rebuilt assets contain approved pin design
         shell: bash
         run: |
@@ -47,10 +60,13 @@ jobs:
           test -n "$css"
           grep -Fq 'cos-unit-pin-drop' "dist/$js"
           grep -Fq 'cos-fleet-individual-pins' "dist/$css"
+          grep -Fq 'cos-compact-group' src/fleetAppearance.css
+          grep -Fq 'cos-compact-group' "dist/$css"
           mkdir -p "$RUNNER_TEMP/cos-reviewed-fleet-dist"
           rsync -a dist/ "$RUNNER_TEMP/cos-reviewed-fleet-dist/"
           echo "Reviewed compiled Fleet pin bundle: $js and $css"
       - name: Safely publish reviewed assets on current main
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         shell: bash
         run: |
           set -euo pipefail
