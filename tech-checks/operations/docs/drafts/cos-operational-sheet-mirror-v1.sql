@@ -7,7 +7,7 @@ create table cos_operational_private.sheet_mirror (
  product_id text primary key check(product_id ~ '^[1-9][0-9]{0,14}$'),
  sheet_id integer not null check(sheet_id in
   (568394918,2017346590,426115083,386511683,826256700,651684134,
-   451969219,135363149,1970577095,828079282,1900162010,1900162011)),
+   451969219,135363149,1975227208,828079282,1900162010,1900162011)),
  row_number integer not null check(row_number between 2 and 10000),
  unit_label text not null check(length(unit_label) between 1 and 250),
  fields jsonb not null,
