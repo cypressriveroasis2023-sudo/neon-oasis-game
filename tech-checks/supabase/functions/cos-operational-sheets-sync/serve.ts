@@ -9,7 +9,7 @@ const transport:typeof fetch=async(input,init)=>{
  const result=await fetch(input,init);
  const url=typeof input==='string'?input:input instanceof URL?input.href:input.url;
  if(result.ok&&url.startsWith(BOOK_URL)&&(!init?.method||init.method==='GET')){
-  const body=await readSheetsJson(result,9*1024*1024,init?.signal??undefined);
+  const body=await readSheetsJson(result,9*1024*1024,init?.signal??AbortSignal.timeout(35000));
   return new Response(JSON.stringify(normalizeGoogleSheetWire(body)),{status:result.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
  }
  return result;
