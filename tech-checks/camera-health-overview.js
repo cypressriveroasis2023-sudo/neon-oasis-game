@@ -53,7 +53,7 @@
   }
   function combinedState(states,empty='verifying'){
     if(!states.length)return empty;
-    return states.every(s=>s==='online')?'online':states.every(s=>s==='offline')?'offline':states.some(s=>['online','offline','degraded'].includes(s))?'degraded':'verifying';
+    return states.every(s=>s==='online')?'online':states.every(s=>s==='offline')?'offline':states.includes('degraded')||states.includes('online')&&states.includes('offline')?'degraded':'verifying';
   }
   function classifyUnit(ds,tracker=[],now=Date.now(),health={}){
     const active=ds.filter(d=>placement(d,tracker)!=='inactive');

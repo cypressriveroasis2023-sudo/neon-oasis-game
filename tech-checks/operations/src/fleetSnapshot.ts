@@ -1,6 +1,7 @@
 import {validateCameraHealth,canonicalCameraUnit,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {resolveVerifiedUnitIdentity} from './verifiedUnitIdentity';
 import {checkedFieldMap} from './gpsPersistence';
+import {fieldProductScope} from './fieldProductScope';
 export type FleetSnapshot={health:Health;fieldMap:ReturnType<typeof checkedFieldMap>;readAt:string;readStartedAt?:number};
 type Unit=FieldHealthUnit&{activeInventoryEligible?:boolean;currentLocationType?:string;placement?:string;placementSource?:string;effectivePlacement?:{contract:string;state:string}};
 export function inventoryPlacement(unit:Unit):'field'|'shop'|'unknown'{
@@ -37,5 +38,6 @@ export function reconcileFleetSnapshot(rawHealth:unknown,rawMap:unknown,now=Date
  const count=(scope:string)=>rows.filter(r=>r.scope===scope).length;
  const next=health.evidenceVersion===2?{...health,rows,online:rows.filter(r=>r.scope==='field'&&r.status==='online').length,offline:rows.filter(r=>r.scope==='field'&&r.status==='offline').length,review:rows.filter(r=>r.scope==='field'&&r.status==='review').length,fieldDevices:count('field'),shopRoot:count('shop'),inventory:{allRecords:rows.length,activeFieldRecords:count('field'),activeShopRecords:count('shop'),inactiveRecords:count('inactive'),unknownScopeRecords:count('unknown')}}:health;
  validateCameraHealth(next);
- return {health:{...next,fleetFieldUnits:inventory},fieldMap,readAt:new Date(now).toISOString()};
+ const productScope=fieldProductScope(fieldMap,now);
+ return {health:{...next,fleetFieldUnits:inventory,...(productScope?{fieldProductScope:productScope}:{})},fieldMap,readAt:new Date(now).toISOString()};
 }

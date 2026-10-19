@@ -71,7 +71,7 @@ export default function CameraHealthOverview({roster,powerReadEnabled=true,healt
       const item=recorded?.items.find(item=>item.unitId===row.id);
       return item?{...row,retired:!item.active}:row;
     });
-    return filterFleetDashboard(rows,initialFleetFilters,'fleet');
+    return filterFleetDashboard(rows,initialFleetFilters,'fleet').filter(row=>row.countedFieldCamera!==false);
   },[roster,units,health,now]);
   const fieldCounts=fleetDashboardSummary(fieldRows);
   const [family,setFamily]=useState('all');

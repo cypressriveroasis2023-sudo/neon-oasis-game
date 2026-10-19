@@ -1,5 +1,6 @@
 import {cameraOverview,healthWithFieldInventory} from './cameraHealthCounts';
 import {validateCameraHealth} from './fieldCameraHealth';
+import {fleetDashboardRows,fleetDashboardSummary,filterFleetDashboard,initialFleetFilters} from './fleetDashboardModel';
 /** Both dashboards consume the same verified, source-separated unit coverage as native health. */
 export function cameraDashboardSummary(value:unknown,now=Date.now()) {
   const unavailable={available:false as const,headline:'Health unavailable',systems:'Provider system totals not verified',cameraCoverage:'Camera/detector coverage not verified',serviceCoverage:'Service coverage not verified',placement:'Placement scope not verified',note:'Source-separated inventory is not available. Open Camera Health to review.',attention:null,refreshedAt:null,coverage:null,scopes:null};
@@ -7,7 +8,7 @@ export function cameraDashboardSummary(value:unknown,now=Date.now()) {
   try{
     const health=validateCameraHealth(value),units=health.fleetFieldUnits||[],overview=cameraOverview(healthWithFieldInventory(health,units,now),now,units);
     if(!overview.scopeVerified)return unavailable;
-    const c=overview.coverage,s=overview.scopes,shared=Boolean(health.fleetFieldUnits),o=overview.operational,attention=shared?o.offline+o.unknown:c.offline+c.review;
+    const c=overview.coverage,s=overview.scopes,shared=Boolean(health.fleetFieldUnits),field=health.fieldProductScope?fleetDashboardSummary(filterFleetDashboard(fleetDashboardRows(units,health,null,null,now),initialFleetFilters,'fleet')):null,o=field?{online:field.online,offline:field.offline,unknown:field.unknown,monitored:field.online+field.offline}:overview.operational,attention=shared?o.offline+o.unknown:c.offline+c.review;
     return {available:true as const,
       headline:shared?(o.monitored+o.unknown===0?'No field units recorded':attention===0?'No field units flagged':attention+' field unit'+(attention===1?' needs':'s need')+' review'):c.total===0?'No active / unresolved units recorded':attention===0?'No provider systems flagged':attention+' provider system'+(attention===1?' needs':'s need')+' review',
       systems:shared?'Field units: '+o.online+' online · '+o.offline+' offline · '+o.unknown+' need review':c.total+' active / unresolved units · Provider systems: '+c.online+' online · '+c.offline+' offline · '+c.review+' review',
