@@ -3,7 +3,7 @@
  * Never read map/geocodes, camera/video health, GPS, vendor or Sheets here. */
 type Row=Record<string,unknown>;
 const obj=(v:unknown):v is Row=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-const id=(v:unknown)=>typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v);
+const id=(v:unknown):v is string=>typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v);
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 const hash=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const safe=(v:unknown,max:number)=>typeof v==='string'&&v===v.trim()&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v)&&!/^[-+=@]/.test(v);
