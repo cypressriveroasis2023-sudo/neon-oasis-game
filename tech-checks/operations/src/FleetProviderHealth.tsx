@@ -19,6 +19,7 @@ function ProviderSection({group,onOpen}:{group:ProviderSummary;onOpen:(product:P
  const [filter,setFilter]=useState<StatusFilter>('all');
  const [search,setSearch]=useState('');
  const [limit,setLimit]=useState(8);
+ const [expanded,setExpanded]=useState(false);
  const isSupport=group.provider==='support';
  const rows=group.items.filter(item=>(filter==='all'||item.healthStatus===filter)
   &&(item.unitNumber+' '+item.productId+' '+item.customer).toLowerCase().includes(search.trim().toLowerCase()));
@@ -33,13 +34,14 @@ function ProviderSection({group,onOpen}:{group:ProviderSummary;onOpen:(product:P
     {(['online','offline','unverified'] as const).map(state=>
      <button key={state} type='button' className={'cos-provider-status cos-provider-status-'+state}
        aria-pressed={filter===state}
-       onClick={()=>{setFilter(previous=>previous===state?'all':state);setLimit(8);}}>
+       onClick={()=>{setFilter(previous=>previous===state?'all':state);setLimit(8);setExpanded(true);}}>
       <b>{group.counts[state]}</b><span>{statusText[state]}</span>
      </button>)}
    </div>}
-  <div className='cos-provider-controls'>
+  {!expanded&&<button type='button' className='cos-provider-expand' onClick={()=>setExpanded(true)}>View {title} equipment and Offline list →</button>}
+  {expanded&&<><div className='cos-provider-controls'>
    <label>{title} status
-    <select aria-label={title+' status filter'} value={filter} onChange={event=>{setFilter(event.target.value as StatusFilter);setLimit(8);}}>
+    <select aria-label={title+' status filter'} value={filter} onChange={event=>{setFilter(event.target.value as StatusFilter);setLimit(8);setExpanded(true);}}>
      <option value='all'>All ({group.count})</option>
      {!isSupport&&<><option value='online'>Online ({group.counts.online})</option><option value='offline'>Offline ({group.counts.offline})</option><option value='unverified'>Unverified ({group.counts.unverified})</option></>}
      {isSupport&&<option value='not_applicable'>No camera ({group.counts.not_applicable})</option>}
@@ -47,7 +49,7 @@ function ProviderSection({group,onOpen}:{group:ProviderSummary;onOpen:(product:P
    </label>
    <label>Find equipment
     <input aria-label={'Search '+title+' equipment'} value={search} placeholder='Unit or Product ID'
-     onChange={event=>{setSearch(event.target.value);setLimit(8);}}/>
+     onChange={event=>{setSearch(event.target.value);setLimit(8);setExpanded(true);}}/>
    </label>
   </div>
   <p className='cos-provider-results'>{rows.length} {title} equipment record{rows.length===1?'':'s'} match.</p>
@@ -64,6 +66,7 @@ function ProviderSection({group,onOpen}:{group:ProviderSummary;onOpen:(product:P
   </ul>
   {!rows.length&&<p className='cos-provider-empty'>{filter==='offline'?'No confirmed offline equipment is recorded in this category. This does not establish that every unit is healthy.':'No equipment matches this filter.'}</p>}
   {rows.length>limit&&<button className='cos-provider-more' onClick={()=>setLimit(current=>current+40)}>Show {Math.min(40,rows.length-limit)} more · {rows.length-limit} remaining</button>}
+  <button type='button' className='cos-provider-collapse' onClick={()=>setExpanded(false)}>Collapse {title} list</button></>}
  </article>;
 }
 
