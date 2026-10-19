@@ -8,12 +8,12 @@ const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f
 const id=(v:unknown)=>typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v);
 const safe=(v:unknown,max=600)=>typeof v==='string'&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v);
 const stamp=(v:unknown)=>typeof v==='string'&&/(?:Z|[+-]\d\d(?::?\d\d)?)$/.test(v)?Date.parse(v.replace(/([+-]\d\d)$/,'$1:00')):NaN;
-const source='owner_supplied_mhelp_export';
 function checked(receipt:unknown,now:number):Row|null{
  if(receipt==null)return null;
- if(!object(receipt)||receipt.contract!=='COS_MHELP_UPLOAD_V1'||receipt.reviewed!==true||!hash(receipt.sourceSha256)||!hash(receipt.payloadSha256)
+ if(!object(receipt)||!['COS_MHELP_UPLOAD_V1','COS_MHELP_API_V1'].includes(receipt.contract)||receipt.reviewed!==true||!hash(receipt.sourceSha256)||!hash(receipt.payloadSha256)
   ||!Number.isFinite(stamp(receipt.receivedAt))||stamp(receipt.receivedAt)>now||!['minute','second'].includes(receipt.receivedAtPrecision)
   ||receipt.exportAsOf!==null||!Array.isArray(receipt.records)||!receipt.records.length||receipt.records.length>10000)throw Error('Invalid reviewed mHelp upload receipt');
+ if(receipt.contract==='COS_MHELP_API_V1'&&(receipt.origin!=='mhelpdesk_api'||receipt.portalId!=='224643'||receipt.complete!==true||receipt.recordCount!==receipt.records.length||!Array.isArray(receipt.apiMissingRecords)))throw Error('Invalid complete live mHelp source');
  const seen=new Set<string>(),targets=new Set<string>();
  for(const r of receipt.records){
   if(!object(r)||!id(r.productId)||seen.has(r.productId)||!safe(r.unitNumber,250)||!r.unitNumber||!safe(r.category,250)||!id(r.customerId)||!safe(r.customer,250)||!r.customer
@@ -105,6 +105,7 @@ function retainedLocation(row:Row,r:Row,b:Row,proof:Row|undefined,customerIds:Ma
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
 export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>}={}):{snapshot:Row;authorities:Row[]}{
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
+ const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
  const byId=new Map<string,Row>();for(const row of snapshot.inventoryItems){if(!object(row)||!uuid(row.id)||byId.has(row.id))throw Error('Invalid upload target inventory');byId.set(row.id,row);}
  const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
@@ -126,7 +127,7 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
     if(groupBlock){reason=groupBlock;if(groupBlock==='identity_conflict')state='held';}
     for(const target of groupBlock?[]:targets){
      const row=byId.get(target.id)!,preserved=retainedLocation(row,r,b,options.validatedLocationProofs?.get(row.id),customerIds);
-     const evidence={source,...(r.scopedAuthority?{evidenceKind:'derived_mapping',scopedRevisionId:r.scopedAuthority.revisionId}:{}),productId:r.productId,sourceSha256:evidenceSha256,observedAt,timestampKind:r.scopedAuthority?'scoped_source_received':'upload_received',timestampPrecision:r.scopedAuthority?'second':receipt.receivedAtPrecision,state:'recorded',fresh:false,reason:'owner_supplied_export_not_live_api'};
+     const evidence={source,...(r.scopedAuthority?{evidenceKind:'derived_mapping',scopedRevisionId:r.scopedAuthority.revisionId}:{}),productId:r.productId,sourceSha256:evidenceSha256,observedAt,timestampKind:live?'api_snapshot_received':r.scopedAuthority?'scoped_source_received':'upload_received',timestampPrecision:r.scopedAuthority?'second':receipt.receivedAtPrecision,state:'recorded',fresh:false,reason:live?'saved_complete_api_snapshot':'owner_supplied_export_not_live_api'};
      changes.set(row.id,{...row,...(preserved?preserved.locationFields:historicalOnly(row)),placement:r.placement,currentLocationType:r.placement.toLowerCase(),placementSource:'mhelpdesk_upload',
       customer:r.customer,site:r.placement==='SHOP'?'SHOP':preserved?.site||null,address:preserved?.address||null,addressSource:preserved?(preserved.locationFields.addressSource||row.addressSource):'Uploaded customer address is source-only; verify installation',
       uploadLifecycle:r.lifecycle,uploadActiveInventoryEligible:r.lifecycle==='UNFLAGGED',uploadProductId:r.productId,uploadSourceAddress:r.sourceAddress,...(r.displayUnitNumber?{uploadDisplayUnitNumber:r.displayUnitNumber}:{}),
@@ -138,11 +139,19 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
   return {recordId:'mhelp_product:'+r.productId,productId:r.productId,unitNumber:r.displayUnitNumber||r.unitNumber,sourceUnitNumber:r.unitNumber,observedAt,category:r.category,placement:r.placement,uploadLifecycle:r.lifecycle,...(r.inventoryOnlyReason?{inventoryOnlyReason:r.inventoryOnlyReason}:{}),
    customer:r.customer,sourceAddress:r.sourceAddress,binding:{state,unitIds,candidateUnitIds:[...new Set([...(r.possibleAliasUnitIds||[]),...(state==='held'&&b?[b.trackerId,b.nativeUnitId].filter(Boolean):[])])],placementHeld:r.placementHeld===true||reason==='newer_or_undated_source_assignment',matchMethod:b?.matchMethod||null,reason},overlayApplied:applied};
  });
+ if(live)for(const removed of receipt.apiMissingRecords){
+  if(!object(removed)||!id(removed.productId)||receipt.records.some((r:Row)=>r.productId===removed.productId))throw Error('Invalid absent Product-ID receipt');
+  const b=removed.binding;if(!b||b.guardCurrent!==true)continue;
+  const targets=[{id:b.nativeUnitId,label:b.nativeLabel},{id:b.trackerId,label:b.trackerLabel}].filter(t=>t.id);
+  const rows=targets.map(t=>byId.get(t.id));if(rows.some((r,i)=>!r||r.unitNumber!==targets[i].label)||rows.some(r=>blockingReason(r!,b,audits,identity,stamp(receipt.receivedAt),rows as Row[])))continue;
+  for(const row of rows as Row[])if(!changes.has(row.id))changes.set(row.id,{...row,uploadLifecycle:'MISSING',uploadActiveInventoryEligible:false,mhelpInventoryReview:'Not returned by the complete mHelpDesk inventory. Saved equipment and history are retained.'});
+ }
  const inventoryItems=snapshot.inventoryItems.map((r:Row)=>changes.get(r.id)||r),priorField=new Set(snapshot.items.map((r:Row)=>r.id));
  const items=inventoryItems.filter((r:Row)=>changes.has(r.id)?r.placement==='FIELD'&&r.uploadActiveInventoryEligible!==false:priorField.has(r.id));
  const count=(fn:(r:Row)=>boolean)=>records.filter(fn).length;
- const uploadInventory={contract:'COS_MHELP_UPLOAD_INVENTORY_V1',source,sourceSha256:receipt.sourceSha256,receivedAt:receipt.receivedAt,receivedAtPrecision:receipt.receivedAtPrecision,
+ const uploadInventory={contract:'COS_MHELP_UPLOAD_INVENTORY_V1',source,sourceSha256:receipt.sourceSha256,receivedAt:receipt.receivedAt,receivedAtPrecision:receipt.receivedAtPrecision,...(live?{lastApiReadAt:receipt.apiSync?.lastSuccessAt||receipt.receivedAt,missingProductIds:receipt.apiMissingRecords.map((r:Row)=>r.productId)}:{}),
   exportAsOf:null,trackerRecords:receipt.trackerRecords||[],trackerSource:receipt.trackerSource||null,countBasis:'mhelp_product_records_not_unique_physical_units',physicalDeduplication:'incomplete',
   summary:{totalRecords:records.length,fieldRecords:count(r=>r.placement==='FIELD'),shopRecords:count(r=>r.placement==='SHOP'),unflaggedFieldRecords:count(r=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED'),unflaggedShopRecords:count(r=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED'),doNotUseRecords:count(r=>r.uploadLifecycle==='DO_NOT_USE'),missingRecords:count(r=>r.uploadLifecycle==='MISSING'),linkedRecords:count(r=>r.binding.state==='linked'),unlinkedRecords:count(r=>r.binding.state==='unlinked'),heldRecords:count(r=>r.binding.state==='held'),appliedRecords:count(r=>r.overlayApplied)},records};
- return {snapshot:{...snapshot,inventoryItems,items,uploadInventory},authorities};
+ const apiSync=receipt.apiSync;
+ return {snapshot:{...snapshot,inventoryItems,items,uploadInventory,...(apiSync?.enabled===true?{mhelpPlacementSync:{...(snapshot.mhelpPlacementSync||{}),contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:apiSync.lastSuccessAt||null,errorCode:apiSync.errorCode||snapshot.mhelpPlacementSync?.errorCode||null}}:{})},authorities};
 }
