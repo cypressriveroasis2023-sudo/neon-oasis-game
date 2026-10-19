@@ -43,9 +43,6 @@ create index cos_operational_outbox_pending on cos_operational_private.sheet_out
 alter table cos_operational_private.current_placements enable row level security;
 alter table cos_operational_private.events enable row level security;
 alter table cos_operational_private.sheet_outbox enable row level security;
-alter table cos_operational_private.current_placements force row level security;
-alter table cos_operational_private.events force row level security;
-alter table cos_operational_private.sheet_outbox force row level security;
 revoke all on all tables in schema cos_operational_private from public,anon,authenticated,service_role;
 
 -- Exactly one current Product ID is required; historic census revisions cannot
@@ -59,7 +56,7 @@ begin
   select records into v_rows from cos_mhelp_placement_private.upload_batches where source_sha256=v_sha;
   if jsonb_typeof(v_rows)<>'array' or jsonb_array_length(v_rows)<1 or jsonb_array_length(v_rows)>10000 then
     raise exception 'Current complete source unavailable' using errcode='55000';end if;
-  select count(*), max(x.value) into v_count,v_product
+  select count(*), (jsonb_agg(x.value))->0 into v_count,v_product
   from jsonb_array_elements(v_rows) x where x.value->>'productId'=p_product;
   if v_count<>1 or v_product->>'unitNumber' is null then
     raise exception 'Exact mHelp Product ID not found or duplicated' using errcode='22023';end if;
@@ -120,7 +117,7 @@ begin
  if p_request_id is null or coalesce(p_product_id,'') !~ '^[1-9][0-9]{0,14}$'
    or coalesce(p_expected_source_sha256,'') !~ '^[a-f0-9]{64}$'
    or p_expected_revision is null or p_expected_revision<0
-   or p_placement not in ('FIELD','SHOP') then
+   or coalesce(p_placement,'') not in ('FIELD','SHOP') then
    raise exception 'Invalid move identity or revision' using errcode='22023';end if;
  if p_placement='FIELD' and
    (coalesce(length(btrim(p_customer)),0)<2 or coalesce(length(btrim(p_site)),0)<2
