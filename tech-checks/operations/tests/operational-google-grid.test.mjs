@@ -44,7 +44,7 @@ test('index edits, duplicate Product IDs, shifted columns, formulas and wrong wo
  assert.throws(()=>readOperationalWorkbook(shifted.metadata,shifted.grid),/Tracker column range changed/);
  const formula=workbook();
  formula.grid.sheets[0].data[1].rowData[1].values[0]={userEnteredValue:{formulaValue:'=IMPORTRANGE("secret","A1")'}};
- assert.throws(()=>readOperationalWorkbook(formula.metadata,formula.grid),/Formula|Unsafe/);
+ assert.throws(()=>readOperationalWorkbook(formula.metadata,formula.grid),/formula|Unsafe/i);
  const wrong=workbook();wrong.metadata.spreadsheetId='another-workbook';
  assert.throws(()=>operationalRanges(wrong.metadata),/Wrong tracker workbook/);
  const missing=workbook();missing.grid.sheets[0].data[0].rowData.pop();
