@@ -8,6 +8,7 @@ import {fleetLocationPinId,type FleetMapPin as Pin} from './fleetLocationPins';
 import {recordedAddressText} from './fleetDisplayAddress';
 import type {MhelpAddressMapPin,MhelpAddressMapReview} from './mhelpAddressMapPins';
 import './mhelpAddressMap.css';
+import './fleetCompactSheet.css';
 import {type ReticleState} from './fieldMapMarkers';
 import {readFieldMapView,saveFieldMapView} from './fieldMapViewState';
 import {useFieldMapDisplay} from './fieldMapDisplay';
