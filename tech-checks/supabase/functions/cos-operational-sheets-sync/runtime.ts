@@ -124,7 +124,7 @@ export function createOperationalSheetSyncRuntime(options:{
        // Exact sheet id and family, not a bare unit number.
        (awaitTitle(s.sheetId))===title);
      if(!t)fail('missing_sheet_row');
-     return {productId:x.productId,sheetId:t.sheetId,row:t.row,label:t.label,fields:t.fields};
+     return {productId:x.productId,sheetId:t.sheetId,row:t.row,label:t.label,matchKey:x.key,fields:t.fields};
     });
     function awaitTitle(sheetId:number){
      return [
