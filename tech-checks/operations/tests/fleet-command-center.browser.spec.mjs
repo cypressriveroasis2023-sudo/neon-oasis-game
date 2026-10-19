@@ -22,6 +22,10 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  await expect(board.locator('.cos-command-rows')).toContainText('Unverified');
  await board.getByRole('button',{name:'Clear filters'}).click();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
+ await board.locator('.cos-command-row').filter({hasText:'Ranger 902'}).click();
+ await expect(board.getByRole('region',{name:'Selected Field equipment details'})).toContainText('Product 1006');
+ await expect(board.getByRole('region',{name:'Selected Field equipment details'})).toContainText('FIELD · mHelpDesk');
+ await board.getByRole('button',{name:'Close details ×'}).click();
  const overflow=await board.evaluate(element=>({width:element.clientWidth,scroll:element.scrollWidth}));
  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width+2);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
