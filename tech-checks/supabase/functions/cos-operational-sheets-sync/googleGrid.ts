@@ -19,8 +19,8 @@ function cells(snapshot:Row,tab:Row,expected:number[],grid:Row):Row[][]{
  if(!Array.isArray(grid.data)||grid.data.length!==expected.length)throw Error('Incomplete protected equipment columns');
  const arrays=new Map<number,Row[]>();
  for(const g of grid.data){
-  if(!object(g)||!Number.isSafeInteger(g.startColumn)||!expected.includes(g.startColumn)
-    ||(g.startRow??0)!==0||arrays.has(g.startColumn)
+  if(!object(g)||!Number.isSafeInteger(g.startColumn??0)||!expected.includes(g.startColumn??0)
+    ||(g.startRow??0)!==0||arrays.has(g.startColumn??0)
     ||!Array.isArray(g.rowData)||g.rowData.length>tab.gridProperties.rowCount)
    throw Error('Tracker column range changed');
   arrays.set(g.startColumn,g.rowData.map((r:Row)=>{
