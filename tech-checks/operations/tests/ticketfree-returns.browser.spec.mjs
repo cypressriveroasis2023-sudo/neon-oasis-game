@@ -110,7 +110,7 @@ test('logout removes an open private queue and late reads cannot restore it',asy
 test('queue errors are visible, not reported as an empty fleet; narrow phones remain usable',async({page})=>{
  await page.setViewportSize({width:320,height:740});await setup(page);await page.evaluate(()=>returnFixture.failRead=true);await page.getByRole('button',{name:'Return to IT',exact:true}).click();
  await expect(page.locator('.cos-ticketfree-status')).toContainText('Saved return queue unavailable');await expect(page.getByRole('heading',{name:'Waiting for IT (0)'})).toHaveCount(0);
- await page.evaluate(()=>returnFixture.failRead=false);await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.getByRole('button',{name:'Send to IT',exact:true})).toBeVisible();
+ await page.evaluate(()=>returnFixture.failRead=false);await page.getByRole('dialog').getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.getByRole('button',{name:'Send to IT',exact:true})).toBeVisible();
  const metrics=await page.locator('dialog').evaluate(d=>({width:d.getBoundingClientRect().width,viewport:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}));expect(metrics.width).toBeLessThanOrEqual(metrics.viewport);expect(metrics.scroll).toBeLessThanOrEqual(metrics.client+1);
  await page.screenshot({path:'test-results-ticketfree/service-return-320.png',fullPage:true});
 });
