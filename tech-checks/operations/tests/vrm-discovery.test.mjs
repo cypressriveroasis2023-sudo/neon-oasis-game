@@ -87,3 +87,31 @@ test('Scheduled success response contains no names, account, portal or token dat
  const response=await handler(new Request('https://edge.example',{method:'POST',headers:{'x-cos-vrm-sync':'a'.repeat(64)}}));
  const data=await response.json();assert.deepEqual(Object.keys(data).sort(),['lastSuccessAt','ok','state']);assert.ok(!JSON.stringify(data).includes('Private'));
 });
+
+test('Private approvals enable one exact VRM installation while preserving existing embeds',async()=>{
+ const original='https://vrm.victronenergy.com/installation/7/embed/synthetic_old';
+ const approved='https://vrm.victronenergy.com/installation/1045297/embed/synthetic_new';
+ const db=storage({items:[
+  {installationId:7,name:'HELIOS 007',available:true,lastSeenAt:null},
+  {installationId:1045297,name:'HELIOS 012',available:true,lastSeenAt:null},
+  {installationId:1041373,name:'HELIOS 011',available:true,lastSeenAt:null},
+ ]});
+ const reader=createVrmFleetReader({rpc:db.rpc,getAccessToken:()=>undefined,embeds:JSON.stringify({'7':original}),
+  readDashboardEmbeds:async()=>({'1045297':approved})});
+ const result=await reader();
+ assert.equal(result.items.find(x=>x.installationId===7).embedUrl,original);
+ assert.equal(result.items.find(x=>x.installationId===1045297).embedUrl,approved);
+ assert.equal(result.items.find(x=>x.installationId===1041373).embedUrl,null);
+ assert.deepEqual(db.calls.map(x=>x.name),['cos_vrm_fleet_snapshot']);
+});
+test('Failed, malformed and mismatched private approvals preserve original fleet and never cross-link installations',async()=>{
+ const original='https://vrm.victronenergy.com/installation/7/embed/synthetic_old';
+ const db=storage({items:[{installationId:7,name:'HELIOS 007',available:true,lastSeenAt:null},{installationId:1045297,name:'HELIOS 012',available:false,lastSeenAt:null}]});
+ for(const readDashboardEmbeds of [async()=>{throw Error('private RPC unavailable')},async()=>({'1045297':'https://vrm.victronenergy.com/installation/7/embed/wrong'}),async()=>['invalid']]){
+  const result=await createVrmFleetReader({rpc:db.rpc,getAccessToken:()=>undefined,embeds:JSON.stringify({'7':original}),readDashboardEmbeds})();
+  assert.equal(result.items.find(x=>x.installationId===7).embedUrl,original);
+  assert.equal(result.items.find(x=>x.installationId===1045297).embedUrl,null);
+ }
+ const checked=await createVrmFleetReader({rpc:db.rpc,getAccessToken:()=>undefined,readDashboardEmbeds:async()=>({'1045297':'https://vrm.victronenergy.com/installation/1045297/embed/synthetic_new'})})();
+ assert.equal(checked.items.find(x=>x.installationId===1045297).embedUrl,null);
+});
