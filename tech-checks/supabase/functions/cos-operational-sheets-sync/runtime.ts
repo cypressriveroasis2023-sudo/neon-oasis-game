@@ -54,7 +54,6 @@ export function createOperationalSheetSyncRuntime(options:{
    catch{throw Error('malformed');}
   };
   let lease:string|null=null,stage='authenticate';
-  let errors=0;
   const fail=(name:string)=>{throw Error(name)};
   try{
    const allowed=await fetchJson(
@@ -120,13 +119,6 @@ export function createOperationalSheetSyncRuntime(options:{
     const second=await read();if(!equals(live,second))fail('sheet_changed');
     stage='bootstrap';
     const records=second.index.map(x=>{
-     const tab=second.sheet.find(y=>{
-      const prefix=x.key.slice(0,x.key.indexOf('|'));
-      const label=x.key.slice(x.key.indexOf('|')+1);
-      return y.label===label&&ranges.some(()=>true) &&
-       // Tab title binding comes from the immutable parsed Google metadata.
-       second.sheet.filter(z=>z.label===label).some(z=>z===y);
-     });
      const title=x.key.slice(0,x.key.indexOf('|')),label=x.key.slice(x.key.indexOf('|')+1);
      const t=second.sheet.filter(s=>s.label===label).find(s=>
        // Exact sheet id and family, not a bare unit number.
@@ -221,7 +213,6 @@ export function createOperationalSheetSyncRuntime(options:{
    return reply({state:'processed',equipment:live.count,inbound,outbound:outgoing,recovered,conflicts,
      held:plan.held.length});
   }catch(cause){
-   errors++;
    // Redact provider bodies, OAuth tokens, customer addresses and row data.
    const reason=stage.startsWith('google')||stage==='readback'?'google_read':
      stage==='metadata'?'google_read':stage==='sheet_read'?'google_read':
