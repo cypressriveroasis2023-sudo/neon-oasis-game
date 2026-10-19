@@ -160,7 +160,7 @@ begin
      and a.next_attempt_at<=now()
      and (a.locked_until is null or a.locked_until<now())
    order by a.next_attempt_at,a.created_at
-   for update skip locked limit 1;
+   limit 1 for update skip locked;
    if not found then return null;end if;
    v_token:=gen_random_uuid();
    update app_private.techcheck_department_alert_outbox_v1 set
