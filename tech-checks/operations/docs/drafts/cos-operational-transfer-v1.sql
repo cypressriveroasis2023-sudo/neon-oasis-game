@@ -34,7 +34,7 @@ create table cos_operational_private.sheet_outbox (
   product_id text not null,
   revision bigint not null,
   new_state jsonb not null,
-  status text not null default 'pending' check(status in ('pending','published','conflict','failed')),
+  status text not null default 'pending' check(status in ('pending','published','conflict','failed','superseded')),
   attempts integer not null default 0 check(attempts >= 0),
   last_error_code text,
   updated_at timestamptz not null default clock_timestamp()
@@ -181,6 +181,11 @@ begin
  insert into cos_operational_private.events(
    request_id,actor_id,product_id,source_unit_number,submitted,before_state,after_state,revision
  ) values(p_request_id,p_actor_user_id,p_product_id,v_label,v_submitted,v_before_state,v_after_state,v_revision);
+ -- Only the latest committed intent may publish. Earlier requested states
+ -- remain append-only events, but must never replay over the newer placement.
+ update cos_operational_private.sheet_outbox
+   set status='superseded',updated_at=clock_timestamp()
+   where product_id=p_product_id and status in ('pending','conflict','failed');
  insert into cos_operational_private.sheet_outbox(request_id,product_id,revision,new_state)
    values(p_request_id,p_product_id,v_revision,v_after_state);
  return jsonb_build_object('committed',true,'replayed',false,'productId',p_product_id,
