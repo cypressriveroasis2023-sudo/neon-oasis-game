@@ -74,3 +74,28 @@ test('one exact crosswalk per Product ID across the 12 tabs preserves every fami
  assert.equal(plan.bootstrap.length,12);assert.equal(plan.held.length,0);
  assert.equal(plan.coverage,12);
 });
+
+test('all 1,001 historical rows may bootstrap while decommissioned and incomplete Field rows remain held',()=>{
+ const retired={placement:'DECOMMISSIONED',customer:'Cameras OnSite',site:'',address:''};
+ const missingSite={...field,site:''};
+ const idx=[item,{key:'SPOTTERS|Spotter 017 - DO NOT USE',productId:'456'},
+   {key:'STANDS|ST 174',productId:'789'}];
+ const all=[row,{sheetId:2017346590,row:4,label:'Spotter 017 - DO NOT USE',fields:retired},
+   {sheetId:1900162010,row:177,label:'ST 174',fields:missingSite}];
+ const first=planOperationalSync(idx,all,[],[]);
+ assert.equal(first.bootstrap.length,3);
+ assert.equal(first.held.length,0);
+ const mirror=[mirror,
+  {productId:'456',sheetId:2017346590,row:4,label:'Spotter 017 - DO NOT USE',fields:retired,revision:0},
+  {productId:'789',sheetId:1900162010,row:177,label:'ST 174',fields:missingSite,revision:0}];
+ const later=planOperationalSync(idx,all,mirror,[]);
+ assert.equal(later.coverage,3);
+ assert.deepEqual(later.held.map(x=>x.productId),['456','789']);
+ assert.equal(later.inbound.length,0);
+ // The operator supplied the missing site, making exactly that record
+ // eligible for inbound revision without inventing a map pin.
+ const improved=all.map(x=>x.label==='ST 174'?{...x,fields:{...missingSite,site:'Project corrected'}}:x);
+ const after=planOperationalSync(idx,improved,mirror,[]);
+ assert.deepEqual(after.inbound.map(x=>x.productId),['789']);
+ assert.deepEqual(after.held.map(x=>x.productId),['456']);
+});
