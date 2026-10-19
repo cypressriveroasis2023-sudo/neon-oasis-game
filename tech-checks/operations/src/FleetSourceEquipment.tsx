@@ -7,7 +7,7 @@ const lifecycle={active:'Active record',do_not_use:'Do not use',missing:'Missing
 export default function FleetSourceEquipment({record,now,estimate,onSelect}:{record:RecordedEquipment;now:number;estimate?:SourceEquipmentLocationPin['estimate'];onSelect?:()=>void}){
  return <article className='cos-fleet-source-record' data-record-id={record.id}>
   <strong>{record.displayUnitNumber||record.unitNumber}</strong><small>{record.customer||'Customer not supplied'}</small>
-  <p className='cos-fleet-recorded-address'>{record.source==='owner_supplied_mhelp_export'?'MHelp address':'Recorded source address'}: {recordedAddressText(record.sourceAddress)||'Not supplied in this source'}</p>
+  <p className='cos-fleet-recorded-address'>{['owner_supplied_mhelp_export','mhelpdesk_api'].includes(record.source||'')?'MHelp address':'Recorded source address'}: {recordedAddressText(record.sourceAddress)||'Not supplied in this source'}</p>
   <p>{record.placement==='field'?'Recorded FIELD':record.placement==='shop'?(sniperShopDisplay(record.placement,record.unitNumber)?'SHOP':'SHOP / ROOT'):'Placement review'} · {lifecycle[record.lifecycle]}</p>
   {record.recordedSourcePlacement&&<p>Source assignment: {record.recordedSourcePlacement.toUpperCase()} · excluded from confirmed placement totals pending identity review.</p>}
   <span className='cos-fleet-badge cos-signal-unknown'>{record.kind==='identity_review'?'Identity review':'Health unlinked'}</span>

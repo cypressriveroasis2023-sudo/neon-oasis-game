@@ -1,0 +1,14 @@
+-- Preserve the installed source/identity/scoped kernels and add server status.
+begin;
+alter function cos_mhelp_placement_private.upload_snapshot() rename to api_base_upload_snapshot;
+revoke all on function cos_mhelp_placement_private.api_base_upload_snapshot() from public,anon,authenticated,service_role;
+create function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql stable set search_path='' as $$
+ select b.value||jsonb_build_object('apiSync',jsonb_build_object('enabled',c.enabled,'lastAttemptAt',c.last_attempt_at,'lastSuccessAt',c.last_success_at,'errorCode',c.error_code),
+  'apiMissingRecords',(select coalesce(jsonb_agg(r||jsonb_build_object('binding',case when r->'binding' is null or r->'binding'='null'::jsonb then 'null'::jsonb else
+   (r->'binding')||jsonb_build_object('guardCurrent',r->'binding'->>'expectedGuard'=cos_mhelp_placement_private.upload_binding_guard((r->'binding'->>'trackerId')::uuid,(r->'binding'->>'nativeUnitId')::uuid)) end)),'[]'::jsonb)
+   from jsonb_array_elements(coalesce(b.value->'apiMissingRecords','[]'::jsonb)) r))
+ from (select cos_mhelp_placement_private.api_base_upload_snapshot() value) b
+ cross join cos_mhelp_placement_private.live_inventory_control c where c.singleton
+$$;
+revoke all on function cos_mhelp_placement_private.upload_snapshot() from public,anon,authenticated,service_role;
+commit;

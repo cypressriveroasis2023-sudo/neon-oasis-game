@@ -4,7 +4,7 @@
  */
 export type MhelpInventoryAuthority={
   total:number;field:number;shop:number;inactive:number;fieldActive:number;
-  sourceSha256:string;receivedAt:string;stale:boolean;
+  sourceSha256:string;receivedAt:string;stale:boolean;live?:boolean;
 };
 const record=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const nonnegative=(v:unknown):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
@@ -34,10 +34,13 @@ export function readMhelpInventoryAuthority(value:unknown,now=Date.now()):MhelpI
  }
  if(field!==s.fieldRecords||shop!==s.shopRecords||fieldActive!==s.unflaggedFieldRecords
   ||inactive!==s.doNotUseRecords+s.missingRecords)return null;
- return {total:records.length,field,shop,inactive,fieldActive,
-  sourceSha256:value.sourceSha256,receivedAt:value.receivedAt,
+ const live=value.source==='mhelpdesk_api';
+ const observedAt=live?value.lastApiReadAt:value.receivedAt;
+ if(typeof observedAt!=='string'||!Number.isFinite(Date.parse(observedAt))||Date.parse(observedAt)>now+60000)return null;
+ return {total:records.length,field,shop,inactive,fieldActive,...(live?{live:true}:{}),
+  sourceSha256:value.sourceSha256,receivedAt:observedAt,
   // The saved upload is historical evidence, not proof of a live vendor read.
-  stale:now-Date.parse(value.receivedAt)>24*60*60*1000};
+  stale:now-Date.parse(observedAt)>(live?45*60*1000:24*60*60*1000)};
 }
 
 /** The whole mHelp Product-ID census is a headline only on the unfiltered
