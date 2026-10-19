@@ -1,0 +1,34 @@
+name: Verify COS Operational Transfers
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/docs/drafts/cos-operational-*.sql'
+      - 'tech-checks/operations/tests/operational-*.test.mjs'
+      - 'tech-checks/operations/src/OperationalMoves.tsx'
+      - 'tech-checks/operations/src/operational*.ts'
+      - 'tech-checks/supabase/functions/cos-operational-sheets-sync/**'
+      - 'tech-checks/supabase/functions/cos-sheets-placement-publish/operational*.ts'
+      - '.github/workflows/verify-cos-operational-transfer.yml'
+permissions:
+  contents: read
+jobs:
+  verify-transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Strict typecheck
+        run: npm run typecheck
+      - name: Focused operational tests
+        run: node --import tsx --test --test-concurrency=1 tests/operational-*.test.mjs
+      - name: Production build
+        run: npm run build
