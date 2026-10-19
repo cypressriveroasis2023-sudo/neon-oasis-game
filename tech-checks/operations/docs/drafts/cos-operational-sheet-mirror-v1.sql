@@ -32,6 +32,28 @@ alter table cos_operational_private.sheet_sync_control enable row level security
 revoke all on cos_operational_private.sheet_mirror,
  cos_operational_private.sheet_sync_control from public,anon,authenticated,service_role;
 
+-- The historic 2027 tracker has 12 DECOMMISSIONED Spotters and four Field
+-- rows without a site. Baseline them without activation or changing source.
+-- Actionable incoming/outgoing commands remain strictly validated separately.
+create function cos_operational_private.valid_sheet_baseline(p_fields jsonb)
+returns boolean language sql immutable set search_path='' as $fn$
+ select coalesce(
+    jsonb_typeof(p_fields)='object'
+    and (p_fields ?& array['placement','customer','site','address'])
+    and (p_fields-array['placement','customer','site','address'])='{}'::jsonb
+    and (p_fields->>'placement') in ('FIELD','SHOP','DECOMMISSIONED')
+    and jsonb_typeof(p_fields->'customer')='string'
+    and jsonb_typeof(p_fields->'site')='string'
+    and jsonb_typeof(p_fields->'address')='string'
+    and length(p_fields->>'customer')<=250
+    and length(p_fields->>'site')<=250
+    and length(p_fields->>'address')<=600
+    and ((p_fields->>'customer')||(p_fields->>'site')||(p_fields->>'address')) !~ '[[:cntrl:]<>]'
+    and coalesce(left(p_fields->>'customer',1),'') not in ('=','+','-','@')
+    and coalesce(left(p_fields->>'site',1),'') not in ('=','+','-','@')
+    and coalesce(left(p_fields->>'address',1),'') not in ('=','+','-','@')
+ ,false)
+$fn$;
 create function cos_operational_private.valid_sheet_fields(p_fields jsonb)
 returns boolean language sql immutable set search_path='' as $fn$
  select coalesce(
@@ -57,7 +79,7 @@ returns boolean language sql immutable set search_path='' as $fn$
  ,false)
 $fn$;
 alter table cos_operational_private.sheet_mirror add constraint sheet_mirror_safe
- check(cos_operational_private.valid_sheet_fields(fields));
+ check(cos_operational_private.valid_sheet_baseline(fields));
 
 create function public.cos_operational_sheet_sync_begin()
 returns jsonb language plpgsql security definer set search_path='' as $fn$
@@ -139,7 +161,7 @@ begin
         when 1900162010 then 'STANDS'
         when 1900162011 then 'WALL-E'
         else 'INVALID' end)||'|'||(v_row->>'label')
-   or not cos_operational_private.valid_sheet_fields(v_row->'fields')
+   or not cos_operational_private.valid_sheet_baseline(v_row->'fields')
    then raise exception 'Invalid mirror row' using errcode='22023';end if;
   select value into v_record from jsonb_array_elements(v_source)
     where value->>'productId'=v_row->>'productId';
