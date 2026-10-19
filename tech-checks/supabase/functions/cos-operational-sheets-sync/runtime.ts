@@ -123,7 +123,7 @@ export function createOperationalSheetSyncRuntime(options:{
      const t=second.sheet.filter(s=>s.label===label).find(s=>
        // Exact sheet id and family, not a bare unit number.
        (awaitTitle(s.sheetId))===title);
-     if(!t)fail('missing_sheet_row');
+     if(!t)throw Error('missing_sheet_row');
      return {productId:x.productId,sheetId:t.sheetId,row:t.row,label:t.label,matchKey:x.key,fields:t.fields};
     });
     function awaitTitle(sheetId:number){
