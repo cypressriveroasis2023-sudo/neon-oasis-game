@@ -590,7 +590,7 @@ export function createOperationsHandler(options) {
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
+        features: { unitTracker: Boolean(context.actorId), operationalTransfers: Boolean(context.actorId)&&options.operationalTransfersEnabled===true, fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
@@ -729,6 +729,7 @@ export function createOperationsHandler(options) {
         return json(await mhelpPartner(path, method, body));
       }
       if(path==='/api/operational-units'||path==='/api/operational-units/move'){
+        if(options.operationalTransfersEnabled!==true)fail('Operational transfers are not enabled on this backend.',503);
         // Authenticated Owner-only local transaction; no Fleet, health or
         // provider preflight in the transfer commit path.
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
@@ -959,7 +960,9 @@ export function createOperationsHandler(options) {
           // A short, saved owner-decision read has no geocode, camera or vendor
           // dependency. Never let stale mHelp placement silently reverse an
           // authorized Product-ID transfer; keep source membership untouched.
-          const operational=projectOperationalFleet(combined,await rpc('cos_operational_transfer_overrides',actorPayload));
+          const operational=options.operationalTransfersEnabled===true
+            ?projectOperationalFleet(combined,await rpc('cos_operational_transfer_overrides',actorPayload))
+            :combined;
           // MHelp Field address is a presentation location by Product ID, never
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
