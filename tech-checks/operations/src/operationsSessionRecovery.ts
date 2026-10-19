@@ -6,6 +6,7 @@ export type SessionRecoveryState = {
   reloadRequired: boolean;
   generation: number;
 };
+export const SESSION_VERIFICATION_TIMEOUT_MS = 45000;
 const reloadMessage = 'Your session changed. Reload COS Operations to verify your account and permissions.';
 const transientReasons = new Set(['token-renewed', 'parent-timeout']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,6 +34,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
   defer?: (callback: () => void) => void;
 }) {
   let active = true, epoch = 0, baseline: string | null = null, verifiedMode: string | null = null;
+  let verificationTimer: ReturnType<typeof setTimeout> | undefined;
   let phase: 'idle' | 'queued' | 'verifying' = 'idle';
   let state: SessionRecoveryState = {session:null, checking:true, error:'', reloadRequired:false, generation:0};
   const publish = (next: SessionRecoveryState) => { state = next; if (active) changed(state); };
@@ -46,7 +48,12 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
     const requestEpoch = epoch, requestMode = mode();
     publish({...state, session:null, checking:true, error:''});
     try {
-      const data = await read();
+      const data = await Promise.race([
+        read(),
+        new Promise<never>((_, reject) => {
+          verificationTimer = setTimeout(() => reject(new Error('Account verification timed out. Retry Operations access or reload the app.')), SESSION_VERIFICATION_TIMEOUT_MS);
+        }),
+      ]);
       if (!active || requestEpoch !== epoch) return;
       if (requestMode !== mode()) { blocked(); return; }
       if (!data || typeof data.authorized !== 'boolean') throw new Error('Operations authorization could not be verified.');
@@ -61,6 +68,9 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       if (recovering) { blocked(); return; }
       phase = 'idle';
       publish({...state, session:null, checking:false, error:cause instanceof Error ? cause.message : 'Operations authorization could not be verified.'});
+    } finally {
+      clearTimeout(verificationTimer);
+      verificationTimer = undefined;
     }
   }
   const controller = {
@@ -87,7 +97,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       phase = 'queued';
       defer(() => { if (active && phase === 'queued' && !state.reloadRequired) void verify(true); });
     },
-    stop() { active = false; epoch++; phase = 'idle'; },
+    stop() { active = false; epoch++; phase = 'idle'; clearTimeout(verificationTimer); verificationTimer = undefined; },
   };
   return controller;
 }
