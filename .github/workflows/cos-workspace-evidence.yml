@@ -1,0 +1,49 @@
+name: COS source-only integration evidence
+on:
+  push:
+    branches: [feature/cos-fleet-command-center-20261019]
+    paths: [.github/workflows/cos-workspace-evidence.yml]
+permissions:
+  contents: read
+jobs:
+  source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve public repository source refs
+        run: |
+          git fetch origin main
+          git fetch origin e6f04869a25818ef7ec385b451c4773a096c3306
+          git fetch origin 3aa6aa3e8c2ef44d1e7c658bb2f4d9be43c96ccd
+          mkdir -p /tmp/cos-integration-evidence
+          git rev-parse HEAD origin/main > /tmp/cos-integration-evidence/refs.txt
+          git archive HEAD | gzip > /tmp/cos-integration-evidence/command-source.tar.gz
+          git archive origin/main | gzip > /tmp/cos-integration-evidence/main-source.tar.gz
+          git archive e6f04869a25818ef7ec385b451c4773a096c3306 | gzip > /tmp/cos-integration-evidence/health-source.tar.gz
+          git archive 3aa6aa3e8c2ef44d1e7c658bb2f4d9be43c96ccd | gzip > /tmp/cos-integration-evidence/transfer-source.tar.gz
+          git diff origin/main...HEAD > /tmp/cos-integration-evidence/command.patch
+          git diff origin/main...e6f04869a25818ef7ec385b451c4773a096c3306 > /tmp/cos-integration-evidence/health.patch
+          git diff origin/main...3aa6aa3e8c2ef44d1e7c658bb2f4d9be43c96ccd > /tmp/cos-integration-evidence/transfer.patch
+      - name: Resolve pinned test dependencies
+        working-directory: tech-checks/operations
+        run: |
+          npm ci --no-audit --no-fund
+          tar -czf /tmp/cos-integration-evidence/node-modules.tar.gz node_modules
+      - name: Record public production asset references
+        run: |
+          curl --fail --retry 2 --connect-timeout 15 --max-time 45 https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/tech-checks/operations/dist/ -o /tmp/cos-integration-evidence/production-index.html
+          sha256sum /tmp/cos-integration-evidence/* > /tmp/cos-integration-evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cos-source-only-workspace
+          path: /tmp/cos-integration-evidence/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
