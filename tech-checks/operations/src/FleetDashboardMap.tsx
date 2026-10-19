@@ -54,7 +54,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    ...displayedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
   ];
   const size=instance.getSize(),compact=entries.length>=COMPACT_MAP_GROUP_THRESHOLD&&!picker.current;
-  const layout=compact?compactMapGroups(entries):
+  const layout=compact?compactMapGroups<Entry>(entries):
    fleetIndividualPinPositions<Entry>(entries,{width:size.x,height:size.y}).map(position=>[position]);
   const state=(row:FleetDashboardRow):ReticleState=>row.support?'support':(['online','offline'].includes(row[layer+'State' as 'cameraState'|'routerState'|'batteryState'])?row[layer+'State' as 'cameraState'|'routerState'|'batteryState']:'unknown') as ReticleState;
   const describe=(item:Entry)=>{
