@@ -93,3 +93,12 @@
 #root#root .cos-command-product-detail>p{font-size:12px;color:#d6e4f6;line-height:1.5}
 #root#root .cos-command-row[aria-expanded=true]{border-color:#79bbff!important;background:#203e59!important}
 @media(max-width:600px){#root#root .cos-command-product-detail dl{grid-template-columns:minmax(0,1fr)}}
+
+
+#root#root .cos-command-attention-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+#root#root .cos-command-attention-actions button{display:flex;align-items:center;gap:10px;min-height:54px!important;background:#142637!important;color:#dbe9fb!important;border:1px solid #405773!important;border-radius:8px!important;padding:9px 11px!important;text-align:left}
+#root#root .cos-command-attention-actions strong{font-size:23px;color:#e8f5ff;font-variant-numeric:tabular-nums;min-width:25px}
+#root#root .cos-command-attention-actions span{font-size:11px;line-height:1.4}
+#root#root .cos-command-attention-actions button:hover:not(:disabled){background:#213c58!important;border-color:#7cb5f2!important}
+#root#root .cos-command-attention-actions button:disabled{opacity:.64}
+@media(max-width:850px){#root#root .cos-command-attention-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
