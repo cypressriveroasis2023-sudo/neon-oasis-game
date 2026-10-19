@@ -1,5 +1,5 @@
 import '../tech-check-rules.js';
-import {createDailySignoff,newSignature,signatureJpeg} from '../service-signoff-ui.js';
+import {createDailySignoff,newSignature,signatureJpeg,hasSignatureInk} from '../service-signoff-ui.js';
 import {normalizeManifest,receiptDifferences,TRANSFER_STATEMENT,INTAKE_CHECKS,transferTitle} from './model.js';
 import {transferClient,deviceDraft,transferJpeg} from './client.js';
 const element=(tag,text='',className='')=>{const n=document.createElement(tag);n.textContent=text;if(className)n.className=className;return n;};
@@ -7,7 +7,8 @@ const button=(text,fn,secondary=false)=>{const b=element('button',text,secondary
 const label=(text,input)=>{const l=element('label',text);l.append(input);return l;};
 const number=value=>value===''?NaN:Number(value);
 const lines=value=>String(value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-const parts=value=>lines(value).map(line=>{const i=line.lastIndexOf('|');if(i<1)throw new Error('Enter each part as name | quantity.');return {name:line.slice(0,i).trim(),quantity:number(line.slice(i+1).trim())};});
+const noExtraParts=value=>/^(?:none|n\/?a|no(?:\s+additional|\s+extra)?\s+parts?)\.?$/i.test(String(value||'').trim());
+const parts=value=>noExtraParts(value)?[]:lines(value).map((line,index)=>{const match=line.match(/^(.+?)\s*(?:\|\s*|:\s*|\s+[x×]\s*)(\d+)$/i);if(!match||!match[1].trim())throw new Error('Additional parts, line '+(index+1)+': use part name | quantity (example: SD card | 1). Leave this field blank or enter N/A if there are no extra parts.');return {name:match[1].trim(),quantity:number(match[2])};});
 const itemInput=item=>({equipment_key:item.equipment_key,family:item.family,unit_tag:item.unit_tag,sims:lines(item.simText),battery_count:number(item.batteryText),parts:parts(item.partsText)});
 const expectedText=item=>`${item.family} ${item.unit_tag}\nSIM: ${item.sims.join(', ')||'None listed'}\nUnit batteries: ${item.battery_count}\nParts: ${item.parts.map(p=>p.name+' × '+p.quantity).join(', ')||'None listed'}`;
 function input(type,value,changed){const n=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')n.type=type;n.value=value??'';n.addEventListener('input',()=>changed(n.value));return n;}
@@ -19,6 +20,39 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
  const current=()=>!disposed&&client.current()&&root.isConnected;
  const guard=()=>{client.assert();if(disposed||!root.isConnected)throw new Error('This transfer screen is no longer active.');};
  const message=(text,error=false)=>{if(!current())return;if(!statusNode?.isConnected){statusNode=element('p','','tc-status');root.append(statusNode);}statusNode.textContent=text;statusNode.setAttribute('role',error?'alert':'status');};
+
+ const showSubmitError=(detail,control=null)=>{
+  if(!current())return;
+  let alert=root.querySelector('[data-transfer-submit-error]');
+  if(!alert){alert=element('p','','tc-submit-error');alert.setAttribute('role','alert');alert.dataset.transferSubmitError='';const submit=root.querySelector('button[type=submit]');if(submit)submit.before(alert);else root.append(alert);}
+  alert.textContent=detail;
+  if(control?.isConnected){control.setAttribute('aria-invalid','true');control.scrollIntoView({block:'center'});control.focus({preventScroll:true});}
+  else alert.scrollIntoView({block:'center'});
+ };
+ const fieldFor=(index,field)=>root.querySelector('[data-transfer-item="'+index+'"][data-transfer-field="'+field+'"]');
+ function validateBeforeSubmit(){
+  if(!draft||draft.request)return null;
+  const form=root.querySelector('form');
+  if(!form)return null;
+  const invalid=[...form.querySelectorAll('input,select,textarea')].find(control=>control.willValidate&&!control.checkValidity());
+  if(invalid){
+   const caption=invalid.getAttribute('aria-label')||invalid.closest('label')?.firstChild?.textContent?.trim()||'required field';
+   return {detail:invalid.type==='checkbox'?'Finish the required equipment check before sending. Every required check must pass; report failed checks instead of marking them as passed.':'Complete '+caption+' before sending.',control:invalid};
+  }
+  if(!draft.items.some(item=>!item.missing))return {detail:'Add at least one equipment unit to this handoff.'};
+  for(let index=0;index<draft.items.length;index++){
+   const item=draft.items[index];if(item.missing)continue;
+   try{parts(item.partsText);}catch(error){return {detail:error.message,control:fieldFor(index,'partsText')};}
+   if(draft.kind==='checkout'){
+    const minimum=contract?.families?.[item.workflow_type]?.minimum_batteries;
+    if(Number.isInteger(minimum)&&number(item.batteryText)<minimum)return {detail:item.family+' '+item.unit_tag+' requires at least '+minimum+' batteries / battery boxes. Verify the actual count.',control:fieldFor(index,'batteryText')};
+   }
+   if(!draft.photos.some(photo=>photo.equipment_key===item.equipment_key))return {detail:'Add the required equipment photo for '+item.family+' '+item.unit_tag+' before sending.',control:root.querySelector('[data-transfer-photo="'+index+'"]')};
+  }
+  if(!draft.signature.confirmed)return {detail:'Sign and check the accuracy confirmation before sending.',control:form.querySelector('.cos-daily-signoff input[type=checkbox]')};
+  if(draft.signature.method==='drawn'&&!hasSignatureInk(draft.signature))return {detail:'Draw your signature, or select Type signature and enter your account name.',control:form.querySelector('.cos-signature-canvas')};
+  return null;
+ }
  const reset=()=>{for(const url of urls)URL.revokeObjectURL(url);urls.clear();root.replaceChildren();statusNode=null;};
  const persist=async()=>{guard();await deviceDraft(storageKey,draft);guard();};
  const invalidate=()=>{if(draft?.signature)draft.signature.confirmed=false;const c=root.querySelector('.cos-daily-signoff input[type=checkbox]');if(c)c.checked=false;};
@@ -61,7 +95,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
  function render(transfer){
   reset();heading({checkout:'Check Out / Hand Off',receipt:'Verify equipment received',return:'Check In / Return'}[draft.kind]);root.append(button('Back to handoffs',()=>load(),true));
   if(draft.request){root.append(element('p','This submission may already be saved. Retry exactly the same submission to verify it; do not create a duplicate.'),button('Retry same submission',()=>complete(transfer)));return;}
-  const form=element('form');form.setAttribute('aria-label','Equipment transfer form');form.onsubmit=e=>{e.preventDefault();void complete(transfer);};
+  const form=element('form');form.noValidate=true;form.setAttribute('aria-label','Equipment transfer form');form.onsubmit=e=>{e.preventDefault();void complete(transfer);};
   if(draft.kind==='checkout'){
    const recipient=element('select');recipient.required=true;recipient.setAttribute('aria-label','Receiving Service technician');recipient.append(new Option('Choose Service technician',''));for(const tech of data.technicians)recipient.append(new Option(tech.name,tech.id));recipient.value=draft.serviceActor;recipient.onchange=()=>{draft.serviceActor=recipient.value;changed();};form.append(label('Hand off to',recipient));
    const equipment=element('select');equipment.setAttribute('aria-label','Select equipment');equipment.append(new Option('Choose a saved Shop unit',''));for(const item of data.equipment){const option=new Option((item.unit_name||item.family+' '+item.unit_tag)+(item.hold_reason?' · '+item.hold_reason:item.reserved?' · already held':!item.supported?' · check mapping required':item.tracker_state!=='shop'?' · not Shop':''),item.equipment_key);option.disabled=item.reserved||!item.supported||item.tracker_state!=='shop';equipment.append(option);}
@@ -73,12 +107,12 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    if(draft.kind==='receipt'){const missing=element('input');missing.type='checkbox';missing.checked=item.missing;missing.onchange=()=>{item.missing=missing.checked;changed();render(transfer);};group.append(label('I did not receive this item',missing));}
    if(!item.missing){
     for(const [field,caption,type] of [['family','Unit family / name','text'],['unit_tag','Unit number','text'],['simText','Exact SIM numbers (one per line; blank only when none)','textarea'],['batteryText','Batteries / battery boxes on this unit','number'],['partsText','Additional parts (one per line: name | quantity)','textarea']]){
-     const n=input(type,item[field],value=>{item[field]=value;changed();});n.setAttribute('aria-label',caption+' '+(index+1));if(['family','unit_tag','batteryText'].includes(field))n.required=true;if(draft.kind==='return')n.readOnly=true;if(type==='number'){n.min='0';n.max='9999';n.step='1';}group.append(label(caption,n));
+     const n=input(type,item[field],value=>{item[field]=value;changed();});n.setAttribute('aria-label',caption+' '+(index+1));n.dataset.transferItem=String(index);n.dataset.transferField=field;if(['family','unit_tag','batteryText'].includes(field))n.required=true;if(draft.kind==='return')n.readOnly=true;if(type==='number'){n.min='0';n.max='9999';n.step='1';}group.append(label(field==='partsText'?'Additional parts (optional — name | quantity, or N/A for none)':caption,n));if(field==='partsText')group.append(element('small','Example: SD card | 1. Leave blank if no additional parts.'));
     }
     const fields=draft.kind==='checkout'?(window.TechCheckRules.itChecklist({equipment_type:item.workflow_type,purpose:'BACKUP',unit_tag:item.unit_tag,required_battery_count:contract.families[item.workflow_type]?.minimum_batteries},1).filter(s=>s.kind==='bool')):draft.kind==='return'?INTAKE_CHECKS.map(field=>({field,label:field.replaceAll('_',' ')})):[];
     if(draft.kind==='checkout')group.append(element('small','Existing IT check-only / BACKUP checklist. This does not dispatch a field job.'));
     for(const step of fields){const caption=step.label.replaceAll('{UNIT}',item.unit_tag).replaceAll('2026 Unit Tracker','2027 Unit Tracker');if(draft.kind==='return'){const n=element('select');n.required=true;n.append(new Option('Choose result',''),new Option('Pass','true'),new Option('Needs repair / attention','false'));n.value=item.checks[step.field]===undefined?'':String(item.checks[step.field]);n.onchange=()=>{item.checks[step.field]=n.value===''?undefined:n.value==='true';changed();};group.append(label(caption,n));}else{const n=element('input');n.type='checkbox';n.required=true;n.checked=item.checks[step.field]===true;n.onchange=()=>{item.checks[step.field]=n.checked;changed();};group.append(label(caption,n));}}
-    const photoInput=element('input');photoInput.type='file';photoInput.accept='image/*';photoInput.setAttribute('aria-label','Equipment photo '+(index+1));
+    const photoInput=element('input');photoInput.type='file';photoInput.accept='image/*';photoInput.setAttribute('aria-label','Equipment photo '+(index+1));photoInput.dataset.transferPhoto=String(index);
     const preview=element('div','','tc-evidence'),old=draft.photos.find(p=>p.equipment_key===item.equipment_key);const show=blob=>{const url=URL.createObjectURL(blob);urls.add(url);const img=element('img');img.alt='Saved equipment photo';img.src=url;preview.replaceChildren(img);};if(old)show(old.blob);
     photoInput.onchange=async()=>{if(busy||!photoInput.files[0])return;const ownerDraft=draft,formRevision=revision;pending++;photoInput.disabled=true;try{const blob=await transferJpeg(photoInput.files[0]);guard();if(draft!==ownerDraft||formRevision!==revision)return;draft.photos=draft.photos.filter(p=>p.equipment_key!==item.equipment_key).concat({equipment_key:item.equipment_key,kind:'unit',blob});invalidate();await persist();show(blob);message('Photo saved in this device draft.');}catch(e){message(e.message,true);}finally{pending--;photoInput.disabled=false;photoInput.value='';}};
     group.append(label('Equipment photo — required',photoInput),preview);
@@ -91,7 +125,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   const submit=element('button',draft.kind==='checkout'?'Sign & send handoff':draft.kind==='return'?'Sign & record return':'Sign & verify received equipment');submit.type='submit';form.append(submit);root.append(form,element('p','A saved transfer does not update permanent truck stock, physical Field/Shop placement, or camera health.','tc-draft-note'));
  }
  async function complete(transfer){
-  if(busy)return;busy=true;const controls=[...root.querySelectorAll('button,input,select,textarea')].map(n=>[n,n.disabled]);for(const [n] of controls)n.disabled=true;
+  if(busy)return;const issue=validateBeforeSubmit();if(issue){showSubmitError(issue.detail,issue.control);return;}busy=true;const controls=[...root.querySelectorAll('button,input,select,textarea')].map(n=>[n,n.disabled]);for(const [n] of controls)n.disabled=true;
   try{
    guard();if(pending)throw new Error('Wait for the photo to finish saving.');if(!navigator.onLine)throw new Error('Offline. Your draft stays on this device; reconnect and retry.');
    let photos;
@@ -109,7 +143,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    const result=await client.submit(draft.request,photos,(n,total)=>message(`Saving evidence ${n} of ${total}…`));guard();
    await deviceDraft(storageKey,null,true).catch(()=>{});guard();
    await load(transferTitle(result.state)+'. Saved in COS; transfer report delivery is pending.');
-  }catch(e){if(current()){if(e.unavailable&&onUnavailable){onUnavailable(e.reason||'unavailable');return;}if(e.rejected&&draft){draft.request=null;draft.submissionPhotos=null;await persist().catch(()=>{});}if(draft?.request)render(transfer);message(e.message,true);}}
+  }catch(e){if(current()){if(e.unavailable&&onUnavailable){onUnavailable(e.reason||'unavailable');return;}if(e.rejected&&draft){draft.request=null;draft.submissionPhotos=null;await persist().catch(()=>{});}if(draft?.request)render(transfer);showSubmitError(e.message);}}
   finally{busy=false;for(const [n,disabled] of controls)if(n.isConnected)n.disabled=disabled;}
  }
  void load();
