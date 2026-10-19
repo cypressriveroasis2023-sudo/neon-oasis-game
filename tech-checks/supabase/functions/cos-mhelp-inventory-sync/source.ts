@@ -15,7 +15,7 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
   if(!Array.isArray(batch)||!Number.isSafeInteger(p.totalRows)||p.totalRows<0||p.totalRows>5000||total!==null&&total!==p.totalRows)throw Error('Incomplete service inventory');total=p.totalRows;
   if(batch.length!==Math.min(200,total!-rows.length))throw Error('Incomplete service page');rows.push(...batch);if(rows.length===total){if(new Set(rows.map(r=>id(r.serviceLocationId??r.customerId))).size!==rows.length)throw Error('Duplicate service identity');return rows;}
  }throw Error('Incomplete service inventory');})());return services.get(key)!;};
- const prior=new Map<string,Row>(baseline.records.map((r:Row)=>[r.productId,r]));
+ const prior=new Map<string,Row>([...(baseline.apiMissingRecords||[]),...baseline.records].map((r:Row)=>[r.productId,r]));
  const catalog=await read('/equipmentTypes?pageSize=200&rowIndex=0&Fields=equipmentTypeId,portalId,category');
  const categoryRows=Array.isArray(catalog)?catalog:catalog?.results??catalog?.data;
  if(!Array.isArray(categoryRows)||categoryRows.length>10000)throw Error('Incomplete equipment categories');

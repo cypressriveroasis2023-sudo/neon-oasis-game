@@ -1,3 +1,4 @@
+import {fleetMapGroups} from './fleetMapGroups';
 import {fleetUnitPinMarkup,fleetSourcePinMarkup,fleetGroupPinMarkup,addressGroupHealth,addressPinStatusLabel} from './fleetStatusPins';
 import {useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
@@ -12,21 +13,31 @@ import {useFieldMapDisplay} from './fieldMapDisplay';
 import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import 'leaflet/dist/leaflet.css';
-type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;onSelectMhelpAddressGroup?:(productIds:string[])=>void;};
-export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,onSelectMhelpAddressGroup}:Props){
+type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;onSelectMhelpAddressGroup?:(productIds:string[])=>void;};
+export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,onSelectMhelpAddressGroup}:Props){
  const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),addressMarkers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),selectAddressGroup=useRef(onSelectMhelpAddressGroup),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0),[expandedIds,setExpandedIds]=useState<string[]>([]);
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
  select.current=onSelect;selectAddress.current=onSelectMhelpAddress;selectAddressGroup.current=onSelectMhelpAddressGroup;picker.current=pickLocation;
- pinRef.current=pins;
+ // Prefer the current mHelp address for uniquely reviewed Product-ID bindings.
+ // Saved installation/GPS evidence remains available in unit details.
+ const addressUnitIds=new Set(mhelpAddressPins.map(p=>mhelpAddressUnits?.get(p.productId)).filter(Boolean));
+ const displayedPins=pins.filter(p=>!addressUnitIds.has(fleetLocationPinId(p)));
+ pinRef.current=displayedPins;
+ type Entry={kind:'address';pin:MhelpAddressMapPin}|{kind:'native';pin:Pin};
+ const scene=(instance:L.Map)=>fleetMapGroups<Entry>([
+  ...mhelpAddressPins.map(pin=>({item:{kind:'address' as const,pin},...instance.latLngToContainerPoint(pin.point)})),
+  ...displayedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
+ ]);
+
  useEffect(()=>{if(!node.current)return;const instance=L.map(node.current,{zoomControl:true,trackResize:false}).setView(restored.current.center||[31,-99],restored.current.zoom||5);map.current=instance;addFieldMapBasemap(instance);markers.current=L.layerGroup().addTo(instance);addressMarkers.current=L.layerGroup().addTo(instance);let resizing=false;const stopResize=observeFleetMapResize(instance,active=>{resizing=active;});
   // A layout-only reset must not suppress the first location fit or replace a
   // restored viewport. Keep marker projection current without recording a move.
   instance.on('zoomend moveend',()=>{if(!resizing){viewportChanged.current=true;const center=instance.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:instance.getZoom()});}setRevision(v=>v+1);});instance.on('click',(event:L.LeafletMouseEvent)=>{if(picker.current)picker.current([event.latlng.lat,event.latlng.lng]);else setExpandedIds([]);});
   return()=>{stopResize();instance.remove();map.current=null;markers.current=null;addressMarkers.current=null;};},[]);
  useEffect(()=>{const instance=map.current,group=markers.current;if(!instance||!group)return;group.clearLayers();
-  const groups=clusterMapPoints(pins.map(pin=>{const p=instance.latLngToContainerPoint(pin.point);return {item:pin,x:p.x,y:p.y};}),48,16);
+  const groups=mhelpAddressPins.length?scene(instance).filter(g=>g.every(p=>p.item.kind==='native')).map(g=>g.map(p=>({item:p.item.pin as Pin,x:p.x,y:p.y}))):clusterMapPoints(pins.map(pin=>{const p=instance.latLngToContainerPoint(pin.point);return {item:pin,x:p.x,y:p.y};}),48,16);
   const state=(row:FleetDashboardRow):ReticleState=>row.support?'support':(['online','offline'].includes(row[layer+'State' as 'cameraState'|'routerState'|'batteryState'])?row[layer+'State' as 'cameraState'|'routerState'|'batteryState']:'unknown') as ReticleState;
   const individual=(pin:Pin,point:[number,number],peer=false)=>{
    if(pin.kind==='source_equipment_estimate'){
@@ -45,36 +56,51 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   for(const items of groups){const first=items[0].item,counts={online:0,offline:0,unknown:0,support:0};items.forEach(p=>{if(p.item.kind!=='source_equipment_estimate')counts[state(p.item.row)]++;});
    if(items.length===1){individual(first,first.point);continue;}
    const sourcePins=items.filter(p=>p.item.kind==='source_equipment_estimate'),nativePins=items.filter(p=>p.item.kind!=='source_equipment_estimate');
+   const origin=mhelpAddressPins.length?instance.containerPointToLatLng(L.point(items.reduce((sum,p)=>sum+p.x,0)/items.length,items.reduce((sum,p)=>sum+p.y,0)/items.length)):L.latLng(first.point);
    const clusterLabel='Expand '+items.length+(sourcePins.length?' equipment records':' units')+(sourcePins.length?' · '+sourcePins.length+' Unlinked equipment · Estimated address':'');
-   const marker=L.marker(first.point,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-dashboard-cluster cos-field-cluster-wrap',html:fleetGroupPinMarkup(counts,items.filter(p=>p.item.kind==='estimate'||p.item.kind==='source_equipment_estimate').length,0,items.filter(p=>p.item.kind==='recorded').length,sourcePins.length),iconSize:[44,58],iconAnchor:[22,39]}),title:clusterLabel,alt:clusterLabel}).addTo(group);
+   const marker=L.marker(origin,{bubblingMouseEvents:false,icon:L.divIcon({className:'cos-dashboard-marker cos-dashboard-cluster cos-field-cluster-wrap',html:fleetGroupPinMarkup(counts,items.filter(p=>p.item.kind==='estimate'||p.item.kind==='source_equipment_estimate').length,0,items.filter(p=>p.item.kind==='recorded').length,sourcePins.length),iconSize:[44,58],iconAnchor:[22,39]}),title:clusterLabel,alt:clusterLabel}).addTo(group);
    const ids=items.map(p=>fleetLocationPinId(p.item)),isExpanded=ids.length===expandedIds.length&&ids.every(id=>expandedIds.includes(id));
    marker.getElement()?.setAttribute('aria-label',clusterLabel);const element=marker.getElement();element?.setAttribute('aria-expanded',String(isExpanded));element?.classList.toggle('cos-field-cluster-expanded',isExpanded);element?.setAttribute('data-unit-ids',JSON.stringify(nativePins.map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-record-ids',JSON.stringify(sourcePins.map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-estimate-unit-ids',JSON.stringify(items.filter(p=>p.item.kind==='estimate').map(p=>fleetLocationPinId(p.item))));element?.setAttribute('data-recorded-unit-ids',JSON.stringify(items.filter(p=>p.item.kind==='recorded').map(p=>fleetLocationPinId(p.item))));if(nativePins.length)element?.setAttribute('data-health',sourcePins.length?'mixed':counts.offline?'offline':counts.unknown?'unknown':counts.online?'online':'support');
-   marker.on('click',()=>{if(!picker.current)setExpandedIds(isExpanded?[]:ids);});
-   if(isExpanded){const anchor=instance.latLngToContainerPoint(first.point),size=instance.getSize();const offsets=expandedGroupOffsets(items.length,1,{width:size.x,height:size.y,anchorX:anchor.x,anchorY:anchor.y,bottomInset:20,occupied:groups.filter(g=>g!==items).map(g=>({x:g[0].x-anchor.x,y:g[0].y-anchor.y}))});
-    items.forEach((item,i)=>{const offset=offsets[i],display=instance.containerPointToLatLng(L.point(anchor.x+offset.x,anchor.y+offset.y));L.polyline([first.point,display],{color:'#aebcd0',weight:1,opacity:.7,interactive:false,dashArray:'3 3'}).addTo(group);individual(item.item,[display.lat,display.lng],true);});
+   if(mhelpAddressPins.length){
+    const popup=document.createElement('div');popup.className='cos-mhelp-address-popup';
+    const heading=document.createElement('strong');heading.textContent=items.length+' nearby units';popup.appendChild(heading);
+    for(const entry of items){const pin=entry.item,button=document.createElement('button');button.type='button';
+     const name=pin.kind==='source_equipment_estimate'?pin.record.displayUnitNumber||pin.record.unitNumber:pin.row.displayName||pin.row.name;
+     const health=pin.kind==='source_equipment_estimate'?'unknown':state(pin.row);
+     button.textContent=name+' · '+(health==='unknown'?'Unverified':health==='support'?'Solar support':health==='online'?'Online':'Offline');
+     button.addEventListener('click',()=>{marker.closePopup();select.current(fleetLocationPinId(pin));});popup.appendChild(button);
+    }
+    marker.bindPopup(popup,{maxWidth:340,maxHeight:280});
+   }else marker.on('click',()=>{if(!picker.current)setExpandedIds(isExpanded?[]:ids);});
+   if(isExpanded&&!mhelpAddressPins.length){const anchor=instance.latLngToContainerPoint(origin),size=instance.getSize();const offsets=expandedGroupOffsets(items.length,1,{width:size.x,height:size.y,anchorX:anchor.x,anchorY:anchor.y,bottomInset:20,occupied:groups.filter(g=>g!==items).map(g=>({x:g[0].x-anchor.x,y:g[0].y-anchor.y}))});
+    items.forEach((item,i)=>{const offset=offsets[i],display=instance.containerPointToLatLng(L.point(anchor.x+offset.x,anchor.y+offset.y));L.polyline([origin,display],{color:'#aebcd0',weight:1,opacity:.7,interactive:false,dashArray:'3 3'}).addTo(group);individual(item.item,[display.lat,display.lng],true);});
    }
   }
- },[pins,layer,revision,expandedIds]);
+ },[pins,layer,revision,expandedIds,mhelpAddressPins,mhelpAddressUnits]);
  // Product-ID-specific MHelp service address layer, deliberately independent of
  // GPS verification, camera links, source held state and native health filters.
  // The Census coordinates are interpolated ADDRESS evidence, not live GPS.
  useEffect(()=>{
   const group=addressMarkers.current;if(!group)return;
   group.clearLayers();
-  const atPoint=new Map<string,MhelpAddressMapPin[]>();
-  for(const pin of mhelpAddressPins){
-   const key=pin.point[0].toFixed(6)+','+pin.point[1].toFixed(6);
-   atPoint.set(key,[...(atPoint.get(key)||[]),pin]);
-  }
-  for(const siblings of atPoint.values()){
-   const first=siblings[0],review=siblings.some(x=>x.state==='address_review'),count=siblings.length;
-   const status=addressGroupHealth(siblings,mhelpAddressHealth||new Map()),statusLabel=addressPinStatusLabel(status.counts);
-   const label=(count===1?first.unitNumber+' · MHelp customer address':count+' MHelp Field units at this address')+' · '+statusLabel+(review?' · Address match needs review':'');
+  const instance=map.current;if(!instance)return;
+  for(const entries of scene(instance).filter(g=>g.some(p=>p.item.kind==='address'))){
+   const siblings=entries.flatMap(p=>p.item.kind==='address'?[p.item.pin]:[]);
+   const native=entries.flatMap(p=>p.item.kind==='native'?[p.item.pin]:[]);
+   const first=siblings[0],review=siblings.some(x=>x.state==='address_review'),count=siblings.length+native.length;
+   const sameAddress=siblings.every(p=>p.point[0]===first.point[0]&&p.point[1]===first.point[1])&&!native.length;
+   const status=addressGroupHealth(siblings,mhelpAddressHealth||new Map());
+   for(const pin of native){const value=pin.kind==='source_equipment_estimate'?'unknown':pin.row.support?'support':pin.row[layer+'State' as 'cameraState'|'routerState'|'batteryState'];status.counts[value==='online'||value==='offline'||value==='support'?value:'unknown']++;}
+   const states=(['online','offline','unknown','support'] as const).filter(key=>status.counts[key]>0);status.state=states.length===1?states[0]:'mixed';
+   const statusLabel=addressPinStatusLabel(status.counts);
+   const label=(count===1?first.unitNumber+' · MHelp customer address':count+(sameAddress?' MHelp Field units at this address':' nearby map entries'))+' · '+statusLabel+(review?' · Address match needs review':'');
    const html='<span class="cos-mhelp-address-pin cos-address-health-'+status.state+(review?' cos-mhelp-address-review':'')+'" aria-hidden="true"><svg class="cos-address-pin-art" viewBox="0 0 30 38" focusable="false"><path d="M15 36C12 31 2 23 2 15a13 13 0 1 1 26 0c0 8-10 16-13 21Z"/><circle cx="15" cy="15" r="9"/>'+(count>1?'':'<circle class="cos-address-pin-center" cx="15" cy="15" r="3"/>')+'</svg>'+(count>1?'<b class="cos-address-pin-count">'+String(count)+'</b>':'')+(review?'<b class="cos-address-review-flag">!</b>':'')+(status.state==='mixed'?'<span class="cos-address-status-dots">'+(['online','offline','unknown','support'] as const).filter(key=>status.counts[key]>0).map(key=>'<i class="cos-signal-'+key+'">●</i>').join('')+'</span>':'')+'</span>';
-   const marker=L.marker(first.point,{bubblingMouseEvents:false,zIndexOffset:250,
+   const displayPoint=sameAddress?first.point:instance.containerPointToLatLng(L.point(entries.reduce((sum,p)=>sum+p.x,0)/entries.length,entries.reduce((sum,p)=>sum+p.y,0)/entries.length));
+   const marker=L.marker(displayPoint,{bubblingMouseEvents:false,zIndexOffset:250,
     icon:L.divIcon({className:'cos-mhelp-address-marker',html,iconSize:[44,58],iconAnchor:[22,38]}),
     title:label,alt:label}).addTo(group);
    marker.getElement()?.setAttribute('data-health',status.state);
+   if(native.length)marker.getElement()?.setAttribute('data-unit-ids',JSON.stringify(native.map(fleetLocationPinId)));
    marker.getElement()?.setAttribute('data-mhelp-product-ids',JSON.stringify(siblings.map(p=>p.productId)));
    marker.getElement()?.setAttribute('aria-label',label);
    if(count===1){
@@ -82,14 +108,14 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     tooltip.textContent=first.unitNumber+' · '+first.customer+' · MHelp address (not GPS) · '+statusLabel+(review?' · Address match needs review':'');
     marker.bindTooltip(tooltip);
    }
-   if(selectAddressGroup.current){marker.on('click',()=>{if(picker.current)return;if(count===1)selectAddress.current?.(first.productId);else selectAddressGroup.current?.(siblings.map(p=>p.productId));});continue;}
+   if(selectAddressGroup.current&&!native.length){marker.on('click',()=>{if(picker.current)return;if(count===1)selectAddress.current?.(first.productId);else selectAddressGroup.current?.(siblings.map(p=>p.productId));});continue;}
    const popup=document.createElement('div');popup.className='cos-mhelp-address-popup';
-   const heading=document.createElement('strong');heading.textContent=count===1?'MHelp Field address':count+' Field units at this address';popup.appendChild(heading);
+   const heading=document.createElement('strong');heading.textContent=count===1?'MHelp Field address':count+(sameAddress?' Field units at this address':' nearby map entries');popup.appendChild(heading);
    const detail=document.createElement('small');detail.textContent='Address-based marker · GPS not required or inferred';popup.appendChild(detail);
    for(const unit of siblings){
     const item=document.createElement('div');item.className='cos-mhelp-address-popup-item';
     const button=document.createElement('button');button.type='button';
-    button.textContent=unit.unitNumber+' · Product '+unit.productId;button.addEventListener('click',()=>{
+    button.textContent=unit.unitNumber+' · Product '+unit.productId+' · '+addressPinStatusLabel(addressGroupHealth([unit],mhelpAddressHealth||new Map()).counts);button.addEventListener('click',()=>{
      selectAddress.current?.(unit.productId);marker.closePopup();
     });item.appendChild(button);
     const source=document.createElement('small');source.textContent='MHelp: '+unit.address;item.appendChild(source);
@@ -99,15 +125,21 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     }
     popup.appendChild(item);
    }
-   marker.bindPopup(popup,{maxWidth:340});
+   for(const pin of native){
+    const button=document.createElement('button');button.type='button';
+    const name=pin.kind==='source_equipment_estimate'?pin.record.displayUnitNumber||pin.record.unitNumber:pin.row.displayName||pin.row.name;
+    const state=pin.kind==='source_equipment_estimate'?'Unverified':pin.row.support?'Solar support':pin.row[layer+'State' as 'cameraState'|'routerState'|'batteryState'];
+    button.dataset.unitId=fleetLocationPinId(pin);button.className='cos-signal-'+state;button.textContent=name+' · '+state;button.addEventListener('click',()=>{marker.closePopup();select.current(fleetLocationPinId(pin));});popup.appendChild(button);
+   }
+   marker.bindPopup(popup,{maxWidth:340,maxHeight:280});
    marker.on('click',()=>{if(!picker.current&&count===1)selectAddress.current?.(first.productId);});
   }
- },[mhelpAddressPins,mhelpAddressHealth]);
+ },[mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,pins,layer,revision]);
  const fit=()=>{setExpandedIds([]);const values=[...pinRef.current.map(p=>p.point),...mhelpAddressPins.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
  // Pending proof validation hides markers, but is not a settled population change.
- const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pins.map(fleetLocationPinId),...mhelpAddressPins.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,locationsReady]);
- const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14));}},[selectedId,pins]);
- return <div ref={panel} className={'cos-fleet-map-panel field-map-workspace'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
+ const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pinRef.current.map(fleetLocationPinId),...mhelpAddressPins.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,mhelpAddressUnits,locationsReady]);
+ const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14));}},[selectedId,pins,mhelpAddressPins,mhelpAddressUnits]);
+ return <div ref={panel} aria-busy={!locationsReady} className={'cos-fleet-map-panel field-map-workspace'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
   <div className='cos-fleet-map-toolbar'><div><strong>Fleet map</strong><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{mhelpAddressPins.length>0&&<> · {mhelpAddressPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small></div><div><button onClick={fit} disabled={!pins.length&&!mhelpAddressPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>

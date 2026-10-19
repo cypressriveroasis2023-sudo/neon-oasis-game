@@ -36,7 +36,7 @@ begin
  end if;
  select * into strict ctl from cos_mhelp_placement_private.live_inventory_control where singleton for update;
  if p_action='fail' then
-  update cos_mhelp_placement_private.live_inventory_control set last_attempt_at=clock_timestamp(),error_code='inventory_source_unavailable' where singleton;
+  update cos_mhelp_placement_private.live_inventory_control set last_attempt_at=clock_timestamp(),error_code=case when p_payload->>'errorCode'='source_rate_limited' then 'source_rate_limited' else 'inventory_source_unavailable' end where singleton;
   return jsonb_build_object('recorded',true);
  end if;
  if p_action is null or p_action not in('stage','run') then raise exception 'Invalid live inventory action';end if;
@@ -51,7 +51,7 @@ begin
  lock table public.equipment_units,app_private.vision_tracker_locations,public.equipment_unit_location_history,
   app_private.cos_geocode_sources,app_private.cos_archived_representations,app_private.cos_owner_identity_claims in share mode;
  baseline:=cos_mhelp_placement_private.upload_snapshot();
- select jsonb_object_agg(x->>'productId',x) into old_rows from jsonb_array_elements(baseline->'records') x;
+ select jsonb_object_agg(x->>'productId',x) into old_rows from jsonb_array_elements(coalesce(baseline->'apiMissingRecords','[]'::jsonb)||(baseline->'records')) x;
  for r in select value from jsonb_array_elements(p_payload->'records') loop
   if jsonb_typeof(r) is distinct from 'object' or coalesce(r->>'productId','')!~'^[1-9][0-9]{0,14}$' or r->>'productId'=any(seen)
    or coalesce(r->>'unitNumber','')='' or length(r->>'unitNumber')>250 or coalesce(r->>'customerId','')!~'^[1-9][0-9]{0,14}$'

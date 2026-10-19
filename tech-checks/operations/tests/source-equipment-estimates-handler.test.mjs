@@ -12,7 +12,7 @@ const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e
 const nativeOrigin='https://synthetic-native.invalid',serviceKey='synthetic-platform-service-key',callerToken='synthetic-owner-user-token';
 const sha=value=>createHash('sha256').update(value).digest('hex'),at='2026-10-06T17:45:00Z';
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
-function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=null,requestSignal=undefined,productPlacement='FIELD',staleEstimate=false}={}){
+function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=null,requestSignal=undefined,productPlacement='FIELD',staleEstimate=false,onSnapshot=null,onPlacement=null}={}){
  const calls=[],unexpected=[];
  const native={id:'00000000-0000-4000-8000-000000000888',unitNumber:'Sniper 888',readOnly:false,_sourceField:true,placement:'FIELD',currentLocationType:'field',status:'field',address:'400 Native Example Road, Test City, TX 77001',customer:'Synthetic native customer',latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:at,gpsRecordedAt:at,hasUnitGps:false};
  const rawSnapshot={inventoryItems:[native],items:[native],summary:{fieldUnits:1,mappedUnits:1,unitGps:0,missingGps:0},generatedAt:at,...(staleEstimate?{sourceEquipmentEstimates:{contract:'COS_SOURCE_EQUIPMENT_ESTIMATES_V1',items:[{stale:true}]}}:{})};
@@ -29,9 +29,9 @@ function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:'00000000-0000-4000-8000-000000000999',roles:{code:'owner',organization_id:org}}]);
   if(name==='cos_owner_identity_snapshot')return response({revision:sha('synthetic empty crosswalk'),claims:[],nativeEpochs:[]});
-  if(name==='appdeploy_field_map_snapshot')return response(rawSnapshot);
+  if(name==='appdeploy_field_map_snapshot'){if(onSnapshot)await onSnapshot(calls.filter(c=>new URL(c.url).pathname.endsWith('/appdeploy_field_map_snapshot')).length);return response(rawSnapshot);}
   if(name==='equipment_units')return response([{id:native.id,organization_id:org,unit_number:native.unitNumber,status:'field'}]);
-  if(name==='cos_mhelp_placement_snapshot')return response({contract:'COS_MHELP_PLACEMENT_V1',enabled:true,items:[],upload});
+  if(name==='cos_mhelp_placement_snapshot'){onPlacement?.();return response({contract:'COS_MHELP_PLACEMENT_V1',enabled:true,items:[],upload});}
   if(name==='cos_mhelp_location_snapshot')return response({contract:'COS_MHELP_FLEET_LOCATIONS_V1',items:[]});
   if(name==='cos_source_equipment_estimates_snapshot'){
    assert.equal(parsed.origin,nativeOrigin);assert.equal(parsed.pathname,'/rest/v1/rpc/cos_source_equipment_estimates_snapshot');assert.equal(init.method,'POST');
@@ -151,4 +151,17 @@ test('optional RPC failure returns unavailable and removes the caller abort list
 test('no source candidate uses no optional RPC, timer, or unavailable fallback',async t=>{
  mockBudget(t);const timers=t.mock.method(globalThis,'setTimeout'),f=fixture({productPlacement:'SHOP'}),listeners=getEventListeners(f.request.signal,'abort').length,response=await f.run(),map=await response.json();assert.equal(response.status,200,JSON.stringify({map,unexpected:f.unexpected}));
  assert.equal(receiptCalls(f).length,0);assert.equal(timers.mock.callCount(),0);assert.equal(map.sourceEquipmentEstimatesStatus,undefined);assert.equal(map.sourceEquipmentEstimates,undefined);assert.deepEqual(map.inventoryItems.map(r=>r.id),[f.native.id]);assert.equal(getEventListeners(f.request.signal,'abort').length,listeners);assertReadOnlyTransport(f);
+});
+
+
+test('saved mHelp placement read starts while the final authority snapshot is pending',async()=>{
+ let release,started=false,placements=0;const gate=new Promise(resolve=>{release=resolve;});
+ const f=fixture({onSnapshot:async n=>{if(n===2){started=true;await gate;}},onPlacement:()=>{placements++;}});
+ const pending=f.run();
+ try{
+  for(let i=0;i<100&&!started;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(started,true);assert.equal(placements,1,'independent saved placement must not wait for fresh projection work');
+ }finally{release();}
+ const result=await pending;assert.equal(result.status,200);const map=await result.json();
+ assert.equal(map.uploadInventory.payloadSha256,f.upload.payloadSha256);assertReadOnlyTransport(f);
 });

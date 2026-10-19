@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {setImmediate} from 'node:timers/promises';
 import {readFileSync} from 'node:fs';
-import {createOperationsSessionRecovery,ownerSessionFingerprint,guardSessionCallback} from '../src/operationsSessionRecovery.ts';
+import {createOperationsSessionRecovery,ownerSessionFingerprint,guardSessionCallback,SESSION_VERIFICATION_TIMEOUT_MS} from '../src/operationsSessionRecovery.ts';
 const owner={authorized:true,legacyOwner:true,role:'Owner',name:'Synthetic Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:true,fleetPlacementEdit:true}};
 const flush=()=>setImmediate();
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
@@ -82,4 +82,24 @@ test('every parent callback that private children retain is generation guarded',
  const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
  for(const callback of ['show','navigate','openUnitHealth','returnToMap','createTicket','cancelCreateTicket','openJob','selectOverviewJob','openLifecycle','backToOverviewJobs','onTvChange'])assert.ok(app.includes('const '+callback+'=useCallback(guardCurrent('),callback);
  assert.match(app,/onSelectUnit=\{guardCurrent\(/);assert.match(app,/registerEquipment=\{guardCurrent\(/);assert.match(app,/onTvChange=\{onTvChange\}/);
+});
+
+
+test('a stalled initial account read leaves verification and supports a fresh manual retry',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const requests=[],states=[];
+ const controller=createOperationsSessionRecovery({read:()=>{const request=deferred();requests.push(request);return request.promise;},mode:()=>'',changed:state=>states.push(state)});
+ const initial=controller.check();
+ t.mock.timers.tick(SESSION_VERIFICATION_TIMEOUT_MS);await initial;
+ assert.equal(states.at(-1).checking,false);assert.equal(states.at(-1).session,null);assert.equal(states.at(-1).reloadRequired,false);assert.match(states.at(-1).error,/verification timed out/);
+ const retry=controller.check();assert.equal(requests.length,2);
+ requests[0].resolve(owner);await flush();assert.equal(states.at(-1).session,null);assert.equal(states.at(-1).checking,true);
+ requests[1].resolve(owner);await retry;assert.equal(states.at(-1).session.authorized,true);assert.equal(states.at(-1).checking,false);controller.stop();
+});
+test('a stalled recovery requires reload and never restores a late authorized response',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=await fixture();f.controller.invalidate('token-renewed');f.run();
+ t.mock.timers.tick(SESSION_VERIFICATION_TIMEOUT_MS);await flush();
+ assert.equal(f.state.checking,false);assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
+ f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);f.controller.stop();
 });
