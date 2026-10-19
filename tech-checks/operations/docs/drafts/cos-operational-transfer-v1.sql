@@ -15,12 +15,14 @@ create table cos_operational_private.current_placements (
   site text not null,
   address text not null,
   last_request_id uuid not null unique,
-  actor_id uuid not null,
+  actor_id uuid,
+  origin text not null default 'owner' check(origin in ('owner','google_sheet')),
   updated_at timestamptz not null default clock_timestamp()
 );
 create table cos_operational_private.events (
   request_id uuid primary key,
-  actor_id uuid not null,
+  actor_id uuid,
+  origin text not null default 'owner' check(origin in ('owner','google_sheet')),
   product_id text not null check(product_id ~ '^[1-9][0-9]{0,14}$'),
   source_unit_number text not null,
   submitted jsonb not null,
@@ -88,7 +90,7 @@ begin
     'sourceAddress',r.value->'sourceAddress',
     'revision',coalesce(c.revision,0),
     'operationalOverride',c.product_id is not null,
-    'syncState',coalesce(o.status,'source_recorded'),
+    'syncState',coalesce(o.status,case when c.origin='google_sheet' then 'published' else 'source_recorded' end),
     'changedAt',c.updated_at
   ) order by r.value->>'unitNumber',r.value->>'productId') into v_items
   from jsonb_array_elements(v_records) r
@@ -174,7 +176,7 @@ begin
  update cos_operational_private.current_placements
     set placement=p_placement,customer=v_customer,site=v_site,address=v_address,
       source_sha_at_move=v_source_sha,revision=v_revision,
-      last_request_id=p_request_id,actor_id=p_actor_user_id,updated_at=clock_timestamp()
+      last_request_id=p_request_id,actor_id=p_actor_user_id,origin='owner',updated_at=clock_timestamp()
     where product_id=p_product_id returning * into strict v_after;
  v_after_state:=jsonb_build_object('placement',v_after.placement,'customer',v_after.customer,
    'site',v_after.site,'address',v_after.address,'revision',v_after.revision);
@@ -223,7 +225,7 @@ begin
     'productId',c.product_id,'unitNumber',c.source_unit_number,
     'revision',c.revision,'placement',c.placement,'customer',c.customer,
     'site',c.site,'address',c.address,'updatedAt',c.updated_at,
-    'syncState',coalesce(o.status,'pending')
+    'syncState',coalesce(o.status,case when c.origin='google_sheet' then 'published' else 'pending' end)
   ) order by c.product_id),'[]'::jsonb) into v_items
  from cos_operational_private.current_placements c
  left join cos_operational_private.sheet_outbox o on o.request_id=c.last_request_id
