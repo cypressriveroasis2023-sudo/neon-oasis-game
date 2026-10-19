@@ -1,6 +1,34 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
+for(const it of [false,true])test(`nearby sites stay as several readable circles ${it?'IT':'Owner'}`,async({page},info)=>{
+ const f=statusPinsFixture();
+ f.field.mhelpAddressMap.items.forEach((p,i)=>{if(i<7){p.latitude=30;p.longitude=-96+i*.04;}});
+ const {app,state}=await mountFleet(page,it,{field:f.field});
+ const markers=app.locator('.cos-mhelp-address-marker');
+ await expect.poll(()=>markers.count()).toBeGreaterThanOrEqual(3);
+ expect((await app.locator('.cos-fleet-map-toolbar').boundingBox()).height).toBeLessThanOrEqual(76);
+ await app.getByLabel('Fleet map details',{exact:true}).click();
+ await expect(app.locator('.cos-fleet-map-details small')).toBeVisible();
+ await expect(app.locator('.cos-fleet-map-details small')).toContainText('7 MHelp customer address units');
+ await app.getByLabel('Fleet map details',{exact:true}).click();
+ const products=await markers.evaluateAll(nodes=>nodes.flatMap(n=>JSON.parse(n.getAttribute('data-mhelp-product-ids'))).sort());
+ expect(products).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
+ const boxes=await markers.evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().toJSON()));
+ for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];expect(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top).toBeTruthy();}
+ await expect(app.locator('.cos-address-review-flag')).toHaveCount(0);
+ await expect(markers.locator('svg path')).toHaveCount(0);
+ for(const id of products){
+  const index=await markers.evaluateAll((nodes,id)=>nodes.findIndex(n=>JSON.parse(n.getAttribute('data-mhelp-product-ids')).includes(id)),id);
+  await markers.nth(index).click();
+  const dialog=app.getByRole('dialog',{name:'MHelp address group'});
+  if(await dialog.count())await dialog.getByRole('button',{name:new RegExp('Product '+id+'$')}).click();
+  await expect(app.getByRole('dialog')).toContainText('Product '+id);
+  await page.keyboard.press('Escape');
+ }
+ await app.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('separate-nearby-sites.png')});
+ expect(state.errors).toEqual([]);expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();
+});
 for(const it of [false,true])test(`dense address groups stay clean and every product opens ${it?'IT':'Owner'}`,async({page},info)=>{
  const f=statusPinsFixture();
  f.field.mhelpAddressMap.items.forEach((p,i)=>{if(i<7){p.latitude=30+i*.00001;p.longitude=-96+i*.00001;}});

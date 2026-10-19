@@ -9,6 +9,6 @@ export function recordedAddressText(value:unknown):string{
  return [part('street'),part('city'),[part('state'),part('zip')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
 }
 export function fleetDisplayAddress(unit:DashboardUnit,record?:RecordedEquipment):FleetDisplayAddress{
- const linked=record?.kind==='unit'&&record.unitId===unit.id&&record.unitNumber===unit.unitNumber&&record.source==='owner_supplied_mhelp_export'&&record.productIds.length>0;
+ const linked=record?.kind==='unit'&&record.unitId===unit.id&&record.unitNumber===unit.unitNumber&&['owner_supplied_mhelp_export','mhelpdesk_api'].includes(record.source||'')&&record.productIds.length>0;
  return linked?{text:recordedAddressText(record.sourceAddress),label:'MHelp address',recordedAt:record.observedAt}:{text:typeof unit.address==='string'?unit.address:'',label:'Installation address',recordedAt:null};
 }

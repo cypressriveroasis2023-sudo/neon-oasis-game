@@ -25,9 +25,9 @@ export function projectEffectiveFleetPlacement(snapshot:Row,audits:Row[],options
   // This list is returned by the separate guarded upload projector. A row's
   // display metadata alone cannot supersede recorded Owner history.
   const unitUploadClaims=(options.authorizedUploadPlacements||[]).filter(a=>a.unitId===row.id);
-  const uploadClaims=unitUploadClaims.filter(a=>a.source==='owner_supplied_mhelp_export'&&a.unitNumber===row.unitNumber
+  const uploadClaims=unitUploadClaims.filter(a=>['owner_supplied_mhelp_export','mhelpdesk_api'].includes(a.source)&&a.unitNumber===row.unitNumber
    &&a.placement===placement&&/^[1-9][0-9]*$/.test(a.productId)&&/^[a-f0-9]{64}$/.test(a.sourceSha256)&&instant(a.observedAt)
-   &&row.placementSource==='mhelpdesk_upload'&&row.placementEvidence?.source==='owner_supplied_mhelp_export'
+   &&row.placementSource==='mhelpdesk_upload'&&row.placementEvidence?.source===a.source
    &&row.placementEvidence.productId===a.productId&&row.placementEvidence.sourceSha256===a.sourceSha256&&row.placementEvidence.observedAt===a.observedAt);
   const authorizedUpload=unitUploadClaims.length===1&&uploadClaims.length===1;
   const concern=placementIdentityConcernKey(row.unitNumber);

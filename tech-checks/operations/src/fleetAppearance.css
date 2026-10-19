@@ -144,6 +144,13 @@
 #root#root .cos-fleet-map-toolbar small { font-size: 12px; }
 #root#root .cos-fleet-map-toolbar > div:last-child { gap: 8px; margin-left: auto; flex-wrap: wrap; }
 #root#root .cos-fleet-map-toolbar button { font-size: 13px; padding: 10px 12px; }
+#root#root .cos-fleet-map-toolbar > div:first-child { flex: 1; min-width: 0; }
+#root#root .cos-fleet-map-toolbar .cos-fleet-map-details summary { display: flex; align-items: center; gap: 6px; min-height: 44px; list-style: none; cursor: pointer; }
+#root#root .cos-fleet-map-details summary::-webkit-details-marker { display: none; }
+#root#root .cos-fleet-map-details summary::after { content: '⌄'; color: var(--fleet-muted); }
+#root#root .cos-fleet-map-details[open] summary::after { content: '⌃'; }
+#root#root .cos-fleet-map-details small { display: block; margin-top: 4px; }
+#root#root .cos-fleet-map-toolbar > div:last-child { flex-wrap: nowrap; }
 #root#root .cos-fleet-map-canvas { height: 500px; min-height: 330px; background: #17202a; }
 /* Only raster tiles are toned down. Markers, locations, controls and attribution are untouched. */
 #root#root .cos-fleet-map-canvas .leaflet-tile-pane { filter: grayscale(.7) invert(.9) hue-rotate(180deg) brightness(.75) contrast(.9); }
@@ -579,8 +586,9 @@
 #root#root .cos-fleet-map-canvas .cos-address-pin-count { inset:0; height:32px; font:800 13px/32px Arial,sans-serif; color:#071421; }
 #root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped { position:absolute; left:8px; top:8px; width:28px!important; min-width:28px!important; max-width:28px!important; height:28px!important; min-height:28px!important; max-height:28px!important; margin:0; }
 #root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped.cos-field-cluster { left:6px; top:6px; width:32px!important; min-width:32px!important; max-width:32px!important; height:32px!important; min-height:32px!important; max-height:32px!important; }
-#root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped .cos-status-pin-art { position:absolute; inset:0; width:100%!important; height:100%!important; color:var(--pin); filter:drop-shadow(0 1px 2px #0007); }
-#root#root .cos-fleet-map-canvas .cos-status-shaped > b { position:absolute; inset:0; display:grid; place-items:center; margin:0; padding:0; height:100%; color:#071421; font:800 11px/1 Arial,sans-serif; transform:none!important; }
+#root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped .cos-status-pin-art { position:absolute; inset:0; z-index:1; width:100%!important; height:100%!important; color:var(--pin); filter:drop-shadow(0 1px 2px #0007); }
+#root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped > b { position:absolute; inset:0; display:grid; place-items:center; margin:0; padding:0; width:100%; max-width:none; height:100%; color:#071421; font:800 11px/1 Arial,sans-serif; transform:none!important; }
+#root#root .cos-fleet-dashboard .cos-fleet-map-canvas .cos-status-shaped > b.cos-reticle-long-id { font-size:9px; letter-spacing:0; }
 #root#root .cos-fleet-map-canvas .cos-field-cluster.cos-status-shaped > b { font-size:13px; }
 #root#root .cos-fleet-map-canvas .cos-status-shaped :is(.cos-pin-location-tag,.cos-cluster-caption,.cos-cluster-location,.cos-cluster-support) { display:none; }
 #root#root .cos-fleet-map-canvas .cos-status-group-ring,
