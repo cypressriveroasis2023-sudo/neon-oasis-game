@@ -33,6 +33,14 @@ jobs:
       - name: Install locked review dependencies
         run: npm ci
         working-directory: tech-checks/operations
+      - name: Capture locked review dependencies
+        run: tar -czf /tmp/cos-review-dependencies.tar.gz node_modules
+        working-directory: tech-checks/operations
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ticketfree-return-dependencies
+          path: /tmp/cos-review-dependencies.tar.gz
+          retention-days: 1
       - name: Require implemented return tests
         run: node --import tsx --test tests/ticketfree-returns-sql.test.mjs tests/ticketfree-returns-client.test.mjs
         working-directory: tech-checks/operations
