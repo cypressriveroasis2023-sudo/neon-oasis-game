@@ -13,6 +13,7 @@ import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntak
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
+import {createOperationalMoves,OperationalMoveError} from './operationalMoves.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
@@ -726,6 +727,13 @@ export function createOperationsHandler(options) {
         }
         return json(await mhelpPartner(path, method, body));
       }
+      if(path==='/api/operational-units'||path==='/api/operational-units/move'){
+        // Authenticated Owner-only local transaction; no Fleet, health or
+        // provider preflight in the transfer commit path.
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method==='POST'&&body===null)body=await requestBody(request);
+        return json(await createOperationalMoves({rpc,actorPayload})(path,method,body));
+      }
       if(path.startsWith('/api/unit-tracker/sheets/')){
         // Connection credentials and checks stay Owner-only; existing IT
         // tracker access and permission checks are unchanged.
@@ -1267,8 +1275,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof OperationalMoveError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof OperationalMoveError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }
