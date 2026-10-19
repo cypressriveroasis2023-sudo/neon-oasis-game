@@ -100,7 +100,9 @@ export function planOperationalSync(
    if(command)hold('mirror_baseline_required_before_publish');
    continue;
   }
-  if(!valid(status)){
+  // An incomplete old row cannot instruct COS, but a fresh Owner move
+  // may repair it if the verified Sheet mirror still agrees exactly.
+  if(!valid(status)&&!command){
    hold('source_status_or_site_needs_review');continue;
   }
   if(command){
