@@ -11,7 +11,7 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  await expect(board.locator('.cos-command-provider')).toHaveCount(4);
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
  await expect(board.locator('.cos-command-metadata')).toContainText('7 Field + 1 Shop = 8');
- await expect(board.getByText('Victron / Helios',{exact:true})).toBeVisible();
+ await expect(board.getByRole('heading',{name:'Victron / Helios',exact:true})).toBeVisible();
  await board.getByRole('button',{name:/Offline linked equipment/}).click();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(1);
  await expect(board.locator('.cos-command-rows')).toContainText('Spotter 1');
