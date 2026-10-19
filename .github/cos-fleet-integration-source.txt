@@ -1,0 +1,1 @@
+COS Fleet source integration is being prepared against verified main 77c93ca5c19dd80442d362ac673c611f64432df0. This temporary marker contains no production data and must be removed before release. Expected authored patch SHA-256: 971f2e6925d86a6f5dfa06cb6b6ea7cb3acfcee8cd74700eb0db56aa5a697818.
