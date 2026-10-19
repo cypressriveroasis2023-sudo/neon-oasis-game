@@ -11,6 +11,9 @@ for(const it of [false,true])test(`dense address groups stay clean and every pro
  await expect(group.locator('.cos-address-pin-count')).toHaveText('7');
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(0);
  await expect(group).toHaveAttribute('data-health','mixed');
+ await expect(group.locator('.cos-status-group-ring')).toHaveCount(1);
+ await expect(app.locator('.cos-address-review-flag')).toHaveCount(0);
+ await expect(group.locator('.cos-address-pin-art')).toHaveCSS('width','32px');
  expect(JSON.parse(await group.getAttribute('data-mhelp-product-ids')).sort()).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
  await group.scrollIntoViewIfNeeded();
  const groupBox=await group.boundingBox(),canvasBox=await app.locator('.cos-fleet-map-canvas').boundingBox();
@@ -24,7 +27,7 @@ for(const it of [false,true])test(`dense address groups stay clean and every pro
  for(const id of ['1001','1002','1003','1004','1005','1006','1007']){
   await dialog.getByRole('button',{name:new RegExp('Product '+id+'$')}).click();
   await expect(app.getByRole('dialog')).toContainText('Product '+id);
-  if(id==='1001'){await app.getByRole('button',{name:'Camera & unit details',exact:true}).click();await expect(app.locator('.cos-fleet-troubleshooting')).toHaveCount(1);}
+  if(id==='1001'){await expect(app.getByRole('dialog')).toContainText('Original mHelpDesk address');await expect(app.getByRole('dialog').locator('.cos-mhelp-address-warning')).toHaveCount(0);await expect(app.getByRole('dialog')).not.toContainText('Compare both addresses');await app.getByRole('button',{name:'Camera & unit details',exact:true}).click();await expect(app.locator('.cos-fleet-troubleshooting')).toHaveCount(1);}
   await page.keyboard.press('Escape');if(id==='1001'){await app.getByRole('button',{name:'Fit pins',exact:true}).click();await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();}await group.click();
  }
  await page.keyboard.press('Escape');

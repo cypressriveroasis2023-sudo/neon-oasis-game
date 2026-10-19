@@ -41,12 +41,13 @@ test('colored Fleet pins stay compact and clusters expand to accessible selectab
  await app.getByLabel('Fleet status',{exact:true}).selectOption('all');
  const cluster=app.locator('.cos-dashboard-cluster');await expect(cluster).toHaveCount(1);
  const dimensions=await cluster.locator('.cos-field-cluster').evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
- expect(dimensions.w).toBe(38);expect(dimensions.h).toBe(38);
+ expect(dimensions.w).toBe(32);expect(dimensions.h).toBe(32);
+ expect(await cluster.locator('.cos-field-cluster').evaluate(el=>getComputedStyle(el,'::after').display)).toBe('block');
  await cluster.click();await expect(app.locator('.cos-dashboard-peer')).toHaveCount(4);
  const solar=app.locator('.cos-dashboard-peer .cos-field-pin-support .cos-reticle-artwork');
  await expect(solar).toHaveCSS('color','rgb(21, 168, 255)');
  const shape=await solar.evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
- expect(shape.w).toBe(38);expect(shape.h).toBe(38);
+ expect(shape.w).toBe(28);expect(shape.h).toBe(28);
  await expect(app.locator('.cos-fleet-map-canvas [data-cos-eye],.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas .cos-reticle-solar-panel')).toHaveCount(0);
  await expect(app.locator('#cos-fleet-eye-artwork')).toHaveCount(0);
  await expect(app.locator('.cos-dashboard-peer .cos-map-status-dot')).toHaveCount(4);

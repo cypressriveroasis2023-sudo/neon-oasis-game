@@ -32,13 +32,18 @@ export function addressGroupHealth(pins:MhelpAddressMapPin[],health:ReadonlyMap<
  const states=order.filter(s=>counts[s]>0);
  return {counts,state:states.length===1?states[0]:'mixed' as const};
 }
-/** Same artwork for all Fleet layers; its display tip is separate from saved coordinates. */
-export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art" viewBox="0 0 30 38" aria-hidden="true" focusable="false"><path d="M15 36C12 31 2 23 2 15a13 13 0 1 1 26 0c0 8-10 16-13 21Z" fill="currentColor" stroke="#071421" stroke-width="2"/><circle cx="15" cy="15" r="9" fill="currentColor"/></svg>';
+/** Same compact circle for all Fleet layers; its center marks the recorded point. */
+export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art" viewBox="0 0 44 44" aria-hidden="true" focusable="false"><circle cx="22" cy="22" r="19" fill="currentColor" stroke="#071421" stroke-width="2"/></svg>';
+/** A single segmented outline keeps mixed groups compact without inventing a dominant status. */
+export function fleetStatusRing(counts:ReticleCounts):string{
+ const total=order.reduce((n,state)=>n+counts[state],0);if(!total)return fieldReticleColors.unknown;
+ let start=0;return 'conic-gradient('+order.filter(state=>counts[state]>0).map(state=>{const end=start+counts[state]/total*100,part=fieldReticleColors[state]+' '+start+'% '+end+'%';start=end;return part;}).join(',')+')';
+}
 const shaped=(html:string)=>html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/,fleetPinArtwork).replace('class="cos-field-pin','class="cos-field-pin cos-status-shaped');
 export function fleetUnitPinMarkup(...args:Parameters<typeof mapReticleMarkup>){return shaped(mapReticleMarkup(...args));}
 export function fleetSourcePinMarkup(label:string){return shaped(sourceEquipmentMarkerMarkup(label)).replace('--pin:#d6a84b','--pin:'+fieldReticleColors.unknown);}
 export function fleetGroupPinMarkup(...args:Parameters<typeof clusterReticleMarkup>){
- return clusterReticleMarkup(...args).replace('class="cos-field-cluster"','class="cos-field-cluster cos-status-shaped"').replace('<i class="cos-reticle-ring" aria-hidden="true"></i>',fleetPinArtwork.replace(' cos-map-status-dot',''));
+ return clusterReticleMarkup(...args).replace('class="cos-field-cluster"','class="cos-field-cluster cos-status-shaped"').replace('<i class="cos-reticle-ring" aria-hidden="true"></i>',fleetPinArtwork.replace(' cos-map-status-dot','')).replace('style="--pin:', 'style="--status-ring:'+fleetStatusRing(args[0])+';--pin:').replace('--pin:#d6a84b','--pin:'+fieldReticleColors.unknown);
 }
 export function addressPinStatusLabel(counts:ReticleCounts):string{
  return order.filter(s=>counts[s]).map(s=>counts[s]+' '+({online:'online',offline:'offline',unknown:'unverified',support:'solar support'}[s])).join(', ');
