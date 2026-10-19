@@ -3,20 +3,27 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
 import './tvBoardExtensions.css';
+import './fleetCompactSheet.css';
 import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,type FieldLocation} from './fieldLocations';
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds} from './tvFleetFeeds';
 import {automaticRefreshDue} from './refreshCadence';
-import {mapReticleMarkup} from './fieldMapMarkers';
+import {type ReticleState} from './fieldMapMarkers';
+import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
+import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
+import {readMhelpAddressMapPins,type MhelpAddressMapResult} from './mhelpAddressMapPins';
+import {readRecordedRoster} from './fleetRecordedRoster';
+import {mhelpFieldHealth} from './mhelpFieldHealth';
+import {fleetDashboardRows} from './fleetDashboardModel';
 import {checkedAddressEstimate,addressEstimateLabel,type AddressEstimate} from './fieldAddressEstimates';
 import {tvMapTour,tvOutageRows,tvCameraPageSize} from './tvMapTour';
 import type {FleetPages} from './tvBoardData';
 type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
-type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>};
+type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
 type Api={get:(path:string)=>Promise<{data:any}>};
-const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map()};
+const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),alive=useRef(false);
@@ -31,7 +38,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         field:async field=>{
           const units=field.items as Unit[];
           const points=await Promise.all(units.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)})));
-          if(current())setData(previous=>({...previous,units,inventory:(Array.isArray((field as any).inventoryItems)?(field as any).inventoryItems:units) as Unit[],readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))}));
+          if(current())setData(previous=>({...previous,units,inventory:(Array.isArray((field as any).inventoryItems)?(field as any).inventoryItems:units) as Unit[],fieldSource:field,addressMap:readMhelpAddressMapPins((field as any).mhelpAddressMap,(field as any).uploadInventory,Date.now()),readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))}));
         },
         health:health=>{if(current())setData(previous=>({...previous,health}));},
         routers:routers=>{if(current())setData(previous=>({...previous,routers}));}
@@ -52,29 +59,114 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const rows=useMemo(()=>data.units.map(unit=>({unit,health:fieldCameraHealth(unit,data.inventory,data.health,clock),router:fieldReachability(unit,data.routers?.items,clock),point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),estimate:data.estimates.get(unit.id)})).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]-{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber)),[data,clock]);
   const outages=useMemo(()=>tvOutageRows(rows),[rows]);
-  const areas=useMemo(()=>tvMapTour(rows),[rows]);
+  // Fleet and TV use the same strict mHelp Product-ID/address proof; never
+  // convert a customer address into GPS verification or guess video health.
+  const tvPins=useMemo(()=>{
+    const source=data.fieldSource,addresses=data.addressMap;
+    const roster=source?readRecordedRoster(source.fleetRoster,data.inventory).roster:null;
+    const dashboardRows=fleetDashboardRows(data.inventory,data.health,data.routers?.items||null,null,clock);
+    const products=source?mhelpFieldHealth(source.uploadInventory,roster,dashboardRows,clock):null;
+    const health=products?fleetAddressHealth(products.items,dashboardRows,'camera'):new Map<string,ReticleState>();
+    const productUnits=new Map((products?.items||[]).filter(product=>product.unitId).map(product=>[product.productId,product.unitId!]));
+    const coveredUnitIds=new Set((addresses?.pins||[]).map(pin=>productUnits.get(pin.productId)).filter(Boolean));
+    type TvPin={key:string;name:string;point:[number,number];health:ReticleState;site:string;address:string;locationLabel:string;verifiedGps:boolean;productId?:string};
+    const located:TvPin[]=(addresses?.pins||[]).map(pin=>({
+      key:'mhelp:'+pin.productId,name:pin.unitNumber,point:pin.point,
+      health:pin.lifecycle==='UNFLAGGED'&&!pin.placementHeld?health.get(pin.productId)||'unknown':'unknown',
+      site:pin.customer,address:pin.address,locationLabel:'MHelp customer/service address · not GPS',verifiedGps:false,productId:pin.productId
+    }));
+    const native:TvPin[]=rows.filter(row=>row.point&&!coveredUnitIds.has(row.unit.id)).map(row=>({
+      key:'native:'+row.unit.id,name:row.unit.unitNumber,
+      point:[row.point!.latitude,row.point!.longitude],
+      health:row.health.state==='online'||row.health.state==='offline'||row.health.state==='support'?row.health.state:'unknown',
+      site:row.unit.site||row.unit.customer||'',address:row.unit.address||'',
+      locationLabel:isCurrentFieldPin(row.unit)?'Verified installation':row.estimate?addressEstimateLabel(row.estimate)+' · not GPS':locationTag(row.unit),
+      verifiedGps:isCurrentFieldPin(row.unit)
+    }));
+    return {pins:[...located,...native],mhelpLocated:located.length,mhelpTotal:addresses?.totalField||0,mhelpMissing:addresses?.unlocated||0,gpsVerified:rows.filter(row=>isCurrentFieldPin(row.unit)).length};
+  },[data,rows,clock]);
+  const areas=useMemo(()=>tvMapTour(tvPins.pins.map(pin=>({unit:{id:pin.key,unitNumber:pin.name},health:{state:pin.health},point:{latitude:pin.point[0],longitude:pin.point[1]}}))),[tvPins]);
   const count=tvCameraPageSize(width,height),parts=Math.max(1,Math.ceil(outages.length/count));
   const shown=outages.slice((page%parts)*count,(page%parts+1)*count),area=areas[page%areas.length];
   useEffect(()=>onPages({camera:parts,map:areas.map(area=>area.label)}),[parts,areas,onPages]);
   const mapNode=useRef<HTMLDivElement|null>(null),mapRef=useRef<L.Map|null>(null),layer=useRef<L.LayerGroup|null>(null);
+  const [mapRevision,setMapRevision]=useState(0);
+  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
+  const groupHost=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{
+    const host=groupHost.current;
+    if(!host||!groupDetails)return;
+    host.replaceChildren(compactGroupPopup(groupDetails.members,groupDetails.zoom));
+    return()=>{host.replaceChildren();};
+  },[groupDetails]);
+  useEffect(()=>{setGroupDetails(null);},[mode,page,enabled,data.readAt]);
+  useEffect(()=>{
+    if(!groupDetails)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setGroupDetails(null);};
+    window.addEventListener('keydown',escape);
+    return()=>window.removeEventListener('keydown',escape);
+  },[groupDetails]);
   useEffect(()=>{
     if(!enabled||!mapNode.current)return;
     const map=L.map(mapNode.current,{zoomControl:false,attributionControl:true}).setView([31,-99],6);mapRef.current=map;
     addFieldMapBasemap(map);
     layer.current=L.layerGroup().addTo(map);
-    return()=>{map.remove();mapRef.current=null;layer.current=null;};
+    const update=()=>setMapRevision(value=>value+1);map.on('zoomend moveend',update);
+    return()=>{map.off('zoomend moveend',update);map.remove();mapRef.current=null;layer.current=null;};
   },[enabled]);
   useEffect(()=>{
     const map=mapRef.current,group=layer.current;if(!map||!group)return;
     group.clearLayers();
-    for(const {unit,health,router,point,estimate} of rows.filter(row=>row.point)){
-      const coordinate:L.LatLngExpression=[point!.latitude,point!.longitude];
-      const marker=L.marker(coordinate,{title:unit.unitNumber+' · '+health.state,icon:L.divIcon({className:'cos-field-pin-wrap',html:mapReticleMarkup(unit.unitNumber,health.state,isCurrentFieldPin(unit)?'current':estimate?.confidence==='source_recorded_unverified'?'recorded':'estimate'),iconSize:[48,48],iconAnchor:[24,24]})});
-      const popup=document.createElement('div');const title=document.createElement('strong');title.textContent=unit.unitNumber;popup.append(title);
-      for(const text of [unit.site||unit.customer||'Site not linked',unit.address||'Address not recorded','Camera / connection: '+health.state.toUpperCase(),fieldReachabilityLabels[router],!isCurrentFieldPin(unit)&&estimate?addressEstimateLabel(estimate)+' · needs verification':locationTag(unit)]){const p=document.createElement('p');p.textContent=text;popup.append(p);}
+    const entries=tvPins.pins.map(pin=>({item:pin,...map.latLngToContainerPoint(pin.point)}));
+    for(const members of compactMapGroups(entries)){
+      if(members.length>1){
+        const counts=compactMapStatusCounts(members.map(row=>({health:row.item.health})));
+        const point=L.point(members.reduce((n,row)=>n+row.x,0)/members.length,members.reduce((n,row)=>n+row.y,0)/members.length);
+        const title=members.length+' field equipment · '+compactGroupDescription(counts);
+        const marker=L.marker(map.containerPointToLatLng(point),{
+          title,alt:title,zIndexOffset:counts.offline?300:100,
+          icon:L.divIcon({className:'cos-compact-group-marker',html:compactGroupMarkup(counts),iconSize:[52,52],iconAnchor:[26,26]})
+        });
+        marker.on('add',()=>{
+          const element=marker.getElement();element?.setAttribute('data-group-count',String(members.length));
+          element?.setAttribute('data-offline-count',String(counts.offline));
+          element?.setAttribute('data-group-member-ids',JSON.stringify(members.map(row=>row.item.key)));
+          element?.setAttribute('aria-label',title);
+        });
+        const coords=new Set(members.map(row=>row.item.point.join(',')));
+        const zoom=coords.size>1&&map.getZoom()<17?()=>{
+          map.closePopup();
+          map.fitBounds(L.latLngBounds(members.map(row=>row.item.point)),{padding:[64,64],maxZoom:16,animate:false});
+        }:undefined;
+        const popupMembers:CompactMapMember[]=members.map(({item})=>({
+          key:item.key,label:item.name+(item.productId?' · Product '+item.productId:''),health:item.health,
+          site:item.site,address:item.address,locationLabel:item.locationLabel,productId:item.productId
+        }));
+        marker.on('click',()=>setGroupDetails({
+          members:popupMembers,zoom:zoom?()=>{
+            setGroupDetails(null);
+            zoom();
+          }:undefined
+        }));
+        group.addLayer(marker);
+        continue;
+      }
+      const {item}=members[0],health=item.health;
+      const html=item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,health,item.verifiedGps?'current':'estimate');
+      const marker=L.marker(item.point,{title:item.name+' · '+health,alt:item.name+' · '+health,
+        icon:L.divIcon({className:'cos-field-pin-wrap cos-tv-fleet-unit-marker',html,iconSize:[44,56],iconAnchor:[22,34]})});
+      marker.on('add',()=>{
+        const element=marker.getElement();element?.setAttribute('data-map-member-id',item.key);
+        if(item.productId)element?.setAttribute('data-mhelp-product-id',item.productId);
+      });
+      const popup=document.createElement('div');popup.className='cos-compact-tv-pin-popup';
+      const title=document.createElement('strong');title.textContent=item.name;popup.append(title);
+      for(const value of [item.site||'Site not linked',item.address||'Address not recorded','Camera / connection: '+health.toUpperCase(),item.locationLabel]){
+        const p=document.createElement('p');p.textContent=value;popup.append(p);
+      }
       marker.bindPopup(popup);group.addLayer(marker);
     }
-  },[rows]);
+  },[tvPins,mapRevision,enabled]);
   useEffect(()=>{
     if(mode!=='map')return;
     const frame=requestAnimationFrame(()=>{
@@ -85,12 +177,12 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     });
     return()=>cancelAnimationFrame(frame);
   },[mode,height,width,area]);
-  const totals={online:rows.filter(r=>r.health.state==='online').length,offline:rows.filter(r=>r.health.state==='offline').length,unknown:rows.filter(r=>r.health.state==='unknown').length,mapped:rows.filter(r=>isCurrentFieldPin(r.unit)).length};
+  const totals={online:rows.filter(r=>r.health.state==='online').length,offline:rows.filter(r=>r.health.state==='offline').length,unknown:rows.filter(r=>r.health.state==='unknown').length,mapped:tvPins.gpsVerified};
   return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
-    <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{outages.length} down units</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{totals.online} online</b><b className='tv-offline'>{totals.offline} offline</b><b>{totals.unknown} unverified</b><b>{totals.mapped} verified pins</b></>}<small>Saved data · refresh 15 min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}</small></div>
+    <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{outages.length} down units</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{totals.online} online</b><b className='tv-offline'>{totals.offline} offline</b><b>{totals.unknown} unverified</b><b>{rows.length} camera units</b><b>{tvPins.mhelpLocated} mHelp address pins</b><b>{totals.mapped} GPS-verified</b></>}<small>Saved data · refresh 15 min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {error}</p>}
     {!data.readAt&&<p className='tv-fleet-loading'>{error?'Fleet information is unavailable.':'Loading Camera Health and field locations…'}</p>}
-    <div className='tv-fleet-map-wrap field-map-workspace' hidden={mode!=='map'} data-area-kind={area.kind}><div ref={mapNode} className='tv-fleet-map' aria-label='Field unit locations'/><div className='tv-map-area' aria-label='Current map area'><strong>{area.label}</strong><span>{area.ids.length} units · <b className='tv-offline'>{area.offline} down</b> · <b className='tv-online'>{area.online} online</b></span></div><div className='tv-map-legend'><span className='tv-online'>● Online</span><span className='tv-offline'>● Offline</span><span>● Unverified</span><span className='tv-solar'>● Solar / support</span><span>EST / SRC: location needs verification</span><span>{rows.length-totals.mapped} locations need verification</span></div></div>
+    <div className='tv-fleet-map-wrap field-map-workspace cos-tv-compact-fleet-map' hidden={mode!=='map'} data-area-kind={area.kind}><div ref={mapNode} className='tv-fleet-map' aria-label='Field unit locations'/>{groupDetails&&mode==='map'&&<section className='cos-compact-group-sheet cos-tv-compact-sheet' role='dialog' aria-label='Grouped TV equipment'><button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button><div ref={groupHost} className='cos-compact-group-sheet-content'/></section>}<div className='tv-map-area' aria-label='Current map area'><strong>{area.label}</strong><span>{area.ids.length} units · <b className='tv-offline'>{area.offline} down</b> · <b className='tv-online'>{area.online} online</b></span></div><div className='tv-map-legend'><span className='tv-online'>● Online</span><span className='tv-offline'>● Offline</span><span>● Unverified</span><span className='tv-solar'>● Solar / support</span><span>Group ring = equipment health · red = confirmed offline</span><span>{tvPins.mhelpLocated} saved mHelp customer-address pins · {tvPins.mhelpMissing} unresolved · {totals.mapped} GPS-verified units</span></div></div>
     {mode==='camera'&&data.readAt&&<div className='tv-fleet-records'>{shown.map(({unit,health,router})=><article key={unit.id} className='tv-fleet-record tv-state-offline'><div><h3>{unit.unitNumber}</h3><b>OFFLINE</b></div><p>{unit.site||unit.customer||'Site not linked'}</p><p>{unit.address||'Address not recorded'}</p><div><span>{fieldReachabilityLabels[router]}</span><span>{locationTag(unit)}</span></div><small>{unit.activeJobNumber||'No linked job'} · {health.basis==='connection'?'IP / port observation':health.basis==='recorder'?'Recorder observation':'Camera / detector observation'} · {cameraTime(health.checkedAt,clock)}</small></article>)}{!outages.length&&<p>{data.health?'No confirmed red outages in the available records.':'Camera Health is unavailable. Waiting for outage records.'}</p>}</div>}
   </div>;
 }
