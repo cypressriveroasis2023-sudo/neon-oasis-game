@@ -83,7 +83,7 @@ export default function FleetCommandCenter({
        <strong>{panel.counts?.[state]??'—'}</strong><small>{names[state]}</small>
      </button>)}
     </div>
-    <p className="cos-command-provider-time">Last successful check: {date(panel.lastCheck)}</p>
+    <p className="cos-command-provider-time">{panel.key==='victron'?'Last successful VRM sync:':'Last saved Camera Health read:'} {date(panel.lastCheck)}</p>
     <p className="cos-command-provider-note">{panel.note}</p>
     <button type="button" className="cos-command-all-provider" onClick={()=>filter(panel.key)}>View {panel.title} units →</button>
    </article>)}
