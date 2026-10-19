@@ -13,13 +13,15 @@ for(const [label,products,rows] of [
  ['unlinked name match',[product('1','unlinked',null)],[row('1')]],['held identity',[product('1','review')],[row('1')]],['inactive source',[product('1','inactive')],[row('1')]],['absent unit',[product('1')],[]],['duplicate unit',[product('1')],[row('1'),row('1')]],['duplicate Product ID',[product('1'),product('1')],[row('1')]],['two products claim one unit',[product('1'),product('2','online','unit-1')],[row('1')]],['retired unit',[product('1')],[row('1','online',{retired:true})]],['Shop unit',[product('1')],[row('1','online',{placement:'shop'})]],['inconsistent observation',[product('1')],[row('1','offline')]],
 ])test(label+' cannot inherit green from an address or possible match',()=>assert.equal(fleetAddressHealth(products,rows,'camera').get('1'),'unknown'));
 test('solar support stays blue without inventing camera health',()=>assert.equal(fleetAddressHealth([product('1','support',null)],[],'camera').get('1'),'support'));
-test('review badge is independent; holds and unknown links stay gray; mixed groups remain mixed',()=>{
+test('address lookup evidence is independent; holds and unknown links stay gray; mixed groups remain mixed',()=>{
  const health=new Map([['1','online'],['2','offline'],['3','support']]);assert.equal(addressGroupHealth([pin('1',{state:'address_review'})],health).state,'online');
  for(const p of [pin('1',{placementHeld:true}),pin('1',{lifecycle:'DO_NOT_USE'}),pin('9')])assert.equal(addressGroupHealth([p],health).state,'unknown');
  const mixed=addressGroupHealth([pin('1'),pin('2'),pin('3')],health);assert.equal(mixed.state,'mixed');assert.equal(addressPinStatusLabel(mixed.counts),'1 online, 1 offline, 1 solar support');
 });
-test('one Fleet pin silhouette retains state, numeric labels and HTML safety',()=>{
- for(const state of ['online','offline','unknown','support']){const m=fleetUnitPinMarkup('Ranger 029.2',state,'recorded');assert.match(m,/M15 36C12 31/);assert.match(m,/029.2/);assert.match(m,/SRC/);assert.match(m,new RegExp('data-health="'+state+'"'));}
- assert.doesNotMatch(fleetUnitPinMarkup('<img src=x onerror=alert(1)>','online'),/<img|onerror/);assert.match(fleetSourcePinMarkup('ST 007'),/--pin:#94a3b8/);assert.match(fleetSourcePinMarkup('ST 007'),/M15 36C12 31/);
- const group=fleetGroupPinMarkup({online:1,offline:1,unknown:0,support:0});assert.match(group,/data-health="mixed"/);assert.match(group,/M15 36C12 31/);
+test('individual Fleet pin drops retain state, numeric labels and HTML safety',()=>{
+ for(const state of ['online','offline','unknown','support']){const m=fleetUnitPinMarkup('Ranger 029.2',state,'recorded');assert.match(m,/class="[^"]*cos-unit-pin-drop/);assert.match(m,/029.2/);assert.match(m,/SRC/);assert.match(m,new RegExp('data-health="'+state+'"'));}
+ assert.match(fleetUnitPinMarkup('Sniper 4-100','offline'),/>4-100<\/b>/);
+ assert.doesNotMatch(fleetUnitPinMarkup('<img src=x onerror=alert(1)>','online'),/<img|onerror/);assert.match(fleetSourcePinMarkup('ST 007'),/--pin:#94a3b8/);assert.match(fleetSourcePinMarkup('ST 007'),/class="[^"]*cos-unit-pin-drop/);
+ const group=fleetGroupPinMarkup({online:1,offline:1,unknown:0,support:0});assert.match(group,/data-health="mixed"/);assert.match(group,/class="[^"]*cos-unit-pin-drop/);
+ assert.match(fleetGroupPinMarkup({online:0,offline:0,unknown:0,support:0},0,0,0,2),/--pin:#94a3b8/);
 });

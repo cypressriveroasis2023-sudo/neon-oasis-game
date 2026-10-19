@@ -1,25 +1,46 @@
 import type {MapPoint} from './fieldMapMarkers';
-/** Group complete screen-space touch boxes, including connected collisions.
- * Original coordinates and identities remain unchanged. Zooming separates groups.
+/** Merge the closest colliding rendered markers, not chains of hidden members.
+ * Each badge is drawn at its members' centroid with a 44px touch box. A 48px
+ * separation leaves a small gap; original coordinates and identities stay intact.
  */
 export function fleetMapGroups<T>(points:MapPoint<T>[]):MapPoint<T>[][] {
- const pending=points.slice(),groups:MapPoint<T>[][]=[];
- while(pending.length){
-  const group=[pending.shift()!];
-  for(let i=0;i<group.length;i++)for(let j=pending.length-1;j>=0;j--){
-   if(Math.abs(group[i].x-pending[j].x)<52&&Math.abs(group[i].y-pending[j].y)<72)group.push(pending.splice(j,1)[0]);
-  }
-  groups.push(group);
+ // Co-located service addresses can contain hundreds of records. Combine those
+ // once before checking nearby badges instead of repeating identical distances.
+ const colocated=new Map<string,{members:MapPoint<T>[];x:number;y:number}>();
+ for(const point of points){
+  const key=point.x+','+point.y,group=colocated.get(key);
+  if(group)group.members.push(point);
+  else colocated.set(key,{members:[point],x:point.x,y:point.y});
  }
- // Moving a group badge to its centroid must not create a new badge collision.
- const center=(g:MapPoint<T>[])=>({x:g.reduce((n,p)=>n+p.x,0)/g.length,y:g.reduce((n,p)=>n+p.y,0)/g.length});
- for(let merged=true;merged;){
-  merged=false;
-  outer:for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){
-   const a=center(groups[i]),b=center(groups[j]);
-   if(Math.abs(a.x-b.x)<52&&Math.abs(a.y-b.y)<72){groups[i].push(...groups.splice(j,1)[0]);merged=true;break outer;}
+ const groups=[...colocated.values()];
+ while(true){
+  let pair:[number,number]|undefined,nearest=Infinity;
+  for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){
+   const dx=Math.abs(groups[i].x-groups[j].x),dy=Math.abs(groups[i].y-groups[j].y);
+   if(dx<48&&dy<48&&dx*dx+dy*dy<nearest){pair=[i,j];nearest=dx*dx+dy*dy;}
   }
+  if(!pair)break;
+  const [i,j]=pair,a=groups[i],b=groups[j],count=a.members.length+b.members.length;
+  a.x=(a.x*a.members.length+b.x*b.members.length)/count;
+  a.y=(a.y*a.members.length+b.y*b.members.length)/count;
+  a.members.push(...b.members);groups.splice(j,1);
  }
  const order=new Map(points.map((p,i)=>[p,i]));
- return groups.map(group=>group.sort((a,b)=>order.get(a)!-order.get(b)!));
+ return groups.map(group=>group.members.sort((a,b)=>order.get(a)!-order.get(b)!));
+}
+
+/** One displayed position per identity; recorded points remain immutable. */
+export function fleetIndividualPinPositions<T>(points:MapPoint<T>[],viewport:{width:number;height:number}) {
+ const occupied:{x:number;y:number}[]=[],stepX=56,stepY=64;
+ const rings=Math.ceil(Math.sqrt(points.length))+3,candidates:{x:number;y:number;distance:number}[]=[];
+ for(let y=-rings;y<=rings;y++)for(let x=-rings;x<=rings;x++)candidates.push({x:x*stepX,y:y*stepY,distance:x*x*stepX*stepX+y*y*stepY*stepY});
+ candidates.sort((a,b)=>a.distance-b.distance||a.y-b.y||a.x-b.x);
+ const inside=(x:number,y:number)=>x>=24&&x<=viewport.width-24&&y>=36&&y<=viewport.height-42&&!(x<80&&y<145);
+ return points.map(point=>{
+  const visible=point.x>=0&&point.x<=viewport.width&&point.y>=0&&point.y<=viewport.height;
+  const clear=(x:number,y:number)=>occupied.every(p=>Math.abs(p.x-x)>=stepX||Math.abs(p.y-y)>=stepY);
+  let chosen=candidates.find(d=>clear(point.x+d.x,point.y+d.y)&&(!visible||inside(point.x+d.x,point.y+d.y)));
+  chosen??=candidates.find(d=>clear(point.x+d.x,point.y+d.y))!;
+  const position={item:point.item,x:point.x+chosen.x,y:point.y+chosen.y,sourceX:point.x,sourceY:point.y};occupied.push(position);return position;
+ });
 }

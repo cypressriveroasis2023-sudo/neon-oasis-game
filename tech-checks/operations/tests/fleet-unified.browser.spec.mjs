@@ -39,28 +39,25 @@ test('colored Fleet pins stay compact and clusters expand to accessible selectab
  const custom={...field,items:catalog.filter(u=>u.currentLocationType==='field'),inventoryItems:catalog,summary:{fieldUnits:4,mappedUnits:4,unitGps:0,missingGps:0}};
  const {app,state}=await mountFleet(page,false,{field:custom});
  await app.getByLabel('Fleet status',{exact:true}).selectOption('all');
- const cluster=app.locator('.cos-dashboard-cluster');await expect(cluster).toHaveCount(1);
- const dimensions=await cluster.locator('.cos-field-cluster').evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
- expect(dimensions.w).toBe(38);expect(dimensions.h).toBe(38);
- await cluster.click();await expect(app.locator('.cos-dashboard-peer')).toHaveCount(4);
- const solar=app.locator('.cos-dashboard-peer .cos-field-pin-support .cos-reticle-artwork');
+ await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(0);await expect(app.locator('.cos-dashboard-marker')).toHaveCount(4);
+ const solar=app.locator('.cos-dashboard-marker .cos-field-pin-support .cos-reticle-artwork');
  await expect(solar).toHaveCSS('color','rgb(21, 168, 255)');
  const shape=await solar.evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
- expect(shape.w).toBe(38);expect(shape.h).toBe(38);
+ expect(shape.w).toBe(28);expect(shape.h).toBe(36);
  await expect(app.locator('.cos-fleet-map-canvas [data-cos-eye],.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas .cos-reticle-solar-panel')).toHaveCount(0);
  await expect(app.locator('#cos-fleet-eye-artwork')).toHaveCount(0);
- await expect(app.locator('.cos-dashboard-peer .cos-map-status-dot')).toHaveCount(4);
+ await expect(app.locator('.cos-dashboard-marker .cos-map-status-dot')).toHaveCount(4);
  for(const [id,label,status,color] of [[catalog[0].id,'Helios 1','online','rgb(43, 255, 53)'],[catalog[1].id,'Spotter 1','offline','rgb(255, 39, 52)'],[catalog[2].id,'Spotter 2','unknown','rgb(148, 163, 184)'],[catalog[4].id,'ST 007','support','rgb(21, 168, 255)']]){
-  const marker=app.locator('.cos-dashboard-peer[data-unit-id="'+id+'"]');
+  const marker=app.locator('.cos-dashboard-marker[data-unit-id="'+id+'"]');
   await expect(marker).toHaveAttribute('aria-label',new RegExp(label));
   await expect(marker.locator('.cos-field-pin')).toHaveAttribute('data-health',status);
-  await expect(marker.locator('circle')).toHaveCSS('fill',color);
-  await expect(marker.locator('.cos-pin-unit-number')).toHaveCSS('color','rgb(7, 20, 33)');
-  const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-status-pin-art circle').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&Math.abs(circle.y+circle.height/2-label.y-label.height/2)<1;});
+  await expect(marker.locator('path')).toHaveCSS('fill',color);
+  await expect(marker.locator('.cos-pin-unit-number')).toHaveCSS('color','rgb(244, 247, 251)');
+  const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-status-pin-art').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&label.top>=circle.bottom;});
   expect(centered).toBe(true);
  }
  await page.screenshot({path:info.outputPath('compact-expanded-fleet-markers.png'),fullPage:true});
- await app.locator('.cos-dashboard-peer[data-unit-id="'+units[1].id+'"]').click();
+ await app.locator('.cos-dashboard-marker[data-unit-id="'+units[1].id+'"]').click();
  await expect(app.getByRole('dialog',{name:'Spotter 1 unit intelligence'})).toBeVisible();
  await expect(app.locator('.camera-unit-state')).toHaveClass(/camera-status-offline/);
  await expect(app.locator('.camera-unit-state')).toHaveCSS('color','rgb(255, 101, 112)');
@@ -180,8 +177,8 @@ test('expanded cluster survives pending location revalidation but settled member
  for(const unit of catalog.slice(0,3))Object.assign(unit,{latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:fresh,gpsRecordedAt:fresh});
  const custom={...field,items:catalog.filter(unit=>unit.currentLocationType==='field'),inventoryItems:catalog,summary:{fieldUnits:3,mappedUnits:3,unitGps:0,missingGps:0}};
  const {app,state}=await mountFleet(page,false,{field:custom,advancingClock:true});
- const cluster=app.locator('.cos-dashboard-cluster');await expect(cluster).toHaveCount(1);await cluster.click();
- const ids=()=>app.locator('.cos-dashboard-peer').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-unit-id')).sort());
+ await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(0);
+ const ids=()=>app.locator('.cos-dashboard-marker').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-unit-id')).sort());
  const expected=catalog.slice(0,3).map(unit=>unit.id).sort();await expect.poll(ids).toEqual(expected);
  const viewport=()=>app.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();
  await page.clock.runFor(60_000);await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
@@ -189,8 +186,6 @@ test('expanded cluster survives pending location revalidation but settled member
  const removed=catalog[1].id;for(const unit of state.field.inventoryItems)if(unit.id===removed)Object.assign(unit,{placement:'SHOP',currentLocationType:'shop',status:'available'});
  state.field.items=state.field.items.filter(unit=>unit.id!==removed);state.field.summary={fieldUnits:2,mappedUnits:2,unitGps:0,missingGps:0};
  await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
- await expect(cluster).toHaveAttribute('aria-expanded','false');await expect(app.locator('.cos-dashboard-peer')).toHaveCount(0);
- await expect(cluster).toHaveAttribute('data-unit-ids',JSON.stringify([catalog[0].id,catalog[2].id]));
- await cluster.click();await expect.poll(ids).toEqual([catalog[0].id,catalog[2].id].sort());
+ await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(0);await expect.poll(ids).toEqual([catalog[0].id,catalog[2].id].sort());
  expect(state.calls.every(call=>call.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
 });
