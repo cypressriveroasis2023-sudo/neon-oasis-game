@@ -11,6 +11,8 @@ on:
       - 'tech-checks/database-maintenance/techcheck-named-handoffs-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-rollout-v2.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-integration-v3.sql'
+      - 'tech-checks/database-maintenance/techcheck-handoff-activation-v1.sql'
+      - 'tech-checks/database-maintenance/techcheck-transfer-delivery-schedule-v1.sql'
       - 'tech-checks/supabase/functions/techcheck-transfer-delivery/**'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
