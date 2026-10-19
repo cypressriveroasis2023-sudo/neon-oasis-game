@@ -54,7 +54,7 @@ export function createOperationalSheetSyncRuntime(options:{
    catch{throw Error('malformed');}
   };
   let lease:string|null=null,stage='authenticate';
-  const fail=(name:string)=>{throw Error(name)};
+  const fail=(name:string):never=>{throw Error(name)};
   try{
    const allowed=await fetchJson(
     'https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-mhelp-readiness',
