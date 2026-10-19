@@ -1,0 +1,52 @@
+/* Provider-scoped accounting. Presentation only; never used by health classification. */
+#root#root .cos-fleet-provider-health{
+ margin:14px 0 18px;padding:18px;border:1px solid var(--fleet-line,#454b54);
+ border-radius:12px;background:var(--fleet-panel,#20262d);color:var(--fleet-text,#f5f7fa)
+}
+#root#root .cos-provider-title h2{margin:0 0 5px;font-size:20px;line-height:1.3}
+#root#root .cos-provider-title p{margin:0 0 15px;font-size:14px;color:var(--fleet-muted,#c2c8d1)}
+#root#root .cos-provider-warning{padding:12px 14px;border-radius:8px;margin:0 0 14px;background:#332a20;border-left:3px solid #e2a652;font-size:13px}
+#root#root .cos-provider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+#root#root .cos-provider-panel{min-width:0;padding:16px;background:#171d24;border:1px solid #414d5b;border-radius:10px}
+#root#root .cos-provider-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#root#root .cos-provider-panel-head h3{font-size:19px;margin:0;line-height:1.3}
+#root#root .cos-provider-panel-head p{margin:2px 0 0;font-size:13px;color:#cbd5e1}
+#root#root .cos-provider-total{font-size:27px;line-height:1.2;color:#fff}
+#root#root .cos-provider-statuses{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:14px 0}
+#root#root .cos-provider-status{min-width:0;min-height:54px!important;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;border-radius:8px!important;background:#26313d!important;color:#f5f7fa!important;padding:8px 10px!important}
+#root#root .cos-provider-status b{font-size:22px;line-height:1.2}
+#root#root .cos-provider-status span{font-size:12px}
+#root#root .cos-provider-status-online b{color:#3cea6d}
+#root#root .cos-provider-status-offline b{color:#ff5964}
+#root#root .cos-provider-status-unverified b{color:#c0cbd8}
+#root#root .cos-provider-status[aria-pressed=true]{outline:2px solid #63b4ff;outline-offset:0}
+#root#root .cos-provider-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+#root#root .cos-provider-controls label{display:block;font-size:12px;color:#cbd5e1;min-width:0}
+#root#root .cos-provider-controls :is(input,select){display:block;width:100%;min-width:0;margin-top:4px;padding:8px 10px;color:#fff;background:#202c39;border:1px solid #5a6b80;border-radius:7px}
+#root#root .cos-provider-results{font-size:12px;color:#cbd5e1;margin:10px 0}
+#root#root .cos-provider-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+#root#root .cos-provider-list>li{min-width:0;border:1px solid #354254;background:#212a35;border-radius:8px;padding:10px 12px}
+#root#root .cos-provider-unit-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#root#root .cos-provider-unit-line>div{display:flex;flex-direction:column;gap:0;min-width:0}
+#root#root .cos-provider-unit-line strong{font-size:14px;overflow-wrap:anywhere}
+#root#root .cos-provider-unit-line>div span,#root#root .cos-provider-list>li>small{font-size:12px;color:#cbd5e1}
+#root#root .cos-provider-pill{border-radius:99px;padding:4px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+#root#root .cos-provider-pill-online{color:#76f6a1;background:#173b2a}
+#root#root .cos-provider-pill-offline{color:#ff8e94;background:#4e1c24}
+#root#root .cos-provider-pill-unverified{color:#d5dde7;background:#344255}
+#root#root .cos-provider-pill-not_applicable{color:#a4d6ff;background:#17364c}
+#root#root .cos-provider-reason{font-size:12px;color:#dbe4ef;margin:7px 0;overflow-wrap:anywhere}
+#root#root .cos-provider-open{margin:7px 0 0;min-height:44px!important;padding:6px 12px;background:transparent!important;color:#98ceff!important;border:1px solid #60758f!important;border-radius:7px}
+#root#root .cos-provider-more{width:100%;margin-top:10px;padding:8px;border:1px solid #61758a;border-radius:8px;background:#293849!important;color:#e6f2ff!important}
+#root#root .cos-provider-empty,#root#root .cos-provider-note{font-size:13px;color:#cbd5e1;margin:10px 0}
+#root#root .cos-provider-other{border-top:1px solid #425063;margin-top:16px;padding-top:8px}
+#root#root .cos-provider-other summary{cursor:pointer;font-size:14px;font-weight:600;margin:2px 0 12px}
+#root#root .cos-provider-legend{margin:14px 0 0;color:#cbd5e1;font-size:12px}
+@media(max-width:780px){
+ #root#root .cos-fleet-provider-health{padding:12px}
+ #root#root .cos-provider-grid{grid-template-columns:minmax(0,1fr)}
+ #root#root .cos-provider-panel{padding:12px}
+}
+@media(max-width:410px){
+ #root#root .cos-provider-controls{grid-template-columns:minmax(0,1fr)}
+}
