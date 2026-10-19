@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
 import './tvBoardExtensions.css';
+import './fleetCompactSheet.css';
 import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,type FieldLocation} from './fieldLocations';
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
