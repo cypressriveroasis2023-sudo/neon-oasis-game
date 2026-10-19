@@ -8,7 +8,7 @@ const SHA='a'.repeat(64),ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const OWNER='22222222-2222-4222-8222-222222222222';
 const source=[
  {productId:'123',unitNumber:'Ranger 028',placement:'FIELD',customer:'Builder',lifecycle:'UNFLAGGED',sourceAddress:{street:'100 Main St',city:'Houston',state:'TX',zip:'77002'}},
- {productId:'124',unitNumber:'Spotter 304HDC4',placement:'SHOP',customer:'Cameras OnSite',lifecycle:'UNFLAGGED',sourceAddress:{}}
+ {productId:'124',unitNumber:'Spotter (solar compatible) 304HDC4',placement:'SHOP',customer:'Cameras OnSite',lifecycle:'UNFLAGGED',sourceAddress:{}}
 ];
 const field={placement:'FIELD',customer:'Builder',site:'Job',address:'100 Main St, Houston TX 77002'};
 const shop={placement:'SHOP',customer:'Cameras OnSite',site:'SHOP',address:'9949 W Sam Houston Pkwy N, Houston TX'};
@@ -31,8 +31,8 @@ const dbcall=(db,name,...args)=>{
  return db.query('select public.cos_operational_sheet_sync_'+name+'('+placeholders+') v',args).then(r=>r.rows[0].v);
 };
 const bootstrapRows=[
- {productId:'123',sheetId:386511683,row:28,label:'Ranger 028',fields:field},
- {productId:'124',sheetId:2017346590,row:305,label:'Spotter 304HDC4',fields:shop}
+ {productId:'123',sheetId:386511683,row:28,label:'Ranger 028',matchKey:'RANGERS|Ranger 028',fields:field},
+ {productId:'124',sheetId:2017346590,row:305,label:'Spotter 304HDC4',matchKey:'SPOTTERS|Spotter 304HDC4',fields:shop}
 ];
 const activeLease=async db=>(await dbcall(db,'begin')).leaseId;
 test('complete 2-product mirror bootstraps without changing a single COS equipment record',async()=>{
