@@ -24,7 +24,10 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared
  await app.locator('.cos-compact-show-all').click();
  await expect(app.locator('.cos-compact-popup-member')).toHaveCount(161);
  await expect(app.locator('.cos-compact-group-popup')).toContainText('Solar Stand 72 001');
- await app.locator('.leaflet-popup-close-button').click();
+ await app.locator('.cos-compact-popup-member[data-mhelp-product-id="1"]').click();
+ await expect(app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(app.locator('.cos-compact-group-sheet')).toHaveCount(0);
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
  await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await app.getByLabel('Fleet map details',{exact:true}).click();await app.getByLabel('Find mapped equipment').selectOption('1');
  const drawer=app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'});
