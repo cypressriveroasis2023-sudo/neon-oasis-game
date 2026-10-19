@@ -19,7 +19,7 @@ export const OPERATIONAL_SHEETS_TABS=Object.freeze([
  {id:1900162010,title:'STANDS',columns:[0,1,3,4,5]},
  {id:1900162011,title:'WALL-E',columns:[0,1,3,4,5]},
 ]);
-export type Fields={placement:'FIELD'|'SHOP';customer:string;site:string;address:string};
+export type Fields={placement:'FIELD'|'SHOP'|'DECOMMISSIONED';customer:string;site:string;address:string};
 export type IndexRow={key:string;productId:string};
 export type SheetRow={sheetId:number;row:number;label:string;fields:Fields;formula?:boolean;validation?:Record<string,any>};
 export type Mirror={productId:string;sheetId:number;row:number;label:string;fields:Fields;revision:number};
@@ -35,8 +35,11 @@ const object=(v:unknown):v is Record<string,any>=>v!==null&&typeof v==='object'&
 const product=(s:unknown):s is string=>typeof s==='string'&&/^[1-9][0-9]{0,14}$/.test(s);
 const canonical=(f:Fields)=>JSON.stringify([f.placement,f.customer,f.site,f.address]);
 const safe=(v:unknown,max:number)=>typeof v==='string'&&v===v.trim()&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v)&&!/^[-+=@]/.test(v);
-const valid=(f:unknown):f is Fields=>object(f)&&['FIELD','SHOP'].includes(f.placement)
- &&safe(f.customer,250)&&safe(f.site,250)&&safe(f.address,600)
+/** A historical baseline may have a decommissioned placement or an unfinished
+ * Field site. Those records must stay visible without becoming executable moves. */
+export const baseline=(f:unknown):f is Fields=>object(f)&&['FIELD','SHOP','DECOMMISSIONED'].includes(f.placement)
+ &&safe(f.customer,250)&&safe(f.site,250)&&safe(f.address,600);
+export const valid=(f:unknown):f is Fields=>baseline(f)&&['FIELD','SHOP'].includes(f.placement)
  &&(f.placement==='SHOP'||(f.customer.length>=2&&f.site.length>=2&&f.address.length>=8));
 export function planOperationalSync(
  index:IndexRow[],sheet:SheetRow[],mirrors:Mirror[],pending:Pending[]
@@ -66,7 +69,7 @@ export function planOperationalSync(
  }
  const mirrorByProduct=new Map<string,Mirror>();
  for(const m of mirrors){
-  if(!product(m?.productId)||mirrorByProduct.has(m.productId)||!Number.isSafeInteger(m.revision)||m.revision<0||!valid(m.fields))
+  if(!product(m?.productId)||mirrorByProduct.has(m.productId)||!Number.isSafeInteger(m.revision)||m.revision<0||!baseline(m.fields))
    throw Error('Invalid COS Sheets mirror baseline');
   mirrorByProduct.set(m.productId,m);
  }
@@ -83,17 +86,22 @@ export function planOperationalSync(
   const hold=(reason:string)=>result.held.push({productId:pid,reason});
   if(!row){hold('sheet_identity_missing');continue;}
   const tab=OPERATIONAL_SHEETS_TABS.find(t=>t.id===row.sheetId)!;
-  if(!valid(row.fields)||row.formula===true){hold('unsafe_or_formula_fields');continue;}
+  if(!baseline(row.fields)||row.formula===true){hold('unsafe_or_formula_fields');continue;}
   const status=row.fields;
   result.coverage++;
   if(mir&&(mir.sheetId!==row.sheetId||mir.label!==row.label||mir.row!==row.row)){
    hold('mirrored_identity_or_row_changed');continue;
   }
   if(!mir){
+   // Even an incomplete/DECOMMISSIONED historical row needs a baseline. It
+   // must not activate COS or block the other 985 valid units.
    // Never mistake preexisting tracker differences for a new manual command.
    result.bootstrap.push({productId:pid,sheetId:row.sheetId,row:row.row,label:row.label,fields:status,revision:0});
    if(command)hold('mirror_baseline_required_before_publish');
    continue;
+  }
+  if(!valid(status)){
+   hold('source_status_or_site_needs_review');continue;
   }
   if(command){
    const outgoing:Outbound={productId:pid,requestId:command.requestId,revision:command.revision,
