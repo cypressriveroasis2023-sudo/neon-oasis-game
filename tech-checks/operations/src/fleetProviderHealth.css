@@ -38,6 +38,8 @@
 #root#root .cos-provider-reason{font-size:12px;color:#dbe4ef;margin:7px 0;overflow-wrap:anywhere}
 #root#root .cos-provider-open{margin:7px 0 0;min-height:44px!important;padding:6px 12px;background:transparent!important;color:#98ceff!important;border:1px solid #60758f!important;border-radius:7px}
 #root#root .cos-provider-more{width:100%;margin-top:10px;padding:8px;border:1px solid #61758a;border-radius:8px;background:#293849!important;color:#e6f2ff!important}
+#root#root .cos-provider-expand,#root#root .cos-provider-collapse{display:block;width:100%;margin:10px 0 0;padding:8px 12px;min-height:44px!important;text-align:left;background:#273748!important;color:#b9dfff!important;border:1px solid #5b7893!important;border-radius:8px}
+#root#root .cos-provider-collapse{background:transparent!important;color:#d2deed!important}
 #root#root .cos-provider-empty,#root#root .cos-provider-note{font-size:13px;color:#cbd5e1;margin:10px 0}
 #root#root .cos-provider-other{border-top:1px solid #425063;margin-top:16px;padding-top:8px}
 #root#root .cos-provider-other summary{cursor:pointer;font-size:14px;font-weight:600;margin:2px 0 12px}
