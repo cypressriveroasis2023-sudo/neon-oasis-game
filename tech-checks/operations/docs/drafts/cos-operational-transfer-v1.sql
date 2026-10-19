@@ -196,3 +196,36 @@ revoke all on function public.cos_operational_transfer_snapshot(uuid,uuid),
 grant execute on function public.cos_operational_transfer_snapshot(uuid,uuid),
  public.cos_operational_transfer_apply(uuid,uuid,text,text,bigint,uuid,text,text,text,text)
  to service_role;
+
+
+-- Read the same owner's committed operational decisions for a Fleet display
+-- overlay. No field/map/health/coordinates are mutated; only exact Product IDs
+-- with matching current labels and unrestricted lifecycle may take precedence.
+create function public.cos_operational_transfer_overrides(
+  p_actor_user_id uuid,p_organization_id uuid
+) returns jsonb language plpgsql security definer set search_path='' as $fn$
+declare v_sha text;v_records jsonb;v_items jsonb;v_held integer;
+begin
+ perform app_private.cos_owner_identity_assert_actor(p_actor_user_id,p_organization_id,false);
+ select active_sha256 into v_sha from cos_mhelp_placement_private.upload_control where singleton;
+ select records into v_records from cos_mhelp_placement_private.upload_batches where source_sha256=v_sha;
+ if jsonb_typeof(v_records)<>'array' or jsonb_array_length(v_records)<1 or jsonb_array_length(v_records)>10000
+   then raise exception 'Current recorded Product IDs unavailable' using errcode='55000';end if;
+ select count(*) into v_held from cos_operational_private.current_placements c
+   where (select count(*) from jsonb_array_elements(v_records) x where x.value->>'productId'=c.product_id
+      and x.value->>'unitNumber'=c.source_unit_number and x.value->>'lifecycle'='UNFLAGGED')<>1;
+ select coalesce(jsonb_agg(jsonb_build_object(
+    'productId',c.product_id,'unitNumber',c.source_unit_number,
+    'revision',c.revision,'placement',c.placement,'customer',c.customer,
+    'site',c.site,'address',c.address,'updatedAt',c.updated_at,
+    'syncState',coalesce(o.status,'pending')
+  ) order by c.product_id),'[]'::jsonb) into v_items
+ from cos_operational_private.current_placements c
+ left join cos_operational_private.sheet_outbox o on o.request_id=c.last_request_id
+ where (select count(*) from jsonb_array_elements(v_records) x where x.value->>'productId'=c.product_id
+      and x.value->>'unitNumber'=c.source_unit_number and x.value->>'lifecycle'='UNFLAGGED')=1;
+ return jsonb_build_object('contract','COS_OPERATIONAL_OVERRIDES_V1',
+    'sourceSha256',v_sha,'items',v_items,'held',v_held);
+end $fn$;
+revoke all on function public.cos_operational_transfer_overrides(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.cos_operational_transfer_overrides(uuid,uuid) to service_role;
