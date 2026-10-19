@@ -79,18 +79,18 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     const address=item.pin,status=addressGroupHealth([address],mhelpAddressHealth||new Map());health=status.state==='mixed'?'unknown':status.state;name=address.unitNumber;
     label=name+' · Product '+address.productId+' · '+addressPinStatusLabel(status.counts)+' · MHelp address: '+address.address;
     html=fleetAddressPinMarkup(name,health);classes='cos-mhelp-address-marker';
-    member={key:'mhelp:'+address.productId,label:name+' · Product '+address.productId,health,site:address.customer,address:address.address,locationLabel:'MHelp customer address · not GPS',productId:address.productId,select:()=>{if(!picker.current){instance.closePopup();selectAddress.current?.(address.productId);}}};
+    member={key:'mhelp:'+address.productId,label:name+' · Product '+address.productId,health,site:address.customer,address:address.address,locationLabel:'MHelp customer address · not GPS',productId:address.productId,select:()=>{if(!picker.current){instance.closePopup();setGroupDetails(null);selectAddress.current?.(address.productId);}}};
    }else if(item.pin.kind==='source_equipment_estimate'){
     const source=item.pin.record;name=source.displayUnitNumber||source.unitNumber;health='unknown';label=name+' · Unlinked equipment · Estimated address · MHelp address: '+recordedAddressText(source.sourceAddress);
     html=fleetSourcePinMarkup(name);classes='cos-dashboard-marker cos-field-pin-wrap cos-source-equipment-marker';
     const id=fleetLocationPinId(item.pin);
-    member={key:id,label:name,health,site:source.customer||'',address:recordedAddressText(source.sourceAddress),locationLabel:'Source-recorded estimate · not installation GPS',select:()=>{if(!picker.current){instance.closePopup();select.current(id);}}};
+    member={key:id,label:name,health,site:source.customer||'',address:recordedAddressText(source.sourceAddress),locationLabel:'Source-recorded estimate · not installation GPS',select:()=>{if(!picker.current){instance.closePopup();setGroupDetails(null);select.current(id);}}};
    }else{
     const native=item.pin;name=native.row.displayName||native.row.name;health=state(native.row);const address=native.row.displayAddress;
     label=name+' · '+(health==='unknown'?'Unverified':health==='support'?'Solar support':health==='online'?'Online':'Offline')+(native.kind==='current'?'':native.kind==='estimate'?' · Estimated address':' · Source-recorded location')+' · '+(address?address.label+': '+(address.text||'Not supplied'):native.row.unit.address||'Address not supplied');
     html=fleetUnitPinMarkup(name,health,native.kind);classes='cos-dashboard-marker cos-field-pin-wrap';
     const id=fleetLocationPinId(item.pin);
-    member={key:id,label:name,health,site:native.row.displayCustomer||native.row.unit.site||native.row.unit.customer||'',address:address?.text||native.row.unit.address||'',locationLabel:native.kind==='current'?'GPS / installation verified':native.kind==='recorded'?'Source-recorded location · not GPS':'Estimated address · not GPS',select:()=>{if(!picker.current){instance.closePopup();select.current(id);}}};
+    member={key:id,label:name,health,site:native.row.displayCustomer||native.row.unit.site||native.row.unit.customer||'',address:address?.text||native.row.unit.address||'',locationLabel:native.kind==='current'?'GPS / installation verified':native.kind==='recorded'?'Source-recorded location · not GPS':'Estimated address · not GPS',select:()=>{if(!picker.current){instance.closePopup();setGroupDetails(null);select.current(id);}}};
    }
    return {name,label,html,health,classes,member};
   };
