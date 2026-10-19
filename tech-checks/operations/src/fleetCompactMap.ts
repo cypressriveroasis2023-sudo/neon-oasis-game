@@ -46,7 +46,10 @@ export function compactGroupPopup(members:CompactMapMember[],zoom?:()=>void):HTM
  const summary=document.createElement('p');summary.className='cos-compact-popup-summary';summary.textContent=compactGroupDescription(counts);
  root.append(heading,summary);
  if(zoom){const zoomButton=document.createElement('button');zoomButton.type='button';zoomButton.textContent='Zoom into locations';zoomButton.addEventListener('click',zoom);root.append(zoomButton);}
- const list=document.createElement('ul');list.className='cos-compact-popup-list';root.append(list);
+ const list=document.createElement('ul');list.className='cos-compact-popup-list';
+ // Keep scrolling the equipment list from zooming or panning the underlying map.
+ list.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
+ list.addEventListener('touchmove',event=>event.stopPropagation(),{passive:true});
  const append=(member:CompactMapMember)=>{
   const li=document.createElement('li'),content=member.select?document.createElement('button'):document.createElement('div');
   content.className='cos-compact-popup-member';
@@ -64,7 +67,10 @@ export function compactGroupPopup(members:CompactMapMember[],zoom?:()=>void):HTM
   const show=document.createElement('button');show.type='button';show.className='cos-compact-show-all';
   show.textContent='Show all '+sorted.length+' equipment';
   show.addEventListener('click',()=>{sorted.slice(18).forEach(append);show.remove();});
+  // A visible action above the scrolling list never falls behind the map
+  // container at small viewport heights or repositions the Leaflet popup.
   root.append(show);
  }
+ root.append(list);
  return root;
 }
