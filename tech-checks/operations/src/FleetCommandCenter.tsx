@@ -33,7 +33,7 @@ export default function FleetCommandCenter({
  onOpen,onShop,onMap,onImport,onRefresh
 }:Props){
  const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>('all');
- const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35);
+ const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState('');
  const data=useMemo(()=>buildFleetCommandCenter(
    uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt),
    [uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt]);
@@ -45,12 +45,13 @@ export default function FleetCommandCenter({
     !term||[p.unitNumber,p.productId,p.customer,p.address,p.category,p.provider,p.site]
      .join(' ').toLowerCase().includes(term)));
  },[data,family,status,query]);
+ const selected=entries.find(p=>p.productId===selectedId);
  if(!data)return <p className="cos-command-source-warning" role="status">
   Complete, verified mHelpDesk Product-ID source is currently unavailable. No inventory or provider totals are being estimated.
   <button type="button" onClick={onRefresh}>Retry saved data</button>
  </p>;
  const filter=(next:FamilyFilter,state:StatusFilter='all')=>{
-  setFamily(next);setStatus(state);setLimit(35);
+  setFamily(next);setStatus(state);setLimit(35);setSelectedId('');
   document.getElementById('cos-command-product-list')?.scrollIntoView({block:'nearest'});
  };
  const cameraTotal=data.counts.online+data.counts.offline+data.counts.unverified;
@@ -122,7 +123,7 @@ export default function FleetCommandCenter({
     <button type="button" onClick={()=>{setFamily('all');setStatus('all');setQuery('');setLimit(35);}}>Clear filters</button>
    </div>
    <div className="cos-command-rows">
-    {entries.slice(0,limit).map(p=><button type="button" className="cos-command-row" key={p.productId} onClick={()=>onOpen(p)}>
+    {entries.slice(0,limit).map(p=><button type="button" className="cos-command-row" key={p.productId} aria-expanded={selectedId===p.productId} onClick={()=>setSelectedId(p.productId)}>
      <span className={'cos-command-dot cos-command-dot-'+p.status} aria-hidden="true">●</span>
      <span className="cos-command-row-main"><strong>{p.unitNumber}</strong><small>Product {p.productId} · {p.category||'Unclassified'}</small>
       <small>{p.customer||'Customer not supplied'}{p.address?' · '+p.address:''}</small>
@@ -133,6 +134,13 @@ export default function FleetCommandCenter({
     </button>)}
     {!entries.length&&<p className="cos-command-empty">No Field products match these filters. No equipment has been removed.</p>}
    </div>
+   {selected&&<aside className="cos-command-product-detail" role="region" aria-label="Selected Field equipment details">
+    <div className="cos-command-detail-head"><div><h4>{selected.unitNumber}</h4><p>Product {selected.productId} · {selected.category} · {selected.provider}</p></div><button type="button" onClick={()=>setSelectedId('')}>Close details ×</button></div>
+    <dl><div><dt>Customer</dt><dd>{selected.customer||'Not supplied'}</dd></div><div><dt>Recorded service address</dt><dd>{selected.address||'Not supplied'}</dd></div><div><dt>Source placement</dt><dd>FIELD · mHelpDesk</dd></div><div><dt>Connectivity</dt><dd>{names[selected.status]}</dd></div><div><dt>Camera identity</dt><dd>{selected.linked?.unitId?'Reviewed COS unit association':selected.linked?.recordId?'Source equipment record only':'No verified camera association'}</dd></div><div><dt>Map location</dt><dd>{selected.mappingIssue?'Customer address needs mapping':'Source address lookup not flagged'}</dd></div></dl>
+    <p>{selected.reason}</p>
+    {(selected.linked?.unitId||selected.linked?.recordId)&&<button type="button" onClick={()=>onOpen(selected)}>Open COS unit and diagnostics →</button>}
+    {!selected.linked?.unitId&&!selected.linked?.recordId&&<p>Camera troubleshooting is held until an exact Product-ID association is verified. This equipment remains visible in Field inventory.</p>}
+   </aside>}
    {entries.length>limit&&<button className="cos-command-more" type="button" onClick={()=>setLimit(v=>v+50)}>Show next {Math.min(50,entries.length-limit)} products ({entries.length-limit} remaining)</button>}
   </section>
   <p className="cos-command-disclaimer">System panels report saved, verified associations. Equipment-family assignments do not establish that a provider is reachable. A single Helios unit may appear in both Star4Live and Victron but counts once in physical inventory. Camera video, router reachability, Victron battery telemetry and manual Tracker LIVE STATUS are separate signals.</p>
