@@ -1,6 +1,6 @@
 import {safeVrmPower} from './vrmSafePower.ts';
 import { collectHeliosPower } from './vrmPower.ts';
-import { heliosVrmUnits, validInstallationId, validVrmName, VRM_MAX_INSTALLATIONS, vrmPortalConfig, type VrmFleetConfig, type VrmInstallation, type VrmSync } from './vrm.ts';
+import { heliosVrmUnits, validInstallationId, validVrmName, VRM_MAX_INSTALLATIONS, vrmPortalConfig, readVrmFleetConfig, type VrmFleetConfig, type VrmInstallation, type VrmSync } from './vrm.ts';
 
 const API = 'https://vrmapi.victronenergy.com/v2';
 const RESPONSE_LIMIT = 2 * 1024 * 1024;
@@ -22,6 +22,8 @@ export type VrmDiscoveryOptions = {
   fetch?: typeof fetch; getAccessToken: () => string | undefined;
   rpc: (name: string, payload: Record<string,unknown>) => Promise<unknown>;
   embeds?: string; now?: () => number; collectPower?: boolean;
+  // Optional service-role-only approvals; never put shared iframe URLs in public source.
+  readDashboardEmbeds?: () => Promise<unknown>;
 };
 type Snapshot = {
   items: VrmInstallation[]; power?:unknown; lastAttemptAt: string | null; lastSuccessAt: string | null;
@@ -87,7 +89,7 @@ export async function discoverVrmInstallations(token: string, fetcher: typeof fe
 export function createVrmFleetReader(options: VrmDiscoveryOptions) {
   const now = options.now || Date.now;
   const read = async () => readSnapshot(await options.rpc('cos_vrm_fleet_snapshot', {}));
-  const present = (snapshot: Snapshot, configured: boolean): VrmFleetConfig & {power?:ReturnType<typeof safeVrmPower>} => {
+  const present = async (snapshot: Snapshot, configured: boolean): Promise<VrmFleetConfig & {power?:ReturnType<typeof safeVrmPower>}> => {
     const old = !snapshot.lastSuccessAt || now() - Date.parse(snapshot.lastSuccessAt) > 2 * VRM_SYNC_INTERVAL_MS;
     const sync: VrmSync = {
       state: !configured ? 'not_configured' : snapshot.syncing ? 'syncing' : snapshot.errorCode ? (snapshot.lastSuccessAt ? 'stale' : 'error') : old ? (snapshot.lastSuccessAt ? 'stale' : 'idle') : 'current',
@@ -95,7 +97,24 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
       nextSyncAt: snapshot.scheduleActive && configured ? new Date(Math.ceil(Math.max(now() + 1, snapshot.retryAfterAt ? Date.parse(snapshot.retryAfterAt) : 0) / VRM_SYNC_INTERVAL_MS) * VRM_SYNC_INTERVAL_MS).toISOString() : null,
       scheduleActive: snapshot.scheduleActive, connectionConfigured: configured,
     };
-    return {...vrmPortalConfig(options.embeds,!snapshot.lastSuccessAt && !snapshot.items.length ? heliosVrmUnits : snapshot.items,sync),...(snapshot.power===undefined?{}:{power:safeVrmPower(snapshot.power,snapshot.items,now())})};
+    const base = vrmPortalConfig(options.embeds,!snapshot.lastSuccessAt && !snapshot.items.length ? heliosVrmUnits : snapshot.items,sync);
+    let fleet = base;
+    if (options.readDashboardEmbeds) {
+      try {
+        const approvals = await options.readDashboardEmbeds();
+        if (!approvals || typeof approvals !== 'object' || Array.isArray(approvals)) throw new Error('Invalid private dashboard approvals');
+        // vrmPortalConfig validates every approval against its exact immutable installation ID.
+        const checked = vrmPortalConfig(JSON.stringify(approvals),base.items,sync);
+        const byId = new Map(checked.items.filter(item => item.embedUrl !== null).map(item => [item.installationId,item.embedUrl]));
+        fleet = readVrmFleetConfig({items:base.items.map(item => ({
+          ...item,embedUrl:item.available === false ? null : byId.get(item.installationId) ?? item.embedUrl,
+        })),sync:base.sync});
+      } catch {
+        // A private approval lookup failure cannot remove existing approved dashboards or the saved fleet.
+        // It leaves newly approved sites in their existing read-only power fallback until recovery.
+      }
+    }
+    return {...fleet,...(snapshot.power===undefined?{}:{power:safeVrmPower(snapshot.power,snapshot.items,now())})};
   };
   return async (refresh = false): Promise<VrmFleetConfig> => {
     const token = options.getAccessToken();
