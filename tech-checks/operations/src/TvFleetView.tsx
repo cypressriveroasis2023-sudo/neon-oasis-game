@@ -126,7 +126,9 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
           key:item.key,label:item.name+(item.productId?' · Product '+item.productId:''),health:item.health,
           site:item.site,address:item.address,locationLabel:item.locationLabel,productId:item.productId
         }));
-        marker.bindPopup(compactGroupPopup(popupMembers,zoom),{maxWidth:420,minWidth:300,className:'cos-compact-group-popup-wrap'});
+        const popupContent=compactGroupPopup(popupMembers,zoom);
+        L.DomEvent.disableClickPropagation(popupContent);
+        marker.bindPopup(popupContent,{maxWidth:420,minWidth:300,autoPan:false,className:'cos-compact-group-popup-wrap'});
         group.addLayer(marker);
         continue;
       }
