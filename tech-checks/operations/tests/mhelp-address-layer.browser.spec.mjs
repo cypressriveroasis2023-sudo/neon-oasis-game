@@ -21,10 +21,10 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared
  expect(await groups.evaluateAll(nodes=>nodes.flatMap(n=>JSON.parse(n.dataset.mhelpProductIds)).sort((a,b)=>Number(a)-Number(b)))).toEqual(Array.from({length:161},(_,i)=>String(i+1)));
  await groups.click();
  await expect(app.locator('.cos-compact-group-popup')).toContainText('161 equipment at nearby locations');
- await expect(app.locator('.cos-compact-group-popup')).toContainText('Solar Stand 72 001');
  await app.locator('.cos-compact-show-all').click();
  await expect(app.locator('.cos-compact-popup-member')).toHaveCount(161);
- await app.locator('.cos-fleet-map-toolbar').click();
+ await expect(app.locator('.cos-compact-group-popup')).toContainText('Solar Stand 72 001');
+ await app.locator('.leaflet-popup-close-button').click();
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
  await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await app.getByLabel('Fleet map details',{exact:true}).click();await app.getByLabel('Find mapped equipment').selectOption('1');
  const drawer=app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'});
