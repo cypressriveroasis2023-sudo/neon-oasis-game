@@ -134,13 +134,13 @@ export default function FleetCommandCenter({
     </button>)}
     {!entries.length&&<p className="cos-command-empty">No Field products match these filters. No equipment has been removed.</p>}
    </div>
-   {selected&&<aside className="cos-command-product-detail" role="region" aria-label="Selected Field equipment details">
+   {selected&&<section className="cos-command-product-detail" role="region" aria-label="Selected Field equipment details">
     <div className="cos-command-detail-head"><div><h4>{selected.unitNumber}</h4><p>Product {selected.productId} · {selected.category} · {selected.provider}</p></div><button type="button" onClick={()=>setSelectedId('')}>Close details ×</button></div>
     <dl><div><dt>Customer</dt><dd>{selected.customer||'Not supplied'}</dd></div><div><dt>Recorded service address</dt><dd>{selected.address||'Not supplied'}</dd></div><div><dt>Source placement</dt><dd>FIELD · mHelpDesk</dd></div><div><dt>Connectivity</dt><dd>{names[selected.status]}</dd></div><div><dt>Camera identity</dt><dd>{selected.linked?.unitId?'Reviewed COS unit association':selected.linked?.recordId?'Source equipment record only':'No verified camera association'}</dd></div><div><dt>Map location</dt><dd>{selected.mappingIssue?'Customer address needs mapping':'Source address lookup not flagged'}</dd></div></dl>
     <p>{selected.reason}</p>
     {(selected.linked?.unitId||selected.linked?.recordId)&&<button type="button" onClick={()=>onOpen(selected)}>Open COS unit and diagnostics →</button>}
     {!selected.linked?.unitId&&!selected.linked?.recordId&&<p>Camera troubleshooting is held until an exact Product-ID association is verified. This equipment remains visible in Field inventory.</p>}
-   </aside>}
+   </section>}
    {entries.length>limit&&<button className="cos-command-more" type="button" onClick={()=>setLimit(v=>v+50)}>Show next {Math.min(50,entries.length-limit)} products ({entries.length-limit} remaining)</button>}
   </section>
   <p className="cos-command-disclaimer">System panels report saved, verified associations. Equipment-family assignments do not establish that a provider is reachable. A single Helios unit may appear in both Star4Live and Victron but counts once in physical inventory. Camera video, router reachability, Victron battery telemetry and manual Tracker LIVE STATUS are separate signals.</p>
