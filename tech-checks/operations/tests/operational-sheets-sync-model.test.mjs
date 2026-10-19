@@ -99,3 +99,18 @@ test('all 1,001 historical rows may bootstrap while decommissioned and incomplet
  assert.deepEqual(after.inbound.map(x=>x.productId),['789']);
  assert.deepEqual(after.held.map(x=>x.productId),['456']);
 });
+
+test('an Owner Shop move repairs an unchanged incomplete historical Field row, never accepting that row as inbound activation',()=>{
+ const incomplete={placement:'FIELD',customer:'Builder',site:'',address:'100 Main St, Houston TX'};
+ const sheetRow={...row,fields:incomplete};
+ const copy={...mirror,fields:incomplete};
+ const noMove=planOperationalSync([item],[sheetRow],[copy],[]);
+ assert.deepEqual(noMove.held,[{productId:ID,reason:'source_status_or_site_needs_review'}]);
+ const correcting=planOperationalSync([item],[sheetRow],[copy],[pending]);
+ assert.equal(correcting.outbound.length,1);
+ assert.equal(correcting.inbound.length,0);
+ const altered={...sheetRow,fields:{...incomplete,customer:'Changed by another editor'}};
+ const conflict=planOperationalSync([item],[altered],[copy],[pending]);
+ assert.equal(conflict.outbound.length,0);
+ assert.deepEqual(conflict.held,[{productId:ID,reason:'concurrent_sheet_edit_conflicts_with_cos_move'}]);
+});
