@@ -39,7 +39,7 @@ export function projectOperationalFleet(snapshot:Row,overrides:unknown):Row{
  for(const productId of unique.keys())if(records.filter(r=>Array.isArray(r.productIds)&&r.productIds.includes(productId)).length!==1)
   throw Error('Operational Product ID is not uniquely represented in the Fleet roster');
  const updated=records.map((r:Row)=>{
-  if(!Array.isArray(r.productIds)||r.productIds.length!==1||!unique.has(r.productIds[0]))return r;
+  if(!Array.isArray(r.productIds)||r.productIds.length!==1||!unique.has(r.productIds[0]))return {...r};
   const move=unique.get(r.productIds[0])!,placement=p(move.placement);
   if(!active(r))return r; // Lifecycle is never overridden.
   const detail={
@@ -61,7 +61,6 @@ export function projectOperationalFleet(snapshot:Row,overrides:unknown):Row{
    customer:move.customer,site:move.site,address:move.address,
    effectivePlacement:{contract:'COS_EFFECTIVE_FLEET_PLACEMENT_V1',state:placement,
     source:'owner_operational',observedAt:move.updatedAt,freshness:'current',reason:null},
-   ...(placement==='shop'?{status:'shop'}:{}),
    // A changed physical site invalidates DISPLAYED live points, but all
    // stored GPS/history/source records remain completely untouched.
    latitude:null,longitude:null,coordinateSource:null,hasUnitGps:false,
@@ -71,7 +70,7 @@ export function projectOperationalFleet(snapshot:Row,overrides:unknown):Row{
   };
   return {...r,...detail,unit,placement,source:'owner',customer:move.customer,site:move.site,
    sourceAddress:{street:move.address,city:'',state:'',zip:''},
-   reviewReason:null};
+   reviewReason:r.reviewReason};
  });
  const inventoryItems=updated.filter(r=>r.kind==='unit').map(r=>({...r.unit,activeInventoryEligible:r.active}));
  const byId=new Map(inventoryItems.map(r=>[r.id,r]));
