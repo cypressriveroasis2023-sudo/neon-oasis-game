@@ -1,0 +1,104 @@
+/* COS Fleet Command Center - scoped to the existing Fleet Dashboard. */
+#root#root .cos-fleet-command{color:#f5f8ff;background:linear-gradient(140deg,#101b28 0%,#101924 75%,#111d29 100%);border:1px solid #2c4057;border-radius:12px;padding:18px;margin:16px 0 20px;box-shadow:0 8px 30px #0003;font-size:14px}
+#root#root .cos-command-head,#root#root .cos-command-list-head{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:15px}
+#root#root .cos-command-head h2{font-size:23px;font-weight:750;line-height:1.25;margin:0 0 4px}
+#root#root .cos-command-head p,#root#root .cos-command-list-head p{font-size:13px;color:#b8c9e0;margin:0;line-height:1.5}
+#root#root .cos-fleet-command button{transition:background-color .15s,border-color .15s}
+#root#root .cos-fleet-command button:focus-visible{outline:2px solid #79bfff;outline-offset:2px}
+#root#root .cos-command-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:14px 0}
+#root#root .cos-fleet-command .cos-command-kpis>button{display:flex;flex-direction:column;align-items:flex-start;min-height:125px;min-width:0;text-align:left;padding:15px 11px!important;background:linear-gradient(#192a3b,#121f2c)!important;border:1px solid #344b64!important;border-radius:10px!important}
+#root#root .cos-command-kpis button:hover,#root#root .cos-command-row:hover{border-color:#60a5fa!important;background:#1b3550!important}
+#root#root .cos-command-kpis span{font-size:12px;color:#cedcf0;font-weight:600;line-height:1.3}
+#root#root .cos-command-kpis strong{font-size:clamp(23px,2.5vw,34px);line-height:1.15;color:#fff;margin:7px 0}
+#root#root .cos-command-kpis small{font-size:11px;color:#a7bad3;line-height:1.35}
+#root#root .cos-command-kpis .cos-command-positive strong{color:#4df391!important}
+#root#root .cos-command-kpis .cos-command-negative strong{color:#ff6572!important}
+#root#root .cos-command-kpis .cos-command-muted strong{color:#bacbe4!important}
+#root#root .cos-command-provider-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#root#root .cos-command-provider{min-width:0;background:linear-gradient(#1a2c3e,#111e2c);border:1px solid #344b64;border-radius:10px;padding:15px}
+#root#root .cos-command-provider-title{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+#root#root .cos-command-provider-title h3{font-size:18px;margin:0;color:#f7f9ff}
+#root#root .cos-command-provider-title small{display:block;font-size:11px;color:#a9bdd5;margin-top:3px}
+#root#root .cos-command-provider-title>strong{font-size:24px;color:#fff;font-variant-numeric:tabular-nums}
+#root#root .cos-command-provider-states{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:13px 0}
+#root#root .cos-command-provider-states button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:8px 2px!important;min-height:68px!important;background:#101a29!important;border:1px solid #31435a!important;border-radius:8px!important}
+#root#root .cos-command-provider-states button:hover:not(:disabled){background:#23354d!important;border-color:#699ddc!important}
+#root#root .cos-command-provider-states strong{font-size:22px;font-weight:750;line-height:1.3}
+#root#root .cos-command-provider-states small{font-size:10px;color:#cbd8ec}
+#root#root .cos-command-status-online strong{color:#43ed88}
+#root#root .cos-command-status-offline strong{color:#ff6872}
+#root#root .cos-command-status-unverified strong{color:#b8c7dd}
+#root#root .cos-command-provider-time{font-size:11px;color:#c5d5e9;margin:6px 0}
+#root#root .cos-command-provider-note{font-size:11px;color:#99b3d0;line-height:1.5;margin:8px 0}
+#root#root .cos-fleet-command .cos-command-all-provider{background:#18365a!important;color:#bfe0ff!important;border:1px solid #4975aa!important;width:100%;padding:8px!important;margin-top:8px;text-align:left;font-size:12px}
+#root#root .cos-command-metadata{margin:14px 0;border:1px solid #30465b;border-radius:9px;padding:12px;display:flex;flex-wrap:wrap;gap:8px 18px;background:#0b1622}
+#root#root .cos-command-metadata span{font-size:12px;color:#c8d7e8}
+#root#root .cos-command-metadata b{color:#f6faff;font-weight:600}
+#root#root .cos-command-inventory{background:#101e2c;border:1px solid #34495e;border-radius:10px;padding:15px}
+#root#root .cos-command-inventory h3{margin:0 0 5px;font-size:19px;color:#fff}
+#root#root .cos-command-list-actions{display:flex;gap:7px;flex-wrap:wrap}
+#root#root .cos-command-filters{display:grid;grid-template-columns:minmax(240px,2fr) minmax(120px,1fr) minmax(120px,1fr) auto;align-items:end;gap:10px;margin-bottom:12px}
+#root#root .cos-command-filters label{font-size:12px;color:#d8e5f5;min-width:0}
+#root#root .cos-command-filters :is(input,select){display:block;width:100%;min-height:44px;font:inherit;font-size:13px;margin-top:5px;padding:8px 10px;color:#f8faff;background:#132638;border:1px solid #48617d;border-radius:7px}
+#root#root .cos-command-rows{display:grid;gap:5px;max-height:540px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#44617b #162536}
+#root#root .cos-fleet-command .cos-command-row{display:flex;align-items:center;gap:11px;min-height:69px!important;width:100%;padding:11px!important;background:#162736!important;border:1px solid #2c455d!important;border-radius:8px!important;text-align:left}
+#root#root .cos-command-row-main{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+#root#root .cos-command-row-main strong{font-size:14px;color:#fff}
+#root#root .cos-command-row-main small{font-size:11px;color:#c3d3e8;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+#root#root .cos-command-row-main .cos-command-issue{color:#ffd3a3}
+#root#root .cos-command-dot{font-size:19px;line-height:1}
+#root#root .cos-command-dot-online{color:#42f483}
+#root#root .cos-command-dot-offline{color:#ff5763}
+#root#root .cos-command-dot-unverified{color:#a9bbd1}
+#root#root .cos-command-dot-not_applicable{color:#289af5}
+#root#root .cos-command-status-pill{border-radius:99px;padding:5px 10px;font-size:11px;white-space:nowrap;font-weight:700}
+#root#root .cos-command-pill-online{color:#78ffaf;background:#154a30}
+#root#root .cos-command-pill-offline{color:#ffabb0;background:#591f30}
+#root#root .cos-command-pill-unverified{color:#dce4ef;background:#35465c}
+#root#root .cos-command-pill-not_applicable{color:#9bd9ff;background:#184c70}
+#root#root .cos-command-arrow{font-size:25px;color:#77aaf6}
+#root#root .cos-command-empty{color:#cbd8e9;margin:18px 0}
+#root#root .cos-fleet-command .cos-command-more{display:block;width:100%;margin-top:10px;color:#d4eafa!important;background:#1e3650!important;border:1px solid #4c7196!important}
+#root#root .cos-command-disclaimer{font-size:11px;line-height:1.6;color:#a7bad2;margin:14px 0 0}
+#root#root .cos-command-source-warning{background:#31291b;border:1px solid #7a5e35;border-radius:8px;padding:12px;font-size:13px;margin:10px 0;color:#ffe5b3}
+#root#root .cos-command-source-warning button{margin-left:12px}
+@media(max-width:1150px){
+ #root#root .cos-command-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #root#root .cos-command-provider-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:750px){
+ #root#root .cos-fleet-command{padding:10px}
+ #root#root .cos-command-head h2{font-size:21px}
+ #root#root .cos-command-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ #root#root .cos-command-kpis button{min-height:112px}
+ #root#root .cos-command-provider-grid{grid-template-columns:minmax(0,1fr)}
+ #root#root .cos-command-filters{grid-template-columns:minmax(0,1fr)}
+ #root#root .cos-command-list-actions{width:100%}
+ #root#root .cos-command-status-pill{max-width:90px;overflow:hidden;text-overflow:ellipsis}
+ #root#root .cos-command-metadata{flex-direction:column}
+}
+@media(prefers-reduced-motion:reduce){
+ #root#root .cos-fleet-command button{transition:none}
+}
+
+
+#root#root .cos-command-product-detail{margin-top:12px;padding:16px;border:1px solid #537aa4;border-radius:10px;background:#1b3045;color:#ecf5ff}
+#root#root .cos-command-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#root#root .cos-command-detail-head h4{font-size:20px;margin:0}
+#root#root .cos-command-detail-head p{font-size:12px;color:#bbd0eb;margin:5px 0 8px}
+#root#root .cos-command-product-detail dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin:14px 0}
+#root#root .cos-command-product-detail dl>div{border-top:1px solid #405871;padding-top:8px;min-width:0}
+#root#root .cos-command-product-detail dt{font-size:11px;color:#b8cbe3}
+#root#root .cos-command-product-detail dd{font-size:13px;color:#f7fbff;margin:4px 0;overflow-wrap:anywhere}
+#root#root .cos-command-product-detail>p{font-size:12px;color:#d6e4f6;line-height:1.5}
+#root#root .cos-command-row[aria-expanded=true]{border-color:#79bbff!important;background:#203e59!important}
+@media(max-width:600px){#root#root .cos-command-product-detail dl{grid-template-columns:minmax(0,1fr)}}
+
+
+#root#root .cos-command-attention-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+#root#root .cos-command-attention-actions button{display:flex;align-items:center;gap:10px;min-height:54px!important;background:#142637!important;color:#dbe9fb!important;border:1px solid #405773!important;border-radius:8px!important;padding:9px 11px!important;text-align:left}
+#root#root .cos-command-attention-actions strong{font-size:23px;color:#e8f5ff;font-variant-numeric:tabular-nums;min-width:25px}
+#root#root .cos-command-attention-actions span{font-size:11px;line-height:1.4}
+#root#root .cos-command-attention-actions button:hover:not(:disabled){background:#213c58!important;border-color:#7cb5f2!important}
+#root#root .cos-command-attention-actions button:disabled{opacity:.64}
+@media(max-width:850px){#root#root .cos-command-attention-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}

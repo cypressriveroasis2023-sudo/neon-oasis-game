@@ -8,6 +8,8 @@ on:
       - 'tech-checks/service-basics-host.js'
       - 'tech-checks/database-maintenance/techcheck-ticketfree-returns-v1.sql'
       - 'tech-checks/operations/tests/ticketfree-return*'
+      - 'tech-checks/operations/tests/playwright.ticketfree.config.mjs'
+      - 'tech-checks/operations/tests/service-basics.browser.spec.mjs'
       - '.github/workflows/techcheck-ticketfree-return-review.yml'
 permissions:
   contents: read
@@ -20,32 +22,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Capture exact reviewed source, not credentials or runtime data
-        run: |
-          mkdir -p /tmp/cos-source
-          git ls-files -z tech-checks .github/workflows | tar --null -T - -czf /tmp/cos-source/source.tar.gz
-          git rev-parse HEAD > /tmp/cos-source/commit.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ticketfree-return-source
-          path: /tmp/cos-source
-          retention-days: 2
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
       - name: Install locked review dependencies
         run: npm ci
         working-directory: tech-checks/operations
-      - name: Capture locked review dependencies
-        run: tar -czf /tmp/cos-review-dependencies.tar.gz node_modules
-        working-directory: tech-checks/operations
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ticketfree-return-dependencies
-          path: /tmp/cos-review-dependencies.tar.gz
-          retention-days: 1
-      - name: Require implemented return tests
+      - name: Ticket-free PostgreSQL transactions and client isolation
         run: node --import tsx --test tests/ticketfree-returns-sql.test.mjs tests/ticketfree-returns-client.test.mjs
+        working-directory: tech-checks/operations
+      - name: Preserve signed handoffs and Service daily evidence
+        run: node --import tsx --test --test-concurrency=1 tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
         working-directory: tech-checks/operations
       - name: Verify new UI syntax
         run: node --check tech-checks/ticketfree-returns/host.js
       - name: Preserve Operations types and build
         run: npm run typecheck && npm run build
         working-directory: tech-checks/operations
+      - name: Install isolated Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: tech-checks/operations
+      - name: Service, IT receipt and named-handoff phone regressions
+        run: npx playwright test --config tests/playwright.ticketfree.config.mjs
+        working-directory: tech-checks/operations
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ticketfree-phone-evidence
+          path: tech-checks/operations/test-results-ticketfree
+          if-no-files-found: ignore
+          retention-days: 7
