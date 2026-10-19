@@ -85,17 +85,17 @@ test('all 1,001 historical rows may bootstrap while decommissioned and incomplet
  const first=planOperationalSync(idx,all,[],[]);
  assert.equal(first.bootstrap.length,3);
  assert.equal(first.held.length,0);
- const mirror=[mirror,
+ const mirrors=[mirror,
   {productId:'456',sheetId:2017346590,row:4,label:'Spotter 017 - DO NOT USE',fields:retired,revision:0},
   {productId:'789',sheetId:1900162010,row:177,label:'ST 174',fields:missingSite,revision:0}];
- const later=planOperationalSync(idx,all,mirror,[]);
+ const later=planOperationalSync(idx,all,mirrors,[]);
  assert.equal(later.coverage,3);
  assert.deepEqual(later.held.map(x=>x.productId),['456','789']);
  assert.equal(later.inbound.length,0);
  // The operator supplied the missing site, making exactly that record
  // eligible for inbound revision without inventing a map pin.
  const improved=all.map(x=>x.label==='ST 174'?{...x,fields:{...missingSite,site:'Project corrected'}}:x);
- const after=planOperationalSync(idx,improved,mirror,[]);
+ const after=planOperationalSync(idx,improved,mirrors,[]);
  assert.deepEqual(after.inbound.map(x=>x.productId),['789']);
  assert.deepEqual(after.held.map(x=>x.productId),['456']);
 });
