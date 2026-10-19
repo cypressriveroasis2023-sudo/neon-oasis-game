@@ -47,7 +47,9 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
    sourceRow:index+2,sourceDates:{apiUpdatedAt:e.updatedAt},binding,holdReason:!exactPrior&&old?'api_equipment_label_changed':typeChanged?'api_equipment_type_changed':old?.holdReason||null,
    possibleAliasUnitIds:binding?[]:[...new Set([...(old?.possibleAliasUnitIds||[]),...(old?.binding?[old.binding.trackerId,old.binding.nativeUnitId].filter(Boolean):[])])],
    ...(exactPrior&&old?.displayUnitNumber?{displayUnitNumber:old.displayUnitNumber,displayAuthorizationSha256:old.displayAuthorizationSha256}:{}),
-   apiAssignment:{customerId:e.customerId,serviceLocationId:e.serviceLocationId,equipmentTypeId:e.equipmentTypeId,active:e.active,fullLabel:e.name},addressReview,
+   apiAssignment:{customerId:e.customerId,serviceLocationId:e.serviceLocationId,equipmentTypeId:e.equipmentTypeId,active:e.active,fullLabel:e.name,
+    placementProof:{version:1,model:e.model,parentLabel:customer,parentIsServiceLocation:p.isServiceLocation,parentActive:p.isActive??null,
+     siteLabel:siteName,serviceVerified:site!==null&&addressReview===null,serviceActive:site?.isActive??null}},addressReview,
   };
  }}));
  const fresh=await options.verifyEquipment();compareInventoryEquipment(fresh,baseline);

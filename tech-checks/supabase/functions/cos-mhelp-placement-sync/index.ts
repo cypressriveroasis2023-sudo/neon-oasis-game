@@ -27,7 +27,7 @@ export async function collectPlacementObservations(links:Row[],equipment:Row[],r
    placement:customer.placement,customerLabel:customer.name.trim(),siteLabel:customer.placement==='SHOP'?'SHOP':site!.name.trim()};
  });
 }
-export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>Promise<boolean>;rpc:(name:string,body:Row)=>Promise<any>;equipment:()=>Promise<Row[]>;customer:(id:string)=>Promise<Row|null>;service?:(parentId:string,siteId:string)=>Promise<Row|null>;locations?:(equipment:Row[])=>Promise<Row[]>;readDiagnostics?:()=>{attempts:number;verified:number;failures:Record<string,number>}}){
+export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>Promise<boolean>;rpc:(name:string,body:Row)=>Promise<any>;equipment:()=>Promise<Row[]>;customer:(id:string)=>Promise<Row|null>;service?:(parentId:string,siteId:string)=>Promise<Row|null>;locations?:(equipment:Row[])=>Promise<Row[]>;completeSource?:()=>Promise<Row>;readDiagnostics?:()=>{attempts:number;verified:number;failures:Record<string,number>}}){
  return async(req:Request)=>{
   const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   if(req.method!=='POST'||new URL(req.url).search||req.headers.has('origin'))return reply({error:'Scheduled request required'},405);
@@ -42,6 +42,9 @@ export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>
   let lease:string|null=null;
   try{
    if(action==='status')return reply(await options.rpc('cos_mhelp_placement_status',{}));
+   if(options.completeSource){const source=await options.completeSource();if(!object(source)||typeof source.handled!=='boolean')throw Error('Complete source unavailable');
+    if(source.handled){if(!['current','deferred','busy_or_disabled'].includes(source.state)||source.vendorReads!==0)throw Error('Invalid complete source receipt');return reply(source,source.state==='deferred'?202:200);}
+   }
    const start=await options.rpc('cos_mhelp_placement_begin',{});
    if(start.leaseId===null)return reply({state:'busy_or_disabled'});
    if(typeof start.leaseId!=='string'||!Array.isArray(start.links))throw Error('Invalid lease');lease=start.leaseId;

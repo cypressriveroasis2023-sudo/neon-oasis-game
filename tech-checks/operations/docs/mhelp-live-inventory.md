@@ -61,3 +61,27 @@ coverage and unchanged native/device/history fingerprints before completion.
 Pause by disabling `live_inventory_control.enabled` and unscheduling only the
 new inventory job. Restore an earlier immutable source pointer only after
 checking the expected current source. Do not delete snapshots or native data.
+
+## Shared inventory and placement reads
+
+Install `database-maintenance/cos-mhelp-single-inventory-reader.sql` before the
+updated workers. A private five-minute read lease admits one complete inventory
+reader across instances. The durable vendor cooldown returns explicit HTTP 202
+deferral with `sourceRefreshed:false`; it is never shortened or counted as a
+successful source refresh. The existing fifteen-minute schedules stay active.
+
+The complete source includes versioned placement proof from the same verified
+equipment/customer/service collection and second equipment pass. The placement
+job projects that proof without another vendor read. It retains exact model,
+label, lifecycle, native-graph and service-membership checks, and records the
+actual full-source observation time. A stale source or pre-upgrade proof defers
+without publishing a new placement receipt. Disabling the full source retains
+the existing placement fallback. Address pins continue through the existing
+Product-ID address worker; no native GPS or history is changed.
+
+For the live bundled placement runtime, use
+`scripts/build-mhelp-placement-single-reader.mjs` with a freshly retrieved native
+bundle. It checks the original handler against the base source, adapts native
+helper aliases, and changes only that handler plus its optional RPC callback.
+All remaining native bytes stay intact. Keep the original native token/runtime
+dependencies when replacing the inventory worker's three source files.
