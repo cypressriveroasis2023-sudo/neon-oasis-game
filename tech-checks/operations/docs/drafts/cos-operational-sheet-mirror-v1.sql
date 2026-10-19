@@ -279,7 +279,7 @@ begin
   select * into strict o from cos_operational_private.sheet_outbox where request_id=(v->>'requestId')::uuid;
   select * into strict m from cos_operational_private.sheet_mirror where product_id=o.product_id;
   select * into strict c from cos_operational_private.current_placements where product_id=o.product_id;
-  if o.status not in('pending','failed')
+  if o.status not in('pending','failed','conflict')
      or c.last_request_id is distinct from o.request_id or c.revision is distinct from o.revision
      or o.product_id is distinct from v->>'productId'
      or o.revision is distinct from (v->>'revision')::bigint
