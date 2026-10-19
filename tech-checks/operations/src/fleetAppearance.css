@@ -593,3 +593,15 @@
 #root#root .cos-fleet-map-canvas .cos-status-shaped :is(.cos-pin-location-tag,.cos-cluster-caption,.cos-cluster-location,.cos-cluster-support) { display:none; }
 #root#root .cos-fleet-map-canvas .cos-status-group-ring,
 #root#root .cos-fleet-map-canvas .cos-field-cluster.cos-status-shaped[data-health=mixed]::after { content:''; display:block; position:absolute; inset:-2px; border-radius:50%; background:var(--status-ring); mask:radial-gradient(transparent 61%,#000 64%); pointer-events:none; }
+
+/* Owner-selected option B: individual pin drops with separate unit labels. */
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins :is(.cos-dashboard-marker,.cos-mhelp-address-marker) { width:44px!important; height:56px!important; min-height:56px; }
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped { position:absolute; display:block; left:8px!important; top:0!important; width:28px!important; min-width:28px!important; max-width:28px!important; height:36px!important; min-height:36px!important; max-height:36px!important; border:0; padding:0; background:transparent!important; border-radius:0; box-shadow:none; }
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped .cos-status-pin-art { position:absolute; inset:0; width:28px!important; max-width:28px!important; height:36px!important; max-height:36px!important; z-index:1; color:var(--pin); overflow:visible; }
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped>b.cos-pin-unit-number { position:absolute; display:block; top:38px; left:50%; right:auto; bottom:auto; width:max-content; min-width:20px; max-width:64px; height:16px; margin:0; padding:1px 4px; border:1px solid #53697b; border-radius:4px; background:#0b1724; color:#f4f7fb!important; font:700 10px/12px Arial,sans-serif; letter-spacing:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transform:translateX(-50%)!important; z-index:2; }
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped :is(.cos-pin-location-tag,.cos-cluster-caption) { display:none; }
+
+#root#root .cos-fleet-map-find { display:grid; gap:4px; margin-top:8px; font-size:12px; }
+#root#root .cos-fleet-map-find select { width:100%; min-height:44px; }
+
+#root#root .cos-fleet-pin-tooltip { max-width:180px; white-space:normal; background:#122132; border:1px solid #53697b; color:#f4f7fb; font-size:12px; }

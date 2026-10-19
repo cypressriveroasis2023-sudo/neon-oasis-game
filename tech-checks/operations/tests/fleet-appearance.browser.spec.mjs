@@ -81,30 +81,28 @@ for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live co
 
 test('circle colors, clustering, fullscreen and unit selection retain their behavior',async({page},info)=>{
   const {app,state}=await mount(page,false,{field:presentationField({cluster:true})});
-  await app.locator('.cos-dashboard-cluster').click();
-  await expect(app.locator('.cos-dashboard-peer')).toHaveCount(4);
+  await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(0);
+  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(4);
   for(const [status,color] of [['online','rgb(43, 255, 53)'],['offline','rgb(255, 39, 52)'],['unknown','rgb(148, 163, 184)'],['support','rgb(21, 168, 255)']]){
-    const marker=app.locator(`.cos-dashboard-peer .cos-field-pin[data-health="${status}"]`);
-    await expect(marker.locator('circle')).toHaveCSS('fill',color);
+    const marker=app.locator(`.cos-dashboard-marker .cos-field-pin[data-health="${status}"]`);
+    await expect(marker.locator('path')).toHaveCSS('fill',color);
     await expect(marker).toHaveCSS('width','28px');
-    await expect(marker).toHaveCSS('height','28px');
+    await expect(marker).toHaveCSS('height','36px');
     const hit=marker.locator('..');
     await expect(hit).toHaveCSS('width','44px');
-    await expect(hit).toHaveCSS('height','44px');
-    const label=await marker.evaluate(node=>{const text=node.querySelector('b'),range=document.createRange();range.selectNodeContents(text);const glyph=range.getBoundingClientRect(),circle=node.getBoundingClientRect();return {dx:Math.abs(glyph.x+glyph.width/2-circle.x-circle.width/2),dy:Math.abs(glyph.y+glyph.height/2-circle.y-circle.height/2),inside:glyph.left>=circle.left&&glyph.right<=circle.right&&glyph.top>=circle.top&&glyph.bottom<=circle.bottom};});
-    expect(label.inside).toBeTruthy();expect(label.dx).toBeLessThanOrEqual(1);expect(label.dy).toBeLessThanOrEqual(2);
+    await expect(hit).toHaveCSS('height','56px');
+    const label=await marker.evaluate(node=>{const text=node.querySelector('b'),range=document.createRange();range.selectNodeContents(text);const glyph=range.getBoundingClientRect(),circle=node.getBoundingClientRect();return {dx:Math.abs(glyph.x+glyph.width/2-circle.x-circle.width/2),dy:Math.abs(glyph.y+glyph.height/2-circle.y-circle.height/2),inside:glyph.left>=circle.left-20&&glyph.right<=circle.right+20&&glyph.top>=circle.bottom&&glyph.bottom<=circle.bottom+24};});
+    expect(label.inside).toBeTruthy();expect(label.dx).toBeLessThanOrEqual(1);expect(label.dy).toBeGreaterThan(10);
   }
   await expect(app.locator('.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas [data-cos-eye]')).toHaveCount(0);
   const enter=app.getByRole('button',{name:'Fullscreen fleet map',exact:true});
   await enter.click();
   const bounds=await app.locator('.cos-fleet-map-expanded').boundingBox();
   expect(bounds).toEqual({x:0,y:0,width:page.viewportSize().width,height:page.viewportSize().height});
-  const group=app.locator('.cos-dashboard-cluster .cos-field-cluster');
-  await expect(group.locator('b')).toHaveText('4');
-  expect(await group.evaluate(node=>Number(getComputedStyle(node.querySelector('b')).zIndex)>Number(getComputedStyle(node.querySelector('svg')).zIndex))).toBeTruthy();
+  await expect(app.locator('.cos-dashboard-cluster,.cos-status-group-ring')).toHaveCount(0);
   await expect(app.getByRole('navigation',{name:'Fleet dashboard views'})).not.toBeVisible();
   await page.screenshot({path:info.outputPath('appearance-fullscreen.png'),fullPage:true});
-  await app.locator('.cos-dashboard-peer[data-unit-id="'+units[1].id+'"]').click();
+  await app.locator('.cos-dashboard-marker[data-unit-id="'+units[1].id+'"]').click();
   const dialog=app.getByRole('dialog',{name:'Spotter 1 unit intelligence'});
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.camera-unit-state')).toHaveClass(/cos-signal-offline/);

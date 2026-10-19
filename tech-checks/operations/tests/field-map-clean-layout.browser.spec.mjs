@@ -32,8 +32,8 @@ test('canonical dashboard retains full fleet counts, bounded map, readable marke
  await expect(frame.getByRole('dialog')).toHaveCount(0);
  const canvas=frame.locator('.cos-fleet-map-canvas');await canvas.scrollIntoViewIfNeeded();
  const size=await canvas.boundingBox();expect(size.height).toBeLessThan(750);expect(size.width).toBeGreaterThan(150);
- const symbol=frame.locator('.cos-field-cluster,.cos-field-pin').first(),artworkSize=await symbol.evaluate(node=>node.classList.contains('cos-field-cluster')?'32px':'28px');await expect(symbol).toHaveCSS('width',artworkSize);await expect(symbol).toHaveCSS('height',artworkSize);
- const touch=frame.locator('.cos-field-cluster-wrap,.cos-field-pin-wrap').first();await expect(touch).toHaveCSS('width','44px');await expect(touch).toHaveCSS('height','44px');
+ const symbol=frame.locator('.cos-field-cluster,.cos-field-pin').first(),artworkSize=await symbol.evaluate(node=>node.classList.contains('cos-field-cluster')?'32px':'28px');await expect(symbol).toHaveCSS('width',artworkSize);await expect(symbol).toHaveCSS('height','36px');
+ const touch=frame.locator('.cos-field-cluster-wrap,.cos-field-pin-wrap').first();await expect(touch).toHaveCSS('width','44px');await expect(touch).toHaveCSS('height','56px');
  await frame.locator('.cos-fleet-unit-row').first().click();await expect(frame.getByRole('dialog')).toContainText('Solar Spotter 1');
  await frame.getByRole('button',{name:'Close unit details',exact:true}).click();
  await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(frame.getByRole('dialog')).toHaveCount(0);

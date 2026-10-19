@@ -11,11 +11,11 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  const marker=id=>app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["${id}"]']`);
  for(const [id,status,color] of [['1001','online','rgb(43, 255, 53)'],['1002','offline','rgb(255, 39, 52)'],['1003','unknown','rgb(148, 163, 184)'],['1004','support','rgb(21, 168, 255)'],['1005','unknown','rgb(148, 163, 184)'],['1006','unknown','rgb(148, 163, 184)'],['1007','unknown','rgb(148, 163, 184)']]){
   await expect(marker(id)).toHaveAttribute('data-health',status);
-  await expect(marker(id).locator('.cos-address-pin-art circle')).toHaveCSS('fill',color);
+  await expect(marker(id).locator('.cos-unit-pin-drop path')).toHaveCSS('fill',color);
  }
  await expect(app.locator('.cos-address-review-flag')).toHaveCount(0);
- await expect(marker('1001').locator('.cos-address-pin-art')).toHaveCSS('width','26px');
- await expect(marker('1001').locator('.cos-address-pin-art circle')).toHaveAttribute('r','13');
+ await expect(marker('1001').locator('.cos-unit-pin-drop')).toHaveCSS('width','28px');
+ await expect(marker('1001').locator('.cos-unit-pin-drop path')).toHaveAttribute('d',/^M15 1/);
  await expect(app.locator('.cos-dashboard-marker .cos-status-pin-art path')).toHaveCount(0); // Unique Product-ID address replaces its duplicate map reference.
  const canvas=await app.locator('.cos-fleet-map-canvas').boundingBox(),pin=await marker('1001').boundingBox();
  const from={x:canvas.x+canvas.width*.7,y:canvas.y+canvas.height*.5};
@@ -27,15 +27,9 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  state.field.mhelpAddressMap.items[1].latitude=state.field.mhelpAddressMap.items[0].latitude;
  state.field.mhelpAddressMap.items[1].longitude=state.field.mhelpAddressMap.items[0].longitude;
  await app.getByRole('button',{name:/Refresh data/}).click();
- const group=app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["1001","1002"]']`);
- await expect(group).toHaveAttribute('data-health','mixed');
- await expect(group).toHaveAttribute('aria-label',/1 online, 1 offline/);
- await expect(group.locator('.cos-status-group-ring')).toHaveCount(1);
- await expect(group.locator('.cos-status-group-ring')).toHaveCSS('background-image', /conic-gradient/);
- await group.click({force:true});
- await expect(app.getByRole('dialog')).toBeVisible();
- await expect(app.getByRole('dialog').getByRole('button')).toHaveCount(3);
- await page.keyboard.press('Escape');
+ await expect(marker('1001')).toHaveAttribute('data-health','online');await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ await expect(app.locator('.cos-status-group-ring,.cos-map-group')).toHaveCount(0);
+ for(const id of ['1001','1002']){await marker(id).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
  state.fail=true;
  await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(app.getByRole('alert')).toBeVisible();

@@ -69,7 +69,7 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pa
  return {frame,state};
 }
 const listUnit=(frame,label)=>{const key=Object.keys(labels).find(key=>labels[key]===label);if(!key)throw Error('Unknown fixture unit');return frame.locator('.cos-fleet-unit-row[data-unit-id="'+ids[key]+'"]');};
-async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
+async function expand(frame){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
 async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
@@ -88,9 +88,9 @@ async function settlePollingMinute(page,frame,state,baseline,minute){
 
 test('Owner proof colors only its exact four IPCs; shared HDC label remains gray and stand blue',async({page},info)=>{
  const {frame,state}=await mount(page);
- await expect(frame.locator('.cos-field-cluster')).toHaveAttribute('data-health','mixed');
- await expect(frame.locator('.cos-cluster-caption')).toHaveText('MIX');
- await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await expect(frame.locator('.cos-field-cluster')).toHaveCount(0);
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(0);
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  await expect(listUnit(frame,labels.owner).locator('strong')).toContainText(labels.owner);
  await expect(listUnit(frame,labels.owner)).toContainText('CAMERA RECORDS ONLINE');

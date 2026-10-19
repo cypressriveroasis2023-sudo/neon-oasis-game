@@ -1,5 +1,5 @@
-import {fieldReticleColors,mapReticleMarkup,clusterReticleMarkup,type ReticleState,type ReticleCounts} from './fieldMapMarkers';
-import {sourceEquipmentMarkerMarkup} from './sourceEquipmentMarker';
+import {fieldReticleColors,mapReticleMarkup,clusterReticleMarkup,mapUnitIdentifier,type ReticleState,type ReticleCounts} from './fieldMapMarkers';
+import {sourceEquipmentMarkerMarkup,sourceEquipmentMarkerIdentifier} from './sourceEquipmentMarker';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import type {MhelpAddressMapPin} from './mhelpAddressMapPins';
@@ -32,15 +32,19 @@ export function addressGroupHealth(pins:MhelpAddressMapPin[],health:ReadonlyMap<
  const states=order.filter(s=>counts[s]>0);
  return {counts,state:states.length===1?states[0]:'mixed' as const};
 }
-/** Same compact circle for all Fleet layers; its center marks the recorded point. */
-export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art" viewBox="0 0 44 44" aria-hidden="true" focusable="false"><circle cx="22" cy="22" r="19" fill="currentColor" stroke="#071421" stroke-width="2"/></svg>';
+/** One pin per equipment record; numeric labels identify units, never counts. */
+export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art cos-unit-pin-drop" viewBox="0 0 30 38" aria-hidden="true" focusable="false"><path d="M15 1C7.3 1 1 7.3 1 15c0 10 14 22 14 22s14-12 14-22C29 7.3 22.7 1 15 1Z" fill="currentColor" stroke="#071421" stroke-width="1.5"/><circle cx="15" cy="14" r="4" fill="#fff"/></svg>';
 /** A single segmented outline keeps mixed groups compact without inventing a dominant status. */
 export function fleetStatusRing(counts:ReticleCounts):string{
  const total=order.reduce((n,state)=>n+counts[state],0);if(!total)return fieldReticleColors.unknown;
  let start=0;return 'conic-gradient('+order.filter(state=>counts[state]>0).map(state=>{const end=start+counts[state]/total*100,part=fieldReticleColors[state]+' '+start+'% '+end+'%';start=end;return part;}).join(',')+')';
 }
 const shaped=(html:string)=>html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/,fleetPinArtwork).replace('class="cos-field-pin','class="cos-field-pin cos-status-shaped');
-export function fleetUnitPinMarkup(...args:Parameters<typeof mapReticleMarkup>){return shaped(mapReticleMarkup(...args));}
+export function fleetUnitPinMarkup(...args:Parameters<typeof mapReticleMarkup>){
+ const number=/^SNIPER\s*([24]-\d{1,6})$/i.exec(args[0].trim())?.[1]||sourceEquipmentMarkerIdentifier(args[0])||mapUnitIdentifier(args[0]);
+ return shaped(mapReticleMarkup(...args)).replace(/<b[^>]*>[\s\S]*?<\/b>/,'<b class="cos-pin-unit-number'+(number.length>3?' cos-reticle-long-id':'')+'" aria-hidden="true">'+(number||'—')+'</b>');
+}
+export function fleetAddressPinMarkup(label:string,state:ReticleState){return fleetUnitPinMarkup(label,state).replace('cos-field-pin cos-status-shaped','cos-mhelp-address-pin cos-status-shaped');}
 export function fleetSourcePinMarkup(label:string){return shaped(sourceEquipmentMarkerMarkup(label)).replace('--pin:#d6a84b','--pin:'+fieldReticleColors.unknown);}
 export function fleetGroupPinMarkup(...args:Parameters<typeof clusterReticleMarkup>){
  return clusterReticleMarkup(...args).replace('class="cos-field-cluster"','class="cos-field-cluster cos-status-shaped"').replace('<i class="cos-reticle-ring" aria-hidden="true"></i>',fleetPinArtwork.replace(' cos-map-status-dot','')).replace('style="--pin:', 'style="--status-ring:'+fleetStatusRing(args[0])+';--pin:').replace('--pin:#d6a84b','--pin:'+fieldReticleColors.unknown);

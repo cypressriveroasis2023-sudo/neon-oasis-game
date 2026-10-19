@@ -28,3 +28,19 @@ export function fleetMapGroups<T>(points:MapPoint<T>[]):MapPoint<T>[][] {
  const order=new Map(points.map((p,i)=>[p,i]));
  return groups.map(group=>group.members.sort((a,b)=>order.get(a)!-order.get(b)!));
 }
+
+/** One displayed position per identity; recorded points remain immutable. */
+export function fleetIndividualPinPositions<T>(points:MapPoint<T>[],viewport:{width:number;height:number}) {
+ const occupied:{x:number;y:number}[]=[],stepX=56,stepY=64;
+ const rings=Math.ceil(Math.sqrt(points.length))+3,candidates:{x:number;y:number;distance:number}[]=[];
+ for(let y=-rings;y<=rings;y++)for(let x=-rings;x<=rings;x++)candidates.push({x:x*stepX,y:y*stepY,distance:x*x*stepX*stepX+y*y*stepY*stepY});
+ candidates.sort((a,b)=>a.distance-b.distance||a.y-b.y||a.x-b.x);
+ const inside=(x:number,y:number)=>x>=24&&x<=viewport.width-24&&y>=36&&y<=viewport.height-42&&!(x<80&&y<145);
+ return points.map(point=>{
+  const visible=point.x>=0&&point.x<=viewport.width&&point.y>=0&&point.y<=viewport.height;
+  const clear=(x:number,y:number)=>occupied.every(p=>Math.abs(p.x-x)>=stepX||Math.abs(p.y-y)>=stepY);
+  let chosen=candidates.find(d=>clear(point.x+d.x,point.y+d.y)&&(!visible||inside(point.x+d.x,point.y+d.y)));
+  chosen??=candidates.find(d=>clear(point.x+d.x,point.y+d.y))!;
+  const position={item:point.item,x:point.x+chosen.x,y:point.y+chosen.y,sourceX:point.x,sourceY:point.y};occupied.push(position);return position;
+ });
+}

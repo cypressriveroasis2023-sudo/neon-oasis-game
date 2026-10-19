@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fleetMapGroups} from '../src/fleetMapGroups.ts';
+import {fleetMapGroups,fleetIndividualPinPositions} from '../src/fleetMapGroups.ts';
 const p=(item,x,y)=>({item,x,y});
 const center=g=>({x:g.reduce((sum,p)=>sum+p.x,0)/g.length,y:g.reduce((sum,p)=>sum+p.y,0)/g.length});
 test('address and GPS collisions group without chaining separate sites together',()=>{
@@ -30,4 +30,14 @@ test('a long chain of nearby sites keeps multiple compact markers at the same zo
  assert.ok(groups.every(group=>group.length<=3));
  assert.deepEqual(groups.flat().map(p=>p.item).sort(),points.map(p=>p.item).sort());
  assert.deepEqual(fleetMapGroups(points),groups,'grouping is deterministic');
+});
+
+test('individual layout retains all identities and immutable source points at dense addresses',()=>{
+ const points=Array.from({length:161},(_,i)=>p(String(i),180,180)),original=structuredClone(points),layout=fleetIndividualPinPositions(points,{width:366,height:400});
+ assert.equal(layout.length,161);assert.deepEqual(points,original);assert.equal(new Set(layout.map(p=>p.item)).size,161);
+ for(let i=0;i<layout.length;i++){assert.equal(layout[i].sourceX,180);assert.equal(layout[i].sourceY,180);for(let j=i+1;j<layout.length;j++)assert.ok(Math.abs(layout[i].x-layout[j].x)>=56||Math.abs(layout[i].y-layout[j].y)>=64);}
+ assert.deepEqual(fleetIndividualPinPositions(points,{width:366,height:400}),layout);
+});
+test('offscreen sites retain their map position rather than being pulled into the viewport',()=>{
+ const input=[p('offscreen',-100,200),p('visible',200,200)];assert.deepEqual(fleetIndividualPinPositions(input,{width:366,height:400})[0],{...input[0],sourceX:-100,sourceY:200});
 });

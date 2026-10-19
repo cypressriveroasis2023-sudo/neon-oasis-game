@@ -18,9 +18,10 @@ test('address lookup evidence is independent; holds and unknown links stay gray;
  for(const p of [pin('1',{placementHeld:true}),pin('1',{lifecycle:'DO_NOT_USE'}),pin('9')])assert.equal(addressGroupHealth([p],health).state,'unknown');
  const mixed=addressGroupHealth([pin('1'),pin('2'),pin('3')],health);assert.equal(mixed.state,'mixed');assert.equal(addressPinStatusLabel(mixed.counts),'1 online, 1 offline, 1 solar support');
 });
-test('compact Fleet status circles retain state, numeric labels and HTML safety',()=>{
- for(const state of ['online','offline','unknown','support']){const m=fleetUnitPinMarkup('Ranger 029.2',state,'recorded');assert.match(m,/cx="22" cy="22" r="19"/);assert.match(m,/029.2/);assert.match(m,/SRC/);assert.match(m,new RegExp('data-health="'+state+'"'));}
- assert.doesNotMatch(fleetUnitPinMarkup('<img src=x onerror=alert(1)>','online'),/<img|onerror/);assert.match(fleetSourcePinMarkup('ST 007'),/--pin:#94a3b8/);assert.match(fleetSourcePinMarkup('ST 007'),/cx="22" cy="22" r="19"/);
- const group=fleetGroupPinMarkup({online:1,offline:1,unknown:0,support:0});assert.match(group,/data-health="mixed"/);assert.match(group,/cx="22" cy="22" r="19"/);
+test('individual Fleet pin drops retain state, numeric labels and HTML safety',()=>{
+ for(const state of ['online','offline','unknown','support']){const m=fleetUnitPinMarkup('Ranger 029.2',state,'recorded');assert.match(m,/class="[^"]*cos-unit-pin-drop/);assert.match(m,/029.2/);assert.match(m,/SRC/);assert.match(m,new RegExp('data-health="'+state+'"'));}
+ assert.match(fleetUnitPinMarkup('Sniper 4-100','offline'),/>4-100<\/b>/);
+ assert.doesNotMatch(fleetUnitPinMarkup('<img src=x onerror=alert(1)>','online'),/<img|onerror/);assert.match(fleetSourcePinMarkup('ST 007'),/--pin:#94a3b8/);assert.match(fleetSourcePinMarkup('ST 007'),/class="[^"]*cos-unit-pin-drop/);
+ const group=fleetGroupPinMarkup({online:1,offline:1,unknown:0,support:0});assert.match(group,/data-health="mixed"/);assert.match(group,/class="[^"]*cos-unit-pin-drop/);
  assert.match(fleetGroupPinMarkup({online:0,offline:0,unknown:0,support:0},0,0,0,2),/--pin:#94a3b8/);
 });
