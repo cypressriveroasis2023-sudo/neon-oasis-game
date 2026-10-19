@@ -68,7 +68,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     const source=item.pin.record;name=source.displayUnitNumber||source.unitNumber;health='unknown';label=name+' · Unlinked equipment · Estimated address · MHelp address: '+recordedAddressText(source.sourceAddress);
     html=fleetSourcePinMarkup(name);classes='cos-dashboard-marker cos-field-pin-wrap cos-source-equipment-marker';
     const id=fleetLocationPinId(item.pin);
-    member={key:id,label:name,health,site:source.site||source.customer||'',address:recordedAddressText(source.sourceAddress),locationLabel:'Source-recorded estimate · not installation GPS',select:()=>{if(!picker.current){instance.closePopup();select.current(id);}}};
+    member={key:id,label:name,health,site:source.customer||'',address:recordedAddressText(source.sourceAddress),locationLabel:'Source-recorded estimate · not installation GPS',select:()=>{if(!picker.current){instance.closePopup();select.current(id);}}};
    }else{
     const native=item.pin;name=native.row.displayName||native.row.name;health=state(native.row);const address=native.row.displayAddress;
     label=name+' · '+(health==='unknown'?'Unverified':health==='support'?'Solar support':health==='online'?'Online':'Offline')+(native.kind==='current'?'':native.kind==='estimate'?' · Estimated address':' · Source-recorded location')+' · '+(address?address.label+': '+(address.text||'Not supplied'):native.row.unit.address||'Address not supplied');
