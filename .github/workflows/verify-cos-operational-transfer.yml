@@ -11,6 +11,9 @@ on:
       - '.github/workflows/verify-cos-operational-transfer.yml'
 permissions:
   contents: read
+concurrency:
+  group: cos-operational-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   verify-transfer:
     runs-on: ubuntu-latest
