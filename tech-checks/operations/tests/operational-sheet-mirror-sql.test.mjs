@@ -11,7 +11,7 @@ const source=[
  {productId:'124',unitNumber:'Spotter (solar compatible) 304HDC4',placement:'SHOP',customer:'Cameras OnSite',lifecycle:'UNFLAGGED',sourceAddress:{}}
 ];
 const field={placement:'FIELD',customer:'Builder',site:'Job',address:'100 Main St, Houston TX 77002'};
-const shop={placement:'SHOP',customer:'Cameras OnSite',site:'SHOP',address:'9949 W Sam Houston Pkwy N, Houston TX'};
+const shop={placement:'SHOP',customer:'Cameras OnSite',site:'SHOP',address:'9949 W Sam Houston Pkwy N, Houston, TX 77064-7503'};
 async function setup(){
  const db=new PGlite();
  await db.exec("create role anon;create role authenticated;create role service_role;create schema app_private;create schema cos_mhelp_placement_private;");
@@ -84,7 +84,7 @@ test('partial bootstrap, stale source/lease, conflicting inbound, duplicate row 
  try{
   let lease=await activeLease(db);
   await assert.rejects(dbcall(db,'bootstrap',lease,SHA,JSON.stringify(bootstrapRows.slice(0,1))),/Incomplete/);
-  await assert.rejects(dbcall(db,'bootstrap',lease,SHA,JSON.stringify([bootstrapRows[0],{...bootstrapRows[1],sheetId:1970577095}])),/sheet_mirror/);
+  await assert.rejects(dbcall(db,'bootstrap',lease,SHA,JSON.stringify([bootstrapRows[0],{...bootstrapRows[1],sheetId:1970577095}])),/Invalid mirror row/);
   assert.equal((await db.query("select count(*)::int n from cos_operational_private.sheet_mirror")).rows[0].n,0);
   await dbcall(db,'bootstrap',lease,SHA,JSON.stringify(bootstrapRows));
   await dbcall(db,'finish',lease);
