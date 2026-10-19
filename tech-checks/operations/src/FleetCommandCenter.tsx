@@ -23,6 +23,7 @@ type Props={
 };
 type StatusFilter='all'|FleetCommandStatus;
 type FamilyFilter='all'|'star4live'|'avigilon'|'reconeyez'|'victron'|'support'|'walle'|'other';
+type FocusFilter='all'|'attention'|'mapping'|'link_review';
 const names:Record<FleetCommandStatus,string>={online:'Online',offline:'Offline',unverified:'Unverified',not_applicable:'No camera'};
 const date=(time:string|null)=>time&&Number.isFinite(Date.parse(time))
  ?new Date(time).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})
@@ -33,7 +34,7 @@ export default function FleetCommandCenter({
  onOpen,onShop,onMap,onImport,onRefresh
 }:Props){
  const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>('all');
- const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState('');
+ const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState(''),[focus,setFocus]=useState<FocusFilter>('all');
  const data=useMemo(()=>buildFleetCommandCenter(
    uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt),
    [uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt]);
@@ -41,20 +42,25 @@ export default function FleetCommandCenter({
   if(!data)return [];
   const source=family==='victron'?data.panels.find(p=>p.key==='victron')?.products||[]:data.items.filter(p=>family==='all'||p.system===family);
   const term=query.trim().toLowerCase();
-  return source.filter(p=>(status==='all'||p.status===status)&&(
+  return source.filter(p=>(status==='all'||p.status===status)
+   &&(focus==='all'||focus==='attention'&&(p.status==='offline'||p.status==='unverified'||p.mappingIssue)
+     ||focus==='mapping'&&p.mappingIssue
+     ||focus==='link_review'&&Boolean(p.linked&&['unlinked','review'].includes(p.linked.state)))&&(
     !term||[p.unitNumber,p.productId,p.customer,p.address,p.category,p.provider,p.site]
      .join(' ').toLowerCase().includes(term)));
- },[data,family,status,query]);
+ },[data,family,status,query,focus]);
  const selected=entries.find(p=>p.productId===selectedId);
  if(!data)return <p className="cos-command-source-warning" role="status">
   Complete, verified mHelpDesk Product-ID source is currently unavailable. No inventory or provider totals are being estimated.
   <button type="button" onClick={onRefresh}>Retry saved data</button>
  </p>;
  const filter=(next:FamilyFilter,state:StatusFilter='all')=>{
-  setFamily(next);setStatus(state);setLimit(35);setSelectedId('');
+  setFamily(next);setStatus(state);setLimit(35);setSelectedId('');setFocus('all');
   document.getElementById('cos-command-product-list')?.scrollIntoView({block:'nearest'});
  };
  const cameraTotal=data.counts.online+data.counts.offline+data.counts.unverified;
+ const linkReview=data.healthVerified?data.items.filter(p=>p.linked&&['unlinked','review'].includes(p.linked.state)).length:null;
+ const showFocus=(next:FocusFilter)=>{setFamily('all');setStatus('all');setFocus(next);setSelectedId('');setLimit(35);document.getElementById('cos-command-product-list')?.scrollIntoView({block:'nearest'});};
  return <section className="cos-fleet-command" aria-label="Complete mHelpDesk Fleet command center">
   <header className="cos-command-head">
    <div><h2>Fleet command center</h2><p>All {data.field} Field Product IDs · camera, power and placement shown separately</p></div>
@@ -95,6 +101,12 @@ export default function FleetCommandCenter({
    <span><b>Camera Health:</b> {data.healthVerified?date(cameraCheckedAt):'Unverified — read unavailable'}</span>
    <span><b>Address map:</b> {data.addressCoverage?data.addressCoverage.located+' located · '+data.addressCoverage.missing+' needing mapping':'No validated map coverage snapshot'}</span>
   </div>
+  <div className="cos-command-attention-actions" aria-label="Support equipment and Field issues">
+   <button type="button" onClick={()=>filter('support','not_applicable')}><strong>{data.counts.support}</strong><span>Support equipment · no cameras</span></button>
+   <button type="button" disabled={linkReview===null} onClick={()=>showFocus('link_review')}><strong>{linkReview??'—'}</strong><span>Camera identities to review</span></button>
+   <button type="button" onClick={()=>showFocus('attention')}><strong>{data.counts.attention}</strong><span>Needs attention · includes unknowns, not necessarily outages</span></button>
+   <button type="button" disabled={!data.addressCoverage} onClick={()=>showFocus('mapping')}><strong>{data.addressCoverage?.missing??'—'}</strong><span>Map address lookups needed</span></button>
+  </div>
   <section id="cos-command-product-list" className="cos-command-inventory" aria-label="Every Field Product ID and connectivity status">
    <div className="cos-command-list-head">
     <div><h3>Field inventory</h3><p>{entries.length} of {data.field} Field Product IDs in this view · 1 product = 1 equipment record</p></div>
@@ -115,12 +127,12 @@ export default function FleetCommandCenter({
      </select>
     </label>
     <label>Connectivity
-     <select aria-label="Filter all Field products by connectivity status" value={status} onChange={e=>{setStatus(e.target.value as StatusFilter);setLimit(35);}}>
+     <select aria-label="Filter all Field products by connectivity status" value={status} onChange={e=>{setStatus(e.target.value as StatusFilter);setFocus('all');setLimit(35);}}>
       <option value="all">All health states</option><option value="online">Online</option><option value="offline">Offline</option>
       <option value="unverified">Unverified</option><option value="not_applicable">No camera / support</option>
      </select>
     </label>
-    <button type="button" onClick={()=>{setFamily('all');setStatus('all');setQuery('');setLimit(35);}}>Clear filters</button>
+    <button type="button" onClick={()=>{setFamily('all');setStatus('all');setFocus('all');setSelectedId('');setQuery('');setLimit(35);}}>Clear filters</button>
    </div>
    <div className="cos-command-rows">
     {entries.slice(0,limit).map(p=><button type="button" className="cos-command-row" key={p.productId} aria-expanded={selectedId===p.productId} onClick={()=>setSelectedId(p.productId)}>
