@@ -192,7 +192,7 @@ export function createOperationsHandler(options) {
   const readMhelpPlacements=async(actorPayload,signal=undefined)=>{if(options.mhelpPlacementEnabled!==true)return null;const receipt=await rpc('cos_mhelp_placement_snapshot',actorPayload,signal);try{return {...receipt,fleetLocations:await rpc('cos_mhelp_location_snapshot',actorPayload,signal)};}catch{return receipt;}};
   // Camera placement consumes only guarded status/items; full map and roster readers stay unchanged.
   const readMhelpCameraPlacements=async(actorPayload,signal=undefined)=>{if(options.mhelpPlacementEnabled!==true)return null;const receipt=await rpc('cos_mhelp_placement_snapshot',{...actorPayload,p_projection:'camera'},signal);if(!receipt||typeof receipt!=='object'||Array.isArray(receipt))throw Error('Invalid placement receipt');return receipt;};
-  const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
+  const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken, readDashboardEmbeds: () => rpc('cos_vrm_dashboard_embeds', {}) }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
   const mhelpPartner = createMhelpPartnerHandler({
