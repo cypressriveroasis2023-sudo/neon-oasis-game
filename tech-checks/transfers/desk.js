@@ -39,7 +39,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    const caption=invalid.getAttribute('aria-label')||invalid.closest('label')?.firstChild?.textContent?.trim()||'required field';
    return {detail:invalid.type==='checkbox'?'Finish the required equipment check before sending. Every required check must pass; report failed checks instead of marking them as passed.':'Complete '+caption+' before sending.',control:invalid};
   }
-  if(!draft.items.some(item=>!item.missing))return {detail:'Add at least one equipment unit to this handoff.'};
+  if(draft.kind==='checkout'&&!draft.items.some(item=>!item.missing))return {detail:'Add at least one equipment unit to this handoff.'};
   for(let index=0;index<draft.items.length;index++){
    const item=draft.items[index];if(item.missing)continue;
    try{parts(item.partsText);}catch(error){return {detail:error.message,control:fieldFor(index,'partsText')};}
