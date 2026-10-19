@@ -78,7 +78,7 @@ export default function FleetProviderHealth({uploadInventory,fieldHealth,healthR
  return <section className='cos-fleet-provider-health' aria-label='Field equipment by provider'>
   <div className='cos-provider-title'>
    <h2>Camera systems — separate status lists</h2>
-   <p><strong>{data.total} Field Product IDs</strong> from mHelpDesk. Camera health is a separate reading; a missing check is not an outage.</p>
+   <p><strong>{data.total} Field Product IDs = {data.total-(data.groups.find(group=>group.provider==='support')?.count||0)} camera-capable / other equipment + {data.groups.find(group=>group.provider==='support')?.count||0} support.</strong> A missing camera check is not an outage.</p>
   </div>
   {!data.healthVerified&&<p className='cos-provider-warning' role='status'>Current camera-health evidence is unavailable or incomplete. All camera-capable equipment remains Unverified until a valid health read succeeds. The Field inventory is retained.</p>}
   {data.stale&&<p className='cos-provider-warning' role='status'>mHelpDesk inventory updates are delayed. These are the last validated equipment assignments, not a fresh vendor read.</p>}
