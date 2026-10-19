@@ -90,6 +90,21 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   useEffect(()=>onPages({camera:parts,map:areas.map(area=>area.label)}),[parts,areas,onPages]);
   const mapNode=useRef<HTMLDivElement|null>(null),mapRef=useRef<L.Map|null>(null),layer=useRef<L.LayerGroup|null>(null);
   const [mapRevision,setMapRevision]=useState(0);
+  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
+  const groupHost=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{
+    const host=groupHost.current;
+    if(!host||!groupDetails)return;
+    host.replaceChildren(compactGroupPopup(groupDetails.members,groupDetails.zoom));
+    return()=>{host.replaceChildren();};
+  },[groupDetails]);
+  useEffect(()=>{setGroupDetails(null);},[mode,page,enabled,data.readAt]);
+  useEffect(()=>{
+    if(!groupDetails)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setGroupDetails(null);};
+    window.addEventListener('keydown',escape);
+    return()=>window.removeEventListener('keydown',escape);
+  },[groupDetails]);
   useEffect(()=>{
     if(!enabled||!mapNode.current)return;
     const map=L.map(mapNode.current,{zoomControl:false,attributionControl:true}).setView([31,-99],6);mapRef.current=map;
@@ -126,9 +141,12 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
           key:item.key,label:item.name+(item.productId?' · Product '+item.productId:''),health:item.health,
           site:item.site,address:item.address,locationLabel:item.locationLabel,productId:item.productId
         }));
-        const popupContent=compactGroupPopup(popupMembers,zoom);
-        L.DomEvent.disableClickPropagation(popupContent);
-        marker.bindPopup(popupContent,{maxWidth:420,minWidth:300,autoPan:false,className:'cos-compact-group-popup-wrap'});
+        marker.on('click',()=>setGroupDetails({
+          members:popupMembers,zoom:zoom?()=>{
+            setGroupDetails(null);
+            zoom();
+          }:undefined
+        }));
         group.addLayer(marker);
         continue;
       }
@@ -163,7 +181,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{outages.length} down units</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{totals.online} online</b><b className='tv-offline'>{totals.offline} offline</b><b>{totals.unknown} unverified</b><b>{rows.length} camera units</b><b>{tvPins.mhelpLocated} mHelp address pins</b><b>{totals.mapped} GPS-verified</b></>}<small>Saved data · refresh 15 min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {error}</p>}
     {!data.readAt&&<p className='tv-fleet-loading'>{error?'Fleet information is unavailable.':'Loading Camera Health and field locations…'}</p>}
-    <div className='tv-fleet-map-wrap field-map-workspace cos-tv-compact-fleet-map' hidden={mode!=='map'} data-area-kind={area.kind}><div ref={mapNode} className='tv-fleet-map' aria-label='Field unit locations'/><div className='tv-map-area' aria-label='Current map area'><strong>{area.label}</strong><span>{area.ids.length} units · <b className='tv-offline'>{area.offline} down</b> · <b className='tv-online'>{area.online} online</b></span></div><div className='tv-map-legend'><span className='tv-online'>● Online</span><span className='tv-offline'>● Offline</span><span>● Unverified</span><span className='tv-solar'>● Solar / support</span><span>Group ring = equipment health · red = confirmed offline</span><span>{tvPins.mhelpLocated} saved mHelp customer-address pins · {tvPins.mhelpMissing} unresolved · {totals.mapped} GPS-verified units</span></div></div>
+    <div className='tv-fleet-map-wrap field-map-workspace cos-tv-compact-fleet-map' hidden={mode!=='map'} data-area-kind={area.kind}><div ref={mapNode} className='tv-fleet-map' aria-label='Field unit locations'/>{groupDetails&&mode==='map'&&<section className='cos-compact-group-sheet cos-tv-compact-sheet' role='dialog' aria-label='Grouped TV equipment'><button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button><div ref={groupHost} className='cos-compact-group-sheet-content'/></section>}<div className='tv-map-area' aria-label='Current map area'><strong>{area.label}</strong><span>{area.ids.length} units · <b className='tv-offline'>{area.offline} down</b> · <b className='tv-online'>{area.online} online</b></span></div><div className='tv-map-legend'><span className='tv-online'>● Online</span><span className='tv-offline'>● Offline</span><span>● Unverified</span><span className='tv-solar'>● Solar / support</span><span>Group ring = equipment health · red = confirmed offline</span><span>{tvPins.mhelpLocated} saved mHelp customer-address pins · {tvPins.mhelpMissing} unresolved · {totals.mapped} GPS-verified units</span></div></div>
     {mode==='camera'&&data.readAt&&<div className='tv-fleet-records'>{shown.map(({unit,health,router})=><article key={unit.id} className='tv-fleet-record tv-state-offline'><div><h3>{unit.unitNumber}</h3><b>OFFLINE</b></div><p>{unit.site||unit.customer||'Site not linked'}</p><p>{unit.address||'Address not recorded'}</p><div><span>{fieldReachabilityLabels[router]}</span><span>{locationTag(unit)}</span></div><small>{unit.activeJobNumber||'No linked job'} · {health.basis==='connection'?'IP / port observation':health.basis==='recorder'?'Recorder observation':'Camera / detector observation'} · {cameraTime(health.checkedAt,clock)}</small></article>)}{!outages.length&&<p>{data.health?'No confirmed red outages in the available records.':'Camera Health is unavailable. Waiting for outage records.'}</p>}</div>}
   </div>;
 }
