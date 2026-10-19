@@ -16,9 +16,24 @@ import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import 'leaflet/dist/leaflet.css';
 type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;};
 export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters}:Props){
- const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
+ const node=useRef<HTMLDivElement>(null),groupHost=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0);
+ const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
+ useEffect(()=>{
+  const host=groupHost.current;
+  if(!host||!groupDetails)return;
+  const content=compactGroupPopup(groupDetails.members,groupDetails.zoom);
+  host.replaceChildren(content);
+  return()=>{host.replaceChildren();};
+ },[groupDetails]);
+ useEffect(()=>{setGroupDetails(null);},[filters?.status,filters?.query,filters?.placement,filters?.family,filters?.provider,filters?.layer,filters?.nearbyId,mhelpAddressPins]);
+ useEffect(()=>{
+  if(!groupDetails)return;
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setGroupDetails(null);};
+  window.addEventListener('keydown',escape);
+  return()=>window.removeEventListener('keydown',escape);
+ },[groupDetails]);
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
  select.current=onSelect;selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
  // Prefer the current mHelp address for uniquely reviewed Product-ID bindings.
@@ -99,10 +114,15 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
      instance.closePopup();
      instance.fitBounds(L.latLngBounds(members.map(point=>point.item.pin.point)),{padding:[72,72],maxZoom:16,animate:false});
     }:undefined;
-    const popupContent=compactGroupPopup(described,zoom);
-    L.DomEvent.disableClickPropagation(popupContent);
-    marker.bindPopup(popupContent,{className:'cos-compact-group-popup-wrap',maxWidth:420,minWidth:300,autoPan:false});
-    marker.on('click',()=>{if(picker.current)instance.closePopup();});
+    // Render the member picker in a stable panel. A Leaflet popup taller than
+    // its map viewport can be clipped, auto-pan, or be destroyed mid-click.
+    marker.on('click',()=>{
+     if(picker.current)return;
+     setGroupDetails({members:described,zoom:zoom?()=>{
+       setGroupDetails(null);
+       zoom();
+     }:undefined});
+    });
     continue;
    }
    const entry=members[0],item=entry.item,pin=item.pin,description=describe(item);
@@ -133,6 +153,10 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   <div className='cos-fleet-map-toolbar'><div><details className='cos-fleet-map-details'><summary aria-label='Fleet map details'><strong>Fleet map</strong></summary><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{visibleMhelpPins.length>0&&<> · {visibleMhelpPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small>{visibleMhelpPins.length>0&&<label className='cos-fleet-map-find'>Find a mapped unit<select aria-label='Find mapped equipment' defaultValue='' onChange={event=>{if(event.currentTarget.value)onSelectMhelpAddress?.(event.currentTarget.value);event.currentTarget.value='';}}><option value=''>Choose unit</option>{visibleMhelpPins.map(pin=><option key={pin.productId} value={pin.productId}>{pin.unitNumber} · Product {pin.productId}</option>)}</select></label>}</details></div><div><button onClick={fit} disabled={!pins.length&&!visibleMhelpPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
+  {groupDetails&&<section className='cos-compact-group-sheet' role='dialog' aria-label='Grouped Fleet equipment'>
+    <button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button>
+    <div ref={groupHost} className='cos-compact-group-sheet-content'/>
+  </section>}
   {locationsReady&&!pins.length&&!visibleMhelpPins.length&&!pickLocation&&<p className='cos-fleet-map-note'>{rows.length?'These units have no currently verified pins or approved address estimates. Open Location verification.':'No linked unit pins match these filters. Recorded equipment can remain in the list without a verified location.'}</p>}
   <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>Compact rings show grouped equipment status · select a group to view its units.</span><small>EST / SRC: installation needs verification · Nearby units may use display offsets; saved locations stay unchanged.</small></details></div>
   {locationsReady&&mhelpAddressReviews.length>0&&<details className='cos-mhelp-address-followups'>
