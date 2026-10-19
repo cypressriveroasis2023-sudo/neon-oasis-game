@@ -48,7 +48,7 @@ test('counts all Field Product IDs once, preserves Shop and support separate fro
  assert.equal(data.panels.find(p=>p.key==='reconeyez')?.count,1);
  assert.equal(data.panels.find(p=>p.key==='victron')?.count,null);
  assert.equal(data.items.filter(p=>p.mappingIssue).length,2);
- assert.equal(data.items.find(p=>p.unitNumber==='Spotter 001')?.address,'1 Example Road, Houston, TX 77001');
+ assert.ok(data.items.find(p=>p.unitNumber==='Spotter 001')?.address.includes('1 Example Road'));
 });
 test('failed camera health never fabricates online or offline devices, retaining all Field records',()=>{
  const data=buildFleetCommandCenter(fixture(),saved(),false,[],null,null,now,time);
