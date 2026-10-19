@@ -38,14 +38,14 @@ returns boolean language sql immutable set search_path='' as $fn$
    jsonb_typeof(p_fields)='object'
    and (p_fields ?& array['placement','customer','site','address'])
    and (p_fields-array['placement','customer','site','address'])='{}'::jsonb
-   and p_fields->>'placement' in('FIELD','SHOP')
+   and (p_fields->>'placement') in('FIELD','SHOP')
    and jsonb_typeof(p_fields->'customer')='string'
    and jsonb_typeof(p_fields->'site')='string'
    and jsonb_typeof(p_fields->'address')='string'
    and length(p_fields->>'customer')<=250
    and length(p_fields->>'site')<=250
    and length(p_fields->>'address')<=600
-   and (p_fields->>'customer'||p_fields->>'site'||p_fields->>'address')
+   and ((p_fields->>'customer')||(p_fields->>'site')||(p_fields->>'address'))
       !~ '[[:cntrl:]<>]'
    and coalesce(left(p_fields->>'customer',1),'') not in ('=','+','-','@')
    and coalesce(left(p_fields->>'site',1),'') not in ('=','+','-','@')
