@@ -19,7 +19,7 @@ async function fixture(){
  await db.exec("create table public.equipment_units(id uuid primary key,unit_number text,ip text,gps_lat numeric,gps_long numeric,status text);create table app_private.vision_tracker_locations(id uuid primary key,unit_number text,placement text,ip text);");
  await db.exec("create function app_private.cos_owner_identity_assert_actor(p uuid,o uuid,w boolean) returns void language plpgsql set search_path='' as $f$ begin if p is distinct from '22222222-2222-4222-8222-222222222222'::uuid or o is distinct from 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid then raise exception 'Owner permission required' using errcode='42501';end if;end $f$;");
  await db.query("insert into cos_mhelp_placement_private.upload_control values(true,$1)",[SHA]);
- await db.query("insert into cos_mhelp_placement_private.upload_batches values($1,$2)",[SHA,[FIELD,SHOP,HELD]]);
+ await db.query("insert into cos_mhelp_placement_private.upload_batches values($1,$2)",[SHA,JSON.stringify([FIELD,SHOP,HELD])]);
  await db.query("insert into public.equipment_units values($1,'Ranger 028','192.0.2.100',29.5,-95.2,'installed')",[randomUUID()]);
  await db.query("insert into app_private.vision_tracker_locations values($1,'Ranger 028','FIELD','192.0.2.100')",[randomUUID()]);
  await db.exec(await readFile(new URL('../docs/drafts/cos-operational-transfer-v1.sql',import.meta.url),'utf8'));
@@ -71,7 +71,7 @@ test('retries are idempotent; concurrent revisions and source changes cannot ove
   await assert.rejects(move(db,command('101','FIELD',{},0)),/moved elsewhere/);
   assert.equal((await db.query("select count(*)::int n from cos_operational_private.events")).rows[0].n,1);
   const newHash='b'.repeat(64);
-  await db.query("insert into cos_mhelp_placement_private.upload_batches values($1,$2)",[newHash,[{...FIELD,placement:'FIELD'},SHOP,HELD]]);
+  await db.query("insert into cos_mhelp_placement_private.upload_batches values($1,$2)",[newHash,JSON.stringify([{...FIELD,placement:'FIELD'},SHOP,HELD])]);
   await db.query("update cos_mhelp_placement_private.upload_control set active_sha256=$1",[newHash]);
   assert.equal((await snap(db)).items.find(x=>x.productId==='101').placement,'SHOP');
   await assert.rejects(move(db,command('101','FIELD',{},1,randomUUID(),SHA)),/Inventory changed/);
@@ -93,7 +93,7 @@ test('missing, duplicate, restricted, malformed and unauthorized moves are denie
    await assert.rejects(db.query('select * from cos_operational_private.events'),/permission denied/);
    await db.exec('reset role');
   }
-  await db.query("update cos_mhelp_placement_private.upload_batches set records=$1 where source_sha256=$2",[[FIELD,FIELD,SHOP,HELD],SHA]);
+  await db.query("update cos_mhelp_placement_private.upload_batches set records=$1 where source_sha256=$2",[JSON.stringify([FIELD,FIELD,SHOP,HELD]),SHA]);
   await assert.rejects(snap(db),/Duplicate Product IDs/);
   await assert.rejects(move(db,command('101','SHOP')),/duplicated/);
   assert.equal((await db.query("select count(*)::int n from cos_operational_private.events")).rows[0].n,0);
