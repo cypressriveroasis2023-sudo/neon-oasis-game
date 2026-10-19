@@ -1,7 +1,7 @@
 import type {MapPoint} from './fieldMapMarkers';
 /** Merge the closest colliding rendered markers, not chains of hidden members.
- * Each badge is drawn at its members' centroid with a 44px touch box. A 48px
- * separation leaves a small gap; original coordinates and identities stay intact.
+ * Each badge is drawn at its members' centroid; 52px status rings require
+ * 56px separation for nonoverlapping target areas; original coordinates and identities stay intact.
  */
 export function fleetMapGroups<T>(points:MapPoint<T>[]):MapPoint<T>[][] {
  // Co-located service addresses can contain hundreds of records. Combine those
@@ -17,7 +17,7 @@ export function fleetMapGroups<T>(points:MapPoint<T>[]):MapPoint<T>[][] {
   let pair:[number,number]|undefined,nearest=Infinity;
   for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){
    const dx=Math.abs(groups[i].x-groups[j].x),dy=Math.abs(groups[i].y-groups[j].y);
-   if(dx<48&&dy<48&&dx*dx+dy*dy<nearest){pair=[i,j];nearest=dx*dx+dy*dy;}
+   if(dx<56&&dy<56&&dx*dx+dy*dy<nearest){pair=[i,j];nearest=dx*dx+dy*dy;}
   }
   if(!pair)break;
   const [i,j]=pair,a=groups[i],b=groups[j],count=a.members.length+b.members.length;
