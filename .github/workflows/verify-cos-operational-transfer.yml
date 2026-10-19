@@ -32,3 +32,9 @@ jobs:
         run: node --import tsx --test --test-concurrency=1 tests/operational-*.test.mjs
       - name: Production build
         run: npm run build
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check isolated two-way sync Edge runtime
+        working-directory: tech-checks/supabase/functions/cos-operational-sheets-sync
+        run: deno check serve.ts
