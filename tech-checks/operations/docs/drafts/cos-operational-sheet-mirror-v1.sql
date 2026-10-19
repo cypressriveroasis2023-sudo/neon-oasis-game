@@ -341,7 +341,7 @@ begin
  where singleton and lease_id=p_lease;
 end $fn$;
 
-revoke all on functions in schema cos_operational_private from public,anon,authenticated,service_role;
+revoke all on all functions in schema cos_operational_private from public,anon,authenticated,service_role;
 revoke all on function public.cos_operational_sheet_sync_begin(),
  public.cos_operational_sheet_sync_bootstrap(uuid,text,jsonb),
  public.cos_operational_sheet_sync_inbound(uuid,text,text,bigint,uuid,jsonb,jsonb),
