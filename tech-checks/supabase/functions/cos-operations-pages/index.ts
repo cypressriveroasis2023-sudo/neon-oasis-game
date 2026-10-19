@@ -14,6 +14,7 @@ import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPla
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createOperationalMoves,OperationalMoveError} from './operationalMoves.ts';
+import {projectOperationalFleet} from './operationalFleetOverlay.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
@@ -955,10 +956,14 @@ export function createOperationsHandler(options) {
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
           const combined=projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity);
+          // A short, saved owner-decision read has no geocode, camera or vendor
+          // dependency. Never let stale mHelp placement silently reverse an
+          // authorized Product-ID transfer; keep source membership untouched.
+          const operational=projectOperationalFleet(combined,await rpc('cos_operational_transfer_overrides',actorPayload));
           // MHelp Field address is a presentation location by Product ID, never
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
-          const withMhelpAddress=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
+          const withMhelpAddress=await withMhelpAddressMap(operational,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{
