@@ -99,7 +99,9 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
      instance.closePopup();
      instance.fitBounds(L.latLngBounds(members.map(point=>point.item.pin.point)),{padding:[72,72],maxZoom:16,animate:false});
     }:undefined;
-    marker.bindPopup(compactGroupPopup(described,zoom),{className:'cos-compact-group-popup-wrap',maxWidth:420,minWidth:300,autoPan:true});
+    const popupContent=compactGroupPopup(described,zoom);
+    L.DomEvent.disableClickPropagation(popupContent);
+    marker.bindPopup(popupContent,{className:'cos-compact-group-popup-wrap',maxWidth:420,minWidth:300,autoPan:false});
     marker.on('click',()=>{if(picker.current)instance.closePopup();});
     continue;
    }
