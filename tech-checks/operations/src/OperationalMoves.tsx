@@ -146,3 +146,4 @@ export default function OperationalMoves({canManage,show}:{canManage:boolean;sho
    </div>
   </div>
  </section>;
+}
