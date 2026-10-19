@@ -14,6 +14,10 @@ on:
       - 'tech-checks/database-maintenance/techcheck-handoff-activation-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-delivery-schedule-v1.sql'
       - 'tech-checks/supabase/functions/techcheck-transfer-delivery/**'
+      - 'tech-checks/database-maintenance/techcheck-department-alerts-*.sql'
+      - 'tech-checks/supabase/functions/techcheck-department-alerts/**'
+      - 'tech-checks/notifications-v1.js'
+      - 'tech-checks/operations/tests/department-alerts-*.test.mjs'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
       - 'tech-checks/operations/tests/helpers/service-basics-fixture.mjs'
@@ -46,6 +50,12 @@ jobs:
         working-directory: tech-checks/operations
       - name: PostgreSQL, transfer and existing Service regressions
         run: node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/transfer-delivery.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
+        working-directory: tech-checks/operations
+      - name: Department handoff and return alert regressions
+        run: node --import tsx --test tests/department-alerts-sql.test.mjs tests/department-alerts-delivery.test.mjs
+        working-directory: tech-checks/operations
+      - name: Notification UI syntax
+        run: node --check ../notifications-v1.js
         working-directory: tech-checks/operations
       - name: TypeScript
         run: npm run typecheck
