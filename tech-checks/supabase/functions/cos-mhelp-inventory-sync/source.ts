@@ -39,11 +39,12 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
   const customer=text(p.name,250),siteName=site?text(site.name,250):'';
   const composite=siteName&&siteName!==customer&&!customer.includes(':')?customer+': '+siteName:customer;
   const unitNumber=e.name.trim(),exactPrior=old?.unitNumber===unitNumber;
-  const binding=exactPrior&&old?.binding?.guardCurrent===true?Object.fromEntries(Object.entries(old.binding).filter(([k])=>k!=='guardCurrent')):null;
+  const typeChanged=!!old&&(String(old.category).toLowerCase().replace(/\s/g,'')!==category.toLowerCase().replace(/\s/g,'')||old.apiAssignment?.equipmentTypeId!=null&&old.apiAssignment.equipmentTypeId!==e.equipmentTypeId);
+  const binding=exactPrior&&!typeChanged&&old?.binding?.guardCurrent===true?Object.fromEntries(Object.entries(old.binding).filter(([k])=>k!=='guardCurrent')):null;
   const lifecycle=e.active===false||/\b(?:DO\s+NOT\s+USE|RETIRED|DECOMMISSIONED|STOLEN)\b/i.test(e.name)?'DO_NOT_USE':/\bMISSING\b/i.test(e.name)?'MISSING':'UNFLAGGED';
   records[index]={productId:e.equipmentId,unitNumber,category,customerId:e.customerId,customer:composite,placement:shop?'SHOP':'FIELD',lifecycle,
    sourceAddress:{street:site?text(site.address1):'',city:site?text(site.city):'',state:site?text(site.state,40):'',zip:site?text(site.zip,20):''},
-   sourceRow:index+2,sourceDates:{apiUpdatedAt:e.updatedAt},binding,holdReason:!exactPrior&&old?'api_equipment_label_changed':old?.holdReason||null,
+   sourceRow:index+2,sourceDates:{apiUpdatedAt:e.updatedAt},binding,holdReason:!exactPrior&&old?'api_equipment_label_changed':typeChanged?'api_equipment_type_changed':old?.holdReason||null,
    possibleAliasUnitIds:binding?[]:[...new Set([...(old?.possibleAliasUnitIds||[]),...(old?.binding?[old.binding.trackerId,old.binding.nativeUnitId].filter(Boolean):[])])],
    ...(exactPrior&&old?.displayUnitNumber?{displayUnitNumber:old.displayUnitNumber,displayAuthorizationSha256:old.displayAuthorizationSha256}:{}),
    apiAssignment:{customerId:e.customerId,serviceLocationId:e.serviceLocationId,equipmentTypeId:e.equipmentTypeId,active:e.active,fullLabel:e.name},addressReview,

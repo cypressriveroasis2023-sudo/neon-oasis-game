@@ -68,7 +68,9 @@ begin
   if old is not null and old->>'unitNumber' is distinct from r->>'unitNumber' then renamed:=renamed+1;end if;
   if old->'sourceAddress' is distinct from r->'sourceAddress' then addresses:=addresses+1;end if;
   b:=null;
-  if old->>'unitNumber'=r->>'unitNumber' and old->'binding'->>'guardCurrent'='true' then
+  if old->>'unitNumber'=r->>'unitNumber' and old->'binding'->>'guardCurrent'='true'
+   and lower(regexp_replace(old->>'category','[[:space:]]','','g'))=lower(regexp_replace(r->>'category','[[:space:]]','','g'))
+   and (old->'apiAssignment'->>'equipmentTypeId' is null or old->'apiAssignment'->>'equipmentTypeId'=r->'apiAssignment'->>'equipmentTypeId') then
    b:=(old->'binding')-'guardCurrent';
    b:=jsonb_set(b,'{expectedGuard}',to_jsonb(cos_mhelp_placement_private.upload_binding_guard((b->>'trackerId')::uuid,(b->>'nativeUnitId')::uuid)));
    foreach target in array array[b->>'trackerId',b->>'nativeUnitId'] loop
