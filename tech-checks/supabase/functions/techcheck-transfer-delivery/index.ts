@@ -24,6 +24,20 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
     actor=data.user.id;
    }
    let body;try{body=await req.json();}catch{return response({error:'Invalid request.'},400);}
+   // Server-only connection probe. It reads the configured Google account and
+   // archive folder without creating files, claiming a report or sending mail.
+   if(cron && body.action==='check_connection'){
+    const credentials=['TECHCHECK_GOOGLE_CLIENT_ID','TECHCHECK_GOOGLE_CLIENT_SECRET','TECHCHECK_GOOGLE_REFRESH_TOKEN'].map(name=>String(env(name)||''));
+    if(credentials.some(v=>!v))return response({ready:false,reason:'Google connection required.'},503);
+    const google=await request('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:credentials[0],client_secret:credentials[1],refresh_token:credentials[2],grant_type:'refresh_token'}),signal:AbortSignal.timeout(20000)});
+    const token=await google.json();if(!google.ok||!token.access_token)return response({ready:false,reason:'Google renewal unavailable.'},503);
+    const options={headers:{Authorization:'Bearer '+token.access_token},signal:AbortSignal.timeout(20000)};
+    const profile=await request('https://openidconnect.googleapis.com/v1/userinfo',options),account=await profile.json();
+    if(!profile.ok||account.email?.toLowerCase()!==RECIPIENT||account.email_verified!==true)return response({ready:false,reason:'Google account verification failed.'},503);
+    const folder=await request('https://www.googleapis.com/drive/v3/files/'+DRIVE_FOLDER+'?fields=id,mimeType&supportsAllDrives=true',options),archive=await folder.json();
+    if(!folder.ok||archive.id!==DRIVE_FOLDER)return response({ready:false,reason:'Archive folder unavailable.'},503);
+    return response({ready:true,email_account_verified:true,archive_folder_verified:true});
+   }
    if(!cron && (typeof body.report_id!=='string'||!/^[a-f0-9-]{36}$/i.test(body.report_id)))return response({error:'Report ID required.'},400);
    report=await call('techcheck_transfer_delivery_v1',{p_action:'claim',p_id:cron?null:body.report_id,p_actor:actor});
    if(!report)return response({accepted:true,status:'pending_or_finished'});

@@ -32,11 +32,17 @@ function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
  };
  const handler=createDeliveryHandler({admin,userClient:{auth:{getUser:async token=>token==='good'?{data:{user:{id:'actor'}}}:{error:{}}}},env:()=>configured?'synthetic-credential':undefined,fetch});
  const post=(headers={authorization:'Bearer good'})=>handler(new Request('https://function.example',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify({report_id:id})}));
- return {post,report,calls,files,status:()=>status};
+ const checkConnection=()=>handler(new Request('https://function.example',{method:'POST',headers:{'Content-Type':'application/json','x-techcheck-cron':'trusted'},body:JSON.stringify({action:'check_connection'})}));
+ return {post,checkConnection,report,calls,files,status:()=>status};
 }
 test('rejects unsigned requests and untrusted scheduler; missing Google configuration never claims success',async()=>{
  const f=fixture({configured:false});assert.equal((await f.post({})).status,401);assert.equal((await f.post({'x-techcheck-cron':'bad'})).status,401);
  assert.equal((await (await f.post()).json()).status,'blocked');assert.equal(f.calls.some(c=>c.url),false);
+});
+test('server connection probe verifies Google and archive without sending email or claiming reports',async()=>{
+ const f=fixture();assert.equal((await (await f.checkConnection()).json()).ready,true);
+ assert.equal(f.calls.some(c=>c.args?.p_action==='claim'),false);assert.equal(f.files.size,0);assert.equal(f.calls.some(c=>c.url?.includes('messages/send')),false);
+ const g=fixture({configured:false});assert.equal((await (await g.checkConnection()).json()).ready,false);
 });
 test('archives signed handoff, exact SIMs and all evidence before one email; retry preserves IDs',async()=>{
  const f=fixture();assert.equal((await (await f.post()).json()).status,'sent');assert.equal(f.files.size,5);
