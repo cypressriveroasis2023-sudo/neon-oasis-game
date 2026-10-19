@@ -72,7 +72,7 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
  if(!allowed)return <section className='panel module' role='alert'><h2>Unit Tracker unavailable</h2><p>This workspace requires an authorized Owner or verified IT account and a compatible backend.</p></section>;
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
-  <OperationalMoves canManage={allowed&&(session as {legacyOwner?:boolean})?.legacyOwner===true} show={show}/>
+  <OperationalMoves canManage={allowed&&(session as {legacyOwner?:boolean;features?:{operationalTransfers?:boolean}})?.legacyOwner===true&&(session as {features?:{operationalTransfers?:boolean}})?.features?.operationalTransfers===true} show={show}/>
   {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<MhelpPartnerReview openMap={openMap} openHealth={openHealth}/>}
   <MhelpIntakeReview session={session}/>
   <SheetsConnectionReview canCheck={(session as {legacyOwner?:boolean})?.legacyOwner===true} queueEnabled={snapshot?.queueEnabled===true}/>
