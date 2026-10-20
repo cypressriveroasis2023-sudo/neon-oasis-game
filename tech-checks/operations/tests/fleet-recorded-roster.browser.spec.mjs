@@ -16,8 +16,9 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Product-ID inventory shows
  await expect(app.locator('.cos-fleet-stats .cos-fleet-stat')).toHaveCount(7);
  await expect(inventory).toContainText('714 Shop');
  await expect(app.locator('div.cos-fleet-count-note')).toContainText('5 assignment representations');
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
- await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('—');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(1);
  await app.getByLabel('Search units, customers, sites or addresses').fill('Ranger 901');
  await expect(app.locator('.cos-fleet-stat-field')).toContainText('FIELD EQUIPMENT');
