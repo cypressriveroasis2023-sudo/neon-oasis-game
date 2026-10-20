@@ -34,6 +34,7 @@ before(async()=>{
  const end=integration.indexOf('create function app_private.techcheck_transfer_legacy_ticket_guard_v1()',start);
  assert.ok(start>0&&end>start);await db.exec(integration.slice(start,end));
  await db.exec(readFileSync(new URL('../../database-maintenance/techcheck-ticketfree-returns-v1.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../../database-maintenance/techcheck-ticketfree-multiselect-v2.sql',import.meta.url),'utf8'));
 });
 after(async()=>db?.close());
 async function as(actor,fn){await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[actor||'']);await db.exec('set role authenticated');try{return await fn();}finally{await db.exec('reset role');}}
@@ -119,4 +120,56 @@ test('photo paths must be uploaded and owned by this request; other Service cann
  assert.equal((await as(it,()=>db.query('select * from storage.objects where name=$1',[path]))).rows.length,1);
  assert.equal((await as(other,()=>db.query('select * from storage.objects where name=$1',[path]))).rows.length,0);
  assert.equal((await as(svc,()=>db.query("update storage.objects set metadata='{}' where name=$1 returning *",[path]))).rows.length,0);
+});
+
+async function finishPending(){for(const r of (await db.query("select id from app_private.techcheck_ticketfree_returns_v1 where state='waiting_it' and identity_state='matched'")).rows)await receive(intake(r.id));}
+const batch=(items,actor=svc)=>rpc(actor,'submit_techcheck_ticketfree_return_batch_v1',{p_items:items});
+const batchItem=e=>({request_id:randomUUID(),returned_key:e.key,used_key:null,notes:'Synthetic batch',photos:[]});
+test('batch returns several truck units once; same IDs replay without duplicates',async()=>{
+ await finishPending();
+ const a=await truckItem({family:'Sniper'}),b=await truckItem({family:'Ranger'}),items=[batchItem(a),batchItem(b)];
+ const result=await batch(items);assert.equal(result.results.length,2);assert.ok(result.results.every(r=>r.state==='waiting_it'));
+ assert.ok((await batch(items)).results.every(r=>r.replayed));
+ for(const item of items)assert.equal((await scalar('select count(*)::int n from app_private.techcheck_ticketfree_returns_v1 where id=$1',[item.request_id])).n,1);
+});
+test('a failed later batch item rolls back all earlier movements and IT notices',async()=>{
+ const a=await truckItem({family:'Spotter'}),items=[batchItem(a),batchItem({key:'not-in-catalogue'})];
+ await assert.rejects(batch(items),/exact identity/);
+ assert.equal((await scalar('select status from service_truck_units where service_tech_id=$1 and equipment_type=$2',[svc,a.family])).status,'assigned');
+ assert.equal((await scalar('select count(*)::int n from app_notifications where unit_tag=$1',[a.tag])).n,0);
+ assert.equal((await scalar('select count(*)::int n from app_private.techcheck_ticketfree_returns_v1 where id=$1',[items[0].request_id])).n,0);
+});
+test('duplicate keys, duplicate replacement usage and return/install overlap are rejected',async()=>{
+ const e=await equipment(),a=batchItem(e),b=batchItem(e);await assert.rejects(batch([a,b]),/cannot be returned/);
+ b.returned_key=(await equipment()).key;a.used_key=b.returned_key;await assert.rejects(batch([a,b]),/both installed/);
+ a.used_key='sniper:replacement';b.used_key=a.used_key;await assert.rejects(batch([a,b]),/installed twice/);
+});
+test('all four truck entries remain returnable when two do not exist in the catalogue; IT holds them for ID review',async()=>{
+ await finishPending();
+ const a=await truckItem({family:'Sniper'}),b=await truckItem({family:'Ranger'});
+ const tag1='MISSING-S-'+randomUUID().slice(0,5),tag2='MISSING-SS-'+randomUUID().slice(0,5);
+ for(const [family,tag]of [['Spotter',tag1],['Solar Spotter',tag2]])await db.query("insert into service_truck_units(service_tech_id,equipment_type,unit_tag,status) values($1,$2,$3,'assigned') on conflict(service_tech_id,equipment_type) do update set unit_tag=excluded.unit_tag,status='assigned'",[svc,family,tag]);
+ const unknown=(family,tag)=>({request_id:randomUUID(),returned_key:null,used_key:null,unlinked_family:family,unlinked_tag:tag,notes:'Unit ID absent',photos:[]});
+ const items=[batchItem(a),batchItem(b),unknown('Spotter',tag1),unknown('Solar Spotter',tag2)];
+ const count=(await scalar('select count(*)::int n from equipment_master')).n;const result=await batch(items);assert.equal(result.results.length,4);
+ assert.equal((await scalar('select count(*)::int n from equipment_master')).n,count);
+ assert.ok((await context(it)).returns.some(r=>r.id===items[2].request_id&&r.identity_state==='needs_review'));
+ const receipt={...intake(items[2].request_id),p_disposition:'review'};
+ await assert.rejects(rpc(svc,'receive_techcheck_ticketfree_unlinked_v1',receipt),/IT must/);
+ await assert.rejects(rpc(it,'receive_techcheck_ticketfree_unlinked_v1',{...receipt,p_disposition:'ready'}),/not Ready/);
+ await assert.rejects(receive({...intake(items[2].request_id)}),/identity changed/);
+ assert.equal((await rpc(it,'receive_techcheck_ticketfree_unlinked_v1',receipt)).state,'identity_review');
+ assert.equal((await rpc(it,'receive_techcheck_ticketfree_unlinked_v1',receipt)).replayed,true);
+ assert.equal((await scalar('select count(*)::int n from equipment_master')).n,count);
+ assert.equal((await scalar('select count(*)::int n from unit_registry where unit_tag=$1',[tag1])).n,0);
+ assert.ok((await context(it)).returns.some(r=>r.id===items[2].request_id&&r.state==='identity_review'));
+ await assert.rejects(db.query("update service_truck_units set status='assigned' where service_tech_id=$1 and equipment_type='Spotter'",[svc]),/waiting for IT/);
+ await db.query("update service_truck_units set unit_tag='OTHER-VERIFIED-UNIT',status='assigned' where service_tech_id=$1 and equipment_type='Spotter'",[svc]);
+ assert.equal((await scalar("select unit_tag from service_truck_units where service_tech_id=$1 and equipment_type='Spotter'",[svc])).unit_tag,'OTHER-VERIFIED-UNIT');
+ await assert.rejects(db.query("insert into unit_registry(unit_key,equipment_type,unit_tag,lifecycle_status) values($1,'Spotter',$2,'shop_inventory')",['wrong:'+tag1,tag1]),/waiting for IT/);
+});
+test('unlinked submissions cannot invent arbitrary truck equipment or impersonate another Service technician',async()=>{
+ const unknown={request_id:randomUUID(),returned_key:null,unlinked_family:'Sniper',unlinked_tag:'invented',notes:'',photos:[]};
+ await assert.rejects(batch([unknown]),/assigned to your truck/);
+ await assert.rejects(batch([unknown],it),/Only the signed-in/);
 });

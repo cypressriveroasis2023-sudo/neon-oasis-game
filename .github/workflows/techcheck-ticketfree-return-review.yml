@@ -1,12 +1,12 @@
 name: TechCheck ticket-free truck return review
 on:
   push:
-    branches: ['feature/cos-ticketfree-truck-return-20261019']
+    branches: ['feature/cos-ticketfree-truck-return-20261019', 'fix/cos-return-multiselect-20261020']
   pull_request:
     paths:
       - 'tech-checks/ticketfree-returns/**'
       - 'tech-checks/service-basics-host.js'
-      - 'tech-checks/database-maintenance/techcheck-ticketfree-returns-v1.sql'
+      - 'tech-checks/database-maintenance/techcheck-ticketfree-*.sql'
       - 'tech-checks/operations/tests/ticketfree-return*'
       - 'tech-checks/operations/tests/playwright.ticketfree.config.mjs'
       - 'tech-checks/operations/tests/service-basics.browser.spec.mjs'
@@ -38,8 +38,8 @@ jobs:
       - name: Preserve Operations types and build
         run: npm run typecheck && npm run build
         working-directory: tech-checks/operations
-      - name: Install isolated Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and iPhone WebKit
+        run: npx playwright install --with-deps chromium webkit
         working-directory: tech-checks/operations
       - name: Service, IT receipt and named-handoff phone regressions
         run: npx playwright test --config tests/playwright.ticketfree.config.mjs

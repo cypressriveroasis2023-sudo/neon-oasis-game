@@ -8,3 +8,23 @@ test('context is bound to the actual account, not a cached persona',async()=>{co
 test('retry sends the same immutable request rather than manufacturing a second return',async()=>{const {state,client}=fixture();const args={p_request_id:crypto.randomUUID(),p_returned_key:'sniper:017',p_photos:[]};state.lost=true;await assert.rejects(client.submit('submit',args,[]),/lost/);await client.submit('submit',args,[]);assert.deepEqual(state.calls[0].args,state.calls[1].args);});
 test('invalid or ambiguous save receipts do not become success',async()=>{const {client}=fixture();await assert.rejects(client.submit('receive',{p_request_id:crypto.randomUUID(),p_return_id:crypto.randomUUID(),p_photos:[]},[]),/not verified/);});
 test('Ready requires physical receipt and six explicit passing answers',()=>{const ready={received:true,disposition:'ready',checks:Object.fromEntries(INTAKE_CHECKS.map(([k])=>[k,true])),notes:''};assert.doesNotThrow(()=>assertIntake(ready));assert.throws(()=>assertIntake({...ready,received:false}),/physically/);assert.throws(()=>assertIntake({...ready,checks:{}}),/six/);assert.throws(()=>assertIntake({...ready,checks:{...ready.checks,batteries_ok:false}}),/repair/);assert.throws(()=>assertIntake({...ready,disposition:'repair'}),/Describe/);assert.equal(stateLabel('waiting_it'),'Waiting for IT');});
+
+import {batchDraft,cataloguePage,selectItem,prepareBatch} from '../../ticketfree-returns/batch-model.js';
+test('catalogue searches every family beyond the original 100-row cutoff and pages the entire collection',()=>{
+ const catalogue=[...Array.from({length:140},(_,n)=>({family:'Recon',name:'Recon '+n,equipment_key:'recon:'+n})),{family:'Sniper',name:'Sniper 176',equipment_key:'sniper:176'},{family:'Spotter',name:'Spotter 257HDC2',equipment_key:'spotter:257HDC2'}];
+ assert.equal(cataloguePage(catalogue,'Sniper 176').items[0].equipment_key,'sniper:176');
+ assert.equal(cataloguePage(catalogue,'257hdc2').count,1);assert.equal(cataloguePage(catalogue,'','Spotter').count,1);
+ const seen=[];for(let n=0;n<6;n++)seen.push(...cataloguePage(catalogue,'','',n).items);assert.equal(seen.length,142);
+});
+test('an interrupted legacy single return keeps its original request and photo identities after upgrade',()=>{
+ const request={p_request_id:'same-id',p_returned_key:'sniper:176',p_used_key:null,p_notes:'original',p_photos:['original-photo']};
+ const next=batchDraft({request,photos:[],notes:'original'},[]);assert.equal(next.items[0].id,'same-id');assert.equal(next.request.p_items[0].request_id,'same-id');assert.deepEqual(next.request.p_items[0].photos,['original-photo']);
+});
+test('multi-select preserves all truck entries, including unmatched identities, and prevents return/install overlap',async()=>{
+ const draft=batchDraft({photos:[],notes:''});for(const family of ['Sniper','Spotter','Ranger','Solar Spotter'])selectItem(draft,{family,unit_tag:'001'},'truck');assert.equal(draft.items.length,4);
+ const client={assert(){},paths:async()=>[]};const args=await prepareBatch(draft,client);assert.equal(args.p_items.length,4);assert.ok(args.p_items.every(i=>i.returned_key===null));
+ draft.items[0].equipment_key='sniper:001';draft.items[1].usedKey='sniper:001';await assert.rejects(prepareBatch(draft,client),/same time/);
+});
+test('unmatched intake is receipt only, never a route into available inventory',()=>{
+ const args={needsReview:true,received:true,disposition:'review',checks:Object.fromEntries(INTAKE_CHECKS.map(([k])=>[k,true]))};assert.doesNotThrow(()=>assertIntake(args));assert.throws(()=>assertIntake({...args,disposition:'ready'}),/cannot be marked Ready/);
+});
