@@ -23,7 +23,8 @@ function cells(snapshot:Row,tab:Row,expected:number[],grid:Row):Row[][]{
     ||(g.startRow??0)!==0||arrays.has(g.startColumn??0)
     ||!Array.isArray(g.rowData)||g.rowData.length>tab.gridProperties.rowCount)
    throw Error('Tracker column range changed');
-  arrays.set(g.startColumn,g.rowData.map((r:Row)=>{
+  // Google omits zero-valued offsets; store under the same normalized key checked above.
+  arrays.set(g.startColumn??0,g.rowData.map((r:Row)=>{
    if(!object(r)||r.values!==undefined&&(!Array.isArray(r.values)||r.values.length>1))
     throw Error('Malformed Google cell range');
    const c=r.values?.[0];
