@@ -72,3 +72,15 @@ for(const it of [false,true])test(`simple card retains real evidence and labeled
  await expect(card.locator('.cos-fleet-troubleshooting')).toHaveAttribute('open','');
  expect(state.errors).toEqual([]);
 });
+
+for(const it of [false,true])test(`circle center marks the recorded location for ${it?'IT':'Owner'}`,async({page})=>{
+ const {app}=await mountFleet(page,it);
+ await expect(app.locator('.cos-fleet-map-panel')).toHaveAttribute('aria-busy','false');
+ await app.getByRole('button',{name:'Fit pins',exact:true}).click();
+ const pin=app.locator('.cos-dashboard-marker[data-display-offset="false"] .cos-status-pin-art');
+ await expect(pin).toHaveCount(1);
+ await expect.poll(async()=>{
+  const canvas=await app.locator('.cos-fleet-map-canvas').boundingBox(),circle=await pin.boundingBox();
+  return Math.max(Math.abs(circle.x+circle.width/2-canvas.x-canvas.width/2),Math.abs(circle.y+circle.height/2-canvas.y-canvas.height/2));
+ }).toBeLessThanOrEqual(2);
+});
