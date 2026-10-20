@@ -46,7 +46,7 @@ return createPlacementSyncHandler({authenticate:async req=>{
  const secret=req.headers.get('x-camera-cron-secret');if(!secret||secret.length>1024||/\s/.test(secret))return false;
  const v=await json(await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':secret},body:'{"action":"authenticate"}',redirect:'error',signal:AbortSignal.timeout(10000)}),128);
  return v?.authenticated===true&&Object.keys(v).length===1;
-},rpc,equipment:async()=>{
+},rpc,completeSource:()=>rpc('cos_mhelp_placement_from_inventory',{}),equipment:async()=>{
  const result=await partner('/api/mhelpdesk/partner/preview','POST',{});
  if(result.partial||!result.liveAccessVerified||result.verifiedPortalId!==PORTAL||result.items.length!==result.totalRows)throw Error('Incomplete inventory');
  config=await tokens.getPartnerConfig();return result.items;
