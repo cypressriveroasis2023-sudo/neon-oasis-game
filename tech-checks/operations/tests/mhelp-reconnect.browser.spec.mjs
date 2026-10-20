@@ -2,8 +2,8 @@ import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
 const origin=process.env.MHELP_RECONNECT_TEST_ORIGIN||'http://127.0.0.1:4173',root='/api/mhelpdesk/partner/reconnect';
 const ready={contract:'cos-mhelpdesk-reconnect-v1',state:'ready',portalId:'224643',revision:2,renewalVerified:false};
-async function mount(page,{role='owner'}={}){
- const calls=[],state={fail:false,delay:null,saved:false,bad:false,errors:[]};page.on('pageerror',error=>state.errors.push(error.message));
+async function mount(page,{role='owner',openAdvanced=true,inventory=null}={}){
+ const calls=[],state={fail:false,delay:null,saved:false,bad:false,errors:[],inventory,mapFailed:false};page.on('pageerror',error=>state.errors.push(error.message));
  await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  await page.route(origin+'/reconnect-fixture',route=>route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/${role==='it'?'?mode=fleet':''}#unit-tracker"></iframe><script>window.holdTokenReplies=false;window.pendingTokenReply=null;window.tokenValue='synthetic-only';addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST'){const respond=()=>e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${role}',accessToken:window.tokenValue},location.origin);if(window.holdTokenReplies)window.pendingTokenReply=respond;else respond();}})</script>`}));
  await page.route('**/functions/v1/cos-operations-pages',async route=>{
@@ -13,7 +13,7 @@ async function mount(page,{role='owner'}={}){
   const answer=data=>route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
   if(request.path==='/api/session')return answer({authorized:true,legacyOwner:role==='owner',role:role==='owner'?'Owner':'IT',features:{unitTracker:true,fleetAccess:true}});
   if(request.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
-  if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}});
+  if(request.path==='/api/field-map'){if(state.mapFailed)return route.abort('failed');return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},...state.inventory});}
   if(request.path===root+'/status'&&state.statusDelay)await state.statusDelay;
   if(request.path===root+'/status')return answer(request.body.requestId?{...ready,state:state.saved?'committed':'pending',renewalVerified:state.saved,revision:state.saved?3:2,requestId:request.body.requestId}:ready);
   if(request.path===root){
@@ -27,6 +27,7 @@ async function mount(page,{role='owner'}={}){
  await page.goto(origin+'/reconnect-fixture');
  const frame=page.frameLocator('iframe'),form=frame.getByRole('region',{name:'Secure mHelpDesk reconnect'});
  await expect(frame.getByRole('region',{name:role==='it'?'COS Fleet Dashboard':'Unit Tracker workspace',exact:true})).toBeVisible();
+ if(role==='owner'&&openAdvanced)await frame.getByText('Advanced / IT tools',{exact:true}).click();
  return {frame,form,calls,state};
 }
 async function openAndFill(form){
@@ -108,3 +109,17 @@ for(const interruption of ['replacement session','Close','parent hide','unmount'
  await page.waitForTimeout(100);expect(calls.filter(x=>x.path===root)).toHaveLength(0);await expect(frame.getByLabel('Fresh access token')).toHaveCount(0);
  const snapshot=await frame.locator('body').evaluate(()=>({local:{...localStorage},session:{...sessionStorage},url:location.href}));expect(JSON.stringify(snapshot)).not.toContain('synthetic-fresh');
 });
+
+ test('normal status reads saved COS data; tools stay closed and failed rereads retain totals',async({page})=>{
+ const inventory={uploadInventory:{contract:'COS_MHELP_UPLOAD_INVENTORY_V1',source:'mhelpdesk_api',lastApiReadAt:new Date().toISOString(),summary:{totalRecords:1001,fieldRecords:287,shopRecords:714}},mhelpPlacementSync:{errorCode:null,nextReadAt:null}};
+ const {frame,state,calls}=await mount(page,{openAdvanced:false,inventory});
+ const panel=frame.getByRole('region',{name:'Automatic inventory status'});
+ await expect(panel.getByRole('status')).toHaveText('Up to date');await expect(panel).toContainText('287');await expect(panel).toContainText('714');
+ await expect(frame.getByRole('button',{name:'Check mHelpDesk connection'})).not.toBeVisible();
+ expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);
+ state.mapFailed=true;await frame.getByRole('button',{name:'Refresh tracker',exact:true}).click();
+ await expect(panel.getByRole('status')).toHaveText('Not yet verified');await expect(panel).toContainText('287');await expect(panel).toContainText('714');await expect(panel).toContainText('Last saved information remains');
+ expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);
+ await frame.getByText('Advanced / IT tools',{exact:true}).click();await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toBeVisible();
+ expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
+ });
