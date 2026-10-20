@@ -85,9 +85,9 @@ test('circle colors, clustering, fullscreen and unit selection retain their beha
   await expect(app.locator('.cos-dashboard-marker')).toHaveCount(4);
   for(const [status,color] of [['online','rgb(43, 255, 53)'],['offline','rgb(255, 39, 52)'],['unknown','rgb(148, 163, 184)'],['support','rgb(21, 168, 255)']]){
     const marker=app.locator(`.cos-dashboard-marker .cos-field-pin[data-health="${status}"]`);
-    await expect(marker.locator('path')).toHaveCSS('fill',color);
+    await expect(marker.locator('circle')).toHaveCSS('fill',color);
     await expect(marker).toHaveCSS('width','28px');
-    await expect(marker).toHaveCSS('height','36px');
+    await expect(marker).toHaveCSS('height','28px');
     const hit=marker.locator('..');
     await expect(hit).toHaveCSS('width','44px');
     await expect(hit).toHaveCSS('height','56px');
@@ -119,7 +119,7 @@ test('unit detail is readable, retains all evidence and has one scroll surface',
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const dialog=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
   await expect(dialog.getByRole('region',{name:'Unit recorded address'})).toContainText(longAddress);
-  for(const heading of ['Camera health','InHand router','Victron power','Installation evidence','Camera troubleshooting'])await expect(dialog.getByRole('heading',{name:heading,exact:true})).toBeVisible();
+  for(const heading of ['Camera health','Router & connection','Battery · Victron','Installation evidence','Ports & tools'])await expect(dialog.getByRole('heading',{name:heading,exact:true})).toBeVisible();
   await expect(dialog.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');
   await expect(dialog.locator('.cos-fleet-power-metrics')).toContainText('190 W');
   await expect(dialog.locator('.cos-fleet-power-metrics')).toContainText('75 W');
@@ -193,8 +193,8 @@ test.describe('touch iPhone Fleet presentation',()=>{
   await page.screenshot({path:info.outputPath('iphone-'+label.replace(' ','-')+'-fleet.png'),fullPage:true});
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const detail=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
-  for(const title of ['Camera health','InHand router','Camera troubleshooting'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
-  await detail.getByRole('heading',{name:'Camera troubleshooting',exact:true}).scrollIntoViewIfNeeded();
+  for(const title of ['Camera health','Router & connection','Ports & tools'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await detail.getByRole('heading',{name:'Ports & tools',exact:true}).scrollIntoViewIfNeeded();
   await detail.evaluate(el=>el.scrollTop=el.scrollHeight);
   expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
   expect(await detail.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);

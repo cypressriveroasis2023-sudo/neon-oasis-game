@@ -14,7 +14,7 @@ for(const it of [false,true])test(`dense Fleet switches between grouped and indi
  await individual.click();await expect(individual).toHaveAttribute('aria-pressed','true');await expect(individual).toHaveCSS('background-color','rgb(7, 89, 200)');await expect(groups).toHaveCount(0);
  const pins=app.locator('.cos-mhelp-address-marker');await expect(pins).toHaveCount(21);
  expect(await pins.evaluateAll(nodes=>nodes.map(n=>n.dataset.mhelpProductId).sort())).toEqual(groupIds);
- await expect(pins.locator('.cos-unit-pin-drop path')).toHaveCount(21);
+ await expect(pins.locator('.cos-unit-pin-drop circle')).toHaveCount(21);
  expect(await pins.evaluateAll(nodes=>nodes.every(n=>n.dataset.sourcePoint==='[30,-96]'))).toBe(true);
  const boxes=await pins.evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().toJSON()));
  for(let i=0;i<boxes.length;i++){expect(boxes[i].width).toBeGreaterThanOrEqual(44);expect(boxes[i].height).toBeGreaterThanOrEqual(44);for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];expect(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top).toBeTruthy();}}
@@ -41,7 +41,7 @@ for(const dense of [false,true])for(const it of [false,true])test(`${dense?'shar
  const ids=await markers.evaluateAll(nodes=>nodes.flatMap(n=>JSON.parse(n.dataset.mhelpProductIds)).sort());expect(ids).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
  const boxes=await markers.evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().toJSON()));
  for(let i=0;i<boxes.length;i++){expect(boxes[i].width).toBeGreaterThanOrEqual(44);expect(boxes[i].height).toBeGreaterThanOrEqual(44);for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];expect(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top).toBeTruthy();}}
- await expect(markers.locator('.cos-unit-pin-drop path')).toHaveCount(7);
+ await expect(markers.locator('.cos-unit-pin-drop circle')).toHaveCount(7);
  const view=()=>app.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom})),before=await view();
  for(const id of ids){await app.locator(`[data-mhelp-product-id="${id}"]`).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');await expect.poll(view).toEqual(before);}
  expect(state.field).toEqual(original);expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
