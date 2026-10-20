@@ -10,6 +10,7 @@ type Props={
  uploadInventory:unknown;
  fieldHealth:{total:number;items:FieldProduct[]}|null;
  healthReadSucceeded:boolean;
+ inventoryReadSucceeded?:boolean;
  rows:FleetDashboardRow[];
  addressMap:MhelpAddressMapResult|null;
  vrm:unknown;
@@ -41,14 +42,14 @@ function verificationSummary(products:FleetCommandProduct[]):string{
 }
 
 export default function FleetCommandCenter({
- uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
+ uploadInventory,fieldHealth,healthReadSucceeded,inventoryReadSucceeded=healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
  onOpen,onShop,onMap,onImport,onRefresh
 }:Props){
  const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>('all');
  const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState(''),[focus,setFocus]=useState<FocusFilter>('all');
  const data=useMemo(()=>buildFleetCommandCenter(
-   uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt),
-   [uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt]);
+   uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,inventoryReadSucceeded),
+   [uploadInventory,fieldHealth,healthReadSucceeded,inventoryReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt]);
  const entries=useMemo(()=>{
   if(!data)return [];
   const source=family==='victron'?data.panels.find(p=>p.key==='victron')?.products||[]:data.items.filter(p=>family==='all'||p.system===family);

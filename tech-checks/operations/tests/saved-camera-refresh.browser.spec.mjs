@@ -49,17 +49,17 @@ function counts(state){const count=path=>state.calls.filter(call=>call.path===pa
 async function visible(app,value){await app.locator('body').evaluate((_,isVisible)=>{Object.defineProperty(document,'hidden',{configurable:true,value:!isVisible});document.dispatchEvent(new Event('visibilitychange'));},value);}
 function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
 
-test('four-minute saved reads see the next producer result before old evidence expires; other feeds stay fifteen minutes',async({page})=>{
+test('four-minute camera and saved power reads see new evidence; routers remain fifteen minutes',async({page})=>{
  const {app,state}=await mount(page);
- await page.clock.runFor(237000);await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:1,power:1});
+ await page.clock.runFor(237000);await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:1,power:2});
  expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000]);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- await page.clock.runFor(240000);await expect.poll(()=>counts(state)).toEqual({health:3,map:3,routers:1,power:1});
+ await page.clock.runFor(240000);await expect.poll(()=>counts(state)).toEqual({health:3,map:3,routers:1,power:3});
  await page.clock.runFor(60000);await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  // At 22:39, the old 22:18 observation would have expired. The saved 22:33
  // producer result is still recent without changing the 20-minute truth rule.
- await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:1,power:1});
- await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:2});
+ await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:1,power:4});
+ await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:5});
  for(let minute=16;minute<=24;minute++){
   await page.clock.runFor(60000);
   if(minute%4===0)await expect.poll(()=>counts(state).health).toBe(minute/4+1);
@@ -122,7 +122,7 @@ test('a failed saved read waits four minutes to retry and manual reload remains 
  await page.clock.runFor(60000);await expect.poll(()=>counts(state).health).toBe(3);
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
- await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:2});
+ await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:4});
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');assertReadOnly(state);
 });
 
