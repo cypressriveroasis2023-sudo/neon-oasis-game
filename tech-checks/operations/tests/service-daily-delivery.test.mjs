@@ -37,6 +37,13 @@ function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
 test('requires user or authenticated scheduler and rejects unknown origins',async()=>{
  const f=fixture();assert.equal((await f.post({})).status,401);assert.equal((await f.post({'x-techcheck-cron':'bad'})).status,401);assert.equal((await f.post({origin:'https://evil.example'})).status,403);assert.equal(f.calls.some(c=>c.args?.p_action==='claim'),false);
 });
+test('daily archive includes exact signed receipt event and revision as a readable PDF appendix',async()=>{
+ const f=fixture(),event='00000000-0000-4000-8000-000000000111';
+ const snapshot={transfer_id:'handoff-id',state:'accepted',revision:2,it_name:'Synthetic IT',service_name:'Synthetic Service',actual:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:['00123456789012345670'],battery_count:2,parts:[]}],expected:[],differences:[],checks:{},signature:{method:'typed',name:'Synthetic Service',signed_at:f.report.submitted_at,statement:'I checked the equipment.'}};
+ f.report.snapshot.transfer_receipts=[{event_id:event,revision:2,signed_at:f.report.submitted_at,snapshot}];
+ assert.equal((await (await f.post()).json()).status,'sent');
+ assert.ok([...f.files.values()].some(v=>v.name==='Equipment receipt '+event+' - revision 2.pdf'));
+});
 test('missing Google configuration persists blocked status and never claims sent',async()=>{
  const f=fixture({configured:false});const r=await f.post();assert.equal((await r.json()).status,'blocked');assert.equal(f.status(),'blocked');assert.equal(f.calls.some(c=>c.url),false);
 });

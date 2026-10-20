@@ -1,0 +1,53 @@
+name: Verify compact Fleet and TV maps
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/src/FleetDashboardMap.tsx'
+      - 'tech-checks/operations/src/TvFleetView.tsx'
+      - 'tech-checks/operations/src/fleetCompactMap.ts'
+      - 'tech-checks/operations/src/fleetAppearance.css'
+      - 'tech-checks/operations/src/tvBoardExtensions.css'
+      - 'tech-checks/operations/tests/fleet-compact-map.test.mjs'
+      - 'tech-checks/operations/tests/mhelp-address-layer.browser.spec.mjs'
+      - 'tech-checks/operations/tests/tech-check-tv.browser.spec.mjs'
+      - '.github/workflows/verify-cos-compact-fleet-tv.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cos-compact-fleet-tv-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused-visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm install --no-audit --no-fund
+      - name: TypeScript validation
+        run: npm run typecheck
+      - name: Production bundle
+        run: npm run build
+      - name: Compact group, grouping and TV population unit tests
+        run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify Fleet, mHelp address filtering and TV board
+        run: npm run test:browser -- tests/fleet-map-groups.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs
+      - name: Browser trace evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compact-fleet-tv-browser-evidence
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore

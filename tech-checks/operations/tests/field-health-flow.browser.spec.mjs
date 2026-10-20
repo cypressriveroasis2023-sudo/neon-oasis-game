@@ -53,8 +53,9 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
 }
 
 async function closeUnit(frame){const button=frame.getByRole('button',{name:'Close unit details'});if(await button.isVisible())await button.click();}
-async function expandGroup(frame,count){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();const group=frame.locator('.cos-field-cluster-wrap').filter({hasText:String(count)}).first();await expect(group).toHaveAttribute('aria-expanded','false');await group.click();await expect(frame.locator('.cos-field-pin')).toHaveCount(count);}
-async function readablePins(frame){return frame.locator('.cos-fleet-map-canvas').evaluate(canvas=>{const bounds=canvas.getBoundingClientRect(),pins=[...canvas.querySelectorAll('.cos-field-pin')];const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.width===38&&box.height===38&&box.left>=bounds.left&&box.right<=bounds.right&&box.top>=bounds.top&&label.bottom<=bounds.bottom&&pins.every((other,j)=>i===j||!overlaps(label,other.getBoundingClientRect())&&!overlaps(label,other.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});}
+async function expandGroup(frame,count){await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(count);}
+
+async function readablePins(frame){return frame.locator('.cos-fleet-map-canvas').evaluate(canvas=>{const bounds=canvas.getBoundingClientRect(),pins=[...canvas.querySelectorAll('.cos-field-pin')];const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const box=pin.getBoundingClientRect(),hit=pin.closest('.cos-field-pin-wrap').getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.width===28&&box.height===36&&hit.width===44&&hit.height===56&&hit.left>=bounds.left&&hit.right<=bounds.right&&hit.top>=bounds.top&&hit.bottom<=bounds.bottom&&box.left>=bounds.left&&box.right<=bounds.right&&box.top>=bounds.top&&label.bottom<=bounds.bottom&&pins.every((other,j)=>i===j||!overlaps(label,other.getBoundingClientRect())&&!overlaps(label,other.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});}
 
 test('provider colors, nearby center and unit health ticket draft stay on the selected identity',async({page},testInfo)=>{
  const {frame,state}=await mount(page);
@@ -208,12 +209,12 @@ test('native card quick actions expose safe endpoints, exact field identity and 
 });
 
 test('compact clusters expose every colocated unit and support equipment has no false camera outage',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true});await expect(frame.locator('.cos-field-cluster>b')).toHaveText('3');await expandGroup(frame,3);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Stand 72 044');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');await closeUnit(frame);await frame.getByLabel('Fleet status').selectOption('support');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-fleet-unit-list')).not.toBeVisible();await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,{crowded:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await expandGroup(frame,3);await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Stand 72 044');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');await closeUnit(frame);await frame.getByLabel('Fleet status').selectOption('support');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-fleet-unit-list')).not.toBeVisible();await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.writes).toHaveLength(0);
 });
 
 
 test('plain status circles expand colocated cameras and blue solar stands',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true});await expect(frame.locator('.cos-field-cluster')).toHaveAttribute('data-health','mixed');await expandGroup(frame,3);await expect(frame.locator('.cos-map-status-dot')).toHaveCount(3);await expect(frame.locator('.cos-reticle-approved-eye,.cos-reticle-solar-panel')).toHaveCount(0);await expect(frame.locator('.cos-pin-unit-number')).toHaveText(['51','52','044']);for(const [status,color] of [['online','rgb(43, 255, 53)'],['offline','rgb(255, 39, 52)'],['support','rgb(21, 168, 255)']])await expect(frame.locator('.cos-field-pin[data-health="'+status+'"] .cos-reticle-artwork')).toHaveCSS('color',color);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('plain-status-circles-expanded.png')});await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,{crowded:true});await expect(frame.locator('.cos-field-cluster')).toHaveCount(0);await expandGroup(frame,3);await expect(frame.locator('.cos-map-status-dot')).toHaveCount(3);await expect(frame.locator('.cos-reticle-approved-eye,.cos-reticle-solar-panel')).toHaveCount(0);await expect(frame.locator('.cos-pin-unit-number')).toHaveText(['51','52','044']);for(const [status,color] of [['online','rgb(43, 255, 53)'],['offline','rgb(255, 39, 52)'],['support','rgb(21, 168, 255)']])await expect(frame.locator('.cos-field-pin[data-health="'+status+'"] .cos-reticle-artwork')).toHaveCSS('color',color);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('plain-status-circles-expanded.png')});await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);expect(state.writes).toHaveLength(0);
 });
 
 
@@ -230,7 +231,7 @@ test('larger shared sites keep all nine unit markers and the stand selectable',a
 
 
 test('closing a shared-site popup restores its auto-pan but preserves a subsequent user pan',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true});await expandGroup(frame,3);await page.clock.runFor(600);const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);const before=await center();await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.cos-field-pin')).toHaveCount(0);expect(await center()).toEqual(before);const box=await frame.locator('.cos-fleet-map-canvas').boundingBox();await page.mouse.move(box.x+box.width-10,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width-55,box.y+box.height/2+25,{steps:8});await page.mouse.up();await page.clock.runFor(600);const panned=await center();expect(panned).not.toEqual(before);await expandGroup(frame,3);expect(await center()).toEqual(panned);expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,{crowded:true});await expandGroup(frame,3);await page.clock.runFor(600);const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);const before=await center();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(3);expect(await center()).toEqual(before);const box=await frame.locator('.cos-fleet-map-canvas').boundingBox();await page.mouse.move(box.x+box.width-10,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width-55,box.y+box.height/2+25,{steps:8});await page.mouse.up();await page.clock.runFor(600);const panned=await center();expect(panned).not.toEqual(before);await expandGroup(frame,3);expect(await center()).toEqual(panned);expect(state.writes).toHaveLength(0);
 });
 
 
@@ -240,12 +241,12 @@ test('filtering away an open cluster discards its old popup-pan snapshot',async(
 
 
 test('zoom alone exposes twelve same-site statuses and blue support without opening a group',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true});await expect(frame.locator('.cos-field-cluster>b')).toHaveText('12');await frame.locator('.leaflet-control-zoom-out').click();await expect(frame.locator('.cos-field-cluster>b')).toHaveText('12');await expandGroup(frame,12);expect(await frame.locator('.cos-field-pin-wrap').evaluateAll(nodes=>nodes.map(node=>node.dataset.unitId).sort())).toEqual(state.units.map(unit=>unit.id).sort());await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(9);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('twelve-unit-expanded-map.png')});expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await frame.locator('.leaflet-control-zoom-out').click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expandGroup(frame,12);expect(await frame.locator('.cos-field-pin-wrap').evaluateAll(nodes=>nodes.map(node=>node.dataset.unitId).sort())).toEqual(state.units.map(unit=>unit.id).sort());await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(9);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('twelve-unit-expanded-map.png')});expect(state.writes).toHaveLength(0);
 });
 
 
 test('automatically separated adjacent sites do not cover each other',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true,nearbyCrowd:true});await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(2);await expandGroup(frame,12);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('adjacent-sites-expanded-map.png')});await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true,nearbyCrowd:true});await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-field-cluster-wrap')).toHaveCount(0);await expandGroup(frame,15);await expect.poll(()=>readablePins(frame)).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('adjacent-sites-expanded-map.png')});await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();expect(state.writes).toHaveLength(0);
 });
 
 
@@ -265,12 +266,12 @@ test('cluster reflow and odd-sized canvas resizes retain exact user center and z
  const canvas=frame.locator('.cos-fleet-map-canvas');
  const cluster=frame.locator('.cos-field-cluster-wrap');
  const view=()=>frame.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));
- await expect(cluster).toHaveAttribute('aria-expanded','false');
+ await expect(cluster).toHaveCount(0);
  const initial=await view();
  for(let cycle=0;cycle<3;cycle++){
   await expandGroup(frame,3);await page.clock.runFor(600);
   expect(await view()).toEqual(initial);
-  await cluster.click();await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await page.clock.runFor(600);
+  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await page.clock.runFor(600);
   expect(await view()).toEqual(initial);
  }
  const box=await canvas.boundingBox();
@@ -283,11 +284,11 @@ test('cluster reflow and odd-sized canvas resizes retain exact user center and z
   await canvas.evaluate((element,{width,height})=>{element.style.flex='none';element.style.width=width+'px';element.style.height=height+'px';},{width,height});
   await expect.poll(()=>canvas.evaluate(element=>({width:element.clientWidth,height:element.clientHeight}))).toEqual({width,height});
   await page.clock.runFor(600);expect(await view()).toEqual(panned);
-  await expect(cluster).toHaveAttribute('aria-expanded','true');await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
+  await expect(cluster).toHaveCount(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  }
  await frame.getByRole('button',{name:'Fit pins',exact:true}).click();await page.clock.runFor(600);
  const fitted=await view();expect(fitted.center).not.toEqual(panned.center);
- await expect(cluster).toHaveAttribute('aria-expanded','false');
+ await expect(cluster).toHaveCount(0);
  await canvas.evaluate(element=>{element.style.removeProperty('flex');element.style.removeProperty('width');element.style.removeProperty('height');});
  await page.clock.runFor(600);expect(await view()).toEqual(fitted);
  expect(state.writes).toHaveLength(0);

@@ -11,9 +11,11 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  const marker=id=>app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["${id}"]']`);
  for(const [id,status,color] of [['1001','online','rgb(43, 255, 53)'],['1002','offline','rgb(255, 39, 52)'],['1003','unknown','rgb(148, 163, 184)'],['1004','support','rgb(21, 168, 255)'],['1005','unknown','rgb(148, 163, 184)'],['1006','unknown','rgb(148, 163, 184)'],['1007','unknown','rgb(148, 163, 184)']]){
   await expect(marker(id)).toHaveAttribute('data-health',status);
-  await expect(marker(id).locator('path')).toHaveCSS('fill',color);
+  await expect(marker(id).locator('.cos-unit-pin-drop path')).toHaveCSS('fill',color);
  }
- await expect(marker('1001').locator('.cos-address-review-flag')).toHaveText('!');
+ await expect(app.locator('.cos-address-review-flag')).toHaveCount(0);
+ await expect(marker('1001').locator('.cos-unit-pin-drop')).toHaveCSS('width','28px');
+ await expect(marker('1001').locator('.cos-unit-pin-drop path')).toHaveAttribute('d',/^M15 1/);
  await expect(app.locator('.cos-dashboard-marker .cos-status-pin-art path')).toHaveCount(0); // Unique Product-ID address replaces its duplicate map reference.
  const canvas=await app.locator('.cos-fleet-map-canvas').boundingBox(),pin=await marker('1001').boundingBox();
  const from={x:canvas.x+canvas.width*.7,y:canvas.y+canvas.height*.5};
@@ -25,18 +27,29 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  state.field.mhelpAddressMap.items[1].latitude=state.field.mhelpAddressMap.items[0].latitude;
  state.field.mhelpAddressMap.items[1].longitude=state.field.mhelpAddressMap.items[0].longitude;
  await app.getByRole('button',{name:/Refresh data/}).click();
- const group=app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["1001","1002"]']`);
- await expect(group).toHaveAttribute('data-health','mixed');
- await expect(group).toHaveAttribute('aria-label',/1 online, 1 offline/);
- await expect(group.locator('.cos-address-status-dots i')).toHaveCount(2);
- await group.click({force:true});
- await expect(app.getByRole('dialog')).toBeVisible();
- await expect(app.getByRole('dialog').getByRole('button')).toHaveCount(3);
- await page.keyboard.press('Escape');
+ await expect(marker('1001')).toHaveAttribute('data-health','online');await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ await expect(app.locator('.cos-status-group-ring,.cos-map-group')).toHaveCount(0);
+ for(const id of ['1001','1002']){await marker(id).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
  state.fail=true;
  await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(app.getByRole('alert')).toBeVisible();
  await expect(app.locator('.cos-mhelp-address-marker[data-health="online"]')).toHaveCount(0);
  expect(state.calls.every(r=>r.method==='GET')).toBeTruthy();
+ expect(state.errors).toEqual([]);
+});
+
+
+test('Offline Fleet filter hides unrelated saved address pins without dropping the red unit',async({page})=>{
+ const {app,state}=await mountFleet(page,false,{field:statusPinsFixture().field});
+ await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(7);
+ await app.getByLabel('Fleet status').selectOption('offline');
+ const markers=app.locator('.cos-mhelp-address-marker');
+ await expect(markers).toHaveCount(1);
+ await expect(markers.first()).toHaveAttribute('data-mhelp-product-id','1002');
+ await expect(markers.first()).toHaveAttribute('data-health','offline');
+ await expect(app.locator('.cos-compact-group-marker')).toHaveCount(0);
+ await app.getByLabel('Fleet status').selectOption('all');
+ await expect(markers).toHaveCount(7);
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);
 });

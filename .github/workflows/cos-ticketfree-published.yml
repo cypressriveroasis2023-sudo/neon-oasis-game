@@ -1,0 +1,51 @@
+name: Verify published ticket-free COS returns
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tech-checks/ticketfree-returns/**'
+      - 'tech-checks/service-basics-host.js'
+      - '.github/workflows/cos-ticketfree-published.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify public assets match this exact release
+        env:
+          COS_RELEASE: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const root='https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/';
+          const paths=['tech-checks/service-basics-host.js',...['host.js','model.js','client.js','style.css'].map(p=>'tech-checks/ticketfree-returns/'+p)];
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const expected=Object.fromEntries(paths.map(p=>[p,hash(readFileSync(p))]));
+          let last='';
+          for(let attempt=0;attempt<20;attempt++){
+            try{
+              const suffix='?cos-release='+process.env.COS_RELEASE+'&attempt='+attempt;
+              const index=await fetch(root+'tech-checks/'+suffix,{cache:'no-store',signal:AbortSignal.timeout(20000)});
+              if(!index.ok||!(await index.text()).includes('service-basics-host.js'))throw new Error('COS entrypoint has not published the expected loader.');
+              const actual={};
+              for(const p of paths){const r=await fetch(root+p+suffix,{cache:'no-store',signal:AbortSignal.timeout(20000)});if(!r.ok)throw new Error(p+': HTTP '+r.status);actual[p]=hash(Buffer.from(await r.arrayBuffer()));if(actual[p]!==expected[p])throw new Error(p+': live content does not yet match the release');}
+              const proof={release:process.env.COS_RELEASE,verified_at:new Date().toISOString(),files:actual,source:'Existing COS GitHub Pages production site'};
+              writeFileSync('ticketfree-live-proof.json',JSON.stringify(proof,null,2));console.log(JSON.stringify(proof,null,2));process.exit(0);
+            }catch(e){last=e.message;console.log('Publication check '+(attempt+1)+': '+last);}
+            await new Promise(r=>setTimeout(r,15000));
+          }
+          throw new Error('Live publication not verified: '+last);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ticketfree-live-proof
+          path: ticketfree-live-proof.json
+          retention-days: 14

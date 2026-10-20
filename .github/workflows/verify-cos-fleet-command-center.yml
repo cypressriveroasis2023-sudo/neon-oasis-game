@@ -1,0 +1,55 @@
+name: Verify COS Fleet Command Center
+on:
+  push:
+    branches:
+      - feature/cos-fleet-command-center-20261019
+  pull_request:
+    paths:
+      - 'tech-checks/operations/src/FleetCommandCenter.tsx'
+      - 'tech-checks/operations/src/fleetCommandCenterModel.ts'
+      - 'tech-checks/operations/src/fleetCommandCenter.css'
+      - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/tests/fleet-command-center.*'
+      - '.github/workflows/verify-cos-fleet-command-center.yml'
+permissions:
+  contents: read
+jobs:
+  verify-command-center:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install pinned dependencies
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript gate
+        run: npm run typecheck
+      - name: Reconciled Fleet source and health model gates
+        run: |
+          node --import tsx --test --test-concurrency=1 \
+            tests/fleet-command-center.test.mjs \
+            tests/mhelp-provider-fleet.test.mjs \
+            tests/mhelp-field-health.test.mjs \
+            tests/fleet-dashboard.test.mjs
+      - name: Production application build
+        run: npm run build
+      - name: Install Chromium browser
+        run: npx playwright install --with-deps chromium
+      - name: Existing Fleet and new command center end-to-end proof
+        run: npm run test:browser -- tests/fleet-command-center.browser.spec.mjs tests/fleet-dashboard.browser.spec.mjs
+      - name: Preserve diagnostic traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-fleet-command-center-browser-evidence
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore

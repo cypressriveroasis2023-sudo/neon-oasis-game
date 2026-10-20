@@ -16,20 +16,30 @@ function addressFixture(){
 for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared addresses, solar stands and unresolved records work independently of native GPS`,async({page},info)=>{
  const {app,state}=await mountFleet(page,it,{field:addressFixture()});
  const coverage=app.locator('.cos-mhelp-address-coverage');await coverage.locator(':scope>summary').click();await expect(coverage).toContainText('Field locations · 161 of 287 equipment located · 126 need an address pin');
- const marker=app.locator('.cos-mhelp-address-marker');await expect(marker).toHaveCount(1);
- await expect(marker).toHaveAttribute('data-mhelp-product-ids',JSON.stringify(Array.from({length:161},(_,i)=>String(i+1))));
+ const marker=app.locator('.cos-mhelp-address-marker'),groups=app.locator('.cos-compact-group-marker');
+ await expect(groups).toHaveCount(1);await expect(groups).toHaveAttribute('data-group-count','161');
+ expect(await groups.evaluateAll(nodes=>nodes.flatMap(n=>JSON.parse(n.dataset.mhelpProductIds)).sort((a,b)=>Number(a)-Number(b)))).toEqual(Array.from({length:161},(_,i)=>String(i+1)));
+ await groups.click();
+ await expect(app.locator('.cos-compact-group-popup')).toContainText('161 equipment at nearby locations');
+ await app.locator('.cos-compact-show-all').click();
+ await expect(app.locator('.cos-compact-popup-member')).toHaveCount(161);
+ await expect(app.locator('.cos-compact-group-popup')).toContainText('Solar Stand 72 001');
+ await app.locator('.cos-compact-popup-member[data-mhelp-product-id="1"]').click();
+ await expect(app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(app.locator('.cos-compact-group-sheet')).toHaveCount(0);
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
- await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await app.locator('.leaflet-control-zoom-out').click();await marker.click();await app.getByRole('dialog',{name:'MHelp address group'}).getByRole('button',{name:'Solar Stand 72 001 · Product 1',exact:true}).click();
+ await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await app.getByLabel('Fleet map details',{exact:true}).click();await app.getByLabel('Find mapped equipment').selectOption('1');
  const drawer=app.getByRole('dialog',{name:'Solar Stand 72 001 MHelp customer address'});
  await expect(drawer).toBeVisible();await expect(drawer).toContainText('FIELD · current mHelpDesk source');await expect(drawer).toContainText('Original mHelpDesk address');
  await expect(drawer.locator('input,select,textarea')).toHaveCount(0);await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
- await marker.click();await app.getByRole('dialog',{name:'MHelp address group'}).getByRole('button',{name:'Field equipment 148 · Product 148',exact:true}).click();await expect(app.getByRole('dialog')).toContainText('Approximate address location');await expect(app.getByRole('dialog')).toContainText('77064');await expect(app.getByRole('dialog')).toContainText('77065');await app.getByRole('button',{name:'Close MHelp address details'}).click();
+ await app.getByLabel('Find mapped equipment').selectOption('148');await expect(app.getByRole('dialog')).toContainText('Approximate address location');await expect(app.getByRole('dialog')).toContainText('77064');await expect(app.getByRole('dialog')).toContainText('77065');await app.getByRole('button',{name:'Close MHelp address details'}).click();
  await expect(app.locator('.cos-fleet-stat-verify')).toContainText('MHELP ADDRESS QUEUE');await expect(app.locator('.cos-fleet-stat-verify strong')).toHaveText('126');
  const queue=app.locator('.cos-mhelp-address-followups');await app.locator('.cos-fleet-stat-verify').click();await expect(queue.locator('li')).toHaveCount(126);
  await queue.locator('li').filter({hasText:'Product 287 ·'}).getByRole('button',{name:'Open unit record'}).click();await expect(app.getByRole('dialog')).toContainText('Product 287');await expect(app.getByRole('dialog')).toContainText('invalid address');await app.getByRole('button',{name:'Close MHelp address details'}).click();
- await app.getByLabel('Fleet status').selectOption('offline');await expect(marker).toHaveCount(1);
- await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(marker).toHaveCount(0);await expect(queue).toHaveCount(0);
- await app.getByLabel('Fleet placement').selectOption('field');await expect(marker).toHaveCount(1);
+ await app.getByLabel('Fleet status').selectOption('offline');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);
+ await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);await expect(queue).toHaveCount(0);
+ await app.getByLabel('Fleet placement').selectOption('field');await app.getByLabel('Fleet status').selectOption('all');await expect(groups).toHaveCount(1);
  expect(await app.locator('html').evaluate(e=>e.scrollWidth<=e.clientWidth+1)).toBe(true);
  await app.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('mhelp-address-layer.png')});
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
@@ -41,7 +51,7 @@ test('a changed source payload hides only the address overlay and preserves exis
 test('restored viewport survives initial address and native marker validation',async({page})=>{
  await page.addInitScript(()=>history.replaceState({...history.state,cosFieldMapView:{status:'field',health:'all',center:[28,-94],zoom:6}},''));
  const {app,state}=await mountFleet(page,false,{field:addressFixture()});
- await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(1);
+ await expect(app.locator('.cos-compact-group-marker')).toHaveCount(1);
  await expect(app.locator('.cos-fleet-map-toolbar')).toContainText('1 verified');
  const view=await app.locator('body').evaluate(()=>history.state.cosFieldMapView);
  expect(view.center).toEqual([28,-94]);expect(view.zoom).toBe(6);
@@ -54,6 +64,6 @@ test('an accepted replacement file with different counts renders its exact Field
  const {app}=await mountFleet(page,false,{field:value});
  const coverage=app.locator('.cos-mhelp-address-coverage');await expect(coverage).toBeVisible();
  const summary=coverage.locator(':scope>summary');if(await summary.count()){await summary.click();await expect(coverage).toContainText('Field locations · 3 of 3 equipment located · 0 need an address pin');}else await expect(coverage).toContainText('3 mHelpDesk Field Product IDs · 3 units with address coordinates · 0 addresses awaiting coordinates');
- await expect(app.locator('.cos-mhelp-address-marker')).toHaveAttribute('data-mhelp-product-ids','["1","2","3"]');
+ expect(await app.locator('.cos-mhelp-address-marker').evaluateAll(nodes=>nodes.map(n=>n.dataset.mhelpProductId).sort())).toEqual(['1','2','3']);
  await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(0);
 });

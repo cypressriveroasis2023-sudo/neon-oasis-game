@@ -1,0 +1,109 @@
+name: Publish reviewed COS Fleet and TV map bundle
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
+      - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/src/FleetDashboardMap.tsx'
+      - 'tech-checks/operations/src/TvFleetView.tsx'
+      - 'tech-checks/operations/src/fleetCompactMap.ts'
+      - 'tech-checks/operations/src/fleetAppearance.css'
+      - 'tech-checks/operations/src/fleetCompactSheet.css'
+      - 'tech-checks/operations/src/fleetCommandCenter*'
+      - 'tech-checks/operations/src/FleetCommandCenter.tsx'
+  pull_request:
+    paths:
+      - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
+permissions:
+  contents: write
+concurrency:
+  group: cos-fleet-pin-static-publish-20261019
+  cancel-in-progress: false
+jobs:
+  publish-fleet-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install reviewed Operations dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict TypeScript verification
+        run: npm run typecheck
+      - name: Build the current Fleet bundle
+        run: npm run build
+      - name: Install Chromium for focused Fleet verification
+        run: npx playwright install --with-deps chromium
+      - name: Verify individual and grouped map semantics
+        run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs
+      - name: Verify map and TV browser behavior
+        run: npm run test:browser -- tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
+      - name: Prove rebuilt assets contain approved pin design
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'fleetIndividualPinPositions' src/FleetDashboardMap.tsx
+          grep -Fq 'cos-unit-pin-drop' src/fleetStatusPins.ts
+          js=$(grep -oE 'assets/index-[^"]+[.]js' dist/index.html | head -n 1)
+          css=$(grep -oE 'assets/index-[^"]+[.]css' dist/index.html | head -n 1)
+          test -n "$js"
+          test -n "$css"
+          grep -Fq 'cos-unit-pin-drop' "dist/$js"
+          grep -Fq 'cos-fleet-individual-pins' "dist/$css"
+          grep -Fq 'cos-compact-group' src/fleetAppearance.css
+          grep -Fq 'cos-compact-group' "dist/$css"
+          mkdir -p "$RUNNER_TEMP/cos-reviewed-fleet-dist"
+          rsync -a dist/ "$RUNNER_TEMP/cos-reviewed-fleet-dist/"
+          echo "Reviewed compiled Fleet pin bundle: $js and $css"
+      - name: Safely publish reviewed assets on current main
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          tested="$GITHUB_SHA"
+          bundle="$RUNNER_TEMP/cos-reviewed-fleet-dist"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Preserve all newer changes and refuse outdated frontend builds.
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git merge-base --is-ancestor "$tested" origin/main || { echo 'Main no longer descends from the verified build'; exit 1; }
+            if ! git diff --quiet "$tested" origin/main -- \
+              tech-checks/operations \
+              ':(exclude)tech-checks/operations/dist' \
+              ':(exclude)tech-checks/operations/tests' \
+              ':(exclude)tech-checks/operations/db' \
+              ':(exclude)tech-checks/operations/scripts'; then
+              echo 'Frontend sources advanced during verification; refusing to publish an obsolete bundle.'
+              exit 1
+            fi
+            git reset --hard
+            git clean -fdx -- tech-checks/operations/dist
+            git switch -C cos-reviewed-fleet-static origin/main
+            mkdir -p tech-checks/operations/dist
+            rsync -a --delete "$bundle/" tech-checks/operations/dist/
+            git add -f -A -- tech-checks/operations/dist
+            if git diff --cached --quiet; then
+              echo 'Reviewed Fleet static assets already match current main.'
+              exit 0
+            fi
+            git commit -m 'Publish verified COS Fleet individual pin bundle'
+            if git push origin HEAD:main; then
+              echo 'Published reviewed Fleet assets without changing later source commits.'
+              exit 0
+            fi
+            echo "Main advanced during publish attempt $attempt; checking source again."
+          done
+          echo 'Concurrent main changes prevented a guarded static publish.'
+          exit 1

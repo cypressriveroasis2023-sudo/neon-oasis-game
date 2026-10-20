@@ -9,6 +9,13 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
+ create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('role',current_setting('test.jwt_role',true))$$;
+ create table prep_tickets(id uuid primary key,status text,is_test boolean default false);
+ create table prep_items(id uuid primary key,prep_ticket_id uuid,equipment_type text,unit_tag text);
+ create table service_truck_units(service_tech_id uuid,equipment_type text,unit_tag text,status text);
+ create table unit_returns(id uuid,equipment_type text,unit_tag text,status text,service_tech_id uuid);
+ create table unit_registry(equipment_type text,unit_tag text,lifecycle_status text,current_holder_id uuid);
+ create table app_private.service_daily_reports(id uuid,service_tech_id uuid,check_date date,submitted_at timestamptz default now(),snapshot jsonb);
  create table profiles(user_id uuid primary key,role text,active boolean,archived_at timestamptz,full_name text,username text);
  create table equipment_master(equipment_key text primary key,unit_tag text,source_family text,canonical_family text,workflow_type text,source_label text,tracker_state text,updated_at timestamptz default now());
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -20,6 +27,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  `);
  await db.exec(await readFile(root+'database-maintenance/techcheck-named-handoffs-v1.sql','utf8'));
  await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-rollout-v2.sql','utf8'));
+ await db.exec(await readFile(root+'database-maintenance/techcheck-transfer-integration-v3.sql','utf8'));
  await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
  // Serialize fixture connections exactly; roles cannot bleed between HTTP requests.
  let pending=Promise.resolve();

@@ -69,7 +69,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
       return;
     }
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
-    if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time}});}
+    if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows}});}
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
@@ -219,6 +219,28 @@ test('TV uses the Field Map background and retains pins when optional feeds fail
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Routers: Connection unavailable');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('1 unverified');
  await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/tile\.openstreetmap\.org\//);
+ expect(state.writes).toEqual([]);
+});
+
+test('TV reads the same complete mHelp Field address layer as Fleet, groups dense sites and preserves GPS distinction',async({page})=>{
+ const {state,frame}=await setup(page);
+ state.fleetUnits[0]={...state.fleetUnits[0],latitude:32.77,longitude:-96.79}; // Distinct native site, not a claimed mHelp Product-ID duplicate.
+ const source='a'.repeat(64),payload='b'.repeat(64);
+ const head={sourceSha256:source,payloadSha256:payload,summary:{totalRecords:1001},records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
+ const address={contract:'COS_MHELP_CENSUS_ADDRESS_MAP_V1',sourceSha256:source,payloadSha256:payload,totalProducts:1001,fieldProducts:287,shopProducts:714,verifiedGps:false,liveGps:false,confidence:'mhelpdesk_customer_address_reference_only',
+  items:Array.from({length:287},(_,i)=>({productId:String(i+1),sourceRowSha256:'c'.repeat(64),unitNumber:'Field unit '+String(i+1),customer:'Saved customer',category:'Spotter',placement:'FIELD',lifecycle:'UNFLAGGED',placementHeld:false,sourceAddress:{street:'123 Example Rd',city:'Houston',state:'TX',zip:'77064'},status:'matched',reason:null,matchedAddress:'123 EXAMPLE RD, HOUSTON, TX, 77064',latitude:29.9,longitude:-95.3,geocodedAt:time,geocodeSource:'us_census_address_range',verified:false,liveGps:false,confidence:'mhelpdesk_address_census_range_unverified'}))};
+ state.fieldMapExtras={uploadInventory:head,mhelpAddressMap:address};
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ await page.clock.fastForward(60000);
+ const map=frame.locator('.tv-fleet-map'),groups=map.locator('.cos-compact-group-marker');
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('287 mHelp address pins');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 GPS-verified');
+ await expect(groups).toHaveCount(1);
+ await expect(groups).toHaveAttribute('data-group-count','287'); // All 287 Product IDs remain selectable; the native unit is separately located.
+ await groups.click();
+ await expect(frame.locator('.cos-compact-group-popup')).toContainText('287 equipment at nearby locations');
+ await expect(frame.locator('.cos-compact-show-all')).toBeVisible();
  expect(state.writes).toEqual([]);
 });
 

@@ -8,3 +8,6 @@
 .tc-transfer .tc-evidence img{max-width:100%;max-height:140px;object-fit:contain}.tc-transfer .cos-signature-canvas{background:#fff;display:block;width:100%;height:180px;border-radius:8px;touch-action:none}.tc-transfer [hidden]{display:none!important}
 .tc-transfer button:focus-visible,.tc-transfer input:focus-visible,.tc-transfer select:focus-visible,.tc-transfer textarea:focus-visible{outline:3px solid #fff;outline-offset:3px}.tc-transfer .tc-draft-note{font-size:13px;color:#ccc}.tc-transfer .tc-expected{font-family:monospace;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 @media(max-width:600px){.tc-transfer{padding:16px;border-radius:12px}.tc-transfer .tc-actions{grid-template-columns:1fr}.tc-transfer .tc-actions button{min-height:76px}.tc-transfer fieldset{padding:12px}.tc-transfer h1{font-size:25px}}
+
+.tc-transfer .tc-submit-error{border:1px solid #b57b83;border-left:4px solid #ffb3bd;background:#3b232a;color:#fff;padding:12px 14px;border-radius:8px;font-weight:700;line-height:1.45;margin:16px 0;overflow-wrap:anywhere}
+.tc-transfer [aria-invalid=true]{border-color:#ffb3bd!important;box-shadow:0 0 0 2px #8b4350}

@@ -33,6 +33,7 @@ export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
  // Fixed stock schema has four units, three SIMs and four battery quantities.
  if(y<220)throw new Error('Summary exceeds one-page stock layout.');
  text(`${s.photos} supporting photos saved with the full answers in the same Drive folder.`,40,y,10);
+ if(r.snapshot.transfer_receipts?.length){y-=16;text(`${r.snapshot.transfer_receipts.length} signed equipment receipt(s) linked in full answers; exact event IDs preserved.`,40,y,9);}
  y-=30;text('TECHNICIAN SIGN-OFF',40,y,11,true);y-=20;
  if(s.signature){for(const line of wrap(s.signature.statement,94)){text(line,40,y,10);y-=13;}}
  else {text('No signature captured in this earlier report.',40,y);y-=16;}

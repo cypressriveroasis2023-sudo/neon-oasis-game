@@ -1,5 +1,6 @@
 import {summaryPdf,summaryHtml} from './summary.ts';
 import {DRIVE_FOLDER,RECIPIENT,reportHtml,rawEmail} from './report.ts';
+import {summaryPdf as receiptPdf} from '../techcheck-transfer-delivery/report.ts';
 const ORIGINS=new Set(['https://cypressriveroasis2023-sudo.github.io','https://cos-vision-integration-preview.pages.dev']);
 export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}:any) {
  const call=async(name:string,args:any)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new Error('Daily delivery database operation failed.');return data;};
@@ -82,6 +83,18 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
    }
    const pdf=summaryPdf(report,signature);
    const summaryId=await create('summary_pdf_v1','READ ME - TechCheck '+report.check_date+' - Summary.pdf',folder,'application/pdf',new Blob([pdf as BlobPart],{type:'application/pdf'}));
+   // The concise daily PDF remains one page; each linked signed receipt has
+   // a readable appendix PDF with exact event/revision and equipment details.
+   for(const receipt of report.snapshot.transfer_receipts||[]){
+    let ink:Uint8Array|undefined;
+    if(receipt.snapshot.signature.method==='drawn'){
+     const {data,error}=await admin.storage.from('techcheck-transfer-evidence').download(receipt.snapshot.signature.path);
+     if(error||!data)throw new Error('Saved handoff signature could not be read.');
+     ink=new Uint8Array(await data.arrayBuffer());
+    }
+    const appendix=receiptPdf({id:receipt.event_id,kind:'receipt',submitted_at:receipt.signed_at,snapshot:receipt.snapshot},ink);
+    await create('receipt_'+receipt.event_id,'Equipment receipt '+receipt.event_id+' - revision '+receipt.revision+'.pdf',folder,'application/pdf',new Blob([appendix as BlobPart],{type:'application/pdf'}));
+   }
    const emailHtml=summaryHtml(report,folder,'https://drive.google.com/file/d/'+summaryId+'/view');
    manifest.complete=true;await checkpoint();
    if(report.email_state==='sending'||report.email_state==='review'){
