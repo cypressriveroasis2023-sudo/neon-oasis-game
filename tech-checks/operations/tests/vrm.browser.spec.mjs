@@ -434,13 +434,18 @@ for(const trigger of ['private-event','verified-parent-message'])test(`Native te
  const item=syntheticUnit(3000999,'HELIOS 099');let release,hold=false;
  const {frame,requests}=await mount(page,{onVrmRequest:async()=>{if(hold)await new Promise(resolve=>{release=resolve});return {data:{...fleet([item]),power:[powerFixture(item)]}};}});await openVrm(frame);
  const panel=frame.getByRole('region',{name:'HELIOS 099 read-only power dashboard'});await expect(panel).toBeVisible();
- hold=true;const response=page.waitForResponse(res=>res.url()===edge&&res.request().method()==='POST'&&res.request().postDataJSON()?.path==='/api/vrm-fleet/refresh');await fleetButton(frame).click();await expect.poll(()=>Boolean(release)).toBe(true);
+ // The session fence may cancel an obsolete body before it finishes. Observe
+ // either transport outcome, then prove neither can refill private telemetry.
+ let settled=0;
+ const completed=request=>{if(request.url()===edge&&request.method()==='POST'&&request.postDataJSON()?.path==='/api/vrm-fleet/refresh')settled++;};
+ page.on('requestfinished',completed);page.on('requestfailed',completed);
+ hold=true;await fleetButton(frame).click();await expect.poll(()=>Boolean(release)).toBe(true);
  if(trigger==='private-event')await frame.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
  else await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
  await expect(panel).toHaveCount(0);
  if(trigger==='private-event')await expectOperationsReloadRequired(frame);
  else await expect(frame.getByRole('alert')).toContainText('Your session changed');
- release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ release();await expect.poll(()=>settled).toBe(1);page.off('requestfinished',completed);page.off('requestfailed',completed);await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  // A healthy parent hide clears this workspace locally; untyped auth loss
  // quarantines the entire private subtree and removes its refresh control.
  if(trigger==='private-event')await expect(fleetButton(frame)).toHaveCount(0);
