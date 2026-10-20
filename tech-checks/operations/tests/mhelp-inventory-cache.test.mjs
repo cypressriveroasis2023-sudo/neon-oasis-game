@@ -10,7 +10,7 @@ test('only fixed projected portal/customer/service/category identities enter the
 });
 test('cold workers reuse actual observations, refresh expired or newly assigned resources, and never claim an unconfirmed cache write',async()=>{
  let now=Date.parse('2026-10-20T00:00:00Z'),calls=0,street=parent.address1;const store=new Map();
- const cache=async(action,k,value,observedAt)=>{const entry=store.get(k);if(action==='read')return entry&&now-Date.parse(entry.observedAt)<3*3600000?{hit:true,...entry}:{hit:false};store.set(k,{payload:value,observedAt});return {saved:true};};
+ const cache=async(action,k,value,observedAt)=>{const entry=store.get(k);if(action==='read')return entry&&now-Date.parse(entry.observedAt)<3*3600000?{hit:true,...entry,observedAt:entry.observedAt.replace('Z','+00:00')}:{hit:false};store.set(k,{payload:value,observedAt});return {saved:true};};
  const make=()=>createInventoryCache({cache,now:()=>now,read:async()=>{calls++;return {...parent,address1:street};}});
  const a=make();await Promise.all([a.read(path),a.read(path)]);assert.equal(calls,1);const observed=a.observedAt(path);now+=15*60000;street='Changed service street';const b=make();assert.equal((await b.read(path)).address1,parent.address1);assert.equal(b.observedAt(path),observed);assert.equal(calls,1);
  assert.equal((await b.read(path,true)).address1,street);assert.equal(calls,2);now+=3*3600000;await make().read(path);assert.equal(calls,3);

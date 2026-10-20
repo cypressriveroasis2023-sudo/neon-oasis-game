@@ -1,4 +1,4 @@
--- Three-hour resource observations are separate from fresh equipment reads.
+-- Expire resource reuse 15 minutes before its three-hour proof boundary.
 -- Additive service-only cache; existing Vault, source CAS and roles unchanged.
 begin;
 create table cos_mhelp_placement_private.inventory_resource_cache(
@@ -20,7 +20,7 @@ begin
  owner_id:=substring(p_key from '^224643:/customers/([1-9][0-9]{0,14})');
  if p_action='read' and p_payload is null and p_observed_at is null then
   select * into r from cos_mhelp_placement_private.inventory_resource_cache where cache_key=p_key;
-  if r.cache_key is null or r.observed_at>n+interval '30 seconds' or r.observed_at<=n-interval '3 hours' then return jsonb_build_object('hit',false);end if;
+  if r.cache_key is null or r.observed_at>n+interval '30 seconds' or r.observed_at<=n-interval '165 minutes' then return jsonb_build_object('hit',false);end if;
   return jsonb_build_object('hit',true,'payload',r.payload,'observedAt',r.observed_at);
  elsif p_action='write' and p_payload is not null and octet_length(p_payload::text)<=1048576
   and p_observed_at<=n+interval '5 seconds' and p_observed_at>n-interval '2 minutes' then

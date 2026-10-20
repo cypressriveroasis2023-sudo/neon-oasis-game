@@ -28,7 +28,7 @@ tables contain only days, counts and timing; no credentials or request URLs.
 
 1. Pass exact-version normal CI and real PostgreSQL multi-client pacing/daily-cap
    tests; local PGlite tests are not proof of distinct PostgreSQL sessions.
-2. The candidate now includes persistent three-hour identity-bound resource caching,
+2. The candidate now includes persistent165-minute identity-bound resource caching,
    explicit per-record observation dates, address-only refresh, a two-pass roster
    cost simulation, and stale cached-placement proof guards. Verify these in hosted
    CI and production; do not promote cached addresses to fresh vendor observations.

@@ -32,7 +32,7 @@ export function projectInventoryCache(path:string,value:unknown):unknown{
  if(result.some(r=>!identity(r.serviceLocationId??r.customerId)||(r.serviceLocationId!=null&&identity(r.customerId)!==s.id))||new Set(result.map(r=>identity(r.serviceLocationId??r.customerId))).size!==result.length)throw Error('Invalid cached service membership');
  return {totalRows:value.totalRows,results:result};
 }
-export const MHELP_RESOURCE_CACHE_TTL_MS=3*60*60*1000;
+export const MHELP_RESOURCE_CACHE_TTL_MS=165*60*1000;
 export function createInventoryCache(options:{read:(path:string)=>Promise<unknown>;cache:(action:'read'|'write',key:string,payload?:unknown,observedAt?:string)=>Promise<unknown>;now?:()=>number}){
  const now=options.now||Date.now,times=new Map<string,string>(),pending=new Map<string,Promise<any>>();let hits=0,misses=0;
  const read=async(path:string,refresh=false):Promise<any>=>{
@@ -41,7 +41,7 @@ export function createInventoryCache(options:{read:(path:string)=>Promise<unknow
    if(!refresh){const cached=await options.cache('read',key);if(!object(cached)||typeof cached.hit!=='boolean')throw Error('Inventory cache unavailable');
     if(cached.hit){const stamp=typeof cached.observedAt==='string'?Date.parse(cached.observedAt):NaN;
      if(!Number.isFinite(stamp)||stamp>now()+30000||now()-stamp>=MHELP_RESOURCE_CACHE_TTL_MS)throw Error('Invalid resource observation');
-     const value=projectInventoryCache(path,cached.payload);hits++;times.set(path,cached.observedAt);return value;
+     const value=projectInventoryCache(path,cached.payload);hits++;times.set(path,new Date(stamp).toISOString());return value;
     }
    }
    const observedAt=new Date(now()).toISOString();misses++;

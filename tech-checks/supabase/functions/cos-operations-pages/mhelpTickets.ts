@@ -1,4 +1,4 @@
-import {currentMhelpConfigOrRenew} from './mhelpAccessRetry.ts';
+import {currentMhelpConfigOrRenew,MhelpPortalChangedError} from './mhelpAccessRetry.ts';
 /** Read-only ticket discovery. The caller must authenticate before invoking this reader.
  * Contract sources: https://www.mhelpdesk.com/partner-api/ticket.html,
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
@@ -218,6 +218,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         if(response.status===401 && operation==='account_read' && options.renewAccess && !renewed){
           renewed=true;cancel(response.body);
           try {config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess);} catch(cause) {
+            if(cause instanceof MhelpPortalChangedError)fail('The renewed mHelpDesk account does not match the saved portal.');
             const failure=new MhelpTicketError('mHelpDesk could not renew its existing server token.');
             if(cause instanceof MhelpTokenRenewalError)failure.renewal=projectMhelpTokenRenewalDiagnostic(cause.diagnostic);
             throw failure;
