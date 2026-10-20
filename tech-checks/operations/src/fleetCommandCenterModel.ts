@@ -39,6 +39,20 @@ export type FleetCommandCenterData={
   addressCoverage:{located:number;missing:number}|null;
 };
 
+export type VerificationBlockers={identity:number;provider:number;inactive:number};
+/** Explain why a Product ID is still unverified without treating missing
+ * identity or stale provider data as an outage. This does not grant identity. */
+export function fleetVerificationBlockers(products:ReadonlyArray<Pick<FleetCommandProduct,'status'|'linked'|'lifecycle'>>):VerificationBlockers {
+ const blockers={identity:0,provider:0,inactive:0};
+ for(const product of products){
+  if(product.status!=='unverified')continue;
+  if(product.lifecycle!=='UNFLAGGED'||product.linked?.state==='inactive')blockers.inactive++;
+  else if(!product.linked?.unitId||['review','unlinked'].includes(product.linked.state))blockers.identity++;
+  else blockers.provider++;
+ }
+ return blockers;
+}
+
 /** Reporting only: source Product IDs are never linked to devices by names, IPs, or site text. */
 export function buildFleetCommandCenter(
   upload:unknown,fieldHealth:{total:number;items:FieldProduct[]}|null,
@@ -64,7 +78,7 @@ export function buildFleetCommandCenter(
     return {...p,status,system:group.provider,address,
       site:typeof source.site==='string'?source.site:'',
       mappingIssue:Boolean(validAddresses)&&!points.has(p.productId),
-      lifecycle:typeof source.lifecycle==='string'?source.lifecycle:'UNFLAGGED'};
+      lifecycle:typeof source.uploadLifecycle==='string'?source.uploadLifecycle:'UNFLAGGED'};
   }));
   if(items.length!==authority.field||new Set(items.map(p=>p.productId)).size!==authority.field)
     throw Error('Field inventory violates unique Product-ID accounting.');
@@ -103,8 +117,15 @@ export function buildFleetCommandCenter(
     if(unique&&power)seenInstallations.add(power.installationId);
     const status:FleetCommandStatus=unique&&recent&&!power?.errorCode&&config?.sync.state==='current'?'online':'unverified';
     vrmCounts[status]++;
-    return {...p,status,reason:status==='online'?'Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera.':
-      'No current uniquely linked Victron telemetry. Offline is not inferred.'};
+    const reason=status==='online'?'Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera.':
+      !p.linked?.unitId?'This mHelp Product ID has no currently usable verified COS equipment association for Victron telemetry. Review the Product ID / COS link.':
+      !power?'The verified COS unit has no unique matching Victron installation record. Check the approved installation ID.':
+      !unique?'The Victron installation association is duplicated or cannot be confirmed against the current installation roster.':
+      Boolean(power.errorCode)?'The saved Victron power read contains an error. Recheck the provider connection.':
+      config?.sync.state!=='current'?'The Victron fleet sync is not current. Await a successful refresh before verifying power.':
+      !recent?'The saved Victron measurement is stale or missing. No current power status is inferred.':
+      'Victron power status is not yet verified.';
+    return {...p,status,reason};
   });
   panels.push({
     key:'victron',title:'Victron / Helios',
