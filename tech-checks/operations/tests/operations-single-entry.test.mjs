@@ -27,6 +27,7 @@ async function verify(main,source){
     if(url.includes('/rest/v1/user_profiles?'))return json([{user_id:'3f073784-96e7-43d8-b9e0-33ab31c3c8b1',display_name:'Synthetic Owner',department:'owner',active}]);
     if(url.includes('/rest/v1/user_roles?'))return json([{roles:{code:'owner',organization_id:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'}}]);
     if(url.endsWith('/rpc/appdeploy_field_map_snapshot'))return json(snapshot);
+    if(url.endsWith('/rpc/cos_fleet_shop_snapshot_v1'))return json({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
     if(url.endsWith('/rpc/cos_owner_identity_snapshot'))return json({revision:'a'.repeat(64),claims:[]});
     if(url.endsWith('/rpc/cos_mhelp_placement_snapshot'))return json(receipt);
     if(/\/(?:camera_devices|equipment_units|vision_vigilant_unit_matches|vision_vigilant_devices)\?/.test(url))return json([]);

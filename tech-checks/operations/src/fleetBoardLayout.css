@@ -145,3 +145,14 @@
 #root#root .cos-camera-port-result.responded{border-color:#3aca85;color:#90efbc}
 #root#root .cos-camera-connection [role=alert]{border-left:3px solid #ff5569;padding:10px;background:#301d2b;color:#ffd7df}
 #root#root .cos-camera-connection button.cos-card-pill{background:#a30928!important;border-color:#f23754!important;color:#fff!important;min-height:48px!important;font-size:15px!important;padding:10px 18px!important}
+#root#root .cos-shop-action{padding:14px;margin:12px 0;border:1px solid #45617d;border-radius:12px;background:#101e2e}
+#root#root .cos-shop-action-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+#root#root .cos-shop-action h3{display:flex;align-items:center;gap:8px;margin:0;font-size:18px}
+#root#root .cos-shop-action-title>b{padding:6px 12px;border:1px solid #647e98;border-radius:999px;font-size:12px;text-transform:uppercase}
+#root#root .cos-shop-action button{min-height:44px!important;padding:10px 16px!important;border-radius:999px!important;font-size:14px!important}
+#root#root .cos-shop-action button.cos-card-pill{background:#a30928!important;border:1px solid #f23754!important;color:#fff!important}
+#root#root .cos-shop-action button:disabled{opacity:.5}
+#root#root .cos-shop-action p{font-size:13px;line-height:1.6}
+#root#root .cos-shop-action label{display:block;font-size:13px;margin:12px 0}
+#root#root .cos-shop-action input{display:block;box-sizing:border-box;min-height:44px;width:100%;margin-top:6px;background:#0b1624;color:#eef4fc;border:1px solid #526f8d;border-radius:8px;padding:10px;font-size:14px}
+#root#root .cos-shop-action [role=alert]{padding:10px;background:#321e2c;border-left:3px solid #ff5577}
