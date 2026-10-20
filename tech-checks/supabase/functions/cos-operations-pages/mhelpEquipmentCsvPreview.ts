@@ -92,7 +92,7 @@ function sameAddress(a:EquipmentCsvRow['sourceAddress'],b:EquipmentCsvRow['sourc
 export function validPrior(v:unknown):{sourceSha256:string;records:PreviousRecord[]}{
   if(!v||typeof v!=='object'||Array.isArray(v))reject('reviewed previous upload missing');
   const prior=v as Record<string,unknown>;
-  if(!['COS_MHELP_UPLOAD_V1','COS_MHELP_API_V1'].includes(String(prior.contract))||prior.reviewed!==true||typeof prior.sourceSha256!=='string'||!SHA256.test(prior.sourceSha256)||!Array.isArray(prior.records)||prior.records.length<1||prior.records.length>10000)reject('reviewed previous upload unavailable');
+  if((prior.contract!=='COS_MHELP_UPLOAD_V1'&&prior.contract!=='COS_MHELP_API_V1')||prior.reviewed!==true||typeof prior.sourceSha256!=='string'||!SHA256.test(prior.sourceSha256)||!Array.isArray(prior.records)||prior.records.length<1||prior.records.length>10000)reject('reviewed previous upload unavailable');
   // API receipts must prove the same complete, reviewed portal-bound baseline
   // used by the saved inventory projection. Never accept a partial API page.
   if(prior.contract==='COS_MHELP_API_V1'&&(prior.origin!=='mhelpdesk_api'||prior.portalId!=='224643'||prior.complete!==true

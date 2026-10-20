@@ -74,6 +74,6 @@ test('reviewed complete API baseline supports CSV comparison with unchanged iden
  const prior={...baseline(),contract:'COS_MHELP_API_V1',origin:'mhelpdesk_api',portalId:'224643',complete:true,recordCount:2,payloadSha256:'b'.repeat(64),apiMissingRecords:[]};
  const source=[header,equipment('103','Sniper 230','Cameras OnSite'),equipment('102','Ranger 024','Cameras OnSite')].join('\n');
  const result=await preview(source,prior);assert.deepEqual(result,await preview(source,baseline()));assert.equal(result.changes.identityReview,1);assert.equal(result.readyToCommit,false);
- for(const patch of [{reviewed:false},{sourceSha256:'bad'},{payloadSha256:'bad'},{origin:'csv'},{portalId:'17'},{complete:false},{recordCount:1},{apiMissingRecords:null},{records:[prior.records[0],prior.records[0]]}])await assert.rejects(preview(source,{...prior,...patch}),/Invalid mHelpDesk/);
+ for(const patch of [{contract:{toString:()=>"COS_MHELP_UPLOAD_V1"}},{reviewed:false},{sourceSha256:'bad'},{payloadSha256:'bad'},{origin:'csv'},{portalId:'17'},{complete:false},{recordCount:1},{apiMissingRecords:null},{records:[prior.records[0],prior.records[0]]}])await assert.rejects(preview(source,{...prior,...patch}),/Invalid mHelpDesk/);
  await assert.rejects(preview(source,prior,HASH),/SHA-256 mismatch/);
 });
