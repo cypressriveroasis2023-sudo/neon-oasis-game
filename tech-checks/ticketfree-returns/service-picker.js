@@ -1,102 +1,102 @@
-import {selectionKey,itemName,itemReason,reasonLabel,selectItem,cataloguePage} from './batch-model.js?v=swap-pickup-20261020';
+import {selectionKey,itemName,itemReason,reasonLabel,selectItem,cataloguePage} from './batch-model.js?v=simple-20261020';
 const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
 const button=(text,fn,cls='')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
 export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit,tell}) {
- const locked=Boolean(draft.request),fields=node('fieldset');fields.disabled=locked;root.append(fields);
- const changed=()=>{save().catch(e=>tell(e.message,true));};
- const dialog=root.closest('dialog');
- const rerender=(top=false)=>{changed();redraw();if(top&&dialog)dialog.scrollTop=0;};
- const selected=e=>draft.items.some(i=>selectionKey(i)===selectionKey(e));
- const usedKeys=()=>draft.items.map(i=>i.usedKey).filter(Boolean);
+ const dialog=root.closest('dialog'),locked=Boolean(draft.request),fields=node('fieldset');fields.disabled=locked;root.append(fields);
+ const change=()=>{save().catch(e=>tell(e.message,true));};
+ const render=()=>{change();redraw();if(dialog)dialog.scrollTop=0;};
  const available=data.truck.filter(t=>t.status==='assigned'&&t.unit_tag);
- const unavailable=e=>!e.equipment_key||selected(e)||usedKeys().includes(e.equipment_key);
- const toggle=(e,source)=>{selectItem(draft,e,source);rerender();};
- const startSwap=e=>{draft.pendingUsedKey=e.equipment_key;draft.tab='swap';draft.query='';draft.family='';draft.page=0;rerender(true);};
- const tabs=node('div','','cos-return-tabs');tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Equipment action');
- for(const [value,text] of [['truck','My truck equipment'],['swap','Used for swap'],['pickup','Pickup from site']]){
-  const b=button(text,()=>{draft.tab=value;if(value!=='swap')draft.pendingUsedKey='';rerender(true);});b.setAttribute('aria-pressed',String(draft.tab===value));tabs.append(b);
+ const extraActions=[];
+ const selected=e=>draft.items.some(i=>selectionKey(i)===selectionKey(e));
+ const mode=draft.simpleMode||(draft.items.length?(draft.items.every(i=>itemReason(i)===itemReason(draft.items[0]))?itemReason(draft.items[0]):'batch'):null);
+ const step=locked?'form':draft.simpleStep||(draft.items.length?'form':'home');
+ function begin(value){
+  if(mode!==value){draft.items=[];draft.pendingUsedKey='';draft.notes='';draft.photos=[];}
+  draft.simpleMode=value;draft.simpleStep='form';draft.query='';draft.page=0;render();
  }
- fields.append(tabs);
- if(locked)root.prepend(node('p','A saved request needs verification. Retry the same selection; no duplicate returns will be created.','cos-ticketfree-warning'));
- function card(e,source) {
-  const label=node('label','','cos-return-pick'),input=node('input'),copy=node('span');input.type='checkbox';input.checked=selected(e);
-  input.setAttribute('aria-label','Return '+itemName(e));input.disabled=Boolean(e.equipment_key&&usedKeys().includes(e.equipment_key));
-  input.onchange=()=>toggle(e,source);copy.append(node('strong',itemName(e)));
-  if(!e.equipment_key)copy.append(node('small','Unit ID needs verification. IT can receive it, but cannot mark it ready yet.'));
-  else copy.append(node('small',input.disabled?'Selected as an installed replacement':input.checked?'Selected for return':source==='truck'?'Return unused equipment to IT':source==='swap'?'Removed during a swap':'Collected on a pickup — no replacement'));
-  label.append(input,copy);return label;
+ function back(){draft.simpleStep='home';render();}
+ function choose(target,item=null){draft.choiceTarget=target;draft.choiceId=item?.id||null;draft.simpleMode=mode;draft.simpleStep='choose';draft.query='';draft.page=0;render();}
+ function selection(label,item,target,edit=null){
+  const b=button('',()=>choose(target,edit),'cos-simple-selection');
+  b.setAttribute('aria-label',label+': '+(item?itemName(item):'Choose equipment'));
+  b.append(node('span',label),node('strong',item?itemName(item):'Choose equipment'),node('small',item?'Change':'Tap to choose'));
+  return b;
  }
- if(draft.tab==='truck'){
-  fields.append(node('h3','My truck equipment'),node('p','Tap Used for swap for installed units. Check unused units to return them.'));
-  const all=button('Select all unused truck equipment',()=>{
-   for(const t of available)if(!selected(t)&&!usedKeys().includes(t.equipment_key))selectItem(draft,t,'truck');rerender();
-  });all.disabled=!available.length;fields.append(all);
-  const grid=node('div','','cos-return-grid');
-  for(const t of available){
-   const unit=node('article','','cos-truck-action');unit.append(card(t,'truck'));
-   const use=button('Used '+itemName(t)+' for swap',()=>startSwap(t));use.disabled=unavailable(t);unit.append(use);
-   if(!t.equipment_key)unit.append(node('small','IT must verify the unit ID before this unit can be recorded as installed.'));
-   grid.append(unit);
+ function details(){const d=node('details','','cos-simple-details');d.append(node('summary','Notes, photos & more'),...extraActions);appendEvidence(d);root.append(d);}
+ function saveButton(text){
+  root.append(button(locked?'Retry saved returns':text,()=>{if(!draft.items.length){tell('Choose the equipment you are bringing back.',true);return;}submit();},'cos-ticketfree-primary'));
+ }
+ if(step==='home'){
+  fields.append(node('h2','What are you doing?'));
+  for(const [value,title,description,icon]of [['swap','Swap equipment','Replace a unit at a site','⇄'],['pickup','Pick up equipment','Bring a unit back','↓']]){
+   const b=button('',()=>begin(value),'cos-simple-action');b.setAttribute('aria-label',title);b.append(node('span',icon,'cos-simple-icon'),node('strong',title),node('small',description));fields.append(b);
   }
-  fields.append(grid);
-  const used=data.truck.filter(t=>t.status!=='assigned'&&t.unit_tag);
-  if(used.length){
-   fields.append(node('h3','No longer available on my truck'));
-   for(const t of used){
-    const swap=data.returns.find(r=>r.used_key&&r.used_key===t.equipment_key),returned=data.returns.find(r=>r.source_mode==='truck_return'&&r.family===t.family&&r.unit_tag===t.unit_tag);
-    fields.append(node('p',itemName(t)+' — '+(swap?'Used for swap · installed at site':returned?'Returned to IT · replenishment due':'Unavailable · replenishment due')));
-   }
+  fields.append(button('Return unused equipment',()=>begin('truck_return'),'cos-simple-unused'));
+  if(draft.items.length)fields.append(button('Continue selected equipment',()=>{draft.simpleStep='form';render();}));
+  return;
+ }
+ if(step==='choose'){
+  fields.append(button('‹ Back',()=>{draft.simpleStep='form';render();},'cos-simple-back'));
+  const used=draft.choiceTarget==='used',truck=mode==='truck_return';
+  fields.append(node('h2',used?'What did you install?':truck?'Return unused equipment':'What are you bringing back?'));
+  const search=node('input');search.type='search';search.placeholder='Type a family and unit number';search.value=draft.query||'';search.setAttribute('aria-label','Search equipment');
+  const list=node('div','','cos-simple-options'),summary=node('p','','cos-simple-count'),pager=node('div','','cos-return-pager');
+  const editing=draft.items.find(i=>i.id===draft.choiceId);
+  const source=used||truck?available:data.equipment.filter(e=>!available.some(t=>selectionKey(t)===selectionKey(e)||(t.family===e.family&&t.unit_tag===e.unit_tag)));
+  function picked(e){
+   if(used){if(editing)editing.usedKey=e.equipment_key;else draft.pendingUsedKey=e.equipment_key;}
+   else if(editing){const at=draft.items.indexOf(editing);draft.items[at]={...e,id:editing.id,source:editing.source,reason:itemReason(editing),usedKey:editing.usedKey||''};}
+   else selectItem(draft,e,mode==='truck_return'?'truck':mode==='swap'?'swap':'pickup');
+   draft.simpleStep='form';render();
   }
-  if(!available.length)fields.append(node('p','No available units are currently on your truck. Use Pickup from site for equipment collected without a replacement.'));
- }else{
-  const swap=draft.tab==='swap',pending=available.find(t=>t.equipment_key&&t.equipment_key===draft.pendingUsedKey);
-  fields.append(node('h3',swap?'Equipment removed during a swap':'Equipment collected on a pickup'));
-  fields.append(node('p',swap?'Select the unit you removed. Pair it with the equipment you installed from your truck below.':'Select the equipment you collected. A pickup does not use replacement stock from your truck.'));
-  if(pending)fields.append(node('p','Used from my truck: '+itemName(pending)+'. Select the equipment it replaced.','cos-return-used'));
-  const search=node('input');search.type='search';search.placeholder='Example: Sniper 176 or Spotter 257HDC2';search.value=draft.query||'';search.setAttribute('aria-label','Search returned equipment');
-  const families=node('div','','cos-return-families');families.setAttribute('role','group');families.setAttribute('aria-label','Equipment family');
-  const results=node('div','','cos-return-results'),summary=node('p'),pager=node('div','','cos-return-pager');summary.setAttribute('role','status');
-  // Assigned truck stock has its own actions; it cannot be mislabeled as a site pickup.
-  const catalogue=data.equipment.filter(e=>!available.some(t=>selectionKey(t)===selectionKey(e)));
   function show(){
-   families.replaceChildren();
-   for(const family of ['',...new Set(catalogue.map(e=>e.family))].sort()){
-    const b=button(family||'All families',()=>{draft.family=family;draft.page=0;show();changed();});b.setAttribute('aria-pressed',String((draft.family||'')===family));families.append(b);
+   const result=cataloguePage(source,draft.query,'',draft.page,12);draft.page=result.page;list.replaceChildren();
+   for(const e of result.items){
+    const conflict=draft.items.some(i=>i.id!==editing?.id&&(selectionKey(i)===selectionKey(e)||i.usedKey===e.equipment_key));
+    const b=button(itemName(e),()=>picked(e),'cos-simple-option');b.setAttribute('aria-label','Select '+itemName(e));
+    b.disabled=conflict||(used&&!e.equipment_key)||(!used&&Boolean(e.equipment_key)&&e.equipment_key===(editing?.usedKey||draft.pendingUsedKey));
+    if(used&&!e.equipment_key)b.append(node('small','IT must verify this unit ID first.'));
+    else if(conflict)b.append(node('small','Already selected'));
+    list.append(b);
    }
-   const result=cataloguePage(catalogue,draft.query,draft.family,draft.page);draft.page=result.page;
-   results.replaceChildren();for(const e of result.items)results.append(card(e,swap?'swap':'pickup'));
-   summary.textContent=result.count?'Showing '+result.start+'–'+result.end+' of '+result.count+' units':'No exact catalogue results. Check the family and unit tag; other families are never substituted.';
-   const prev=button('Previous units',()=>{draft.page--;show();changed();}),next=button('Next units',()=>{draft.page++;show();changed();});prev.disabled=result.page===0;next.disabled=result.page===result.pages-1;
-   pager.replaceChildren(prev,node('span','Page '+(result.page+1)+' of '+result.pages),next);
+   summary.textContent=result.count?result.start+'–'+result.end+' of '+result.count:'No matching equipment.';
+   const previous=button('Previous',()=>{draft.page--;show();change();}),next=button('Next',()=>{draft.page++;show();change();});previous.disabled=result.page===0;next.disabled=result.page===result.pages-1;pager.replaceChildren(previous,next);pager.hidden=result.pages===1;
   }
-  search.oninput=()=>{draft.query=search.value;draft.page=0;show();changed();};fields.append(search,families,summary,results,pager);show();
+  search.oninput=()=>{draft.query=search.value;draft.page=0;show();change();};fields.append(search,summary,list,pager);show();return;
  }
- const review=node('section','','cos-return-selection');review.append(node('h3','Sending to IT ('+draft.items.length+')'));
- if(!draft.items.length)review.append(node('p','No equipment selected yet.'));
- for(const item of draft.items){
-  const reason=itemReason(item),line=node('article','','cos-ticketfree-return');line.append(node('strong',itemName(item)),node('small','Reason: '+reasonLabel(reason)));
-  if(!item.equipment_key)line.append(node('p','IT will verify this unit ID before it is added to available inventory.'));
-  if(item.source==='site'&&item.equipment_key){
-   const reasons=node('div','','cos-return-reasons');reasons.setAttribute('role','group');reasons.setAttribute('aria-label','Return reason for '+itemName(item));
-   for(const [value,text]of [['swap','Return from swap'],['pickup','Pickup — no replacement']]){
-    const b=button(text,()=>{item.reason=value;if(value==='pickup')item.usedKey='';rerender();});b.setAttribute('aria-pressed',String(reason===value));reasons.append(b);
-   }
-   line.append(reasons);
+ if(locked){
+  fields.append(node('h2','Verify saved return'),node('p','Retry this saved request to confirm it.'));
+  for(const item of draft.items){const card=node('article','','cos-simple-review');card.append(node('strong',itemName(item)),node('small',reasonLabel(itemReason(item))));if(item.usedKey)card.append(node('p','Installed: '+itemName(data.truck.find(t=>t.equipment_key===item.usedKey)||{name:item.usedKey})));fields.append(card);}
+  saveButton('Retry saved returns');return;
+ }
+ fields.append(button('‹ Back',back,'cos-simple-back'));
+ fields.append(node('h2',mode==='swap'?'Record a swap':mode==='pickup'?'Pick up equipment':mode==='truck_return'?'Return unused equipment':'Review returns'));
+ if(mode==='truck_return'){
+  fields.append(button('Select all truck equipment',()=>{for(const e of available)if(!selected(e))selectItem(draft,e,'truck');render();},'cos-simple-unused'));
+  const grid=node('div','','cos-simple-options');
+  for(const e of available){
+   const label=node('label','','cos-return-pick'),input=node('input'),copy=node('span');input.type='checkbox';input.checked=selected(e);input.setAttribute('aria-label','Return '+itemName(e));input.onchange=()=>{selectItem(draft,e,'truck');render();};copy.append(node('strong',itemName(e)));if(!e.equipment_key)copy.append(node('small','IT will verify the unit ID.'));label.append(input,copy);grid.append(label);
+  }
+  fields.append(grid);if(!available.length)fields.append(node('p','No unused equipment is assigned to your truck.'));
+ }else{
+  const entries=draft.items.length?draft.items:[null];
+  for(const item of entries){
+   const pair=node('div','','cos-simple-pair'),reason=item?itemReason(item):mode;
    if(reason==='swap'){
-    line.append(node('p','Equipment used from my truck (required)'));
-    for(const t of available){
-     const label=node('label','','cos-return-radio'),radio=node('input');radio.type='radio';radio.name='replacement-'+item.id;
-     radio.checked=Boolean(t.equipment_key)&&item.usedKey===t.equipment_key;radio.disabled=!t.equipment_key||selected(t)||draft.items.some(i=>i!==item&&i.usedKey===t.equipment_key);
-     radio.setAttribute('aria-label','Install '+itemName(t)+' for '+itemName(item));
-     radio.onchange=()=>{item.usedKey=t.equipment_key;rerender();};label.append(radio,node('span',itemName(t)+(radio.disabled?' — unavailable for this swap':'')));line.append(label);
-    }
-    const installed=available.find(t=>t.equipment_key&&t.equipment_key===item.usedKey);
-    line.append(node('p',installed?itemName(installed)+' will be removed from available truck inventory. '+itemName(item)+' will be sent to IT.':'Choose the installed unit before saving this swap.',installed?'cos-return-used':'cos-ticketfree-warning'));
+    const key=item?.usedKey||(!item?draft.pendingUsedKey:''),used=data.truck.find(t=>key&&t.equipment_key===key);
+    pair.append(selection('I installed from my truck',used,'used',item),node('div','⇅','cos-simple-arrow'));
    }
+   pair.append(selection('I am bringing back',item,'returned',item));
+   if(reason==='swap'){
+    const key=item?.usedKey||(!item?draft.pendingUsedKey:''),used=data.truck.find(t=>key&&t.equipment_key===key);
+    if(used)pair.append(node('p',itemName(used)+' leaves truck stock','cos-return-used'));
+   }
+   if(item)extraActions.push(button('Remove '+itemName(item),()=>{draft.items=draft.items.filter(i=>i.id!==item.id);render();},'cos-simple-remove'));
+   fields.append(pair);
   }
-  line.append(button('Remove '+itemName(item),()=>{draft.items=draft.items.filter(i=>i.id!==item.id);rerender();}));review.append(line);
+  if(draft.items.length&&mode!=='batch')extraActions.push(button(mode==='swap'?'Add another swap':'Add another unit',()=>{draft.pendingUsedKey='';choose('returned');},'cos-simple-unused'));
  }
- fields.append(review);appendEvidence(fields);
- const send=button(locked?'Retry saved returns':'Send '+draft.items.length+' unit'+(draft.items.length===1?'':'s')+' to IT',submit,'cos-ticketfree-primary');
- send.disabled=!draft.items.length;root.append(send,node('small','Saving a swap removes the installed equipment from truck availability. Returned equipment becomes available only after IT checks it in.'));
+ saveButton(mode==='swap'?'Save swap':mode==='pickup'?'Save pickup':'Save return');
+ if(draft.items.length)root.append(node('small','IT will receive '+draft.items.map(itemName).join(', ')+'.','cos-simple-helper'));
+ details();
 }
