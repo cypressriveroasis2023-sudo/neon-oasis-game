@@ -13,6 +13,6 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} sees automatic API invento
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
  await app.getByRole('button',{name:/Data sources/}).click();const status=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(status).toContainText('mHelpDesk automatic inventory updates');await expect(status).toContainText('Last successful inventory update');
  await page.screenshot({path:test.info().outputPath('automatic-mhelp-inventory.png'),fullPage:true});
- state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('alert',{name:'mHelpDesk connection needs attention'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');
+ state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');
  expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
 });
