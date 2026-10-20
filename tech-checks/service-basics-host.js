@@ -1,7 +1,7 @@
 // Service's basic daily tools use the existing inspection and inventory writers.
 // This is product presentation, not a replacement for server authorization.
 import './auth-mobile-host.js?v=20261016';
-import './ticketfree-returns/host.js?v=multi-20261020';
+import './ticketfree-returns/host.js?v=swap-pickup-20261020';
 import './service-transfer-host.js?v=named-handoffs-v1';
 import './service-daily-report-host.js?v=20261016-signoff';
 export const SERVICE_BASICS_ONLY = true;
