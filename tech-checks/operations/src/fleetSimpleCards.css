@@ -1,0 +1,20 @@
+/* Shared Owner/IT cards: visible words, readable icons and 44px pill targets. */
+#root .cos-fleet-drawer .cos-card-icon{width:24px;height:24px;flex:0 0 24px;vertical-align:middle;color:#c4d3e8}
+#root .cos-fleet-drawer h3{display:flex;gap:10px;align-items:center;font-size:18px;line-height:1.4}
+#root .cos-fleet-drawer .cos-fleet-unit-health-section{padding:18px;background:#121c2b;border:1px solid #34435a;border-radius:12px;min-width:0}
+#root .cos-fleet-drawer .cos-fleet-unit-health-section p,#root .cos-fleet-drawer .cos-fleet-unit-health-section dd{font-size:15px;line-height:1.6;overflow-wrap:anywhere}
+#root .cos-fleet-drawer .cos-fleet-unit-health-section small{font-size:13px;line-height:1.5;color:#b4c3d8}
+#root .cos-fleet-drawer .cos-card-quick-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 8px}
+#root .cos-fleet-drawer .cos-card-pill,#root .cos-fleet-drawer button:not(.cos-fleet-drawer-close),#root .cos-fleet-drawer .camera-card-actions a,#root .cos-fleet-drawer .camera-resource-access,#root .cos-fleet-drawer .unit-diagnostic-actions a{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:11px 18px;border:1px solid #526783;border-radius:999px;background:#1c2d47;color:#f1f5fc;font-size:14px;line-height:1.4;text-decoration:none;white-space:normal;overflow-wrap:anywhere;max-width:100%}
+#root .cos-fleet-drawer .cos-card-quick-actions .cos-card-pill{background:#b60020;border-color:#d52d4a}
+#root .cos-fleet-drawer .cos-card-tool-note{font-size:13px;color:#b4c3d8}
+#root .cos-fleet-drawer summary{min-height:44px;padding:12px 4px;font-size:15px}
+#root .cos-fleet-drawer .cos-fleet-troubleshooting summary{border-radius:12px;background:#172337;padding:14px}
+#root .cos-fleet-drawer .cos-router-readable article{padding:12px 0}
+#root .cos-fleet-drawer .cos-port-pills{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+#root .cos-fleet-drawer .cos-port-pills span{border:1px solid #526783;background:#172337;border-radius:999px;padding:6px 12px;font-size:14px;color:#e6edf7}
+#root .cos-fleet-drawer .cos-fleet-recorded-address{padding:16px;background:#121c2b;border-radius:12px}
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped{top:4px!important;height:28px!important;min-height:28px!important;max-height:28px!important;border-radius:50%}
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped .cos-status-pin-art{height:28px!important;max-height:28px!important}
+#root#root .cos-fleet-dashboard .cos-fleet-individual-pins .cos-status-shaped>b.cos-pin-unit-number{top:32px}
+@media(max-width:600px){#root .cos-fleet-drawer .cos-card-quick-actions{display:grid;grid-template-columns:1fr}#root .cos-fleet-drawer .cos-card-pill{width:100%}}

@@ -16,7 +16,7 @@ const render=(value,at=now)=>renderToStaticMarkup(React.createElement(FleetUnitH
 const currentMetrics=html=>html.split('aria-label="Recent power measurements"')[1]?.split('</dl>')[0]||'';
 
 test('the unit top card groups camera, exact InHand and Victron evidence without additional reads',()=>{
- const html=render(row());assert(html.indexOf('Camera health')<html.indexOf('InHand router'));assert(html.indexOf('InHand router')<html.indexOf('Victron power'));assert.match(html,/Fixture InHand · IR615/);assert.match(html,/192\.0\.2\.10/);assert.match(html,/Port reachable/);assert.match(html,/92\.7%/);assert.match(html,/Lowest reported charge/);assert.match(html,/2 reported charge sources/);
+ const html=render(row());assert(html.indexOf('Camera health')<html.indexOf('Router &amp; connection'));assert(html.indexOf('Router &amp; connection')<html.indexOf('Battery · Victron'));assert.match(html,/Fixture InHand · IR615/);assert.match(html,/192\.0\.2\.10/);assert.match(html,/Port reachable/);assert.match(html,/92\.7%/);assert.match(html,/https:\/\/vrm\.victronenergy\.com\/installation\/1001\/dashboard/);assert.match(html,/Lowest reported charge/);assert.match(html,/2 reported charge sources/);
  const source=readFileSync(new URL('../src/FleetUnitHealth.tsx',import.meta.url),'utf8');assert.doesNotMatch(source,/from ['"]\.\/api|fetch\(|useEffect\(/);
 });
 test('power preserves source instances, signed raw readings and verified zero without summing or runtime claims',()=>{
@@ -24,7 +24,7 @@ test('power preserves source instances, signed raw readings and verified zero wi
 });
 for(const kind of ['stale','provider failure','sync failure','missing'])test('current power metrics fail closed for '+kind,()=>{
  const power=structuredClone(vrm);let at=now;if(kind==='stale')at+=3600000;if(kind==='provider failure')power.power[0].errorCode='provider';if(kind==='sync failure')power.sync={state:'error',error:'Synthetic failure'};if(kind==='missing')power.power[0].measurements=[];
- const html=render(row(power,[router],at),at),metrics=currentMetrics(html);assert.doesNotMatch(metrics,/190 W|180 W|-75 W|0 W/);assert.equal((metrics.match(/Unverified/g)||[]).length,3);assert.doesNotMatch(html.split('aria-label="Selected unit battery charge"')[1]?.split('</strong>')[0]||'',/92\.7%/);
+ const html=render(row(power,[router],at),at),metrics=currentMetrics(html);assert.doesNotMatch(metrics,/190 W|180 W|-75 W|0 W/);assert.equal((metrics.match(/Unverified/g)||[]).length,5);assert.doesNotMatch(html.split('aria-label="Selected unit battery charge"')[1]?.split('</strong>')[0]||'',/92\.7%/);
 });
 test('duplicate unit identity and mismatched router UUID cannot donate associated source data',()=>{
  const html=render(row(vrm,[{...router,candidateUnit:{id:'00000000-0000-4000-8000-999999999999',unitNumber:'Helios 1'}}],now,[unit,{...unit,id:'00000000-0000-4000-8000-000000000002'}]));assert.doesNotMatch(html,/192\.0\.2\.10|92\.7%|190 W/);assert.match(html,/No exact, unique router association/);
