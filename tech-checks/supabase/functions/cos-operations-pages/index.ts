@@ -13,6 +13,8 @@ import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntak
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
+import {createOperationalMoves,OperationalMoveError} from './operationalMoves.ts';
+import {projectOperationalFleet} from './operationalFleetOverlay.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
@@ -588,7 +590,7 @@ export function createOperationsHandler(options) {
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
+        features: { unitTracker: Boolean(context.actorId), operationalTransfers: Boolean(context.actorId)&&options.operationalTransfersEnabled===true, fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
@@ -725,6 +727,14 @@ export function createOperationsHandler(options) {
           }
         }
         return json(await mhelpPartner(path, method, body));
+      }
+      if(path==='/api/operational-units'||path==='/api/operational-units/move'){
+        if(options.operationalTransfersEnabled!==true)fail('Operational transfers are not enabled on this backend.',503);
+        // Authenticated Owner-only local transaction; no Fleet, health or
+        // provider preflight in the transfer commit path.
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method==='POST'&&body===null)body=await requestBody(request);
+        return json(await createOperationalMoves({rpc,actorPayload})(path,method,body));
       }
       if(path.startsWith('/api/unit-tracker/sheets/')){
         // Connection credentials and checks stay Owner-only; existing IT
@@ -947,10 +957,16 @@ export function createOperationsHandler(options) {
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
           const combined=projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity);
+          // A short, saved owner-decision read has no geocode, camera or vendor
+          // dependency. Never let stale mHelp placement silently reverse an
+          // authorized Product-ID transfer; keep source membership untouched.
+          const operational=options.operationalTransfersEnabled===true
+            ?projectOperationalFleet(combined,await rpc('cos_operational_transfer_overrides',actorPayload))
+            :combined;
           // MHelp Field address is a presentation location by Product ID, never
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
-          const withMhelpAddress=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
+          const withMhelpAddress=await withMhelpAddressMap(operational,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{
@@ -1267,8 +1283,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof OperationalMoveError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof OperationalMoveError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }

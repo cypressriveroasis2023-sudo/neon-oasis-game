@@ -14,6 +14,8 @@ Deno.serve(createOperationsHandler({
   mhelpPlacementEnabled:true,
   // Deny Owner equipment commits until SQL, source authority, and full CI are approved.
   ownerEquipmentImportEnabled:Deno.env.get('COS_OWNER_EQUIPMENT_IMPORT_ENABLED')==='true',
+  // Remains closed until transfer SQL + complete two-way Sheet worker are verified.
+  operationalTransfersEnabled:Deno.env.get('COS_OPERATIONAL_TRANSFERS_ENABLED')==='true',
   googleSheets: { getServiceAccountJson:()=>Deno.env.get('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion:signSheetsAssertion },
 }));
 
