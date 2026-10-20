@@ -603,6 +603,9 @@
 
 #root#root .cos-fleet-map-find { display:grid; gap:4px; margin-top:8px; font-size:12px; }
 #root#root .cos-fleet-map-find select { width:100%; min-height:44px; }
+#root#root .cos-fleet-pin-view { display:flex; flex-wrap:wrap; gap:6px; padding:0 12px 8px; background:var(--cos-vision-raised); }
+#root#root .cos-fleet-pin-view button { min-width:88px; min-height:44px; padding:8px 12px; border:1px solid var(--fleet-line); border-radius:6px; font-size:13px; }
+#root#root .cos-fleet-pin-view button[aria-pressed=true] { background:#0759c8!important; border-color:#3c91ed!important; color:#fff!important; }
 
 #root#root .cos-fleet-pin-tooltip { max-width:180px; white-space:normal; background:#122132; border:1px solid #53697b; color:#f4f7fb; font-size:12px; }
 
