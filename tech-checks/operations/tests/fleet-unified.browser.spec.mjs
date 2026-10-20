@@ -43,7 +43,7 @@ test('colored Fleet pins stay compact and clusters expand to accessible selectab
  const solar=app.locator('.cos-dashboard-marker .cos-field-pin-support .cos-reticle-artwork');
  await expect(solar).toHaveCSS('color','rgb(21, 168, 255)');
  const shape=await solar.evaluate(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));
- expect(shape.w).toBe(28);expect(shape.h).toBe(36);
+ expect(shape.w).toBe(28);expect(shape.h).toBe(28);
  await expect(app.locator('.cos-fleet-map-canvas [data-cos-eye],.cos-fleet-map-canvas .company-eye,.cos-fleet-map-canvas .cos-reticle-solar-panel')).toHaveCount(0);
  await expect(app.locator('#cos-fleet-eye-artwork')).toHaveCount(0);
  await expect(app.locator('.cos-dashboard-marker .cos-map-status-dot')).toHaveCount(4);
@@ -51,7 +51,7 @@ test('colored Fleet pins stay compact and clusters expand to accessible selectab
   const marker=app.locator('.cos-dashboard-marker[data-unit-id="'+id+'"]');
   await expect(marker).toHaveAttribute('aria-label',new RegExp(label));
   await expect(marker.locator('.cos-field-pin')).toHaveAttribute('data-health',status);
-  await expect(marker.locator('path')).toHaveCSS('fill',color);
+  await expect(marker.locator('circle')).toHaveCSS('fill',color);
   await expect(marker.locator('.cos-pin-unit-number')).toHaveCSS('color','rgb(244, 247, 251)');
   const centered=await marker.evaluate(el=>{const circle=el.querySelector('.cos-status-pin-art').getBoundingClientRect(),label=el.querySelector('.cos-pin-unit-number').getBoundingClientRect();return Math.abs(circle.x+circle.width/2-label.x-label.width/2)<1&&label.top>=circle.bottom;});
   expect(centered).toBe(true);

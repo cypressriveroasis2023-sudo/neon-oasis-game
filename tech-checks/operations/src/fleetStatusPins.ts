@@ -33,7 +33,7 @@ export function addressGroupHealth(pins:MhelpAddressMapPin[],health:ReadonlyMap<
  return {counts,state:states.length===1?states[0]:'mixed' as const};
 }
 /** One pin per equipment record; numeric labels identify units, never counts. */
-export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art cos-unit-pin-drop" viewBox="0 0 30 38" aria-hidden="true" focusable="false"><path d="M15 1C7.3 1 1 7.3 1 15c0 10 14 22 14 22s14-12 14-22C29 7.3 22.7 1 15 1Z" fill="currentColor" stroke="#071421" stroke-width="1.5"/><circle cx="15" cy="14" r="4" fill="#fff"/></svg>';
+export const fleetPinArtwork='<svg class="cos-reticle-artwork cos-map-status-dot cos-status-pin-art cos-unit-pin-drop cos-unit-pin-circle" viewBox="0 0 30 30" aria-hidden="true" focusable="false"><circle cx="15" cy="15" r="13" fill="currentColor" stroke="#071421" stroke-width="2"/></svg>';
 /** A single segmented outline keeps mixed groups compact without inventing a dominant status. */
 export function fleetStatusRing(counts:ReticleCounts):string{
  const total=order.reduce((n,state)=>n+counts[state],0);if(!total)return fieldReticleColors.unknown;

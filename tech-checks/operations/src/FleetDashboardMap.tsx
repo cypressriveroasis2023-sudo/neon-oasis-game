@@ -133,7 +133,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    const offset=Math.abs(entry.x-sourceX)>1||Math.abs(entry.y-sourceY)>1;
    if(offset)L.polyline([pin.point,display],{color:'#9eacbd',weight:1,opacity:.55,interactive:false}).addTo(group);
    const label=description.label+(offset?' · Display offset; recorded location unchanged':'');
-   const marker=L.marker(display,{bubblingMouseEvents:false,autoPanOnFocus:false,zIndexOffset:item.kind==='address'?250:0,icon:L.divIcon({className:description.classes+(offset?' cos-dashboard-peer':''),html:description.html,iconSize:[44,56],iconAnchor:[22,34]}),title:label,alt:label}).addTo(group),element=marker.getElement();
+   const marker=L.marker(display,{bubblingMouseEvents:false,autoPanOnFocus:false,zIndexOffset:item.kind==='address'?250:0,icon:L.divIcon({className:description.classes+(offset?' cos-dashboard-peer':''),html:description.html,iconSize:[44,56],iconAnchor:[22,18]}),title:label,alt:label}).addTo(group),element=marker.getElement();
    element?.setAttribute('aria-label',label);element?.setAttribute('data-health',description.health);
    element?.setAttribute('data-source-point',JSON.stringify(pin.point));element?.setAttribute('data-display-offset',String(offset));
    if(item.kind==='address'){
