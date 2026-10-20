@@ -1,6 +1,7 @@
 import {createMhelpTokenManager} from './mhelpTokenSession.ts';
 import {createMhelpReconnect,MhelpReconnectError} from './mhelpReconnect.ts';
 import {createMhelpReadBackoff} from './mhelpReadBackoff.ts';
+import {createMhelpRequestBudget} from './mhelpRequestBudget.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co';
 export function nativeMhelpTokens(env:(name:string)=>string|undefined,fetcher:typeof fetch=fetch){
  const options={getConfig:()=>({accessToken:env('COS_MHELP_ACCESS_TOKEN'),refreshToken:env('COS_MHELP_REFRESH_TOKEN'),clientId:env('COS_MHELP_CLIENT_ID'),clientSecret:env('COS_MHELP_CLIENT_SECRET'),portalId:env('COS_MHELP_PORTAL_ID')}),fetch:fetcher,session:async (body:Record<string,unknown>)=>{
@@ -13,6 +14,16 @@ export function nativeMhelpTokens(env:(name:string)=>string|undefined,fetcher:ty
   catch(cause){if(cause instanceof MhelpReconnectError)throw cause;throw Error('Token storage unavailable');}finally{reader.releaseLock();}
  }};
  const backoff=createMhelpReadBackoff({fetch:fetcher,gate:options.session});
- const guarded={...options,fetch:backoff.fetch};
- return {...createMhelpTokenManager(guarded),reconnect:createMhelpReconnect(guarded),fetch:backoff.fetch,readBackoff:backoff.snapshot};
+ const budget=createMhelpRequestBudget({fetch:backoff.fetch,admit:async essential=>{
+  const service=env('SUPABASE_SERVICE_ROLE_KEY');if(env('SUPABASE_URL')!==NATIVE||!service)throw Error('Request allowance unavailable');
+  const response=await fetcher(NATIVE+'/rest/v1/rpc/cos_mhelp_request_budget',{method:'POST',headers:{apikey:service,Authorization:'Bearer '+service,'Content-Type':'application/json'},body:JSON.stringify({p_essential:essential}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});
+  if(!response.ok||!response.body||Number(response.headers.get('Content-Length'))>4096)throw Error('Request allowance unavailable');
+  const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let size=0,raw='';
+  try{for(;;){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>4096)throw Error();raw+=decoder.decode(r.value,{stream:true});}return JSON.parse(raw+decoder.decode());}
+  catch{throw Error('Request allowance unavailable');}finally{void reader.cancel().catch(()=>{});try{reader.releaseLock();}catch{}}
+ }});
+ // Outer budget refusals never enter the provider-backoff recorder. Genuine
+ // provider 429s still pass through the existing inner durable backoff.
+ const guarded={...options,fetch:budget.fetch};
+ return {...createMhelpTokenManager(guarded),reconnect:createMhelpReconnect(guarded),fetch:budget.fetch,readBackoff:backoff.snapshot};
 }

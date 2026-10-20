@@ -104,6 +104,7 @@ function runtime({failAt='reconnect_claim',code='PT409',status=409,errorBody,fai
  const env=name=>({SUPABASE_URL:native,SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',COS_MHELP_CLIENT_ID:'synthetic-client',COS_MHELP_CLIENT_SECRET:'synthetic-secret'})[name];
  const json=(v,status=200)=>Response.json(v,{status});
  const manager=nativeMhelpTokens(env,async(url,init)=>{
+  if(String(url).endsWith('/rpc/cos_mhelp_request_budget')){assert.equal(typeof JSON.parse(init.body).p_essential,'boolean');return json({allowed:true,reason:null,retryAt:null});}
   if(String(url).startsWith(native)){
    const request=JSON.parse(init.body);actions.push(request.p_action);
    if(request.p_action===failAt&&remaining-->0)return errorBody===undefined?json({code,message:secret,details:secret,hint:secret},status):new Response(errorBody,{status});
