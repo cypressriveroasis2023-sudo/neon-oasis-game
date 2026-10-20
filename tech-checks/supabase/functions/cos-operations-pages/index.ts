@@ -1,3 +1,5 @@
+import {projectManualShop} from './fleetShopProjection.ts';
+import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
 import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
@@ -582,6 +584,13 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
+      const shopPlacement=/^\/api\/fleet\/units\/([a-f0-9-]+)\/shop-placement$/i.exec(path);
+      if(shopPlacement){
+        if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail('An active COS Owner or verified IT account is required.',403);
+        try{return json(await createFleetShopPlacement({rpc,actorPayload:{p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID}})(shopPlacement[1],method,body));}
+        catch(error){if(error instanceof FleetShopError)return json({error:error.message},error.status);throw error;}
+      }
+
       if (/^\/api\/camera-health\/devices\/[^/]+\/check$/.test(path)) {
         if (!(context.legacyOwner && context.actorId) && !verifiedFleetIt) fail('An active COS Owner or verified IT account is required.',403);
         if (method !== 'POST') fail('Use POST for a connection check.',405);
@@ -958,7 +967,8 @@ export function createOperationsHandler(options) {
           // MHelp Field address is a presentation location by Product ID, never
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
-          const withMhelpAddress=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
+          const addressMap=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
+          const withMhelpAddress=await projectManualShop(addressMap,await rpc('cos_fleet_shop_snapshot_v1',actorPayload,request.signal));
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{
