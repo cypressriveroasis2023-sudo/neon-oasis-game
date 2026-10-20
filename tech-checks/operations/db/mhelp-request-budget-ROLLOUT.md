@@ -34,9 +34,15 @@ tables contain only days, counts and timing; no credentials or request URLs.
 3. Finish measured-cost full-scan admission/cadence. Existing source age guards
    must keep their meaning; stale placement remains queued with real timestamps.
    A daily cap by itself is not a sustainable synchronization strategy.
-4. Finish expiry-aware renewal and durable invalid-grant suppression using the
-   existing token lease/CAS manager, without coupling inventory failure to a
-   successfully committed rotated pair.
+4. The candidate now includes expiry-aware ensureAccess and revision-bound
+   invalid-grant suppression using the existing token lease/CAS manager. Finish
+   real multi-client verification and the coordinated deployed-bundle rollout.
+   Change EXISTING renewal job 10 to an hourly :01 UTC metadata check ONLY AFTER
+   the new readiness worker is verified: its six-hour margin requires a check
+   interval shorter than six hours. Do not run the old forced-rotation worker
+   hourly. The new renewal action never launches an inventory preview, never
+   claims renewal on a not-due check, and preserves a committed pair on a later
+   account-read failure. Actual unattended renewal is still unverified.
 5. Inspect all current deployed bundles and preserve newer unowned code. Build a
    coordinated delta for operations, readiness, assignments, inventory,
    placement, ticket source and the diagnostic renewal helper. The latter still

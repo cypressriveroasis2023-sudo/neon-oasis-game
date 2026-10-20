@@ -30,6 +30,9 @@ export class MhelpTokenRenewalError extends Error{
   this.diagnostic=Object.freeze(projectMhelpTokenRenewalDiagnostic({stage,reason,httpStatus,oauthError})!);
  }
 }
+export class MhelpReconnectRequiredError extends Error{
+ constructor(){super('Reconnect the mHelpDesk account using the secure form.');}
+}
 const cancel=(stream:{cancel:()=>Promise<unknown>})=>{try{void stream.cancel().catch(()=>{});}catch{/* Best-effort cleanup only. */}};
 /** Abort is an independent deadline even when a transport ignores its signal. */
 function tokenDeadline<T>(run:()=>Promise<T>,signal:AbortSignal,stage:MhelpTokenRenewalDiagnostic['stage'],httpStatus:number|null=null,late?:(value:T)=>void):Promise<T>{
@@ -67,7 +70,10 @@ async function tokenRequest(fetcher:typeof fetch,init:RequestInit,signal:AbortSi
  catch(cause){if(cause instanceof MhelpTokenRenewalError)throw cause;throw new MhelpTokenRenewalError('token_request',signal.aborted?'deadline':'transport_failed');}
  return bounded(response,signal,true);
 }
-export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>}){
+export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>;now?:()=>number;renewalGuard?:(action:'check'|'reject',lease?:string)=>Promise<Row>}){
+ const now=options.now||Date.now;
+ const due=(stored:Row)=>typeof stored.expires_at!=='string'||!Number.isFinite(Date.parse(stored.expires_at))||Date.parse(stored.expires_at)-now()<=6*60*60*1000;
+ const current=(stored:Row)=>{if(stored.configured!==true||!validToken(stored.access_token)||!validPortal(stored.portal_id))fail();return {accessToken:stored.access_token as string,portalId:stored.portal_id as string};};
  let pending:Promise<{accessToken:string;portalId:string}>|null=null;
  const getPartnerConfig=async()=>{
   const stored=await options.session({p_action:'read'});
@@ -75,11 +81,17 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
   if(stored.configured!==true||!validToken(stored.access_token)||!validPortal(stored.portal_id))fail();
   return {accessToken:stored.access_token as string,portalId:stored.portal_id as string};
  };
- const renew=async()=>{
+ const renew=async(onlyIfDue=false)=>{
   const config=options.getConfig();
   if(!validToken(config.clientId)||!validToken(config.clientSecret))fail();
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  let lease:string|null=null,rotated=false;
+  let lease:string|null=null,rotated=false,retainLease=false;
+  const guard=async(lease?:string)=>{
+   if(!options.renewalGuard)return;
+   const status=await options.renewalGuard('check',lease);
+   if(typeof status.allowed!=='boolean'||(!Number.isSafeInteger(status.revision)||Number(status.revision)<1))fail();
+   if(!status.allowed)throw new MhelpReconnectRequiredError();
+  };
   try{
    let stored=await options.session({p_action:'read'});
    const readPortal=async(accessToken:string)=>{
@@ -94,32 +106,59 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
     stored=await options.session({p_action:'bootstrap',p_access_token:config.accessToken,p_refresh_token:config.refreshToken,p_portal_id:portal});
    }
    if(stored.configured!==true||!validPortal(stored.portal_id))fail();
+   if(onlyIfDue&&!due(stored))return current(stored);
+   await guard();
    const claimed=await options.session({p_action:'claim'});
    if(claimed.configured!==true||!validToken(claimed.refresh_token)||!validPortal(claimed.portal_id)||typeof claimed.lease_id!=='string'||!/^[0-9a-f-]{36}$/i.test(claimed.lease_id))fail();
    lease=claimed.lease_id as string;
+   await guard(lease);
+   // Another worker may have renewed between our read and atomic claim. Its
+   // latest pair is returned by the claim, so a due-check never rotates it again.
+   if(onlyIfDue&&!due(claimed))return current(claimed);
    const form=new URLSearchParams({client_id:config.clientId,client_secret:config.clientSecret,grant_type:'refresh_token',scope:'openid profile offline_access mhdapi',refresh_token:claimed.refresh_token as string});
    const issued=await tokenRequest(options.fetch,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:form.toString(),redirect:'error',cache:'no-store',signal:controller.signal},controller.signal);
    rotated=true;
    if(!validToken(issued.access_token)||typeof issued.token_type!=='string'||issued.token_type.toLowerCase()!=='bearer'||!Number.isInteger(issued.expires_in)||Number(issued.expires_in)<60||Number(issued.expires_in)>86400)fail();
    const refresh=issued.refresh_token==null?claimed.refresh_token:issued.refresh_token;if(!validToken(refresh))fail();
-   const expires=new Date(Date.now()+Number(issued.expires_in)*1000).toISOString();
+   const expires=new Date(now()+Number(issued.expires_in)*1000).toISOString();
    const commit={p_action:'commit',p_session:lease,p_access_token:issued.access_token,p_refresh_token:refresh,p_expires_at:expires};
    // Persist the rotated pair before verification; retry a lost acknowledgement idempotently.
    let committed:Row;
    try{committed=await options.session(commit);}catch{committed=await options.session(commit);}
    if(committed.committed!==true)fail();
    lease=null;
-   const portal=await readPortal(issued.access_token as string);
+   // A reconnect or later renewal can advance the store after our commit. Use
+   // the latest persisted revision rather than an in-memory credential pair.
+   const latest=current(await options.session({p_action:'read'}));
+   const portal=await readPortal(latest.accessToken);
    if(portal!==claimed.portal_id)fail();
-   return {accessToken:issued.access_token as string,portalId:claimed.portal_id as string};
-  }catch(cause){if(cause instanceof MhelpTokenRenewalError)throw cause;fail();}finally{
+   return latest;
+  }catch(cause){
+   if(cause instanceof MhelpTokenRenewalError&&cause.diagnostic.httpStatus===400&&cause.diagnostic.oauthError==='invalid_grant'&&lease&&!rotated&&options.renewalGuard){
+    retainLease=true;
+    let result:Row;try{result=await options.renewalGuard('reject',lease);}catch{result=await options.renewalGuard('reject',lease);}
+    if(result.allowed!==false||(!Number.isSafeInteger(result.revision)||Number(result.revision)<1))fail();
+    retainLease=false;throw new MhelpReconnectRequiredError();
+   }
+   if(cause instanceof MhelpTokenRenewalError||cause instanceof MhelpReconnectRequiredError)throw cause;fail();
+  }finally{
    clearTimeout(timer);
    // A failed persistence attempt retains its lease until expiry to prevent overlapping rotations.
-   if(lease&&!rotated)await options.session({p_action:'release',p_session:lease}).catch(()=>{});
+   if(lease&&!rotated&&!retainLease)await options.session({p_action:'release',p_session:lease}).catch(()=>{});
   }
  };
- return {getPartnerConfig,renewAccess:()=>{
+ const renewAccess=()=>{
   if(!pending)pending=renew().finally(()=>{pending=null;});
   return pending;
+ };
+ return {getPartnerConfig,renewAccess,ensureAccess:async()=>{
+  const stored=await options.session({p_action:'read'});
+  if(options.renewalGuard){const guard=await options.renewalGuard('check');if(typeof guard.allowed!=='boolean'||(!Number.isSafeInteger(guard.revision)||Number(guard.revision)<1))fail();if(!guard.allowed)throw new MhelpReconnectRequiredError();}
+  if(stored.configured===true&&!due(stored))return {...current(stored),renewed:false,expiresAt:stored.expires_at as string};
+  if(!pending)pending=renew(true).finally(()=>{pending=null;});
+  await pending;
+  const latest=await options.session({p_action:'read'});
+  if(typeof latest.expires_at!=='string'||!Number.isFinite(Date.parse(latest.expires_at))||Date.parse(latest.expires_at)<=now())fail();
+  return {...current(latest),renewed:latest.revision!==stored.revision,expiresAt:latest.expires_at};
  }};
 }

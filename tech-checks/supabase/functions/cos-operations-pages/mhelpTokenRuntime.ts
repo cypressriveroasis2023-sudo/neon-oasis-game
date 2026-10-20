@@ -14,16 +14,17 @@ export function nativeMhelpTokens(env:(name:string)=>string|undefined,fetcher:ty
   catch(cause){if(cause instanceof MhelpReconnectError)throw cause;throw Error('Token storage unavailable');}finally{reader.releaseLock();}
  }};
  const backoff=createMhelpReadBackoff({fetch:fetcher,gate:options.session});
- const budget=createMhelpRequestBudget({fetch:backoff.fetch,admit:async essential=>{
+ const metadata=async(name:'cos_mhelp_request_budget'|'cos_mhelp_renewal_guard',body:Record<string,unknown>)=>{
   const service=env('SUPABASE_SERVICE_ROLE_KEY');if(env('SUPABASE_URL')!==NATIVE||!service)throw Error('Request allowance unavailable');
-  const response=await fetcher(NATIVE+'/rest/v1/rpc/cos_mhelp_request_budget',{method:'POST',headers:{apikey:service,Authorization:'Bearer '+service,'Content-Type':'application/json'},body:JSON.stringify({p_essential:essential}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});
+  const response=await fetcher(NATIVE+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:service,Authorization:'Bearer '+service,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});
   if(!response.ok||!response.body||Number(response.headers.get('Content-Length'))>4096)throw Error('Request allowance unavailable');
   const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let size=0,raw='';
-  try{for(;;){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>4096)throw Error();raw+=decoder.decode(r.value,{stream:true});}return JSON.parse(raw+decoder.decode());}
+  try{for(;;){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>4096)throw Error();raw+=decoder.decode(r.value,{stream:true});}const value=JSON.parse(raw+decoder.decode());if(!value||typeof value!=='object'||Array.isArray(value))throw Error();return value as Record<string,unknown>;}
   catch{throw Error('Request allowance unavailable');}finally{void reader.cancel().catch(()=>{});try{reader.releaseLock();}catch{}}
- }});
+ };
+ const budget=createMhelpRequestBudget({fetch:backoff.fetch,admit:essential=>metadata('cos_mhelp_request_budget',{p_essential:essential})});
  // Outer budget refusals never enter the provider-backoff recorder. Genuine
  // provider 429s still pass through the existing inner durable backoff.
- const guarded={...options,fetch:budget.fetch};
+ const guarded={...options,fetch:budget.fetch,renewalGuard:(action:'check'|'reject',lease?:string)=>metadata('cos_mhelp_renewal_guard',{p_action:action,p_lease:lease||null})};
  return {...createMhelpTokenManager(guarded),reconnect:createMhelpReconnect(guarded),fetch:budget.fetch,readBackoff:backoff.snapshot};
 }

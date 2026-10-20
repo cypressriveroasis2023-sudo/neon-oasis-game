@@ -1,4 +1,5 @@
 import {MhelpPartnerError, MHELP_PARTNER_CONTRACT} from '../cos-operations-pages/mhelpPartner.ts';
+import {MhelpReconnectRequiredError} from '../cos-operations-pages/mhelpTokenSession.ts';
 type Row = Record<string, any>;
 /** Constructed only by the trusted ticket adapter; never from a vendor error body. */
 export class TicketReadinessError extends Error {
@@ -43,7 +44,7 @@ export function projectReadiness(v: Row, fullReview=false): Row {
   }
   return result;
 }
-export function createMhelpReadinessHandler(options: {authenticate:(req:Request)=>Promise<boolean>|boolean; partner:(path:string,method:string,body:unknown)=>Promise<Row>; fullReview?:()=>Promise<Row>; renewAccess?:()=>Promise<unknown>; ticketPreview?:(window:{createdAfter:string;createdBefore:string})=>Promise<Row>; renewalConfiguration?:()=>{refreshTokenConfigured:boolean;clientIdConfigured:boolean;clientSecretConfigured:boolean}}) {
+export function createMhelpReadinessHandler(options: {authenticate:(req:Request)=>Promise<boolean>|boolean; partner:(path:string,method:string,body:unknown)=>Promise<Row>; fullReview?:()=>Promise<Row>; renewAccess?:()=>Promise<unknown>; ensureAccess?:()=>Promise<unknown>; ticketPreview?:(window:{createdAfter:string;createdBefore:string})=>Promise<Row>; renewalConfiguration?:()=>{refreshTokenConfigured:boolean;clientIdConfigured:boolean;clientSecretConfigured:boolean}}) {
   return async (req: Request) => {
     try { if (!await options.authenticate(req)) return reply({error:'Forbidden'},403); }
     catch { return reply({error:'Forbidden'},403); }
@@ -55,6 +56,13 @@ export function createMhelpReadinessHandler(options: {authenticate:(req:Request)
         return reply(await options.ticketPreview({createdAfter:input.createdAfter,createdBefore:input.createdBefore}));
       }
       const action = input.action;
+      if(action==='renew_access'&&options.ensureAccess){
+        const v=await options.ensureAccess() as Row;
+        if(!v||v.portalId!=='224643'||typeof v.renewed!=='boolean'||typeof v.expiresAt!=='string'||!Number.isFinite(Date.parse(v.expiresAt))||Date.parse(v.expiresAt)<=Date.now())throw Error('Unverified renewal status');
+        // No account/equipment preview when renewal is not due. The shared
+        // manager verifies the account after an actual atomic token rotation.
+        return reply({contract:'COS_MHELP_RENEWAL_STATUS_V1',state:v.renewed?'renewed':'not_due',tokenRenewalVerified:v.renewed,expiresAt:v.expiresAt,sourceRefreshed:false});
+      }
       if (action==='full_review' && !options.fullReview) return reply({error:'Full review unavailable'},503);
       if (action==='renew_access') { if(!options.renewAccess)return reply({error:'Token renewal unavailable'},503);await options.renewAccess(); }
       const projected=projectReadiness(action==='full_review' ? await options.fullReview!() : await options.partner('/api/mhelpdesk/partner/'+(action==='renew_access'?'preview':action), action === 'status' ? 'GET':'POST',{}),action==='full_review');
@@ -66,6 +74,7 @@ export function createMhelpReadinessHandler(options: {authenticate:(req:Request)
       return reply(projected);
     }
     catch (e) {
+      if(e instanceof MhelpReconnectRequiredError)return reply({contract:'COS_MHELP_RENEWAL_STATUS_V1',state:'reconnect_required',tokenRenewalVerified:false,sourceRefreshed:false,error:'Reconnect mHelpDesk using the secure form.'},409);
       const known=e instanceof MhelpPartnerError || e instanceof TicketReadinessError;
       const provider=known && e.provider && ['account_read','equipment_read','ticket_read','ticket_types_read','ticket_statuses_read'].includes(e.provider.operation) && Number.isInteger(e.provider.httpStatus) && e.provider.httpStatus>=100 && e.provider.httpStatus<=599 ? {operation:e.provider.operation,httpStatus:e.provider.httpStatus}:null;
       return reply({error:known ? e.message:'mHelpDesk readiness is unavailable',...(provider?{provider}: {})},known ? e.status:503);
