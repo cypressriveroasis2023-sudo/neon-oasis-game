@@ -118,3 +118,8 @@
  #root#root .cos-fleet-board .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){width:100%;min-height:0}
  #root#root .cos-fleet-board .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded) .cos-fleet-map-canvas{height:60dvh;min-height:225px}
 }
+
+/* Keep the map controls on one compact line without reducing their touch areas. */
+#root#root .cos-fleet-board .cos-fleet-map-toolbar{padding:8px 10px;gap:6px}
+#root#root .cos-fleet-board .cos-fleet-map-toolbar strong{font-size:15px;line-height:20px}
+#root#root .cos-fleet-board .cos-fleet-map-toolbar button{min-height:44px;line-height:1.4;font-size:12px;padding:8px 10px;white-space:nowrap}
