@@ -62,9 +62,8 @@ for(const it of [false,true])test(`simple card retains real evidence and labeled
  await expect(card.getByText('Router not linked.',{exact:false})).toBeVisible();
  const vrm=card.getByRole('link',{name:'Open Victron'});
  await expect(vrm).toHaveAttribute('href','https://vrm.victronenergy.com/installation/1001/dashboard');
- const tools=card.getByRole('link',{name:'Ping & scan tools'});
- await expect(tools).toHaveAttribute('href',/camera-health.html\?unit=Helios(?:%20|\+)1/);
- expect((await tools.boundingBox()).height).toBeGreaterThanOrEqual(44);
+ await expect(card.getByRole('heading',{name:'Quick troubleshooting'})).toBeVisible();
+ await expect(card.getByText('No saved public camera connection is linked', {exact:false})).toBeVisible();
  await expect(card.getByText('Battery voltage',{exact:true})).toBeVisible();
  expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();
  await card.locator('.cos-fleet-troubleshooting>summary').click();

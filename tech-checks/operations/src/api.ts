@@ -121,7 +121,8 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   const preparation = ownerAction && path.endsWith('/owner-census-prepare');
   // Saved map reads can exceed 30s. Owner actions have a75s native admission
   // bound including authentication. These are observation limits, never retry grants.
-  const timeoutMs = ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
+  const connectionCheck = method === 'POST' && /^\/api\/camera-health\/devices\/[0-9]+\/check$/.test(path);
+  const timeoutMs = connectionCheck ? 60000 : ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
   const controller = new AbortController();
   let abortKind: 'timeout' | 'cancelled' | null = null;
   const cancel = () => { abortKind ??= 'cancelled'; controller.abort(); };
@@ -142,7 +143,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
       });
     } catch (cause) {
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
-      throw new OperationsApiError(method === 'POST'
+      throw new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
     }
