@@ -19,13 +19,13 @@ async function mount(page,{configured=false,tokenOnly=false,role='owner'}={}){
  });
  await page.goto(origin+'/partner-fixture');
  const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace'});
- await expect(role==='it'?frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true}):workspace).toBeVisible();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
+ await expect(role==='it'?frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true}):workspace).toBeVisible();if(role==='owner')await frame.getByText('Advanced / IT tools',{exact:true}).click();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
 }
 test('setup requires an explicit check and never claims live sync or calls equipment preview',async({page})=>{
  const {review,calls}=await mount(page);await expect(review).toBeVisible();
  expect(calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner/'))).toBe(false);
  await review.getByRole('button',{name:'Check mHelpDesk connection'}).click();
- await expect(review.getByRole('status')).toContainText('Connection setup required');await expect(review).toContainText('Automatic sync is paused');
+ await expect(review.getByRole('status')).toContainText('Connection setup required');await expect(review).toContainText('This preview does not change the automatic inventory schedule');
  await expect(review.getByRole('button',{name:'Preview mHelpDesk equipment'})).toHaveCount(0);
  expect(calls.some(x=>x.path.endsWith('/preview'))).toBe(false);
  await expect(review.getByRole('link',{name:'Partner API documentation'})).toHaveAttribute('href',status.docsUrl);
@@ -37,7 +37,7 @@ test('token alone enables explicit portal discovery and displays the verified ID
  expect(calls.some(x=>x.path.endsWith('/preview'))).toBe(false);
  await review.getByRole('button',{name:'Preview mHelpDesk equipment'}).click();
  await expect(review).toContainText('Verified mHelpDesk portal ID: '+item.portalId);
- await expect(review).toContainText('you do not need to add another secret');await expect(review).toContainText('Automatic sync is paused');
+ await expect(review).toContainText('you do not need to add another secret');await expect(review).toContainText('This preview does not change the automatic inventory schedule');
  expect(calls.filter(x=>x.method==='POST').map(x=>x.path)).toEqual(['/api/mhelpdesk/partner/preview']);
 });
 test('verified read displays partial coverage, exact decimal label and separate administrative activity',async({page})=>{

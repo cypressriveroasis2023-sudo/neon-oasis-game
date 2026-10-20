@@ -277,7 +277,7 @@ jobs:
           if-no-files-found: ignore
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs tests/mhelp-import-flow.browser.spec.mjs
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs tests/mhelp-import-flow.browser.spec.mjs tests/mhelp-reconnect.browser.spec.mjs tests/mhelp-partner-api.browser.spec.mjs tests/unit-tracker.browser.spec.mjs
       - name: mHelp interaction evidence
         if: always()
         uses: actions/upload-artifact@v4
