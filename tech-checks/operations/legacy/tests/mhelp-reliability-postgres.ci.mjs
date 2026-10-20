@@ -27,6 +27,9 @@ export async function main(){
  const key='224643:/customers/3?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,city,state,zip,countryId',payload={customerId:3,portalId:224643,name:'Synthetic customer',isServiceLocation:false,address1:'Synthetic service street'};
  const observation=new Date().toISOString();assert.equal((await call('select public.cos_mhelp_inventory_cache($1,$2,$3::jsonb,$4::timestamptz);',['write',key,JSON.stringify(payload),observation])).saved,true);
  const cached=await call('select public.cos_mhelp_inventory_cache($1,$2);',['read',key]);assert.equal(cached.hit,true);assert.equal(Date.parse(cached.observedAt),Date.parse(observation));await exec("update cos_mhelp_placement_private.inventory_resource_cache set observed_at=clock_timestamp()-interval '4 hours'");assert.equal((await call('select public.cos_mhelp_inventory_cache($1,$2);',['read',key])).hit,false);
+ // The preceding reconnect rollback proof intentionally leaves its synthetic
+ // Vault fault switched on. Reset that fixture fault before our synthetic commit.
+ await exec('update vault.synthetic_faults set fail_refresh=false');
  await exec('update public.cos_mhelp_token_state set lease_id=null,lease_until=null,lease_kind=null,lease_revision=null,lease_request_id=null');
  const claimed=await call("select public.cos_mhelp_token_session('claim');");assert(claimed.lease_id);
  const rejected=await race(parameters("select public.cos_mhelp_renewal_guard('reject',$1::uuid);",[claimed.lease_id]),"select public.cos_mhelp_renewal_guard('check');",'renewal-rejection');assert.equal(rejected[0].allowed,false);assert.equal(rejected[1].allowed,false);assert.equal(rejected[0].revision,rejected[1].revision);
