@@ -117,7 +117,7 @@ test('a failed saved read waits four minutes to retry and manual reload remains 
  const {app,state}=await mount(page);state.failed=true;
  await page.clock.runFor(237000);await expect.poll(()=>counts(state).health).toBe(2);
  await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
  await page.clock.runFor(180000);await visible(app,true);expect(counts(state).health).toBe(2);
  await page.clock.runFor(60000);await expect.poll(()=>counts(state).health).toBe(3);
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
@@ -147,7 +147,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  expect(counts(state).health).toBe(2);expect(counts(state).map).toBe(2);
  state.gate.resolve();state.gate=null;
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
  // Settled partial data was not promoted into a complete current snapshot.

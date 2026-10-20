@@ -311,7 +311,7 @@ test('Field Map blocks another GPS write until a successful manual refresh', asy
   expect(state.writes).toHaveLength(1);
   await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();
   await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');
-  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('camera colors are unverified');
+  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Online and offline totals are unavailable');
   await expect(save).toBeDisabled();
   expect(state.writes).toHaveLength(1);
   state.failedPaths.delete('/api/field-map');
