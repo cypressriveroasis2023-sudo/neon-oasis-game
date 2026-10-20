@@ -12,7 +12,7 @@ function choose(options,value='',label='') {
  for(const [v,t] of options){const o=node('option',t);o.value=v;s.append(o);}s.value=value;return s;
 }
 export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
- const client=ticketfreeClient(context),dialog=node('dialog','','cos-ticketfree-dialog'),title=node('h2',client.role==='service'?'Truck swaps, pickups & returns':'Returned by Service'),status=node('p','','cos-ticketfree-status'),body=node('div'),toolbar=node('div','','cos-ticketfree-toolbar');
+ const client=ticketfreeClient(context),dialog=node('dialog','','cos-ticketfree-dialog'),title=node('h2',client.role==='service'?'Swaps & returns to IT':'Returned by Service'),status=node('p','','cos-ticketfree-status'),body=node('div'),toolbar=node('div','','cos-ticketfree-toolbar');
  let alive=true,generation=0,data=null,draft=null,draftKey='',busy=false,saveChain=Promise.resolve();
  const valid=()=>alive&&client.current()&&dialog.isConnected;
  const tell=(text,error=false)=>{if(!valid())return;status.textContent=text;status.setAttribute('role',error?'alert':'status');if(error)dialog.scrollTop=0;};
@@ -25,7 +25,7 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
   const rev=++generation;tell('Loading saved truck and return records…');refresh.disabled=true;
   try{const next=await client.read();if(!valid()||rev!==generation)return;data=next;
    if(client.role==='service'&&!draft){draftKey='ticketfree:submit:'+client.actor;draft=batchDraft(await deviceDraft(draftKey)||freshDraft('submit'),data.equipment);if(!valid()||rev!==generation)return;}
-   render();dialog.scrollTop=0;tell(message||'No ticket needed. Choose Used for swap, Pickup from site, or return unused truck equipment.');
+   render();dialog.scrollTop=0;tell(message||(client.role==='service'?'Choose a swap, pickup or unused return. No ticket needed.':'Review returns and confirm physical receipt.'));
   }catch(e){tell(e.message,true);}finally{if(valid())refresh.disabled=false;}
  }
  function section(label){const s=node('section','','cos-ticketfree-section');s.append(node('h3',label));body.append(s);return s;}
@@ -36,7 +36,7 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
   renderReturns();
  }
  function renderService() {
-  const root=section('What happened to the equipment?');
+  const root=section('Equipment action');
   servicePicker(root,{data,draft,save:keep,redraw:render,appendEvidence:appendNotesPhotos,submit:()=>void submit(),tell});
  }
  function appendNotesPhotos(fields) {
@@ -104,7 +104,7 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
    const result=draft.kind==='submit'?await client.submitBatch(draft.request,draft.photos):await client.submit(draft.kind,draft.request,draft.photos);
    if(!valid()||rev!==generation)return;
    const swaps=draft.kind==='submit'?draft.request.p_items.filter(i=>i.used_key).length:0;
-   const message=draft.kind==='submit'?result.results.length+' unit(s) sent to IT. Each unit is waiting for physical check-in.'+(swaps?' '+swaps+' installed replacement(s) removed from available truck inventory.':''):stateLabel(result.state)+'. Saved in COS.';
+   const message=draft.kind==='submit'?result.results.length+' unit(s) sent to IT.'+(swaps?' '+swaps+' installed replacement(s) removed from available truck inventory.':' Waiting for physical check-in.'):stateLabel(result.state)+'. Saved in COS.';
    await saveChain;
    await deviceDraft(draftKey,null,true);client.assert();draft=null;draftKey='';onSaved(result);await load(message);
   }catch(e){if(valid()&&draft===originalDraft){if(e.rejected){draft.request=null;await keep().catch(()=>{});}render();tell(e.message+(draft.request?' The same request is retained for a safe retry.':''),true);}}

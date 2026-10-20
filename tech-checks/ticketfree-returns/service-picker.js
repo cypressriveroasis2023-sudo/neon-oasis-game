@@ -16,7 +16,7 @@ export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit
  for(const [value,text] of [['truck','My truck equipment'],['swap','Used for swap'],['pickup','Pickup from site']]){
   const b=button(text,()=>{draft.tab=value;if(value!=='swap')draft.pendingUsedKey='';rerender(true);});b.setAttribute('aria-pressed',String(draft.tab===value));tabs.append(b);
  }
- fields.append(node('p','Record what left your truck and why equipment is coming back to IT.'),tabs);
+ fields.append(tabs);
  if(locked)root.prepend(node('p','A saved request needs verification. Retry the same selection; no duplicate returns will be created.','cos-ticketfree-warning'));
  function card(e,source) {
   const label=node('label','','cos-return-pick'),input=node('input'),copy=node('span');input.type='checkbox';input.checked=selected(e);
@@ -27,7 +27,7 @@ export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit
   label.append(input,copy);return label;
  }
  if(draft.tab==='truck'){
-  fields.append(node('h3','My truck equipment'),node('p','Used a unit to replace equipment at a site? Tap Used for swap. Only select a return if you are bringing that unit back.'));
+  fields.append(node('h3','My truck equipment'),node('p','Tap Used for swap for installed units. Check unused units to return them.'));
   const all=button('Select all unused truck equipment',()=>{
    for(const t of available)if(!selected(t)&&!usedKeys().includes(t.equipment_key))selectItem(draft,t,'truck');rerender();
   });all.disabled=!available.length;fields.append(all);
