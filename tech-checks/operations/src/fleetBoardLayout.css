@@ -69,9 +69,9 @@
  #root#root .cos-fleet-board .cos-board-provider-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:750px){
- #root#root .company-shell:has(.cos-fleet-board) .company-utility-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:56px;height:56px;padding:5px 12px;margin-bottom:6px}
+ #root#root .company-shell:has(.cos-fleet-board) .company-utility-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:64px;height:64px;padding:5px 12px;margin-bottom:6px}
  #root#root .company-shell:has(.cos-fleet-board) .company-mobile-brand{width:145px;margin:0;justify-content:flex-start}
- #root#root .company-shell:has(.cos-fleet-board) .company-mobile-brand .cos-company-logo{width:145px!important;max-height:48px!important}
+ #root#root .company-shell:has(.cos-fleet-board) .company-mobile-brand .cos-company-logo{width:145px!important;max-height:none!important}
  #root#root .company-shell:has(.cos-fleet-board) .company-connection{font-size:9px;padding:6px 8px;margin:0;white-space:nowrap;flex:none}
  #root#root .cos-fleet-board{padding:0 10px 12px;border-radius:12px}
  #root#root .cos-fleet-board .cos-fleet-tabs{margin:0 -10px;padding:4px 75px 4px 10px;min-height:44px}
@@ -123,3 +123,25 @@
 #root#root .cos-fleet-board .cos-fleet-map-toolbar{padding:8px 10px;gap:6px}
 #root#root .cos-fleet-board .cos-fleet-map-toolbar strong{font-size:15px;line-height:20px}
 #root#root .cos-fleet-board .cos-fleet-map-toolbar button{min-height:44px;line-height:1.4;font-size:12px;padding:8px 10px;white-space:nowrap}
+/* Every Fleet view uses the same compact COS shell. Task tabs put their own work first. */
+#root#root .cos-fleet-board .cos-fleet-clock{display:none}
+#root#root .cos-fleet-board .cos-fleet-tab-summary{margin:8px 0 12px}
+#root#root .cos-fleet-board .cos-fleet-tab-summary>summary{min-height:44px;padding:12px;border:1px solid #30485f;border-radius:9px;background:#121f2f;cursor:pointer;font-size:13px}
+#root#root .cos-fleet-board[data-fleet-view=map] .cos-fleet-tab-summary{margin:0}
+#root#root .cos-fleet-board[data-fleet-view=map] .cos-fleet-tab-summary>summary{display:none}
+#root#root .cos-fleet-board .cos-fleet-message{padding:10px 12px;font-size:12px;line-height:1.5}
+#root#root .cos-fleet-board .cos-fleet-message p{margin:5px 0}
+#root#root .cos-fleet-board .cos-fleet-message summary{cursor:pointer;min-height:30px;padding-top:7px}
+#root#root .cos-camera-tools{background:#101e2e;border:1px solid #36516b;border-radius:12px;padding:14px;margin:12px 0}
+#root#root .cos-camera-tools h3{display:flex;align-items:center;gap:9px;margin:0;font-size:18px}
+#root#root .cos-camera-connection{padding:12px 0;border-top:1px solid #30485f;margin-top:12px;overflow-wrap:anywhere}
+#root#root .cos-camera-connection p{font-size:13px;margin:6px 0 10px;line-height:1.6}
+#root#root .cos-camera-connection .cos-card-quick-actions{display:flex;flex-wrap:wrap;gap:10px}
+#root#root .cos-camera-connection button.cos-card-pill{min-height:48px;min-width:110px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:999px;background:#a30928;border:1px solid #f23754;color:#fff;font-size:15px;cursor:pointer}
+#root#root .cos-camera-connection button:disabled{opacity:.55;cursor:wait}
+#root#root .cos-camera-test-result{padding:12px;background:#15283b;border-radius:9px;margin-top:12px}
+#root#root .cos-camera-test-result small{display:block;margin:6px 0;font-size:12px;color:#c2d0e0}
+#root#root .cos-camera-port-result{display:inline-block;padding:7px 10px;margin:4px 6px 4px 0;border:1px solid #698099;border-radius:999px;font-size:12px;color:#d1dce9}
+#root#root .cos-camera-port-result.responded{border-color:#3aca85;color:#90efbc}
+#root#root .cos-camera-connection [role=alert]{border-left:3px solid #ff5569;padding:10px;background:#301d2b;color:#ffd7df}
+#root#root .cos-camera-connection button.cos-card-pill{background:#a30928!important;border-color:#f23754!important;color:#fff!important;min-height:48px!important;font-size:15px!important;padding:10px 18px!important}
