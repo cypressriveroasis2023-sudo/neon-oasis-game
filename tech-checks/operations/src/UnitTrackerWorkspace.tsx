@@ -7,14 +7,14 @@ import MhelpSyncStatus from './MhelpSyncStatus';
 import MhelpIntakeReview from './MhelpIntakeReview';
 import SheetsConnectionReview from './SheetsConnectionReview';
 
-type Props={session:unknown;show:(message:string)=>void;initialUnitId?:string;onSelectUnit?:(id:string)=>void;openMap:(id:string)=>void;openHealth:(id:string)=>void};
+type Props={initialConnectionOpen?:boolean;session:unknown;show:(message:string)=>void;initialUnitId?:string;onSelectUnit?:(id:string)=>void;openMap:(id:string)=>void;openHealth:(id:string)=>void};
 const message=(cause:unknown)=>cause instanceof Error?cause.message:'Unit Tracker could not verify the current records.';
 const display=(value:unknown)=>value===null||value===''?'Not recorded':String(value);
 const unitName=(identity:{fullVariant:string;unitLabel:string})=>identity.fullVariant+' '+identity.unitLabel;
 function RequestDetails({request}:{request:TrackerRequest}){
  return <details className='unit-tracker-request'><summary><strong>{unitName(request.identity)}</strong><span>{request.kind==='add'?'Pending addition':'Pending change'}</span><span className='unit-tracker-status'>Sheets connection required</span></summary><p>Saved in COS {new Date(request.createdAt).toLocaleString()}. This request has not been sent to Google Sheets or applied to fleet records.</p><dl className='unit-tracker-values'>{Object.entries(request.changes).map(([key,value])=><div key={key}><dt>{trackerFieldLabels[key as keyof TrackerFields]}</dt><dd>{request.kind==='update'&&<><span className='unit-tracker-before'>{display(request.before?.[key as keyof TrackerFields])}</span><span aria-label='changes to'> → </span></>}{value===null?'Clear this field':String(value)}</dd></div>)}</dl><small>Request ID: {request.requestId}</small></details>;
 }
-export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelectUnit,openMap,openHealth}:Props){
+export default function UnitTrackerWorkspace({initialConnectionOpen=false,session,show,initialUnitId,onSelectUnit,openMap,openHealth}:Props){
  const allowed=trackerAccess(session);
  const [savedInventory,setSavedInventory]=useState<unknown>(null);
  const [snapshot,setSnapshot]=useState<TrackerSnapshot|null>(null),[inventory,setInventory]=useState<TrackerInventory[]>([]);
@@ -74,7 +74,7 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
   <MhelpSyncStatus snapshot={savedInventory} readFailed={Boolean(error)}/>
-  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<details className='unit-tracker-advanced'><summary>Advanced / IT tools</summary><MhelpPartnerReview openMap={openMap} openHealth={openHealth}/></details>}
+  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<details className='unit-tracker-advanced' open={initialConnectionOpen||undefined}><summary>Advanced / IT tools</summary><MhelpPartnerReview openMap={openMap} openHealth={openHealth}/></details>}
   <MhelpIntakeReview session={session}/>
   <SheetsConnectionReview canCheck={(session as {legacyOwner?:boolean})?.legacyOwner===true} queueEnabled={snapshot?.queueEnabled===true}/>
   {trackerError&&<p className='operations-error' role='alert'>{trackerError} Pending requests and their save controls are unavailable.</p>}{snapshot?.availability==='unavailable'&&<p role='status'>{snapshot.reason||'The pending request store is not ready.'}</p>}
