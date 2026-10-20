@@ -27,7 +27,7 @@ async function mount(page,{fail=false,legacySelection=false,customUnits=units}={
 }
 test('canonical dashboard retains full fleet counts, bounded map, readable markers and explicit-only details',async({page},info)=>{
  const {frame,state}=await mount(page,{legacySelection:true});
- await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['319','116','0','107','309']);
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['319','—','—','116','0','107','309']);
  await expect(frame.locator('.cos-fleet-count-note')).toContainText('96 support units have 0 cameras');
  await expect(frame.getByRole('dialog')).toHaveCount(0);
  const canvas=frame.locator('.cos-fleet-map-canvas');await canvas.scrollIntoViewIfNeeded();

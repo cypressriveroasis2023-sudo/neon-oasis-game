@@ -39,7 +39,7 @@ test('Field cards and selected troubleshooting retain recorder wording and separ
 });
 test('new Owner hold removes eligibility while preserving the old map row and source observation',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','1','2','0','3']);
- state.guards=state.guards.slice(1);await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','0','2','1','3']);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');expect(state.rows[0].evidence.status).toBe('online');expect(state.rows[0].activationState).toBe('deactivated');expect(state.writes).toEqual([]);
+ state.guards=state.guards.slice(1);await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','—','—','0','2','1','3']);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText('RECORDER UNVERIFIED');expect(state.rows[0].evidence.status).toBe('online');expect(state.rows[0].activationState).toBe('deactivated');expect(state.writes).toEqual([]);
 });
 test('stale recorder observations remain unknown despite current installation and guard',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','1','2','0','3']);

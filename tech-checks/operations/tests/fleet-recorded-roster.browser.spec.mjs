@@ -13,7 +13,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Product-ID inventory shows
  await expect(inventory).toContainText('1001 total equipment records');
  await expect(app.locator('.cos-fleet-stat-field')).toContainText('FIELD EQUIPMENT');
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('287');
- await expect(app.locator('.cos-fleet-stats .cos-fleet-stat')).toHaveCount(5);
+ await expect(app.locator('.cos-fleet-stats .cos-fleet-stat')).toHaveCount(7);
  await expect(inventory).toContainText('714 Shop');
  await expect(app.locator('div.cos-fleet-count-note')).toContainText('5 assignment representations');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');

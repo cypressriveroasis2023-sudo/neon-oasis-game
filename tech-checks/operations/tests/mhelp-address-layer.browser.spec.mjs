@@ -35,7 +35,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared
  await expect(drawer.locator('input,select,textarea')).toHaveCount(0);await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
  await app.getByLabel('Find mapped equipment').selectOption('148');await expect(app.getByRole('dialog')).toContainText('Approximate address location');await expect(app.getByRole('dialog')).toContainText('77064');await expect(app.getByRole('dialog')).toContainText('77065');await app.getByRole('button',{name:'Close MHelp address details'}).click();
  await expect(app.locator('.cos-fleet-stat-verify')).toContainText('MHELP ADDRESS QUEUE');await expect(app.locator('.cos-fleet-stat-verify strong')).toHaveText('126');
- const queue=app.locator('.cos-mhelp-address-followups');await app.locator('.cos-fleet-stat-verify').click();await expect(queue.locator('li')).toHaveCount(126);
+ const queue=app.locator('.cos-mhelp-address-followups');await queue.locator(':scope > summary').click();await expect(queue.locator('li')).toHaveCount(126);
  await queue.locator('li').filter({hasText:'Product 287 ·'}).getByRole('button',{name:'Open unit record'}).click();await expect(app.getByRole('dialog')).toContainText('Product 287');await expect(app.getByRole('dialog')).toContainText('invalid address');await app.getByRole('button',{name:'Close MHelp address details'}).click();
  await app.getByLabel('Fleet status').selectOption('offline');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);
  await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);await expect(queue).toHaveCount(0);
