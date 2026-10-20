@@ -26,3 +26,8 @@ test('missing, malformed and failing RPCs cannot fall back to direct fetch',asyn
   let vendor=0;const t=nativeMhelpTokens(env,async(url)=>{if(!String(url).startsWith(native))vendor++;return response();});await assert.rejects(t.fetch(data));assert.equal(vendor,0);
  }
 });
+
+test('an admitted ordinary data read replaces a stale caller token with the current persisted revision',async()=>{
+ const actions=[];const t=nativeMhelpTokens(env,async(url,init)=>{const u=String(url);if(u.endsWith('/cos_mhelp_request_budget')){actions.push('admit');return Response.json({allowed:true,reason:null,retryAt:null});}if(u.endsWith('/cos_mhelp_token_session')){const body=JSON.parse(init.body);actions.push(body.p_action);return body.p_action==='read'?Response.json({configured:true,portal_id:'224643',revision:10,access_token:'synthetic-current'}):Response.json({allowed:true,retryAt:null,leaseId:null,revision:0,consecutiveLimits:0});}assert.equal(u,data);actions.push('vendor');assert.equal(new Headers(init.headers).get('Authorization'),'Bearer synthetic-current');return Response.json({results:[],totalRows:0});});
+ assert.equal((await t.fetch(data,{headers:{Authorization:'Bearer synthetic-old',Accept:'application/json'}})).status,200);assert.deepEqual(actions,['admit','gate_admit','read','vendor']);
+});

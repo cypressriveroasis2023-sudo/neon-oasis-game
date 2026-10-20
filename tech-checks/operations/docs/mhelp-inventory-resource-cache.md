@@ -1,0 +1,35 @@
+# Resource observations within the shared request allowance
+
+This addition continues backend PR246; it does not replace its shared request budget or expiry-aware renewal owner. It is not production acceptance. Jobs7/11 stay paused until the coordinated rollout is verified; existing job10 stays active. Owner already authorized necessary resumption and hourly metadata-only maintenance on job10 after the new handler is verified.
+
+The confirmed account limit is 5,000 requests per UTC calendar day, 6 requests/second, burst3, with exponential backoff on429. PR246's 4,800/day COS ceiling and 200 essential reserve stay unchanged. Its ledger counts conservative admissions, including abandoned admissions and any later provider hold; it does not claim to measure other account integrations. Local allowance refusals remain outside the genuine provider-backoff recorder. Never clear a provider hold or reset unknown earlier usage to get a green result.
+
+## Two observation clocks
+
+The quarter-hour dispatcher retains both complete equipment reads, including paging/boundary consistency. Equipment membership, duplicates, ProductIDs, models, current assignments and second-pass stability are still validated. `readAt`/`sourceReadAt` describe this actual equipment comparison. The existing30-minute placement source-age guard is unchanged.
+
+Customers, explicitly parent-bound service pages and categories have a persistent three-hour cache. Each key binds portal224643, the exact customer/resource/page and fixed safe field projection. Vendor extras are stripped; credentials, address2/access notes, vendor GPS and IPs are excluded. Cache writes require a confirmed receipt, and an older response cannot overwrite a newer observation. An unconfirmed cache write or unavailable authority fails the snapshot and retains the prior admitted inventory.
+
+Each record separately carries actual `apiCustomerObservedAt`, `apiAddressObservedAt` and `apiCategoryObservedAt`. Reuse never resets these clocks. Missing, future or expired observations are rejected. A changed equipment assignment can force one bounded service-membership refresh. Already unresolved unchanged membership waits for normal expiry, avoiding another full service read every tick. Address-only changes refresh at expiry even if equipment did not change. This is a bounded three-hour address freshness policy, not a claim of newly fetched addresses every15minutes.
+
+The additive cached-placement patch transforms only three guarded regions of the currently installed single-reader function. It preserves identity, lifecycle, customer/service, authorized move and source checks. Stale cached proof defers. Per-link observation timestamps and `resourceObservedAt` retain older evidence while `sourceReadAt` retains actual equipment time. No source/equipment/GPS/IP/history table is written by the migration. Re-read its current definition before installation; a changed anchor or already-installed extension fails closed.
+
+## Reproducible cost evidence
+
+A synthetic roster matching the census dimensions (1,001 total,287Field,714Shop,63customers,56separate service lists) ran96two-pass equipment cycles with the actual source reader and paging handler. It exercised the one-based boundary retry and an address-only change. Its synthetic transport received2,496 requests:1,344equipment,192account,504customer,448service and8category reads. The final23:45 equipment comparison correctly retained21:00 address observations. These are measured synthetic calls, not a production usage meter or proof of the cause of earlier429s.
+
+Roster growth, additional service pages, retries, ticket and interactive work consume the same4,800 ceiling. Exhaustion may defer a snapshot and must remain visible. No records are silently dropped and no delta endpoint/webhook is assumed. The native disabled customer-probe is403-only; the original-project readiness gateway authenticates the cron only, and its bundled Partner module is unreachable from that entry. Do not deploy dormant ticket-source code merely to claim coverage; audit actual active callers.
+
+## Release and acceptance
+
+Normal exact-head CI now includes a fixed-loopback PostgreSQL17 service check with distinct database clients. It verifies pacing contention, final daily slot/reserve, UTC reset, provider hold crossing reset, cache observation TTL, rejected-grant lease/revision guards and browser-role denial. Local PGlite/synthetic checks do not substitute for that hosted result.
+
+Build the Operations runtime extension from the freshly fetched native bridge. `build-mhelp-reliability-runtime.mjs` confirms every existing byte and import-map file is retained; only the hoisted token factory binding changes before initialization. The actual v106 candidate was also evaluated as an ES module with the existing jose import stubbed: it booted the current handler, installed the new factory and made zero network calls. Re-read current deployed versions before actual rollout; this is a local candidate proof, not deployment.
+
+Install only reviewed additive SQL. Deploy compatible modules/isolated overlays to all active COS callers while7/11 remain paused, preserving unowned current runtime code. The unscheduled diagnostic must stop pinning the old manager before claiming it is covered. Ordinary data requests reload the persisted access token after admission; secure reconnect/rotation verification uses its explicit candidate pair.
+
+Keep PR246's six-hour expiry margin and its planned hourly :01 UTC metadata check on the SAME job10. Change that schedule only after the new readiness action is installed and verified; never run the old forced-rotation action hourly. It must report not_due without equipment/vendor scans, and only actual verified renewal may claim success. Do not force production expiry or ask for a new pair based on the old revision8 rejection.
+
+Before activating a coordinated rollout, compare the initial unknown-usage hold with current safe token expiry. Do not introduce a hold that would prevent a required renewal until after expiry; retain the existing producer until a safe transition window. The initial next-UTC-reset policy is not shortened to evade unknown usage. Known provider Retry-After may extend beyond reset.
+
+After the safe strategy is active, observe two actual scheduled inventory200 completions and truthful cached observation times, scheduled placement200 with API source/zero vendor reads, source-specific address processing and unchanged protected data. Separately observe normal unattended renewal and a persisted pair revision advance. A merge, enqueue,202, simulated budget or secure-form reconnect alone is not completion. Finish actual live UI publication/behavior and honest paused/waiting/auth/freshness labels before closing the continuation.

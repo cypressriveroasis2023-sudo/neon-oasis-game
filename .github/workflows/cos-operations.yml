@@ -155,6 +155,11 @@ jobs:
         env:
           COS_MHELP_POSTGRES_CI: '1'
         run: node --import tsx legacy/tests/mhelp-reconnect-postgres.ci.mjs
+      - name: Verify shared mHelp allowance, cache and renewal guard in real PostgreSQL
+        timeout-minutes: 5
+        env:
+          COS_MHELP_POSTGRES_CI: '1'
+        run: node --import tsx legacy/tests/mhelp-reliability-postgres.ci.mjs
       - run: npm run typecheck
       - name: Strictly typecheck the isolated MHelp address geocoder
         run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-address-geocodio/index.ts

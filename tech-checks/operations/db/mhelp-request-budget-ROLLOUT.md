@@ -28,9 +28,11 @@ tables contain only days, counts and timing; no credentials or request URLs.
 
 1. Pass exact-version normal CI and real PostgreSQL multi-client pacing/daily-cap
    tests; local PGlite tests are not proof of distinct PostgreSQL sessions.
-2. Finish persistent identity-bound customer/service/category caching with real
-   observation times and address-only refresh. Do not promote cached address
-   proof to a fresh vendor observation. Preserve complete-source comparison.
+2. The candidate now includes persistent three-hour identity-bound resource caching,
+   explicit per-record observation dates, address-only refresh, a two-pass roster
+   cost simulation, and stale cached-placement proof guards. Verify these in hosted
+   CI and production; do not promote cached addresses to fresh vendor observations.
+   See ../docs/mhelp-inventory-resource-cache.md for the exact observation contract.
 3. Finish measured-cost full-scan admission/cadence. Existing source age guards
    must keep their meaning; stale placement remains queued with real timestamps.
    A daily cap by itself is not a sustainable synchronization strategy.
