@@ -50,3 +50,31 @@ test('index edits, duplicate Product IDs, shifted columns, formulas and wrong wo
  const missing=workbook();missing.grid.sheets[0].data[0].rowData.pop();
  assert.throws(()=>readOperationalWorkbook(missing.metadata,missing.grid),/Not every Product ID/);
 });
+
+test('Google omitted zero grid offsets retain column A in all twelve tabs and the Product-ID index',()=>{
+ const explicit=workbook();
+ const expected=readOperationalWorkbook(explicit.metadata,explicit.grid);
+ const compact=workbook();
+ // A read-only live API sample omitted zero startRow/startColumn fields.
+ // This changes serialization only, never the identity or cell coordinates.
+ for(const sheet of compact.grid.sheets){
+  for(const data of sheet.data){
+   if(data.startRow===0)delete data.startRow;
+   if(data.startColumn===0)delete data.startColumn;
+  }
+ }
+ assert.deepEqual(readOperationalWorkbook(compact.metadata,compact.grid),expected);
+});
+test('omitted zero offsets cannot conceal duplicate or shifted protected columns',()=>{
+ for(const indexOnly of [false,true]){
+  const duplicate=workbook();
+  const target=indexOnly?duplicate.grid.sheets.at(-1):duplicate.grid.sheets[0];
+  delete target.data[0].startColumn;
+  target.data[1].startColumn=0;
+  assert.throws(()=>readOperationalWorkbook(duplicate.metadata,duplicate.grid),/Tracker column range changed/);
+  const missing=workbook();
+  const changed=indexOnly?missing.grid.sheets.at(-1):missing.grid.sheets[0];
+  delete changed.data[1].startColumn;
+  assert.throws(()=>readOperationalWorkbook(missing.metadata,missing.grid),/Tracker column range changed/);
+ }
+});
