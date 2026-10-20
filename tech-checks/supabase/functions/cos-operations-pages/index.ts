@@ -41,6 +41,7 @@ import {currentTrackerShopScope} from './cameraTrackerShopScope.ts';
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
+import {projectCameraSweepCoverage} from '../../../operations/shared/cameraSweepCoverage.ts';
 import {fieldRecorderHealthGuards,projectFieldRecorderAuthority} from './fieldRecorderObservation.ts';
 import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
 import { routerSnapshot } from './routers.ts';
@@ -1067,7 +1068,7 @@ export function createOperationsHandler(options) {
             readIdentitySources(context),
             legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,checked_at,ip_reachable,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers),
             legacyAll('equipment_master?select=canonical_family,unit_tag,source_label,tracker_state,health_provider&canonical_family=in.(Helios,Ranger,Solar Spotter,Spotter,SS Hybrid,CAMV,Sniper,Sniper 2,Sniper 4,Recon,Recon 2)&order=canonical_family.asc,unit_tag.asc,source_label.asc', context.headers),
-            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status,units:metadata->units&provider=in.(witness,vigilant)&order=provider.asc', context.headers),
+            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status,units:metadata->units,sweep_source:metadata->>source,sweep_complete:metadata->complete,sweep_counts_known:metadata->counts_known,sweep_eligible:metadata->eligible,sweep_scanned:metadata->scanned,sweep_published:metadata->published,sweep_held:metadata->held,sweep_reconciled_at:metadata->>reconciled_at,sweep_held_reasons:metadata->held_reasons&provider=in.(witness,vigilant,avigilon)&order=provider.asc', context.headers),
             readReconSources(),
           ]);
           const {devices,audits:placementAudits}=bundle.sources,identity=bundle.identity;
@@ -1076,7 +1077,7 @@ export function createOperationsHandler(options) {
             .catch(()=>projectReconProviderIdentities([],devices,[]));
           const mhelpReceipt=await readMhelpCameraPlacements(actorPayload);
           const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
-          const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),sweepCoverage:projectCameraSweepCoverage(providerIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
           // Current guarded source placement only classifies synthetic PDF inventory.
           // This is optional, bounded, read-only and never changes a camera resource.
           const shopRead=(inventory,current,mhelpReceipt)=>({inventory,mhelpReceipt:mhelpReceipt??(options.mhelpPlacementEnabled===true?{}:null),nativeUnits:current.sources.units,devices:current.sources.devices,audits:current.sources.audits,identity:current.identity,matches:current.sources.matches,ownerClaims:current.sources.ownerCrosswalk.claims});

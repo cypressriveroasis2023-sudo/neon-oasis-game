@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Field product and inspect held or linked records',async({page})=>{
- const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field});
+ const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field,health:fixture.health});
  const disclosure=app.locator('.cos-fleet-accounting');
  await expect(disclosure).not.toHaveAttribute('open','');
  await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
