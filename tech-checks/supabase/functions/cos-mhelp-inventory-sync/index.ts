@@ -33,7 +33,7 @@ export function createInventoryComparisonHandler(options:{authenticate:(req:Requ
   let readLease:string|null=null;
   try{if(action==='status'){if(!options.status)throw Error();return reply(await options.status());}
    if(options.acquireRead){const gate=await options.acquireRead();if(!object(gate)||typeof gate.allowed!=='boolean')throw Error('Read authority unavailable');
-    if(!gate.allowed){if(!['source_rate_limited','inventory_read_in_progress'].includes(gate.reason)||typeof gate.retryAt!=='string'||!Number.isFinite(Date.parse(gate.retryAt)))throw Error('Read authority unavailable');return reply({state:'deferred',reason:gate.reason,retryAt:gate.retryAt,sourceRefreshed:false,inventoryWrites:0},202);}
+    if(!gate.allowed){if(gate.reason==='inventory_paused'&&gate.retryAt===null)return reply({state:'paused',reason:'inventory_paused',sourceRefreshed:false,inventoryWrites:0},202);if(!['source_rate_limited','inventory_read_in_progress'].includes(gate.reason)||typeof gate.retryAt!=='string'||!Number.isFinite(Date.parse(gate.retryAt)))throw Error('Read authority unavailable');return reply({state:'deferred',reason:gate.reason,retryAt:gate.retryAt,sourceRefreshed:false,inventoryWrites:0},202);}
     if(typeof gate.leaseId!=='string'||!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(gate.leaseId))throw Error('Read authority unavailable');readLease=gate.leaseId;
    }
    const review=await options.readEquipment(),baseline=await options.readBaseline();const comparison=compareInventoryEquipment(review,baseline);if(action==='compare')return reply(comparison);

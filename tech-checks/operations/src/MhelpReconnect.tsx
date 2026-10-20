@@ -51,7 +51,7 @@ export default function MhelpReconnect(){
    {busy&&attempt.current&&<p role='status'>Reconnect is being verified. Closing cancels an unsent request. A submitted request may still finish; check its result before trying again.</p>}
    {status?.state==='unavailable'&&<p>The protected token store is not initialized. Reconnect is unavailable.</p>}
    {status?.state==='ready'&&!attempt.current&&<form onSubmit={event=>void submit(event)} autoComplete='off'>
-    <p>Company portal: <strong>{status.portalId}</strong>. Connection revision: {status.revision}.</p>
+    <p>Reconnect the existing company account.</p>
     <p>Obtain a fresh matching access-token and refresh-token pair yourself from mHelpDesk Developer Access. Keep the existing API Key and Secret unchanged. Never send tokens in chat.</p>
     <p>Submitting replaces the stored pair for this portal and restores persistent API access using the existing client credentials. COS verifies the token renewal before saving. The fields clear when submitted or closed.</p>
     <label>Fresh access token<input ref={access} type='password' autoComplete='off' data-1p-ignore='true' data-lpignore='true' autoCapitalize='none' spellCheck={false} maxLength={16384} required disabled={busy}/></label>

@@ -47,12 +47,22 @@ tables contain only days, counts and timing; no credentials or request URLs.
    account-read failure. Actual unattended renewal is still unverified.
 5. Inspect all current deployed bundles and preserve newer unowned code. Build a
    coordinated delta for operations, readiness, assignments, inventory,
-   placement, ticket source and the diagnostic renewal helper. The latter still
-   imports an older pinned manager and must not be mistaken for gate coverage.
+   placement and the diagnostic renewal helper. Its candidate now uses local
+   reviewed shared code; production remains on the old pin until deployment.
+   Do not deploy the dormant ticket-source worker merely to claim coverage.
    Search for other account readers, including external integrations.
-6. Record fresh preservation fingerprints. Install the reviewed gate and read
+6. Merge/release dependent UI PR245 normally before promoting the integrated
+   PR246 tree. The candidate now includes exact-revision auth/failure observations,
+   an enforced native pause and the actor-scoped status projection/UI; they are
+   not installed. Install mhelp-reliability-status.sql only after the request
+   budget and renewal guard SQL, preserving the current function definitions.
+   Its isolated Operations extension attaches the safe projection after all
+   existing projector initializers, preserving every unowned byte.
+   Record fresh preservation fingerprints. Install the reviewed gate and read
    back its ACL/configuration. Roll out all covered workers while 7/11 remain
-   paused; never briefly resume uncovered writers/readers.
+   paused; never briefly resume uncovered writers/readers. The status migration
+   deliberately disables native live_inventory_control until coordinated
+   resumption. Its gate prevents manual scans and legacy placement fallback.
 7. Resume only after the bounded-cost source strategy passes verification; observe
    two real scheduled source successes, matching placement/address processing,
    measured budget headroom and one real unattended renewal. Do not force token

@@ -32,3 +32,5 @@ test('recovery and unrelated receipts clear the alert',()=>{
 test('untrusted auth text or errors cannot expose credentials or trigger reconnect',()=>{
  const html=render({...receipt,errorCode:'synthetic-private-token',accessToken:'synthetic-private-token',reliability:{...reliability,contract:'other'}});assert.match(html,/role="status"/);assert.doesNotMatch(html,/synthetic-private-token|reconnect|<button/i);
 });
+
+test('a transient renewal check failure has a clear alert without reconnect or discarded saved data',()=>{const html=render({...receipt,errorCode:null,reliability:{...reliability,auth:{state:'verified',renewalCheckFailed:true},inventory:{paused:true}}});assert.match(html,/Automatic renewal check delayed/);assert.match(html,/role="alert"/);assert.doesNotMatch(html,/reconnect|<button/i);});

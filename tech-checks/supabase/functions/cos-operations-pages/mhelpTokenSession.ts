@@ -70,7 +70,7 @@ async function tokenRequest(fetcher:typeof fetch,init:RequestInit,signal:AbortSi
  catch(cause){if(cause instanceof MhelpTokenRenewalError)throw cause;throw new MhelpTokenRenewalError('token_request',signal.aborted?'deadline':'transport_failed');}
  return bounded(response,signal,true);
 }
-export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>;now?:()=>number;renewalGuard?:(action:'check'|'reject',lease?:string)=>Promise<Row>}){
+export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>;now?:()=>number;renewalGuard?:(action:'check'|'reject',lease?:string)=>Promise<Row>;recordFailure?:(revision:number)=>Promise<unknown>;recordVerified?:(revision:number)=>Promise<Row>}){
  const now=options.now||Date.now;
  const due=(stored:Row)=>typeof stored.expires_at!=='string'||!Number.isFinite(Date.parse(stored.expires_at))||Date.parse(stored.expires_at)-now()<=6*60*60*1000;
  const current=(stored:Row)=>{if(stored.configured!==true||!validToken(stored.access_token)||!validPortal(stored.portal_id))fail();return {accessToken:stored.access_token as string,portalId:stored.portal_id as string};};
@@ -79,13 +79,14 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
   const stored=await options.session({p_action:'read'});
   if(stored.configured===false)return {accessToken:options.getConfig().accessToken,portalId:options.getConfig().portalId};
   if(stored.configured!==true||!validToken(stored.access_token)||!validPortal(stored.portal_id))fail();
+  if(options.renewalGuard){const guard=await options.renewalGuard('check');if(typeof guard.allowed!=='boolean'||!Number.isSafeInteger(guard.revision)||guard.revision!==stored.revision)fail();if(!guard.allowed)throw new MhelpReconnectRequiredError();}
   return {accessToken:stored.access_token as string,portalId:stored.portal_id as string};
  };
  const renew=async(onlyIfDue=false)=>{
   const config=options.getConfig();
   if(!validToken(config.clientId)||!validToken(config.clientSecret))fail();
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  let lease:string|null=null,rotated=false,retainLease=false;
+  let lease:string|null=null,rotated=false,retainLease=false,observedRevision:number|null=null;
   const guard=async(lease?:string)=>{
    if(!options.renewalGuard)return;
    const status=await options.renewalGuard('check',lease);
@@ -106,11 +107,13 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
     stored=await options.session({p_action:'bootstrap',p_access_token:config.accessToken,p_refresh_token:config.refreshToken,p_portal_id:portal});
    }
    if(stored.configured!==true||!validPortal(stored.portal_id))fail();
+   if(Number.isSafeInteger(stored.revision)&&Number(stored.revision)>0)observedRevision=Number(stored.revision);
    if(onlyIfDue&&!due(stored))return current(stored);
    await guard();
    const claimed=await options.session({p_action:'claim'});
    if(claimed.configured!==true||!validToken(claimed.refresh_token)||!validPortal(claimed.portal_id)||typeof claimed.lease_id!=='string'||!/^[0-9a-f-]{36}$/i.test(claimed.lease_id))fail();
    lease=claimed.lease_id as string;
+   if(Number.isSafeInteger(claimed.revision)&&Number(claimed.revision)>0)observedRevision=Number(claimed.revision);
    await guard(lease);
    // Another worker may have renewed between our read and atomic claim. Its
    // latest pair is returned by the claim, so a due-check never rotates it again.
@@ -129,9 +132,11 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
    lease=null;
    // A reconnect or later renewal can advance the store after our commit. Use
    // the latest persisted revision rather than an in-memory credential pair.
-   const latest=current(await options.session({p_action:'read'}));
+   const latestStored=await options.session({p_action:'read'}),latest=current(latestStored);
+   if(Number.isSafeInteger(latestStored.revision)&&Number(latestStored.revision)>0)observedRevision=Number(latestStored.revision);
    const portal=await readPortal(latest.accessToken);
    if(portal!==claimed.portal_id)fail();
+   if(options.recordVerified){if(!Number.isSafeInteger(latestStored.revision)||Number(latestStored.revision)<1)fail();if((await options.recordVerified(Number(latestStored.revision))).verified!==true)fail();}
    return latest;
   }catch(cause){
    if(cause instanceof MhelpTokenRenewalError&&cause.diagnostic.httpStatus===400&&cause.diagnostic.oauthError==='invalid_grant'&&lease&&!rotated&&options.renewalGuard){
@@ -140,6 +145,7 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
     if(result.allowed!==false||(!Number.isSafeInteger(result.revision)||Number(result.revision)<1))fail();
     retainLease=false;throw new MhelpReconnectRequiredError();
    }
+   if(!(cause instanceof MhelpReconnectRequiredError)&&observedRevision&&options.recordFailure)await options.recordFailure(observedRevision).catch(()=>{});
    if(cause instanceof MhelpTokenRenewalError||cause instanceof MhelpReconnectRequiredError)throw cause;fail();
   }finally{
    clearTimeout(timer);
@@ -152,8 +158,8 @@ export function createMhelpTokenManager(options:{getConfig:()=>Config;fetch:type
   return pending;
  };
  return {getPartnerConfig,renewAccess,ensureAccess:async()=>{
-  const stored=await options.session({p_action:'read'});
-  if(options.renewalGuard){const guard=await options.renewalGuard('check');if(typeof guard.allowed!=='boolean'||(!Number.isSafeInteger(guard.revision)||Number(guard.revision)<1))fail();if(!guard.allowed)throw new MhelpReconnectRequiredError();}
+  let stored=await options.session({p_action:'read'});
+  if(options.renewalGuard){const guard=await options.renewalGuard('check');if(typeof guard.allowed!=='boolean'||(!Number.isSafeInteger(guard.revision)||Number(guard.revision)<1))fail();if(!guard.allowed)throw new MhelpReconnectRequiredError();if(stored.revision!==guard.revision){stored=await options.session({p_action:'read'});if(stored.revision!==guard.revision)fail();}}
   if(stored.configured===true&&!due(stored))return {...current(stored),renewed:false,expiresAt:stored.expires_at as string};
   if(!pending)pending=renew(true).finally(()=>{pending=null;});
   await pending;

@@ -12,9 +12,10 @@ export default function MhelpConnectionAlert({value,canReconnect,onReconnect}:Pr
   <strong>Reconnect mHelpDesk</strong><p>mHelpDesk rejected the saved authorization. Showing saved inventory; camera health is separate.</p>
   {canReconnect?<button type='button' className='secondary' onClick={onReconnect}>Reconnect mHelpDesk</button>:<p>Ask a COS Owner to reconnect mHelpDesk.</p>}
  </section>;
+ if(auth?.renewalCheckFailed===true)return <section className='cos-fleet-message' role='alert' aria-label='mHelpDesk renewal delayed'><strong>Automatic renewal check delayed</strong><p>COS could not verify automatic token renewal and will retry. Showing saved inventory; camera health is separate.</p></section>;
  if(inventory?.paused===true)return <section className='cos-fleet-message' role='status' aria-label='mHelpDesk updates paused'><strong>mHelpDesk updates paused</strong><p>Showing saved inventory; camera health is separate.</p></section>;
- const failed=typeof sync.errorCode==='string'&&!!sync.errorCode;
- const retry=typeof inventory?.nextEligibleAt==='string'&&Number.isFinite(Date.parse(inventory.nextEligibleAt))?inventory.nextEligibleAt:null;
+ const failed=typeof sync.errorCode==='string'&&!!sync.errorCode||inventory?.failed===true;
+ const retry=typeof inventory?.nextEligibleAt==='string'&&Number.isFinite(Date.parse(inventory.nextEligibleAt))&&Date.parse(inventory.nextEligibleAt)>Date.now()?inventory.nextEligibleAt:null;
  if(!failed&&!retry)return null;
  return <section className='cos-fleet-message' role='status' aria-label='mHelpDesk update delayed'><strong>mHelpDesk update delayed</strong>
   <p>{retry?<>Waiting for mHelpDesk. Automatic retry is eligible at <time dateTime={retry}>{new Date(retry).toLocaleString()}</time>.</>:sync.errorCode==='source_rate_limited'?'mHelpDesk is limiting requests. COS will retry automatically.':'Automatic inventory updates could not finish. Showing saved inventory; camera health is separate.'}</p>

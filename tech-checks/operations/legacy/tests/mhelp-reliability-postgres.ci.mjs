@@ -1,6 +1,7 @@
 /** Real separate PostgreSQL sessions, fixed ephemeral CI destination only. */
 import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {setTimeout as sleep} from 'node:timers/promises';import {resolve} from 'node:path';import {fileURLToPath} from 'node:url';
 import {assertCiContext,validateIsolatedServer,parameters,openPsql} from './mhelp-postgres-concurrency.ci.mjs';
+import {statusFixture} from '../../tests/mhelp-reliability-status-fixture.mjs';
 export {assertCiContext};
 const json=s=>s.split(/\r?\n/).filter(x=>/^[\[{]/.test(x.trim())).map(x=>JSON.parse(x));
 const exec=sql=>openPsql(sql).done;
@@ -34,7 +35,18 @@ export async function main(){
  const claimed=await call("select public.cos_mhelp_token_session('claim');");assert(claimed.lease_id);
  const rejected=await race(parameters("select public.cos_mhelp_renewal_guard('reject',$1::uuid);",[claimed.lease_id]),"select public.cos_mhelp_renewal_guard('check');",'renewal-rejection');assert.equal(rejected[0].allowed,false);assert.equal(rejected[1].allowed,false);assert.equal(rejected[0].revision,rejected[1].revision);
  await call("select public.cos_mhelp_token_session('commit',$1::uuid,'synthetic-reliable-access','synthetic-reliable-refresh',clock_timestamp()+interval '24 hours');",[claimed.lease_id]);assert.equal((await call("select public.cos_mhelp_renewal_guard('check');")).allowed,true);
- for(const role of ['anon','authenticated'])for(const sql of ["select public.cos_mhelp_request_budget(false);","select public.cos_mhelp_renewal_guard('check');",parameters("select public.cos_mhelp_inventory_cache('read',$1);",[key])])await assert.rejects(exec('begin;set local role '+role+";select set_config('request.jwt.claim.role','service_role',true);"+sql+'commit;'),e=>e.sqlstate==='42501');
- console.log('PASS real distinct-client allowance pacing/cap/reserve, UTC reset/provider hold, observed cache TTL, lease-bound rejected-grant suppression/revision recovery and denied client roles');
+ await exec(statusFixture);await exec(await readFile(new URL('../../db/mhelp-reliability-status.sql',import.meta.url),'utf8'));
+ const currentRevision=(await query('select revision from public.cos_mhelp_token_state where singleton'))[0].revision;
+ assert.equal((await call('select public.cos_mhelp_auth_observation($1::bigint);',[Number(currentRevision)])).verified,true);
+ assert.equal((await call('select public.cos_mhelp_auth_observation($1::bigint);',[Number(currentRevision)-1])).verified,false);
+ const status=await call('select public.cos_mhelp_reliability_status();');assert.equal(status.auth.state,'verified');assert.equal(status.inventory.paused,true);
+ assert.equal((await call('select public.cos_mhelp_renewal_failure($1::bigint);',[Number(currentRevision)])).recorded,true);
+ assert.equal((await call('select public.cos_mhelp_reliability_status();')).auth.renewalCheckFailed,true);
+ assert.equal((await call('select public.cos_mhelp_auth_observation($1::bigint);',[Number(currentRevision)])).verified,true);
+ assert.equal((await call('select public.cos_mhelp_reliability_status();')).auth.renewalCheckFailed,false);
+ assert.equal((await call("select public.cos_mhelp_inventory_read_lease('acquire');")).reason,'inventory_paused');
+ assert.equal((await call('select public.cos_mhelp_placement_from_inventory();')).vendorReads,0);
+ for(const role of ['anon','authenticated'])for(const sql of ["select public.cos_mhelp_renewal_failure(9);","select public.cos_mhelp_auth_observation(9);","select public.cos_mhelp_reliability_status();","select public.cos_mhelp_request_budget(false);","select public.cos_mhelp_renewal_guard('check');",parameters("select public.cos_mhelp_inventory_cache('read',$1);",[key])])await assert.rejects(exec('begin;set local role '+role+";select set_config('request.jwt.claim.role','service_role',true);"+sql+'commit;'),e=>e.sqlstate==='42501');
+ console.log('PASS real distinct-client allowance pacing/cap/reserve, UTC reset/provider hold, observed cache TTL, lease-bound rejected-grant suppression/revision recovery native pause/auth evidence and denied client roles');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.message);process.exitCode=1;});
