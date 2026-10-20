@@ -1,3 +1,4 @@
+import {manualShopInventory,manualShopAddresses} from '../../supabase/functions/cos-operations-pages/fleetShopProjection';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -38,7 +39,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         field:async field=>{
           const units=field.items as Unit[];
           const points=await Promise.all(units.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)})));
-          if(current())setData(previous=>({...previous,units,inventory:(Array.isArray((field as any).inventoryItems)?(field as any).inventoryItems:units) as Unit[],fieldSource:field,addressMap:readMhelpAddressMapPins((field as any).mhelpAddressMap,(field as any).uploadInventory,Date.now()),readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))}));
+          if(current())setData(previous=>({...previous,units,inventory:(Array.isArray((field as any).inventoryItems)?(field as any).inventoryItems:units) as Unit[],fieldSource:field,addressMap:manualShopAddresses(readMhelpAddressMapPins((field as any).mhelpAddressMap,(field as any).uploadInventory,Date.now()),manualShopInventory((field as any).uploadInventory,(field as any).manualPlacementOverrides)),readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))}));
         },
         health:health=>{if(current())setData(previous=>({...previous,health}));},
         routers:routers=>{if(current())setData(previous=>({...previous,routers}));}
@@ -65,7 +66,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     const source=data.fieldSource,addresses=data.addressMap;
     const roster=source?readRecordedRoster(source.fleetRoster,data.inventory).roster:null;
     const dashboardRows=fleetDashboardRows(data.inventory,data.health,data.routers?.items||null,null,clock);
-    const products=source?mhelpFieldHealth(source.uploadInventory,roster,dashboardRows,clock):null;
+    const products=source?mhelpFieldHealth(manualShopInventory(source.uploadInventory,source.manualPlacementOverrides),roster,dashboardRows,clock):null;
     const health=products?fleetAddressHealth(products.items,dashboardRows,'camera'):new Map<string,ReticleState>();
     const productUnits=new Map((products?.items||[]).filter(product=>product.unitId).map(product=>[product.productId,product.unitId!]));
     const coveredUnitIds=new Set((addresses?.pins||[]).map(pin=>productUnits.get(pin.productId)).filter(Boolean));

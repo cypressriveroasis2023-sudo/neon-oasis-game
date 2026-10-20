@@ -7,6 +7,8 @@ on:
       - 'tech-checks/operations/src/FleetDashboard.tsx'
       - 'tech-checks/operations/src/FleetBoardSystems.tsx'
       - 'tech-checks/operations/src/FleetCameraTools.tsx'
+      - 'tech-checks/operations/src/FleetShopAction.tsx'
+      - 'tech-checks/supabase/functions/cos-operations-pages/fleetShopProjection.ts'
       - 'tech-checks/operations/src/FleetUnitHealth.tsx'
       - 'tech-checks/operations/tests/tech-check-tv.browser.spec.mjs'
       - 'tech-checks/operations/src/fleetBoardLayout.css'
@@ -51,9 +53,9 @@ jobs:
       - name: Install Chromium for focused Fleet verification
         run: npx playwright install --with-deps chromium
       - name: Verify individual and grouped map semantics
-        run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs tests/camera-diagnostics.test.mjs tests/fleet-unit-health.test.mjs
+        run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs tests/camera-diagnostics.test.mjs tests/fleet-unit-health.test.mjs tests/fleet-shop-placement.test.mjs tests/fleet-shop-database.test.mjs
       - name: Verify map and TV browser behavior
-        run: npm run test:browser -- tests/fleet-camera-tools.browser.spec.mjs tests/fleet-board-layout.browser.spec.mjs tests/fleet-command-center.browser.spec.mjs tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
+        run: npm run test:browser -- tests/fleet-shop-action.browser.spec.mjs tests/fleet-camera-tools.browser.spec.mjs tests/fleet-board-layout.browser.spec.mjs tests/fleet-command-center.browser.spec.mjs tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
       - name: Prove rebuilt assets contain approved pin design
         shell: bash
         run: |
