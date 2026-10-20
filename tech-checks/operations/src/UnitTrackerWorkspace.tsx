@@ -3,6 +3,7 @@ import {api,OperationsApiError} from './api';
 import {addressUuid,checkedTrackerRequest,checkedTrackerSnapshot,checkedTrackerDetail,checkedTrackerLookup,newTrackerDraft,trackerAccess,trackerChanges,trackerDraft,trackerDraftProblem,trackerFieldLabels,trackerInventory,trackerRequestMatches,trackerRequestPayload,trackerWorkbookId,type TrackerDraft,type TrackerFields,type TrackerInventory,type TrackerRequest,type TrackerSnapshot,type TrackerSource} from './unitTracker';
 import './unitTracker.css';
 import MhelpPartnerReview from './MhelpPartnerReview';
+import MhelpSyncStatus from './MhelpSyncStatus';
 import MhelpIntakeReview from './MhelpIntakeReview';
 import SheetsConnectionReview from './SheetsConnectionReview';
 
@@ -15,6 +16,7 @@ function RequestDetails({request}:{request:TrackerRequest}){
 }
 export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelectUnit,openMap,openHealth}:Props){
  const allowed=trackerAccess(session);
+ const [savedInventory,setSavedInventory]=useState<unknown>(null);
  const [snapshot,setSnapshot]=useState<TrackerSnapshot|null>(null),[inventory,setInventory]=useState<TrackerInventory[]>([]);
  const [query,setQuery]=useState(''),[placement,setPlacement]=useState('ALL'),[page,setPage]=useState(0),[selected,setSelected]=useState(addressUuid(initialUnitId)?initialUnitId:'');
  const [loading,setLoading]=useState(false),[sourceLoading,setSourceLoading]=useState(false),[saving,setSaving]=useState(false);
@@ -31,7 +33,7 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
   if(!live.current||request!==revision.current)return null;
   let current:TrackerSnapshot|null=null;
   try{if(trackerResult.status==='rejected')throw trackerResult.reason;current=checkedTrackerSnapshot(trackerResult.value.data);setSnapshot(current);setTrackerError('');}catch(cause){setSnapshot(null);setTrackerError(message(cause));}
-  try{if(mapResult.status==='rejected')throw mapResult.reason;setInventory(trackerInventory(mapResult.value.data,current?.sources||[],current?.requests||[]));setError('');}catch(cause){setInventory([]);setError(message(cause));}
+  try{if(mapResult.status==='rejected')throw mapResult.reason;setInventory(trackerInventory(mapResult.value.data,current?.sources||[],current?.requests||[]));setSavedInventory(mapResult.value.data);setError('');}catch(cause){setError(message(cause));}
   setLoading(false);return current;
  },[allowed]);
  useEffect(()=>{live.current=true;if(allowed)void refresh();return()=>{live.current=false;revision.current++;editRevision.current++;};},[allowed,refresh]);
@@ -71,7 +73,8 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
  if(!allowed)return <section className='panel module' role='alert'><h2>Unit Tracker unavailable</h2><p>This workspace requires an authorized Owner or verified IT account and a compatible backend.</p></section>;
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
-  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<MhelpPartnerReview openMap={openMap} openHealth={openHealth}/>}
+  <MhelpSyncStatus snapshot={savedInventory} readFailed={Boolean(error)}/>
+  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<details className='unit-tracker-advanced'><summary>Advanced / IT tools</summary><MhelpPartnerReview openMap={openMap} openHealth={openHealth}/></details>}
   <MhelpIntakeReview session={session}/>
   <SheetsConnectionReview canCheck={(session as {legacyOwner?:boolean})?.legacyOwner===true} queueEnabled={snapshot?.queueEnabled===true}/>
   {trackerError&&<p className='operations-error' role='alert'>{trackerError} Pending requests and their save controls are unavailable.</p>}{snapshot?.availability==='unavailable'&&<p role='status'>{snapshot.reason||'The pending request store is not ready.'}</p>}
