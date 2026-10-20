@@ -166,3 +166,30 @@ test('source checksum, source CAS, changed current 2027 ID, and weak Owner confi
   assert.equal((await db.query("select active_sha256 from cos_mhelp_placement_private.upload_control")).rows[0].active_sha256,previous);
  }finally{await db.close();}
 });
+
+test('complete API baseline → October20 CSV preview/stage/commit preserves 1001 IDs and native records',async()=>{
+ const {parseEquipmentCsv}=await import('../../supabase/functions/cos-operations-pages/mhelpEquipmentCsvPreview.ts');
+ const {ownerEquipmentCsvReview}=await import('../../supabase/functions/cos-operations-pages/mhelpEquipmentOwnerReview.ts');
+ const {stageOwnerEquipmentCsv,commitOwnerEquipmentCsv}=await import('../../supabase/functions/cos-operations-pages/mhelpEquipmentWriteBridge.ts');
+ const db=await setup();try{
+  await db.exec(nativeSchema.slice(nativeSchema.indexOf(' create table '),nativeSchema.indexOf(' create function ')));await installActualReview(db);
+  // Synthetic census. The actual customer file is never included in source control.
+  await db.exec("alter table public.equipment_units add column ip text,add column sim text; insert into public.equipment_units(id,organization_id,unit_number,status,gps_latitude,gps_longitude,ip,sim) values('00000000-0000-4000-8000-000000000777','ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5','Ranger 777','ACTIVE',30,-95,'192.0.2.7','synthetic-sim');insert into public.equipment_unit_location_history values('00000000-0000-4000-8000-000000000777');insert into app_private.vision_tracker_locations values('00000000-0000-4000-8000-000000000778','ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5','Ranger 777','ranger777','RANGERS','FIELD','Domain Builders','Saved Site','Saved Address',30,-95)");
+  const nativeSnapshot=async()=>{const all={};for(const table of ['public.equipment_units','public.equipment_unit_location_history','app_private.vision_tracker_locations'])all[table]=(await db.query(`select coalesce(jsonb_agg(to_jsonb(t)),'[]') value from ${table} t`)).rows[0].value;return all;};const protectedBefore=await nativeSnapshot();
+  const csv=['ProductId,ProductModel,CustomerId,CustomerName,Category,Address,City,State,Zip,ProductDesc',...Array.from({length:1001},(_,i)=>`${i+1},Ranger ${i+1},${i<284?'100':'200'},${i<284?'Domain Builders':'Cameras OnSite'},Ranger,${i+1} Main St,Houston,TX,77064,198.51.100.77`)].join('\n');
+  const next=parseEquipmentCsv(csv),old=structuredClone(next);for(const r of old.slice(284,287))Object.assign(r,{placement:'FIELD',customerId:'100',customer:'Domain Builders'});
+  const api={contract:'COS_MHELP_API_V1',origin:'mhelpdesk_api',portalId:'224643',reviewed:true,complete:true,recordCount:1001,sourceSha256:previous,payloadSha256:'b'.repeat(64),receivedAt:'2026-10-20T17:36:07Z',receivedAtPrecision:'second',exportAsOf:null,apiMissingRecords:[],records:old,companyCustomerIds:['200'],trackerRecords:[]};
+  await db.query('update cos_mhelp_placement_private.upload_batches set receipt=$1,records=$2 where source_sha256=$3',[JSON.stringify(api),JSON.stringify(old),previous]);
+  const hash=createHash('sha256').update(csv).digest('hex'),body={sourceFilename:'ServiceItem_List_20261020170000.csv',bytesBase64:Buffer.from(csv).toString('base64'),expectedSha256:hash};let reads=0;
+  const verifyCensus=async()=>{reads++;return {contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1',verifiedBy:'cos_sheets_service',sourceSha256:censusSha,observedAt:new Date().toISOString(),productIds:next.map(r=>r.productId),productRows:next.map(r=>({productId:r.productId,family:r.category,unitLabel:r.unitNumber,placement:r.placement,customer:r.customer})),total:1001,field:284,shop:717};};
+  const options={actorId:actor,organizationId:org,previous:api,body,google:{getServiceAccountJson:()=>null},verifyCensus};
+  const review=await ownerEquipmentCsvReview(options);assert.equal(review.censusStatus,'verified');assert.equal(review.readyToCommit,false);assert.equal(review.admission.gates.canCommit,false);assert.equal(review.changes.placement,3);assert.deepEqual(review.inventory,{total:1001,field:284,shop:717,inactive:0});
+  const rpc=async(name,a)=>{
+   if(name==='cos_owner_mhelp_equipment_stage_v1')return stage(db,[a.p_actor_user_id,a.p_organization_id,a.p_request_id,a.p_filename,a.p_source_sha256,a.p_expected_active_sha256,a.p_current_2027_sha256,JSON.stringify(a.p_current_2027_rows),a.p_original_bytes_base64,JSON.stringify(a.p_records)]);
+   assert.equal(name,'cos_owner_mhelp_equipment_commit_v1');return commit(db,a.p_stage_id,a.p_confirmation_text,a.p_current_2027_sha256);
+  };
+  const staged=await stageOwnerEquipmentCsv({...options,requestId:randomUUID(),rpc});assert.equal(staged.productIdsMatched,1001);assert.equal(staged.readyToCommit,false);
+  const out=await commitOwnerEquipmentCsv({...options,stageId:staged.stageId,confirmationText:'I reviewed the October 20 source with 1001 IDs, 284 Field and 717 Shop.',rpc});assert.deepEqual({records:out.records,field:out.field,shop:out.shop},{records:1001,field:284,shop:717});assert.equal(reads,3);
+  const saved=(await db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[hash])).rows[0].records;assert.equal(new Set(saved.map(r=>r.productId)).size,1001);assert.equal(saved.filter(r=>r.placementHeld).length,3);assert(!JSON.stringify(saved).includes('198.51.100.77'));assert.deepEqual(await nativeSnapshot(),protectedBefore);
+ }finally{await db.close();}
+});
