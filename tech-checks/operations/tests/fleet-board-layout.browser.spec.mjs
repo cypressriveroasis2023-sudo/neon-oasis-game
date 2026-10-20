@@ -19,6 +19,8 @@ for(const it of [false,true])test(`main Fleet board is map-first and source-labe
  await board.getByRole('searchbox',{name:'Search units, customers, sites or addresses'}).fill('');
  const map=await board.locator('.cos-fleet-map-panel').boundingBox();
  const units=await board.locator('.cos-fleet-unit-panel').boundingBox();
+ await expect(board.locator('.cos-board-system-note')).toContainText('mHelp inventory saved');
+ await expect(board.locator('.cos-board-system-note')).toBeVisible();
  const small=testInfo.project.name==='mobile-390';
  if(small){
   expect(map.y).toBeLessThan(630);

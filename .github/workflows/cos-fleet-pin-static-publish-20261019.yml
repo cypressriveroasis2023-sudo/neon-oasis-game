@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
       - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/src/FleetBoardSystems.tsx'
+      - 'tech-checks/operations/src/fleetBoardLayout.css'
       - 'tech-checks/operations/src/FleetDashboardMap.tsx'
       - 'tech-checks/operations/src/TvFleetView.tsx'
       - 'tech-checks/operations/src/fleetCompactMap.ts'
@@ -19,7 +21,8 @@ permissions:
   contents: write
 concurrency:
   group: cos-fleet-pin-static-publish-20261019
-  cancel-in-progress: false
+  # A newer production source supersedes older builds; PR checks never cancel a live release.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 jobs:
   publish-fleet-pins:
     runs-on: ubuntu-latest
