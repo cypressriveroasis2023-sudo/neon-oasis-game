@@ -198,7 +198,8 @@ test('A selected installation removed from the cache falls back safely, includin
 });
 
 test('Repeated refresh clicks share one in-flight request and preserve a newer user selection',async({page})=>{
- await page.clock.install();
+ const start=Date.parse('2026-10-20T12:00:00Z');
+ await page.clock.install({time:new Date(start-60000)});await page.clock.pauseAt(new Date(start));
  const items=[syntheticUnit(2800001,'First installation'),syntheticUnit(2800002,'Second installation')];
  let release;
  let refreshes=0;
