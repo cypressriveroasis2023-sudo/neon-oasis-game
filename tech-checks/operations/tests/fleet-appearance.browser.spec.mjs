@@ -85,9 +85,9 @@ test('circle colors, clustering, fullscreen and unit selection retain their beha
   await expect(app.locator('.cos-dashboard-marker')).toHaveCount(4);
   for(const [status,color] of [['online','rgb(43, 255, 53)'],['offline','rgb(255, 39, 52)'],['unknown','rgb(148, 163, 184)'],['support','rgb(21, 168, 255)']]){
     const marker=app.locator(`.cos-dashboard-marker .cos-field-pin[data-health="${status}"]`);
-    await expect(marker.locator('path')).toHaveCSS('fill',color);
+    await expect(marker.locator('circle')).toHaveCSS('fill',color);
     await expect(marker).toHaveCSS('width','28px');
-    await expect(marker).toHaveCSS('height','36px');
+    await expect(marker).toHaveCSS('height','28px');
     const hit=marker.locator('..');
     await expect(hit).toHaveCSS('width','44px');
     await expect(hit).toHaveCSS('height','56px');
