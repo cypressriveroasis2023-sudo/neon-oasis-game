@@ -35,4 +35,8 @@
 .cos-return-selection details{margin:12px 0}.cos-return-selection summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
 .cos-ticketfree-dialog .cos-return-radio{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:400;margin:6px 0}
 .cos-return-pager>span{flex:1;text-align:center}.cos-return-families>button{font-size:14px;padding:10px 12px}
+.cos-truck-action{min-width:0;display:flex;flex-direction:column;gap:8px}.cos-truck-action .cos-return-pick{flex:1}
+.cos-truck-action>small{padding:0 4px}.cos-return-reasons{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.cos-return-reasons>button{flex:1 1 150px}.cos-return-used{border-left:4px solid #65c9e9;background:#17394a;padding:10px;overflow-wrap:anywhere}
+.cos-return-tabs>button{flex:1 1 130px}
 @media(max-width:380px){.cos-return-grid{grid-template-columns:1fr}}

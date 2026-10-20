@@ -1,8 +1,11 @@
 // Selections use exact family-qualified identities, never a number-only join.
 export const selectionKey = item => item.equipment_key || 'truck:' + item.family + ':' + item.unit_tag;
 export const itemName = item => item.name || item.family + ' ' + item.unit_tag;
+export const itemReason = item => item.reason || (item.usedKey ? 'swap' : item.source === 'truck' ? 'truck_return' : 'pickup');
+export const reasonLabel = reason => ({swap:'Return from swap',pickup:'Pickup from site',truck_return:'Unused truck equipment'}[reason] || 'Return reason unavailable');
+export const savedReturnReason = item => item.used_key || item.source_mode === 'swap' ? 'swap' : ({field_return:'pickup',truck_return:'truck_return'}[item.source_mode]);
 export function batchDraft(saved, equipment = []) {
- if (saved.items) return saved;
+ if (saved.items) return {...saved,tab:saved.tab==='site'?'pickup':saved.tab||'truck',items:saved.items.map(item=>({...item,reason:itemReason(item)}))};
  const request = saved.request;
  const key = request?.p_returned_key || saved.returnedKey;
  const entry = equipment.find(e => e.equipment_key === key);
@@ -12,7 +15,9 @@ export function batchDraft(saved, equipment = []) {
 export function selectItem(draft, entry, source) {
  const key=selectionKey(entry),at=draft.items.findIndex(e=>selectionKey(e)===key);
  if(at>=0){draft.items.splice(at,1);return;}
- draft.items.push({...entry,id:crypto.randomUUID(),source,usedKey:''});
+ const reason=source==='truck'?'truck_return':source==='swap'?'swap':'pickup';
+ draft.items.push({...entry,id:crypto.randomUUID(),source:source==='truck'?'truck':'site',reason,usedKey:reason==='swap'?draft.pendingUsedKey||'':''});
+ if(reason==='swap')draft.pendingUsedKey='';
 }
 export function cataloguePage(equipment, query='', family='', page=0, size=24) {
  const tokens=query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -25,6 +30,11 @@ export async function prepareBatch(draft,client) {
  if(draft.items.length>24)throw new Error('Send up to 24 units at a time.');
  const keys=draft.items.map(selectionKey),used=draft.items.map(i=>i.usedKey).filter(Boolean);
  if(new Set(keys).size!==keys.length||new Set(used).size!==used.length||used.some(k=>keys.includes(k)))throw new Error('A unit cannot be returned and installed at the same time, or used in two swaps.');
+ for(const item of draft.items){
+  const reason=itemReason(item);
+  if(reason==='swap'&&!item.usedKey)throw new Error('Select the equipment used from your truck for the swap returning '+itemName(item)+'.');
+  if(reason!=='swap'&&item.usedKey)throw new Error('Only a swap can remove installed replacement equipment from your truck.');
+ }
  const items=[];
  for(const item of draft.items){
   client.assert();

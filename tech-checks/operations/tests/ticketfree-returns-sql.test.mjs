@@ -55,7 +55,7 @@ test('active roles are required and private records cannot be read directly',asy
 });
 test('a no-ticket swap atomically records usage, a pending return, and notices for both IT techs',async()=>{
  const old=await equipment(),used=await truckItem(),r=request(old,used);const result=await send(r);
- assert.equal(result.state,'waiting_it');assert.equal((await scalar('select status,last_used_ticket_no from service_truck_units where service_tech_id=$1 and equipment_type=$2',[svc,used.family])).status,'used_restock_due');
+ assert.equal(result.state,'waiting_it');assert.equal((await scalar('select source_mode from app_private.techcheck_ticketfree_returns_v1 where id=$1',[r.p_request_id])).source_mode,'swap');assert.equal((await scalar('select status,last_used_ticket_no from service_truck_units where service_tech_id=$1 and equipment_type=$2',[svc,used.family])).status,'used_restock_due');
  assert.equal((await scalar('select tracker_state from equipment_master where equipment_key=$1',[used.key])).tracker_state,'field_or_unknown');
  assert.equal((await scalar('select tracker_state from equipment_master where equipment_key=$1',[old.key])).tracker_state,'field_or_unknown');
  assert.equal((await scalar('select lifecycle_status from unit_registry where unit_key=$1',[old.key])).lifecycle_status,'returned_waiting_it');
@@ -172,4 +172,16 @@ test('unlinked submissions cannot invent arbitrary truck equipment or impersonat
  const unknown={request_id:randomUUID(),returned_key:null,unlinked_family:'Sniper',unlinked_tag:'invented',notes:'',photos:[]};
  await assert.rejects(batch([unknown]),/assigned to your truck/);
  await assert.rejects(batch([unknown],it),/Only the signed-in/);
+});
+
+
+test('a site pickup records its own reason without consuming or replenishing any truck stock',async()=>{
+ const e=await equipment(),r=request(e);
+ const stock=await db.query('select * from service_truck_units order by service_tech_id,equipment_type');
+ const before=(await scalar('select count(*)::int n from service_truck_restock_requests')).n;
+ await send(r);
+ assert.equal((await scalar('select source_mode from app_private.techcheck_ticketfree_returns_v1 where id=$1',[r.p_request_id])).source_mode,'field_return');
+ assert.equal((await scalar('select count(*)::int n from service_truck_restock_requests')).n,before);
+ assert.deepEqual((await db.query('select * from service_truck_units order by service_tech_id,equipment_type')).rows,stock.rows);
+ assert.ok((await context(it)).returns.some(x=>x.id===r.p_request_id&&x.source_mode==='field_return'&&!x.used_key));
 });
