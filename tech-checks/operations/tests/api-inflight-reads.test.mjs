@@ -141,7 +141,7 @@ test('bearer rollover never shares the preceding account or session response', a
   f.answer(1, { actor: 'synthetic-new-account' });
   f.answer(0, { actor: 'synthetic-old-account' });
   assert.equal((await newRead).data.actor, 'synthetic-new-account');
-  assert.equal((await oldRead).data.actor, 'synthetic-old-account');
+  await assert.rejects(oldRead, status(409));
 });
 
 test('paused IT assignment reads and claim writes never reach transport; Service reads remain independent', async () => {
@@ -166,7 +166,7 @@ test('mode is part of read identity even with the same valid role, bearer and pa
   assert.equal(f.requests.length, 2);
   f.answer(0, { view: 'initial' });
   f.answer(1, { view: 'changed' });
-  assert.equal((await initial).data.view, 'initial');
+  await assert.rejects(initial, status(409));
   assert.equal((await changed).data.view, 'changed');
 });
 
@@ -191,7 +191,7 @@ test('an in-flight read cannot bypass a newly unavailable parent session', async
   }
   assert.equal(f.handshakes.length, 5);
   f.answer(0);
-  await first;
+  await assert.rejects(first,status(409));
 });
 
 test('parent origin, source and request identity are still required before any shared read', async () => {
@@ -230,7 +230,7 @@ test('parent timeout is not bypassed by a pending read, and later authorization 
   assert.equal(f.handshakes.length, 3);
   assert.equal(f.requests.length, 2, 'authorization interruption invalidates earlier shared entries');
   f.answer(0);f.answer(1);
-  await Promise.all([first, retry]);
+  await Promise.all([assert.rejects(first,status(409)), retry]);
 });
 
 test('standalone and opaque-origin callers cannot join an authenticated read', async () => {
@@ -245,7 +245,7 @@ test('standalone and opaque-origin callers cannot join an authenticated read', a
   await assert.rejects(f.api.get('/api/jobs'), status(401));
   assert.equal(f.requests.length, 1);
   f.answer(0);
-  await first;
+  await assert.rejects(first,status(409));
 });
 
 test('path and assignment-mode guards run before deduplication or network access', async () => {
@@ -621,7 +621,7 @@ test('real parent role denial and empty token are hard stops, not transient time
 test('trusted host security hide during verification rejects its late successful session body',async()=>{
  const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
  f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
- f.answer(1);f.answer(2,recoveryOwner);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed']);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
+ f.answer(1);f.answer(2,recoveryOwner);await assert.rejects(pending,status(409));await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed']);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
 });
 test('wrong-origin and sibling hide messages cannot interrupt same-Owner recovery',async()=>{
  const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
@@ -629,7 +629,7 @@ test('wrong-origin and sibling hide messages cannot interrupt same-Owner recover
  f.answer(1);f.answer(2,recoveryOwner);await pending;await flush();assert.deepEqual(f.reasons,['token-renewed']);assert.ok(f.sessionState.session);f.current.stop();
 });
 test('denial from the verification request cannot recursively revalidate',async()=>{
- const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();f.answer(1);f.answer(2,{error:'Synthetic revoked'},403);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed','authentication-denied']);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
+ const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();f.answer(1);f.answer(2,{error:'Synthetic revoked'},403);await assert.rejects(pending,status(409));await recoveryTurn();assert.deepEqual(f.reasons,['token-renewed','authentication-denied']);assert.equal(f.sessionState.reloadRequired,true);assert.equal(f.requests.length,3);f.current.stop();
 });
 
 test('an unsent POST cannot cross token renewal while parent authorization is pending',async()=>{
@@ -652,7 +652,7 @@ test('pagehide during POST parent authorization blocks transport even if its old
 });
 test('a previously submitted write is never replayed by successful revalidation',async()=>{
  const f=await recoveryFixture(),write=f.api.post('/api/owner-tasks',{title:'Synthetic submitted intent'});await flush();assert.equal(f.requests[1].envelope.method,'POST');
- f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();f.answer(1,{saved:true});await write;await recoveryTurn();assert.equal(f.requests.filter(r=>r.envelope.method==='POST').length,1);assert.equal(f.requests.length,4);assert.ok(f.sessionState.session);f.current.stop();
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();f.answer(1,{saved:true});await assert.rejects(write,/save could not be confirmed/);await recoveryTurn();assert.equal(f.requests.filter(r=>r.envelope.method==='POST').length,1);assert.equal(f.requests.length,4);assert.ok(f.sessionState.session);f.current.stop();
 });
 
 test('ordinary host hide clears the paired cache and rejects late old sources without replacing a healthy Owner session',async()=>{
@@ -663,4 +663,33 @@ test('ordinary host hide clears the paired cache and rejects late old sources wi
 
 test('a captured draft session remains invalid after same-Owner recovery and a new draft gets a fresh fence',async()=>{
  const f=await recoveryFixture(),oldDraft=f.api.captureSession();assert.equal(oldDraft(),true);f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();assert.equal(oldDraft(),false);f.answer(1);f.answer(2,recoveryOwner);await read;await flush();assert.ok(f.sessionState.session);assert.equal(oldDraft(),false);assert.equal(f.api.captureSession()(),true);f.current.stop();
+});
+
+for(const code of [200,401,403])for(const timing of ['during','after'])test(`obsolete HTTP ${code} ${timing} same-Owner verification cannot revoke it or return data`,async()=>{
+ const f=await recoveryFixture(),old=assert.rejects(f.api.get('/api/camera-health/summary-v3'),status(409));await flush();
+ f.state.token='synthetic-session-b';const fresh=f.api.get('/api/routers');await recoveryTurn();
+ assert.equal(f.sessionState.checking,true);assert.equal(f.sessionState.session,null);
+ if(timing==='after'){f.answer(3,recoveryOwner);await flush();assert.ok(f.sessionState.session);}
+ f.answer(1,{privateOldData:true},code);await old;
+ assert.deepEqual(f.reasons,['token-renewed']);assert.equal(f.sessionState.reloadRequired,false);
+ if(timing==='during'){assert.equal(f.sessionState.session,null);f.answer(3,recoveryOwner);}
+ f.answer(2);await fresh;await flush();assert.equal(f.sessionState.session.productionOwnerUserId,recoveryOwner.productionOwnerUserId);
+ assert.equal(f.requests.length,4);assert.ok(f.requests.every(r=>r.envelope.method==='GET'));f.current.stop();
+});
+for(const patch of [{productionOwnerUserId:'22222222-2222-4222-8222-222222222222'},{features:{fleetAccess:true,vrmRead:false}},{authorized:false}])test('obsolete denial cannot make changed identity or revoked permissions recoverable',async()=>{
+ const f=await recoveryFixture(),old=assert.rejects(f.api.get('/api/routers'),status(409));await flush();
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/jobs');await recoveryTurn();f.answer(2);await read;
+ f.answer(1,{error:'Synthetic old denial'},401);await old;f.answer(3,{...recoveryOwner,...patch});await flush();
+ assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
+});
+test('successful headers cannot admit an old body after a session boundary during parsing',async()=>{
+ const f=await recoveryFixture(),old=assert.rejects(f.api.get('/api/routers'),status(409)),body=deferred();await flush();
+ f.requests[1].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/jobs');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();
+ body.resolve({privateOldData:true});await old;assert.ok(f.sessionState.session);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
+});
+for(const code of [200,401,403])test('submitted old write HTTP '+code+' stays uncertain and is never replayed',async()=>{
+ const f=await recoveryFixture(),write=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),/save could not be confirmed/);await flush();
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();f.answer(1,{saved:true},code);await write;
+ assert.equal(f.requests.filter(r=>r.envelope.method==='POST').length,1);assert.equal(f.requests.length,4);assert.ok(f.sessionState.session);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
 });
