@@ -20,6 +20,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  const node=useRef<HTMLDivElement>(null),groupHost=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0);
+ const [pinMode,setPinMode]=useState<'grouped'|'individual'>(restored.current.pinMode||'grouped');
  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
  useEffect(()=>{
   const host=groupHost.current;
@@ -28,7 +29,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   host.replaceChildren(content);
   return()=>{host.replaceChildren();};
  },[groupDetails]);
- useEffect(()=>{setGroupDetails(null);},[filters?.status,filters?.query,filters?.placement,filters?.family,filters?.provider,filters?.layer,filters?.nearbyId,mhelpAddressPins]);
+ useEffect(()=>{setGroupDetails(null);},[pinMode,filters?.status,filters?.query,filters?.placement,filters?.family,filters?.provider,filters?.layer,filters?.nearbyId,mhelpAddressPins]);
  useEffect(()=>{
   if(!groupDetails)return;
   const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setGroupDetails(null);};
@@ -69,7 +70,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    ...visibleMhelpPins.map(pin=>({item:{kind:'address' as const,pin},...instance.latLngToContainerPoint(pin.point)})),
    ...displayedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
   ];
-  const size=instance.getSize(),compact=entries.length>=COMPACT_MAP_GROUP_THRESHOLD&&!picker.current;
+  const size=instance.getSize(),compact=pinMode==='grouped'&&entries.length>=COMPACT_MAP_GROUP_THRESHOLD&&!picker.current;
   const layout=compact?compactMapGroups<Entry>(entries):
    fleetIndividualPinPositions<Entry>(entries,{width:size.x,height:size.y}).map(position=>[position]);
   const state=(row:FleetDashboardRow):ReticleState=>row.support?'support':(['online','offline'].includes(row[layer+'State' as 'cameraState'|'routerState'|'batteryState'])?row[layer+'State' as 'cameraState'|'routerState'|'batteryState']:'unknown') as ReticleState;
@@ -144,7 +145,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    marker.on('click',()=>description.member.select?.());
    const tooltip=document.createElement('span');tooltip.textContent=description.name+' · '+({online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support'}[description.health]);marker.bindTooltip(tooltip,{direction:'top',offset:[0,-24],className:'cos-fleet-pin-tooltip'});marker.on('click',()=>marker.closeTooltip());
   }
- },[pins,layer,revision,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation]);
+ },[pins,layer,revision,pinMode,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation]);
 
  const fit=()=>{const values=[...pinRef.current.map(p=>p.point),...visibleMhelpPins.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
  // Pending proof validation hides markers, but is not a settled population change.
@@ -153,13 +154,16 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  return <div ref={panel} aria-busy={!locationsReady} className={'cos-fleet-map-panel field-map-workspace cos-fleet-individual-pins cos-fleet-compact-groups'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
   <div className='cos-fleet-map-toolbar'><div><details className='cos-fleet-map-details'><summary aria-label='Fleet map details'><strong>Fleet map</strong></summary><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{visibleMhelpPins.length>0&&<> · {visibleMhelpPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small>{visibleMhelpPins.length>0&&<label className='cos-fleet-map-find'>Find a mapped unit<select aria-label='Find mapped equipment' defaultValue='' onChange={event=>{if(event.currentTarget.value)onSelectMhelpAddress?.(event.currentTarget.value);event.currentTarget.value='';}}><option value=''>Choose unit</option>{visibleMhelpPins.map(pin=><option key={pin.productId} value={pin.productId}>{pin.unitNumber} · Product {pin.productId}</option>)}</select></label>}</details></div><div><button onClick={fit} disabled={!pins.length&&!visibleMhelpPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
+  <div className='cos-fleet-pin-view' role='group' aria-label='Map pin view'>
+   {(['grouped','individual'] as const).map(mode=><button key={mode} type='button' aria-pressed={pinMode===mode} onClick={()=>{setPinMode(mode);saveFieldMapView({pinMode:mode});}}>{mode==='grouped'?'Grouped':'Individual pins'}</button>)}
+  </div>
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
   {groupDetails&&<section className='cos-compact-group-sheet' role='dialog' aria-label='Grouped Fleet equipment'>
     <button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button>
     <div ref={groupHost} className='cos-compact-group-sheet-content'/>
   </section>}
   {locationsReady&&!pins.length&&!visibleMhelpPins.length&&!pickLocation&&<p className='cos-fleet-map-note'>{rows.length?'These units have no currently verified pins or approved address estimates. Open Location verification.':'No linked unit pins match these filters. Recorded equipment can remain in the list without a verified location.'}</p>}
-  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>Compact rings show grouped equipment status · select a group to view its units.</span><small>EST / SRC: installation needs verification · Nearby units may use display offsets; saved locations stay unchanged.</small></details></div>
+  <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>{pinMode==='grouped'?'Compact rings show grouped equipment status · select a group to view its units.':'Each labeled pin selects one unit · shared addresses use connector lines to the recorded point.'}</span><small>EST / SRC: installation needs verification · Nearby units may use display offsets; saved locations stay unchanged.</small></details></div>
   {locationsReady&&mhelpAddressReviews.length>0&&<details className='cos-mhelp-address-followups'>
    <summary>{mhelpAddressReviews.length} MHelp Field equipment records need address coordinates (no GPS required)</summary>
    <p>These equipment records are still in mHelpDesk Field. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>
