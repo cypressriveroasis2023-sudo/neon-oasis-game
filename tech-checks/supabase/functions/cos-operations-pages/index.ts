@@ -1,3 +1,4 @@
+import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
 import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
@@ -581,6 +582,13 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
+      if (/^\/api\/camera-health\/devices\/[^/]+\/check$/.test(path)) {
+        if (!(context.legacyOwner && context.actorId) && !verifiedFleetIt) fail('An active COS Owner or verified IT account is required.',403);
+        if (method !== 'POST') fail('Use POST for a connection check.',405);
+        try { return json(await checkSavedCamera({id:path.split('/')[4],body,headers:context.headers,fetcher:requestFetch,signal:request.signal})); }
+        catch(error) { if(error instanceof CameraDiagnosticError)return json({error:error.message},error.status); throw error; }
+      }
+
       if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,

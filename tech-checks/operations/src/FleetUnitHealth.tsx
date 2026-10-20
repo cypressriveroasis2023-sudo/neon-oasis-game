@@ -1,6 +1,6 @@
 import FleetCardIcon from './FleetCardIcon';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
-import {unitCardPath} from './cameraCardActions';
+import FleetCameraTools from './FleetCameraTools';
 import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
 import {cameraTimestamp} from './cameraEvidence';
 import {healthObservationLabel} from './healthObservationTime';
@@ -19,7 +19,7 @@ function Status({state,label}:{state:Signal;label?:string}){return <span classNa
 export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{row:FleetDashboardRow;now:number;editing?:boolean;lastKnown?:LastKnownCamera|null}){
  const metrics=row.power?.measurements.filter(m=>m.metric in powerLabels)||[];
  const recent=row.batteryReadIssue?[]:metrics.filter(m=>cameraTimestamp(m.observedAt,now).fresh);
- return <><div className='cos-card-quick-actions' aria-label='Unit tools'><a className='cos-card-pill' href={unitCardPath(row.name)} target='_blank' rel='noopener noreferrer'><FleetCardIcon kind='tools'/>Ping &amp; scan tools ↗</a></div><p className='cos-card-tool-note'>Opens this unit in existing diagnostics. No test runs until you choose it there.</p><div className='cos-fleet-unit-health-grid'>
+ return <><FleetCameraTools key={row.id} row={row}/><div className='cos-fleet-unit-health-grid'>
   <section className='cos-fleet-unit-health-section cos-fleet-camera-card' aria-label={editing?'Unit health signals':'Selected unit camera health'}>
    <h3><FleetCardIcon kind="camera"/>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
    <small>{healthObservationLabel(row.camera.basis,row.camera.state)}: {cameraTime(row.camera.checkedAt,now)}</small>
