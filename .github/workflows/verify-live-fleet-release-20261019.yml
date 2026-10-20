@@ -1,0 +1,66 @@
+name: Verify actual published COS Fleet dashboard
+on:
+  push:
+    branches: [verify/cos-live-fleet-release-20261019]
+    paths: [.github/workflows/verify-live-fleet-release-20261019.yml]
+permissions:
+  contents: read
+jobs:
+  verify-live-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify production entry point and exact compiled assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const root='tech-checks/operations/dist/';
+          const origin='https://cypressriveroasis2023-sudo.github.io';
+          const base=origin+'/neon-oasis-game/'+root;
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const expected=readFileSync(root+'index.html');
+          const report={verifiedAt:new Date().toISOString(),sourceCommit:process.env.GITHUB_SHA,
+            deploymentUrl:origin+'/neon-oasis-game/tech-checks/',
+            mode:'Unauthenticated static release verification; no inventory or provider requests',files:[]};
+          async function read(url){
+            const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(20000)});
+            if(!response.ok)throw new Error('HTTP '+response.status+' for '+url);
+            return Buffer.from(await response.arrayBuffer());
+          }
+          async function exact(path){
+            const local=readFileSync(root+path);
+            const live=await read(base+path);
+            const matches=hash(local)===hash(live);
+            report.files.push({path,status:200,bytes:live.length,sha256:hash(live),matchesSource:matches});
+            if(!matches)throw new Error('Published asset differs from current release: '+path);
+            return live.toString('utf8');
+          }
+          const index=await exact('index.html');
+          const js=index.match(/src="\.\/(assets\/index-[A-Za-z0-9_-]+\.js)"/)?.[1];
+          const css=index.match(/href="\.\/(assets\/index-[A-Za-z0-9_-]+\.css)"/)?.[1];
+          if(!js||!css)throw new Error('Missing versioned production assets');
+          const [code,styles]=await Promise.all([exact(js),exact(css)]);
+          const required=['Complete mHelpDesk Fleet command center','Field inventory','Avigilon','Star4Live','Recon / Recon II','Victron / Helios','Search all Field Product IDs'];
+          for(const marker of required)if(!code.includes(marker))throw new Error('Missing deployed dashboard marker: '+marker);
+          for(const marker of ['cos-fleet-command','cos-command-provider-grid','cos-compact-group'])if(!styles.includes(marker))throw new Error('Missing deployed style: '+marker);
+          report.dashboardMarkers=required;
+          report.verified=true;
+          writeFileSync('cos-live-release-proof.json',JSON.stringify(report,null,2)+'\n');
+          console.log(JSON.stringify(report,null,2));
+          console.log('PASS: actual production index, JavaScript and CSS match the existing COS release. Signed-in acceptance and synchronization are not implied.');
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cos-live-fleet-release-proof
+          path: cos-live-release-proof.json
+          retention-days: 7
+          if-no-files-found: error
