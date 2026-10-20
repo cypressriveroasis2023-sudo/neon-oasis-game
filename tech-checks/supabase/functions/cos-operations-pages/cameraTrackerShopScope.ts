@@ -123,7 +123,17 @@ export async function currentTrackerShopScope(summary:Row,tracker:Row[],initial:
  let reported=false;
  const fallback=(reason:ShopScopeFallback)=>{if(reported)return;reported=true;try{reader.onFallback?.(reason);}catch{/* Diagnostics never affect presentation. */}};
  if(!summary?.rows?.some((r:Row)=>r.trackerOnly===true&&r.scope==='unknown'&&String(r.id).startsWith('tracker:')))return summary;
- if(!validArray(initial?.inventory)||!initial.inventory.length){fallback('projection-invalid');return summary;}
+ // Reject evidence that cannot pass the final projection before rereading the
+ // complete identity and placement graph. This optional SHOP allowance must
+ // never consume the health request's CPU budget for an unusable inventory.
+ if(!validArray(initial?.inventory)||!initial.inventory.length||!validRead({...initial,sources:[]})){fallback('projection-invalid');return summary;}
+ if(initial.mhelpReceipt?.enabled===true){
+  const at=cameraTimestamp(initial.mhelpReceipt.lastSuccessAt).at;
+  if(!at||Date.now()-Date.parse(at)>MHELP_FRESH_MS){fallback('projection-invalid');return summary;}
+ }
+ const candidates=summary.rows.filter((r:Row)=>r.trackerOnly===true&&r.scope==='unknown'&&String(r.id).startsWith('tracker:')).length;
+ const minimumScan=summary.rows.length+tracker.length+2*(initial.inventory.length+initial.nativeUnits.length+initial.devices.length+initial.audits.length+initial.matches.length+initial.ownerClaims.length+initial.identity.unitIdentities.length+initial.identity.identityWarnings.length+(initial.identity.ownerConfirmedUnitIdentities?.length||0)+(initial.mhelpReceipt?.items.length||0));
+ if(candidates*minimumScan>MAX_WORK){fallback('projection-invalid');return summary;}
  const controller=new AbortController(),deadline=Date.now()+timeoutMs;let timer:ReturnType<typeof setTimeout>|undefined,stage:ShopScopeFallback='source-read';
  const bounded=new Promise<Row>(resolve=>{timer=setTimeout(()=>{controller.abort();fallback('timeout');resolve(summary);},timeoutMs);});
  const operation=(async()=>{

@@ -77,7 +77,8 @@ export function serviceState(row:CameraRow,now=Date.now()):EvidenceState {
 }
 export function combinedState(states:CameraState[],empty:CameraState='verifying'):CameraState {
   if(!states.length)return empty;
-  return states.every(state=>state==='online')?'online':states.every(state=>state==='offline')?'offline':states.some(state=>['online','offline','degraded'].includes(state))?'degraded':'verifying';
+  // Missing coverage is unverified. Partial requires confirmed mixed states.
+  return states.every(state=>state==='online')?'online':states.every(state=>state==='offline')?'offline':states.includes('degraded')||states.includes('online')&&states.includes('offline')?'degraded':'verifying';
 }
 export function classifyCameraUnit(rows:CameraRow[],now=Date.now()):UnitEvidence {
   const active=rows.filter(row=>row.scope!=='inactive');

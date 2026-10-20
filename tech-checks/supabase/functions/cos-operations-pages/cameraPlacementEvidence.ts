@@ -68,7 +68,8 @@ export function serviceState(row:CameraRow,now=Date.now()):EvidenceState {
 }
 export function combinedState(states:CameraState[],empty:CameraState='verifying'):CameraState {
   if(!states.length)return empty;
-  return states.every(state=>state==='online')?'online':states.every(state=>state==='offline')?'offline':states.some(state=>['online','offline','degraded'].includes(state))?'degraded':'verifying';
+  // Missing coverage is unverified. Partial requires confirmed mixed states.
+  return states.every(state=>state==='online')?'online':states.every(state=>state==='offline')?'offline':states.includes('degraded')||states.includes('online')&&states.includes('offline')?'degraded':'verifying';
 }
 export function classifyCameraUnit(rows:CameraRow[],now=Date.now()):UnitEvidence {
   const active=rows.filter(row=>row.scope!=='inactive');
@@ -164,22 +165,30 @@ function witnessUnits(integrations:SourceRecord[]) {
 }
 export function cameraSummary(devices:SourceRecord[],health:SourceRecord[],now=Date.now(),tracker:TrackerPlacement[]=[],integrations:SourceRecord[]=[]) {
   validateCameraSources(devices,health,tracker);
+  // Index exact labels and typed keys once. Preserve every duplicate: these
+  // indexes change lookup cost, never identity or placement admission.
+  const trackerByLabel=new Map<string,TrackerPlacement[]>(),trackerByKey=new Map<string,TrackerPlacement[]>();
+  for(const record of tracker){
+    const label=normalized(record.source_label),key=canonicalTrackerKey(record);
+    trackerByLabel.set(label,[...(trackerByLabel.get(label)||[]),record]);
+    if(key)trackerByKey.set(key,[...(trackerByKey.get(key)||[]),record]);
+  }
   const byId=new Map(health.map(row=>[resourceId(row.camera_device_id),row])),witness=witnessUnits(integrations);
   const rows:CameraRow[]=devices.map(device=>{
     const evidence=cameraEvidence(device),service=serviceEvidence(device,byId.get(resourceId(device.id))||{},false,now);
-    const row:CameraRow={id:device.id,name:device.device_name||device.unit_key||('Resource '+device.id),unit:device.unit_key||'',type:device.device_type||'',organization:device.organization||'',activationState:device.activation_state||'',scope:cameraScope(device,tracker),status:'review',checkedAt:evidence.observedAt,evidence,serviceEvidence:service};
+    const row:CameraRow={id:device.id,name:device.device_name||device.unit_key||('Resource '+device.id),unit:device.unit_key||'',type:device.device_type||'',organization:device.organization||'',activationState:device.activation_state||'',scope:cameraScope(device,trackerByLabel.get(normalized(device.unit_key))||[]),status:'review',checkedAt:evidence.observedAt,evidence,serviceEvidence:service};
     const connection=savedCameraConnection(device.public_ip,device.expected_ports);if(connection)row.connection=connection;
     if(device.source==='reconeyez')row.batteryEvidence=reconBatteryEvidence(device.recon_battery_percent,device.recon_battery_updated_at,device.recon_battery_status,device.recon_battery_status_updated_at);
     row.status=['field','unknown'].includes(row.scope!)?currentCameraStatus(evidence,now):'review';return row;
   });
   const linked=new Set(devices.map(device=>deviceTrackerKey(device.unit_key)).filter(Boolean));
-  for(const device of devices)for(const record of tracker.filter(row=>normalized(row.source_label)===normalized(device.unit_key))){const key=canonicalTrackerKey(record);if(key)linked.add(key);}
+  for(const device of devices)for(const record of trackerByLabel.get(normalized(device.unit_key))||[]){const key=canonicalTrackerKey(record);if(key)linked.add(key);}
   const synthesized=new Set<string>();
   for(const record of tracker){
     const key=canonicalTrackerKey(record);if(!key||record.tracker_state!=='field_or_unknown'||linked.has(key)||synthesized.has(key))continue;
     synthesized.add(key);
-    const peers=tracker.filter(row=>canonicalTrackerKey(row)===key);
-    const exactLabel=normalized(record.source_label),labelKey=deviceTrackerKey(record.source_label),identitySafe=peers.length===1&&exactLabel!==''&&(!labelKey||labelKey===key)&&tracker.filter(row=>normalized(row.source_label)===exactLabel).length===1;
+    const peers=trackerByKey.get(key)||[];
+    const exactLabel=normalized(record.source_label),labelKey=deviceTrackerKey(record.source_label),identitySafe=peers.length===1&&exactLabel!==''&&(!labelKey||labelKey===key)&&(trackerByLabel.get(exactLabel)||[]).length===1;
     const observed=identitySafe&&String(record.health_provider||'').toLowerCase()==='witness'&&Object.hasOwn(witness,key)&&object(witness[key])?witness[key]:{};
     // Each DTO is an allowlist. Unknown metadata, IP addresses, tokens and provider payloads cannot escape.
     const service=serviceEvidence({activation_state:'active'},observed,true,now);
