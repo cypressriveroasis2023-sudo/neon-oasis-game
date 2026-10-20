@@ -41,121 +41,116 @@ async function setup(page){
  });
  await expect(page.locator('[data-cos-ticketfree-returns]')).toHaveCount(1);
 }
-async function open(page){await page.getByRole('button',{name:'Swap / Pickup / Return to IT',exact:true}).click();await expect(page.getByRole('heading',{name:'My truck equipment'})).toBeVisible();}
-async function selectSite(page){await open(page);await page.getByRole('button',{name:'Pickup from site',exact:true}).click();await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Spotter 257HDC2');await page.getByRole('checkbox',{name:'Return Spotter 257HDC2',exact:true}).check();}
+async function open(page){await page.getByRole('button',{name:'Equipment swaps & returns',exact:true}).click();await expect(page.getByRole('heading',{name:'What are you doing?'})).toBeVisible();}
+async function chooseUsed(page,name='Ranger 002',index=0){await page.getByRole('button',{name:/^I installed from my truck:/}).nth(index).click();await page.getByRole('button',{name:'Select '+name,exact:true}).click();}
+async function chooseReturn(page,name='Spotter 257HDC2',index=0){await page.getByRole('button',{name:/^I am bringing back:/}).nth(index).click();await page.getByRole('searchbox',{name:'Search equipment'}).fill(name);await page.getByRole('button',{name:'Select '+name,exact:true}).click();}
+async function swap(page){await open(page);await page.getByRole('button',{name:'Swap equipment',exact:true}).click();await chooseUsed(page);await chooseReturn(page);}
+async function pickup(page){await open(page);await page.getByRole('button',{name:'Pick up equipment',exact:true}).click();await chooseReturn(page);}
 async function asIT(page){await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();await page.evaluate(async()=>{setIdentity('it');show('it');await import('/tech-checks/it-daily-host.js');});await page.getByRole('button',{name:/Returned by Service.*Check In/}).click();}
 const checks=['Physical condition','Accessories and mounting','Batteries','SD cards','Camera / electronics','Power functions'];
 async function intake(page,disposition='ready'){for(const label of checks)await page.getByRole('combobox',{name:label,exact:true}).selectOption('true');await page.getByRole('checkbox',{name:'I have physically received and verified this unit.'}).check();await page.getByRole('combobox',{name:'Inventory destination'}).selectOption(disposition);}
+const writes=()=>returnFixture.calls.filter(c=>c.name==='submit_techcheck_ticketfree_return_batch_v1');
 
-test('all four screenshot truck cards are selectable, including the two without catalogue IDs',async({page},info)=>{
+test('approved Service home has two big choices and a quiet unused return, with no inventory grid or filters',async({page},info)=>{
  await setup(page);await open(page);
- for(const name of ['Ranger 002','Sniper 001','Solar Spotter 005','Spotter 003'])await expect(page.getByRole('checkbox',{name:'Return '+name,exact:true})).toBeEnabled();
- await expect(page.getByRole('dialog').locator('select')).toHaveCount(0);
- await page.getByRole('button',{name:'Select all unused truck equipment'}).click();await expect(page.getByRole('heading',{name:'Sending to IT (4)'})).toBeVisible();
- await page.screenshot({path:info.outputPath('multi-select-truck.png'),fullPage:true});
- await page.getByRole('button',{name:'Send 4 units to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('4 unit(s) sent to IT');
- const calls=await page.evaluate(()=>returnFixture.calls.filter(c=>c.name==='submit_techcheck_ticketfree_return_batch_v1'));
- expect(calls).toHaveLength(1);expect(calls[0].args.p_items).toHaveLength(4);expect(calls[0].args).not.toHaveProperty('p_ticket_no');
- await asIT(page);await expect(page.getByRole('heading',{name:'Waiting for IT (4)'})).toBeVisible();await expect(page.getByRole('button',{name:'Check in this equipment'})).toHaveCount(4);
+ for(const name of ['Swap equipment','Pick up equipment']){const b=page.getByRole('button',{name,exact:true});await expect(b).toBeVisible();expect((await b.boundingBox()).height).toBeGreaterThanOrEqual(150);}
+ await expect(page.getByRole('button',{name:'Return unused equipment',exact:true})).toBeVisible();
+ await expect(page.getByRole('searchbox')).toHaveCount(0);await expect(page.getByRole('checkbox')).toHaveCount(0);await expect(page.getByRole('group',{name:'Equipment family'})).toHaveCount(0);
+ expect(await page.evaluate(writes)).toHaveLength(0);await page.screenshot({path:info.outputPath('approved-service-home.png'),fullPage:true});
 });
-test('complete catalogue is paginated, supports every family and searches past row 100 without a dropdown',async({page})=>{
- await setup(page);await open(page);await page.getByRole('button',{name:'Pickup from site',exact:true}).click();
- await expect(page.getByText('Showing 1–24 of 142 units',{exact:true})).toBeVisible();
- for(let n=0;n<5;n++)await page.getByRole('button',{name:'Next units'}).click();
- await expect(page.getByRole('checkbox',{name:'Return Sniper 176',exact:true})).toBeVisible();
- await page.getByRole('group',{name:'Equipment family'}).getByRole('button',{name:'Spotter',exact:true}).click();
- await expect(page.getByRole('checkbox',{name:'Return Spotter 257HDC2',exact:true})).toBeVisible();
- await page.getByRole('group',{name:'Equipment family'}).getByRole('button',{name:'All families',exact:true}).click();
- await page.getByRole('searchbox').fill('Sniper 176');await page.getByRole('checkbox',{name:'Return Sniper 176',exact:true}).check();
- await page.getByRole('searchbox').fill('257HDC2');await page.getByRole('checkbox',{name:'Return Spotter 257HDC2',exact:true}).check();
- await expect(page.getByRole('heading',{name:'Sending to IT (2)'})).toBeVisible();await expect(page.getByRole('dialog').locator('select')).toHaveCount(0);
-});
-test('a field swap records the selected installed replacement and IT separately checks in the removed unit',async({page})=>{
- await setup(page);await selectSite(page);await page.getByRole('button',{name:'Return from swap',exact:true}).click();
- await expect(page.getByText('Equipment used from my truck (required)',{exact:true})).toBeVisible();
- await expect(page.getByRole('radio',{name:'Install Sniper 001 for Spotter 257HDC2',exact:true})).not.toBeChecked();
- await page.getByRole('radio',{name:'Install Ranger 002 for Spotter 257HDC2',exact:true}).check();
- await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
- expect(await page.evaluate(()=>returnFixture.returns[0].used_key)).toBe('ranger:002');await expect(page.getByRole('checkbox',{name:'Return Ranger 002',exact:true})).toHaveCount(0);await expect(page.locator('.cos-ticketfree-status')).toContainText('removed from available truck inventory');await asIT(page);await expect(page.getByText('Reason: Return from swap',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Check in this equipment'}).click();
- await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('physically received');
+
+test('approved swap form pairs two large selections and IT receives one clear receipt card',async({page},info)=>{
+ await setup(page);await swap(page);
+ await expect(page.getByRole('heading',{name:'Record a swap'})).toBeVisible();await expect(page.getByText('Ranger 002 leaves truck stock',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Notes',{exact:true})).not.toBeVisible();expect(await page.evaluate(writes)).toHaveLength(0);
+ await page.screenshot({path:info.outputPath('approved-swap-form.png'),fullPage:true});
+ await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
+ expect(await page.evaluate(()=>returnFixture.returns[0].used_key)).toBe('ranger:002');expect(await page.evaluate(()=>returnFixture.truck.find(t=>t.equipment_key==='ranger:002').status)).toBe('used_restock_due');
+ await asIT(page);await expect(page.getByRole('heading',{name:'Equipment coming back'})).toBeVisible();await expect(page.getByText('Return from swap',{exact:true})).toBeVisible();await expect(page.getByText('Installed: Ranger 002',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Receive & inspect',exact:true})).toHaveCount(1);await page.screenshot({path:info.outputPath('approved-it-return-card.png'),fullPage:true});
+ await page.getByRole('button',{name:'Receive & inspect',exact:true}).click();await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('physically received');
  await intake(page);await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Checked in — Ready inventory');
 });
-test('an unmatched truck item is received for ID review, never silently created as Ready stock',async({page})=>{
- await setup(page);await open(page);await page.getByRole('checkbox',{name:'Return Sniper 001',exact:true}).check();await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
- await asIT(page);await page.getByRole('button',{name:'Check in this equipment'}).click();
- await expect(page.getByRole('combobox',{name:'Inventory destination'}).locator('option')).toHaveCount(1);
- await intake(page,'review');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Received — Unit ID review');
- await expect(page.getByRole('heading',{name:'Received — Unit ID review (1)',exact:true})).toBeVisible();
-});
-test('failed condition checks require a repair destination and a note',async({page})=>{
- await setup(page);await selectSite(page);await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');await asIT(page);await page.getByRole('button',{name:'Check in this equipment'}).click();await intake(page);
- await page.getByRole('combobox',{name:'Power functions',exact:true}).selectOption('false');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('must go to repair');
- await page.getByRole('combobox',{name:'Inventory destination'}).selectOption('repair');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Describe');await page.getByLabel('Notes',{exact:true}).fill('Power failure.');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Needs repair');
-});
-test('a lost batch response keeps the same selection and IDs across close and reopen',async({page})=>{
- await setup(page);await open(page);await page.getByRole('button',{name:'Select all unused truck equipment'}).click();await page.evaluate(()=>returnFixture.loseOnce=true);await page.getByRole('button',{name:'Send 4 units to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('same request is retained');
- await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();await open(page);await page.getByRole('button',{name:'Retry saved returns'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('4 unit(s) sent');
- const calls=await page.evaluate(()=>returnFixture.calls.filter(c=>c.name==='submit_techcheck_ticketfree_return_batch_v1'));expect(calls).toHaveLength(2);expect(calls[0].args).toEqual(calls[1].args);expect(await page.evaluate(()=>returnFixture.returns.length)).toBe(4);
-});
-test('logout closes the queue and late reads do not leak a prior account selection',async({page})=>{
- await setup(page);await page.evaluate(()=>returnFixture.hold=true);await page.getByRole('button',{name:'Swap / Pickup / Return to IT',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Loading');await page.evaluate(()=>{logout();returnFixture.release();});await expect(page.locator('dialog')).toHaveCount(0);
-});
-test('queue errors remain explicit and selection cards fit a 320px phone',async({page},info)=>{
- await page.setViewportSize({width:320,height:740});await setup(page);await page.evaluate(()=>returnFixture.failRead=true);await page.getByRole('button',{name:'Swap / Pickup / Return to IT',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('unavailable');await page.evaluate(()=>returnFixture.failRead=false);await page.getByRole('dialog').getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(page.getByRole('checkbox',{name:'Return Sniper 001',exact:true})).toBeEnabled();
- const m=await page.getByRole('dialog').evaluate(d=>({width:d.getBoundingClientRect().width,viewport:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}));expect(m.width).toBeLessThanOrEqual(m.viewport);expect(m.scroll).toBeLessThanOrEqual(m.client+1);await page.screenshot({path:info.outputPath('truck-return-320.png'),fullPage:true});
+
+test('pickup uses one unit selection and never consumes truck stock',async({page})=>{
+ await setup(page);await pickup(page);await expect(page.getByRole('button',{name:/^I installed from my truck:/})).toHaveCount(0);
+ await page.getByRole('button',{name:'Save pickup',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
+ expect(await page.evaluate(()=>returnFixture.truck.every(t=>t.status==='assigned'))).toBe(true);expect(await page.evaluate(()=>returnFixture.returns[0].source_mode)).toBe('field_return');
+ await asIT(page);await expect(page.getByText('Pickup from site',{exact:true})).toBeVisible();
 });
 
-
-test('Used for swap starts with the installed truck unit and saves the correct pair',async({page},info)=>{
- await setup(page);await open(page);
- await page.getByRole('button',{name:'Used Ranger 002 for swap',exact:true}).click();
- await expect(page.getByText('Used from my truck: Ranger 002. Select the equipment it replaced.',{exact:true})).toBeVisible();
- await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Spotter 257HDC2');
- await page.getByRole('checkbox',{name:'Return Spotter 257HDC2',exact:true}).check();
- await expect(page.getByRole('radio',{name:'Install Ranger 002 for Spotter 257HDC2',exact:true})).toBeChecked();
- await expect(page.getByText('Reason: Return from swap',{exact:true})).toBeVisible();
- await page.screenshot({path:info.outputPath('used-from-truck-swap.png'),fullPage:true});
- await page.getByRole('button',{name:'Send 1 unit to IT'}).click();
- await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
- expect(await page.evaluate(()=>returnFixture.returns[0].source_mode)).toBe('swap');
- await page.getByRole('button',{name:'My truck equipment',exact:true}).click();
- await expect(page.getByRole('button',{name:'Used Ranger 002 for swap',exact:true})).toHaveCount(0);
- await expect(page.getByText('Ranger 002 — Used for swap · installed at site',{exact:true})).toBeVisible();
- await page.screenshot({path:info.outputPath('used-truck-inventory.png'),fullPage:true});
+test('unused return keeps all four truck entries returnable, including unmatched IDs',async({page})=>{
+ await setup(page);await open(page);await page.getByRole('button',{name:'Return unused equipment',exact:true}).click();
+ for(const name of ['Ranger 002','Sniper 001','Solar Spotter 005','Spotter 003'])await expect(page.getByRole('checkbox',{name:'Return '+name,exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Select all truck equipment'}).click();await page.getByRole('button',{name:'Save return',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('4 unit(s) sent');
+ const calls=await page.evaluate(writes);expect(calls).toHaveLength(1);expect(calls[0].args.p_items).toHaveLength(4);expect(calls[0].args).not.toHaveProperty('p_ticket_no');
+ await asIT(page);await expect(page.getByRole('button',{name:'Receive & inspect',exact:true})).toHaveCount(4);
 });
 
-test('a swap cannot silently save as a pickup when the installed truck unit is missing',async({page})=>{
- await setup(page);await open(page);await page.getByRole('button',{name:'Used for swap',exact:true}).click();
- await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Sniper 176');
- await page.getByRole('checkbox',{name:'Return Sniper 176',exact:true}).check();
- await page.getByRole('button',{name:'Send 1 unit to IT'}).click();
- await expect(page.locator('.cos-ticketfree-status')).toContainText('Select the equipment used from your truck');
- expect(await page.evaluate(()=>returnFixture.calls.filter(c=>c.name==='submit_techcheck_ticketfree_return_batch_v1').length)).toBe(0);
- await page.getByRole('button',{name:'Pickup — no replacement',exact:true}).click();
- await page.getByRole('button',{name:'Send 1 unit to IT'}).click();
- await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
- expect(await page.evaluate(()=>returnFixture.returns[0].source_mode)).toBe('field_return');
- expect(await page.evaluate(()=>returnFixture.truck.every(t=>t.status==='assigned'))).toBe(true);
- await asIT(page);await expect(page.getByText('Reason: Pickup from site',{exact:true})).toBeVisible();
+test('unit chooser searches all families beyond row 100 and preserves exact suffix identities',async({page})=>{
+ await setup(page);await open(page);await page.getByRole('button',{name:'Pick up equipment',exact:true}).click();await page.getByRole('button',{name:/^I am bringing back:/}).click();
+ await expect(page.getByText('1–12 of 142',{exact:true})).toBeVisible();await page.getByRole('searchbox',{name:'Search equipment'}).fill('257HDC2');await expect(page.getByRole('button',{name:'Select Spotter 257HDC2',exact:true})).toBeVisible();
+ await page.getByRole('searchbox').fill('Sniper 176');await page.getByRole('button',{name:'Select Sniper 176',exact:true}).click();await expect(page.getByRole('button',{name:'I am bringing back: Sniper 176',exact:true})).toBeVisible();
 });
 
-test('changing a swap to pickup releases its replacement and preserves the explicit pickup reason',async({page})=>{
- await setup(page);await open(page);await page.getByRole('button',{name:'Used Ranger 002 for swap',exact:true}).click();
- await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Sniper 176');await page.getByRole('checkbox',{name:'Return Sniper 176',exact:true}).check();
- await page.getByRole('button',{name:'Pickup — no replacement',exact:true}).click();
- await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
- expect(await page.evaluate(()=>returnFixture.returns[0].used_key)).toBe(null);
- expect(await page.evaluate(()=>returnFixture.truck.find(t=>t.equipment_key==='ranger:002').status)).toBe('assigned');
- await asIT(page);await expect(page.getByText('Reason: Pickup from site',{exact:true})).toBeVisible();
+test('saving a swap without its installed unit is explicit and performs no write',async({page})=>{
+ await setup(page);await open(page);await page.getByRole('button',{name:'Swap equipment',exact:true}).click();await chooseReturn(page);
+ await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Select the equipment used from your truck');expect(await page.evaluate(writes)).toHaveLength(0);
+ await chooseUsed(page);await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
 });
 
-test('a mixed swap and pickup keep separate reasons and only consume the one installed replacement',async({page})=>{
- await setup(page);await open(page);await page.getByRole('button',{name:'Used Ranger 002 for swap',exact:true}).click();
- await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Sniper 176');await page.getByRole('checkbox',{name:'Return Sniper 176',exact:true}).check();
- await page.getByRole('button',{name:'Pickup from site',exact:true}).click();await page.getByRole('searchbox',{name:'Search returned equipment'}).fill('Spotter 257HDC2');await page.getByRole('checkbox',{name:'Return Spotter 257HDC2',exact:true}).check();
- await page.getByRole('button',{name:'Send 2 units to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('2 unit(s) sent');
- expect(await page.evaluate(()=>returnFixture.returns.map(r=>r.source_mode))).toEqual(['swap','field_return']);
- expect(await page.evaluate(()=>returnFixture.truck.filter(t=>t.status!=='assigned').length)).toBe(1);
- await asIT(page);await expect(page.getByText('Reason: Return from swap',{exact:true})).toBeVisible();await expect(page.getByText('Reason: Pickup from site',{exact:true})).toBeVisible();
+test('installed choice is own truck only, holds unknown IDs, and removes used stock after save',async({page})=>{
+ await setup(page);await open(page);await page.getByRole('button',{name:'Swap equipment',exact:true}).click();await page.getByRole('button',{name:/^I installed from my truck:/}).click();
+ await expect(page.getByRole('button',{name:'Select Sniper 001',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Select Sniper 176',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Select Ranger 002',exact:true}).click();await chooseReturn(page);await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
+ await page.getByRole('button',{name:'Swap equipment',exact:true}).click();await page.getByRole('button',{name:/^I installed from my truck:/}).click();await expect(page.getByRole('button',{name:'Select Ranger 002',exact:true})).toHaveCount(0);
+});
+
+test('multiple pickups remain one atomic batch with individual IT receipts',async({page})=>{
+ await setup(page);await pickup(page);await page.getByText('Notes, photos & more',{exact:true}).click();await page.getByRole('button',{name:'Add another unit',exact:true}).click();await page.getByRole('searchbox').fill('Sniper 176');await page.getByRole('button',{name:'Select Sniper 176',exact:true}).click();
+ await page.getByRole('button',{name:'Save pickup',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('2 unit(s) sent');expect(await page.evaluate(writes)).toHaveLength(1);expect(await page.evaluate(()=>returnFixture.truck.every(t=>t.status==='assigned'))).toBe(true);
+});
+
+test('multiple swaps pair different truck units and never reuse one replacement',async({page})=>{
+ await setup(page);await swap(page);await page.getByText('Notes, photos & more',{exact:true}).click();await page.getByRole('button',{name:'Add another swap',exact:true}).click();await page.getByRole('searchbox').fill('Sniper 176');await page.getByRole('button',{name:'Select Sniper 176',exact:true}).click();
+ await page.getByRole('button',{name:/^I installed from my truck:/}).nth(1).click();await expect(page.getByRole('button',{name:'Select Ranger 002',exact:true})).toBeDisabled();await page.getByRole('button',{name:'Select Solar Spotter 005',exact:true}).click();
+ await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('2 unit(s) sent');expect(await page.evaluate(()=>returnFixture.returns.map(r=>r.used_key))).toEqual(['ranger:002','solar_spotter:005']);
+});
+
+test('unmatched truck equipment goes to IT identity review and never silently becomes Ready',async({page})=>{
+ await setup(page);await open(page);await page.getByRole('button',{name:'Return unused equipment',exact:true}).click();await page.getByRole('checkbox',{name:'Return Sniper 001',exact:true}).check();await page.getByRole('button',{name:'Save return',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
+ await asIT(page);await page.getByRole('button',{name:'Receive & inspect',exact:true}).click();await expect(page.getByRole('combobox',{name:'Inventory destination'}).locator('option')).toHaveCount(1);await intake(page,'review');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Received — Unit ID review');
+});
+
+test('failed inspection remains repair-held and requires an explanation',async({page})=>{
+ await setup(page);await pickup(page);await page.getByRole('button',{name:'Save pickup',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');await asIT(page);await page.getByRole('button',{name:'Receive & inspect',exact:true}).click();await intake(page);
+ await page.getByRole('combobox',{name:'Power functions',exact:true}).selectOption('false');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('must go to repair');await page.getByRole('combobox',{name:'Inventory destination'}).selectOption('repair');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Describe');await page.getByLabel('Notes',{exact:true}).fill('Power failure');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Needs repair');
+});
+
+test('lost save response retains original IDs and retries from the simple screen once',async({page})=>{
+ await setup(page);await swap(page);await page.evaluate(()=>returnFixture.loseOnce=true);await page.getByRole('button',{name:'Save swap',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('same request is retained');await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+ await page.getByRole('button',{name:'Equipment swaps & returns',exact:true}).click();await expect(page.getByRole('heading',{name:'Verify saved return'})).toBeVisible();await page.getByRole('button',{name:'Retry saved returns',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
+ const calls=await page.evaluate(writes);expect(calls).toHaveLength(2);expect(calls[0].args).toEqual(calls[1].args);expect(await page.evaluate(()=>returnFixture.returns.length)).toBe(1);
+});
+
+test('logout ignores late account reads and closes private selections',async({page})=>{
+ await setup(page);await page.evaluate(()=>returnFixture.hold=true);await page.getByRole('button',{name:'Equipment swaps & returns',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Loading');await page.evaluate(()=>{logout();returnFixture.release();});await expect(page.locator('dialog')).toHaveCount(0);
+});
+
+test('errors stay explicit and the approved choices and swap form fit 320px',async({page},info)=>{
+ await page.setViewportSize({width:320,height:740});await setup(page);await page.evaluate(()=>returnFixture.failRead=true);await page.getByRole('button',{name:'Equipment swaps & returns',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('unavailable');await page.evaluate(()=>returnFixture.failRead=false);await page.getByRole('dialog').getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'What are you doing?'})).toBeVisible();await page.getByRole('button',{name:'Swap equipment',exact:true}).click();await chooseUsed(page);await chooseReturn(page);
+ const m=await page.getByRole('dialog').evaluate(d=>({width:d.getBoundingClientRect().width,viewport:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}));expect(m.width).toBeLessThanOrEqual(m.viewport);expect(m.scroll).toBeLessThanOrEqual(m.client+1);await page.screenshot({path:info.outputPath('approved-swap-320.png'),fullPage:true});
+});
+
+test('an existing mixed return draft survives the simpler layout without changing its IDs or pairings',async({page})=>{
+ await setup(page);await page.evaluate(async()=>{
+  const {deviceDraft}=await import('/tech-checks/transfers/client.js');
+  await deviceDraft('ticketfree:submit:'+fixture.actor,{kind:'submit',id:crypto.randomUUID(),tab:'site',notes:'Retained before redesign',photos:[],request:null,items:[
+   {id:'11111111-1111-4111-8111-111111111111',source:'site',equipment_key:'sniper:176',family:'Sniper',unit_tag:'176',usedKey:'ranger:002',reason:'swap'},
+   {id:'22222222-2222-4222-8222-222222222222',source:'site',equipment_key:'spotter:257HDC2',family:'Spotter',unit_tag:'257HDC2',usedKey:'',reason:'pickup'}]});
+ });
+ await page.getByRole('button',{name:'Equipment swaps & returns',exact:true}).click();await expect(page.getByRole('heading',{name:'Review returns'})).toBeVisible();expect(await page.evaluate(writes)).toHaveLength(0);
+ await page.getByRole('button',{name:'Save return',exact:true}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('2 unit(s) sent');
+ const calls=await page.evaluate(writes);expect(calls[0].args.p_items.map(i=>i.request_id)).toEqual(['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222']);expect(calls[0].args.p_items.map(i=>i.used_key)).toEqual(['ranger:002',null]);expect(calls[0].args.p_items.every(i=>i.notes==='Retained before redesign')).toBe(true);
 });

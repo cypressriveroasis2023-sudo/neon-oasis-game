@@ -40,3 +40,27 @@
 .cos-return-reasons>button{flex:1 1 150px}.cos-return-used{border-left:4px solid #65c9e9;background:#17394a;padding:10px;overflow-wrap:anywhere}
 .cos-return-tabs>button{flex:1 1 130px}
 @media(max-width:380px){.cos-return-grid{grid-template-columns:1fr}}
+/* Approved simple phone flow: choose an action, choose equipment, save. */
+.cos-ticketfree-dialog{width:min(520px,calc(100vw - 20px));background:#081b30;padding:20px;color:#f3f8ff}
+.cos-ticketfree-toolbar{top:-20px;background:#081b30;flex-wrap:nowrap;padding:8px 0 14px}
+.cos-simple-brand{flex:1;font:700 12px/1.3 system-ui;letter-spacing:1.5px;color:#a9c6e2}
+.cos-ticketfree-toolbar button{min-width:44px;padding:8px;font-size:20px;background:transparent;border-color:transparent}
+.cos-ticketfree-status:empty{display:none}.cos-ticketfree-section{border:0;margin-top:10px;padding-top:0}
+.cos-ticketfree-dialog h2{font-size:28px;line-height:1.15;margin:16px 0 24px;letter-spacing:-.5px}
+.cos-simple-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:170px!important;width:100%;margin:14px 0;background:linear-gradient(145deg,#102c49,#163555)!important;border-color:#3b6284!important;border-radius:14px!important}
+.cos-simple-action strong{font-size:25px}.cos-simple-action small{font-size:16px}.cos-simple-icon{font-size:48px;line-height:1;color:#22cbf2}
+.cos-simple-unused{display:block;width:100%;margin:14px 0;min-height:56px!important;background:transparent!important}
+.cos-simple-back{padding:8px 0!important;background:transparent!important;border:0!important;min-height:44px;text-align:left}
+.cos-simple-selection{display:grid;width:100%;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:12px 0;padding:20px!important;min-height:100px!important;background:#14314f!important;text-align:left;overflow-wrap:anywhere}
+.cos-simple-selection>span{grid-column:1/-1;font-size:16px;font-weight:400;color:#c9def0}.cos-simple-selection strong{font-size:25px;line-height:1.2}.cos-simple-selection small{color:#25c9ef;font-weight:700;align-self:center}
+.cos-simple-arrow{text-align:center;font-size:28px;line-height:1;margin:12px;color:#c4e6fa}.cos-simple-pair{margin:14px 0 24px}
+.cos-simple-details{margin:18px 0;color:#c9def0}.cos-simple-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-size:15px}.cos-simple-details summary::before{content:'+';margin-right:8px}.cos-simple-details[open]>summary::before{content:'-'}
+.cos-ticketfree-dialog .cos-ticketfree-primary{background:#1ac9ee!important;color:#031b2e;border:0!important;min-height:62px;font-size:21px;font-weight:800}
+.cos-ticketfree-dialog .cos-simple-receive{background:#36e781!important;min-height:70px}
+.cos-simple-helper{text-align:center;margin:12px 0}.cos-simple-options{display:grid;gap:10px;margin:16px 0}.cos-simple-option{width:100%;text-align:left;min-height:60px!important;font-size:19px!important}.cos-simple-count{font-size:14px;color:#acc7df}
+.cos-simple-remove{font-size:14px!important;border:0!important;background:transparent!important;min-height:44px;padding:8px!important;color:#aecbe0!important}
+.cos-simple-it-card{padding:20px;border-color:#375b7d;background:#122f4c;border-radius:14px;margin:18px 0}.cos-simple-it-card>h3{font-size:32px;margin:18px 0 4px}.cos-simple-it-card>p{font-size:19px;margin:10px 0}.cos-simple-badge{display:inline-block!important;background:#1ac9ee;color:#042236!important;padding:6px 12px;border-radius:8px;font-weight:800!important}.cos-simple-installed{border-top:1px solid #456786;padding-top:16px;color:#c1dbef;font-size:16px!important}
+.cos-simple-review{padding:14px;background:#14314f;border-radius:10px;margin:12px 0}
+@media(max-width:380px){.cos-ticketfree-dialog{padding:14px}.cos-ticketfree-toolbar{top:-14px}.cos-simple-action{min-height:150px!important}.cos-simple-action strong{font-size:22px}.cos-ticketfree-dialog h2{font-size:25px}.cos-simple-selection strong{font-size:22px}}
+
+.cos-simple-selection strong{font-size:clamp(20px,5.5vw,25px)}

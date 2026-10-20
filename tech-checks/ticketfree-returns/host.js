@@ -1,6 +1,6 @@
-import {ticketfreeClient} from './client.js?v=swap-pickup-20261020';
-import {batchDraft,prepareBatch,reasonLabel,savedReturnReason} from './batch-model.js?v=swap-pickup-20261020';
-import {servicePicker} from './service-picker.js?v=swap-pickup-20261020';
+import {ticketfreeClient} from './client.js?v=simple-20261020';
+import {batchDraft,prepareBatch,reasonLabel,savedReturnReason} from './batch-model.js?v=simple-20261020';
+import {servicePicker} from './service-picker.js?v=simple-20261020';
 import {INTAKE_CHECKS,stateLabel,freshDraft,assertIntake} from './model.js?v=multi-20261020';
 import {deviceDraft,transferJpeg} from '../transfers/client.js';
 const node=(tag,text='',cls='')=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -12,31 +12,31 @@ function choose(options,value='',label='') {
  for(const [v,t] of options){const o=node('option',t);o.value=v;s.append(o);}s.value=value;return s;
 }
 export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
- const client=ticketfreeClient(context),dialog=node('dialog','','cos-ticketfree-dialog'),title=node('h2',client.role==='service'?'Swaps & returns to IT':'Returned by Service'),status=node('p','','cos-ticketfree-status'),body=node('div'),toolbar=node('div','','cos-ticketfree-toolbar');
+ const client=ticketfreeClient(context),dialog=node('dialog','','cos-ticketfree-dialog'),title=node('div','CAMERAS ONSITE','cos-simple-brand'),status=node('p','','cos-ticketfree-status'),body=node('div'),toolbar=node('div','','cos-ticketfree-toolbar');
  let alive=true,generation=0,data=null,draft=null,draftKey='',busy=false,saveChain=Promise.resolve();
  const valid=()=>alive&&client.current()&&dialog.isConnected;
  const tell=(text,error=false)=>{if(!valid())return;status.textContent=text;status.setAttribute('role',error?'alert':'status');if(error)dialog.scrollTop=0;};
  const keep=()=>{const snapshot=structuredClone(draft),key=draftKey;saveChain=saveChain.catch(()=>{}).then(()=>deviceDraft(key,snapshot));return saveChain;};
  const close=()=>{if(busy)return;if(draft)void keep().catch(()=>{});alive=false;generation++;dialog.close();dialog.remove();};
  const refresh=button('Refresh',()=>void load());
- toolbar.append(title,refresh,button('Close',close));dialog.append(toolbar,status,body);document.body.append(dialog);
+ refresh.textContent='↻';refresh.setAttribute('aria-label','Refresh');const closeButton=button('✕',close);closeButton.setAttribute('aria-label','Close');toolbar.append(title,refresh,closeButton);dialog.append(toolbar,status,body);document.body.append(dialog);
  dialog.addEventListener('cancel',e=>{e.preventDefault();close();});dialog.showModal();
  async function load(message='') {
   const rev=++generation;tell('Loading saved truck and return records…');refresh.disabled=true;
   try{const next=await client.read();if(!valid()||rev!==generation)return;data=next;
    if(client.role==='service'&&!draft){draftKey='ticketfree:submit:'+client.actor;draft=batchDraft(await deviceDraft(draftKey)||freshDraft('submit'),data.equipment);if(!valid()||rev!==generation)return;}
-   render();dialog.scrollTop=0;tell(message||(client.role==='service'?'Choose a swap, pickup or unused return. No ticket needed.':'Review returns and confirm physical receipt.'));
+   render();dialog.scrollTop=0;tell(message||'');
   }catch(e){tell(e.message,true);}finally{if(valid())refresh.disabled=false;}
  }
- function section(label){const s=node('section','','cos-ticketfree-section');s.append(node('h3',label));body.append(s);return s;}
+ function section(label,parent=body){const s=node('section','','cos-ticketfree-section');if(label)s.append(node('h3',label));parent.append(s);return s;}
  function render() {
   if(!valid()||!data)return;body.replaceChildren();
   if(draft?.kind==='receive'){renderIntake();return;}
-  if(client.role==='service')renderService();
-  renderReturns();
+  if(client.role==='service'){renderService();if((draft.simpleStep||(!draft.items.length?'home':'form'))==='home'){const history=node('details','','cos-simple-details');history.append(node('summary','My returns ('+data.pending_count+')'));body.append(history);renderReturns(history);}return;}
+  body.append(node('h2','Equipment coming back'));renderReturns();
  }
  function renderService() {
-  const root=section('Equipment action');
+  const root=section('');
   servicePicker(root,{data,draft,save:keep,redraw:render,appendEvidence:appendNotesPhotos,submit:()=>void submit(),tell});
  }
  function appendNotesPhotos(fields) {
@@ -46,32 +46,33 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
   fields.append(labeled('Photos (optional)',photos),node('small',draft.photos.length+' photo(s) in this draft'));
   if(draft.photos.length)fields.append(button('Clear draft photos',()=>{draft.photos=[];void keep();render();}));
  }
- function renderReturns() {
+ function renderReturns(parent=body) {
   const pending=data.returns.filter(r=>r.state==='waiting_it'),review=data.returns.filter(r=>r.state==='identity_review'),recent=data.returns.filter(r=>!['waiting_it','identity_review'].includes(r.state));
-  const s=section('Waiting for IT ('+data.pending_count+')');if(!pending.length)s.append(node('p','No equipment is waiting for IT check-in.'));
+  const s=section(client.role==='service'?'Waiting for IT ('+data.pending_count+')':'',parent);if(!pending.length)s.append(node('p','No equipment is waiting for IT check-in.'));
   for(const r of pending)s.append(returnCard(r));
-  if(review.length){const held=section('Received — Unit ID review ('+review.length+')');for(const r of review)held.append(returnCard(r));}
-  if(recent.length){const history=section('Recent check-ins');for(const r of recent.slice(0,30))history.append(returnCard(r));}
+  if(review.length){const held=section('Received — Unit ID review ('+review.length+')',parent);for(const r of review)held.append(returnCard(r));}
+  if(recent.length){const details=node('details','','cos-simple-details');details.append(node('summary','Recent check-ins'));parent.append(details);for(const r of recent.slice(0,30))details.append(returnCard(r));}
  }
  function returnCard(r,allowAction=true) {
-  const card=node('article','','cos-ticketfree-return');card.dataset.returnId=r.id;
-  card.append(node('strong',r.family+' '+r.unit_tag),node('span',stateLabel(r.state)),node('small','From '+r.service_tech_name+' · '+stamp(r.submitted_at)));
-  card.append(node('p','Reason: '+reasonLabel(savedReturnReason(r))));
-  if(r.used_key)card.append(node('p','Used from truck: '+r.used_family+' '+r.used_tag+' · installed at site, no longer available on truck'));
-  if(r.notes)card.append(node('p',r.notes));
-  if(r.received_at)card.append(node('small','Received by '+r.it_tech_name+' · '+stamp(r.received_at)));
-  if(r.intake_notes)card.append(node('p',r.intake_notes));
-  if(r.identity_state==='needs_review')card.append(node('p','Unit ID verification required before this equipment can become Ready inventory.'));
-  if(r.photos?.length)card.append(button('View return photos',()=>void showPhotos(r.photos,card)));
-  if(allowAction&&client.role!=='service'&&r.state==='waiting_it')card.append(button('Check in this equipment',()=>void beginIntake(r),'cos-ticketfree-primary'));
-  return card;
+  const card=node('article','','cos-ticketfree-return cos-simple-it-card');card.dataset.returnId=r.id;
+  card.append(node('small',reasonLabel(savedReturnReason(r)),'cos-simple-badge'),node('h3',r.family+' '+r.unit_tag),node('p','From '+r.service_tech_name));
+  if(r.used_key)card.append(node('p','Installed: '+r.used_family+' '+r.used_tag,'cos-simple-installed'));
+  if(allowAction&&client.role!=='service'&&r.state==='waiting_it')card.append(button('Receive & inspect',()=>void beginIntake(r),'cos-ticketfree-primary cos-simple-receive'));
+  else card.append(node('span',stateLabel(r.state)));
+  if(r.identity_state==='needs_review')card.append(node('p','IT must verify this unit ID before it becomes available.'));
+  const details=node('details','','cos-simple-details');details.append(node('summary','Details'),node('small','Sent '+stamp(r.submitted_at)));
+  if(r.notes)details.append(node('p',r.notes));
+  if(r.received_at)details.append(node('small','Received by '+r.it_tech_name+' · '+stamp(r.received_at)));
+  if(r.intake_notes)details.append(node('p',r.intake_notes));
+  if(r.photos?.length)details.append(button('View return photos',()=>void showPhotos(r.photos,details)));
+  card.append(details);return card;
  }
  async function showPhotos(paths,card) {
   try{for(const path of paths){const url=await client.photoUrl(path);if(!valid()||!card.isConnected)return;const image=node('img');image.alt='Saved equipment return evidence';image.src=url;image.loading='lazy';card.append(image);}}catch(e){tell(e.message,true);}
  }
  async function beginIntake(r) {
   if(busy)return;const rev=++generation;
-  try{draftKey='ticketfree:receive:'+client.actor+':'+r.id;const saved=await deviceDraft(draftKey);if(!valid()||rev!==generation)return;draft=saved||freshDraft('receive',r.id);draft.returnRevision=r.revision;draft.needsReview=r.identity_state==='needs_review';if(draft.needsReview)draft.disposition='review';render();tell('Confirm physical receipt, then record condition.');}catch(e){tell(e.message,true);}
+  try{draftKey='ticketfree:receive:'+client.actor+':'+r.id;const saved=await deviceDraft(draftKey);if(!valid()||rev!==generation)return;draft=saved||freshDraft('receive',r.id);draft.returnRevision=r.revision;draft.needsReview=r.identity_state==='needs_review';if(draft.needsReview)draft.disposition='review';render();dialog.scrollTop=0;tell('Confirm physical receipt, then record condition.');}catch(e){tell(e.message,true);}
  }
  function renderIntake() {
   const r=data.returns.find(x=>x.id===draft.returnId);if(!r){tell('This return is no longer in the queue. Refresh before continuing.',true);return;}
@@ -125,7 +126,7 @@ function sync() {
  if(!s)return;
  const target=s.role==='service'?document.querySelector('#wlSvcHome .wl-service-action-list')||document.getElementById('wlSvcTruckInventory'):document.getElementById('cosITDailyHost');
  if(!target)return;
- if(!mounted?.isConnected||mounted.parentElement!==target){mounted?.remove();mounted=button(s.role==='service'?'Swap / Pickup / Return to IT':'Returned by Service — Check In',()=>{
+ if(!mounted?.isConnected||mounted.parentElement!==target){mounted?.remove();mounted=button(s.role==='service'?'Equipment swaps & returns':'Returned by Service — Check In',()=>{
    closePanel?.();closePanel=openTicketfreeReturns(s.c,{onSaved:()=>{lastCountAt=0;void updateCount();window.dispatchEvent(new CustomEvent('techcheck:ticketfree-return-saved'));}});
   },'cos-ticketfree-launch');mounted.dataset.cosTicketfreeReturns='';target.prepend(mounted);}
  if(s.role!=='service')void updateCount();
@@ -140,7 +141,7 @@ async function updateCount() {
 }
 function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
 if(typeof document!=='undefined'){
- const css=node('link');css.rel='stylesheet';css.href=new URL('./style.css?v=swap-pickup-20261020',import.meta.url).href;document.head.append(css);
+ const css=node('link');css.rel='stylesheet';css.href=new URL('./style.css?v=simple-20261020',import.meta.url).href;document.head.append(css);
  new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
  for(const event of ['techcheck:view-changed','techcheck:data-refreshed','pageshow','online'])window.addEventListener(event,schedule);
  document.addEventListener('visibilitychange',()=>{lastCountAt=0;schedule();});
