@@ -1,5 +1,5 @@
 import {useMemo,useState} from 'react';
-import {buildFleetCommandCenter,type FleetCommandStatus} from './fleetCommandCenterModel';
+import {buildFleetCommandCenter,fleetVerificationBlockers,type FleetCommandStatus,type FleetCommandProduct} from './fleetCommandCenterModel';
 import type {ProviderProduct} from './mhelpProviderFleet';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
@@ -28,6 +28,17 @@ const names:Record<FleetCommandStatus,string>={online:'Online',offline:'Offline'
 const date=(time:string|null)=>time&&Number.isFinite(Date.parse(time))
  ?new Date(time).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})
  :'No successful check recorded';
+
+/** Single-line verification explanation; every count refers to source Product IDs.
+ * These are blockers, not additional offline cameras. */
+function verificationSummary(products:FleetCommandProduct[]):string{
+ const blockers=fleetVerificationBlockers(products);
+ return [
+  blockers.identity?blockers.identity+' need COS equipment association':'',
+  blockers.provider?blockers.provider+' need a conclusive provider / power observation':'',
+  blockers.inactive?blockers.inactive+' flagged inactive in mHelp':''
+ ].filter(Boolean).join(' · ');
+}
 
 export default function FleetCommandCenter({
  uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
@@ -90,7 +101,9 @@ export default function FleetCommandCenter({
      </button>)}
     </div>
     <p className="cos-command-provider-time">{panel.key==='victron'?'Last successful VRM sync:':'Last saved Camera Health read:'} {date(panel.lastCheck)}</p>
-    <p className="cos-command-provider-note">{panel.note}</p>
+    <p className="cos-command-provider-note">{panel.counts?.unverified
+      ?(!data.healthVerified&&panel.key!=='victron'?'Camera Health read unavailable; reload saved evidence before assigning a cause.':verificationSummary(panel.products))
+      :panel.note}</p>
     <button type="button" className="cos-command-all-provider" onClick={()=>filter(panel.key)}>View {panel.title} units →</button>
    </article>)}
   </div>
