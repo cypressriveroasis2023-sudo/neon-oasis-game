@@ -66,6 +66,7 @@ async function route(f,{path='/api/field-map',changeArchive=false,ownerAppears=f
   if(name==='appdeploy_equipment_registry_snapshot')return response({items:[f.old,f.canonical],trackerUnits:[]});
   if(name==='cos_archived_representation_projection'){archiveReads++;return response(changeArchive&&archiveReads>1?[]:[f.proof]);}
   if(name==='cos_geocode_sources_map_projection')return response([f.source]);
+  if(name==='cos_fleet_shop_snapshot_v1')return response({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
   if(name==='cos_owner_identity_snapshot')return response({revision:A,nativeEpochs:[],claims:[]});
   if(name==='cos_fleet_placement_evidence_v1'){auditReads++;return response(ownerAppears&&auditReads>1?[{id:'999',unit_key:'SPOTTER 987654',device_ids:[],action:'MOVE_TO_ROOT'}]:[]);}
   if(['cos_imported_geocode_read_many','cos_field_geocode_read_many','cos_field_geocode_fallback_read_many','cos_source_recorded_coordinates_read_many'].includes(name))return response([]);

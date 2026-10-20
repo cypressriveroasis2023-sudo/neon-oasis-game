@@ -30,6 +30,7 @@ function transport(scenario, calls) {
     if (url.endsWith('/rpc/cos_fleet_placement_evidence_v1')) return json([]);
     if (url.endsWith('/rpc/appdeploy_field_map_snapshot')) return json({items:[],inventoryItems:[],summary:{fieldUnits:0},generatedAt:'2026-10-08T00:00:00Z'});
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
+    if(url.endsWith('/rpc/cos_fleet_shop_snapshot_v1'))return json({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
     if (url.endsWith('/rpc/cos_owner_identity_snapshot')) return json({revision:'a'.repeat(64),nativeEpochs:[],claims:[]});
     if (url.includes('/rest/v1/rpc/')) {
       if (scenario.rpcDenied) return json({message:'Native department or workflow guard rejected the request'},400);
