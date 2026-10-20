@@ -39,7 +39,7 @@ test('basemap renders while field records wait, with no invented pins or empty f
  await expect.poll(()=>state.tiles).toBeGreaterThan(0);
  await expect(canvas.locator('.leaflet-tile-loaded').first()).toBeVisible();
  await expect(frame.getByRole('status').filter({hasText:'Loading the authenticated COS fleet'})).toBeVisible();
- await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—']);
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—','—','—']);
  await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.getByText('No units match this filter.')).toHaveCount(0);
  await expect(frame.getByRole('button',{name:'Fullscreen fleet map'})).toBeEnabled();
@@ -68,7 +68,7 @@ test('initial field failure preserves the basemap and retry fills the same canva
  state.fail=true;state.release();
  await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');
  await expect(canvas).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
- await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—']);
+ await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—','—','—']);
  state.fail=false;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
