@@ -7,6 +7,7 @@ import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
 import './fleetCommandCenter.css';
 
 type Props={
+ initialFamily?:string;
  uploadInventory:unknown;
  fieldHealth:{total:number;items:FieldProduct[]}|null;
  healthReadSucceeded:boolean;
@@ -41,10 +42,10 @@ function verificationSummary(products:FleetCommandProduct[]):string{
 }
 
 export default function FleetCommandCenter({
- uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
+ initialFamily='all',uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
  onOpen,onShop,onMap,onImport,onRefresh
 }:Props){
- const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>('all');
+ const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>(['all','star4live','avigilon','reconeyez','victron'].includes(initialFamily)?initialFamily as FamilyFilter:'all');
  const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState(''),[focus,setFocus]=useState<FocusFilter>('all');
  const data=useMemo(()=>buildFleetCommandCenter(
    uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt),

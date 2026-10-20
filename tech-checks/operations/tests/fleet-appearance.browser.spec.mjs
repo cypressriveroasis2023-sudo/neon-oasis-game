@@ -34,15 +34,15 @@ function onlySavedReads(state) {
 
 for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live counts, readable long addresses and usable filters`,async({page},info)=>{
   const {app,state}=await mount(page,it);
-  await expect(app.locator('.cos-fleet-stats strong')).toHaveText(['4','1','1','1','0']);
+  await expect(app.locator('.cos-fleet-stats strong')).toHaveText(['4','—','—','1','1','1','0']);
   const row=app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'});
   await expect(row).toContainText(longAddress);
   await expect(row.locator('[aria-label="camera: Online"]')).toContainText('Camera');
   await expect(row.locator('[aria-label="router: Online"]')).toContainText('Router');
   await expect(row.locator('[aria-label="battery: Online"]')).toContainText('Battery');
-  await expect(app.locator('.cos-fleet-stat-online')).toHaveCSS('background-color','rgb(32, 38, 45)');
+  await expect(app.locator('.cos-fleet-stat-online')).toHaveCSS('background-image',/linear-gradient/);
   const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
-    const cards=[...el.querySelectorAll('.cos-fleet-stat')].map(card=>card.getBoundingClientRect());
+    const cards=[...el.querySelectorAll('.cos-fleet-stat')].filter(card=>card.getClientRects().length).map(card=>card.getBoundingClientRect()).sort((a,b)=>a.top-b.top||a.left-b.left);
     const list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect(),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect();
     const address=el.querySelector('.cos-fleet-unit-copy small:nth-of-type(2)');
     return {cards:cards.map(card=>({x:card.x,y:card.y,width:card.width})), list:{x:list.x,y:list.y},map:{x:map.x,y:map.y},
@@ -56,7 +56,7 @@ for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live co
   if(geometry.width<=750){
     expect(Math.abs(geometry.cards[0].y-geometry.cards[1].y)).toBeLessThan(1);
     expect(geometry.cards[2].y).toBeGreaterThan(geometry.cards[0].y);
-    expect(geometry.cards[4].width).toBeGreaterThan(geometry.cards[0].width*1.9);
+    expect(Math.abs(geometry.cards[4].width-geometry.cards[0].width)).toBeLessThan(1);
     expect(geometry.map.y).toBeLessThan(geometry.list.y);
   }else{
     expect(new Set(geometry.cards.map(card=>Math.round(card.y))).size).toBe(1);
@@ -176,7 +176,7 @@ test.describe('touch iPhone Fleet presentation',()=>{
   const {app,state}=await mount(page);
   const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
    const shell=el.closest('.company-shell'),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect(),list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect();
-   const cards=[...el.querySelectorAll('.cos-fleet-stats .cos-fleet-stat')].map(x=>x.getBoundingClientRect());
+   const cards=[...el.querySelectorAll('.cos-fleet-stats .cos-fleet-stat')].filter(x=>x.getClientRects().length).map(x=>x.getBoundingClientRect()).sort((a,b)=>a.top-b.top||a.left-b.left);
    const controls=[...el.querySelectorAll('.cos-fleet-tabs button,.cos-fleet-map-toolbar button,.cos-fleet-filter-row select,.cos-fleet-search input')].filter(control=>control.getClientRects().length).map(x=>x.getBoundingClientRect());
    return {width:innerWidth,mapY:map.y,listY:list.y,mainWidth:shell.querySelector('.owner-it-main').getBoundingClientRect().width,
     sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).display,firstY:cards[0].y,secondY:cards[1].y,
@@ -264,11 +264,11 @@ test('short desktop viewport preserves sidebar and desktop Fleet map columns',as
  onlySavedReads(state);
 });
 
-test('compact map overview keeps compact filters above the map and accounting below without changing saved reads',async({page})=>{
+test('main map overview keeps unit filters with the list and accounting below without changing saved reads',async({page})=>{
  const {app,state}=await mount(page);
  const order=await app.locator('.cos-fleet-dashboard').evaluate(root=>{
   const workspace=root.querySelector('.cos-fleet-workspace'),filters=root.querySelector('.cos-fleet-filters');
-  return Boolean(filters.compareDocumentPosition(workspace)&Node.DOCUMENT_POSITION_FOLLOWING);
+  return workspace.querySelector('.cos-fleet-unit-panel').contains(filters);
  });
  expect(order).toBe(true);
  await expect(app.locator('.cos-fleet-heading h1')).toBeVisible();
