@@ -8,6 +8,7 @@ on:
       - 'tech-checks/operations/src/FleetBoardSystems.tsx'
       - 'tech-checks/operations/src/FleetCameraTools.tsx'
       - 'tech-checks/operations/src/FleetUnitHealth.tsx'
+      - 'tech-checks/operations/tests/tech-check-tv.browser.spec.mjs'
       - 'tech-checks/operations/src/fleetBoardLayout.css'
       - 'tech-checks/operations/src/FleetDashboardMap.tsx'
       - 'tech-checks/operations/src/TvFleetView.tsx'
