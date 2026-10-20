@@ -47,7 +47,7 @@ jobs:
       - name: Verify individual and grouped map semantics
         run: node --import tsx --test tests/fleet-compact-map.test.mjs tests/fleet-map-groups.test.mjs tests/tv-map-tour.test.mjs
       - name: Verify map and TV browser behavior
-        run: npm run test:browser -- tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
+        run: npm run test:browser -- tests/fleet-board-layout.browser.spec.mjs tests/fleet-command-center.browser.spec.mjs tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
       - name: Prove rebuilt assets contain approved pin design
         shell: bash
         run: |
