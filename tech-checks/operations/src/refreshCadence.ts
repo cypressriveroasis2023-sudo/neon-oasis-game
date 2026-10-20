@@ -6,3 +6,7 @@ export const CAMERA_AUTO_REFRESH_MS=4*60*1000;
 export function automaticRefreshDue(lastAttemptAt:number,now:number,hidden:boolean,intervalMs=AUTO_REFRESH_MS) {
   return !hidden && Number.isFinite(now) && (lastAttemptAt===0 || now-lastAttemptAt>=intervalMs);
 }
+
+// Power observations expire independently of camera reads. This interval reads
+// only COS's saved VRM snapshot; vendor polling and device settings do not change.
+export const POWER_SAVED_REFRESH_MS=4*60*1000;

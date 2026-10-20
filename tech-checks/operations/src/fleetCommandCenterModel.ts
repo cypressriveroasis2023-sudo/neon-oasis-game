@@ -2,8 +2,8 @@ import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import {mhelpProviderFleet,type ProviderProduct,type ProviderCounts,type FieldProvider} from './mhelpProviderFleet';
 import {recordedAddressText} from './fleetDisplayAddress';
 import {canonicalCameraUnit} from './fieldCameraHealth';
-import {cameraTimestamp} from './cameraEvidence';
 import {readVrmFleetConfig} from '../../supabase/functions/cos-operations-pages/vrm';
+import {verifiedFleetPower} from './fleetPowerVerification';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
@@ -58,7 +58,7 @@ export function buildFleetCommandCenter(
   upload:unknown,fieldHealth:{total:number;items:FieldProduct[]}|null,
   healthReadSucceeded:boolean,rows:FleetDashboardRow[],
   addressMap:MhelpAddressMapResult|null,vrm:unknown,now=Date.now(),
-  cameraCheckedAt:string|null=null
+  cameraCheckedAt:string|null=null,inventoryReadSucceeded=healthReadSucceeded
 ):FleetCommandCenterData|null {
   const authority=readMhelpInventoryAuthority(upload,now);
   const provider=mhelpProviderFleet(upload,fieldHealth,healthReadSucceeded,now);
@@ -106,26 +106,17 @@ export function buildFleetCommandCenter(
   try{if(vrm)config=readVrmFleetConfig(vrm);}catch{/* unavailable provider cannot prove outages */}
   const helios=items.filter(p=>canonicalCameraUnit(p.unitNumber)?.startsWith('HELIOS|'));
   const vrmCounts:ProviderCounts={online:0,offline:0,unverified:0,not_applicable:0};
-  const seenInstallations=new Set<number>();
+  // Inventory identity and power evidence have independent read boundaries.
+  // A camera-provider failure must not erase a fresh, exact Product-ID power link.
+  const powerProducts=mhelpProviderFleet(upload,fieldHealth,inventoryReadSucceeded,now);
+  const inventoryLinks=new Map((powerProducts?.healthVerified?powerProducts.groups.flatMap(g=>g.items):[])
+    .map(p=>[p.productId,p.linked]));
   const victron=helios.map(p=>{
-    const unitRows=p.linked?.unitId?rows.filter(r=>r.id===p.linked?.unitId):[];
-    const row=unitRows.length===1?unitRows[0]:null;
-    const power=row?.power;
-    const available=config?.items.filter(i=>i.installationId===power?.installationId&&i.name===power?.name)||[];
-    const recent=power?.measurements.some(m=>cameraTimestamp(m.observedAt,now).fresh)===true;
-    const unique=Boolean(power&&available.length===1&&!seenInstallations.has(power.installationId));
-    if(unique&&power)seenInstallations.add(power.installationId);
-    const status:FleetCommandStatus=unique&&recent&&!power?.errorCode&&config?.sync.state==='current'?'online':'unverified';
+    const linked=inventoryLinks.get(p.productId)||null;
+    const evidence=verifiedFleetPower(recordById.get(p.productId),linked,rows,config,now);
+    const status:FleetCommandStatus=evidence.online?'online':'unverified';
     vrmCounts[status]++;
-    const reason=status==='online'?'Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera.':
-      !p.linked?.unitId?'This mHelp Product ID has no currently usable verified COS equipment association for Victron telemetry. Review the Product ID / COS link.':
-      !power?'The verified COS unit has no unique matching Victron installation record. Check the approved installation ID.':
-      !unique?'The Victron installation association is duplicated or cannot be confirmed against the current installation roster.':
-      Boolean(power.errorCode)?'The saved Victron power read contains an error. Recheck the provider connection.':
-      config?.sync.state!=='current'?'The Victron fleet sync is not current. Await a successful refresh before verifying power.':
-      !recent?'The saved Victron measurement is stale or missing. No current power status is inferred.':
-      'Victron power status is not yet verified.';
-    return {...p,status,reason};
+    return {...p,linked,status,reason:evidence.reason};
   });
   panels.push({
     key:'victron',title:'Victron / Helios',

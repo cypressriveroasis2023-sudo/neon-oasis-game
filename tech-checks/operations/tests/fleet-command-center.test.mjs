@@ -18,6 +18,7 @@ function fixture(){
  const records=tuples.map(([unitNumber,category,placement],i)=>({
   productId:productId(i),recordId:'mhelp_product:'+productId(i),unitNumber,category,placement,
   customer:placement==='SHOP'?'Cameras Onsite':'Customer '+i,uploadLifecycle:'UNFLAGGED',
+  ...(i===3?{binding:{state:'linked',unitIds:['11111111-1111-1111-1111-111111111111'],candidateUnitIds:[],placementHeld:false}}:{}),
   sourceAddress:{street:(i+1)+' Example Road',city:'Houston',state:'TX',zip:'77001'},
  }));
  return {contract:'COS_MHELP_UPLOAD_INVENTORY_V1',countBasis:'mhelp_product_records_not_unique_physical_units',
@@ -69,7 +70,7 @@ test('Victron is an overlapping Helios support system; current telemetry is not 
    portalUrl:'https://vrm.victronenergy.com/installation/1000099/dashboard',embedUrl:null}],
    sync:{state:'current',lastAttemptAt:time,lastSuccessAt:time,nextSyncAt:null,
     error:null,scheduleActive:true,connectionConfigured:true}};
- const rows=[{id:uid,power:{installationId:1000099,name:'Helios 003',errorCode:null,
+ const rows=[{id:uid,placement:'field',retired:false,support:false,power:{installationId:1000099,name:'Helios 003',errorCode:null,
    lastAttemptAt:time,measurements:[{metric:'battery_soc',value:12,unit:'%',source:'battery',instance:0,observedAt:time}]}}];
  const data=buildFleetCommandCenter(fixture(),saved(),true,rows,null,vrm,now,time);
  const panel=data?.panels.find(p=>p.key==='victron');
