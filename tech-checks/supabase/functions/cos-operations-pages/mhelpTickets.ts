@@ -1,3 +1,4 @@
+import {currentMhelpConfigOrRenew} from './mhelpAccessRetry.ts';
 /** Read-only ticket discovery. The caller must authenticate before invoking this reader.
  * Contract sources: https://www.mhelpdesk.com/partner-api/ticket.html,
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
@@ -216,7 +217,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         catch(error) {if(error instanceof MhelpTicketError)throw error;return fail('mHelpDesk could not complete the ticket preview.');}
         if(response.status===401 && operation==='account_read' && options.renewAccess && !renewed){
           renewed=true;cancel(response.body);
-          try {config=await options.renewAccess();} catch(cause) {
+          try {config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess);} catch(cause) {
             const failure=new MhelpTicketError('mHelpDesk could not renew its existing server token.');
             if(cause instanceof MhelpTokenRenewalError)failure.renewal=projectMhelpTokenRenewalDiagnostic(cause.diagnostic);
             throw failure;

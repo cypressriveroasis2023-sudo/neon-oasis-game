@@ -1,3 +1,4 @@
+import {currentMhelpConfigOrRenew} from './mhelpAccessRetry.ts';
 import {mhelpUnitIdentity} from '../../../operations/shared/mhelpUnitIdentity.ts';
 /** Read-only service-location preview for the existing verified fleet roles. Credentials and raw vendor records never leave this module. */
 import {MhelpPartnerError,projectPartnerEquipment} from './mhelpPartner.ts';
@@ -30,7 +31,7 @@ export function createMhelpUnitLocationReader(options:Options){return async(inpu
  if(!config.accessToken||config.accessToken.length>16384||/\s/.test(config.accessToken))fail('The existing mHelpDesk connection is unavailable.');
  const read=async(path:string,max=262144):Promise<unknown>=>{
   const response=await boundedFetch(API+path,{method:'GET',headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(12000)});
-  if(response.status===401&&path==='/users/me'&&!renewed&&options.renewAccess){void response.body?.cancel();renewed=true;config=await options.renewAccess();if(!config.accessToken||config.accessToken.length>16384||/\s/.test(config.accessToken))fail('mHelpDesk token renewal is unavailable.');return read(path,max);}
+  if(response.status===401&&path==='/users/me'&&!renewed&&options.renewAccess){void response.body?.cancel();renewed=true;config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess);if(!config.accessToken||config.accessToken.length>16384||/\s/.test(config.accessToken))fail('mHelpDesk token renewal is unavailable.');return read(path,max);}
   if(!response.ok||!response.body||Number(response.headers.get('Content-Length'))>max){void response.body?.cancel();fail(response.status===429?'mHelpDesk is limiting requests. Retry later.':'mHelpDesk could not read the service location.');}
   const reader=response.body!.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let raw='',bytes=0;try{for(;;){const r=await reader.read();if(r.done)break;bytes+=r.value.byteLength;if(bytes>max)fail('mHelpDesk returned an oversized location response.');raw+=decoder.decode(r.value,{stream:true});}return JSON.parse(raw+decoder.decode());}finally{void reader.cancel().catch(()=>{});}
  };
