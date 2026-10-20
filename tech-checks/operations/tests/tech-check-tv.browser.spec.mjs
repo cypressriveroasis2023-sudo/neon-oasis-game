@@ -161,7 +161,7 @@ test('Owner saves switches and can turn every TV section off without changing wo
 });
 
 test('Teddy and Victor have no inspection fields and Camera Health rotates with the verified map',async({page},testInfo)=>{
- const {state,frame}=await setup(page);
+ const {state,frame}=await setup(page,{pausedClock:true});
  state.readiness=['Teddy Hopper','Victor Garcia'].map((name,index)=>({userId:'staff-'+index,name,department:'it',status:'not_started',result:{}}));
  state.settings={sections:['readiness'],revision:1,updatedAt:time};await page.clock.fastForward(60000);
  await expect(frame.getByText('No company vehicle · truck and trailer inspections do not apply.').first()).toBeVisible();
@@ -175,9 +175,13 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
+ // Settle the previous daily read before advancing another interval. A queued
+ // read correctly coalesces while pending; that is not a missed refresh. Keep
+ // virtual time paused between explicit advances so screenshots cannot add ticks.
+ const refreshButton=frame.getByRole('button',{name:'Refresh',exact:true});
+ await expect(refreshButton).toHaveAttribute('aria-busy','false');await expect.poll(()=>state.pendingDaily).toBe(0);
  const scheduledReads=state.reads;
  await page.clock.fastForward(60000);
- const refreshButton=frame.getByRole('button',{name:'Refresh',exact:true});
  await expect.poll(()=>state.reads).toBe(scheduledReads+1);
  await expect(refreshButton).toHaveAttribute('aria-busy','false');await expect.poll(()=>state.pendingDaily).toBe(0);
  expect(state.dailyResults.at(-1)).toEqual({read:scheduledReads+1,status:200});expect(state.fleetReads).toBe(reads);
