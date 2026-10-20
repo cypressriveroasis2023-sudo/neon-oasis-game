@@ -7,9 +7,13 @@ on:
     paths:
       - 'tech-checks/operations/src/FleetCommandCenter.tsx'
       - 'tech-checks/operations/src/fleetCommandCenterModel.ts'
+      - 'tech-checks/operations/src/fleetPowerVerification.ts'
+      - 'tech-checks/operations/src/refreshCadence.ts'
       - 'tech-checks/operations/src/fleetCommandCenter.css'
       - 'tech-checks/operations/src/FleetDashboard.tsx'
       - 'tech-checks/operations/tests/fleet-command-center.*'
+      - 'tech-checks/operations/tests/fleet-independent-power.*'
+      - 'tech-checks/operations/tests/saved-camera-refresh.browser.spec.mjs'
       - '.github/workflows/verify-cos-fleet-command-center.yml'
 permissions:
   contents: read
@@ -35,6 +39,7 @@ jobs:
         run: |
           node --import tsx --test --test-concurrency=1 \
             tests/fleet-command-center.test.mjs \
+            tests/fleet-independent-power.test.mjs \
             tests/mhelp-provider-fleet.test.mjs \
             tests/mhelp-field-health.test.mjs \
             tests/fleet-dashboard.test.mjs
@@ -42,8 +47,8 @@ jobs:
         run: npm run build
       - name: Install Chromium browser
         run: npx playwright install --with-deps chromium
-      - name: Existing Fleet and new command center end-to-end proof
-        run: npm run test:browser -- tests/fleet-command-center.browser.spec.mjs tests/fleet-dashboard.browser.spec.mjs
+      - name: Existing Fleet and independent power end-to-end proof
+        run: npm run test:browser -- tests/fleet-command-center.browser.spec.mjs tests/fleet-dashboard.browser.spec.mjs tests/saved-camera-refresh.browser.spec.mjs tests/fleet-independent-power.browser.spec.mjs
       - name: Preserve diagnostic traces
         if: always()
         uses: actions/upload-artifact@v4
