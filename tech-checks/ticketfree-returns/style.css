@@ -23,3 +23,16 @@
 .cos-ticketfree-return{margin:10px 0}.cos-ticketfree-return p{margin:8px 0}.cos-ticketfree-return img{display:block;max-width:100%;max-height:280px;margin:10px 0;object-fit:contain}
 .cos-ticketfree-dialog :is(button,input,select,textarea):focus-visible,.cos-ticketfree-launch:focus-visible{outline:3px solid #87d7ff;outline-offset:3px}
 @media(max-width:380px){.cos-ticketfree-truck{grid-template-columns:1fr}.cos-ticketfree-dialog{padding:14px}.cos-ticketfree-toolbar{top:-14px}}
+/* Native checkboxes stay visible and use full-card touch targets on iPhone. */
+.cos-return-tabs,.cos-return-families,.cos-return-pager{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:center}
+.cos-return-tabs>button{flex:1}.cos-ticketfree-dialog [aria-pressed=true]{background:#155c77;border-color:#9cd9ed}
+.cos-return-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.cos-ticketfree-dialog .cos-return-pick{display:flex;align-items:flex-start;gap:12px;margin:0;padding:14px;border:1px solid #5c718a;border-radius:10px;background:#162436;min-width:0;cursor:pointer;font-weight:400}
+.cos-return-pick:has(input:checked){border-color:#9cd9ed;background:#194052}
+.cos-return-pick>span{min-width:0;overflow-wrap:anywhere}.cos-return-pick strong{display:block}.cos-return-pick small{margin-top:5px}
+.cos-ticketfree-dialog .cos-return-pick input[type=checkbox],.cos-ticketfree-dialog .cos-return-radio input[type=radio]{flex:0 0 24px;width:24px;height:24px;min-height:24px;margin:2px 0;padding:0;accent-color:#65c9e9}
+.cos-return-results{display:grid;gap:8px}.cos-return-selection{margin:22px 0 10px;border-top:1px solid #3c526c;padding-top:16px}
+.cos-return-selection details{margin:12px 0}.cos-return-selection summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
+.cos-ticketfree-dialog .cos-return-radio{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:400;margin:6px 0}
+.cos-return-pager>span{flex:1;text-align:center}.cos-return-families>button{font-size:14px;padding:10px 12px}
+@media(max-width:380px){.cos-return-grid{grid-template-columns:1fr}}

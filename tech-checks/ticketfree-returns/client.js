@@ -1,4 +1,4 @@
-import {validateContext} from './model.js';
+import {validateContext} from './model.js?v=multi-20261020';
 export const BUCKET='techcheck-ticketfree-evidence';
 export function ticketfreeClient(context) {
  const actor=context.getSession()?.user?.id,role=context.getRole();
@@ -18,10 +18,25 @@ export function ticketfreeClient(context) {
    const {error}=await context.db.storage.from(BUCKET).upload(args.p_photos[i],photos[i],{contentType:'image/jpeg',upsert:false});assert();
    if(error&&String(error.statusCode)!=='409')throw new Error('Photo upload failed. Your draft is retained; reconnect and retry.');
   }
-  const result=await rpc(kind==='submit'?'submit_techcheck_ticketfree_return_v1':'receive_techcheck_ticketfree_return_v1',args);
+  const result=await rpc(kind==='submit'?'submit_techcheck_ticketfree_return_v1':(args.p_disposition==='review'?'receive_techcheck_ticketfree_unlinked_v1':'receive_techcheck_ticketfree_return_v1'),args);
   if(result?.request_id!==args.p_request_id||result?.return_id!==(kind==='submit'?args.p_request_id:args.p_return_id)||![1,2].includes(result.revision))throw new Error('The save result was not verified. Retry the same request; do not create another return.');
   return result;
  }
+ async function submitBatch(args,photos) {
+  assert();
+  if(!Array.isArray(args.p_items)||!args.p_items.length)throw new Error('No saved return selections.');
+  for(const item of args.p_items){
+   if(item.photos.length!==photos.length)throw new Error('Saved return photos changed. Reopen the retained draft.');
+   for(let i=0;i<photos.length;i++){
+    const {error}=await context.db.storage.from(BUCKET).upload(item.photos[i],photos[i],{contentType:'image/jpeg',upsert:false});assert();
+    if(error&&String(error.statusCode)!=='409')throw new Error('Photo upload failed. The complete selection is retained for retry.');
+   }
+  }
+  const result=await rpc('submit_techcheck_ticketfree_return_batch_v1',args);
+  const ids=args.p_items.map(i=>i.request_id);
+  if(result?.version!==1||!Array.isArray(result.results)||result.results.length!==ids.length||new Set(result.results.map(r=>r.request_id)).size!==ids.length||result.results.some(r=>!ids.includes(r.request_id)||r.return_id!==r.request_id||r.revision!==1||r.state!=='waiting_it'))throw new Error('The batch save could not be verified. Retry the same saved selection.');
+  return result;
+ }
  const photoUrl=async path=>{assert();const {data,error}=await context.db.storage.from(BUCKET).createSignedUrl(path,300);assert();if(error||!data?.signedUrl)throw new Error('Saved photo unavailable.');return data.signedUrl;};
- return {actor,role,current,assert,read,paths,submit,photoUrl};
+ return {actor,role,current,assert,read,paths,submit,submitBatch,photoUrl};
 }
