@@ -161,6 +161,7 @@ async function routeFixture({historicalSite=false,verifiedIt=false,onFetch=()=>{
   if(url.includes('/vision_vigilant_devices?'))return json(f.bundle.sources.providers);
   if(url.includes('/camera_devices?'))return json(f.bundle.sources.devices);
   if(url.includes('/rpc/cos_camera_identity_epochs_v1'))return json(f.target.epochs);
+  if(url.includes('/rpc/cos_fleet_shop_snapshot_v1'))return json({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
   if(url.includes('/rpc/cos_owner_identity_snapshot'))return json(f.bundle.sources.ownerCrosswalk);
   if(url.includes('/rpc/cos_fleet_placement_evidence_v1'))return json(f.bundle.sources.audits);
   if(url.includes('/rpc/appdeploy_field_map_snapshot'))return json(f.rawSnapshot);
