@@ -163,6 +163,10 @@ test('all four truck entries remain returnable when two do not exist in the cata
  assert.equal((await scalar('select count(*)::int n from equipment_master')).n,count);
  assert.equal((await scalar('select count(*)::int n from unit_registry where unit_tag=$1',[tag1])).n,0);
  assert.ok((await context(it)).returns.some(r=>r.id===items[2].request_id&&r.state==='identity_review'));
+ await assert.rejects(db.query("update service_truck_units set status='assigned' where service_tech_id=$1 and equipment_type='Spotter'",[svc]),/waiting for IT/);
+ await db.query("update service_truck_units set unit_tag='OTHER-VERIFIED-UNIT',status='assigned' where service_tech_id=$1 and equipment_type='Spotter'",[svc]);
+ assert.equal((await scalar("select unit_tag from service_truck_units where service_tech_id=$1 and equipment_type='Spotter'",[svc])).unit_tag,'OTHER-VERIFIED-UNIT');
+ await assert.rejects(db.query("insert into unit_registry(unit_key,equipment_type,unit_tag,lifecycle_status) values($1,'Spotter',$2,'shop_inventory')",['wrong:'+tag1,tag1]),/waiting for IT/);
 });
 test('unlinked submissions cannot invent arbitrary truck equipment or impersonate another Service technician',async()=>{
  const unknown={request_id:randomUUID(),returned_key:null,unlinked_family:'Sniper',unlinked_tag:'invented',notes:'',photos:[]};

@@ -6,6 +6,7 @@ alter table app_private.techcheck_ticketfree_returns_v1 add column identity_stat
 alter table app_private.techcheck_ticketfree_returns_v1 add constraint ticketfree_identity_binding_v2 check((identity_state='matched' and returned_key is not null) or (identity_state='needs_review' and returned_key is null));
 alter table app_private.techcheck_ticketfree_returns_v1 drop constraint techcheck_ticketfree_returns_v1_state_check;
 alter table app_private.techcheck_ticketfree_returns_v1 add constraint techcheck_ticketfree_returns_v1_state_check check(state in ('waiting_it','checked_in','repair','identity_review'));
+alter table app_private.techcheck_ticketfree_returns_v1 add constraint ticketfree_unlinked_stock_hold_v2 check(identity_state<>'needs_review' or state in ('waiting_it','identity_review'));
 create unique index ticketfree_unlinked_open_v2 on app_private.techcheck_ticketfree_returns_v1(family,unit_tag) where identity_state='needs_review' and state in ('waiting_it','identity_review');
 
 create function app_private.submit_techcheck_ticketfree_unlinked_v1(p_request_id uuid,p_family text,p_unit_tag text,p_notes text,p_photos text[]) returns jsonb
@@ -147,7 +148,16 @@ begin
   where state in ('waiting_it','identity_review') and ((family=v->>'equipment_type' and unit_tag=v->>'unit_tag')
     or (family=before_row->>'equipment_type' and unit_tag=before_row->>'unit_tag'))
   order by returned_key loop
-  perform pg_advisory_xact_lock(hashtextextended(r.returned_key,2));
+  perform pg_advisory_xact_lock(hashtextextended(coalesce(r.returned_key,r.registry_key),2));
+  -- IT has received the old item: replenishing its truck slot with a different
+  -- unit does not release or reissue the held returned equipment.
+  if tg_table_name='service_truck_units' and r.state='identity_review'
+   and before_row->>'status'='used_restock_due'
+   and before_row->>'service_tech_id'=r.service_tech_id::text
+   and v->>'service_tech_id'=r.service_tech_id::text
+   and v->>'equipment_type'=r.family
+   and nullif(v->>'unit_tag','') is not null
+   and v->>'unit_tag' is distinct from r.unit_tag then continue;end if;
   if tg_table_name='unit_registry' and v->>'unit_key'=r.registry_key and v->>'equipment_type'=r.family
    and v->>'unit_tag'=r.unit_tag and v->>'lifecycle_status'=r.expected_lifecycle
    and v->>'current_holder_id'=r.service_tech_id::text then continue;end if;

@@ -59,8 +59,8 @@ export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit
    const details=node('details');if(item.usedKey)details.open=true;details.append(node('summary',item.usedKey?'Replacement installed: '+item.usedKey:'Record replacement installed (optional)'));
    const options=[{equipment_key:'',name:'No replacement installed'},...available];
    for(const t of options){
-    const label=node('label','','cos-return-radio'),radio=node('input');radio.type='radio';radio.name='replacement-'+item.id;radio.checked=(item.usedKey||'')===(t.equipment_key||'');
-    const none=t.equipment_key==='';radio.disabled=!none&&(!t.equipment_key||draft.items.some(i=>i.equipment_key===t.equipment_key)||draft.items.some(i=>i!==item&&i.usedKey===t.equipment_key));
+    const label=node('label','','cos-return-radio'),radio=node('input');radio.type='radio';radio.name='replacement-'+item.id;
+    const none=t.equipment_key==='';radio.checked=none?!item.usedKey:Boolean(t.equipment_key)&&item.usedKey===t.equipment_key;radio.disabled=!none&&(!t.equipment_key||draft.items.some(i=>i.equipment_key===t.equipment_key)||draft.items.some(i=>i!==item&&i.usedKey===t.equipment_key));
     radio.setAttribute('aria-label',(none?'No replacement':'Install '+itemName(t))+' for '+itemName(item));
     radio.onchange=()=>{item.usedKey=t.equipment_key;rerender();};label.append(radio,node('span',itemName(t)+(radio.disabled?' — unavailable for this swap':'')));details.append(label);
    }

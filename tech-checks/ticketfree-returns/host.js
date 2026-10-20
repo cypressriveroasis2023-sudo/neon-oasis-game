@@ -47,9 +47,10 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
   if(draft.photos.length)fields.append(button('Clear draft photos',()=>{draft.photos=[];void keep();render();}));
  }
  function renderReturns() {
-  const pending=data.returns.filter(r=>r.state==='waiting_it'),recent=data.returns.filter(r=>r.state!=='waiting_it');
+  const pending=data.returns.filter(r=>r.state==='waiting_it'),review=data.returns.filter(r=>r.state==='identity_review'),recent=data.returns.filter(r=>!['waiting_it','identity_review'].includes(r.state));
   const s=section('Waiting for IT ('+data.pending_count+')');if(!pending.length)s.append(node('p','No equipment is waiting for IT check-in.'));
   for(const r of pending)s.append(returnCard(r));
+  if(review.length){const held=section('Received — Unit ID review ('+review.length+')');for(const r of review)held.append(returnCard(r));}
   if(recent.length){const history=section('Recent check-ins');for(const r of recent.slice(0,30))history.append(returnCard(r));}
  }
  function returnCard(r,allowAction=true) {

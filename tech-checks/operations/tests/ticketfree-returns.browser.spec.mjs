@@ -71,7 +71,9 @@ test('complete catalogue is paginated, supports every family and searches past r
  await expect(page.getByRole('heading',{name:'Sending to IT (2)'})).toBeVisible();await expect(page.getByRole('dialog').locator('select')).toHaveCount(0);
 });
 test('a field swap records the selected installed replacement and IT separately checks in the removed unit',async({page})=>{
- await setup(page);await selectSite(page);await page.locator('summary').getByText('Record replacement installed (optional)').click();
+ await setup(page);await selectSite(page);await page.locator('summary').filter({hasText:'Record replacement installed (optional)'}).click();
+ await expect(page.getByRole('radio',{name:'No replacement for Spotter 257HDC2',exact:true})).toBeChecked();
+ await expect(page.getByRole('radio',{name:'Install Sniper 001 for Spotter 257HDC2',exact:true})).not.toBeChecked();
  await page.getByRole('radio',{name:'Install Ranger 002 for Spotter 257HDC2',exact:true}).check();
  await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');
  expect(await page.evaluate(()=>returnFixture.returns[0].used_key)).toBe('ranger:002');await asIT(page);await page.getByRole('button',{name:'Check in this equipment'}).click();
@@ -83,6 +85,7 @@ test('an unmatched truck item is received for ID review, never silently created 
  await asIT(page);await page.getByRole('button',{name:'Check in this equipment'}).click();
  await expect(page.getByRole('combobox',{name:'Inventory destination'}).locator('option')).toHaveCount(1);
  await intake(page,'review');await page.getByRole('button',{name:'Complete IT check-in'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('Received — Unit ID review');
+ await expect(page.getByRole('heading',{name:'Received — Unit ID review (1)',exact:true})).toBeVisible();
 });
 test('failed condition checks require a repair destination and a note',async({page})=>{
  await setup(page);await selectSite(page);await page.getByRole('button',{name:'Send 1 unit to IT'}).click();await expect(page.locator('.cos-ticketfree-status')).toContainText('1 unit(s) sent');await asIT(page);await page.getByRole('button',{name:'Check in this equipment'}).click();await intake(page);
