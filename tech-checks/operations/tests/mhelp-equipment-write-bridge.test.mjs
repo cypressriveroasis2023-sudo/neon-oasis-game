@@ -44,3 +44,13 @@ test('unexpected source fields and malformed expected hashes are denied before t
  await assert.rejects(stageOwnerEquipmentCsv({...options,requestId:UUID,rpc,body:{...body,unexpected:true}}),/unexpected source request field/);
  assert.equal(calls,0);
 });
+
+test('assignment review rereads exact file and current Google proof, and never trusts browser census or identities',async()=>{
+ const {reviewOwnerEquipmentAssignments}=await import('../../supabase/functions/cos-operations-pages/mhelpEquipmentAssignmentReview.ts');let calls=0;
+ const rpc=async(name,args)=>{calls++;assert.equal(name,'cos_owner_mhelp_assignment_review_v1');assert.equal(args.p_current_2027_sha256,'b'.repeat(64));assert.equal(args.p_actor_user_id,actor);return {contract:'COS_OWNER_ASSIGNMENT_REVIEW_V1',stageId:UUID,sourceSha256:args.p_source_sha256,censusSha256:args.p_current_2027_sha256,reviewDigest:'d'.repeat(64),approved:false,items:[]};};
+ await reviewOwnerEquipmentAssignments({...options,rpc,stageId:UUID,action:'read'});assert.equal(calls,1);
+ await assert.rejects(reviewOwnerEquipmentAssignments({...options,rpc,stageId:UUID,action:'read',verifyCensus:async()=>{throw Error('unavailable')}}),/CENSUS_NOT_VERIFIED/);
+ await assert.rejects(reviewOwnerEquipmentAssignments({...options,rpc,stageId:UUID,action:'approve',reviewDigest:'d'.repeat(64),confirmationText:'yes'}),/explicit assignment review/);
+ await assert.rejects(reviewOwnerEquipmentAssignments({...options,rpc,stageId:UUID,action:'read',body:{...body,binding:{nativeUnitId:UUID}}}),/unexpected source request field/);
+ assert.equal(calls,1);
+});

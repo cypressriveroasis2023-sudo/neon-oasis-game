@@ -1,5 +1,7 @@
 import {useRef,useState} from 'react';
 import {api} from './api';
+import OwnerAssignmentReview from './OwnerAssignmentReview';
+import type {AssignmentReview} from '../../supabase/functions/cos-operations-pages/mhelpEquipmentAssignmentReview';
 import type {OwnerEquipmentReview} from '../../supabase/functions/cos-operations-pages/mhelpEquipmentOwnerReview';
 
 /** Existing Owner session only; the server repeats the Owner permission check.
@@ -11,11 +13,12 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
  const fileRef=useRef<HTMLInputElement>(null);
  const [pending,setPending]=useState(false),[failure,setFailure]=useState(''),[preview,setPreview]=useState<OwnerEquipmentReview|null>(null);
  const [expected,setExpected]=useState('');
+ const [assignmentReview,setAssignmentReview]=useState<AssignmentReview|null>(null);
  const [stage,setStage]=useState<StageReceipt|null>(null),[applied,setApplied]=useState<AppliedReceipt|null>(null);
  const [approval,setApproval]=useState(false),[confirmationText,setConfirmationText]=useState('');
  const run=async()=>{
   if(pending)return;
-  setFailure('');setPreview(null);setStage(null);setApplied(null);setApproval(false);
+  setFailure('');setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);setApproval(false);
   const file=fileRef.current?.files?.[0];
   if(!file){setFailure('Choose the original complete mHelpDesk equipment CSV.');return;}
   if(!/\.csv$/i.test(file.name)||file.size<1||file.size>2*1024*1024){setFailure('Choose an equipment CSV no larger than 2 MiB.');return;}
@@ -42,7 +45,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
  };
  const stageChanges=async()=>{
   if(!allowStage||!preview||preview.censusStatus!=='verified'||pending)return;
-  setFailure('');setStage(null);setApplied(null);setPending(true);
+  setFailure('');setStage(null);setAssignmentReview(null);setApplied(null);setPending(true);
   try{
    const result=(await api.post<StageReceipt>('/api/mhelpdesk/equipment/stage',{...await original(),requestId:crypto.randomUUID()})).data;
    if(result.contract!=='COS_OWNER_EQUIPMENT_STAGE_V1'||result.previewOnly!==true||result.readyToCommit!==false||
@@ -51,8 +54,20 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
   }catch(e){setFailure(e instanceof Error?e.message:'The Owner source review is unavailable. No equipment was changed.');}
   finally{setPending(false);}
  };
+ const reviewAssignments=async(action:'read'|'approve',note?:string)=>{
+  if(!stage||pending)return;
+  setPending(true);setFailure('');setApproval(false);
+  try{const result=(await api.post<AssignmentReview>('/api/mhelpdesk/equipment/assignments',{
+   ...await original(),stageId:stage.stageId,action,...(action==='approve'?{reviewDigest:assignmentReview?.reviewDigest,confirmationText:note}:{})
+  })).data;
+   if(result.contract!=='COS_OWNER_ASSIGNMENT_REVIEW_V1'||result.stageId!==stage.stageId||result.sourceSha256!==stage.sourceSha256)throw Error('Assignment review receipt does not match this stage.');
+   setAssignmentReview(result);
+  }catch(e){setAssignmentReview(null);setFailure(e instanceof Error?e.message:'Current assignment review is unavailable.');}
+  finally{setPending(false);}
+ };
+ const assignmentsReady=assignmentReview&&(assignmentReview.approved||assignmentReview.items.length===0);
  const commitChanges=async()=>{
-  if(!allowStage||!stage||!preview||!approval||confirmationText.trim().length<24||pending)return;
+  if(!allowStage||!stage||!preview||!assignmentsReady||!approval||confirmationText.trim().length<24||pending)return;
   setFailure('');setPending(true);
   try{
    const result=(await api.post<AppliedReceipt>('/api/mhelpdesk/equipment/commit',{
@@ -70,9 +85,9 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
   <p>Compare a complete mHelpDesk export against the last reviewed COS source upload. The 2027 Unit Tracker is operational; the 2026 tracker is historical only.</p>
   <p><strong>Preview only.</strong> This control cannot change placements, device associations, IPs, GPS, or history. A separate guarded Owner commit is required after identity review.</p>
   <label htmlFor='cos-mhelp-equipment-csv'>Original mHelpDesk equipment CSV</label>
-  <input id='cos-mhelp-equipment-csv' ref={fileRef} type='file' accept='.csv,text/csv' onChange={()=>{setPreview(null);setStage(null);setApplied(null);setFailure('');}} disabled={pending}/>
+  <input id='cos-mhelp-equipment-csv' ref={fileRef} type='file' accept='.csv,text/csv' onChange={()=>{setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);setFailure('');}} disabled={pending}/>
   <label htmlFor='cos-mhelp-equipment-sha'>Expected source SHA-256 (optional, from manifest)</label>
-  <input id='cos-mhelp-equipment-sha' type='text' maxLength={64} autoComplete='off' spellCheck={false} value={expected} onChange={event=>{setExpected(event.target.value);setPreview(null);setStage(null);setApplied(null);}} placeholder='64 lowercase hex characters' disabled={pending}/>
+  <input id='cos-mhelp-equipment-sha' type='text' maxLength={64} autoComplete='off' spellCheck={false} value={expected} onChange={event=>{setExpected(event.target.value);setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);}} placeholder='64 lowercase hex characters' disabled={pending}/>
   <button type='button' disabled={pending} onClick={run}>{pending?'Checking original CSV…':'Preview equipment changes'}</button>
   {failure&&<p role='alert'>{failure}</p>}
   {preview&&<div aria-live='polite'>
@@ -89,10 +104,12 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
    {!allowStage&&<p>Protected equipment save is awaiting independently reviewed backend installation. Preview remains read-only.</p>}
    {stage&&!applied&&<section aria-label='Protected Owner approval'>
     <p><strong>Staged source:</strong> {stage.productIdsMatched} products · {stage.recordedField} Field · {stage.recordedShop} Shop. Identity holds remain separate from camera identities.</p>
+    {!assignmentReview&&<button type='button' disabled={pending} onClick={()=>reviewAssignments('read')}>Review current assignment identities</button>}
+    {assignmentReview&&assignmentReview.items.length>0&&<OwnerAssignmentReview key={assignmentReview.reviewDigest} review={assignmentReview} pending={pending} onApprove={note=>reviewAssignments('approve',note)}/>}
     <label><input type='checkbox' checked={approval} onChange={e=>setApproval(e.target.checked)} disabled={pending}/> I reviewed the changed and held source assignments; do not merge unverified camera identities or GPS.</label>
     <label htmlFor='cos-owner-equipment-approval-note'>Owner approval note (at least 24 characters)</label>
     <textarea id='cos-owner-equipment-approval-note' value={confirmationText} onChange={e=>setConfirmationText(e.target.value)} maxLength={800} disabled={pending} rows={3}/>
-    <button type='button' disabled={pending||!approval||confirmationText.trim().length<24} onClick={commitChanges}>Apply reviewed source through protected COS backend</button>
+    <button type='button' disabled={pending||!assignmentsReady||!approval||confirmationText.trim().length<24} onClick={commitChanges}>Apply reviewed source through protected COS backend</button>
    </section>}
    {applied&&<p role='status'><strong>Committed source receipt verified:</strong> {applied.records} records · {applied.field} Field · {applied.shop} Shop. Live Fleet/map and camera status require separate readback.</p>}
   </div>}

@@ -9,6 +9,7 @@ import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
 import {EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
 import {ownerEquipmentCsvReview} from './mhelpEquipmentOwnerReview.ts';
 import {stageOwnerEquipmentCsv,commitOwnerEquipmentCsv} from './mhelpEquipmentWriteBridge.ts';
+import {reviewOwnerEquipmentAssignments} from './mhelpEquipmentAssignmentReview.ts';
 import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from './combinedFleetRoster.ts';
 import {sourceEquipmentAddressCandidates,projectSourceEquipmentAddressEstimates} from './sourceEquipmentAddressEstimates.ts';
 import { checkedTvSections } from './tv-board-settings/index.ts';
@@ -489,7 +490,7 @@ export function createOperationsHandler(options) {
       const context = await authenticate(request);
       if (!path && request.method === 'POST') {
         const { body: envelope, byteLength: envelopeBytes } = await readMhelpAwareJsonWithSize(request, context.legacyOwner && context.actorId ? MHELP_JSON_LIMIT : 65536, admitLargeBody);
-        const envelopeLimit = ['/api/mhelpdesk/equipment/preview','/api/mhelpdesk/equipment/stage','/api/mhelpdesk/equipment/commit'].includes(envelope.path) ? Math.ceil(EQUIPMENT_CSV_MAX_BYTES / 3) * 4 + 16384 : envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
+        const envelopeLimit = ['/api/mhelpdesk/equipment/preview','/api/mhelpdesk/equipment/stage','/api/mhelpdesk/equipment/commit','/api/mhelpdesk/equipment/assignments'].includes(envelope.path) ? Math.ceil(EQUIPMENT_CSV_MAX_BYTES / 3) * 4 + 16384 : envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
         if (envelopeBytes > envelopeLimit) fail('Request body is too large.', 413);
         if (Object.keys(envelope).some(k => !['path', 'method', 'body'].includes(k))) fail('Unsupported transport fields.');
         if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path) && !(envelope.method==='GET' && envelope.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1')) fail('COS endpoint not found.', 404);
@@ -777,7 +778,7 @@ export function createOperationsHandler(options) {
           fail('The equipment comparison is unavailable. No records were changed.',503);
         }
       }
-      if (path==='/api/mhelpdesk/equipment/stage'||path==='/api/mhelpdesk/equipment/commit') {
+      if (path==='/api/mhelpdesk/equipment/stage'||path==='/api/mhelpdesk/equipment/commit'||path==='/api/mhelpdesk/equipment/assignments') {
         // Disabled unless independently reviewed private SQL, receipt storage and
         // full authenticated integration tests are explicitly enabled by Ops.
         // The service-ticket PDF import is a distinct route and stays unchanged.
@@ -785,7 +786,7 @@ export function createOperationsHandler(options) {
         if (method!=='POST') fail('Method not supported.',405);
         if(options.ownerEquipmentImportEnabled!==true)fail('Protected equipment admission is not enabled. Preview remains available.',503);
         if(body===null)body=await readMhelpAwareJson(request,Math.ceil(EQUIPMENT_CSV_MAX_BYTES/3)*4+16384,admitLargeBody);
-        const allowed=path.endsWith('/stage')?['bytesBase64','sourceFilename','expectedSha256','requestId']:['bytesBase64','sourceFilename','expectedSha256','stageId','confirmationText'];
+        const allowed=path.endsWith('/assignments')?['bytesBase64','sourceFilename','expectedSha256','stageId','action','reviewDigest','confirmationText']:path.endsWith('/stage')?['bytesBase64','sourceFilename','expectedSha256','requestId']:['bytesBase64','sourceFilename','expectedSha256','stageId','confirmationText'];
         if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!allowed.includes(k)))fail('Invalid equipment submission.',400);
         const original={bytesBase64:body.bytesBase64,sourceFilename:body.sourceFilename,...(body.expectedSha256===undefined?{}:{expectedSha256:body.expectedSha256})};
         const current=await readMhelpPlacements(actorPayload);
@@ -793,7 +794,7 @@ export function createOperationsHandler(options) {
         const common={body:original,previous:current.upload,actorId:context.actorId,organizationId:ORGANIZATION_ID,
           google:{getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion,fetch:requestFetch},rpc};
         try {
-          return json(path.endsWith('/stage')?
+          return json(path.endsWith('/assignments')? await reviewOwnerEquipmentAssignments({...common,stageId:body.stageId,action:body.action,reviewDigest:body.reviewDigest,confirmationText:body.confirmationText}):path.endsWith('/stage')?
             await stageOwnerEquipmentCsv({...common,requestId:body.requestId}):
             await commitOwnerEquipmentCsv({...common,stageId:body.stageId,confirmationText:body.confirmationText}));
         } catch(e){

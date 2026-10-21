@@ -24,7 +24,7 @@ function input(body:unknown):EquipmentSourceInput{
  return {bytesBase64:b.bytesBase64,sourceFilename:b.sourceFilename,
   ...(typeof b.expectedSha256==='string'?{expectedSha256:b.expectedSha256}:{})};
 }
-async function currentSource(o:BridgeOptions){
+export async function currentSource(o:BridgeOptions){
  if(!UUID.test(o.actorId)||!UUID.test(o.organizationId))invalid('authenticated actor required');
  const source=input(o.body),preview=await previewMhelpEquipmentCsv(source,o.previous);
  const bytes=Uint8Array.from(atob(source.bytesBase64),v=>v.charCodeAt(0));
