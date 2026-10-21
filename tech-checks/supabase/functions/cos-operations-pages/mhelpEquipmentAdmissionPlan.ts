@@ -4,7 +4,7 @@
  * current native source receipt. Future commit code must RECHECK every guard inside
  * one database transaction; a plan is not permission or proof to update equipment.
  */
-import type {EquipmentCsvRow} from './mhelpEquipmentCsvPreview.ts';
+import {validPrior,type EquipmentCsvRow} from './mhelpEquipmentCsvPreview.ts';
 
 const SHA = /^[a-f0-9]{64}$/;
 const ID = /^[1-9][0-9]{0,14}$/;
@@ -42,7 +42,8 @@ function identicalAddress(a:EquipmentCsvRow['sourceAddress'],b:EquipmentCsvRow['
 function isRecord(v:unknown):v is Record<string,unknown>{return !!v&&typeof v==='object'&&!Array.isArray(v);}
 /** Output contains only bounded Product-ID/label/placement decisions; never addresses or IPs. */
 export function prepareMhelpEquipmentAdmission(rows:EquipmentCsvRow[],previous:unknown,guards:AdmissionGuards):AdmissionPlan{
-  if(!Array.isArray(rows)||!rows.length||rows.length>10000||!isRecord(previous)||previous.contract!=='COS_MHELP_UPLOAD_V1'||previous.reviewed!==true||!Array.isArray(previous.records)||previous.records.length>10000||!SHA.test(guards.sourceSha256)||!SHA.test(guards.expectedActiveSourceSha256)||previous.sourceSha256!==guards.expectedActiveSourceSha256)bad('complete source and current reviewed source guard required');
+  if(isRecord(previous)&&previous.contract==='COS_MHELP_API_V1')validPrior(previous);
+  if(!Array.isArray(rows)||!rows.length||rows.length>10000||!isRecord(previous)||(previous.contract!=='COS_MHELP_UPLOAD_V1'&&previous.contract!=='COS_MHELP_API_V1')||previous.reviewed!==true||!Array.isArray(previous.records)||previous.records.length>10000||!SHA.test(guards.sourceSha256)||!SHA.test(guards.expectedActiveSourceSha256)||previous.sourceSha256!==guards.expectedActiveSourceSha256)bad('complete source and current reviewed source guard required');
   const productIds=new Set<string>();
   for(const r of rows){if(!r||!ID.test(r.productId)||productIds.has(r.productId)||!['FIELD','SHOP'].includes(r.placement)||!['UNFLAGGED','MISSING','DO_NOT_USE'].includes(r.lifecycle)||!r.unitNumber||!r.customerId||!r.customer||!r.category||!r.sourceAddress)bad('invalid or duplicate source equipment');productIds.add(r.productId);}
   const oldRecords=previous.records as GuardedRecord[], prior=new Map<string,GuardedRecord>(),missing=new Map<string,GuardedRecord[]>();

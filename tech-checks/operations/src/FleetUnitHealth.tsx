@@ -24,7 +24,7 @@ export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{
    <h3><FleetCardIcon kind="camera"/>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
    <small>{healthObservationLabel(row.camera.basis,row.camera.state)}: {cameraTime(row.camera.checkedAt,now)}</small>
    <LastKnownCameraStatus observation={lastKnown} now={now}/>
-   <details><summary>Camera source details</summary><p>{row.camera.reason}</p><p>Camera troubleshooting contains the matched devices and saved checks.</p></details>
+   <details><summary>{row.cameraState==='unknown'?'Why is this unverified?':'Camera source details'}</summary><p>{row.camera.reason}</p><p>Camera troubleshooting contains the matched devices and saved checks.</p></details>
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-router-card' aria-label='Selected unit router health'>
    <h3><FleetCardIcon kind="router"/>Router &amp; connection</h3><Status state={row.routerState} label={row.routerState==='online'?'Reachable':row.routerState==='offline'?'Unreachable':'Unverified'}/>

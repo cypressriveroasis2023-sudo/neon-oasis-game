@@ -96,3 +96,23 @@ test('direct ittech desktop session opens COS Camera Health without the native a
  expect(f.calls.filter(call=>call.name?.startsWith('techcheck_transfer'))).toHaveLength(0);
  expect(f.errors).toEqual([]);
 });
+
+test('IT phone can explicitly open the same Fleet board and return to handoffs',async({page},info)=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
+ const nav=page.getByRole('navigation',{name:'IT daily views'});
+ await nav.getByRole('button',{name:'Fleet map & troubleshooting',exact:true}).click();
+ await expect(page.locator('#cosITDailyFrame')).toBeVisible();
+ await expect(page.frameLocator('#cosITDailyFrame').getByRole('heading',{name:'Fleet Dashboard',exact:true})).toBeVisible();
+ await page.screenshot({path:info.outputPath('IT-phone-shared-fleet.png'),fullPage:true});
+ await nav.getByRole('button',{name:'Check out / check in',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeVisible();await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ expect(f.calls.some(c=>c.name==='submit_techcheck_transfer_v1')).toBe(false);expect(f.errors).toEqual([]);
+});
+test('IT phone keeps an open handoff form when Fleet is selected',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ await page.getByRole('navigation',{name:'IT daily views'}).getByRole('button',{name:'Fleet map & troubleshooting'}).click();
+ await expect(page.getByRole('status').filter({hasText:'Finish or close the current handoff form'})).toBeVisible();
+ await expect(page.getByLabel('Receiving Service technician')).toBeVisible();await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ expect(f.calls.some(c=>c.name==='submit_techcheck_transfer_v1')).toBe(false);
+});

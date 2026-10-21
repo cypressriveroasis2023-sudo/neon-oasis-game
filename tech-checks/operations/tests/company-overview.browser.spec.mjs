@@ -45,11 +45,8 @@ async function mount(page,{cameraData=camera}={}) {
 test('company overview orders real health sources before the eight-stage customer journey', async ({ page }, testInfo) => {
   const { frame, state } = await mount(page);
   const overview = frame.getByRole('region', { name: 'Company overview', exact: true });
-  expect(await overview.locator('.company-health-card h2').allTextContents()).toEqual(['Camera Health', 'InHand Routers', 'Victron power']);
-  await expect(overview.getByText('2 field units need review', { exact: true })).toBeVisible();
-  await expect(overview.getByText('1 stored router record', { exact: true })).toBeVisible();
-  await expect(overview.getByText('Live GPS setup pending', { exact: true })).toBeVisible();
-  await expect(overview.getByText('POWER STATUS NOT AVAILABLE IN THIS VIEW', { exact: true })).toBeVisible();
+  await expect(overview.getByRole('navigation',{name:'Equipment systems'})).toBeVisible();
+  await expect(overview.locator('.company-health-card')).toHaveCount(0);
   const lifecycle = overview.getByRole('navigation', { name: 'Company job lifecycle' });
   expect(await lifecycle.locator('strong').allTextContents()).toEqual(['Quote', 'Agreement', 'Signed', 'Schedule & Parts', 'IT Prep', 'Service Install', 'Closeout', 'Billing']);
   await expect(lifecycle.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
@@ -58,7 +55,7 @@ test('company overview orders real health sources before the eight-stage custome
   await expect(lifecycle.getByRole('button', { name: 'Signed: Not connected', exact: true })).toBeVisible();
   await lifecycle.getByRole('button', { name: 'Agreement: Not connected', exact: true }).click();
   await expect(overview.getByText('Agreement tracking is not connected.', { exact: true })).toBeVisible();
-  const healthBox = await overview.locator('.company-health-grid').boundingBox();
+  const healthBox = await overview.getByRole('navigation',{name:'Equipment systems'}).boundingBox();
   const stagesBox = await lifecycle.boundingBox();
   const attentionBox = await overview.getByRole('heading', { name: 'What needs attention' }).boundingBox();
   expect(healthBox.y + healthBox.height).toBeLessThan(stagesBox.y);
@@ -75,21 +72,16 @@ test('company overview orders real health sources before the eight-stage custome
 test('refresh replaces failed sources with unavailable values and recovers verified zero separately', async ({ page }) => {
   const { frame, state } = await mount(page);
   // Change the fixture only after the initial independent sources have settled.
-  await expect(frame.getByText('2 field units need review', { exact: true })).toBeVisible();
-  await expect(frame.getByText('1 stored router record', { exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
   state.failures.add('/api/jobs');
   state.failures.add('/api/camera-health/summary-v3');
   state.failures.add('/api/routers');
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
-  await expect(frame.getByText('Health unavailable', { exact: true })).toBeVisible();
-  await expect(frame.getByText('Router count unavailable', { exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'Schedule & Parts: Unavailable', exact: true })).toBeVisible();
   await expect(frame.getByText('Nothing currently needs Owner attention in the loaded review sources.', { exact: true })).toHaveCount(0);
   await expect(frame.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
   state.failures.clear();
   await frame.getByRole('button', { name: 'Retry dashboard', exact: true }).click();
-  await expect(frame.getByText('2 field units need review', { exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'IT Prep: 0 jobs', exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
@@ -263,23 +255,16 @@ test('enlarged eye never overlaps sidebar labels at short desktop heights',async
 });
 
 
-test('dashboard cards and native Camera Health share source-separated unit totals',async({page})=>{
+test('Overview uses one inventory source and sends troubleshooting to the common Fleet card',async({page})=>{
  const {frame,state}=await mount(page);
- const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
- const systems='Field units: 1 online · 1 offline · 1 need review';
- await expect(company).toContainText(systems);await expect(area).toContainText(systems);await expect(company).toContainText('Camera/detector evidence by unit: 1 online · 1 offline · 1 mixed/unverified · 0 channel status unavailable');await expect(company).toContainText('3 confirmed-field units · 0 location review');
- await area.click();await expect(frame.getByLabel('Fleet status',{exact:true})).toHaveValue('all');await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(3);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','1','1','1','3']);await frame.getByText('Authorized tools',{exact:true}).click();await frame.getByRole('button',{name:'Advanced camera diagnostics',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?diagnostics=1');await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
+ await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).toContainText('Current reviewed equipment inventory is unavailable');
+ await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Camera status & troubleshooting'}).click();
+ await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:'Fleet health',exact:true})).toHaveAttribute('aria-current','page');
+ expect(state.requests.every(request=>request.method==='GET')).toBe(true);
 });
-
-test('legacy health stays unavailable on both dashboards while other metrics remain useful',async({page})=>{
+test('legacy health does not create a second set of Overview totals',async({page})=>{
  const {frame}=await mount(page,{cameraData:{...camera,evidenceVersion:1}});
- const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
- await expect(company).toContainText('Health unavailable');await expect(area).toContainText('Health unavailable');await expect(company).not.toContainText('1 online');await expect(area).not.toContainText('1 online');await expect(frame.getByText('1 stored router record',{exact:true})).toBeVisible();await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toBeVisible();
-});
-
-test('dashboard provider counts age without issuing fresh reads or inferring offline status',async({page})=>{
- const {frame,state}=await mount(page);
- const area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});await expect(area).toContainText('Field units: 1 online · 1 offline · 1 need review');const reads=state.requests.length;
- await page.clock.setFixedTime(new Date(now+16*60000));await frame.locator('body').evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- await expect(area).toContainText('Field units: 0 online · 0 offline · 3 need review');await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toContainText('3 field units need review');expect(state.requests.length).toBe(reads);
+ await expect(frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card')).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).not.toContainText('0 Field equipment');
 });

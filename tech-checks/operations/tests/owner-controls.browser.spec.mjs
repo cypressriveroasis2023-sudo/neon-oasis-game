@@ -65,6 +65,7 @@ async function mount(page,workspace='daily-board',authorized=true,overrides={}){
  const frame=page.frameLocator('#operations'),controls=frame.locator('.owner-board-controls');
  if(authorized)await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
  else await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();
+ if(workspace==='daily-board'){await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();}
  if(workspace==='daily-board')await expect(controls.getByRole('button',{name:'ADD COS JOB',exact:true})).toBeEnabled();
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width+1);
  return {state,frame,controls};
@@ -84,7 +85,7 @@ test('Owner creates one synthetic job, verifies its fresh identity and preserves
  await controls.getByRole('button',{name:'ADD COS JOB',exact:true}).click();
  await expect(frame.getByRole('status').filter({hasText:'TEST-102 created and found in current jobs.'})).toBeVisible();
  await expect(controls.getByLabel('Selected COS Job')).toHaveValue(createdId);expect(state.writes).toHaveLength(1);
- await page.reload();await expect(controls.getByLabel('Selected COS Job').locator('option[value="'+createdId+'"]')).toHaveCount(1);expect(state.writes).toHaveLength(1);
+ await page.reload();await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();await expect(controls.getByLabel('Selected COS Job').locator('option[value="'+createdId+'"]')).toHaveCount(1);expect(state.writes).toHaveLength(1);
 });
 test('Owner assignment rejects an unchanged readback and stays locked through failed refresh',async({page})=>{
  const {state,controls}=await mount(page);await selectJob(controls);await controls.getByLabel('Assign technician').selectOption('Morgan IT');state.unchanged=true;
@@ -112,12 +113,12 @@ test('Owner IT handoff validates times and verifies the new Service visit',async
  await controls.getByRole('button',{name:'OWNER VERIFIED · SCHEDULE TO SERVICE',exact:true}).click();await expect(controls.getByRole('alert')).toContainText('after the start');expect(state.writes).toHaveLength(0);
  await controls.getByLabel('End time').fill('10:00');await controls.getByRole('button',{name:'OWNER VERIFIED · SCHEDULE TO SERVICE',exact:true}).click();await confirm(frame);
  await expect(frame.getByRole('status').filter({hasText:'advanced from IT and scheduled to Casey Service · saved and verified'})).toBeVisible();expect(state.jobs[0].visitId).toBe(nextVisit);expect(state.writes).toHaveLength(1);
- await page.reload();await selectJob(controls);await expect(controls.getByRole('button',{name:'OWNER VERIFIED · SCHEDULE TO SERVICE'})).toHaveCount(0);
+ await page.reload();await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();await selectJob(controls);await expect(controls.getByRole('button',{name:'OWNER VERIFIED · SCHEDULE TO SERVICE'})).toHaveCount(0);
 });
 test('Owner truck approval preserves nested missing identifiers without marking stock received',async({page})=>{
  const {state,frame,controls}=await mount(page);await controls.getByRole('button',{name:'APPROVE / OVERRIDE',exact:true}).click();await prompt(frame,'Fixture approved with shortage');await confirm(frame);
  await expect(frame.getByRole('status').filter({hasText:'Truck stock approved · saved and verified'})).toBeVisible();await expect(controls.getByText('backup battery identifier',{exact:true})).toBeVisible();await expect(controls.getByText('Approval does not mark these items received.',{exact:true})).toBeVisible();expect(state.writes).toHaveLength(1);
- await page.reload();await expect(controls.getByText('backup battery identifier',{exact:true})).toBeVisible();
+ await page.reload();await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();await expect(controls.getByText('backup battery identifier',{exact:true})).toBeVisible();
 });
 test('Every AppDeploy handoff is reachable and workspace Back, Forward and reload preserve destinations',async({page})=>{
  const {state,frame}=await mount(page,'today');
@@ -158,7 +159,7 @@ for(const [label,jobType] of [['service','SERVICE'],['pickup','PICKUP'],['instal
  test('Dashboard '+label+' shortcut opens the existing type without creating, including keyboard and history',async({page},testInfo)=>{
   const {frame,controls,state}=await mount(page,'today');
   const actions=frame.getByRole('region',{name:'Create ticket',exact:true});
-  await expect(actions).toBeInViewport();
+  await actions.scrollIntoViewIfNeeded();await expect(actions).toBeInViewport();
   const shortcut=actions.getByRole('button',{name:'Create '+label+' ticket',exact:true});
   if(jobType==='SERVICE')await page.screenshot({path:testInfo.outputPath('dashboard-ticket-actions.png'),fullPage:true});
   await shortcut.focus();await page.keyboard.press('Enter');

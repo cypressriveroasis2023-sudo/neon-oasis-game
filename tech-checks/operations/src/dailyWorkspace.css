@@ -1,0 +1,29 @@
+#root .cos-inventory-overview{background:#111f30;border:1px solid #36516b;border-radius:14px;padding:16px;margin:12px 0 20px;color:#edf4ff}
+#root .cos-inventory-overview header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#root .cos-inventory-overview h2{margin:0;font-size:21px}
+#root .cos-inventory-overview p{font-size:13px;line-height:1.6;color:#bacadd;margin:8px 0}
+#root .cos-inventory-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+#root .cos-inventory-totals button{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px;background:#172b40;border:1px solid #46627f;border-radius:10px;color:#edf4ff;min-height:88px}
+#root .cos-inventory-totals strong{font-size:30px;font-variant-numeric:tabular-nums}
+#root .cos-inventory-totals span{font-size:13px}
+#root .cos-daily-shortcuts{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 20px}
+#root .cos-daily-shortcuts button,#root .cos-inventory-overview button,#root .cos-workspace-settings>summary{min-height:44px;cursor:pointer}
+#root .cos-daily-shortcuts button{padding:12px 18px;border-radius:999px;background:#9e102b;border:1px solid #e43855;color:white}
+#root .cos-workspace-settings{margin:16px 0;border:1px solid #36516b;border-radius:12px;padding:12px;background:#101e2d}
+#root .cos-workspace-settings>summary{padding:10px;font-weight:700}
+#root .cos-shop-products{display:grid;gap:8px;margin-top:12px}
+#root .cos-shop-products article{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #36516b;border-radius:10px;background:#122438;padding:14px}
+#root .cos-shop-products small{display:block;color:#b9cbe0;line-height:1.6}
+#root .cos-shop-products button{min-height:44px;white-space:normal}
+#root .cos-inventory-overview input{width:100%;box-sizing:border-box;min-height:44px;margin:8px 0;padding:12px;border:1px solid #4f6c8a;border-radius:9px;background:#0b1725;color:#eef5ff}
+@media(max-width:600px){#root .cos-inventory-overview header{align-items:flex-start;flex-wrap:wrap}#root .cos-inventory-totals{gap:6px}#root .cos-inventory-totals button{padding:12px 8px}#root .cos-inventory-totals strong{font-size:26px}#root .cos-shop-products article{align-items:flex-start;flex-wrap:wrap}#root .cos-daily-shortcuts button{flex:1 1 140px}}
+#root .cos-inventory-overview button{padding:10px 16px;border-radius:999px;font-size:13px}
+#root .cos-inventory-overview .cos-inventory-totals button{border-radius:10px}
+@media(max-width:750px){
+ #root#root .company-shell:has(.cos-inventory-overview) .company-utility-bar,#root#root .company-shell:has(.cos-daily-board) .company-utility-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:64px;height:64px;padding:5px 12px;margin-bottom:6px}
+ #root#root .company-shell:has(.cos-inventory-overview) .company-mobile-brand,#root#root .company-shell:has(.cos-daily-board) .company-mobile-brand{width:145px;margin:0;justify-content:flex-start}
+ #root#root .company-shell:has(.cos-inventory-overview) .company-mobile-brand .cos-company-logo,#root#root .company-shell:has(.cos-daily-board) .company-mobile-brand .cos-company-logo{width:145px!important;max-height:none!important}
+ #root#root .company-shell:has(.cos-inventory-overview) .company-connection,#root#root .company-shell:has(.cos-daily-board) .company-connection{font-size:9px;padding:6px 8px;margin:0;white-space:nowrap;flex:none}
+ #root .company-shell:has(.cos-inventory-overview) .command-page-header{padding-top:12px;margin-bottom:12px}
+ #root .company-shell:has(.cos-inventory-overview) .command-page-header h1{font-size:24px}
+}

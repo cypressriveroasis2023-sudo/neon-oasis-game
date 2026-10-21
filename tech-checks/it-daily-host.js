@@ -9,7 +9,7 @@ const context = () => window.TechCheckContext;
 // Legacy COS account has no separate native-platform identity. The server RPC below
 // remains the authority for IT camera access; this ID only selects the camera UI.
 const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
-let disposeTransfer = null;
+let disposeTransfer = null, phoneBoard = false;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
 function fitDailyFrame() {
@@ -89,6 +89,18 @@ async function verify(value) {
   let timer;
   try { const response = await Promise.race([context().db.rpc('cos_verified_fleet_capabilities_v1'),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),12000);})]); return response && !response.error && response.data?.fleetRead === true; } catch { return false; } finally {clearTimeout(timer);}
 }
+function phoneNavigation(value,generation){
+  const nav=document.createElement('nav');nav.className='cos-it-handoff-actions';nav.setAttribute('aria-label','IT daily views');
+  for(const [label,board] of [['Check out / check in',false],['Fleet map & troubleshooting',true]]){
+    const button=document.createElement('button');button.type='button';button.textContent=label;button.setAttribute('aria-pressed',String(phoneBoard===board));
+    button.onclick=()=>{
+      if(generation!==revision||key(scope())!==key(value)||board===phoneBoard)return;
+      if(root.querySelector('form')){let note=root.querySelector('[data-daily-switch-note]');if(!note){note=document.createElement('p');note.dataset.dailySwitchNote='';note.setAttribute('role','status');nav.after(note);}note.textContent='Finish or close the current handoff form before switching views.';return;}
+      phoneBoard=board;clearFrame();root.replaceChildren();void open(value,++revision);
+    };nav.append(button);
+  }
+  return nav;
+}
 async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
@@ -102,14 +114,14 @@ async function open(value, generation, handoffFailure = null) {
     }
     return;
   }
-  // Phone Tech Check is dedicated to equipment check-out and check-in.
-  // Never substitute Camera Health or bypass transfer readiness if unavailable.
-  const handoffSelected=value.phone;
+  // Handoffs remain the phone default. Fleet is an explicit verified read view,
+  // never an automatic substitute for an unavailable transfer backend.
+  const handoffSelected=value.phone&&!phoneBoard;
   let handoffFallback = null;
   if(handoffSelected){
     const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
     if(generation!==revision || key(scope())!==key(value) || !root)return;
-    if(readiness.ready){root.replaceChildren();const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Checking equipment handoff availability…');void open(value,generation,reason);}});return;}
+    if(readiness.ready){root.replaceChildren(phoneNavigation(value,generation));const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Checking equipment handoff availability…');void open(value,generation,reason);}});return;}
     handoffFallback=document.createElement('section');handoffFallback.className='cos-it-daily-status';
     handoffFallback.setAttribute('aria-label','Equipment handoff availability');
     const note=document.createElement('p');note.setAttribute('role','status');
@@ -123,9 +135,9 @@ async function open(value, generation, handoffFailure = null) {
     const title=document.createElement('h1');title.textContent='Equipment Check Out / Check In';
     handoffFallback.append(title,actions,note,retry);
   }
-  if(value.phone) {
+  if(value.phone&&!phoneBoard) {
     // A failed rollout must not display a substitute workflow on the phone.
-    root.replaceChildren(handoffFallback);
+    root.replaceChildren(phoneNavigation(value,generation),handoffFallback);
     return;
   }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
@@ -134,7 +146,7 @@ async function open(value, generation, handoffFailure = null) {
     ? './camera-health.html?itDaily=1'
     : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
-  root.replaceChildren(frame);
+  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),frame);
   scheduleFrameFit();
 }
 function present() {
@@ -157,11 +169,11 @@ function present() {
   if (value.role==='it') for (const id of ['view-owner','view-svc','view-morning']) shield(document.getElementById(id));
   scheduleFrameFit();
   if (next===scopeKey) return;
-  revision++;scopeKey=next;clearFrame();status(value.phone?'Opening equipment Check Out / Check In…':'Opening Camera Health and Fleet Map…');void open(value,revision);
+  revision++;scopeKey=next;phoneBoard=false;clearFrame();status(value.phone?'Opening equipment Check Out / Check In…':'Opening Camera Health and Fleet Map…');void open(value,revision);
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
-  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px;padding:10px 14px;background:#303a44;color:#fff;border:1px solid #6b7785;border-radius:9px}.cos-it-daily-status h1{font-size:24px;line-height:1.25;margin:0 0 12px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;padding:12px;font-size:16px;font-weight:700;border:1px solid #66717d;border-radius:10px;white-space:normal;background:#252d36;color:#fff}.cos-it-handoff-actions button:disabled{opacity:1;background:#252d36;color:#cbd4dd;border-color:#566371;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
+  style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px;padding:10px 14px;background:#303a44;color:#fff;border:1px solid #6b7785;border-radius:9px}.cos-it-daily-status h1{font-size:24px;line-height:1.25;margin:0 0 12px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;padding:12px;font-size:16px;font-weight:700;border:1px solid #66717d;border-radius:10px;white-space:normal;background:#252d36;color:#fff}.cos-it-handoff-actions button[aria-pressed=true]{background:#97132c;border-color:#ed3652;color:#fff}.cos-it-handoff-actions button:disabled{opacity:1;background:#252d36;color:#cbd4dd;border-color:#566371;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
   document.head.append(style);
   // Runs before protected legacy delegated/inline handlers; inert also blocks keyboard entry.
   for (const type of ['click','submit','change','input']) window.addEventListener(type,event=>{
