@@ -3,7 +3,17 @@ import {fixture,receipt,id,preparationOwner,now} from './owner-census-preparatio
 import {otherId} from './owner-census-once-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const deferred=()=>{let resolve;const promise=new Promise(y=>{resolve=y;});return {promise,resolve};};
-async function openLocationUnit(frame,name){const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();}
+async function openLocationUnit(frame,name,{readOnly=false}={}){
+ const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();
+ await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();
+ const editor=frame.getByRole('button',{name:'Edit / verify installation →',exact:true});
+ if(readOnly){
+  await expect(editor).toHaveCount(0);
+  await frame.locator('.cos-fleet-installation-evidence > summary').click();
+  await expect(frame.locator('.cos-fleet-installation-evidence')).toHaveAttribute('open','');
+  await expect(frame.locator('.field-map-detail')).toHaveCount(0);
+ }else await editor.click();
+}
 async function mount(page,{role='Owner',marker=true,holdPost=false,response=receipt(),postStatus=200}={}){
  const f=fixture();if(!marker)delete f.row.locationGeocode.censusPreparation;
  f.snapshot.items.push({id:otherId,unitNumber:'SYNTHETIC OTHER 901',status:'field',currentLocationType:'field',readOnly:false,address:'300 Other Fixture Road, Testville, TX 77003',latitude:32,longitude:-97,coordinateSource:'manual',locationVerification:'owner_verified',gpsRecordedAt:'2026-10-11T00:00:00Z',locationVerifiedAt:'2026-10-11T00:00:00Z'});
@@ -40,7 +50,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900',{readOnly:role==='IT'});}
  return {frame,state};
 }
 const prepare=frame=>frame.getByRole('button',{name:'Prepare approved lookup',exact:true});

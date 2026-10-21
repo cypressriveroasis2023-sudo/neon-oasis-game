@@ -2,7 +2,17 @@ import {test,expect} from '@playwright/test';
 import {fixture,consumed,id,otherId,owner,now} from './owner-census-once-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const deferred=()=>{let resolve;const promise=new Promise(y=>{resolve=y;});return {promise,resolve};};
-async function openLocationUnit(frame,name){const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();}
+async function openLocationUnit(frame,name,{readOnly=false}={}){
+ const close=frame.getByRole('button',{name:'Close unit details',exact:true});if(await close.isVisible())await close.click();
+ await frame.getByRole('button',{name:'Clear fleet search'}).click();await frame.locator('.cos-fleet-unit-row').filter({hasText:name}).click();
+ const editor=frame.getByRole('button',{name:'Edit / verify installation →',exact:true});
+ if(readOnly){
+  await expect(editor).toHaveCount(0);
+  await frame.locator('.cos-fleet-installation-evidence > summary').click();
+  await expect(frame.locator('.cos-fleet-installation-evidence')).toHaveAttribute('open','');
+  await expect(frame.locator('.field-map-detail')).toHaveCount(0);
+ }else await editor.click();
+}
 async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=false,policyState=null,initialOutcome=null}={}){
  const f=fixture();if(!proof)delete f.snapshot.ownerCensusProofs;
  if(policyState==='draining'){f.row.locationGeocode.censusOnlyState='draining';f.row.locationGeocode.censusOnlyNotBefore='2020-01-01T00:00:00Z';}
@@ -40,7 +50,7 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-once-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900');}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await openLocationUnit(frame,'SYNTHETIC BOUNDARY 900',{readOnly:role==='IT'});}
  return {frame,state};
 }
 test('complete enrolled Owner proof enables one deliberate lookup, duplicate clicks send once, reload reads consumed result',async({page})=>{
@@ -59,7 +69,8 @@ for(const role of ['IT','Service'])test(role+' cannot see or dispatch the Owner-
 });
 test('existing IT map readers see a server-admitted building estimate without an execution action',async({page})=>{
  const {frame,state}=await mount(page,{role:'IT',initialOutcome:'success'});
- await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('suite and installed unit position remain unverified');
+ const estimate=frame.getByRole('region',{name:'Address estimate'});await expect(estimate).toBeVisible();
+ await expect(estimate).toContainText('suite and installed unit position remain unverified');
  await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toHaveCount(0);
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+id+'"]')).toHaveCount(0);
