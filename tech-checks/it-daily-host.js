@@ -50,7 +50,12 @@ function scope() {
   const preview=document.body.classList.contains('owner-test-role-preview');
   // An Owner's IT phone preview shows the intended actions as disabled; preview
   // remains unauthorized by verify() and cannot mount or submit transfers.
-  return {id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
+  const value={id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
+  // Resizing must not dispose an open handoff form or correction workspace,
+  // including its pending-save and verified-readback screens. Keep only the
+  // mounted presentation; a change to any account or access field still clears it.
+  if(disposeTransfer && root?.querySelector('form, .tc-corrections') && key({...value,phone:!value.phone})===scopeKey)value.phone=!value.phone;
+  return value;
 }
 function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive,value.phone].join(':') : ''; }
 function clearFrame() {

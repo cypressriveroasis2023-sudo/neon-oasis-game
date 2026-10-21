@@ -272,12 +272,34 @@ for(const width of [390,1440])test(`actual IT daily host reaches corrections and
  const priorAccessChecks=await page.evaluate(()=>fixture.capabilityChecks);
  await page.evaluate(()=>{confirmSameActor();dispatchEvent(new Event('techcheck:data-refreshed'));});
  await expect.poll(()=>page.evaluate(()=>fixture.capabilityChecks)).toBeGreaterThan(priorAccessChecks);
- await expect(page.getByLabel('Reason for correction',{exact:true})).toHaveAttribute('data-test-mounted','retained');
- await expect(page.getByRole('checkbox',{name:selfLabel,exact:true})).toBeChecked();
+ const expectSameDraft=async()=>{
+  // A restored draft in a newly mounted form would lose this DOM-only marker.
+  // Preserve the actual editor and its confirmation through layout changes.
+  await expect(page.getByLabel('Reason for correction',{exact:true})).toHaveAttribute('data-test-mounted','retained');
+  await expect(page.getByLabel('Reason for correction',{exact:true})).toHaveValue('The technician confirmed the actual unit and provided a matching tag photograph.');
+  await expect(page.getByLabel('Corrected unit',{exact:true})).toHaveValue(CORRECTED_KEY);
+  await expect(page.getByRole('checkbox',{name:selfLabel,exact:true})).toBeChecked();
+ };
+ const resizeWithDraft=async viewport=>{
+  await page.setViewportSize(viewport);
+  // Flush resize handling and the following rendering turn without a fixed
+  // delay. Assertions below read DOM state and do not require visibility.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectSameDraft();
+ };
+ await expectSameDraft();
+ await resizeWithDraft({width:width===390?1440:390,height:900});
+ await resizeWithDraft({width,height:900});
+ // Hosted full-page screenshots can briefly resize the rendering viewport.
+ // Exercise that transition directly, without claiming a usable 1px layout.
+ await resizeWithDraft({width:1,height:1});
+ await resizeWithDraft({width,height:900});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.evaluate(()=>{window.syntheticViewportEvents=[];addEventListener('resize',()=>syntheticViewportEvents.push({width:innerWidth,height:innerHeight,phone:matchMedia('(max-width: 900px)').matches}));});
  await page.screenshot({path:info.outputPath(`it-actual-route-draft-${width}.png`),fullPage:true});
  await info.attach('synthetic-screenshot-viewport-events',{contentType:'application/json',body:Buffer.from(JSON.stringify(await page.evaluate(()=>syntheticViewportEvents)))});
+ await expectSameDraft();
+ await resizeWithDraft({width:width===390?1440:390,height:900});
  await expect(page.getByRole('button',{name:'Save correction',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Save correction',exact:true}).click();await expect(savedStatus(page)).toBeVisible();
  expect((await savedTransfer(IT)).corrections[0].applied_by.id).toBe(IT);await expectOriginalUnchanged();

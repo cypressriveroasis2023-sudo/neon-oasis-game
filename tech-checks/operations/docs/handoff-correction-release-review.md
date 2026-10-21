@@ -140,6 +140,29 @@ switching, offline/lost-response retry, saved provenance and photo bindings,
 immutable originals, and pending Service behavior. PGlite alone does not prove
 multi-session PostgreSQL locking; the separate gate supplies that proof.
 
+### Hosted acceptance findings and follow-up
+
+The hosted review of `55d8492e7b7fe4b0aab154e63b73f257317c38ba` found two
+specific failures. It is a preserved historical checkpoint, not a passing release.
+The 1440px correction test exposed an IT host remount when Chromium's full-page
+screenshot briefly resized the viewport to 1 × 1. The host now keeps an open
+handoff form or correction workspace mounted when only its presentation width
+changes, including the uncertain-save and verified-readback screens. Identity,
+role, effective role, preview and profile changes still invalidate that scope.
+
+The existing page-integrity test also needed an explicit allowlist entry for
+the new correction-host module. It now verifies that exact module URL once and
+in the reviewed order. The original eight-script count and baseline body/URL
+digest remain unchanged.
+
+The follow-up local run passed all 17 correction browser cases. Both actual IT
+routes retain the same editor node, values and confirmation across phone/desktop
+width changes and a deliberate 1 × 1 transition, then save and verify readback
+at the opposite layout width. Account switching still clears the correction
+workspace. The 31 existing IT host browser cases and 11 host availability/page
+integrity unit checks also passed. Hosted workflows must pass again on the final
+commit; these local results do not waive that gate.
+
 Reproduce from `tech-checks/operations` with Node 22:
 
 ```sh
