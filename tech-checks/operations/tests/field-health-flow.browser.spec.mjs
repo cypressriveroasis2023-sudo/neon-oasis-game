@@ -127,6 +127,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');
  const child=page.frames().find(child=>child.parentFrame());
  await child.evaluate(()=>{location.hash='daily-board';});
+ await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toBeVisible();
  await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toBeVisible();
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue('');
