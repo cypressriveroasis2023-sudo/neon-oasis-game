@@ -7,6 +7,8 @@ on:
       - 'tech-checks/operations/scripts/prepareOwnerCanonicalEvidenceSql.mjs'
       - 'tech-checks/operations/scripts/prepareUploadSnapshotOnceSql.mjs'
       - 'tech-checks/operations/scripts/prepareOwnerAssignmentReviewIndexedSql.mjs'
+      - 'tech-checks/operations/scripts/prepareOwnerAssignmentTimestampRuntime.mjs'
+      - 'tech-checks/operations/tests/fixtures/assignment-timestamps.mjs'
       - 'tech-checks/operations/tests/fixtures/assignment-review-before-20261021.sql'
       - 'tech-checks/operations/tests/fixtures/assignment-review-indexed.mjs'
       - 'tech-checks/operations/docs/drafts/cos-owner-assignment-review-indexed-20261021.sql'
@@ -62,6 +64,9 @@ jobs:
             tests/mhelp-assignment-review.test.mjs \
             tests/mhelp-canonical-evidence-postgres.mjs \
             tests/mhelp-upload-snapshot-once.test.mjs
+      - name: Verify timestamp formats and guarded runtime replacement
+        timeout-minutes: 2
+        run: node --import tsx --test --experimental-test-isolation=none tests/mhelp-assignment-timestamps.test.mjs tests/mhelp-assignment-timestamp-runtime.test.mjs
       - name: Verify full-size indexed assignment review
         timeout-minutes: 2
         run: node --test --experimental-test-isolation=none tests/mhelp-assignment-review-indexed.test.mjs
@@ -84,3 +89,4 @@ jobs:
         run: node --test --experimental-test-isolation=none tests/mhelp-assignment-review-indexed.test.mjs
       - name: Typecheck COS Owner importer and existing app
         run: npm run typecheck
+
