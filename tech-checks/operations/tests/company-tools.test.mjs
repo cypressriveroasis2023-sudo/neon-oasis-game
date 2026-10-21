@@ -1,3 +1,4 @@
+// 2026-10-21 reviewed embedded Camera Health navigation guard; normalize its exact block and retain baseline hashes.
 // 2026-10-18 provider count markup folds into a disclosure; script hashes are unchanged.
 // 2026-10-17 reviewed shared Camera Health entry, explicit diagnostics/return links,
 // provider-group wording and removal of historical 2026 synthetic tracker rows (#197).
@@ -44,7 +45,17 @@ const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.u
 for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
     const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
-    const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
+    let navigationPreserved=original;
+    if(name==='camera-health'){
+      const entry='function openSharedCameraHealth(){\n';
+      const reviewedGuard='  // The parent chose diagnostics for this embedded board. Redirecting to the\n'
+        +'  // main COS app would mount another board and repeat the workspace launch.\n'
+        +'  if(window.self!==window.top)return false;\n';
+      assert.equal(original.split(reviewedGuard).length-1,1);
+      assert.equal(original.split(entry+reviewedGuard).length-1,1);
+      navigationPreserved=original.replace(entry+reviewedGuard,entry);
+    }
+    const html=navigationPreserved.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261018-cos-centered').length-1,1);
     if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v=20261015-placement-read-coalescing-v1"').length-1,1);

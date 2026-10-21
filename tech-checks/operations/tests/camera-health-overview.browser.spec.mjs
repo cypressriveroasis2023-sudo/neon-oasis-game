@@ -275,3 +275,16 @@ test('returning from resource diagnostics restores its saved unit search before 
  await page.goto('/tech-checks/camera-health.html');
  await expect(page.getByRole('heading',{name:'Shared Camera Health and Field Map'})).toBeVisible();
 });
+
+test('embedded daily diagnostics stays open even when IT has shared Fleet capability',async({page})=>{
+ await mount(page,{role:'it',fleetRead:true});
+ await page.route('**/embedded-camera-fixture',route=>route.fulfill({contentType:'text/html',body:'<script>'+mock+'</script><iframe title="IT diagnostics" style="width:100%;height:90vh" src="/tech-checks/camera-health.html?itDaily=1"></iframe>'}));
+ await page.goto('/embedded-camera-fixture');
+ const frame=page.frameLocator('iframe');
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics',exact:true})).toBeVisible();
+ await expect(frame.locator('.compact-unit')).toHaveCount(3);
+ await frame.getByLabel('Search units',{exact:true}).fill('RANGER 022');
+ await expect(frame.getByLabel('Search units',{exact:true})).toHaveValue('RANGER 022');
+ await expect(page).toHaveURL('/embedded-camera-fixture');
+ await expect(frame.getByRole('heading',{name:'Shared Camera Health and Field Map'})).toHaveCount(0);
+});
