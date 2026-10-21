@@ -5,6 +5,8 @@ on:
       - '.github/workflows/techcheck-transfer-review.yml'
       - 'tech-checks/transfers/**'
       - 'tech-checks/service-transfer-host.js'
+      - 'tech-checks/handoff-corrections-host.js'
+      - 'tech-checks/index.html'
       - 'tech-checks/service-signoff-ui.js'
       - 'tech-checks/it-daily-host.js'
       - 'tech-checks/it-feature-availability.js'
@@ -13,18 +15,43 @@ on:
       - 'tech-checks/database-maintenance/techcheck-transfer-integration-v3.sql'
       - 'tech-checks/database-maintenance/techcheck-handoff-activation-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-delivery-schedule-v1.sql'
+      - 'tech-checks/database-maintenance/techcheck-handoff-corrections-v1.sql'
+      - 'tech-checks/database-maintenance/techcheck-correction-delivery-schedule-v1.sql'
       - 'tech-checks/supabase/functions/techcheck-transfer-delivery/**'
+      - 'tech-checks/supabase/functions/techcheck-correction-delivery/**'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
+      - 'tech-checks/operations/tests/helpers/correction*'
       - 'tech-checks/operations/tests/helpers/service-basics-fixture.mjs'
       - 'tech-checks/operations/tests/service-basics.browser.spec.mjs'
+      - 'tech-checks/operations/tests/it-daily-mode.browser.spec.mjs'
       - 'tech-checks/operations/tests/playwright.transfer.config.mjs'
+      - 'tech-checks/operations/tests/playwright.corrections.config.mjs'
 permissions:
   contents: read
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_PASSWORD: synthetic-correction-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      COS_CORRECTION_POSTGRES_TEST: '1'
+      COS_CORRECTION_POSTGRES_REQUIRED: '1'
+      COS_CORRECTION_PG_HOST: '127.0.0.1'
+      COS_CORRECTION_PG_PORT: '5432'
+      COS_CORRECTION_PG_USER: 'postgres'
+      COS_CORRECTION_PG_EVIDENCE: '${{ github.workspace }}/tech-checks/operations/test-results-correction-postgres.json'
     steps:
       - uses: actions/checkout@v4
       - name: Preserve exact review source
@@ -45,10 +72,22 @@ jobs:
         run: npm ci
         working-directory: tech-checks/operations
       - name: PostgreSQL, transfer and existing Service regressions
-        run: node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/transfer-delivery.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
+        run: node --import tsx --test --experimental-test-isolation=none --test-concurrency=1 tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/transfer-delivery.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
         working-directory: tech-checks/operations
       - name: TypeScript
         run: npm run typecheck
+        working-directory: tech-checks/operations
+      - name: Type-check correction delivery worker
+        run: >-
+          node ./node_modules/typescript/bin/tsc
+          --noEmit --allowImportingTsExtensions --module esnext
+          --moduleResolution bundler --target es2022 --lib es2022,dom
+          --strict --skipLibCheck
+          ../supabase/functions/techcheck-correction-delivery/index.ts
+          ../supabase/functions/techcheck-correction-delivery/report.ts
+        working-directory: tech-checks/operations
+      - name: Audited correction database, client and archive checks
+        run: node --import tsx --test --experimental-test-isolation=none --test-concurrency=1 tests/transfer-correction*.test.mjs
         working-directory: tech-checks/operations
       - name: Build existing application
         run: npm run build
@@ -59,9 +98,20 @@ jobs:
       - name: Synthetic handoff and camera-only browser tests
         run: npx playwright test --config tests/playwright.transfer.config.mjs
         working-directory: tech-checks/operations
+      - name: Synthetic correction phone and desktop acceptance
+        run: npx playwright test --config tests/playwright.corrections.config.mjs
+        working-directory: tech-checks/operations
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: techcheck-transfer-review-results
           path: tech-checks/operations/test-results-transfers
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: techcheck-correction-review-results
+          path: |
+            tech-checks/operations/test-results-corrections
+            tech-checks/operations/test-results-correction-postgres.json
           retention-days: 7

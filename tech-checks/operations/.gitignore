@@ -1,3 +1,6 @@
 node_modules/
 test-results/
+test-results-corrections/
+test-results-transfers/
+test-results-correction-postgres.json
 playwright-report/
