@@ -158,22 +158,16 @@ test('Operations desktop and mobile use a complete animated company logo',async(
     if(width<=700){
       const status=await frame.locator('.company-connection').boundingBox();
       const bar=await frame.locator('.company-utility-bar').boundingBox();
-      if(workspace==='Fleet Dashboard'){
-        // The compact Fleet board places a full, undistorted 145px lockup
-        // beside connection status. Overview retains its centered lockup.
-        expect(bounds.width).toBeCloseTo(145,0);
-        expect(bounds.x).toBeCloseTo(12,0);
-        expect(bounds.y).toBeGreaterThanOrEqual(bar.y);
-        expect(bounds.y+bounds.height).toBeLessThanOrEqual(bar.y+bar.height+1);
-        expect(status.x).toBeGreaterThanOrEqual(bounds.x+bounds.width+9);
-        expect(status.x+status.width).toBeLessThanOrEqual(width-11);
-        expect(Math.abs(status.y+status.height/2-(bounds.y+bounds.height/2))).toBeLessThanOrEqual(1);
-        expect(bar.height).toBeCloseTo(64,0);
-      }else{
-        expect(bounds.width).toBeGreaterThanOrEqual(180);
-        expect(bounds.x+bounds.width/2).toBeCloseTo(width/2,0);
-        expect(status.y).toBeGreaterThanOrEqual(bounds.y+bounds.height);
-      }
+      // Both approved daily Overview and Fleet use the complete 145px
+      // lockup beside status; retain geometry, clipping and overlap checks.
+      expect(bounds.width).toBeCloseTo(145,0);
+      expect(bounds.x).toBeCloseTo(12,0);
+      expect(bounds.y).toBeGreaterThanOrEqual(bar.y);
+      expect(bounds.y+bounds.height).toBeLessThanOrEqual(bar.y+bar.height+1);
+      expect(status.x).toBeGreaterThanOrEqual(bounds.x+bounds.width+9);
+      expect(status.x+status.width).toBeLessThanOrEqual(width-11);
+      expect(Math.abs(status.y+status.height/2-(bounds.y+bounds.height/2))).toBeLessThanOrEqual(1);
+      expect(bar.height).toBeCloseTo(64,0);
       await expect(frame.locator('.company-utility-bar')).toHaveCSS('border-bottom-width','0px');
       expect(status.y+status.height).toBeLessThanOrEqual(bar.y+bar.height+1);
     }

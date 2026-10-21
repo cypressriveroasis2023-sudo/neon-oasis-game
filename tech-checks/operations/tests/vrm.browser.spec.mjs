@@ -198,7 +198,8 @@ test('A selected installation removed from the cache falls back safely, includin
 });
 
 test('Repeated refresh clicks share one in-flight request and preserve a newer user selection',async({page})=>{
- await page.clock.install();
+ const start=Date.parse('2026-10-20T12:00:00Z');
+ await page.clock.install({time:new Date(start-60000)});await page.clock.pauseAt(new Date(start));
  const items=[syntheticUnit(2800001,'First installation'),syntheticUnit(2800002,'Second installation')];
  let release;
  let refreshes=0;
@@ -296,16 +297,18 @@ test('An initial failed read recovers through one explicit fleet refresh',async(
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet/refresh']);
 });
 
-test('Dashboard power counts follow the saved fleet when new installations arrive',async({page})=>{
+test('Overview Battery & solar opens the saved fleet and new installations arrive without discovery',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-09T12:00:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
  let items=[syntheticUnit(3300001,'Initial installation')];
- const {frame}=await mount(page,{initialHash:'#today',onVrmRequest:async()=>({data:fleet(items)})});
- const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('1 power installations');
+ const {frame,requests}=await mount(page,{initialHash:'#today',onVrmRequest:async()=>({data:fleet(items)})});
+ await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Battery & solar',exact:true}).click();
+ const installations=frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button');
+ await expect(installations).toHaveCount(1);
  items=Array.from({length:11},(_,index)=>syntheticUnit(3300001+index,'Synthetic power array '+index));
- await dashboard.getByRole('button',{name:'Refresh fleet',exact:true}).click();
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('11 power installations');
- await dashboard.getByRole('button',{name:/Victron Power/}).click();
- await expect(frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(11);
+ await page.clock.runFor(60000);
+ await expect(installations).toHaveCount(11);
+ expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet']);
+ expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 test('An old backend supports the new workspace through 404-only legacy fallback',async({page})=>{
@@ -328,20 +331,21 @@ test('A forbidden dynamic fleet never falls back to a legacy installation list',
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet']);
 });
 
-test('The dashboard uses old-backend fallback only for an absent dynamic fleet route',async({page})=>{
+test('Overview Battery & solar uses 404-only saved-fleet fallback and hard-stops on a later denial',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-09T12:00:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
  let forbidden=false;
  const {frame,requests}=await mount(page,{initialHash:'#today',onVrmRequest:async request=>request.path==='/api/vrm-portal'?{data:{items:vrmPortalConfig().items}}:{status:forbidden?403:404,data:{error:forbidden?'Synthetic access denied':'Route unavailable'}}});
- const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('9 power installations');
+ await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Battery & solar',exact:true}).click();
+ await expect(frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(9);
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal']);
- forbidden=true;await dashboard.getByRole('button',{name:'Refresh fleet',exact:true}).click();
- await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(dashboard.getByRole('button',{name:/Victron Power/})).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
- // Static navigation is not private fleet content. Even its retained desktop
- // button must remain generation-fenced and cannot reopen or reread the fleet.
+ forbidden=true;await page.clock.runFor(60000);
+ await expectOperationsReloadRequired(frame);await expect(frame.locator('.vrm-workspace')).toHaveCount(0);await expect(fleetButton(frame)).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ // Retained static navigation stays generation-fenced after genuine denial.
  const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true});
  if(await sidebarPower.isVisible())await sidebarPower.click();
- await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ await expectOperationsReloadRequired(frame);await expect(frame.locator('.vrm-workspace')).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet']);
+ expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 function powerFixture(item,{stale=false}={}){
@@ -434,13 +438,18 @@ for(const trigger of ['private-event','verified-parent-message'])test(`Native te
  const item=syntheticUnit(3000999,'HELIOS 099');let release,hold=false;
  const {frame,requests}=await mount(page,{onVrmRequest:async()=>{if(hold)await new Promise(resolve=>{release=resolve});return {data:{...fleet([item]),power:[powerFixture(item)]}};}});await openVrm(frame);
  const panel=frame.getByRole('region',{name:'HELIOS 099 read-only power dashboard'});await expect(panel).toBeVisible();
- hold=true;const response=page.waitForResponse(res=>res.url()===edge&&res.request().method()==='POST'&&res.request().postDataJSON()?.path==='/api/vrm-fleet/refresh');await fleetButton(frame).click();await expect.poll(()=>Boolean(release)).toBe(true);
+ // The session fence may cancel an obsolete body before it finishes. Observe
+ // either transport outcome, then prove neither can refill private telemetry.
+ let settled=0;
+ const completed=request=>{if(request.url()===edge&&request.method()==='POST'&&request.postDataJSON()?.path==='/api/vrm-fleet/refresh')settled++;};
+ page.on('requestfinished',completed);page.on('requestfailed',completed);
+ hold=true;await fleetButton(frame).click();await expect.poll(()=>Boolean(release)).toBe(true);
  if(trigger==='private-event')await frame.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
  else await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
  await expect(panel).toHaveCount(0);
  if(trigger==='private-event')await expectOperationsReloadRequired(frame);
  else await expect(frame.getByRole('alert')).toContainText('Your session changed');
- release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ release();await expect.poll(()=>settled).toBe(1);page.off('requestfinished',completed);page.off('requestfailed',completed);await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  // A healthy parent hide clears this workspace locally; untyped auth loss
  // quarantines the entire private subtree and removes its refresh control.
  if(trigger==='private-event')await expect(fleetButton(frame)).toHaveCount(0);

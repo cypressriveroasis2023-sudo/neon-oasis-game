@@ -32,6 +32,7 @@ async function mount(page,{it=false,locationWrites=false}={}){
    return route.fulfill({status,headers,json:status===200?data:{error:'Synthetic authorization denied'}});
   }
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
+  if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
   const data=body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
@@ -126,4 +127,27 @@ test('GPS draft waiting for an address digest cannot submit after session invali
  state.sessionGate=gate;await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'token-renewed'}})));await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  await app.locator('body').evaluate(()=>window.finishSyntheticGpsDigest());await expect(privateView(app)).toHaveCount(0);expect(state.calls.filter(call=>call.method==='POST')).toEqual([]);
  gate.resolve();await expect(refresh(app)).toBeEnabled();await expect(app.getByRole('dialog')).toHaveCount(0);expect(state.calls.filter(call=>call.method==='POST')).toEqual([]);readOnly(state);
+});
+
+for(const status of [401,403])for(const timing of ['during','after'])test(`obsolete source ${status} ${timing} verified renewal keeps Owner Fleet available`,async({page},testInfo)=>{
+ const {app,state,initialSessions}=await mount(page),old=deferred(),verification=deferred();old.status=status;state.routerGate=old;
+ await refresh(app).click();await expect.poll(()=>state.routerGate).toBe(null);await expect(refresh(app)).toBeEnabled();
+ state.sessionGate=verification;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ if(timing==='after'){verification.resolve();await expect(refresh(app)).toBeEnabled();}
+ old.resolve();await expect.poll(()=>state.oldRouterDelivered).toBe(true);
+ if(timing==='during'){await expect(privateView(app)).toHaveCount(0);verification.resolve();}
+ await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(app.getByRole('alert')).toHaveCount(0);expect(await reasons(app)).toEqual(['token-renewed']);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+ await page.screenshot({path:testInfo.outputPath(`owner-stale-${status}-${timing}-recovered.png`)});
+});
+test('persisted pageshow reloads the security-hidden document and verifies access afresh',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);
+ await app.locator('body').evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true})));await blocked(app);
+ await app.locator('body').evaluate(()=>dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+ await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');readOnly(state);
+});
+test('ordinary pageshow cannot reset an authentication hard stop',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.routerStatus=403;await refresh(app).click();await blocked(app);
+ await app.locator('body').evaluate(()=>dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false})));
+ await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
 });
