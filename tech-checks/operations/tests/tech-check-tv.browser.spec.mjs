@@ -147,6 +147,7 @@ test('remote choices rotate all pending types, including future and unscheduled 
 test('Owner saves switches and can turn every TV section off without changing work records',async({page})=>{
  const {state,frame}=await setup(page);
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ await frame.getByText('TV display & settings',{exact:true}).click();
  const controls=frame.getByRole('region',{name:'TV board settings'});
  await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).check();
  await controls.getByRole('button',{name:'Save TV settings',exact:true}).click();
@@ -324,6 +325,7 @@ test('Field Map visits overview and geographic close-ups with the red area first
 test('Owner saves rotation time and a remote timing update changes the TV interval',async({page})=>{
  const {state,frame}=await setup(page);
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ await frame.getByText('TV display & settings',{exact:true}).click();
  const controls=frame.getByRole('region',{name:'TV board settings'});
  await controls.getByRole('checkbox',{name:'Shop updates',exact:true}).uncheck();
  await controls.getByRole('checkbox',{name:'Field Map',exact:true}).check();

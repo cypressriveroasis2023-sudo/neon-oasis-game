@@ -67,7 +67,7 @@ for(const it of [false,true])test(`simple card retains real evidence and labeled
  await expect(card.getByText('Battery voltage',{exact:true})).toBeVisible();
  expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();
  await card.locator('.cos-fleet-troubleshooting>summary').click();
- await expect(card.getByRole('heading',{name:'Ports & tools'})).toBeVisible();
+ await expect(card.getByRole('heading',{name:'Advanced settings'})).toBeVisible();
  await expect(card.locator('.cos-fleet-troubleshooting')).toHaveAttribute('open','');
  expect(state.errors).toEqual([]);
 });

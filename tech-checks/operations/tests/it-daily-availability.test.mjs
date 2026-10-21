@@ -64,10 +64,10 @@ test('daily landing has no extra Fleet launch and shared modes preserve existing
 
 test('IT desktop lands on Fleet Map while phone mounts named handoffs without legacy prep controls',()=>{
  const host=read('it-daily-host.js'),app=read('operations/src/App.tsx');
- assert.match(host,/#fleet-dashboard/);assert.match(host,/if\(value.phone\)/);
+ assert.match(host,/#fleet-dashboard/);assert.match(host,/if\(value.phone&&!phoneBoard\)/);
  assert.match(host,/disposeTransfer=mountTransferDesk/);
- assert.match(host,/const handoffSelected=value.phone;/);
- assert.match(host,/root.replaceChildren\(handoffFallback\)/);
+ assert.match(host,/const handoffSelected=value.phone&&!phoneBoard;/);
+ assert.match(host,/root.replaceChildren\(phoneNavigation\(value,generation\),handoffFallback\)/);
  assert.match(host,/button.disabled=true/);
  assert.match(app,/setRouteLocation\(\{workspace:'Fleet Dashboard'/);
  assert.doesNotMatch(app,/active==='Camera Health'&&dailyOnly\?<CameraHealthWorkspace/);

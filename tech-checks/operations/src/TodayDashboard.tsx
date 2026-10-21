@@ -2,29 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import WorkspaceOverview from './WorkspaceOverview';
 import CompanyOverview from './CompanyOverview';
 import { api } from './api';
-import { dashboardSources, emptyTodayDashboard, loadCompanyEquipment, loadTodayDashboard, type CompanyEquipmentData, type DashboardData } from './todayDashboardData';
+import { dashboardSources, emptyTodayDashboard, loadTodayDashboard, type DashboardData } from './todayDashboardData';
 import type { CompanyStageId } from './companyLifecycle';
 
 type Props = { setActive: (workspace: string) => void; openJob?: (id:string, workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
 
 export default function LiveTodayDashboard({ setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
   const [data, setData] = useState<DashboardData>(emptyTodayDashboard);
-  const [equipment, setEquipment] = useState<CompanyEquipmentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<CompanyStageId | null>(null);
   const revision = useRef(0), running = useRef(false);
   const jobsSection = useRef<HTMLDivElement>(null);
-  const refresh = async (force=false) => {
+  const refresh = async () => {
     if (running.current) return;
     running.current = true;
     const request = ++revision.current;
     setLoading(true);
     setData(emptyTodayDashboard());
-    setEquipment(null);
-    await Promise.all([
-      loadTodayDashboard(api, next => { if (request === revision.current) setData(next); }),
-      loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(previous=>previous?.camera?.fleetFieldUnits&&!next.camera?.fleetFieldUnits?{...next,camera:previous.camera}:next); },force),
-    ]);
+    await loadTodayDashboard(api, next => { if (request === revision.current) setData(next); });
     if (request !== revision.current) return;
     running.current = false;
     setLoading(false);
@@ -33,9 +28,9 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     void refresh();
     return () => { revision.current += 1; running.current = false; };
   }, []);
-  useEffect(()=>{const paired=()=>{const request=revision.current;void api.fleet().then(value=>{if(request===revision.current)setEquipment(previous=>previous?{...previous,camera:value.health}:previous);}).catch(()=>{});};window.addEventListener('cos-fleet-snapshot-updated',paired);return()=>window.removeEventListener('cos-fleet-snapshot-updated',paired);},[]);
+
   const failed = dashboardSources.filter(([key]) => Boolean(data.errors[key]));
-  const complete = !loading && failed.length === 0 && !Object.keys(equipment?.errors || {}).length;
+  const complete = !loading && failed.length === 0;
   const browseStage = (stage: CompanyStageId | null) => {
     setStageFilter(stage);
     window.requestAnimationFrame(() => {
@@ -45,10 +40,10 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
   };
   return <div className={'owner-command-home company-command-home'+(detailOpen?' overview-detail-open':'')} aria-busy={loading}>
     {!detailOpen && <>
-      <CompanyOverview data={data} equipment={equipment} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
+      <CompanyOverview data={data} equipment={null} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
         <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
-        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh(true)}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
+        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
       </div>
       {failed.length > 0 && <section className='company-source-error' role='alert' aria-label='Dashboard data unavailable'>
         <h2>Some dashboard information is unavailable</h2>
