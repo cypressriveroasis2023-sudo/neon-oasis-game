@@ -15,3 +15,15 @@ test('recorded Shop state and ineligible identity are shown instead of an automa
  const html=renderToStaticMarkup(React.createElement(OwnerAssignmentReview,{review:{...review,items:[item]},pending:false,onApprove:()=>{}}));
  assert.match(html,/recorded-move/);assert.match(html,/move is not repeated/);assert.match(html,/Identity conflict/);assert.match(html,/<button disabled=""/);
 });
+
+test('352 continuity reviews keep 344 timestamp references collapsed and distinguish eight historical differences from five CSV changes',async()=>{
+ const {assignmentContinuityItems}=await import('./fixtures/assignment-continuity-ui.mjs');
+ const items=assignmentContinuityItems(review.items[0]);
+ const html=renderToStaticMarkup(React.createElement(OwnerAssignmentReview,{review:{...review,items},pending:false,onApprove:()=>{throw Error('No implicit approval')}}));
+ assert.match(html,/5 CSV assignment changes/);assert.match(html,/344 timestamp-only evidence references/);assert.match(html,/8 historical assignment differences/);assert.match(html,/352 unique Product IDs/);
+ assert.equal((html.match(/data-assignment-product=/g)||[]).length,11);assert.doesNotMatch(html,/<table/);assert.match(html,/<details><summary>Inspect 344/);
+ assert.equal((html.match(/data-assignment-product="2229931"/g)||[]).length,1);assert.match(html,/Previous assignment evidence: FIELD · customer 99/);assert.match(html,/Current assignment evidence: FIELD · customer 100/);
+ items[100]={...items[100],eligible:false,blocker:'Current link evidence is ambiguous',continuity:null};
+ const blocked=renderToStaticMarkup(React.createElement(OwnerAssignmentReview,{review:{...review,items},pending:false,onApprove:()=>{}}));
+ assert.match(blocked,/role="alert"/);assert.match(blocked,/Product 7000100: Current link evidence is ambiguous/);
+});

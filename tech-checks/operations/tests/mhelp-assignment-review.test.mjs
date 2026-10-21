@@ -7,11 +7,22 @@ import {createHash,randomUUID} from 'node:crypto';
 import {setup,installActualReview,actor,org,previous,censusSha,stage,commit} from './mhelp-owner-staging-fixture.mjs';
 import {schema} from './fixtures/mhelp-placement-schema.mjs';
 import {prepareOwnerAssignmentReviewSql} from '../scripts/prepareOwnerAssignmentReviewSql.mjs';
+import {prepareOwnerAssignmentContinuitySql} from '../scripts/prepareOwnerAssignmentContinuitySql.mjs';
 const ids=['2226860','2300344','2229407','2229931','2233383'];
 const labels=['Spotter 261HDC2','Solar Spotter 054','Solar Spotter 008','Solar Stand 015','Solar Spotter 013'];
 const note='I confirm these exact existing identities and the proposed assignments.';
 const unverifiedGps={latitude:29.7633,longitude:-95.3633};
-async function fixture(){
+const oldObservation='2026-10-13T08:00:00.000Z',currentObservation='2026-10-20T17:36:07.336985Z';
+const installedSignatures=[
+ 'public.cos_owner_mhelp_equipment_stage_v1(uuid,uuid,uuid,text,text,text,text,jsonb,text,jsonb)',
+ 'public.cos_owner_mhelp_equipment_commit_v1(uuid,uuid,uuid,text,text,text)',
+ 'public.cos_owner_mhelp_assignment_review_v1(uuid,uuid,uuid,text,text,text,text,text)',
+ 'cos_mhelp_placement_private.assignment_review(uuid)',
+ 'cos_mhelp_placement_private.assert_assignment_review(uuid)',
+ 'cos_mhelp_placement_private.assignment_review_lock()'
+];
+const sqlLiteral=v=>v===null?'null':"'"+String(v).replaceAll("'","''")+"'";
+async function fixture({extraRows=0,references=[],beforeStage}={}){
  const db=await setup(process.env.COS_ASSIGNMENT_POSTGRES_CI==='1'?assignmentPostgres():undefined);
  await db.exec(schema.slice(schema.indexOf(' create table '),schema.indexOf(' create function ')));
  await db.exec("alter table public.equipment_units add column model_id uuid,add column sim text,add column ip text; create table cos_mhelp_placement_private.links(equipment_id text,tracker_id uuid,native_unit_id uuid,full_label text,observation jsonb,observed_at timestamptz);create table app_private.cos_fleet_shop_moves(id uuid,organization_id uuid,unit_id uuid,unit_number text,model_id uuid,created_at timestamptz,source_bindings jsonb);");
@@ -20,34 +31,52 @@ async function fixture(){
  await db.exec(overlay.slice(overlay.indexOf('create function cos_mhelp_placement_private.upload_binding_guard('),overlay.indexOf('create function cos_mhelp_placement_private.review_upload(')));
  await installActualReview(db);
  const old=[],rows=[],trackers=[];
- for(let i=0;i<5;i++){
+ const fixtureIds=[...ids,...Array.from({length:extraRows},(_,i)=>String(9000001+i))];
+ const fixtureLabels=[...labels,...Array.from({length:extraRows},(_,i)=>`Continuity unit ${i+1}`)];
+ for(let i=0;i<fixtureIds.length;i++){
+  const productId=fixtureIds[i],unitNumber=fixtureLabels[i];
   const tracker=randomUUID(),native=i===3?null:randomUUID();
-  await db.query("insert into app_private.vision_tracker_locations values($1,$2,$3,$3,'synthetic','FIELD','Old customer','Old site','Old address',null,null)",[tracker,org,labels[i]]);
-  if(native)await db.query("insert into public.equipment_units(id,organization_id,unit_number,status,sim,ip) values($1,$2,$3,'available','preserved-sim','192.0.2.1')",[native,org,labels[i]]);
-  if(ids[i]==='2233383'){
+  await db.query("insert into app_private.vision_tracker_locations values($1,$2,$3,$3,'synthetic','FIELD','Old customer','Old site','Old address',null,null)",[tracker,org,unitNumber]);
+  if(native)await db.query("insert into public.equipment_units(id,organization_id,unit_number,status,sim,ip) values($1,$2,$3,'available','preserved-sim','192.0.2.1')",[native,org,unitNumber]);
+  if(productId==='2233383'){
    // Existing coordinates predate review and have no verified installation timestamp.
    await db.query('update app_private.vision_tracker_locations set latitude=$1,longitude=$2 where id=$3',[unverifiedGps.latitude,unverifiedGps.longitude,tracker]);
    await db.query('update public.equipment_units set gps_latitude=$1,gps_longitude=$2,gps_recorded_at=null where id=$3',[unverifiedGps.latitude,unverifiedGps.longitude,native]);
   }
   const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,$2) g',[tracker,native])).rows[0].g;
-  const binding={productId:ids[i],fullLabel:labels[i],trackerId:tracker,trackerLabel:labels[i],nativeUnitId:native,nativeLabel:native?labels[i]:null,matchMethod:'reviewed_product_id',representedUnitIds:[native||tracker],representationEvidenceSha256:previous,evidenceSha256:previous,expectedGuard:guard};
-  await db.query('insert into cos_mhelp_placement_private.links values($1,$2,$3,$4,null,null)',[ids[i],tracker,native,labels[i]]);
-  const row={productId:ids[i],unitNumber:labels[i],category:i===3?'Solar Stand':'Camera',customerId:'100',customer:'Old customer',placement:i===4?'SHOP':'FIELD',lifecycle:'UNFLAGGED',sourceRow:i+2,sourceAddress:{street:'Old',city:'Houston',state:'TX',zip:'77064'}};
-  old.push({...row,binding});rows.push({...row,customerId:i===4?'300':'200',customer:i===4?'New customer: New site':'Cameras OnSite',placement:i===4?'FIELD':'SHOP',sourceAddress:{...row.sourceAddress,street:i===4?'New field address':'Known shop address'}});
-  trackers.push({recordId:'tracker:'+ids[i],matchedProductId:ids[i],unitNumber:labels[i],binding:{state:'linked',trackerId:tracker,trackerLabel:labels[i],nativeUnitId:native,nativeLabel:native?labels[i]:null,expectedGuard:guard,unitIds:[native||tracker],unitLabels:{[tracker]:labels[i],...(native?{[native]:labels[i]}:{})},representedUnitIds:[native||tracker]}});
-  if(i<2){await db.query("insert into app_private.cos_fleet_shop_moves values($1,$2,$3,$4,null,now(),$5)",[randomUUID(),org,native,labels[i],JSON.stringify([{productId:ids[i],sourceSha256:previous,sourceUnitNumber:labels[i]}])]);await db.query("update public.equipment_units set current_location_type='shop' where id=$1",[native]);await db.query('insert into public.equipment_unit_location_history values($1)',[native]);}
+  const binding={productId,fullLabel:unitNumber,trackerId:tracker,trackerLabel:unitNumber,nativeUnitId:native,nativeLabel:native?unitNumber:null,matchMethod:'reviewed_product_id',representedUnitIds:[native||tracker],representationEvidenceSha256:previous,evidenceSha256:previous,expectedGuard:guard};
+  await db.query('insert into cos_mhelp_placement_private.links values($1,$2,$3,$4,null,null)',[productId,tracker,native,unitNumber]);
+  const row={productId,unitNumber,category:i===3?'Solar Stand':'Camera',customerId:'100',customer:'Old customer',placement:i===4?'SHOP':'FIELD',lifecycle:'UNFLAGGED',sourceRow:i+2,sourceAddress:{street:'Old',city:'Houston',state:'TX',zip:'77064'}};
+  old.push({...row,binding});rows.push(i>=5?{...row}:{...row,customerId:i===4?'300':'200',customer:i===4?'New customer: New site':'Cameras OnSite',placement:i===4?'FIELD':'SHOP',sourceAddress:{...row.sourceAddress,street:i===4?'New field address':'Known shop address'}});
+  trackers.push({recordId:'tracker:'+productId,matchedProductId:productId,unitNumber,binding:{state:'linked',trackerId:tracker,trackerLabel:unitNumber,nativeUnitId:native,nativeLabel:native?unitNumber:null,expectedGuard:guard,unitIds:[native||tracker],unitLabels:{[tracker]:unitNumber,...(native?{[native]:unitNumber}:{})},representedUnitIds:[native||tracker]}});
+  if(i<2){await db.query("insert into app_private.cos_fleet_shop_moves values($1,$2,$3,$4,null,now(),$5)",[randomUUID(),org,native,unitNumber,JSON.stringify([{productId,sourceSha256:previous,sourceUnitNumber:unitNumber}])]);await db.query("update public.equipment_units set current_location_type='shop' where id=$1",[native]);await db.query('insert into public.equipment_unit_location_history values($1)',[native]);}
  }
- const receipt={contract:'COS_MHELP_API_V1',reviewed:true,complete:true,origin:'mhelpdesk_api',portalId:'224643',sourceSha256:previous,recordCount:5,trackerRecords:trackers};
+ for(const reference of references){
+  const row=old[reference.index];
+  const current={productId:row.productId,customerId:row.customerId,placement:row.placement,serviceLocationId:'1000',observedAt:currentObservation};
+  const previousAssignment={...current,observedAt:oldObservation,...(reference.kind==='assignment_difference'?{customerId:'999',placement:'SHOP',serviceLocationId:'9990'}:{})};
+  row.binding.previousAssignment=previousAssignment;
+  if(reference.lifecycle)row.lifecycle=rows[reference.index].lifecycle=reference.lifecycle;
+  await db.query('update cos_mhelp_placement_private.links set observation=$1,observed_at=$2 where equipment_id=$3',[JSON.stringify({state:'confirmed',equipmentId:row.productId,customerId:current.customerId,placement:current.placement,serviceLocationId:current.serviceLocationId}),currentObservation,row.productId]);
+ }
+ if(beforeStage)await beforeStage({db,old,rows,trackers});
+ const receipt={contract:'COS_MHELP_API_V1',reviewed:true,complete:true,origin:'mhelpdesk_api',portalId:'224643',sourceSha256:previous,recordCount:old.length,trackerRecords:trackers};
  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1,receipt=$2 where source_sha256=$3',[JSON.stringify(old),JSON.stringify(receipt),previous]);
  const defs={};for(const n of ['public.cos_owner_mhelp_equipment_stage_v1(uuid,uuid,uuid,text,text,text,text,jsonb,text,jsonb)','public.cos_owner_mhelp_equipment_commit_v1(uuid,uuid,uuid,text,text,text)'])defs[n]=(await db.query('select pg_get_functiondef($1::regprocedure) d',[n])).rows[0].d;
  await db.exec(await prepareOwnerAssignmentReviewSql(defs));
+ const currentDefs={};for(const signature of installedSignatures)currentDefs[signature]=(await db.query('select pg_get_functiondef($1::regprocedure) d',[signature])).rows[0].d;
+ await db.exec(await prepareOwnerAssignmentContinuitySql(currentDefs));
+ await db.exec("create function app_private.capture_conflict(statement text) returns text language plpgsql as $$begin execute statement;return 'succeeded';exception when others then return sqlstate;end $$");
  const bytes=Buffer.from('ProductId,ProductModel,CustomerId,CustomerName,Category,Address,City,State,Zip\n'+rows.map(r=>[r.productId,r.unitNumber,r.customerId,r.customer,r.category,r.sourceAddress.street,'Houston','TX','77064'].join(',')).join('\n')+'\n');
  const sha=createHash('sha256').update(bytes).digest('hex'),id=randomUUID();
- await stage(db,[actor,org,id,'ServiceItem_List_20261020172623.csv',sha,previous,censusSha,JSON.stringify(rows.map(r=>({productId:r.productId,unitLabel:r.unitNumber,family:r.category,placement:r.placement,customer:r.customer}))),bytes.toString('base64'),JSON.stringify(rows)]);
+ const stageArgs=[actor,org,id,'ServiceItem_List_20261020172623.csv',sha,previous,censusSha,JSON.stringify(rows.map(r=>({productId:r.productId,unitLabel:r.unitNumber,family:r.category,placement:r.placement,customer:r.customer}))),bytes.toString('base64'),JSON.stringify(rows)];
+ await stage(db,stageArgs);
  const read=()=>db.query("select public.cos_owner_mhelp_assignment_review_v1($1,$2,$3,$4,$5) r",[actor,org,id,sha,censusSha]).then(r=>r.rows[0].r);
  const approve=(digest,noteValue=note)=>db.query("select public.cos_owner_mhelp_assignment_review_v1($1,$2,$3,$4,$5,'approve',$6,$7) r",[actor,org,id,sha,censusSha,digest,noteValue]).then(r=>r.rows[0].r);
  const protectedState=async()=>{const result={};for(const table of ['public.equipment_units','app_private.vision_tracker_locations','public.equipment_unit_location_history','cos_mhelp_placement_private.links','app_private.cos_fleet_shop_moves'])result[table]=(await db.query(`select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]') r from ${table} t`)).rows[0].r;return result;};
- return {db,id,sha,read,approve,old,rows,protectedState};
+ const stateOf=(fn,args)=>db.query('select app_private.capture_conflict($1) state',[`select ${fn}(${args.map(sqlLiteral).join(',')})`]).then(r=>r.rows[0].state);
+ const stored=()=>db.query('select records,receipt,review_receipt,applied_at from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[id]).then(r=>r.rows[0]);
+ return {db,id,sha,read,approve,old,rows,protectedState,stageArgs,restage:()=>stage(db,stageArgs),stateOf,stored};
 }
 test('five exact assignments retain identities, unverified GPS, recorded Shop moves and tracker-only equipment; commit replay does not duplicate writes',async()=>{
  const f=await fixture();try{
@@ -102,8 +131,104 @@ for(const scenario of ['changed before approval','partial failure','lifecycle re
 });
 
 test('stale Shop guard with another protected location or identity claim cannot be approved',async()=>{
- const f=await fixture();try{await f.db.query('update public.equipment_units set gps_latitude=30 where id=$1',[f.old[0].binding.nativeUnitId]);const view=await f.read();assert.equal(view.items.find(i=>i.productId==='2226860').eligible,false);await assert.rejects(f.approve(view.reviewDigest));}finally{await f.db.close();}
+ const f=await fixture({beforeStage:async({db,old})=>{await db.query('update public.equipment_units set gps_latitude=30 where id=$1',[old[0].binding.nativeUnitId]);}});try{const view=await f.read();assert.equal(view.items.find(i=>i.productId==='2226860').eligible,false);await assert.rejects(f.approve(view.reviewDigest));}finally{await f.db.close();}
 });
 test('failure after stage update rolls back the entire approval',async()=>{
- const f=await fixture();try{const view=await f.read();await f.db.exec("create function app_private.synthetic_failure() returns trigger language plpgsql as $$begin raise exception 'synthetic late failure';end $$;create trigger assignment_failure after update on cos_mhelp_placement_private.owner_equipment_stages for each row execute function app_private.synthetic_failure()");await assert.rejects(f.approve(view.reviewDigest),/synthetic late failure/);const row=(await f.db.query('select records,review_receipt from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[f.id])).rows[0];assert.ok(row.records.every(r=>r.binding===null));assert.equal(row.review_receipt.assignmentReview,undefined);}finally{await f.db.close();}
+ const f=await fixture({extraRows:1,references:[{index:5,kind:'timestamp_only'}]});try{const view=await f.read(),before=await f.stored();await f.db.exec("create function app_private.synthetic_failure() returns trigger language plpgsql as $$begin raise exception 'synthetic late failure';end $$;create trigger assignment_failure after update on cos_mhelp_placement_private.owner_equipment_stages for each row execute function app_private.synthetic_failure()");await assert.rejects(f.approve(view.reviewDigest),/synthetic late failure/);const row=await f.stored();assert.ok(row.records.every(r=>r.binding===null));assert.equal(row.review_receipt.assignmentReview,undefined);assert.deepEqual(row.receipt.assignmentContinuity,before.receipt.assignmentContinuity);}finally{await f.db.close();}
+});
+
+test('continuity review preserves the five movements, historical references, identities and unchanged guards',async()=>{
+ const f=await fixture({extraRows:2,references:[{index:0,kind:'timestamp_only'},{index:3,kind:'timestamp_only'},{index:4,kind:'assignment_difference'},{index:5,kind:'timestamp_only'},{index:6,kind:'assignment_difference'}]});try{
+  const before=await f.protectedState(),staged=await f.stored(),view=await f.read();
+  assert.equal(view.items.length,7);assert.equal(new Set(view.items.map(i=>i.productId)).size,7);
+  assert.equal(view.items.filter(i=>i.sourceAssignmentChanged).length,5);
+  assert.equal(view.items.filter(i=>i.continuity?.kind==='timestamp_only').length,3);
+  assert.equal(view.items.filter(i=>i.continuity?.kind==='assignment_difference').length,2);
+  assert.ok(view.items.every(i=>i.eligible));assert.ok(staged.records.every(r=>r.binding===null));
+  assert.equal(staged.receipt.assignmentContinuity.contract,'COS_OWNER_ASSIGNMENT_CONTINUITY_V1');
+  assert.equal(staged.receipt.assignmentContinuity.items.length,7);
+  for(const item of staged.receipt.assignmentContinuity.items){
+   const old=f.old.find(r=>r.productId===item.productId);
+   assert.deepEqual(item.originalBinding,old.binding);assert.ok(item.currentLinks.length===1);
+   assert.match(item.protectedStateSha256,/^[a-f0-9]{64}$/);
+  }
+  const onlyContinuity=view.items.find(i=>i.productId==='9000001');
+  assert.equal(onlyContinuity.sourceAssignmentChanged,false);assert.equal(onlyContinuity.guardChanged,false);
+  assert.deepEqual(onlyContinuity.continuity.previousAssignment,f.old[5].binding.previousAssignment);
+  assert.equal(Date.parse(onlyContinuity.continuity.currentAssignment.observedAt),Date.parse(currentObservation));
+  assert.equal((await f.restage()).stageId,f.id);
+  assert.equal((await f.approve(view.reviewDigest)).approved,true);
+  assert.equal((await f.approve(view.reviewDigest)).idempotent,true);
+  const approved=await f.stored();
+  assert.deepEqual(approved.receipt.assignmentContinuity,staged.receipt.assignmentContinuity);
+  assert.equal((await f.restage()).assignmentReview.reviewDigest,view.reviewDigest);
+  for(const row of approved.records){
+   const old=f.old.find(r=>r.productId===row.productId),item=view.items.find(i=>i.productId===row.productId);
+   assert.equal(row.binding.nativeUnitId,old.binding.nativeUnitId);assert.equal(row.binding.trackerId,old.binding.trackerId);
+   if(!item.guardChanged)assert.equal(row.binding.expectedGuard,old.binding.expectedGuard);
+   if(item.continuity)assert.deepEqual(row.binding.previousAssignment,item.continuity.currentAssignment);
+  }
+  const original=(await f.db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[previous])).rows[0].records;
+  assert.deepEqual(original,f.old);
+  assert.equal((await commit(f.db,f.id)).applied,true);assert.equal((await commit(f.db,f.id)).idempotent,true);
+  assert.deepEqual(await f.protectedState(),before);
+  const batch=(await f.db.query('select receipt,records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[f.sha])).rows[0];
+  assert.deepEqual(batch.receipt.assignmentContinuity,staged.receipt.assignmentContinuity);
+  assert.ok(batch.records.every(r=>r.binding&&!r.placementHeld));
+  assert.equal((await f.db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
+ }finally{await f.db.close();}
+});
+
+for(const phase of ['staged','approved'])for(const change of ['observation timestamp','assignment fields','link identity'])test(`${change} changed after ${phase} continuity snapshot rejects read, replay and commit`,async()=>{
+ const f=await fixture({extraRows:1,references:[{index:5,kind:'timestamp_only'}]});try{
+  const view=await f.read();if(phase==='approved')await f.approve(view.reviewDigest);
+  const before=await f.stored();
+  if(change==='observation timestamp')await f.db.exec("update cos_mhelp_placement_private.links set observed_at=observed_at+interval '1 microsecond' where equipment_id='9000001'");
+  if(change==='assignment fields')await f.db.exec("update cos_mhelp_placement_private.links set observation=jsonb_set(observation,'{customerId}','\"999\"') where equipment_id='9000001'");
+  if(change==='link identity')await f.db.query("update cos_mhelp_placement_private.links set native_unit_id=$1 where equipment_id='9000001'",[randomUUID()]);
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[actor,org,f.id,f.sha,censusSha]),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[actor,org,f.id,f.sha,censusSha,'approve',view.reviewDigest,note]),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_equipment_stage_v1',f.stageArgs),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_equipment_commit_v1',[actor,org,f.id,previous,censusSha,note]),'PT409');
+  assert.deepEqual(await f.stored(),before);
+  assert.equal((await f.db.query('select active_sha256 a from cos_mhelp_placement_private.upload_control')).rows[0].a,previous);
+  assert.equal((await f.db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,0);
+ }finally{await f.db.close();}
+});
+
+for(const invalid of ['missing','unconfirmed','ambiguous','foreign identity'])test(`${invalid} current assignment evidence remains held and cannot be approved`,async()=>{
+ const f=await fixture({extraRows:1,references:[{index:5,kind:'timestamp_only'}],beforeStage:async({db})=>{
+  if(invalid==='missing')await db.exec("delete from cos_mhelp_placement_private.links where equipment_id='9000001'");
+  if(invalid==='unconfirmed')await db.exec("update cos_mhelp_placement_private.links set observation=jsonb_set(observation,'{state}','\"pending\"') where equipment_id='9000001'");
+  if(invalid==='ambiguous')await db.exec("insert into cos_mhelp_placement_private.links select * from cos_mhelp_placement_private.links where equipment_id='9000001'");
+  if(invalid==='foreign identity')await db.query("update cos_mhelp_placement_private.links set tracker_id=$1 where equipment_id='9000001'",[randomUUID()]);
+ }});try{
+  const view=await f.read(),item=view.items.find(i=>i.productId==='9000001'),before=await f.stored();
+  assert.equal(item.eligible,false);assert.ok(item.blocker);
+  assert.equal(before.receipt.assignmentContinuity.items.find(i=>i.productId==='9000001').referenceEligible,false);
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[actor,org,f.id,f.sha,censusSha,'approve',view.reviewDigest,note]),'PT409');
+  assert.deepEqual(await f.stored(),before);
+ }finally{await f.db.close();}
+});
+
+for(const lifecycle of ['DO_NOT_USE','MISSING'])test(`${lifecycle} continuity remains restricted even with matching current identity`,async()=>{
+ const f=await fixture({extraRows:1,references:[{index:5,kind:'timestamp_only',lifecycle}]});try{
+  const view=await f.read(),item=view.items.find(i=>i.productId==='9000001');
+  assert.equal(item.eligible,false);assert.ok(item.blocker);
+  const before=await f.protectedState(),stored=await f.stored();
+  assert.equal(stored.records.find(r=>r.productId==='9000001').lifecycle,lifecycle);
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[actor,org,f.id,f.sha,censusSha,'approve',view.reviewDigest,note]),'PT409');
+  assert.deepEqual(await f.protectedState(),before);assert.deepEqual(await f.stored(),stored);
+ }finally{await f.db.close();}
+});
+
+test('RPC business conflicts return PT409 while Owner authorization remains 42501',async()=>{
+ const f=await fixture();try{
+  const staleStage=[...f.stageArgs];staleStage[2]=randomUUID();staleStage[5]='0'.repeat(64);
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_equipment_stage_v1',staleStage),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[actor,org,f.id,f.sha,censusSha,'approve','0'.repeat(64),note]),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_equipment_commit_v1',[actor,org,f.id,previous,censusSha,note]),'PT409');
+  assert.equal(await f.stateOf('public.cos_owner_mhelp_assignment_review_v1',[randomUUID(),org,f.id,f.sha,censusSha]),'42501');
+  assert.equal((await f.stored()).review_receipt.assignmentReview,undefined);
+ }finally{await f.db.close();}
 });

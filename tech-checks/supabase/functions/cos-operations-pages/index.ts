@@ -798,6 +798,7 @@ export function createOperationsHandler(options) {
             await stageOwnerEquipmentCsv({...common,requestId:body.requestId}):
             await commitOwnerEquipmentCsv({...common,stageId:body.stageId,confirmationText:body.confirmationText}));
         } catch(e){
+          if(e instanceof HttpError && e.status===409)fail('The equipment source or assignment evidence changed. Refresh the Owner review before continuing.',409);
           if(e instanceof Error && e.message.startsWith('Invalid mHelpDesk equipment CSV:'))fail(e.message,422);
           if(e instanceof Error && e.message.startsWith('Protected COS equipment admission:'))fail(e.message,409);
           fail('Current Owner equipment guards could not be verified. No source update was authorized.',503);
