@@ -37,7 +37,7 @@ async function bounded(fetcher:typeof fetch,url:string,init:RequestInit,signal:A
  try{while(true){const{value,done}=await deadline(()=>reader.read(),signal);if(done)break;size+=value.byteLength;if(size>32768)fail();raw+=decoder.decode(value,{stream:true});}raw+=decoder.decode();const result=JSON.parse(raw);if(!object(result))fail();return result;}
  catch{return fail();}finally{cancel(reader);try{reader.releaseLock();}catch{}}
 }
-export function createMhelpReconnect(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>}){
+export function createMhelpReconnect(options:{getConfig:()=>Config;fetch:typeof fetch;session:(body:Row)=>Promise<Row>;recordVerified?:(revision:number)=>Promise<unknown>}){
  let pending=false;
  const result=(row:Row,request:Row={})=>{
   if(row.configured===false)return {contract:CONTRACT,state:'unavailable',portalId:null,revision:null,renewalVerified:false};
@@ -86,7 +86,11 @@ export function createMhelpReconnect(options:{getConfig:()=>Config;fetch:typeof 
    await authorized();
    try{saved=await deadline(()=>options.session(commit),controller.signal);}catch(cause){if(cause instanceof MhelpReconnectError&&cause.status===409)throw cause;await authorized();saved=await deadline(()=>options.session(commit),controller.signal);}
    if(saved.committed!==true)fail();
-   lease=null;return result(saved,request);
+   lease=null;
+   // The pair/account was actually verified above. Missing metadata does not
+   // undo a committed reconnect; the normal status remains unverified instead.
+   if(options.recordVerified&&revision(saved.revision))await options.recordVerified(saved.revision).catch(()=>{});
+   return result(saved,request);
   }catch(cause){if(cause instanceof MhelpReconnectError)throw cause;fail();}
   finally{
    clearTimeout(timer);controller.abort();

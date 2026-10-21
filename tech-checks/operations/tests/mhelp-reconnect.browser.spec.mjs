@@ -123,3 +123,18 @@ for(const interruption of ['replacement session','Close','parent hide','unmount'
  await frame.getByText('Advanced / IT tools',{exact:true}).click();await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toBeVisible();
  expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
  });
+
+test('connected authorization and a real pause stay separate, without hidden scans or a reconnect prompt',async({page})=>{
+ const inventory={uploadInventory:{contract:'COS_MHELP_UPLOAD_INVENTORY_V1',source:'mhelpdesk_api',lastApiReadAt:'2026-10-20T17:36:07Z',summary:{totalRecords:1001,fieldRecords:287,shopRecords:714,heldRecords:12}},mhelpPlacementSync:{contract:'COS_MHELP_PLACEMENT_V1',errorCode:'inventory_source_unavailable',reliability:{contract:'COS_MHELP_RELIABILITY_STATUS_V1',auth:{state:'verified',verifiedAt:'2026-10-20T16:54:48Z'},inventory:{paused:true,updating:false,failed:true,nextEligibleAt:'2026-10-21T00:00:00Z'}}}};
+ const {frame,calls}=await mount(page,{openAdvanced:false,inventory});const panel=frame.getByRole('region',{name:'Automatic inventory status'});
+ await expect(panel.getByRole('status')).toHaveText('Automatic updates paused');await expect(panel).toContainText('Connected');await expect(panel).toContainText('12');await expect(panel.locator('time[datetime="2026-10-20T17:36:07Z"]')).toHaveCount(1);await expect(panel).not.toContainText(/retry|reconnect/i);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
+});
+test('confirmed rejected authorization gives one main-view secure action, preserving Owner-only form access',async({page})=>{
+ const inventory={mhelpPlacementSync:{contract:'COS_MHELP_PLACEMENT_V1',reliability:{contract:'COS_MHELP_RELIABILITY_STATUS_V1',auth:{state:'reconnect_required'},inventory:{paused:false,updating:false,failed:false}}}};
+ const {frame,calls}=await mount(page,{openAdvanced:false,inventory});const panel=frame.getByRole('region',{name:'Automatic inventory status'});await expect(panel.getByRole('status')).toHaveText('Reconnect required');await expect(panel.getByRole('button')).toHaveCount(1);await panel.getByRole('button',{name:'Open secure reconnect'}).click();await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toBeVisible();await expect(frame.getByLabel('Fresh access token')).toHaveCount(0);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);
+});
+test('transient unattended renewal failure warns without asking for a pair and clears on verified recovery',async({page})=>{
+ const inventory={mhelpPlacementSync:{contract:'COS_MHELP_PLACEMENT_V1',reliability:{contract:'COS_MHELP_RELIABILITY_STATUS_V1',auth:{state:'verified',verifiedAt:'2026-10-20T16:54:48Z',renewalCheckFailed:true},inventory:{paused:false,updating:false,failed:false}}}};
+ const {frame,state,calls}=await mount(page,{openAdvanced:false,inventory});const panel=frame.getByRole('region',{name:'Automatic inventory status'});await expect(panel.getByRole('alert')).toContainText('automatic renewal check could not finish');await expect(panel.getByRole('button')).toHaveCount(0);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);
+ state.inventory.mhelpPlacementSync.reliability.auth.renewalCheckFailed=false;await frame.getByRole('button',{name:'Refresh tracker',exact:true}).click();await expect(panel.getByRole('alert')).toHaveCount(0);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);expect(state.errors).toEqual([]);
+});

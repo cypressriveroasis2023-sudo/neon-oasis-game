@@ -1,3 +1,4 @@
+import {currentMhelpConfigOrRenew} from './mhelpAccessRetry.ts';
 /** Owner-only, read-only Partner API review. No fleet, Sheet, or vendor writes. */
 export const MHELP_PARTNER_CONTRACT = 'cos-mhelpdesk-partner-review-v1';
 export const MHELP_PARTNER_DOCS = 'https://www.mhelpdesk.com/partner-api/index.html';
@@ -116,7 +117,7 @@ export function createMhelpPartnerHandler(options: {
         catch { return fail('mHelpDesk could not be reached. Retry the preview.'); }
         if (response.status===401 && url===CURRENT_USER_API && options.renewAccess && !renewed) {
           renewed=true; await response.body?.cancel().catch(()=>{});
-          try { config=await options.renewAccess(); } catch { return fail('mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.'); }
+          try { config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess); } catch { return fail('mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.'); }
           if (!config || typeof config.accessToken!=='string' || !config.accessToken || config.accessToken.length>16384 || /\s/.test(config.accessToken)) fail('mHelpDesk secure token renewal is unavailable.');
           return read(url,maxBytes);
         }

@@ -4,6 +4,7 @@ import {revealMapFilters} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
+const routerWorkspace=frame=>frame.getByRole('region',{name:'InHand Routers workspace',exact:true});
 const openRouters=frame=>frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Router connections',exact:true}).click();
 async function openMap(frame){await openWorkspace(frame,'Field Map');await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('all');await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
@@ -45,6 +46,7 @@ test('missing GPS remains unpinned and source failure can retry without fabricat
  await expect(frame.getByRole('alert')).toContainText('Router fixture unavailable');
  await expect(records(frame)).toHaveCount(0);
  await expect(frame.getByLabel('Selected router details')).toHaveCount(0);
+ await expect(routerWorkspace(frame)).not.toContainText('0 Camera Health router records');
  state.fail=false;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  await expect(frame.locator('.router-workspace .panelhead')).toContainText('4 Camera Health router records');

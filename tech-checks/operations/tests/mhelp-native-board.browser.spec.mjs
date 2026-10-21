@@ -29,8 +29,9 @@ async function mount(page,authorized=true,importEnabled=true){
 }
 test('production bundle on native board loads its local PDF worker and preserves responsive review',async({page},info)=>{
   const{frame,writes}=await mount(page);
-  await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
   const panel=frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true});
+  await expect(panel).toBeHidden();
+  await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
   await expect(panel.getByRole('heading',{name:'Import mHelpDesk ticket'})).toBeVisible();
   await panel.locator('input[type=file]').setInputFiles({name:'Ticket123456_999.pdf',mimeType:'application/pdf',buffer:syntheticTicketPdf()});
   await expect(panel.getByRole('heading',{name:'Review Work Order 009001'})).toBeVisible();
@@ -52,6 +53,7 @@ test('unauthorized native board never exposes PDF import or source history',asyn
 test('native board with an older backend never exposes import actions before capability is enabled',async({page})=>{
  const {frame,writes}=await mount(page,true,false);
  await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
+ await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
  await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toHaveCount(0);
  expect(writes).toEqual([]);
 });

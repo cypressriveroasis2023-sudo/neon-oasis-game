@@ -16,6 +16,8 @@ function RequestDetails({request}:{request:TrackerRequest}){
 }
 export default function UnitTrackerWorkspace({initialConnectionOpen=false,session,show,initialUnitId,onSelectUnit,openMap,openHealth}:Props){
  const allowed=trackerAccess(session);
+ const [connectionOpen,setConnectionOpen]=useState(initialConnectionOpen);
+ useEffect(()=>{if(initialConnectionOpen)setConnectionOpen(true);},[initialConnectionOpen]);
  const [savedInventory,setSavedInventory]=useState<unknown>(null);
  const [snapshot,setSnapshot]=useState<TrackerSnapshot|null>(null),[inventory,setInventory]=useState<TrackerInventory[]>([]);
  const [query,setQuery]=useState(''),[placement,setPlacement]=useState('ALL'),[page,setPage]=useState(0),[selected,setSelected]=useState(addressUuid(initialUnitId)?initialUnitId:'');
@@ -73,8 +75,8 @@ export default function UnitTrackerWorkspace({initialConnectionOpen=false,sessio
  if(!allowed)return <section className='panel module' role='alert'><h2>Unit Tracker unavailable</h2><p>This workspace requires an authorized Owner or verified IT account and a compatible backend.</p></section>;
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
-  <MhelpSyncStatus snapshot={savedInventory} readFailed={Boolean(error)}/>
-  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<details className='unit-tracker-advanced' open={initialConnectionOpen||undefined}><summary>Advanced / IT tools</summary><MhelpPartnerReview openMap={openMap} openHealth={openHealth}/></details>}
+  <MhelpSyncStatus snapshot={savedInventory} readFailed={Boolean(error)} canReconnect={(session as {legacyOwner?:boolean})?.legacyOwner===true} onReconnect={()=>setConnectionOpen(true)}/>
+  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<details className='unit-tracker-advanced' open={connectionOpen} onToggle={event=>setConnectionOpen(event.currentTarget.open)}><summary>Advanced / IT tools</summary><MhelpPartnerReview openMap={openMap} openHealth={openHealth}/></details>}
   <MhelpIntakeReview session={session}/>
   <SheetsConnectionReview canCheck={(session as {legacyOwner?:boolean})?.legacyOwner===true} queueEnabled={snapshot?.queueEnabled===true}/>
   {trackerError&&<p className='operations-error' role='alert'>{trackerError} Pending requests and their save controls are unavailable.</p>}{snapshot?.availability==='unavailable'&&<p role='status'>{snapshot.reason||'The pending request store is not ready.'}</p>}

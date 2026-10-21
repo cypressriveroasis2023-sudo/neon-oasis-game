@@ -74,7 +74,8 @@ test('renewal POST diagnostics pass through existing reader category into only t
   assert.deepEqual(diagnostic.log.renewal,responseDiagnostic('http_error',400,'invalid_grant'));
   assert(!JSON.stringify(diagnostic).includes(secret));return true;
  });
- assert.deepEqual(f.actions,['read','read','claim','release']);assert.equal(f.requests(),1);
+ // The third metadata read checks for a newer persisted pair before forced renewal.
+ assert.deepEqual(f.actions,['read','read','read','claim','release']);assert.equal(f.requests(),1);
 });
 test('log boundary reprojects diagnostic fields and ignores forged generic errors or unrelated categories',()=>{
  const expected=responseDiagnostic('http_error',400,'invalid_grant');

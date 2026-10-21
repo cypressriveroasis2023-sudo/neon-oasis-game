@@ -16,7 +16,7 @@ export function validateIsolatedServer(guard){
 }
 const literal=value=>value===null?'NULL':typeof value==='boolean'?String(value):typeof value==='number'&&Number.isFinite(value)?String(value):"'"+String(value).replaceAll("'","''")+"'";
 export const parameters=(sql,values=[])=>sql.replace(/\$(\d+)/g,(_,number)=>{if(Number(number)<1||Number(number)>values.length)throw Error('Invalid synthetic SQL parameter');return literal(values[Number(number)-1]);});
-function openPsql(sql,{application='mhelp-ci',held=false}={}){
+export function openPsql(sql,{application='mhelp-ci',held=false}={}){
   assertCiContext();
   const child=spawn('psql',['--no-psqlrc','--quiet','--tuples-only','--no-align','--set=ON_ERROR_STOP=1','--set=VERBOSITY=verbose','--host='+connection.host,'--port='+connection.port,'--username='+connection.user,'--dbname='+connection.database],{
     env:{PATH:process.env.PATH,LANG:'C.UTF-8',PGPASSWORD:'synthetic-ci-only',PGAPPNAME:application,PGCONNECT_TIMEOUT:'5',PGOPTIONS:'-c statement_timeout=15000 -c lock_timeout=3000'},stdio:['pipe','pipe','pipe'],
