@@ -98,8 +98,9 @@ async function mount(page, options = {}) {
   page.on('pageerror', error => state.errors.push(error.message));
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
+    if(options.realCameraRedirect && url.origin===origin && url.pathname==='/') {state.rootLoads=(state.rootLoads||0)+1;return route.fulfill({contentType:'text/html',body:fixture(options)});}
     if(options.rootLanding && url.origin===origin && (url.pathname==='/'||url.pathname==='/index.html'))return route.fulfill({contentType:'text/html',body:'<h1>Main COS workspace</h1>'});
-    if(options.legacyCameraOnly && url.origin===origin && url.pathname==='/camera-health.html'){if(options.holdBoard)await options.holdBoard.promise;state.cameraLoads=(state.cameraLoads||0)+1;return route.fulfill({contentType:'text/html',body:'<h1>Provider diagnostics</h1><label>Camera search<input value=""></label><a href="/?cameraView=1">Open Fleet Dashboard</a>'});}
+    if(options.legacyCameraOnly && url.origin===origin && url.pathname==='/camera-health.html'){if(options.holdBoard)await options.holdBoard.promise;state.cameraLoads=(state.cameraLoads||0)+1;return route.fulfill({contentType:'text/html',body:'<h1>Provider diagnostics</h1><label>Camera search<input value=""></label><a href="/?cameraView=1">Open Fleet Dashboard</a>'+(options.realCameraRedirect?'<script>const profile={role:"it"},fleetCapabilities={fleetRead:true};'+readHost('camera-health.html').split('function openSharedCameraHealth(){')[1].split('function canEditFieldPlacement')[0].replace(/^/,'function openSharedCameraHealth(){')+';openSharedCameraHealth();</script>':'')});}
     if (url.origin === origin && url.pathname === '/it-daily-fixture') return route.fulfill({contentType: 'text/html', body: fixture(options)});
     if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js', '/transfers/desk.js', '/transfers/model.js', '/transfers/readiness.js', '/transfers/client.js', '/service-signoff-ui.js', '/tech-check-rules.js'].includes(url.pathname)) {
       return route.fulfill({contentType: 'text/javascript', body: readHost(url.pathname.slice(1))});
@@ -511,4 +512,17 @@ test('scripted root navigation cannot leave a nested full COS application inside
  await expect(page).toHaveURL(origin+'/?cameraView=1');
  await expect(page.getByRole('heading',{name:'Main COS workspace'})).toBeVisible();
  await expect(page.locator('iframe')).toHaveCount(0);
+});
+
+// Execute the production camera redirect inside the real daily host. The root
+// destination remounts that host, matching the reload loop seen in the recording.
+test('legacy IT diagnostics never cycles through the main COS loading screen',async({page})=>{
+ await desktop(page);const {frame,state}=await mount(page,options({legacyCameraOnly:true,realCameraRedirect:true}));
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ const search=frame.getByRole('textbox',{name:'Camera search'});await search.fill('Sniper 148');
+ await page.waitForTimeout(1500);
+ await expect(page).toHaveURL(origin+'/it-daily-fixture');
+ await expect(search).toHaveValue('Sniper 148');
+ expect(state.rootLoads||0).toBe(0);expect(state.cameraLoads).toBe(1);
+ expect(state.errors).toEqual([]);
 });
