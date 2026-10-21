@@ -25,3 +25,35 @@ test('Owner must inspect and explicitly approve exact assignment identities befo
  await expect(apply).toBeDisabled();await app.getByRole('checkbox',{name:/I reviewed the changed/}).check();await app.getByLabel('Owner approval note (at least 24 characters)').fill('I approve the complete reviewed source and identity transitions.');await apply.click();
  await expect(app.getByRole('status').filter({hasText:'Committed source receipt verified'})).toBeVisible();expect(approvals).toBe(1);expect(commits).toBe(1);
 });
+
+test('large continuity review stays compact, exposes the exact manifest, and keeps Apply held after a 409 or blocked evidence',async({page})=>{
+ const {assignmentContinuityItems}=await import('./fixtures/assignment-continuity-ui.mjs');
+ const items=assignmentContinuityItems(item),{app}=await mountFleet(page,false,{features:{ownerEquipmentImportEnabled:true}});let approvals=0,stages=0,blocked=false;
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fallback();const request=route.request().postDataJSON();if(!request.path.startsWith('/api/mhelpdesk/equipment/'))return route.fallback();
+  const headers={'access-control-allow-origin':'http://127.0.0.1:4173'};let data;
+  if(request.path.endsWith('/preview'))data={contract:'COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1',previewOnly:true,readyToCommit:false,sourceSha256:sha,inventory:{total:1001,field:284,shop:717,inactive:0},changes:{unchanged:996,added:0,absent:0,placement:5,customer:5,address:1,identityReview:0},samples:[],censusStatus:'verified',admission:{counts:{unchanged:996,assignment_change:5,new_source_only:0},totalHeld:352},guardNotice:'Current evidence review required'};
+  if(request.path.endsWith('/stage')){stages++;data={contract:'COS_OWNER_EQUIPMENT_STAGE_V1',stageId,sourceSha256:sha,productIdsMatched:1001,recordedField:284,recordedShop:717,expiresInMinutes:60,previewOnly:true,readyToCommit:false};}
+  if(request.path.endsWith('/assignments')){
+   if(request.body.action==='approve'){approvals++;expect(request.body.reviewDigest).toBe('d'.repeat(64));blocked=true;return route.fulfill({headers,status:409,json:{error:'The equipment source or assignment evidence changed. Refresh the Owner review before continuing.'}});}
+   data={contract:'COS_OWNER_ASSIGNMENT_REVIEW_V1',stageId,sourceSha256:sha,censusSha256:'c'.repeat(64),reviewDigest:'d'.repeat(64),approved:false,items:items.map((r,i)=>blocked&&i===100?{...r,eligible:false,continuity:null,blocker:'Current link evidence is ambiguous'}:r)};
+  }
+  if(request.path.endsWith('/commit'))throw Error('Final Apply must remain held');
+  return route.fulfill({headers,json:data});
+ });
+ await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await app.getByLabel('Original mHelpDesk equipment CSV').setInputFiles({name:'ServiceItem_List_20261020172623.csv',mimeType:'text/csv',buffer:Buffer.from('synthetic complete CSV')});
+ await app.getByRole('button',{name:'Preview equipment changes'}).click();await app.getByRole('button',{name:'Stage reviewed inventory (no Fleet changes)'}).click();
+ await app.getByRole('button',{name:'Review current assignment identities'}).click();const review=app.getByRole('region',{name:'Review existing equipment assignments'});
+ await expect(review).toContainText('5 CSV assignment changes');await expect(review).toContainText('344 timestamp-only evidence references');await expect(review).toContainText('8 historical assignment differences');await expect(review).toContainText('352 unique Product IDs');
+ await expect(review.locator('article[data-assignment-product]')).toHaveCount(11);await expect(review.locator('[data-assignment-product="2229931"]')).toHaveCount(1);
+ await expect(review.getByRole('table',{name:'Timestamp-only Product ID manifest'})).toHaveCount(0);
+ await review.locator('summary').click();const manifest=review.getByRole('table',{name:'Timestamp-only Product ID manifest'});await expect(manifest.locator('tbody tr')).toHaveCount(344);
+ await expect(manifest.locator('tbody tr').first()).toContainText('2226860');await expect(manifest.locator('tbody tr').first()).toContainText('2026-10-13T10:00:00Z');await expect(manifest.locator('tbody tr').first()).toContainText('2026-10-20T17:36:07.336985+00:00');await expect(manifest.locator('tbody tr').first()).toContainText('00000000-0000-4000-8000-000000000001');
+ await review.locator('summary').click();await expect(manifest).toHaveCount(0);
+ const approve=review.getByRole('button',{name:'Approve these assignments for this stage'});await expect(approve).toBeDisabled();
+ await review.getByRole('checkbox').check();await review.getByRole('textbox').fill('I reviewed the continuity manifest and each historical assignment difference.');await approve.click();
+ await expect(app.getByRole('alert').filter({hasText:'Refresh the Owner review'})).toBeVisible();await expect(app.getByRole('button',{name:'Apply reviewed source through protected COS backend'})).toBeDisabled();expect(approvals).toBe(1);expect(stages).toBe(1);
+ await app.getByRole('button',{name:'Review current assignment identities'}).click();await expect(review.getByRole('alert')).toContainText('Product 7000100: Current link evidence is ambiguous');
+ await review.getByRole('checkbox').check();await review.getByRole('textbox').fill('This note cannot authorize an unresolved current identity blocker.');await expect(approve).toBeDisabled();expect(approvals).toBe(1);
+});

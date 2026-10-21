@@ -54,3 +54,24 @@ test('assignment review rereads exact file and current Google proof, and never t
  await assert.rejects(reviewOwnerEquipmentAssignments({...options,rpc,stageId:UUID,action:'read',body:{...body,binding:{nativeUnitId:UUID}}}),/unexpected source request field/);
  assert.equal(calls,1);
 });
+
+const safeAssignment=r=>({placement:r.placement,customer:r.customer,customerId:r.customerId,address:r.sourceAddress});
+const reviewItem=()=>({productId:'11',unitNumber:rows[0].unitNumber,before:safeAssignment(rows[0]),after:safeAssignment(rows[0]),identity:{nativeUnitId:null,nativeLabel:null,trackerId:UUID,trackerLabel:rows[0].unitNumber},current:{nativePlacement:null,nativeStatus:null,internalTrackerPlacement:'FIELD',internalTrackerCustomer:rows[0].customer,internalTrackerSite:null,gpsPresent:false,shopReceiptId:null,shopRecordedAt:null},guardChanged:false,eligible:true,blocker:null,sourceAssignmentChanged:false,continuity:{kind:'timestamp_only',previousAssignment:{productId:'11',customerId:'100',placement:'FIELD',serviceLocationId:null,observedAt:'2026-10-13T10:00:00Z'},currentAssignment:{productId:'11',customerId:'100',placement:'FIELD',serviceLocationId:null,observedAt:'2026-10-20T17:36:07.336985+00:00'}}});
+async function projected(items,extra={}){
+ const {reviewOwnerEquipmentAssignments}=await import('../../supabase/functions/cos-operations-pages/mhelpEquipmentAssignmentReview.ts');
+ return reviewOwnerEquipmentAssignments({...options,stageId:UUID,action:'read',rpc:async(name,args)=>({contract:'COS_OWNER_ASSIGNMENT_REVIEW_V1',stageId:UUID,sourceSha256:args.p_source_sha256,censusSha256:args.p_current_2027_sha256,reviewDigest:'d'.repeat(64),approved:false,items,...extra})});
+}
+test('continuity bridge projects exact old/current references without forwarding private receipt or link data',async()=>{
+ const item=reviewItem();item.privateBinding={secret:'do-not-forward'};item.identity.ip='192.0.2.8';item.continuity.currentAssignment.rawLink={private:'do-not-forward'};
+ const result=await projected([item],{rawReceipt:{private:'do-not-forward'}});
+ assert.deepEqual(result.items[0].continuity.previousAssignment,item.continuity.previousAssignment);assert.equal(result.items[0].continuity.currentAssignment.observedAt,'2026-10-20T17:36:07.336985+00:00');assert.equal(result.items[0].sourceAssignmentChanged,false);
+ assert.doesNotMatch(JSON.stringify(result),/do-not-forward|192\.0\.2\.8|rawReceipt|rawLink/);
+ const unavailable={...reviewItem(),continuity:null,eligible:false,blocker:'Current link evidence is ambiguous'};assert.deepEqual((await projected([unavailable])).items[0],unavailable);
+ const legacy=reviewItem();delete legacy.continuity;delete legacy.sourceAssignmentChanged;assert.equal((await projected([legacy])).items[0].sourceAssignmentChanged,false);
+});
+test('continuity bridge rejects duplicate products, mismatched references and misleading continuity kinds',async()=>{
+ const changed=reviewItem();changed.continuity.kind='assignment_difference';changed.continuity.previousAssignment.customerId='99';assert.equal((await projected([changed])).items[0].continuity.kind,'assignment_difference');
+ const cases=[r=>{r.continuity.currentAssignment.productId='12'},r=>{r.continuity.currentAssignment.observedAt='unknown'},r=>{r.continuity.currentAssignment.customerId='999'},r=>{r.continuity.kind='assignment_difference'},r=>{r.sourceAssignmentChanged='false'},r=>{r.identity.trackerId='wrong-identity'}];
+ for(const mutate of cases){const item=reviewItem();mutate(item);await assert.rejects(projected([item]),/explicit assignment review/);}
+ await assert.rejects(projected([reviewItem(),reviewItem()]),/explicit assignment review/);
+});
