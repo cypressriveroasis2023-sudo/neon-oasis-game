@@ -42,7 +42,8 @@ for(const role of ['owner','it'])test(role+' gets an explicit operational field 
  await frame.getByLabel('Camera Health unit filter').selectOption('unknown');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('provider');expect(state.errors).toEqual([]);
 });
 test('IT current-assignment refresh reads back evidence and preserves verified GPS',async({page})=>{
- const {frame,state}=await mount(page,'it');await frame.locator('.cos-fleet-unit-row').filter({hasText:'Helios 001'}).click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await frame.getByRole('button',{name:'Refresh mHelpDesk location'}).click();
+ const {frame,state}=await mount(page,'it');await frame.locator('.cos-fleet-unit-row').filter({hasText:'Helios 001'}).click();await expect(frame.getByRole('button',{name:'Edit / verify installation →'})).toHaveCount(0);await frame.locator('.cos-fleet-troubleshooting > summary').click();await frame.getByRole('button',{name:'Refresh mHelpDesk location'}).click();
  await expect(frame.getByRole('region',{name:'Current mHelpDesk unit location'})).toContainText('500 New Service Road');await expect(frame.getByRole('region',{name:'Current mHelpDesk unit location'})).toContainText('unverified');
- await expect(frame.locator('.cos-fleet-drawer')).toContainText('123 Synthetic Street');await expect(frame.locator('.cos-fleet-drawer')).toContainText('Phone Gps');expect(state.calls.filter(c=>c.method==='POST')).toHaveLength(1);expect(state.calls.some(c=>/\/gps$/.test(c.path))).toBe(false);expect(state.errors).toEqual([]);
+ const evidence=frame.locator('.cos-fleet-installation-evidence');await evidence.locator('summary').click();
+ await expect(evidence.getByText('123 Synthetic Street',{exact:true})).toBeVisible();await expect(evidence.getByText('Verified installation',{exact:true})).toBeVisible();await expect(evidence.getByText('29.76, -95.37',{exact:true})).toBeVisible();expect(state.calls.filter(c=>c.method==='POST')).toHaveLength(1);expect(state.calls.some(c=>/\/gps$/.test(c.path))).toBe(false);expect(state.errors).toEqual([]);
 });

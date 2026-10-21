@@ -22,6 +22,7 @@ for(const it of [false,true])for(const width of [320,390,430])test(`${it?'IT':'O
  await page.mouse.wheel(650,0);
  await anchored();
  for(const name of ['Fleet health','Location verification','Needs setup','Data sources']){
+  if(it&&name==='Needs setup'){await expect(app.getByRole('button',{name:new RegExp('^'+name)})).toHaveCount(0);await anchored();continue;}
   await app.getByRole('button',{name:new RegExp('^'+name)}).click();
   await anchored();
   if(name==='Fleet health'){

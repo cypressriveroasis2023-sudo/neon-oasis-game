@@ -181,21 +181,39 @@ async function choose(frame,name) {
   await nav.getByRole('button',{name,exact:true}).click();
 }
 
-for(const view of ['Fleet Dashboard','Camera Health'])test('verified desktop IT opens '+view+' without extra workspaces',async({page},info)=>{
+for(const [technician,secondVerified,subject] of [
+  ['Teddy',false,'4f7044b5-86b6-411f-8898-39bb64b4ddbc'],
+  ['Victor',true,'b7cc3cbf-d11e-4d4a-9742-c07701857911'],
+])for(const view of ['Fleet Dashboard','Camera Health'])test(technician+' verified desktop IT opens '+view+' with the shared searchable Fleet',async({page},info)=>{
   await desktop(page);
-  const {frame,state}=await mount(page,options());
+  const {frame,state}=await mount(page,options({secondVerified}));
   await readyFleet(frame); // The phone/desktop host deliberately starts Fleet.
+  expect(await page.evaluate(()=>window.fixtureSubject)).toBe(subject);
+  await expect(frame.getByRole('region',{name:'Fleet units in view',exact:true})).toBeVisible();
+  const search=frame.getByRole('searchbox',{name:'Search units, customers, sites or addresses'});
+  await search.fill('Helios');
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+  await expect(frame.locator('.cos-fleet-unit-row')).toContainText('Helios 001');
+  await search.fill('No synthetic unit matches this');
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);
+  await frame.getByRole('button',{name:'Clear fleet search',exact:true}).click();
+  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
+  await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Needs setup/})).toHaveCount(0);
   if(view==='Camera Health'){
     await choose(frame,'Camera Health');
     await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
     await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(0);
+    await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);
+    await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toContainText('Helios 001');
   }
   await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('title','Fleet Dashboard and Camera Health');
   await expect(page.locator('#existing-it-tool')).toBeHidden();
   const {menu}=await scopedMenu(frame);
   await menu.getByRole('button',{name:/Close menu/}).click();
   await expect(frame.getByRole('button',{name:'Advanced camera diagnostics',exact:true})).toHaveCount(0);
-  await page.screenshot({path:info.outputPath('IT-desktop-'+view.replaceAll(' ','-')+'.png'),fullPage:true});
+  await expect(frame.getByRole('region',{name:'Owner equipment inventory CSV preview',exact:true})).toHaveCount(0);
+  await expect(page.locator('#fixtureOwnerControl')).toBeHidden();
+  await page.screenshot({path:info.outputPath(technician+'-IT-desktop-'+view.replaceAll(' ','-')+'.png'),fullPage:true});
   await assertReadBoundary(page,state);
 });
 
@@ -518,11 +536,15 @@ test('scripted root navigation cannot leave a nested full COS application inside
 // destination remounts that host, matching the reload loop seen in the recording.
 test('legacy IT diagnostics never cycles through the main COS loading screen',async({page})=>{
  await desktop(page);const {frame,state}=await mount(page,options({legacyCameraOnly:true,realCameraRedirect:true}));
+ const access=page.getByRole('region',{name:'Fleet access for this account',exact:true});
+ await expect(access).toHaveText('Fleet map is not available for this account. Sign in with your individual IT account to use the shared Fleet dashboard. Camera diagnostics remain available here.');
  await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toHaveCount(0);
  const search=frame.getByRole('textbox',{name:'Camera search'});await search.fill('Sniper 148');
  await page.waitForTimeout(1500);
  await expect(page).toHaveURL(origin+'/it-daily-fixture');
  await expect(search).toHaveValue('Sniper 148');
  expect(state.rootLoads||0).toBe(0);expect(state.cameraLoads).toBe(1);
+ expect(state.calls).toEqual([]); // Never attempt native Fleet using a legacy-only identity.
  expect(state.errors).toEqual([]);
 });

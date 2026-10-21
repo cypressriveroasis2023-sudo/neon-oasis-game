@@ -20,7 +20,7 @@ type Props={
  onOpen:(product:ProviderProduct)=>void;
  onShop:()=>void;
  onMap:()=>void;
- onImport:()=>void;
+ onImport?:()=>void;
  onRefresh:()=>void;
 };
 type StatusFilter='all'|FleetCommandStatus;
@@ -127,7 +127,7 @@ export default function FleetCommandCenter({
     <div><h3>Field inventory</h3><p>{entries.length} of {data.field} Field Product IDs in this view · 1 product = 1 equipment record</p></div>
     <div className="cos-command-list-actions">
      <button type="button" onClick={onMap}>View map ↓</button>
-     <button type="button" onClick={onImport}>mHelpDesk CSV / sync →</button>
+     {onImport&&<button type="button" onClick={onImport}>mHelpDesk CSV / sync →</button>}
     </div>
    </div>
    <div className="cos-command-filters">

@@ -13,8 +13,8 @@ test('dark host preserves script bodies and URLs except reviewed extensions and 
   assert.equal(html.split('cos-eye-branding.js?v=20261018-cos-centered').length-1,1);
   assert.equal(html.split('verified-it-fleet-host.js?v=unified-fleet-20261013').length-1,1);
   assert.equal(html.split('it-ticket-instructions-host.js?v=service-ticket-instructions-20261010').length-1,1);
-  // Exact reviewed cache version from the merged PR267 diagnostics repair.
-  const dailyHostTags=['stable-it-diagnostics-20261021']
+  // Exact reviewed cache version; the PR267 diagnostics and session repairs remain intact.
+  const dailyHostTags=['it-fleet-access-20261021']
     .map(version=>`<script type="module" src="./it-daily-host.js?v=${version}"></script>`)
     .filter(tag=>html.includes(tag));
   assert.equal(dailyHostTags.length,1);

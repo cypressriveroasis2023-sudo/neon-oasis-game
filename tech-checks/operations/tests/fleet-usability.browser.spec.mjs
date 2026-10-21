@@ -27,10 +27,10 @@ test('the unit drawer scrolls both ways and installation editing does not jump f
 
 test('unverified combined roster cannot display a partial missing-location total as complete',async({page})=>{const value=structuredClone(field);value.fleetRoster=recordedRoster(value.inventoryItems,fresh);value.fleetRoster.summary.field=999;const {app}=await mountFleet(page,false,{field:value});await expect(app.locator('.cos-fleet-stat-verify strong')).toHaveText('—');await expect(app.getByRole('button',{name:'Missing map location: —',exact:true})).toBeVisible();});
 
-for(const capability of [undefined,false])test('IT with '+(capability===false?'denied':'omitted')+' Victron capability cannot read power through a Helios drawer or installation editor',async({page})=>{
+for(const capability of [undefined,false])test('IT with '+(capability===false?'denied':'omitted')+' Victron capability cannot read power through a Helios drawer or saved evidence',async({page})=>{
  const {app,state}=await mountFleet(page,true,{features:{vrmRead:capability}});await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();const drawer=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
  await expect(drawer.getByRole('region',{name:'Selected unit power'})).toContainText('Unverified');await expect(drawer.getByRole('region',{name:'Helios Victron battery and solar'})).toHaveCount(0);
- await drawer.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();await expect(drawer.locator('.field-map-detail')).toBeVisible();await expect(drawer.getByRole('button',{name:'Back to diagnostics',exact:true})).toBeEnabled();await expect(drawer.getByRole('region',{name:'Helios Victron battery and solar'})).toHaveCount(0);
+ await expect(drawer.getByRole('button',{name:'Edit / verify installation →',exact:true})).toHaveCount(0);await drawer.locator('.cos-fleet-installation-evidence > summary').click();await expect(drawer.locator('.cos-fleet-installation-evidence')).toHaveAttribute('open','');await expect(drawer.locator('.cos-fleet-installation-evidence')).toContainText('Verified installation');await expect(drawer.locator('.field-map-detail')).toHaveCount(0);await expect(drawer.getByRole('region',{name:'Helios Victron battery and solar'})).toHaveCount(0);
  expect(state.calls.some(call=>call.path.startsWith('/api/vrm-'))).toBe(false);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 

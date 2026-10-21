@@ -21,6 +21,7 @@ for(const it of [false,true])test(`inline camera checks keep ${it?'IT':'Owner'} 
 });
 for(const it of [false,true])test(`every Fleet tab has the compact COS theme for ${it?'IT':'Owner'}`,async({page})=>{
  const {app}=await mountFleet(page,it);for(const [label,view] of [['Fleet health','fleet'],['Location verification','verify'],['Needs setup','setup'],['Data sources','sources'],['Map','map']]){
+  if(it&&view==='setup'){await expect(app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:label,exact:false})).toHaveCount(0);continue;}
   await app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:label,exact:false}).click();
   const board=app.locator('.cos-fleet-board');await expect(board).toHaveAttribute('data-fleet-view',view);await expect(board.locator('.cos-fleet-clock')).toBeHidden();
   expect(await board.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
