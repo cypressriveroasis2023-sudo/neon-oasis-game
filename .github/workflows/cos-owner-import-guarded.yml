@@ -5,6 +5,9 @@ on:
       - 'tech-checks/operations/tests/mhelp-*.test.mjs'
       - 'tech-checks/operations/tests/mhelp-canonical-evidence-postgres.mjs'
       - 'tech-checks/operations/scripts/prepareOwnerCanonicalEvidenceSql.mjs'
+      - 'tech-checks/operations/scripts/prepareUploadSnapshotOnceSql.mjs'
+      - 'tech-checks/operations/tests/fixtures/upload-snapshot-before-20261021.sql'
+      - 'tech-checks/operations/docs/drafts/cos-upload-snapshot-once-20261021.sql'
       - 'tech-checks/operations/docs/drafts/cos-owner-canonical-evidence.sql'
       - 'tech-checks/operations/docs/drafts/cos-owner-equipment-stage-commit-20261016.sql'
       - 'tech-checks/supabase/functions/cos-operations-pages/mhelp*Equipment*.ts'
@@ -53,7 +56,8 @@ jobs:
             tests/mhelp-equipment-write-bridge.test.mjs \
             tests/mhelp-owner-staging-pglite.test.mjs \
             tests/mhelp-assignment-review.test.mjs \
-            tests/mhelp-canonical-evidence-postgres.mjs
+            tests/mhelp-canonical-evidence-postgres.mjs \
+            tests/mhelp-upload-snapshot-once.test.mjs
       - name: Verify real PostgreSQL 17 Owner equipment transaction
         timeout-minutes: 4
         env:
@@ -65,6 +69,6 @@ jobs:
         timeout-minutes: 4
         env:
           COS_ASSIGNMENT_POSTGRES_CI: '1'
-        run: node --import tsx --test --test-concurrency=1 tests/mhelp-assignment-review.test.mjs tests/mhelp-canonical-evidence-postgres.mjs
+        run: node --import tsx --test --test-concurrency=1 tests/mhelp-assignment-review.test.mjs tests/mhelp-canonical-evidence-postgres.mjs tests/mhelp-upload-snapshot-once.test.mjs
       - name: Typecheck COS Owner importer and existing app
         run: npm run typecheck
