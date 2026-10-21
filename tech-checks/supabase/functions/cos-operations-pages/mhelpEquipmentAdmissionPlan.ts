@@ -38,7 +38,7 @@ export type AdmissionPlan = {
 };
 function bad(message:string):never{throw new Error('Equipment admission plan rejected: '+message);}
 function identicalAddress(a:EquipmentCsvRow['sourceAddress'],b:EquipmentCsvRow['sourceAddress']){
-  return sourceFields.every(k=>normalize(a[k])===normalize(b[k]));
+  return sourceFields.every(k=>typeof a[k]==='string'&&typeof b[k]==='string'&&normalize(a[k])===normalize(b[k]));
 }
 function isRecord(v:unknown):v is Record<string,unknown>{return !!v&&typeof v==='object'&&!Array.isArray(v);}
 /** Output contains only bounded Product-ID/label/placement decisions; never addresses or IPs. */
