@@ -98,7 +98,8 @@ async function mount(page, options = {}) {
   page.on('pageerror', error => state.errors.push(error.message));
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
-    if(options.legacyCameraOnly && url.origin===origin && url.pathname==='/camera-health.html'){state.cameraLoads=(state.cameraLoads||0)+1;return route.fulfill({contentType:'text/html',body:'<h1>Provider diagnostics</h1><label>Camera search<input value=""></label>'});}
+    if(options.rootLanding && url.origin===origin && (url.pathname==='/'||url.pathname==='/index.html'))return route.fulfill({contentType:'text/html',body:'<h1>Main COS workspace</h1>'});
+    if(options.legacyCameraOnly && url.origin===origin && url.pathname==='/camera-health.html'){if(options.holdBoard)await options.holdBoard.promise;state.cameraLoads=(state.cameraLoads||0)+1;return route.fulfill({contentType:'text/html',body:'<h1>Provider diagnostics</h1><label>Camera search<input value=""></label><a href="/?cameraView=1">Open Fleet Dashboard</a>'});}
     if (url.origin === origin && url.pathname === '/it-daily-fixture') return route.fulfill({contentType: 'text/html', body: fixture(options)});
     if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js', '/transfers/desk.js', '/transfers/model.js', '/transfers/readiness.js', '/transfers/client.js', '/service-signoff-ui.js', '/tech-check-rules.js'].includes(url.pathname)) {
       return route.fulfill({contentType: 'text/javascript', body: readHost(url.pathname.slice(1))});
@@ -136,7 +137,7 @@ async function mount(page, options = {}) {
     }[call.path];
     return route.fulfill({headers, contentType: 'application/json', body: JSON.stringify(data)});
   });
-  await page.goto(origin + '/it-daily-fixture' + (options.deepLink ?? '#it-dashboard'));
+  await page.goto(origin + '/it-daily-fixture' + (options.deepLink ?? '#it-dashboard'),{waitUntil:options.holdBoard?'domcontentloaded':'load'});
   return {state, frame: page.frameLocator('#cosITDailyFrame')};
 }
 
@@ -444,4 +445,70 @@ test('legacy IT provider diagnostics stays loaded through repeated sign-in confi
  await expect(search).toHaveValue('Sniper 148');
  expect(state.cameraLoads).toBe(1);
  await expect(page.locator('#cosITDailyFrame')).toBeVisible();
+});
+
+test('a slow legacy board keeps visible loading and offers retry instead of a blank area',async({page})=>{
+ await desktop(page);await page.clock.install();const holdBoard=gate();
+ const {frame,state}=await mount(page,options({legacyCameraOnly:true,holdBoard}));
+ const board=page.locator('.cos-it-board-loading');
+ await expect(board).toHaveAttribute('aria-busy','true');
+ await expect(board.getByRole('status')).toHaveText('Opening your board…');
+ await expect(page.locator('#cosITDailyFrame')).toBeHidden();
+ await page.clock.fastForward(20001);
+ await expect(board.getByRole('button',{name:'Retry opening board'})).toBeVisible();
+ await expect(board.getByRole('status')).toContainText('taking longer than usual');
+ holdBoard.release();
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ await expect(board).toHaveAttribute('aria-busy','false');
+ await expect(board.getByRole('status')).toHaveCount(0);
+ expect(state.cameraLoads).toBe(1);
+});
+
+test('leaving while a board loads cannot expose a late private frame',async({page})=>{
+ await desktop(page);const holdBoard=gate();
+ await mount(page,options({legacyCameraOnly:true,holdBoard}));
+ await expect(page.getByText('Opening your board…',{exact:true})).toBeVisible();
+ await page.evaluate(()=>window.logout());holdBoard.release();
+ await expect(page.locator('#cosITDailyHost')).toHaveCount(0);
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+});
+
+test('retry replaces a stalled board once and safely ignores the old pending document',async({page})=>{
+ await desktop(page);await page.clock.install();const holdBoard=gate();
+ const {frame,state}=await mount(page,options({legacyCameraOnly:true,holdBoard}));
+ await expect(page.getByText('Opening your board…',{exact:true})).toBeVisible();
+ await page.locator('#cosITDailyFrame').evaluate(n=>window.fixtureOldLoadingFrame=n);
+ await page.clock.fastForward(20001);
+ await page.getByRole('button',{name:'Retry opening board',exact:true}).click();
+ await expect(page.getByText('Opening your board…',{exact:true})).toBeVisible();
+ expect(await page.locator('#cosITDailyFrame').evaluate(n=>n!==window.fixtureOldLoadingFrame)).toBe(true);
+ holdBoard.release();
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
+ expect(state.errors).toEqual([]);
+});
+
+test('embedded diagnostic dashboard links leave the iframe instead of nesting COS headers',async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options({legacyCameraOnly:true,rootLanding:true}));
+ await frame.getByRole('link',{name:'Open Fleet Dashboard'}).click();
+ await expect(page).toHaveURL(origin+'/?cameraView=1',{timeout:1500});
+ await expect(page.getByRole('heading',{name:'Main COS workspace'})).toBeVisible();
+ await expect(page.locator('iframe')).toHaveCount(0);
+});
+
+test('a dynamically added dashboard link exits the diagnostic iframe on its first click',async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options({legacyCameraOnly:true,rootLanding:true}));
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ await frame.locator('body').evaluate(body=>{const a=document.createElement('a');a.href='/index.html?fieldUnit=HELIOS%20001';a.textContent='Dynamic main dashboard';body.append(a);a.click();});
+ await expect(page).toHaveURL(origin+'/index.html?fieldUnit=HELIOS%20001');
+ await expect(page.locator('iframe')).toHaveCount(0);
+});
+
+test('scripted root navigation cannot leave a nested full COS application inside IT',async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options({legacyCameraOnly:true,rootLanding:true}));
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ await frame.locator('body').evaluate(()=>location.assign('/?cameraView=1'));
+ await expect(page).toHaveURL(origin+'/?cameraView=1');
+ await expect(page.getByRole('heading',{name:'Main COS workspace'})).toBeVisible();
+ await expect(page.locator('iframe')).toHaveCount(0);
 });

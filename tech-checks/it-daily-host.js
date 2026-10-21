@@ -12,6 +12,7 @@ const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null, phoneBoard = false;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
+let boardLoadTimer = null;
 let accessRecheck = null;
 let authSubject; // undefined until the auth listener has supplied its first session.
 function fitDailyFrame() {
@@ -23,6 +24,12 @@ function fitDailyFrame() {
   const remaining = viewportTop + viewportHeight - Math.max(frameTop,viewportTop) - 12;
   const height = Math.max(1, Math.floor(Math.min(viewportHeight,remaining))) + 'px';
   if (frame.style.height !== height) frame.style.height = height;
+}
+function mainWorkspaceLink(href){
+  try{
+    const home=new URL('./',location.href),url=new URL(href,location.href);
+    return url.origin===home.origin && [home.pathname,home.pathname+'index.html'].includes(url.pathname)?url:null;
+  }catch{return null;}
 }
 function scheduleFrameFit() {
   if (fitScheduled) return;
@@ -45,7 +52,14 @@ function scope() {
   return {id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
 }
 function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive,value.phone].join(':') : ''; }
-function clearFrame() { disposeTransfer?.(); disposeTransfer=null; setFieldMapDisplay(frame,false); frame?.remove(); frame = null; }
+function clearFrame() {
+  clearTimeout(boardLoadTimer);boardLoadTimer=null;
+  // Retire references before DOM teardown: detaching a loading iframe can fire
+  // its load/unload callbacks synchronously. Those callbacks must see it as stale.
+  const obsolete=frame, dispose=disposeTransfer;frame=null;disposeTransfer=null;
+  dispose?.();setFieldMapDisplay(obsolete,false);obsolete?.remove();
+}
+
 function shield(node) {
   if (!node || node === root) return;
   if (!shielded.has(node)) shielded.set(node,{inert:node.inert,display:node.style.getPropertyValue('display'),priority:node.style.getPropertyPriority('display')});
@@ -162,8 +176,36 @@ async function open(value, generation, handoffFailure = null) {
   frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
     ? './camera-health.html?itDaily=1'
     : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
-  frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
-  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),frame);
+  const board=document.createElement('section');board.className='cos-it-board-loading';board.style.position='relative';board.setAttribute('aria-busy','true');
+  const pending=document.createElement('section');pending.className='cos-it-daily-status';pending.style.cssText='position:absolute;inset:0;z-index:1;margin:0;min-height:180px';
+  const heading=document.createElement('h1');heading.textContent='Camera Health and Fleet Map';
+  const note=document.createElement('p');note.setAttribute('role','status');note.textContent='Opening your board…';
+  const retry=document.createElement('button');retry.type='button';retry.textContent='Retry opening board';retry.hidden=true;
+  const currentFrame=frame;
+  const current=()=>generation===revision && frame===currentFrame && key(scope())===key(value);
+  retry.onclick=()=>{if(!current())return;clearFrame();status('Opening Camera Health and Fleet Map…');void open(value,++revision);};
+  pending.append(heading,note,retry);
+  frame.style.visibility='hidden';frame.inert=true;
+  frame.addEventListener('load',()=>{
+    if(!current())return;
+    try{
+      const href=currentFrame.contentWindow.location.href,doc=currentFrame.contentDocument;
+      if(href==='about:blank'||!doc)return;
+      // A root COS page must never become another board inside this board.
+      // Cover scripted navigation as well as links from older cached diagnostics.
+      const home=mainWorkspaceLink(href);
+      if(home){location.assign(home.href);return;}
+      const targetHome=link=>{if(link && mainWorkspaceLink(link.href))link.target='_top';};
+      for(const link of doc.querySelectorAll('a[href]'))targetHome(link);
+      doc.addEventListener('click',event=>{if(current())targetHome(event.target?.closest?.('a[href]'));},true);
+    }catch{note.textContent='The board could not finish opening. Retry to open it again.';retry.hidden=false;return;}
+    clearTimeout(boardLoadTimer);boardLoadTimer=null;
+    pending.remove();board.setAttribute('aria-busy','false');currentFrame.style.visibility='';currentFrame.inert=false;
+    setFieldMapDisplay(currentFrame,false);scheduleFrameFit();
+  });
+  board.append(frame,pending);
+  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),board);
+  boardLoadTimer=setTimeout(()=>{if(!current())return;note.textContent='The board is taking longer than usual to open. You can keep waiting or retry.';retry.hidden=false;},20000);
   scheduleFrameFit();
 }
 function present() {
