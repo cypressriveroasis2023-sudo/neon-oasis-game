@@ -46,6 +46,8 @@ test('Owner Watchful area opens the exact portal separately with keyboard and cl
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(link).toHaveAccessibleDescription('Opens in a new tab. Watchful may ask you to sign in.');
+  await expect(frame.getByRole('navigation',{name:'Daily work shortcuts'}).getByRole('button')).toHaveCount(5);
+  await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).toBeVisible();
   const systems=frame.getByRole('navigation',{name:'Equipment systems',exact:true});
   await expect(systems.getByRole('button')).toHaveCount(3);
   for(const name of ['Camera status & troubleshooting','Router connections','Battery & solar'])await expect(systems.getByRole('button',{name,exact:true})).toBeVisible();

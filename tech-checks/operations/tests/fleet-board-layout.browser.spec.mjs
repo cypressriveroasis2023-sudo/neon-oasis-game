@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
 for(const it of [false,true])test(`main Fleet board is map-first and source-labeled for ${it?'IT':'Owner'}`,async({page},testInfo)=>{
- const {app,state}=await mountFleet(page,it,{field:statusPinsFixture().field});
+ const f=statusPinsFixture();const {app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
  const board=app.locator('.cos-fleet-board');
  await expect(board).toBeVisible();
  const stats=board.locator('.cos-fleet-stats');

@@ -1,3 +1,4 @@
+import {reviewedShopAddressEnrichment} from './mhelpShopAddressEvidence.ts';
 /** Owner equipment CSV preflight ONLY. Never admits source authority or writes records.
  * Import commitment requires a separate reviewed, current-guarded database action.
  * In particular, mHelpDesk ProductDesc/IP cannot become a camera endpoint. */
@@ -132,7 +133,7 @@ export function compareMhelpEquipmentRows(rows:EquipmentCsvRow[],previous:unknow
     let changed=false;
     if(earlier.placement!==row.placement){counts.placement++;changed=true;push('placement',row,earlier.placement,row.placement,'Current authority/identity guards required');}
     if(earlier.customerId!==row.customerId||normalize(earlier.customer)!==normalize(row.customer)){counts.customer++;changed=true;push('customer',row,earlier.placement,row.placement,'Assignment changed; validate installation and owner history');}
-    if(!sameAddress(earlier.sourceAddress,row.sourceAddress)){counts.address++;changed=true;push('address',row,earlier.placement,row.placement,'Source address changed; not verified installation GPS');}
+    if(!sameAddress(earlier.sourceAddress,row.sourceAddress)){counts.address++;changed=true;push('address',row,earlier.placement,row.placement,reviewedShopAddressEnrichment(previous,earlier,row)?'Reviewed Shop source-address enrichment; current association guards still required':'Source address changed; not verified installation GPS');}
     if(earlier.lifecycle!==row.lifecycle){counts.lifecycle++;changed=true;push('lifecycle',row,earlier.placement,row.placement,'Lifecycle change requires review');}
     if(normalize(earlier.unitNumber)!==normalize(row.unitNumber)||normalize(earlier.category)!==normalize(row.category)){counts.details++;changed=true;push('details',row,earlier.placement,row.placement,'Unit identity/category changed; hold association');}
     if(!changed)counts.unchanged++;

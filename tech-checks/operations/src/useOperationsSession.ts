@@ -19,11 +19,15 @@ export function useOperationsSession(onInvalidated: () => void) {
       clearView.current();
     };
     const leave = () => { current.invalidate('security-hide'); clearView.current(); };
+    // A bfcache restore retains the terminal security-hide controller. Start a
+    // fresh document and normal parent/server verification; never revive it.
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };
     const hidden = (event: MessageEvent) => {
       if (event.origin === location.origin && event.source === window.parent && event.data?.type === 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' && current.hide()) clearView.current();
     };
     window.addEventListener('cos-private-data-invalidated', invalidate);
     window.addEventListener('pagehide', leave);
+    window.addEventListener('pageshow', restore);
     window.addEventListener('message', hidden);
     void current.check();
     return () => {
@@ -31,6 +35,7 @@ export function useOperationsSession(onInvalidated: () => void) {
       if (controller.current === current) controller.current = null;
       window.removeEventListener('cos-private-data-invalidated', invalidate);
       window.removeEventListener('pagehide', leave);
+      window.removeEventListener('pageshow', restore);
       window.removeEventListener('message', hidden);
     };
   }, []);

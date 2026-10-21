@@ -117,6 +117,9 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   finally { if (pendingReads.get(key) === pending) pendingReads.delete(key); }
 }
 async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<ApiResponse<T>> {
+  const sessionRevision = privateSessionRevision;
+  const sessionMode = location.search;
+  const obsolete = () => sessionRevision !== privateSessionRevision || token !== lastVerifiedSession?.token || sessionMode !== location.search;
   const ownerAction = method === 'POST' && /^\/api\/field-map\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/owner-census-(prepare|once)$/.test(path);
   const preparation = ownerAction && path.endsWith('/owner-census-prepare');
   // Saved map reads can exceed 30s. Owner actions have a75s native admission
@@ -131,6 +134,13 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   const timer = window.setTimeout(() => { abortKind ??= 'timeout'; controller.abort(); }, timeoutMs);
   const preparationFailure = (category: 'timeout' | 'auth' | 'source_hold' | 'upstream_failure' | 'cancelled', status = 503) =>
     Object.assign(new OperationsApiError('Approved lookup preparation could not be confirmed.', status), { preparationFailure: category });
+  const requireCurrent = () => {
+    if (!obsolete()) return;
+    if (preparation) throw preparationFailure('auth', 409);
+    throw new OperationsApiError(method === 'POST'
+      ? 'The save could not be confirmed. Refresh this workspace before trying again.'
+      : 'Your session changed. Reload the shared view.', method === 'POST' ? 503 : 409);
+  };
   try {
     let response: Response;
     try {
@@ -147,7 +157,11 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
     }
-    if (!response.ok && [401,403].includes(response.status)) invalidatePrivateData('authentication-denied');
+    // An obsolete request still fails, but cannot revoke a newer session. No
+    // data (including a late successful body) may cross this private-view fence.
+    if (obsolete()) { void response.body?.cancel().catch(() => {}); requireCurrent(); }
+    const authenticationDenied = !response.ok && [401,403].includes(response.status);
+    if (authenticationDenied) invalidatePrivateData('authentication-denied');
     if (preparation && !response.ok) {
       // Only bounded categories escape this read-only path; do not parse or expose raw errors.
       void response.body?.cancel().catch(() => {});
@@ -158,6 +172,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
       throw new OperationsApiError('Operations returned an incomplete response. Please refresh.', response.status || 503);
     }
+    if (!authenticationDenied) requireCurrent();
     if (ownerAction && abortKind) {
       if (preparation) throw preparationFailure(abortKind);
       throw new OperationsApiError('The save could not be confirmed. Refresh this workspace before trying again.', 503);

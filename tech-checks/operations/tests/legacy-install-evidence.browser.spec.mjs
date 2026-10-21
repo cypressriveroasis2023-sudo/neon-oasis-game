@@ -60,9 +60,12 @@ test('existing Owner review navigation clears evidence and does not write',async
 for(const pending of [false,true])test('shared auth invalidation clears '+(pending?'pending':'settled')+' legacy evidence',async({page})=>{
  const {state,frame,section}=await open(page,s=>{s.hold=pending;});
  if(pending)await expect.poll(()=>Boolean(state.release)).toBe(true);else await expect(section.getByRole('article')).toHaveCount(1);
- const response=pending?page.waitForResponse(result=>result.url()===edge&&result.request().method()==='POST'&&result.request().postDataJSON()?.path==='/api/owner-review/legacy-evidence'):null;
+ let settled=0;
+ const completed=request=>{if(request.url()===edge&&request.method()==='POST'&&request.postDataJSON()?.path==='/api/owner-review/legacy-evidence')settled++;};
+ if(pending){page.on('requestfinished',completed);page.on('requestfailed',completed);}
  await page.frames().find(f=>f.parentFrame()).evaluate(()=>dispatchEvent(new Event('cos-private-data-invalidated')));
- if(pending){state.release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
+ // Obsolete bodies may be cancelled; neither completion nor cancellation may restore evidence.
+ if(pending){state.release();await expect.poll(()=>settled).toBe(1);page.off('requestfinished',completed);page.off('requestfailed',completed);await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
  await expectOperationsReloadRequired(frame);await expect(section).toHaveCount(0);await expect(section.getByRole('article')).toHaveCount(0);await expect(frame.locator('body')).not.toContainText('900101');
  expect(state.requests.filter(r=>r.path==='/api/owner-review/legacy-evidence')).toHaveLength(1);expect(state.writes).toHaveLength(0);
 });

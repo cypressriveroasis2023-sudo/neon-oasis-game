@@ -59,6 +59,7 @@ pg('CREATE TABLE cos_mhelp_placement_private.scoped_control(base_sha256 text pri
 const scoped=readFileSync(new URL('../db/scoped_inventory_overlay.sql',import.meta.url),'utf8');
 const scopedStart=scoped.indexOf('create function cos_mhelp_placement_private.scoped_records(');
 pg(scoped.slice(scopedStart,scoped.indexOf('$$;',scopedStart)+3));
+pg(readFileSync(new URL('../docs/drafts/cos-shop-address-evidence.sql',import.meta.url),'utf8'));
 pg(readFileSync(new URL('../docs/drafts/cos-owner-equipment-stage-commit-20261016.sql',import.meta.url),'utf8'));
 
 const id=randomUUID(),staged=stage(id);
