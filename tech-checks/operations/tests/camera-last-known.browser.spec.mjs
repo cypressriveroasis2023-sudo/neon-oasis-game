@@ -11,7 +11,9 @@ async function mount(page,{failed=false}={}){
  const state={failed,calls:[],errors:[],active:0};
  const unit={id:unitId,unitNumber,modelName:'Solar Spotter',status:'field',placement:'FIELD',currentLocationType:'field',address:'100 Synthetic Road',site:'Synthetic historical status',customer:'Synthetic customer',latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:observedAt,locationVerifiedAt:observedAt};
  page.on('pageerror',error=>state.errors.push(error.message));
- await page.clock.install({time:new Date(start)});await page.clock.pauseAt(new Date(start));
+ // Install before the target: elapsed transport time between these calls must
+ // not make pauseAt attempt to travel backwards. All assertions still use start.
+ await page.clock.install({time:new Date(start-60000)});await page.clock.pauseAt(new Date(start));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/camera-last-known-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-last-known-only'},location.origin)})</script>`});

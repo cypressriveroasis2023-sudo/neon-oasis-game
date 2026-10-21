@@ -4,6 +4,7 @@ import type {ProviderProduct} from './mhelpProviderFleet';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
+import FieldProductEvidence,{productHealthLabel} from './FieldProductEvidence';
 import './fleetCommandCenter.css';
 
 type Props={
@@ -155,7 +156,7 @@ export default function FleetCommandCenter({
       <small>{p.customer||'Customer not supplied'}{p.address?' · '+p.address:''}</small>
       {p.mappingIssue&&<small className="cos-command-issue">Address pin needs mapping — remains in Field inventory</small>}
      </span>
-     <span className={'cos-command-status-pill cos-command-pill-'+p.status}>{names[p.status]}</span>
+     <span className={'cos-command-status-pill cos-command-pill-'+p.status}>{productHealthLabel(p.status,p.linked?.evidence)}</span>
      <span className="cos-command-arrow" aria-hidden="true">›</span>
     </button>)}
     {!entries.length&&<p className="cos-command-empty">No Field products match these filters. No equipment has been removed.</p>}
@@ -164,6 +165,7 @@ export default function FleetCommandCenter({
     <div className="cos-command-detail-head"><div><h4>{selected.unitNumber}</h4><p>Product {selected.productId} · {selected.category} · {selected.provider}</p></div><button type="button" onClick={()=>setSelectedId('')}>Close details ×</button></div>
     <dl><div><dt>Customer</dt><dd>{selected.customer||'Not supplied'}</dd></div><div><dt>Recorded service address</dt><dd>{selected.address||'Not supplied'}</dd></div><div><dt>Source placement</dt><dd>FIELD · mHelpDesk</dd></div><div><dt>Connectivity</dt><dd>{names[selected.status]}</dd></div><div><dt>Camera identity</dt><dd>{selected.linked?.unitId?'Reviewed COS unit association':selected.linked?.recordId?'Source equipment record only':'No verified camera association'}</dd></div><div><dt>Map location</dt><dd>{selected.mappingIssue?'Customer address needs mapping':'Source address lookup not flagged'}</dd></div></dl>
     <p>{selected.reason}</p>
+    <FieldProductEvidence value={selected.linked?.evidence} now={now}/>
     {(selected.linked?.unitId||selected.linked?.recordId)&&<button type="button" onClick={()=>onOpen(selected)}>Open COS unit and diagnostics →</button>}
     {!selected.linked?.unitId&&!selected.linked?.recordId&&<p>Camera troubleshooting is held until an exact Product-ID association is verified. This equipment remains visible in Field inventory.</p>}
    </section>}
