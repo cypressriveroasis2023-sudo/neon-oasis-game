@@ -53,7 +53,7 @@ declare bytes bytea; prior_sha text; n integer; distinct_n integer;
   row_data jsonb; old_row jsonb; old_tracker jsonb; tracker_row jsonb;
   binding jsonb; adjusted jsonb:='[]'::jsonb; tracker_rows jsonb:='[]'::jsonb;
   receipt jsonb; company_ids jsonb; received timestamptz:=clock_timestamp();
-  prior_rows jsonb; scoped_revision bigint; scoped_sha text;
+  prior_rows jsonb; scoped_revision bigint; scoped_sha text; shop_baseline jsonb;
 begin
  perform app_private.appdeploy_assume_actor(p_actor_user_id,p_organization_id);
  if p_organization_id<>'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid
@@ -116,6 +116,7 @@ begin
  if jsonb_typeof(prior_rows) is distinct from 'array' then
   raise exception 'Current scoped source authority unavailable' using errcode='40001';end if;
  scoped_sha:=encode(pg_catalog.sha256(pg_catalog.convert_to(prior_rows::text,'UTF8')),'hex');
+ shop_baseline:=cos_mhelp_placement_private.shop_address_baseline(prior_sha);
  -- All business-readable identities are matched ONLY on Product ID. A changed
  -- label, a missing product or an ambiguous previous Product ID never inherits
  -- a native camera, router, site, GPS or tracker association.
@@ -154,7 +155,25 @@ begin
     if old_row->>'placement' is distinct from row_data->>'placement'
        or old_row->>'customerId' is distinct from row_data->>'customerId'
        or old_row->>'customer' is distinct from row_data->>'customer'
-       or old_row->'sourceAddress' is distinct from row_data->'sourceAddress'
+       or (old_row->'sourceAddress' is distinct from row_data->'sourceAddress' and not coalesce((
+        old_row->>'placement'='SHOP' and row_data->>'placement'='SHOP'
+        and old_row->'sourceAddress'='{"street":"","city":"","state":"","zip":""}'::jsonb
+        and old_row->'apiAssignment'->'placementProof'->>'version'='1'
+        and old_row->'apiAssignment'->'placementProof'->>'serviceVerified'='false'
+        and old_row->'apiAssignment'->'placementProof'->>'siteLabel'=''
+        and coalesce(old_row->'addressReview','null'::jsonb)='null'::jsonb
+        and (exists(select 1 from jsonb_array_elements(shop_baseline->'records') h
+          where h->>'productId'=row_data->>'productId' and h->>'unitNumber'=row_data->>'unitNumber'
+           and h->>'category'=row_data->>'category' and h->>'customerId'=row_data->>'customerId'
+           and h->>'customer'=row_data->>'customer' and h->>'placement'=row_data->>'placement'
+           and h->>'lifecycle'=row_data->>'lifecycle' and h->'sourceAddress'=row_data->'sourceAddress')
+         or (not exists(select 1 from jsonb_array_elements(shop_baseline->'records') h where h->>'productId'=row_data->>'productId')
+          and exists(select 1 from jsonb_array_elements(shop_baseline->'records') h
+           where h->>'customerId'=row_data->>'customerId' and h->>'customer'=row_data->>'customer')
+          and not exists(select 1 from jsonb_array_elements(shop_baseline->'records') h
+           where h->>'customerId'=row_data->>'customerId' and h->>'customer'=row_data->>'customer'
+            and h->'sourceAddress' is distinct from row_data->'sourceAddress')))
+       ),false))
        or old_row->>'lifecycle' is distinct from row_data->>'lifecycle'
        or old_row->>'placementHeld'='true' then
       adjusted:=adjusted||jsonb_build_array(row_data||jsonb_build_object(

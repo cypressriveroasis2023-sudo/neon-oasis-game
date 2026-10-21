@@ -35,6 +35,7 @@ async function setup(){
  const start=scoped.indexOf('create function cos_mhelp_placement_private.scoped_records(');
  await db.exec(scoped.slice(start,scoped.indexOf('$$;',start)+3));
  await db.exec("create function cos_mhelp_placement_private.upload_binding_guard(uuid,uuid) returns text language sql stable as $$select repeat('d',64)$$;");
+ await db.exec(readFileSync(new URL('../docs/drafts/cos-shop-address-evidence.sql',import.meta.url),'utf8'));
  await db.exec(draft);
  return db;
 }
@@ -191,5 +192,71 @@ test('complete API baseline → October20 CSV preview/stage/commit preserves 100
   const staged=await stageOwnerEquipmentCsv({...options,requestId:randomUUID(),rpc});assert.equal(staged.productIdsMatched,1001);assert.equal(staged.readyToCommit,false);
   const out=await commitOwnerEquipmentCsv({...options,stageId:staged.stageId,confirmationText:'I reviewed the October 20 source with 1001 IDs, 284 Field and 717 Shop.',rpc});assert.deepEqual({records:out.records,field:out.field,shop:out.shop},{records:1001,field:284,shop:717});assert.equal(reads,3);
   const saved=(await db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[hash])).rows[0].records;assert.equal(new Set(saved.map(r=>r.productId)).size,1001);assert.equal(saved.filter(r=>r.placementHeld).length,3);assert(!JSON.stringify(saved).includes('198.51.100.77'));assert.deepEqual(await nativeSnapshot(),protectedBefore);
+ }finally{await db.close();}
+});
+
+for(const scenario of ['verified enrichment','different historical address','different historical customer','different historical placement','stale guard','lifecycle change','nonblank API address','unreviewed history','corrupt history','unsupported baseline'])
+ test(`Shop source-address stage: ${scenario}`,async()=>{
+ const db=await setup();
+ try{
+  await db.exec(nativeSchema.slice(nativeSchema.indexOf(' create table '),nativeSchema.indexOf(' create function ')));
+  await db.exec('create table cos_mhelp_placement_private.links(equipment_id text,tracker_id uuid,native_unit_id uuid,full_label text,observation jsonb,observed_at timestamptz)');
+  await installActualReview(db);
+  const tracker=randomUUID();
+  await db.query("insert into app_private.vision_tracker_locations values($1,$2,'Ranger 024','ranger024','RANGERS','SHOP','Cameras OnSite','Saved Shop','Saved Address',30,-95)",[tracker,org]);
+  const old=(await db.query('select records,receipt from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[previous])).rows[0];
+  const historyRows=structuredClone(old.records),historySha='f'.repeat(64);
+  if(scenario==='different historical address')historyRows[1].sourceAddress.street='Other Shop';
+  if(scenario==='different historical customer')historyRows[1].customerId='201';
+  if(scenario==='different historical placement')historyRows[1].placement='FIELD';
+  const historyReceipt={...old.receipt,sourceSha256:historySha,reviewed:scenario!=='unreviewed history'};
+  await db.query("insert into cos_mhelp_placement_private.upload_batches values($1,'pending',$2,$3,clock_timestamp()-interval '1 day')",[historySha,JSON.stringify(historyReceipt),JSON.stringify(historyRows)]);
+  await db.query("update cos_mhelp_placement_private.upload_batches set payload_sha256=encode(sha256(convert_to(jsonb_build_object('receipt',receipt,'records',records)::text,'UTF8')),'hex') where source_sha256=$1",[historySha]);
+  if(scenario==='corrupt history')await db.query("update cos_mhelp_placement_private.upload_batches set payload_sha256=repeat('0',64) where source_sha256=$1",[historySha]);
+  const binding={productId:'12',trackerId:tracker,nativeUnitId:null,trackerLabel:'Ranger 024',nativeLabel:null,fullLabel:'Ranger 024',matchMethod:'exact_family_unit',representedUnitIds:[tracker],representationEvidenceSha256:previous,canonicalKey:'RANGER:24',reviewEvidence:{method:'synthetic'},evidenceSha256:previous,expectedGuard:(scenario==='stale guard'?'e':'d').repeat(64)};
+  old.records[1]={...old.records[1],binding,sourceAddress:{street:'',city:'',state:'',zip:''},apiAssignment:{placementProof:{version:1,serviceVerified:false,siteLabel:''}},addressReview:null};
+  if(scenario==='nonblank API address')old.records[1].sourceAddress.street='Other Shop';
+  if(scenario==='lifecycle change')old.records[1].lifecycle='DO_NOT_USE';
+  old.receipt={...old.receipt,contract:scenario==='unsupported baseline'?'COS_MHELP_UPLOAD_V1':'COS_MHELP_API_V1',complete:true,origin:'mhelpdesk_api',portalId:'224643'};
+  await db.query('update cos_mhelp_placement_private.upload_batches set records=$1,receipt=$2 where source_sha256=$3',[JSON.stringify(old.records),JSON.stringify(old.receipt),previous]);
+  const nativeBefore=(await db.query('select to_jsonb(t) value from app_private.vision_tracker_locations t')).rows;
+  const id=randomUUID();await stage(db,params(id));
+  const staged=(await db.query('select records,receipt from cos_mhelp_placement_private.owner_equipment_stages where id=$1',[id])).rows[0];
+  const row=staged.records.find(r=>r.productId==='12');
+  assert.deepEqual(row.sourceAddress,records[1].sourceAddress);
+  if(['verified enrichment','different historical placement'].includes(scenario)){
+   assert.deepEqual(row.binding,binding);assert.notEqual(row.placementHeld,true);
+  }else{assert.equal(row.binding,null);assert.equal(row.placementHeld,true);}
+  await commit(db,id);await commit(db,id);
+  assert.deepEqual((await db.query('select to_jsonb(t) value from app_private.vision_tracker_locations t')).rows,nativeBefore);
+  assert.equal((await db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
+  assert.deepEqual((await db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[previous])).rows[0].records,old.records);
+ }finally{await db.close();}
+});
+
+test('guarded SQL release preserves stage privileges and aborts on definition drift',async()=>{
+ const db=await setup();
+ try{
+  const {prepareMhelpShopAddressSql}=await import('../scripts/prepareMhelpShopAddressSql.mjs');
+  await db.exec("create table cos_mhelp_placement_private.live_inventory_control(singleton boolean,enabled boolean,last_attempt_at timestamptz,last_success_at timestamptz,error_code text);insert into cos_mhelp_placement_private.live_inventory_control values(true,false,null,null,null);create function cos_mhelp_placement_private.api_base_upload_snapshot() returns jsonb language sql as $$select '{}'::jsonb$$;create function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql as $$select '{}'::jsonb$$;revoke all on function cos_mhelp_placement_private.upload_snapshot() from public,anon,authenticated,service_role;");
+  // Reconstruct the prior stage by reversing only this patch's three anchors.
+  const patched=(await db.query("select pg_get_functiondef('public.cos_owner_mhelp_equipment_stage_v1(uuid,uuid,uuid,text,text,text,text,jsonb,text,jsonb)'::regprocedure) d")).rows[0].d;
+  const start=patched.indexOf("or (old_row->'sourceAddress' is distinct from row_data->'sourceAddress' and not coalesce((");
+  const stop=patched.indexOf('),false))',start)+9;
+  const beforeStage=(patched.slice(0,start)+"or old_row->'sourceAddress' is distinct from row_data->'sourceAddress'"+patched.slice(stop))
+   .replace('; shop_baseline jsonb;',';').replace(" shop_baseline:=cos_mhelp_placement_private.shop_address_baseline(prior_sha);\n",'');
+  await db.exec(beforeStage);
+  const projection=readFileSync(new URL('../db/mhelp-live-inventory-projection.sql',import.meta.url),'utf8');
+  const pstart=projection.indexOf('create function cos_mhelp_placement_private.upload_snapshot()');
+  await db.exec(projection.slice(pstart,projection.indexOf('$$;',pstart)+3).replace('create function','create or replace function'));
+  const names=['public.cos_owner_mhelp_equipment_stage_v1(uuid,uuid,uuid,text,text,text,text,jsonb,text,jsonb)','cos_mhelp_placement_private.upload_snapshot()'];
+  const installed={};for(const name of names)installed[name]=(await db.query('select pg_get_functiondef($1::regprocedure) d',[name])).rows[0].d;
+  const inspect=()=>db.query('select oid,proowner,proacl,prosecdef,proconfig from pg_proc where oid=$1::regprocedure',[names[0]]).then(r=>r.rows);
+  const before=await inspect();
+  await db.exec(await prepareMhelpShopAddressSql(installed));assert.deepEqual(await inspect(),before);
+  assert.equal((await db.query("select has_function_privilege('anon',$1,'EXECUTE') v",[names[0]])).rows[0].v,false);
+  assert.equal((await db.query("select has_function_privilege('service_role','cos_mhelp_placement_private.shop_address_baseline(text)','EXECUTE') v")).rows[0].v,false);
+  await assert.rejects(db.exec(await prepareMhelpShopAddressSql(installed)),/Installed source changed/);
+  await db.exec('rollback');assert.deepEqual(await inspect(),before);
  }finally{await db.close();}
 });
