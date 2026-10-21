@@ -296,15 +296,16 @@ test('An initial failed read recovers through one explicit fleet refresh',async(
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-fleet/refresh']);
 });
 
-test('Dashboard power counts follow the saved fleet when new installations arrive',async({page})=>{
+test('Overview power shortcut follows the saved fleet when new installations arrive',async({page})=>{
  let items=[syntheticUnit(3300001,'Initial installation')];
  const {frame}=await mount(page,{initialHash:'#today',onVrmRequest:async()=>({data:fleet(items)})});
- const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('1 power installations');
+ await frame.getByRole('button',{name:'Battery & solar',exact:true}).click();
+ const dashboard=frame.getByRole('region',{name:'Victron VRM Helios fleet',exact:true});
+ await expect(dashboard.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(1);
+ await expect(dashboard).toContainText('1 installation');
  items=Array.from({length:11},(_,index)=>syntheticUnit(3300001+index,'Synthetic power array '+index));
  await dashboard.getByRole('button',{name:'Refresh fleet',exact:true}).click();
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('11 power installations');
- await dashboard.getByRole('button',{name:/Victron Power/}).click();
+ await expect(dashboard).toContainText('11 installations');
  await expect(frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(11);
 });
 
@@ -331,17 +332,19 @@ test('A forbidden dynamic fleet never falls back to a legacy installation list',
 test('The dashboard uses old-backend fallback only for an absent dynamic fleet route',async({page})=>{
  let forbidden=false;
  const {frame,requests}=await mount(page,{initialHash:'#today',onVrmRequest:async request=>request.path==='/api/vrm-portal'?{data:{items:vrmPortalConfig().items}}:{status:forbidden?403:404,data:{error:forbidden?'Synthetic access denied':'Route unavailable'}}});
- const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
- await expect(dashboard.getByRole('button',{name:/Victron Power/})).toContainText('9 power installations');
+ await frame.getByRole('button',{name:'Battery & solar',exact:true}).click();
+ const dashboard=frame.getByRole('region',{name:'Victron VRM Helios fleet',exact:true});
+ await expect(dashboard).toContainText('9 installations');
+ await expect(frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button')).toHaveCount(9);
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal']);
  forbidden=true;await dashboard.getByRole('button',{name:'Refresh fleet',exact:true}).click();
- await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(dashboard.getByRole('button',{name:/Victron Power/})).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
+ await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(dashboard.getByRole('button',{name:'Refresh fleet',exact:true})).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  // Static navigation is not private fleet content. Even its retained desktop
  // button must remain generation-fenced and cannot reopen or reread the fleet.
  const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true});
  if(await sidebarPower.isVisible())await sidebarPower.click();
  await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
- expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet']);
+ expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet/refresh']);
 });
 
 function powerFixture(item,{stale=false}={}){

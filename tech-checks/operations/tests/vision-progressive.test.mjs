@@ -25,8 +25,8 @@ test('initial dashboard shells show checking and unknown values rather than prem
   const fleet = module.exports.fleet(), company = module.exports.company();
   assert.equal((fleet.match(/Checking connected records…/g) || []).length, 6);
   assert.doesNotMatch(fleet, /0 routers|0 field units|0 confirmed on hand/);
-  assert.match(company, /Checking Camera Health…/);
-  assert.match(company, /Checking router inventory…/);
+  assert.match(company, /Equipment systems/);
+  assert.doesNotMatch(company, /company-health-card/);
   assert.match(company, /Quote: Checking…/);
   assert.match(company, /Total unverified/);
   assert.doesNotMatch(company, /0 review items|Nothing currently needs Owner attention|No provider systems flagged|0 stored router records/);

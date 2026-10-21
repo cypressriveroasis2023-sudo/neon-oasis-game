@@ -23,8 +23,15 @@ test('rate limits request automatic retry without a reconnect alarm',()=>{
 test('pause takes priority over source failures and unknown retry times are not invented',()=>{
  const html=render({...receipt,reliability:{...reliability,auth:{state:'verified'},inventory:{paused:true}}});assert.match(html,/updates paused/);assert.doesNotMatch(html,/retry|reconnect/i);
 });
-test('known eligibility shows its exact instant without claiming a scheduled completion',()=>{
+test('known eligibility shows its exact instant without claiming a scheduled completion',t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-20T23:00:00Z'));
  const retry='2026-10-21T00:00:00Z';const html=render({...receipt,reliability:{...reliability,auth:{state:'verified'},inventory:{paused:false,nextEligibleAt:retry}}});assert.match(html,/eligible at/);assert.match(html,/dateTime="2026-10-21T00:00:00Z"/);assert.doesNotMatch(html,/reconnect/i);
+});
+test('elapsed or invalid eligibility never appears as a future automatic retry',t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-21T00:00:00Z'));
+ for(const nextEligibleAt of ['2026-10-20T23:59:59Z','2026-10-21T00:00:00Z','not-a-date']){
+  const html=render({...receipt,reliability:{...reliability,auth:{state:'verified'},inventory:{paused:false,nextEligibleAt}}});assert.match(html,/updates could not finish/);assert.doesNotMatch(html,/eligible at|<time|reconnect/i);
+ }
 });
 test('recovery and unrelated receipts clear the alert',()=>{
  for(const value of [null,undefined,[],{},'failed',{...receipt,errorCode:null},{...receipt,errorCode:''},{...receipt,errorCode:{}},{...receipt,contract:'other'}])assert.equal(render(value),'');

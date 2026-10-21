@@ -32,7 +32,7 @@ export function readRecordedRoster(value:unknown,inventory?:DashboardUnit[]):{ro
  if(inventory&&(inventory.length!==unitIds.size||new Set(inventory.map(row=>row.id)).size!==inventory.length||inventory.some(row=>!v.items.some(item=>item.kind==='unit'&&item.unitId===row.id&&item.unitNumber===row.unitNumber&&item.placement===inventoryPlacement(row)&&(typeof row.activeInventoryEligible!=='boolean'||item.active===row.activeInventoryEligible)))))return bad();
  return {roster:v,error:null};
 }
-export const recordedFamily=(r:RecordedEquipment)=>r.family||canonicalCameraUnit(r.unitNumber)?.split('|')[0]||r.category||'Other equipment';
+export const recordedFamily=(r:RecordedEquipment)=>canonicalCameraUnit(r.unitNumber)?.split('|')[0]||r.family||r.category||'Other equipment';
 export const recordedSourceLabel=(r:RecordedEquipment)=>({mhelpdesk_api:'MHelp API',owner_supplied_mhelp_export:'MHelp export',current_tracker:'2027 tracker',recorded_inventory:'Recorded inventory',owner:'Owner record'}[r.source]);
 /** Non-UUID source rows stay outside camera classification and native write actions. */
 export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map'){

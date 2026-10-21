@@ -4,14 +4,13 @@ import {revealMapFilters} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
-const card=frame=>frame.locator('.company-health-card').filter({has:frame.getByRole('heading',{name:'InHand Routers',exact:true})});
+const routerWorkspace=frame=>frame.getByRole('region',{name:'InHand Routers workspace',exact:true});
 async function openMap(frame){await openWorkspace(frame,'Field Map');await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('all');await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
- await expect(card(frame)).toBeVisible();
- await expect(card(frame)).toContainText('4 stored router records');
- await expect(card(frame)).toContainText('Live GPS setup pending');
- await frame.getByRole('button',{name:'Open router inventory',exact:true}).click();
+ await frame.getByRole('button',{name:'Router connections',exact:true}).click();
+ await expect(routerWorkspace(frame)).toContainText('4 Camera Health router records');
+ await expect(routerWorkspace(frame)).toContainText('InHand GPS feed not connected');
  await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toBeVisible();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  await frame.getByRole('textbox',{name:'Search routers'}).fill('192.0.2.3');
@@ -42,10 +41,12 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
 });
 test('missing GPS remains unpinned and source failure can retry without fabricating healthy fleet',async({page})=>{
  const {frame,state}=await mountRouterFixture(page,{fail:true,gps:false});
- await expect(card(frame)).toContainText('Router inventory could not be loaded.');
- await expect(card(frame)).toContainText('Router count unavailable');
- state.fail=false;await frame.getByRole('button',{name:'Retry dashboard',exact:true}).click();
- await expect(card(frame)).toContainText('4 stored router records');
+ await frame.getByRole('button',{name:'Router connections',exact:true}).click();
+ await expect(routerWorkspace(frame).getByRole('alert')).toContainText('Router fixture unavailable');
+ await expect(records(frame)).toHaveCount(0);
+ await expect(routerWorkspace(frame)).not.toContainText('0 Camera Health router records');
+ state.fail=false;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
+ await expect(routerWorkspace(frame)).toContainText('4 Camera Health router records');
  await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('No router GPS');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
@@ -54,7 +55,7 @@ test('missing GPS remains unpinned and source failure can retry without fabricat
 });
 test('refresh retains clearly marked old inventory on outage and clears it when authorization is denied',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
- await frame.getByRole('button',{name:'Open router inventory',exact:true}).click();
+ await frame.getByRole('button',{name:'Router connections',exact:true}).click();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  state.fail=true;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
  await expect(frame.getByRole('alert')).toContainText('Showing the last successful inventory');
