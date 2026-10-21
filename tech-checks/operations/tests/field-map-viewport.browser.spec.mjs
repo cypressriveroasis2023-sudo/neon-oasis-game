@@ -36,7 +36,7 @@ async function mount(page) {
   await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/field-map-viewport-fixture');
   const frame = page.frameLocator('iframe');
-  await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Company overview' })).toBeVisible();
   await openWorkspace(frame, 'Field Map');await showAllFieldHealth(frame);
   await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(80);
   return { frame, requests };

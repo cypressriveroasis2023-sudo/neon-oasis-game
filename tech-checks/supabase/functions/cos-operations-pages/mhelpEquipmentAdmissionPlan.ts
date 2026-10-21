@@ -4,6 +4,7 @@
  * current native source receipt. Future commit code must RECHECK every guard inside
  * one database transaction; a plan is not permission or proof to update equipment.
  */
+import {reviewedShopAddressEnrichment} from './mhelpShopAddressEvidence.ts';
 import {validPrior,type EquipmentCsvRow} from './mhelpEquipmentCsvPreview.ts';
 
 const SHA = /^[a-f0-9]{64}$/;
@@ -66,7 +67,7 @@ export function prepareMhelpEquipmentAdmission(rows:EquipmentCsvRow[],previous:u
       record(row,p,'identity_change',true,'Unit/category identity changed; require exact Product ID evidence');continue;
     }
     if(p.lifecycle!==row.lifecycle){record(row,p,'lifecycle_change',true,'Lifecycle change requires source and owner review');continue;}
-    if(p.placement!==row.placement||p.customerId!==row.customerId||normalize(p.customer)!==normalize(row.customer)||!identicalAddress(p.sourceAddress,row.sourceAddress)){
+    if(p.placement!==row.placement||p.customerId!==row.customerId||normalize(p.customer)!==normalize(row.customer)||(!identicalAddress(p.sourceAddress,row.sourceAddress)&&!reviewedShopAddressEnrichment(previous,p,row))){
       record(row,p,'assignment_change',true,'Installation/customer movement: retain old GPS and owner records; verify current location and actor guards');continue;
     }
     record(row,p,'unchanged',false,'Same Product ID and source assignment; do not rewrite camera, IP or GPS');

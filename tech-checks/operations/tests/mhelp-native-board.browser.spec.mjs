@@ -29,6 +29,7 @@ async function mount(page,authorized=true,importEnabled=true){
 }
 test('production bundle on native board loads its local PDF worker and preserves responsive review',async({page},info)=>{
   const{frame,writes}=await mount(page);
+  await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
   const panel=frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true});
   await expect(panel.getByRole('heading',{name:'Import mHelpDesk ticket'})).toBeVisible();
   await panel.locator('input[type=file]').setInputFiles({name:'Ticket123456_999.pdf',mimeType:'application/pdf',buffer:syntheticTicketPdf()});
