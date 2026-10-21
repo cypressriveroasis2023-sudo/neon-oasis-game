@@ -2,14 +2,19 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createDeliveryHandler} from '../../supabase/functions/service-daily-delivery/index.ts';
 import {summaryPdf,summaryHtml} from '../../supabase/functions/service-daily-delivery/summary.ts';
-import {reportHtml,rawEmail,RECIPIENT,DRIVE_FOLDER} from '../../supabase/functions/service-daily-delivery/report.ts';
+import {reportHtml,rawEmail,RECIPIENT} from '../../supabase/functions/service-daily-delivery/report.ts';
+import {TECHNICIANS_ROOT,TECHNICIAN_FOLDERS} from '../../supabase/functions/_shared/technicianArchive.ts';
 const id='00000000-0000-4000-8000-000000000003';
 function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
  const report={id,actor_name:'Synthetic <script> & Tech',check_date:'2026-10-16',submitted_at:'2026-10-16T12:00:00Z',lease_token:'lease',drive_manifest:{},email_state:'pending',photos:[{category:'Sniper',view:'front',path:'private/photo.jpg'}],snapshot:{truck_checks:Object.fromEntries(Array.from({length:8},(_,i)=>['truck_'+(i+1),true])),taking_trailer:false,trailer_checks:{},inventory:{units:[{equipment_type:'Sniper',unit_tag:'SN-0001'}],sims:[{slot_no:1,sim_number:'00123456789012345670'}],stock:{recon_battery_qty:25,agm_12v_110ah_qty:4,litime_12v_100ah_qty:2,battery_12v_35ah_qty:4}}}};
  const calls=[],files=new Map();let status='queued',counter=0;
+ const technician=TECHNICIAN_FOLDERS[2],folder=(id,name,parent)=>({id,name,mimeType:'application/vnd.google-apps.folder',parents:parent?[parent]:[],trashed:false});
+ const destinations=new Map([TECHNICIANS_ROOT,...TECHNICIAN_FOLDERS].map(v=>[v.id,folder(v.id,v.name,v.id===TECHNICIANS_ROOT.id?null:TECHNICIANS_ROOT.id)]));
+ destinations.set('existing-date',folder('existing-date',report.check_date,technician.id));destinations.set('existing-category',folder('existing-category','Truck Inspections','existing-date'));
  const admin={rpc:async(name,args)=>{
   calls.push({name,args:structuredClone(args)});
   if(name==='service_daily_cron_authorized_v1')return {data:args.p_secret==='trusted'};
+  if(name==='techcheck_archive_destination_v1')return {data:{version:1,enabled:true,ready:true,source:'daily',source_id:id,actor_id:'00000000-0000-4000-8000-000000000081',check_date:report.check_date,category:'Truck Inspections',root_folder:TECHNICIANS_ROOT,technician_folder:technician,date_folder:{id:'existing-date',parent_id:technician.id,name:report.check_date,adopted:true},category_folder:{id:'existing-category',parent_id:'existing-date',name:'Truck Inspections',adopted:true}}};
   if(args.p_action==='claim')return {data:status==='sent'||status==='review'?null:structuredClone(report)};
   if(args.p_action==='checkpoint'){Object.assign(report,structuredClone(args.p_data));return {data:{ok:true}};}
   if(args.p_action==='finish'){status=args.p_data.status;return {data:{ok:true}};}
@@ -21,14 +26,17 @@ function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
   if(url.endsWith('/userinfo'))return result({email:RECIPIENT,email_verified:true});
   if(url.includes('generateIds'))return result({ids:['generated-'+(++counter)]});
   if(url.includes('messages/send')){if(sendTimeout)throw new Error('synthetic timeout');return result({id:'message-id'});}
-  if(url.includes('/files/'+DRIVE_FOLDER))return result({id:DRIVE_FOLDER});
+  if((!opts.method||opts.method==='GET')&&new URL(url).pathname==='/drive/v3/files'){
+   const q=new URL(url).searchParams.get('q')||'',parent=q.match(/^'([^']+)' in parents/)?.[1],name=q.match(/ and name = '([^']+)'$/)?.[1];
+   return result({files:[...destinations.values()].filter(v=>v.parents[0]===parent&&v.name===name)});
+  }
   if(opts.method==='POST'){
    let metadata;
    if(typeof opts.body==='string')metadata=JSON.parse(opts.body);else metadata=JSON.parse((await opts.body.text()).split('\r\n\r\n')[1].split('\r\n--')[0]);
    if(uploadFailure&&metadata.mimeType==='image/jpeg')throw new Error('synthetic interruption');
-   if(files.has(metadata.id))return new Response('{}',{status:409});files.set(metadata.id,metadata);return result(metadata);
+   if(files.has(metadata.id))return new Response('{}',{status:409});files.set(metadata.id,{...metadata,trashed:false});return result(metadata);
   }
-  const fileId=url.split('/files/')[1]?.split('?')[0];return result(files.get(fileId));
+  const fileId=url.split('/files/')[1]?.split('?')[0];return files.has(fileId)||destinations.has(fileId)?result(files.get(fileId)||destinations.get(fileId)):new Response('{}',{status:404});
  };
  const handler=createDeliveryHandler({admin,userClient:{auth:{getUser:async token=>token==='good'?{data:{user:{id:'actor'}}}:{error:{}}}},env:()=>configured?'synthetic-credential':undefined,fetch});
  const post=(headers={authorization:'Bearer good'})=>handler(new Request('https://function.example',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify({report_id:id})}));
@@ -49,6 +57,7 @@ test('missing Google configuration persists blocked status and never claims sent
 });
 test('archives report, exact answers and private photos before one verified email',async()=>{
  const f=fixture();const result=await (await f.post()).json();assert.equal(result.status,'sent');assert.equal(f.status(),'sent');assert.equal(f.files.size,5);
+ assert.deepEqual(f.files.get(f.report.drive_manifest.folder.id).parents,['existing-category']);
  const email=f.calls.findIndex(c=>c.url?.includes('messages/send'));const archive=f.calls.findIndex(c=>c.args?.p_data?.drive_manifest?.complete);assert.ok(archive<email);
  assert.equal(f.report.email_state,'sent');assert.equal(f.report.email_id,'message-id');await f.post();assert.equal(f.calls.filter(c=>c.url?.includes('messages/send')).length,1);
  const html=reportHtml(f.report);assert.ok(html.includes('00123456789012345670'));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(html.includes('trailer inspection not required'));

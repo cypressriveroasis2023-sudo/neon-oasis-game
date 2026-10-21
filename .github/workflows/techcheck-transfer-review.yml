@@ -17,8 +17,11 @@ on:
       - 'tech-checks/database-maintenance/techcheck-transfer-delivery-schedule-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-handoff-corrections-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-correction-delivery-schedule-v1.sql'
+      - 'tech-checks/database-maintenance/techcheck-archive-routing-v1.sql'
       - 'tech-checks/supabase/functions/techcheck-transfer-delivery/**'
       - 'tech-checks/supabase/functions/techcheck-correction-delivery/**'
+      - 'tech-checks/supabase/functions/service-daily-delivery/**'
+      - 'tech-checks/supabase/functions/_shared/technicianArchive.ts'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
       - 'tech-checks/operations/tests/helpers/correction*'
@@ -52,6 +55,7 @@ jobs:
       COS_CORRECTION_PG_PORT: '5432'
       COS_CORRECTION_PG_USER: 'postgres'
       COS_CORRECTION_PG_EVIDENCE: '${{ github.workspace }}/tech-checks/operations/test-results-correction-postgres.json'
+      COS_ARCHIVE_PG_EVIDENCE: '${{ github.workspace }}/tech-checks/operations/test-results-archive-postgres.json'
     steps:
       - uses: actions/checkout@v4
       - name: Preserve exact review source
@@ -85,9 +89,15 @@ jobs:
           --strict --skipLibCheck
           ../supabase/functions/techcheck-correction-delivery/index.ts
           ../supabase/functions/techcheck-correction-delivery/report.ts
+          ../supabase/functions/_shared/technicianArchive.ts
+          ../supabase/functions/techcheck-transfer-delivery/index.ts
+          ../supabase/functions/service-daily-delivery/index.ts
         working-directory: tech-checks/operations
       - name: Audited correction database, client and archive checks
         run: node --import tsx --test --experimental-test-isolation=none --test-concurrency=1 tests/transfer-correction*.test.mjs
+        working-directory: tech-checks/operations
+      - name: Technician archive routing and overlapping folder reservations
+        run: node --import tsx --test --experimental-test-isolation=none --test-concurrency=1 tests/transfer-archive-routing*.test.mjs
         working-directory: tech-checks/operations
       - name: Build existing application
         run: npm run build
@@ -114,4 +124,5 @@ jobs:
           path: |
             tech-checks/operations/test-results-corrections
             tech-checks/operations/test-results-correction-postgres.json
+            tech-checks/operations/test-results-archive-postgres.json
           retention-days: 7

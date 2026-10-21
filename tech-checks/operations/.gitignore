@@ -3,4 +3,5 @@ test-results/
 test-results-corrections/
 test-results-transfers/
 test-results-correction-postgres.json
+test-results-archive-postgres.json
 playwright-report/

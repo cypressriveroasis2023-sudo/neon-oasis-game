@@ -75,6 +75,18 @@ Preparing and testing these files does not authorize installing them.
    schema, worker, frontend and connection/readback checks are verified. No
    release operation may amend the disputed handoff without its technician's
    physical identity confirmation and matching photograph.
+5. **Ongoing filing:** `database-maintenance/techcheck-archive-routing-v1.sql`
+   adds three private tables, immutable folder reservations and a service-only
+   routing RPC bound to existing queue leases. Exact verified technician UUIDs
+   map to the existing folders. Redeploy the two original delivery workers with
+   the shared resolver, then explicitly enable its initially disabled routing
+   gate. This adds no new schedule, secret, sharing rule or recipient. See
+   [technician archive routing](technician-archive-routing.md).
+
+The correction evidence-path predicate and event request-ID guard take effect
+when the migration is installed, even while the new correction gates are false.
+The scheduler script registers an active five-minute job; its queue claims no
+work while the gates are false. These are part of the explicit approval scope.
 
 The target is project `goqrnolcvqnirjmzaeyk` and the existing COS GitHub Pages
 application. There is no new application, project, account, sharing policy or
@@ -112,6 +124,9 @@ inventory update, Drive upload or email was performed by these tests.
 | Existing transfer, Service and IT browser regressions | 77 passed |
 | Existing application TypeScript and production build | Passed |
 | New worker strict TypeScript; synthetic PDF render review | Passed |
+| New archive routing/provider checks | 15 named tests passed |
+| Archive routing SQL | 10 passed, including verified seed preflight and two actual PostgreSQL overlap proofs |
+| All three Edge `serve.ts` entrypoints, actual Deno-aware check | Passed |
 
 The PostgreSQL gate observes distinct backend PIDs and actual blocking before
 commit. It covers competing corrections, correction versus receipt in both
@@ -171,13 +186,15 @@ this amendment feature. Existing independent ticket-free workflows do not
 bridge every named reservation. Preserve these gaps explicitly; never use the
 older truck adjustment operation to imply a physical return.
 
-Existing original transfer and Service daily-report producers still target the
-older archive root. The correction worker correctly follows the original's
-stable folder ID. Updating ongoing original-report routing needs a shared,
-concurrency-safe technician/date/category resolver and verified access for the
-existing Edge Google connection. IT Checks and ticket-free returns have no
-general Drive producer located in the audited modules. Do not claim those
-ongoing filing paths are complete from the earlier reorganization alone.
+The reviewed original transfer and Service daily-report producers now use the
+shared technician/date/category resolver for new packages. Existing moved
+packages keep their IDs and current parents; concurrent jobs converge on one
+reserved date/category identity. This routing source is not deployed yet and
+still requires approval and actual Edge Google
+access/readback. The correction worker follows the original's stable folder ID.
+IT Checks and ticket-free returns have no general Drive producer located in the
+audited modules. Do not claim those ongoing filing paths are complete from the
+earlier reorganization or this two-worker routing update alone.
 
 ## Disputed real record
 
