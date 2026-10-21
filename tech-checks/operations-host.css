@@ -126,3 +126,8 @@ html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is
    is hidden. Remove that column only while VISION owns the tool navigation. */
 html body.cos-operations-legacy #appView #view-owner #ownerApp {display:block!important}
 html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage .ownerAppGroup>h2>span {background:#172337!important;color:#E6EDF7!important}
+
+/* Anchor both the host document and its embedded workspace on mobile Safari. */
+html:has(body.cos-operations-host){width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior-x:none}
+@supports(overflow:clip){html:has(body.cos-operations-host){overflow-x:clip}}
+body.cos-operations-host,#cosOperationsMount,#cosOperationsFrame{max-width:100%;min-width:0;overscroll-behavior-x:none}
