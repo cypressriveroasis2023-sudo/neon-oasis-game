@@ -4,7 +4,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 test('all mHelp Field Product IDs remain visible with searchable system and health lists',async({page},testInfo)=>{
  const fixture=fieldProductFixture();
- const {app,state}=await mountFleet(page,false,{field:fixture.field});
+ const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health});
  await app.getByRole('button',{name:'Data sources',exact:true}).click();
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await expect(board).toBeVisible();
@@ -27,7 +27,7 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  await board.getByRole('searchbox',{name:'Search all Field Product IDs'}).fill('1006');
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(1);
  await expect(board.locator('.cos-command-rows')).toContainText('Ranger 902');
- await expect(board.locator('.cos-command-rows')).toContainText('Unverified');
+ await expect(board.locator('.cos-command-rows')).toContainText('Device link needed');
  await board.getByRole('button',{name:'Clear filters'}).click();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
  await board.locator('.cos-command-row').filter({hasText:'Ranger 902'}).click();
