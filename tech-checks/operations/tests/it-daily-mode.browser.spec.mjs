@@ -23,6 +23,7 @@ function fixture({ role = 'it', linked = true, holdCapability = false, slowLegac
   // The synthetic capability RPC must honor the real legacy IT allowlist.
   let html = itHomeFixture(role, linked, { dashboard: true, ...options, capability:linked&&options.capability!==false });
   if (slowLegacy) html = html.replace('async function loadITManagedTickets(){return []};', 'async function loadITManagedTickets(){return new Promise(()=>{});};');
+  if(options.legacyCameraOnly)html=html.replaceAll('4f7044b5-86b6-411f-8898-39bb64b4ddbc','05bf20fe-19f7-4db7-ac05-5b2a5f681fdf');
   const setup = `<script>(() => {
     window.fixtureEffectiveRole = ${JSON.stringify(preview ? 'it' : role)};
     window.fixturePreview = ${preview}; window.fixtureAuthenticated = true;
@@ -97,6 +98,7 @@ async function mount(page, options = {}) {
   page.on('pageerror', error => state.errors.push(error.message));
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
+    if(options.legacyCameraOnly && url.origin===origin && url.pathname==='/camera-health.html'){state.cameraLoads=(state.cameraLoads||0)+1;return route.fulfill({contentType:'text/html',body:'<h1>Provider diagnostics</h1><label>Camera search<input value=""></label>'});}
     if (url.origin === origin && url.pathname === '/it-daily-fixture') return route.fulfill({contentType: 'text/html', body: fixture(options)});
     if (url.origin === origin && ['/it-daily-host.js', '/it-feature-availability.js', '/field-map-display-host.js', '/verified-it-fleet-host.js', '/production-assignments-host.js', '/it-ticket-instructions-host.js', '/it-mhelp-projection.js', '/transfers/desk.js', '/transfers/model.js', '/transfers/readiness.js', '/transfers/client.js', '/service-signoff-ui.js', '/tech-check-rules.js'].includes(url.pathname)) {
       return route.fulfill({contentType: 'text/javascript', body: readHost(url.pathname.slice(1))});
@@ -387,4 +389,59 @@ test('bad direct production-assignments route cannot mount shared IT queue',asyn
   await expect(frame.getByRole('alert')).toContainText('IT assignment workflows are paused');
   await expect(frame.getByRole('region',{name:'Shared IT queue'})).toHaveCount(0);
   expect(state.calls.filter(call=>call.path.startsWith('/api/tech/')).every(call=>call.method==='GET')).toBe(true);
+});
+
+test('same-account sign-in confirmations preserve the board and current search',async({page})=>{
+ await desktop(page);
+ const {frame,state}=await mount(page,options());
+ await readyFleet(frame);
+ const search=frame.getByRole('searchbox',{name:'Search units, customers, sites or addresses'});
+ await search.fill('Helios');
+ await page.locator('#cosITDailyFrame').evaluate(n=>{window.fixtureStableFrame=n;window.fixtureFrameRemovals=0;new MutationObserver(records=>{for(const r of records)for(const removed of r.removedNodes)if(removed===n||removed.contains?.(n))window.fixtureFrameRemovals++;}).observe(document.body,{subtree:true,childList:true});});
+ await page.evaluate(()=>{for(const event of ['SIGNED_IN','INITIAL_SESSION','TOKEN_REFRESHED','SIGNED_IN'])for(const fn of window.fixtureAuthListeners)fn(event,window.fixtureSession());});
+ await expect(search).toHaveValue('Helios');
+ expect(await page.evaluate(()=>({same:document.getElementById('cosITDailyFrame')===window.fixtureStableFrame,removals:window.fixtureFrameRemovals}))).toEqual({same:true,removals:0});
+ await assertReadBoundary(page,state);
+});
+
+test('sign-out clears IT immediately even before the surrounding profile catches up',async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options());await readyFleet(frame);
+ await page.evaluate(()=>{for(const fn of window.fixtureAuthListeners)fn('SIGNED_OUT',null);});
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ await page.evaluate(()=>{document.body.classList.toggle('late-legacy-redraw');window.dispatchEvent(new Event('pageshow'));});
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+});
+
+for(const event of ['SIGNED_IN','TOKEN_REFRESHED'])test(`changed account ${event} removes old IT before profile catch-up`,async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options());await readyFleet(frame);
+ await page.evaluate(event=>{for(const fn of window.fixtureAuthListeners)fn(event,{user:{id:'33333333-3333-4333-8333-333333333333'}});},event);
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ await page.evaluate(()=>document.body.classList.toggle('late-profile-redraw'));
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+});
+
+test('same-account auth retains the selected phone view and unsent form',async({page})=>{
+ await phone(page);await mount(page,options());
+ const nav=page.getByRole('navigation',{name:'IT daily views'});await expect(nav).toBeVisible();
+ await page.locator('#cosITDailyHost').evaluate(n=>{const f=document.createElement('form');f.innerHTML='<label>Unsent note<input name="note" value="Keep my handoff"></label>';n.append(f);});
+ await page.evaluate(()=>{for(const fn of window.fixtureAuthListeners)fn('SIGNED_IN',window.fixtureSession());});
+ await expect(page.getByRole('textbox',{name:'Unsent note'})).toHaveValue('Keep my handoff');
+ await expect(nav.getByRole('button',{name:'Check out / check in',exact:true})).toHaveAttribute('aria-pressed','true');
+});
+
+test('same-account confirmation still removes a board when fleet access is revoked',async({page})=>{
+ await desktop(page);const {frame}=await mount(page,options());await readyFleet(frame);
+ await page.evaluate(()=>{window.fixtureCapability=false;for(const fn of window.fixtureAuthListeners)fn('SIGNED_IN',window.fixtureSession());});
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ await expect(page.getByRole('status')).toContainText('access could not be verified');
+});
+
+test('legacy IT provider diagnostics stays loaded through repeated sign-in confirmations',async({page})=>{
+ await desktop(page);const {frame,state}=await mount(page,options({legacyCameraOnly:true}));
+ await expect(frame.getByRole('heading',{name:'Provider diagnostics'})).toBeVisible();
+ const search=frame.getByRole('textbox',{name:'Camera search'});await search.fill('Sniper 148');
+ await page.evaluate(()=>{for(const fn of window.fixtureAuthListeners)fn('SIGNED_IN',window.fixtureSession());});
+ await expect(search).toHaveValue('Sniper 148');
+ expect(state.cameraLoads).toBe(1);
+ await expect(page.locator('#cosITDailyFrame')).toBeVisible();
 });
