@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/cos-fleet-pin-static-publish-20261019.yml'
       - 'tech-checks/operations/src/FleetDashboard.tsx'
+      - 'tech-checks/operations/src/OwnerAssignmentReview.tsx'
       - 'tech-checks/operations/src/App.tsx'
       - 'tech-checks/operations/src/useFleetInventory.ts'
       - 'tech-checks/operations/src/FleetInventoryOverview.tsx'
@@ -71,6 +72,8 @@ jobs:
         run: npm run test:browser -- tests/mobile-overflow.browser.spec.mjs tests/daily-simplification.browser.spec.mjs tests/transfer-readiness.browser.spec.mjs tests/transfer.browser.spec.mjs tests/fleet-shop-action.browser.spec.mjs tests/fleet-camera-tools.browser.spec.mjs tests/fleet-board-layout.browser.spec.mjs tests/fleet-command-center.browser.spec.mjs tests/fleet-map-groups.browser.spec.mjs tests/fleet-status-pins.browser.spec.mjs tests/shared-fleet-map.browser.spec.mjs tests/source-equipment-pins.browser.spec.mjs tests/mhelp-address-layer.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs
       - name: Verify daily work, ticket controls and tracker recovery
         run: npm run test:browser -- tests/company-overview.browser.spec.mjs tests/vision-dashboard.browser.spec.mjs tests/vision-progressive.browser.spec.mjs tests/owner-controls.browser.spec.mjs tests/unit-tracker.browser.spec.mjs
+      - name: Verify protected Owner assignment review and final Apply controls
+        run: npm run test:browser -- tests/mhelp-assignment-review.browser.spec.mjs
       - name: Prove rebuilt assets contain approved pin design
         shell: bash
         run: |

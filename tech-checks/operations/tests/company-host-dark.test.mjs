@@ -13,9 +13,14 @@ test('dark host preserves script bodies and URLs except reviewed extensions and 
   assert.equal(html.split('cos-eye-branding.js?v=20261018-cos-centered').length-1,1);
   assert.equal(html.split('verified-it-fleet-host.js?v=unified-fleet-20261013').length-1,1);
   assert.equal(html.split('it-ticket-instructions-host.js?v=service-ticket-instructions-20261010').length-1,1);
-  assert.equal(html.split('it-daily-host.js?v=daily-simple-20261021').length-1,1);
+  // Exact reviewed cache versions from PR264 and its PR266 successor.
+  const dailyHostTags=['stable-it-session-20261021','visible-it-loading-20261021']
+    .map(version=>`<script type="module" src="./it-daily-host.js?v=${version}"></script>`)
+    .filter(tag=>html.includes(tag));
+  assert.equal(dailyHostTags.length,1);
+  assert.equal(html.split(dailyHostTags[0]).length-1,1);
   assert.equal(html.split('operations-host.js?v=unified-fleet-20261013').length-1,1);
-  const scripts=[...originalHost.replace('<script type="module" src="./it-daily-host.js?v=daily-simple-20261021"></script>','').replace('<script type="module" src="./it-ticket-instructions-host.js?v=service-ticket-instructions-20261010"></script>','').replace('<script type="module" src="./verified-it-fleet-host.js?v=unified-fleet-20261013"></script>','').replace('production-assignments-host.js?v=operations-assigned-prep-20261006','production-assignments-host.js?v=operations-v100-phase2-20261004').replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261018-cos-centered">\n<script defer src="./cos-eye-branding.js?v=20261018-cos-centered"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
+  const scripts=[...originalHost.replace(dailyHostTags[0],'').replace('<script type="module" src="./it-ticket-instructions-host.js?v=service-ticket-instructions-20261010"></script>','').replace('<script type="module" src="./verified-it-fleet-host.js?v=unified-fleet-20261013"></script>','').replace('production-assignments-host.js?v=operations-assigned-prep-20261006','production-assignments-host.js?v=operations-v100-phase2-20261004').replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261018-cos-centered">\n<script defer src="./cos-eye-branding.js?v=20261018-cos-centered"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
   assert.equal(scripts.length,8);
   // Baseline main 9af5916e: includes full inline bodies and external module URLs.
   const baselineScripts=scripts.join('\n').replace('operations-host.js?v=unified-fleet-20261013','operations-host.js?v=operations-v100-phase2-20261004');
