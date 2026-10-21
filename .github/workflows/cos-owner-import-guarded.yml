@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'tech-checks/operations/tests/mhelp-*.test.mjs'
+      - 'tech-checks/operations/tests/mhelp-canonical-evidence-postgres.mjs'
+      - 'tech-checks/operations/scripts/prepareOwnerCanonicalEvidenceSql.mjs'
+      - 'tech-checks/operations/docs/drafts/cos-owner-canonical-evidence.sql'
       - 'tech-checks/operations/docs/drafts/cos-owner-equipment-stage-commit-20261016.sql'
       - 'tech-checks/supabase/functions/cos-operations-pages/mhelp*Equipment*.ts'
       - 'tech-checks/supabase/functions/cos-operations-pages/mhelp2027ProductCensus.ts'
@@ -49,7 +52,8 @@ jobs:
             tests/mhelp-owner-review.test.mjs \
             tests/mhelp-equipment-write-bridge.test.mjs \
             tests/mhelp-owner-staging-pglite.test.mjs \
-            tests/mhelp-assignment-review.test.mjs
+            tests/mhelp-assignment-review.test.mjs \
+            tests/mhelp-canonical-evidence-postgres.mjs
       - name: Verify real PostgreSQL 17 Owner equipment transaction
         timeout-minutes: 4
         env:
@@ -61,6 +65,6 @@ jobs:
         timeout-minutes: 4
         env:
           COS_ASSIGNMENT_POSTGRES_CI: '1'
-        run: node --import tsx --test tests/mhelp-assignment-review.test.mjs
+        run: node --import tsx --test --test-concurrency=1 tests/mhelp-assignment-review.test.mjs tests/mhelp-canonical-evidence-postgres.mjs
       - name: Typecheck COS Owner importer and existing app
         run: npm run typecheck
