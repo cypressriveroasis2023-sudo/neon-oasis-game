@@ -158,3 +158,27 @@ html body :is(.cos-dialog-field input, .cos-dialog-field textarea, .cos-dialog-i
   color: #A3B3CA;
   opacity: 1;
 }
+
+/* Keep the document anchored on phones, including Safari rubber-band gestures.
+   Horizontal tables/tabs own their scrolling; map gestures and pinch zoom stay native. */
+html{max-width:100%;overflow-x:hidden;overscroll-behavior-x:none}
+@supports(overflow:clip){html{overflow-x:clip}}
+body,#root{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:none}
+#root .company-shell,#root .company-shell>.owner-it-main{max-width:100%;min-width:0}
+#root :is(.cos-fleet-tabs,.cos-fleet-table-wrap,.operations-section-nav,.lifecycle-tabs){max-width:100%;overscroll-behavior-x:contain}
+@media(max-width:750px){
+ #root .company-shell :is(input,select,textarea){font-size:16px!important}
+ #root :is(.cos-fleet-command,.cos-command-inventory,.cos-command-provider,.cos-command-provider-title,.cos-command-row,.cos-fleet-unit-health-section){min-width:0;overflow-wrap:anywhere}
+}
+/* Fleet health becomes readable cards instead of a 790px table on a phone. */
+@media(max-width:750px){
+ #root .cos-fleet-health-table{overflow:visible;border:0}
+ #root .cos-fleet-health-table table{display:block;min-width:0;width:100%}
+ #root .cos-fleet-health-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ #root .cos-fleet-health-table :is(tbody,tr){display:block;width:100%;min-width:0}
+ #root .cos-fleet-health-table tr{margin:0 0 12px;padding:8px 12px;border:1px solid #344b64;border-radius:10px;background:#121f2f}
+ #root .cos-fleet-health-table td{display:block;min-width:0;width:100%;padding:8px 0;overflow-wrap:anywhere}
+ #root .cos-fleet-health-table td::before{content:attr(data-label);display:block;font-size:11px;color:#aebed0;margin-bottom:4px}
+ #root .cos-fleet-health-table td:first-child strong{font-size:17px}
+ #root .cos-fleet-health-table td:last-child button{width:100%;min-height:44px}
+}
