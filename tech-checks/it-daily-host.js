@@ -12,6 +12,8 @@ const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null, phoneBoard = false;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
+let accessRecheck = null;
+let authSubject; // undefined until the auth listener has supplied its first session.
 function fitDailyFrame() {
   if (!frame?.isConnected || frame.style.position === 'fixed') return;
   const viewport = window.visualViewport;
@@ -33,7 +35,7 @@ const visible = node => Boolean(node && !node.classList.contains('hidden') && no
 function scope() {
   if (!IT_DAILY_ONLY || !visible(document.getElementById('appView'))) return null;
   const c = context(), id = c?.getSession()?.user?.id, p = c?.getProfile(), role = c?.getRole();
-  if (!id) return null;
+  if (!id || (authSubject !== undefined && authSubject !== id)) return null;
   const profileLive=p?.user_id===id && p?.active===true && !p?.archived_at;
   const effective = c?.getEffectiveRole();
   if (role !== 'it' && !(role === 'owner' && (effective === 'it' || effective === 'owner' && visible(document.getElementById('view-it'))))) return null;
@@ -88,6 +90,21 @@ async function verify(value) {
   if (value.role === 'owner') return value.effective === 'owner';
   let timer;
   try { const response = await Promise.race([context().db.rpc('cos_verified_fleet_capabilities_v1'),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),12000);})]); return response && !response.error && response.data?.fleetRead === true; } catch { return false; } finally {clearTimeout(timer);}
+}
+function reconfirmAccess(value,generation){
+  if(accessRecheck?.generation===generation)return;
+  const check={generation};accessRecheck=check;
+  // Leave the auth callback before making another authenticated request.
+  setTimeout(async()=>{
+    try{
+      if(generation!==revision || key(scope())!==key(value))return;
+      const permitted=await verify(value);
+      if(generation===revision && key(scope())===key(value) && !permitted){
+        revision++; // Discard in-flight opens/token responses from the old access check.
+        status('Your current daily-view access could not be verified. Refresh or sign in again.',true);
+      }
+    }finally{if(accessRecheck===check)accessRecheck=null;}
+  },0);
 }
 function phoneNavigation(value,generation){
   const nav=document.createElement('nav');nav.className='cos-it-handoff-actions';nav.setAttribute('aria-label','IT daily views');
@@ -153,7 +170,18 @@ function present() {
   const c=context();
   if (!authObserved && c?.db?.auth?.onAuthStateChange) {
     authObserved=true;
-    c.db.auth.onAuthStateChange(event=>{if(event==='TOKEN_REFRESHED')return; revision++; scopeKey=''; clearFrame(); queueMicrotask(present);});
+    c.db.auth.onAuthStateChange((event,session)=>{
+      const value=scope(), subject=session?.user?.id || null;
+      authSubject=subject;
+      // Auth can reconfirm SIGNED_IN when a tab regains focus. Keep the same
+      // verified workspace (and any handoff draft) mounted for the same scope.
+      // A different subject, sign-out or role/profile change still clears it.
+      const reaffirmed=['SIGNED_IN','INITIAL_SESSION','TOKEN_REFRESHED'].includes(event);
+      if(reaffirmed && value?.profileLive && subject===value.id && key(value)===scopeKey){
+        reconfirmAccess(value,revision);queueMicrotask(present);return;
+      }
+      revision++; scopeKey=''; clearFrame(); queueMicrotask(present);
+    });
   }
   const value=scope(), next=key(value);
   if (!value) { if (scopeKey || root) {revision++; scopeKey=''; clearFrame(); root?.remove(); root=null; restore();} return; }
