@@ -1,0 +1,18 @@
+{
+  "name": "direct-ip-generic-hosted-proof",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node ci/verify.mjs",
+    "test:local": "TZ=UTC NODE_OPTIONS=\"--require ./ci/loopback-only.cjs\" node --no-wasm-async-compilation --no-wasm-tier-up --import tsx --test --test-isolation=none --test-concurrency=1 tests/contract.test.mjs tests/acl.test.mjs tests/harness.test.mjs tests/client.test.mjs",
+    "test:postgres": "node --import tsx --test --test-concurrency=1 tests/contract.test.mjs tests/acl.test.mjs tests/postgres.test.mjs tests/harness.test.mjs tests/client.test.mjs",
+    "typecheck": "tsc --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --lib ES2023,DOM inputs/client/directAttemptClient.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "pg": "8.16.3",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3"
+  }
+}

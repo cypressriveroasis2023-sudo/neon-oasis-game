@@ -1,0 +1,122 @@
+# Synthetic-only proof. No production secrets, live endpoints, or deployment steps.
+name: Direct-IP generic PostgreSQL and HTTP proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'direct-ip-proof/**'
+      - '.github/workflows/direct-ip-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres-multiclient:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TZ: UTC
+      DIRECT_IP_PROOF_POSTGRES: '1'
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_DB: direct_ip_proof
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d direct_ip_proof"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: direct-ip-proof
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          cache-dependency-path: direct-ip-proof/package-lock.json
+      - name: Verify exact committed source and workflow boundary
+        run: |
+          node ci/verify.mjs
+          cmp ci/proposed-workflow.yml ../.github/workflows/direct-ip-proof.yml
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify staged and committed source gates
+        run: node --test tests/verifier.test.mjs
+      - name: Strict direct client helper types
+        run: npm run typecheck
+      - name: Exercise actual PostgreSQL independent sessions and generic client contract
+        run: |
+          mkdir -p evidence
+          export NODE_OPTIONS="--require $PWD/ci/loopback-only.cjs"
+          set +e
+          npm run test:postgres 2>&1 | tee evidence/hosted-postgres.log
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > evidence/hosted-postgres.exit
+          exit "$code"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: direct-ip-postgres-native-results
+          path: direct-ip-proof/evidence/hosted-postgres.*
+          retention-days: 7
+  postgrest-http:
+    # Independent database service: no shared fixture cleanup or gated SQL edits.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      TZ: UTC
+      DIRECT_IP_PROOF_POSTGRES: '1'
+      DIRECT_IP_PROOF_HTTP: '1'
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_DB: direct_ip_proof
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d direct_ip_proof"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: direct-ip-proof
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          cache-dependency-path: direct-ip-proof/package-lock.json
+      - name: Verify exact committed source and workflow boundary
+        run: |
+          node ci/verify.mjs
+          cmp ci/proposed-workflow.yml ../.github/workflows/direct-ip-proof.yml
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run actual PostgREST HTTP transport
+        run: |
+          export NODE_OPTIONS="--require $PWD/ci/loopback-only.cjs"
+          bash http/run-hosted-stage.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: direct-ip-postgrest-http-results
+          path: |
+            direct-ip-proof/http/*.generated.json
+            direct-ip-proof/http/*.generated.txt
+            direct-ip-proof/http/*.generated.log
+          retention-days: 7
