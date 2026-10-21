@@ -10,6 +10,7 @@ import {prepareOwnerAssignmentReviewSql} from '../scripts/prepareOwnerAssignment
 const ids=['2226860','2300344','2229407','2229931','2233383'];
 const labels=['Spotter 261HDC2','Solar Spotter 054','Solar Spotter 008','Solar Stand 015','Solar Spotter 013'];
 const note='I confirm these exact existing identities and the proposed assignments.';
+const unverifiedGps={latitude:29.7633,longitude:-95.3633};
 async function fixture(){
  const db=await setup(process.env.COS_ASSIGNMENT_POSTGRES_CI==='1'?assignmentPostgres():undefined);
  await db.exec(schema.slice(schema.indexOf(' create table '),schema.indexOf(' create function ')));
@@ -23,6 +24,11 @@ async function fixture(){
   const tracker=randomUUID(),native=i===3?null:randomUUID();
   await db.query("insert into app_private.vision_tracker_locations values($1,$2,$3,$3,'synthetic','FIELD','Old customer','Old site','Old address',null,null)",[tracker,org,labels[i]]);
   if(native)await db.query("insert into public.equipment_units(id,organization_id,unit_number,status,sim,ip) values($1,$2,$3,'available','preserved-sim','192.0.2.1')",[native,org,labels[i]]);
+  if(ids[i]==='2233383'){
+   // Existing coordinates predate review and have no verified installation timestamp.
+   await db.query('update app_private.vision_tracker_locations set latitude=$1,longitude=$2 where id=$3',[unverifiedGps.latitude,unverifiedGps.longitude,tracker]);
+   await db.query('update public.equipment_units set gps_latitude=$1,gps_longitude=$2,gps_recorded_at=null where id=$3',[unverifiedGps.latitude,unverifiedGps.longitude,native]);
+  }
   const guard=(await db.query('select cos_mhelp_placement_private.upload_binding_guard($1,$2) g',[tracker,native])).rows[0].g;
   const binding={productId:ids[i],fullLabel:labels[i],trackerId:tracker,trackerLabel:labels[i],nativeUnitId:native,nativeLabel:native?labels[i]:null,matchMethod:'reviewed_product_id',representedUnitIds:[native||tracker],representationEvidenceSha256:previous,evidenceSha256:previous,expectedGuard:guard};
   await db.query('insert into cos_mhelp_placement_private.links values($1,$2,$3,$4,null,null)',[ids[i],tracker,native,labels[i]]);
@@ -43,23 +49,29 @@ async function fixture(){
  const protectedState=async()=>{const result={};for(const table of ['public.equipment_units','app_private.vision_tracker_locations','public.equipment_unit_location_history','cos_mhelp_placement_private.links','app_private.cos_fleet_shop_moves'])result[table]=(await db.query(`select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]') r from ${table} t`)).rows[0].r;return result;};
  return {db,id,sha,read,approve,old,rows,protectedState};
 }
-test('five exact assignments retain identities, recorded Shop moves and tracker-only equipment; commit replay does not duplicate writes',async()=>{
+test('five exact assignments retain identities, unverified GPS, recorded Shop moves and tracker-only equipment; commit replay does not duplicate writes',async()=>{
  const f=await fixture();try{
   const before=await f.protectedState(),view=await f.read();assert.equal(view.items.length,5);assert.equal(view.items.filter(i=>i.guardChanged).length,2);assert.ok(view.items.every(i=>i.eligible));
   assert.equal(view.items.find(i=>i.productId==='2229931').identity.nativeUnitId,null);
+  const fieldReview=view.items.find(i=>i.productId==='2233383');assert.equal(fieldReview.current.gpsPresent,true);assert.equal(fieldReview.guardChanged,false);
   await assert.rejects(commit(f.db,f.id),/assignment review required/);
   assert.equal((await f.approve(view.reviewDigest)).approved,true);assert.equal((await f.approve(view.reviewDigest)).idempotent,true);
   await assert.rejects(f.approve(view.reviewDigest,note+' changed'),/Conflicting/);
   const saved=await commit(f.db,f.id);assert.equal(saved.applied,true);assert.equal((await commit(f.db,f.id)).idempotent,true);
   const records=(await f.db.query('select records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[f.sha])).rows[0].records;
-  for(const row of records){const old=f.old.find(o=>o.productId===row.productId);assert.equal(row.binding.nativeUnitId,old.binding.nativeUnitId);assert.equal(row.binding.trackerId,old.binding.trackerId);assert.notEqual(row.placementHeld,true);}
+  for(const row of records){const old=f.old.find(o=>o.productId===row.productId);assert.equal(row.binding.nativeUnitId,old.binding.nativeUnitId);assert.equal(row.binding.trackerId,old.binding.trackerId);assert.notEqual(row.placementHeld,true);if(row.productId==='2233383')assert.equal(row.binding.expectedGuard,old.binding.expectedGuard);}
   const batch=(await f.db.query('select * from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[f.sha])).rows[0];
   const upload={...batch.receipt,payloadSha256:batch.payload_sha256,records:records.map(r=>({...r,binding:{...r.binding,guardCurrent:true}}))};
-  const inventoryItems=records.map(r=>({id:r.binding.representedUnitIds[0],unitNumber:r.binding.nativeLabel||r.binding.trackerLabel,placement:'FIELD',customer:'Old customer',site:'Old site',hasUnitGps:false,latitude:null,longitude:null,health:'unverified'}));
+  const inventoryItems=records.map(r=>({id:r.binding.representedUnitIds[0],unitNumber:r.binding.nativeLabel||r.binding.trackerLabel,placement:'FIELD',customer:'Old customer',site:'Old site',hasUnitGps:false,latitude:null,longitude:null,health:'unverified',...(r.productId==='2233383'?{...unverifiedGps,coordinateSource:'tracker',locationVerification:'coordinates_unverified',locationVerifiedAt:null,gpsRecordedAt:null}:{})}));
   const projection=projectMhelpUploadPlacement({items:inventoryItems,inventoryItems},upload,[]).snapshot;
   assert.equal(projection.uploadInventory.summary.linkedRecords,5);assert.equal(projection.uploadInventory.summary.heldRecords,0);assert.equal(projection.uploadInventory.summary.appliedRecords,5);
   assert.equal(projection.items.length,1);assert.equal(projection.items[0].uploadProductId,'2233383');assert.equal(projection.items[0].customer,'New customer: New site');assert.equal(projection.items[0].latitude,null);assert.equal(projection.items[0].hasUnitGps,false);assert.equal(projection.items[0].health,'unverified');assert.equal(projection.items[0].uploadSourceAddress.street,'New field address');
-  assert.deepEqual(await f.protectedState(),before);assert.equal((await f.db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
+  const field=projection.items[0];assert.equal(field.longitude,null);assert.equal(field.historicalLatitude,unverifiedGps.latitude);assert.equal(field.historicalLongitude,unverifiedGps.longitude);assert.equal(field.historicalHasUnitGps,false);assert.equal(field.locationVerification,'coordinates_unverified');assert.equal(field.locationVerifiedAt,null);assert.equal(field.address,null);assert.equal(field.coordinateSource,null);
+  assert.deepEqual(field.uploadSourceAddress,f.rows.find(r=>r.productId==='2233383').sourceAddress);
+  const after=await f.protectedState();assert.deepEqual(after,before);
+  const savedNative=after['public.equipment_units'].find(r=>r.id===fieldReview.identity.nativeUnitId),savedTracker=after['app_private.vision_tracker_locations'].find(r=>r.id===fieldReview.identity.trackerId);
+  assert.deepEqual([savedNative.gps_latitude,savedNative.gps_longitude,savedNative.gps_recorded_at],[unverifiedGps.latitude,unverifiedGps.longitude,null]);assert.deepEqual([savedTracker.latitude,savedTracker.longitude],[unverifiedGps.latitude,unverifiedGps.longitude]);
+  assert.equal((await f.db.query('select count(*)::int n from cos_mhelp_placement_private.upload_audit')).rows[0].n,1);
  }finally{await f.db.close();}
 });
 for(const change of ['native identity','tracker assignment','source conflict','receipt changed','census','scoped'])test(`concurrent ${change} rejects stale approval or commit atomically`,async()=>{
