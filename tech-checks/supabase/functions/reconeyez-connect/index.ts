@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {syncReconInventory} from "./inventorySync.ts";
+import {beginReconAttempt,lookupReconAttempt,knownReconAttempt,reconOwnedFingerprint,validateReconFinish,requireReconSuccess,failReconAttempt,assertReconDeadline,RECON_V2_LIMITS,ReconOwnedConflict,ReconOwnedUnknown,ReconSourceFailure,type ReconBegin,type ReconDb,type ReconFinish} from "../_shared/reconOwnedMetadataV2.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -21,18 +23,6 @@ type ReconDevice = {
   type?: string;
 };
 
-function isShopArea(area: string) {
-  return /(^|\b)(shop|shop equipment|warehouse|stock)(\b|$)/i.test(area || "");
-}
-
-function normalizeUnitKey(d: ReconDevice) {
-  const area = String(d.area || "").trim();
-  if (area) return area;
-  const description = String(d.description || "").trim();
-  if (description) return description;
-  return String(d.name || d.guid || "Reconeyez");
-}
-
 async function getProfile(authHeader: string) {
   const url = Deno.env.get("SUPABASE_URL")!;
   const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -47,114 +37,103 @@ async function getProfile(authHeader: string) {
   return { user, profile };
 }
 
-async function fetchReconInventory(host: string, port: number, username: string, password: string) {
-  const endpoint = `https://${host}:${port}/control/v1/get_device_list`;
-  const auth = "Basic " + btoa(`${username}:${password}`);
-  const res = await fetch(endpoint, {
-    method: "GET",
-    headers: {
-      "Authorization": auth,
-      "Accept": "application/json",
-      "User-Agent": "CamerasOnsite-CameraHealth/1.0"
-    }
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    let detail = text.trim();
-    if (res.status === 401) detail = "Reconeyez rejected the username/password or reverse-control permission is not enabled for this user.";
-    if (res.status === 429) detail = "Reconeyez rate limit reached. Try again in a moment.";
-    throw new Error(`Reconeyez ${res.status}: ${detail || res.statusText}`);
-  }
-  let parsed: unknown;
-  try { parsed = JSON.parse(text); }
-  catch { throw new Error("Reconeyez returned a response Camera Health could not read."); }
-  if (!Array.isArray(parsed)) throw new Error("Reconeyez device-list response was not an array.");
-  return parsed as ReconDevice[];
+/** One budget includes headers and the complete response body. Finalization gets a reserve. */
+async function fetchReconInventory(host:string,port:number,username:string,password:string,attempt:ReconBegin) {
+  assertReconDeadline(attempt,5000);
+  const budget=Math.min(RECON_V2_LIMITS.provider_total_seconds*1000,Date.parse(attempt.expires_at)-Date.now()-5000);
+  const sourceDeadline=Date.now()+budget;
+  if(budget<=0)throw new ReconOwnedConflict(attempt.kind);
+  const controller=new AbortController();
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  const expired=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new ReconSourceFailure('provider_unavailable'));},budget);});
+  try {
+    const response=await Promise.race([fetch(`https://${host}:${port}/control/v1/get_device_list`,{method:"GET",signal:controller.signal,
+      headers:{Authorization:"Basic "+btoa(`${username}:${password}`),Accept:"application/json","User-Agent":"CamerasOnsite-CameraHealth/1.0"}}),expired]);
+    const text=await Promise.race([response.text(),expired]);
+    if(controller.signal.aborted||Date.now()>=sourceDeadline)throw new ReconSourceFailure('provider_unavailable');
+    if(response.status===206)throw new ReconSourceFailure('partial_inventory');
+    if(response.status!==200)throw new ReconSourceFailure(response.status===401||response.status===403?'provider_rejected':'provider_unavailable');
+    let parsed:unknown;
+    try {parsed=JSON.parse(text);} catch {throw new ReconSourceFailure('invalid_inventory');}
+    if(!Array.isArray(parsed))throw new ReconSourceFailure('invalid_inventory');
+    if(Date.now()>=sourceDeadline)throw new ReconSourceFailure('provider_unavailable');
+    assertReconDeadline(attempt,5000);
+    return {list:parsed as Record<string,unknown>[],sourceDeadline};
+  } catch(error) {
+    if(error instanceof ReconOwnedConflict||error instanceof ReconSourceFailure)throw error;
+    throw new ReconSourceFailure('provider_unavailable');
+  } finally {if(timer!==undefined)clearTimeout(timer);}
 }
 
-async function syncInventory(db: ReturnType<typeof createClient>, list: ReconDevice[]) {
-  const detectors = list.filter((d) => {
-    const t = String(d?.type || "").toLowerCase();
-    return t.startsWith("detector");
-  });
-
-  const now = new Date().toISOString();
-  const {data:existingRows,error:existingError}=await db.from("camera_devices").select("device_serial,organization,activation_state,activation_source,source_metadata,vigilant_status").eq("source","reconeyez");
-  if(existingError)throw existingError;
-  const existingBySerial=new Map((existingRows||[]).map((x:any)=>[x.device_serial,x]));
-  const rows = detectors
-    .filter((d) => String(d.guid || "").trim())
-    .map((d) => {
-      const guid = String(d.guid).trim();
-      const area = String(d.area || "").trim();
-      const name = String(d.name || `Reconeyez ${guid.slice(-4)}`).trim();
-      const shop = isShopArea(area);
-      const existing:any=existingBySerial.get(`reconeyez:${guid}`);
-      return {
-        device_serial: `reconeyez:${guid}`,
-        external_device_id: guid,
-        device_name: name,
-        device_model: String(d.type || "Reconeyez detector"),
-        device_type: "Reconeyez detector",
-        device_owner: "Cameras Onsite",
-        organization: existing?.organization??(area || "Reconeyez"),
-        vigilant_status: existing?.vigilant_status??"Unknown",
-        source: "reconeyez",
-        source_imported_at: now,
-        monitoring_enabled: true,
-        tech_check_unit_type: "Recon",
-        monitoring_profile: "reconeyez",
-        expected_ports: [],
-        port_labels: {},
-        activation_state: existing?.activation_state??(shop ? "deactivated" : "active"),
-        activation_source: existing?.activation_source??(shop ? "reconeyez_shop_area" : "reconeyez_area"),
-        unit_key: normalizeUnitKey(d),
-        source_metadata: {
-          ...(existing?.source_metadata||{}),
-          guid,
-          area,
-          description: String(d.description || ""),
-          reconeyez_type: String(d.type || "")
-        },
-        updated_at: now
-      };
-    });
-
-  for (let i = 0; i < rows.length; i += 80) {
-    const { error } = await db
-      .from("camera_devices")
-      .upsert(rows.slice(i, i + 80), { onConflict: "device_serial" });
-    if (error) throw new Error(`Camera inventory save failed: ${error.message}`);
+async function secrets(db:ReconDb,attempt?:ReconBegin) {
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  let reply:{data:unknown;error:unknown};
+  const budget=attempt?Math.min(5000,Date.parse(attempt.expires_at)-Date.now()-5000):5000;
+  if(budget<=0)throw new ReconOwnedConflict(attempt?.kind);
+  try {
+    reply=await Promise.race([Promise.resolve(db.rpc('get_reconeyez_integration_secrets',{})),new Promise<never>((_,reject)=>{
+      timer=setTimeout(()=>reject(new ReconSourceFailure('source_read_failed')),budget);
+    })]);
+  } catch {throw new ReconSourceFailure('source_read_failed');}
+  finally {if(timer!==undefined)clearTimeout(timer);}
+  const {data,error}=reply;
+  if(Array.isArray(data)&&data.length!==1)throw new ReconSourceFailure('source_read_failed');
+  const value=Array.isArray(data)?data[0]:data;
+  if(error||!value||typeof value!=='object'||Array.isArray(value))throw new ReconSourceFailure('source_read_failed');
+  const row=value as Record<string,unknown>,keys=['server_host','server_port','username','password','webhook_secret'];
+  if(Object.keys(row).length!==keys.length||keys.some(key=>!Object.hasOwn(row,key))||typeof row.server_host!=='string'||!row.server_host||
+    row.server_port!==null&&(!Number.isInteger(row.server_port)||typeof row.server_port!=='number'||row.server_port<1||row.server_port>65535)||
+    ['username','password','webhook_secret'].some(key=>row[key]!==null&&typeof row[key]!=='string'))throw new ReconSourceFailure('source_read_failed');
+  return row;
+}
+function ownedError(error:unknown,kind:'inventory_sync'|'inventory_connect'|'receiver_test') {
+  if(error instanceof ReconOwnedConflict)return json({error:error.message,code:error.code},409);
+  if(error instanceof ReconSourceFailure)return json({error:error.message},502);
+  const uncertain=error instanceof ReconOwnedUnknown?error:new ReconOwnedUnknown(kind);
+  return json({error:uncertain.message},502);
+}
+function receiverBody(attempt:ReconBegin) {
+  return {eventType:'IntegrationTest',deviceGuid:'__camera_health_receiver_test__',timestamp:attempt.observed_at,
+    source:'Camera Health self-test',cos_receiver_test_v2:{schema_version:2,attempt_id:knownReconAttempt(attempt).attempt_id}};
+}
+async function receiverSuccess(finish:ReconFinish,attempt:ReconBegin,fingerprint?:string) {
+  const expected=fingerprint??await reconOwnedFingerprint({attempt_id:knownReconAttempt(attempt).attempt_id,body:receiverBody(attempt)});
+  return requireReconSuccess(validateReconFinish(finish,{attempt,fingerprint:expected}));
+}
+async function storedReceiverResult(db:ReconDb,attempt:ReconBegin,fingerprint:string):Promise<ReconFinish|null> {
+  const state=await lookupReconAttempt(db,attempt);
+  if(state.terminal)return validateReconFinish(state.terminal,{attempt,fingerprint,validateResult:result=>{
+    if(Date.parse(String(result.receiver_tested_at))<Date.parse(attempt.observed_at)||Date.parse(String(result.receiver_tested_at))>Date.parse(attempt.expires_at))throw new ReconOwnedUnknown('receiver_test');
+  }});
+  if(['superseded','expired','unknown'].includes(state.state))throw new ReconOwnedConflict('receiver_test');
+  return null;
+}
+async function runReceiverTest(db:ReconDb,attempt:ReconBegin,endpoint:string) {
+  const body=receiverBody(attempt),fingerprint=await reconOwnedFingerprint({attempt_id:knownReconAttempt(attempt).attempt_id,body});
+  if(attempt.outcome==='duplicate') {
+    const prior=await storedReceiverResult(db,attempt,fingerprint);if(prior)return requireReconSuccess(prior);
   }
-
-  const { data: imported, error: readError } = await db
-    .from("camera_devices")
-    .select("id,external_device_id,activation_state")
-    .eq("source", "reconeyez");
-  if (readError) throw new Error(`Could not reload Reconeyez devices: ${readError.message}`);
-
-  const healthRows = (imported || []).map((d: any) => ({
-    camera_device_id: d.id,
-    overall_status: "unknown",
-    detail: "Waiting for Reconeyez cloud health event"
-  }));
-
-  for (let i = 0; i < healthRows.length; i += 100) {
-    const { error } = await db
-      .from("camera_health_current")
-      .upsert(healthRows.slice(i, i + 100), {
-        onConflict: "camera_device_id",
-        ignoreDuplicates: true
-      });
-    if (error) throw new Error(`Could not initialize Reconeyez health rows: ${error.message}`);
+  for(let delivery=0;delivery<2;delivery++) {
+    assertReconDeadline(attempt,5000);
+    const budget=Math.min(RECON_V2_LIMITS.receiver_http_seconds*1000,Date.parse(attempt.expires_at)-Date.now()-5000);
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+    const expired=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new ReconOwnedUnknown('receiver_test'));},budget);});
+    let rejected=false;
+    try {
+      const response=await Promise.race([fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal}),expired]);
+      await Promise.race([response.text(),expired]);
+      rejected=!controller.signal.aborted&&[400,401,403,404,405].includes(response.status);
+    } catch { /* Delivery may have committed its authenticated audit/ack: recover before any decision. */ }
+    finally {if(timer!==undefined)clearTimeout(timer);}
+    const saved=await storedReceiverResult(db,attempt,fingerprint);
+    if(saved)return requireReconSuccess(saved);
+    if(rejected) {
+      const failure=await failReconAttempt(db,attempt,'receiver_rejected');
+      if(failure.terminal_outcome==='success')return await receiverSuccess(failure,attempt,fingerprint);
+      throw new ReconSourceFailure('receiver_rejected');
+    }
   }
-
-  return {
-    imported: rows.length,
-    active: (imported || []).filter((d: any) => d.activation_state !== "deactivated").length,
-    shop: (imported || []).filter((d: any) => d.activation_state === "deactivated").length,
-    skipped_non_detectors: Math.max(0, list.length - detectors.length)
-  };
+  throw new ReconOwnedUnknown('receiver_test');
 }
 
 Deno.serve(async (req: Request) => {
@@ -176,13 +155,10 @@ Deno.serve(async (req: Request) => {
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || "status").toLowerCase();
 
-  const { data: integration } = await db
-    .from("camera_integrations")
-    .select("provider,server_host,server_port,enabled,username_secret_id,password_secret_id,webhook_secret_id,last_sync_at,last_sync_status,last_error,metadata")
-    .eq("provider", "reconeyez")
-    .maybeSingle();
 
   if (action === "status") {
+    const {data:integration,error}=await db.from('camera_integrations').select('provider,server_host,server_port,enabled,username_secret_id,password_secret_id,webhook_secret_id,last_sync_at,last_sync_status,last_error,metadata').eq('provider','reconeyez').maybeSingle();
+    if(error)return json({error:'Reconeyez status is unavailable.'},502);
     return json({
       provider: "reconeyez",
       server: integration?.server_host || "na.reconeyez.com",
@@ -202,55 +178,34 @@ Deno.serve(async (req: Request) => {
   if (action === "webhook_setup" || action === "test_webhook") {
     if (String(profile.role) !== "owner") return json({ error: "Owner access is required for Reconeyez live-feed setup." }, 403);
 
-    const { data: secretRows, error: secretError } = await db.rpc("get_reconeyez_integration_secrets");
-    if (secretError) return json({ error: `Could not read Reconeyez integration security configuration: ${secretError.message}` }, 500);
-    const secret = Array.isArray(secretRows) ? secretRows[0] : secretRows;
-    const webhookSecret = String(secret?.webhook_secret || "");
-    if (!webhookSecret) return json({ error: "Reconeyez webhook receiver is not configured." }, 409);
-
-    const base = String(Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
-    const endpoint = `${base}/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
-    const endpointPath = `/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
-
-    if (action === "test_webhook") {
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            eventType: "IntegrationTest",
-            deviceGuid: "__camera_health_receiver_test__",
-            timestamp: new Date().toISOString(),
-            source: "Camera Health self-test"
-          })
-        });
-        const resultText = await response.text();
-        if (!response.ok && response.status !== 202) {
-          throw new Error(`Receiver returned ${response.status}: ${resultText || response.statusText}`);
-        }
-        const existing = integration?.metadata && typeof integration.metadata === "object" ? integration.metadata : {};
-        await db.from("camera_integrations").update({
-          metadata: {
-            ...existing,
-            receiver_tested_at: new Date().toISOString(),
-            receiver_test_status: "ok"
-          },
-          updated_at: new Date().toISOString()
-        }).eq("provider", "reconeyez");
-        return json({ ok: true, receiver_ready: true });
-      } catch (e) {
-        const message = String((e as Error)?.message || e);
-        const existing = integration?.metadata && typeof integration.metadata === "object" ? integration.metadata : {};
-        await db.from("camera_integrations").update({
-          metadata: {
-            ...existing,
-            receiver_test_status: "error",
-            receiver_test_error: message
-          },
-          updated_at: new Date().toISOString()
-        }).eq("provider", "reconeyez");
-        return json({ error: message }, 502);
+    let receiverAttempt:ReconBegin|undefined;
+    let secret:Record<string,unknown>;
+    try {
+      if(action==='test_webhook')receiverAttempt=await beginReconAttempt(db,'receiver_test');
+      secret=await secrets(db,receiverAttempt);
+    } catch(error) {
+      if(receiverAttempt&&error instanceof ReconSourceFailure) {
+        try {
+          const failed=await failReconAttempt(db,receiverAttempt,error.reason);
+          if(failed.terminal_outcome==='success')return json({ok:true,...await receiverSuccess(failed,receiverAttempt)});
+        } catch(recoveryError) {return ownedError(recoveryError,'receiver_test');}
       }
+      return ownedError(error,'receiver_test');
+    }
+    const webhookSecret=typeof secret.webhook_secret==='string'?secret.webhook_secret:'';
+    if(!webhookSecret) {
+      if(receiverAttempt) {
+        try {const failed=await failReconAttempt(db,receiverAttempt,'source_read_failed');if(failed.terminal_outcome==='success')return json({ok:true,...await receiverSuccess(failed,receiverAttempt)});}
+        catch(error) {return ownedError(error,'receiver_test');}
+      }
+      return json({error:'Reconeyez webhook receiver is not configured.'},409);
+    }
+    const base=String(Deno.env.get('SUPABASE_URL')||'').replace(/\/$/,'');
+    const endpoint=`${base}/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
+    const endpointPath=`/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
+    if(receiverAttempt) {
+      try {return json({ok:true,...await runReceiverTest(db,receiverAttempt,endpoint)});}
+      catch(error) {return ownedError(error,'receiver_test');}
     }
 
     const supportRequest = [
@@ -287,77 +242,44 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  let username = "";
-  let password = "";
-  let host = "na.reconeyez.com";
-  let port = 9028;
-
-  if (action === "connect") {
-    if (String(profile.role) !== "owner") return json({ error: "Owner access is required to save Reconeyez credentials." }, 403);
-    username = String(body?.username || "").trim();
-    password = String(body?.password || "");
-    if (!username || !password) return json({ error: "Reconeyez username and password are required." }, 400);
-    host = "na.reconeyez.com";
-    port = 9028;
-
+  if(action==='connect'||action==='sync') {
+    if(action==='connect'&&String(profile.role)!=='owner')return json({error:'Owner access is required to save Reconeyez credentials.'},403);
+    const kind=action==='connect'?'inventory_connect':'inventory_sync';
+    let attempt:ReconBegin|undefined;
     try {
-      const list = await fetchReconInventory(host, port, username, password);
-      const { error: saveError } = await db.rpc("save_reconeyez_credentials", {
-        p_username: username,
-        p_password: password
-      });
-      if (saveError) throw new Error(`Could not store credentials securely: ${saveError.message}`);
-      const result = await syncInventory(db, list);
-      await db.from("camera_integrations").update({
-        enabled: true,
-        last_sync_at: new Date().toISOString(),
-        last_sync_status: "ok",
-        last_error: null,
-        metadata: { ...(integration?.metadata||{}), last_inventory_count: list.length, last_detector_count: result.imported },
-        updated_at: new Date().toISOString()
-      }).eq("provider", "reconeyez");
-      return json({ ok: true, connected: true, ...result });
-    } catch (e) {
-      const message = String((e as Error)?.message || e);
-      await db.from("camera_integrations").update({
-        last_sync_status: "error",
-        last_error: message,
-        updated_at: new Date().toISOString()
-      }).eq("provider", "reconeyez");
-      return json({ error: message }, 502);
-    }
-  }
-
-  if (action === "sync") {
-    const { data: secretRows, error: secretError } = await db.rpc("get_reconeyez_integration_secrets");
-    if (secretError) return json({ error: `Could not read Reconeyez integration credentials: ${secretError.message}` }, 500);
-    const secret = Array.isArray(secretRows) ? secretRows[0] : secretRows;
-    username = String(secret?.username || "");
-    password = String(secret?.password || "");
-    host = String(secret?.server_host || "na.reconeyez.com");
-    port = Number(secret?.server_port || 9028);
-    if (!username || !password) return json({ error: "Reconeyez has not been connected yet. Owner must connect it once." }, 409);
-
-    try {
-      const list = await fetchReconInventory(host, port, username, password);
-      const result = await syncInventory(db, list);
-      await db.from("camera_integrations").update({
-        enabled: true,
-        last_sync_at: new Date().toISOString(),
-        last_sync_status: "ok",
-        last_error: null,
-        metadata: { last_inventory_count: list.length, last_detector_count: result.imported },
-        updated_at: new Date().toISOString()
-      }).eq("provider", "reconeyez");
-      return json({ ok: true, ...result });
-    } catch (e) {
-      const message = String((e as Error)?.message || e);
-      await db.from("camera_integrations").update({
-        last_sync_status: "error",
-        last_error: message,
-        updated_at: new Date().toISOString()
-      }).eq("provider", "reconeyez");
-      return json({ error: message }, 502);
+      // No integration/source/credential read precedes this authorized begin.
+      attempt=await beginReconAttempt(db,kind);
+      if(attempt.outcome==='duplicate') {
+        const previous=await lookupReconAttempt(db,attempt);
+        if(previous.terminal)return json({ok:true,...(action==='connect'?{connected:true}:{}),...requireReconSuccess(previous.terminal)});
+        if(previous.state!=='pending')throw new ReconOwnedConflict(kind);
+      }
+      let username:string,password:string,host='na.reconeyez.com',port=9028;
+      if(action==='connect') {
+        username=typeof body.username==='string'?body.username.trim():'';
+        password=typeof body.password==='string'?body.password:'';
+        if(!username||!password)throw new ReconSourceFailure('provider_rejected');
+      } else {
+        const secret=await secrets(db,attempt);
+        username=typeof secret.username==='string'?secret.username:'';
+        password=typeof secret.password==='string'?secret.password:'';
+        host=typeof secret.server_host==='string'&&secret.server_host?secret.server_host:'na.reconeyez.com';
+        port=secret.server_port===null?9028:secret.server_port as number;
+        if(!username||!password||!Number.isInteger(port)||port<1||port>65535)throw new ReconSourceFailure('source_read_failed');
+      }
+      const {list,sourceDeadline}=await fetchReconInventory(host,port,username,password,attempt);
+      const finish=await syncReconInventory(db,list,attempt,action==='connect'?{username,password}:undefined,sourceDeadline);
+      return json({ok:true,...(action==='connect'?{connected:true}:{}),...requireReconSuccess(finish)});
+    } catch(error) {
+      // Only a definite pre-publication source/validation failure may publish failure.
+      // Unknown or malformed publication acknowledgements are recovered inside the adapter.
+      if(attempt&&attempt.outcome!=='absent'&&error instanceof ReconSourceFailure) {
+        try {
+          const failed=await failReconAttempt(db,attempt,error.reason);
+          if(failed.terminal_outcome==='success')return json({ok:true,...(action==='connect'?{connected:true}:{}),...requireReconSuccess(failed)});
+        } catch(recoveryError) {return ownedError(recoveryError,kind);}
+      }
+      return ownedError(error,kind);
     }
   }
 
