@@ -32,22 +32,21 @@ async function mount(page) {
   });
   await page.goto('/vision-areas-fixture');
   const frame=page.frameLocator('iframe');
-  await expect(frame.getByRole('region',{name:'VISION dashboard'})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).toBeVisible();
   return {frame,requests};
 }
 test('six dashboard areas use one menu and retain the approved theme', async ({page},testInfo) => {
   const {frame,requests}=await mount(page);
-  const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
-  await expect(dashboard.locator('.vision-area-card')).toHaveCount(6);
-  await expect(dashboard.getByRole('button',{name:/Camera Health/})).toContainText('Field units: 0 online · 0 offline · 2 need review');
-  await expect(dashboard).toContainText('1 confirmed on hand');
-  await expect(dashboard).toContainText('1 placement not recorded');
-  await dashboard.getByRole('button',{name:/Camera Health/}).click();
+  const dashboard=frame.getByRole('region',{name:'Shared equipment inventory'});
+  await expect(dashboard).toContainText('Current reviewed equipment inventory is unavailable');
+  await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Camera status & troubleshooting'}).click();
   await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
   await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
   await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:'Fleet health',exact:true})).toHaveAttribute('aria-current','page');
   await openWorkspace(frame,'Units On Hand');
   const inventory=frame.getByRole('region',{name:'Units On Hand',exact:true});
+  await expect(inventory.getByRole('alert')).toContainText('Current reviewed equipment inventory is unavailable');
+  await inventory.getByText('IT readiness and older tracker records',{exact:true}).click();
   await expect(inventory).toContainText(shop.unitNumber);
   await expect(inventory).not.toContainText(gps.unitNumber);
   await expect(inventory).not.toContainText(unknown.unitNumber);

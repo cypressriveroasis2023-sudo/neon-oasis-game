@@ -119,7 +119,7 @@ test('unit detail is readable, retains all evidence and has one scroll surface',
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const dialog=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
   await expect(dialog.getByRole('region',{name:'Unit recorded address'})).toContainText(longAddress);
-  for(const heading of ['Camera health','Router & connection','Battery · Victron','Installation evidence','Ports & tools'])await expect(dialog.getByRole('heading',{name:heading,exact:true})).toBeVisible();
+  for(const heading of ['Camera health','Router & connection','Battery · Victron','Installation evidence','Advanced settings'])await expect(dialog.getByRole('heading',{name:heading,exact:true})).toBeVisible();
   await expect(dialog.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');
   await expect(dialog.locator('.cos-fleet-power-metrics')).toContainText('190 W');
   await expect(dialog.locator('.cos-fleet-power-metrics')).toContainText('75 W');
@@ -193,8 +193,8 @@ test.describe('touch iPhone Fleet presentation',()=>{
   await page.screenshot({path:info.outputPath('iphone-'+label.replace(' ','-')+'-fleet.png'),fullPage:true});
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const detail=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
-  for(const title of ['Camera health','Router & connection','Ports & tools'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
-  await detail.getByRole('heading',{name:'Ports & tools',exact:true}).scrollIntoViewIfNeeded();
+  for(const title of ['Camera health','Router & connection','Advanced settings'])await expect(detail.getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await detail.getByRole('heading',{name:'Advanced settings',exact:true}).scrollIntoViewIfNeeded();
   await detail.evaluate(el=>el.scrollTop=el.scrollHeight);
   expect(await detail.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
   expect(await detail.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);

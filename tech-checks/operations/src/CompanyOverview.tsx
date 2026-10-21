@@ -1,5 +1,4 @@
-import { useEffect,useState } from 'react';
-import { cameraDashboardSummary } from './cameraDashboardSummary';
+import { useState } from 'react';
 import { COMPANY_STAGES, companyStageCounts, type CompanyStageId } from './companyLifecycle';
 import { summarizeTodayDashboard, type CompanyEquipmentData, type DashboardData, type DashboardRow } from './todayDashboardData';
 import './CompanyOverview.css';
@@ -37,16 +36,11 @@ function attentionItems(data: DashboardData): AttentionItem[] {
   return items;
 }
 
-export default function CompanyOverview({ data, equipment, openWorkspace, openJob, browseStage, stageFilter }: Props) {
+export default function CompanyOverview({ data, openWorkspace, openJob, browseStage, stageFilter }: Props) {
   const [unavailableStage, setUnavailableStage] = useState<CompanyStageId | null>(null);
   const counts = companyStageCounts(data.jobs);
   const summary = summarizeTodayDashboard(data);
   const attention = attentionItems(data);
-  const [healthNow,setHealthNow]=useState(Date.now());
-  useEffect(()=>{const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[]);
-  const camera = cameraDashboardSummary(equipment?.camera,healthNow);
-  const cameraPending = !equipment?.camera && !equipment?.errors.camera;
-  const routersPending = !equipment?.routers && !equipment?.errors.routers;
   const jobsPending = data.jobs === null && !data.errors.jobs;
   const reviewPending = (['jobs', 'quotes', 'invoices', 'pos'] as const).some(key => data[key] === null && !data.errors[key]);
   const teams: { label: string; count: number | null; note?: string }[] = [
@@ -69,33 +63,7 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
       <div className='company-overview-actions'><button className='company-secondary' onClick={() => { setUnavailableStage(null); browseStage(null); }}>View all jobs</button><button className='company-primary' onClick={() => openWorkspace('Quotes')}>Open quotes <span aria-hidden='true'>→</span></button></div>
     </header>
 
-    <div className='company-health-grid' aria-label='Equipment health'>
-      <article className='company-health-card' aria-busy={cameraPending}>
-        <h2>Camera Health</h2>
-        <strong>{cameraPending ? 'Checking Camera Health…' : camera.headline}</strong>
-        <p>{camera.systems}</p>
-        {camera.available&&<><p>{camera.cameraCoverage}</p><p>{camera.serviceCoverage}</p><p>{camera.placement}</p></>}
-        <small className={camera.attention && camera.attention > 0 ? 'company-attention-note' : ''}>{camera.available?'Source refreshed '+new Date(camera.refreshedAt!).toLocaleString():'SUMMARY NOT VERIFIED'}</small>
-        <small>{camera.note}</small>
-        {equipment?.errors.camera && <p className='company-card-error' role='alert'>{equipment.errors.camera}</p>}
-        <button onClick={() => openWorkspace('Camera Health')}>Open Camera Health <span aria-hidden='true'>→</span></button>
-      </article>
-      <article className='company-health-card' aria-busy={routersPending}>
-        <h2>InHand Routers</h2>
-        <strong>{routersPending ? 'Checking router inventory…' : equipment?.routers ? countLabel(equipment.routers.items.length, 'stored router record') : 'Router count unavailable'}</strong>
-        <p>Live GPS setup pending</p>
-        <small>STORED INVENTORY & PORT OBSERVATIONS</small>
-        {equipment?.errors.routers && <p className='company-card-error' role='alert'>{equipment.errors.routers}</p>}
-        <button onClick={() => openWorkspace('InHand Routers')}>Open router inventory <span aria-hidden='true'>→</span></button>
-      </article>
-      <article className='company-health-card'>
-        <h2>Victron power</h2>
-        <strong>Power monitoring</strong>
-        <p>Battery and solar readings in Victron VRM</p>
-        <small>POWER STATUS NOT AVAILABLE IN THIS VIEW</small>
-        <button onClick={() => openWorkspace('Victron VRM')}>Open Victron info <span aria-hidden='true'>→</span></button>
-      </article>
-    </div>
+    <nav className='cos-daily-shortcuts' aria-label='Equipment systems'><button onClick={()=>openWorkspace('Camera Health')}>Camera status & troubleshooting</button><button onClick={()=>openWorkspace('InHand Routers')}>Router connections</button><button onClick={()=>openWorkspace('Victron VRM')}>Battery & solar</button></nav>
 
     <section className='company-flow' aria-labelledby='company-flow-heading'>
       <div className='company-section-heading'><h2 id='company-flow-heading'><span className='company-desktop-label'>Jobs, from quote to billing</span><span className='company-mobile-label'>Job flow</span></h2><span className='company-flow-caption'>THE COMPLETE CUSTOMER JOURNEY</span></div>
