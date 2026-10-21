@@ -48,7 +48,8 @@ jobs:
             tests/mhelp-2027-product-census.test.mjs \
             tests/mhelp-owner-review.test.mjs \
             tests/mhelp-equipment-write-bridge.test.mjs \
-            tests/mhelp-owner-staging-pglite.test.mjs
+            tests/mhelp-owner-staging-pglite.test.mjs \
+            tests/mhelp-assignment-review.test.mjs
       - name: Verify real PostgreSQL 17 Owner equipment transaction
         timeout-minutes: 4
         env:
@@ -56,5 +57,10 @@ jobs:
         run: |
           command -v psql
           node tests/mhelp-owner-postgres.ci.mjs
+      - name: Verify assignment review against real PostgreSQL 17
+        timeout-minutes: 4
+        env:
+          COS_ASSIGNMENT_POSTGRES_CI: '1'
+        run: node --import tsx --test tests/mhelp-assignment-review.test.mjs
       - name: Typecheck COS Owner importer and existing app
         run: npm run typecheck
