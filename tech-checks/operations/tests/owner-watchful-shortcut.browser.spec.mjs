@@ -46,7 +46,8 @@ test('Owner Watchful area opens the exact portal separately with keyboard and cl
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(link).toHaveAccessibleDescription('Opens in a new tab. Watchful may ask you to sign in.');
-  await expect(frame.locator('.vision-area-card')).toHaveCount(6);
+  await expect(frame.getByRole('navigation',{name:'Daily work shortcuts'}).getByRole('button')).toHaveCount(5);
+  await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).toBeVisible();
   expect(state.portalRequests).toHaveLength(0);
   const dashboardUrl = await frame.locator('body').evaluate(() => location.href);
   await link.focus(); await expect(link).toBeFocused();
@@ -97,7 +98,7 @@ for (const account of [
     await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
     await expect(frame.getByRole('button',{name:'Register in COS inventory →',exact:true})).toHaveCount(0);
   } else if (account.authorized === false) await expect(frame.getByRole('heading', {name: 'Operations access needs attention'})).toBeVisible();
-  else await expect(frame.getByRole('region', {name: 'VISION dashboard'})).toBeVisible();
+  else await expect(frame.getByRole('region', {name: 'Company overview'})).toBeVisible();
   await expect(shortcut(frame)).toHaveCount(0);
   await expect(frame.getByRole('link', {name: 'Open Watchful', exact: true})).toHaveCount(0);
   expect(state.portalRequests).toHaveLength(0);

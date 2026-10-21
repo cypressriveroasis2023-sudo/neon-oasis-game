@@ -209,11 +209,11 @@ test('approved Today workspace uses the available screen width at normal browser
     header:document.querySelector('.company-utility-bar').getBoundingClientRect().toJSON(),
     gutters:parseFloat(getComputedStyle(today.closest('main')).paddingLeft)+parseFloat(getComputedStyle(today.closest('main')).paddingRight),
     work:today.querySelector('.workspace-work').getBoundingClientRect().toJSON(),
-    health:document.querySelector('.company-health-grid').getBoundingClientRect().toJSON()
+    inventory:document.querySelector('.cos-inventory-overview').getBoundingClientRect().toJSON()
   }));
   expect(layout.zoom).toBe(1);
   expect(layout.today.width).toBeCloseTo(layout.header.width-layout.gutters,0);
-  for(const section of [layout.work,layout.health]){
+  for(const section of [layout.work,layout.inventory]){
     expect(section.left).toBeGreaterThanOrEqual(layout.today.left);
     expect(section.right).toBeLessThanOrEqual(layout.today.right+1);
   }
