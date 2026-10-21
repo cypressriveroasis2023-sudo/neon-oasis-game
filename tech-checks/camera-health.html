@@ -1204,6 +1204,9 @@ async function loadFleetCapabilities(){fleetCapabilities={fleetRead:false,fleetP
 // An overview entry uses the same authenticated Fleet view as Field Map.
 // Unit-specific links keep the existing diagnostics, placement and IP tools.
 function openSharedCameraHealth(){
+  // The parent chose diagnostics for this embedded board. Redirecting to the
+  // main COS app would mount another board and repeat the workspace launch.
+  if(window.self!==window.top)return false;
   const params=new URLSearchParams(location.search);
   const diagnostics=params.get('diagnostics')==='1'||['q','unit','action','folder'].some(key=>params.get(key)?.trim());
   let returning=false;

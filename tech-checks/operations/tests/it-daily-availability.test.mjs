@@ -95,7 +95,7 @@ test('direct ittech profile uses server fleet capability instead of the old two-
 test('direct ittech routes only to existing COS-authenticated Camera Health; other IT route remains unchanged',()=>{
  const host=read('it-daily-host.js');
  assert.match(host,/const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'/);
- assert.match(host,/frame\.src=value\.role==='it'&&value\.id===legacyCameraOnlyIT\s*\? '\.\/camera-health\.html\?itDaily=1'/);
+ assert.match(host,/frame\.src=value\.role==='it'&&value\.id===legacyCameraOnlyIT\s*\? '\.\/camera-health\.html\?itDaily=1&diagnostics=1'/);
  assert.match(host,/\: '\.\/operations\/dist\/index\.html\?mode='/);
  assert.match(host,/const permitted = await verify\(value\)/);
  assert.match(host,/key\(scope\(\)\) !== key\(value\)/);

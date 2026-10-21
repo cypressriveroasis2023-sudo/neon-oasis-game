@@ -56,7 +56,7 @@ export async function mountTransfers(page,{role='it',serviceActor=SERVICE,seedHa
  window.TechCheckContext={db,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getProfile:()=>({full_name:name(),username:name(),user_id:fixture.actor,role:fixture.role,active:true,archived_at:null}),getSession:session};
  window.show=key=>{for(const v of ['it','svc','owner','morning'])document.getElementById('view-'+v).classList.toggle('hidden',key!==v);dispatchEvent(new Event('techcheck:view-changed'));};
  window.logout=()=>{fixture.actor=null;document.getElementById('appView').classList.add('hidden');listeners.forEach(fn=>fn('SIGNED_OUT'));};
- window.changeActor=actor=>{fixture.actor=actor;listeners.forEach(fn=>fn('SIGNED_IN'));dispatchEvent(new Event('techcheck:data-refreshed'));};
+ window.changeActor=actor=>{fixture.actor=actor;listeners.forEach(fn=>fn('SIGNED_IN',session()));dispatchEvent(new Event('techcheck:data-refreshed'));};
  </script><script type="module" src="./${role==='it'?'it-daily-host.js':'service-transfer-host.js'}"></script></body></html>`;
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{

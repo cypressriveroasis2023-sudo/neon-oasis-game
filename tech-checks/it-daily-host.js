@@ -174,7 +174,7 @@ async function open(value, generation, handoffFailure = null) {
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
-    ? './camera-health.html?itDaily=1'
+    ? './camera-health.html?itDaily=1&diagnostics=1'
     : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
   const board=document.createElement('section');board.className='cos-it-board-loading';board.style.position='relative';board.setAttribute('aria-busy','true');
   const pending=document.createElement('section');pending.className='cos-it-daily-status';pending.style.cssText='position:absolute;inset:0;z-index:1;margin:0;min-height:180px';
