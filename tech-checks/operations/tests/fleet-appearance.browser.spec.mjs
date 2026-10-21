@@ -115,7 +115,7 @@ test('circle colors, clustering, fullscreen and unit selection retain their beha
 });
 
 test('unit detail is readable, retains all evidence and has one scroll surface',async({page},info)=>{
-  const {app,state}=await mount(page,false,{features:{fieldLocationVerification:true}});
+  const {app,state}=await mount(page);
   await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
   const dialog=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
   await expect(dialog.getByRole('region',{name:'Unit recorded address'})).toContainText(longAddress);
