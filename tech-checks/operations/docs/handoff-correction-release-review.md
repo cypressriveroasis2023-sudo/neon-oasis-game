@@ -163,6 +163,22 @@ workspace. The 31 existing IT host browser cases and 11 host availability/page
 integrity unit checks also passed. Hosted workflows must pass again on the final
 commit; these local results do not waive that gate.
 
+The hosted follow-up at `54501a420408a1ffbbb13198a5b2331c5d4af884` passed the
+dedicated transfer/correction review and every earlier Operations stage. Its full
+browser suite reported 3,276 passed, 2 failed and 190 skipped. Both failures were
+the existing daily-IT camera diagnostics fixture at desktop widths. Its special
+302 redirected the embedded Operations page to the parent root, activating the
+existing IT host navigation guard and leaving the signed-in synthetic fixture.
+All four hosted attempts' traces confirm that top-level navigation; both the
+fixture and guard predate this correction work.
+
+The fixture now serves the actual embedded `operations/dist/index.html` path
+through its existing file interceptor. No production code, access guard, test
+assertion, timeout or retry setting was changed for this repair. The exact nine
+local cases first reproduced both failures, then passed eight cases after the
+fixture change, with the one existing phone daily-IT exclusion still skipped and
+zero flaky cases. Hosted workflows must also pass on this follow-up commit.
+
 Reproduce from `tech-checks/operations` with Node 22:
 
 ```sh
