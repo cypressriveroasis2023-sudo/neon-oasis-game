@@ -28,6 +28,7 @@ function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=
   if(name==='profiles')return response([{user_id:owner,full_name:'Synthetic Owner',role:'owner',active:true,archived_at:null}]);
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:'00000000-0000-4000-8000-000000000999',roles:{code:'owner',organization_id:org}}]);
+  if(name==='cos_fleet_shop_snapshot_v1')return response({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
   if(name==='cos_owner_identity_snapshot')return response({revision:sha('synthetic empty crosswalk'),claims:[],nativeEpochs:[]});
   if(name==='appdeploy_field_map_snapshot'){if(onSnapshot)await onSnapshot(calls.filter(c=>new URL(c.url).pathname.endsWith('/appdeploy_field_map_snapshot')).length);return response(rawSnapshot);}
   if(name==='equipment_units')return response([{id:native.id,organization_id:org,unit_number:native.unitNumber,status:'field'}]);
