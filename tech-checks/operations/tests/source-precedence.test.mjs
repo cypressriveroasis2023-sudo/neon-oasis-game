@@ -155,6 +155,7 @@ async function fieldRoute(f,{size=400,evidence='available'}={}){
   const name=url.split('/rest/v1/rpc/')[1],args=init.body?JSON.parse(init.body):{};
   if(name==='appdeploy_field_map_snapshot'){counts.snapshots++;return response({items:others,inventoryItems:[target,...others],summary:{}});}
   if(name==='cos_geocode_sources_map_projection'){counts.sources++;return response(await nativeRPC(native,'map_projection',args));}
+  if(name==='cos_fleet_shop_snapshot_v1')return response({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
   if(name==='cos_owner_identity_snapshot')return response({revision:'a'.repeat(64),nativeEpochs:[],claims:[]});
   if(name==='cos_fleet_placement_evidence_v1')return response([f.audit]);
   if(name==='cos_imported_precedence_read_current'){
