@@ -7,7 +7,7 @@ export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',TEST_IT='05bf20fe-19f7-4d
 export const OWNER='00000000-0000-4000-8000-000000000004';
 const linkedIT=new Map([[IT,{name:'Synthetic IT',actorId:'d0757b64-9623-4adc-afff-21cc7853e88a'}],[TEST_IT,{name:'Test IT',actorId:'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'}]]);
 const root=new URL('../../../',import.meta.url).pathname;
-export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0}={}){
+export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0,guided=false}={}){
  const itIdentity=linkedIT.get(itActor);if(!itIdentity)throw Error('Unknown synthetic IT identity');
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
@@ -104,6 +104,8 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const path=resolve(root,'.'+url.pathname.slice('/tech-checks'.length));if(path.startsWith(root)){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
  unexpected.push(url.pathname);return route.abort();
  });
+ // Contract regressions use the accessible all-steps view. Guided scenarios retain the default.
+ if(!guided)await page.addLocatorHandler(page.getByRole('button',{name:'Show all steps',exact:true}),async locator=>{await locator.click();});
  await page.goto('http://127.0.0.1:4173/tech-checks/');
  return {db,run,calls,unexpected,errors,handoff,paths,close:async()=>{await pending;await db.close();}};
 }

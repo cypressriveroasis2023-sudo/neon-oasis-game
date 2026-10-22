@@ -1,4 +1,5 @@
 import '../tech-check-rules.js';
+import {guideTransferForm} from './guided.js';
 import {createDailySignoff,newSignature,signatureJpeg,hasSignatureInk} from '../service-signoff-ui.js';
 import {normalizeManifest,receiptDifferences,latestReceiptEvent,canRecordReceipt,TRANSFER_STATEMENT,INTAKE_CHECKS,transferTitle,TRANSFER_PURPOSES,transferPurposeLabel,hasTransferPurpose,installationBatteryPlan} from './model.js';
 import {transferClient,deviceDraft,transferJpeg} from './client.js';
@@ -19,13 +20,14 @@ function loadStyle(){if(document.querySelector('[data-transfer-style]'))return;c
 // Mounts inside the original TechCheck page, using its current account and database.
 export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}){
  loadStyle();root.classList.add('tc-transfer');root.setAttribute('aria-label',role==='it'?'IT equipment check in and check out':'Equipment received from IT');
- const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
+ const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0,guide={step:0,all:false};
  const current=()=>!disposed&&client.current()&&root.isConnected;
  const guard=()=>{client.assert();if(disposed||!root.isConnected)throw new Error('This transfer screen is no longer active.');};
  const message=(text,error=false)=>{if(!current())return;if(!statusNode?.isConnected){statusNode=element('p','','tc-status');root.append(statusNode);}statusNode.textContent=text;statusNode.setAttribute('role',error?'alert':'status');};
 
  const showSubmitError=(detail,control=null)=>{
   if(!current())return;
+  if(control)root.querySelector('form')?.revealTransferControl?.(control);
   let alert=root.querySelector('[data-transfer-submit-error]');
   if(!alert){alert=element('p','','tc-submit-error');alert.setAttribute('role','alert');alert.dataset.transferSubmitError='';const submit=root.querySelector('button[type=submit]');if(submit)submit.before(alert);else root.append(alert);}
   alert.textContent=detail;
@@ -209,6 +211,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
  }
  function chooseReturns(){reset();heading('Check In / Return','Choose a handoff accepted by Service. Returns remain held for inventory review or repair.');root.append(button('Back',()=>home(),true));const rows=data.transfers.filter(t=>t.state==='accepted');if(!rows.length)root.append(element('p','No accepted handoffs are available for return.'));for(const t of rows)root.append(button(t.service_name+' · '+t.manifest.map(i=>i.family+' '+i.unit_tag).join(', '),()=>start('return',t)));}
  async function start(kind,transfer=null){
+  guide={step:0,all:false};
   if(busy)return;const turn=++revision;storageKey=client.actor+':'+kind+':'+(transfer?.id||'new');
   try{const saved=await deviceDraft(storageKey);guard();if(turn!==revision)return;
    if(kind==='receipt'&&!canRecordReceipt(transfer)&&(!saved?.request||!(transfer.events||[]).some(event=>event.kind==='receipt'&&event.id===saved.request.p_request_id))){home('This handoff already needs IT / Owner review. Check the saved receipt below; do not submit it again.');return;}
@@ -251,11 +254,13 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    if(draft.purpose==='installation')form.append(element('p','Installation — prepare the equipment and its required installation battery package.','tc-purpose-note'));
    const recipient=element('select');recipient.required=true;recipient.setAttribute('aria-label','Receiving Service technician');recipient.append(new Option('Choose Service technician',''));for(const tech of data.technicians)recipient.append(new Option(tech.name,tech.id));recipient.value=draft.serviceActor;recipient.onchange=()=>{draft.serviceActor=recipient.value;changed();};form.append(label('Hand off to',recipient));
    const equipment=element('select');equipment.setAttribute('aria-label','Select equipment');equipment.append(new Option('Choose a saved Shop unit',''));for(const item of data.equipment){const option=new Option((item.unit_name||item.family+' '+item.unit_tag)+(item.hold_reason?' · '+item.hold_reason:item.reserved?' · already held':!item.supported?' · check mapping required':item.tracker_state!=='shop'?' · not Shop':''),item.equipment_key);option.disabled=item.reserved||!item.supported||item.tracker_state!=='shop';equipment.append(option);}
-   form.append(label('Equipment',equipment),button('Add unit to handoff',()=>{if(!hasTransferPurpose(draft.purpose))return message('Choose the handoff purpose first.',true);const e=data.equipment.find(i=>i.equipment_key===equipment.value);if(!e)return message('Select an available Shop unit.',true);if(draft.items.some(i=>i.equipment_key===e.equipment_key))return message('That unit is already included.',true);if(draft.items.length>=20)return message('Use at most 20 units.',true);const plan=installationBatteryPlan(e.workflow_type||e.family);draft.items.push({equipment_key:e.equipment_key,family:e.family,unit_tag:e.unit_tag,workflow_type:e.workflow_type,simText:'',batteryText:draft.purpose==='installation'&&plan.count===0?'0':'',batteryConfiguration:plan.configuration,partsText:'',checks:{},missing:false});changed();render(transfer);},true));
+   const search=input('search','',value=>{const query=value.trim().toLowerCase();for(const option of equipment.options)option.hidden=Boolean(option.value)&&!((option.text+' '+option.value).toLowerCase().includes(query));});search.setAttribute('aria-label','Search saved equipment');search.placeholder='Unit name, number or saved equipment key';
+   form.append(label('Search equipment',search),label('Equipment',equipment),button('Add unit to handoff',()=>{if(!hasTransferPurpose(draft.purpose))return message('Choose the handoff purpose first.',true);const e=data.equipment.find(i=>i.equipment_key===equipment.value);if(!e)return message('Select an available Shop unit.',true);if(draft.items.some(i=>i.equipment_key===e.equipment_key))return message('That unit is already included.',true);if(draft.items.length>=20)return message('Use at most 20 units.',true);const plan=installationBatteryPlan(e.workflow_type||e.family);draft.items.push({equipment_key:e.equipment_key,family:e.family,unit_tag:e.unit_tag,workflow_type:e.workflow_type,simText:'',batteryText:draft.purpose==='installation'&&plan.count===0?'0':'',batteryConfiguration:plan.configuration,partsText:'',checks:{},missing:false});changed();render(transfer);},true));
   }else{
    form.append(element('strong',transferPurposeLabel(draft.purpose),'tc-purpose'),element('p',`${transfer.it_name} → ${transfer.service_name}`),element('small','Handoff '+transfer.id));
    if(draft.purpose==='truck_replenishment')form.append(element('p','Confirm the equipment you received. Spare batteries are counted separately in your daily truck inventory.','tc-purpose-note'));
   }
+  const setupNodes=[...form.children],equipmentSteps=[];
   draft.items.forEach((item,index)=>{
    const expected=transfer?.manifest.find(i=>i.equipment_key===item.equipment_key),group=element('fieldset');group.append(element('legend',(expected?.family||item.family)+' '+(expected?.unit_tag||item.unit_tag)));
    const simpleReceipt=draft.kind==='receipt'&&draft.purpose==='truck_replenishment',asListed=simpleReceipt&&item.receiptMode!=='difference';
@@ -288,14 +293,21 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
     for(const step of fields){let caption=step.label.replaceAll('{UNIT}',item.unit_tag).replaceAll('2026 Unit Tracker','2027 Unit Tracker');if(draft.purpose==='truck_replenishment'&&item.workflow_type==='Ranger'&&step.field==='functions_ok')caption='Camera, MPPT, router and all required functions work correctly';if(draft.purpose==='installation'&&item.workflow_type==='Ranger'&&step.field==='delivery_batteries_charged_ok')caption='Is the required LiFePO4 battery charged and ready with this Ranger?';if(draft.kind==='return'){const n=element('select');n.required=true;n.append(new Option('Choose result',''),new Option('Pass','true'),new Option('Needs repair / attention','false'));n.value=item.checks[step.field]===undefined?'':String(item.checks[step.field]);n.onchange=()=>{item.checks[step.field]=n.value===''?undefined:n.value==='true';changed();};group.append(label(caption,n));}else{const n=element('input');n.type='checkbox';n.required=true;n.checked=item.checks[step.field]===true;n.onchange=()=>{item.checks[step.field]=n.checked;changed();};group.append(label(caption,n));}}
     photoField(group,item,index);
    }
-   if(draft.kind==='checkout')group.append(button('Remove unit',()=>{draft.items.splice(index,1);draft.photos=draft.photos.filter(p=>p.equipment_key!==item.equipment_key);changed();render(transfer);},true));form.append(group);
+   if(draft.kind==='checkout')group.append(button('Remove unit',()=>{draft.items.splice(index,1);draft.photos=draft.photos.filter(p=>p.equipment_key!==item.equipment_key);changed();render(transfer);},true));form.append(group);equipmentSteps.push({title:'Check '+(expected?.family||item.family)+' '+(expected?.unit_tag||item.unit_tag),nodes:[group]});
   });
+  const beforeReview=new Set(form.children);
+  const reviewSummary=element('section','','tc-transfer-review');reviewSummary.setAttribute('aria-label','Review transfer');form.append(reviewSummary);
   const notes=input('textarea',draft.notes,value=>{draft.notes=value;changed();});notes.maxLength=2000;notes.setAttribute('aria-label','Transfer notes');const notesLabel=label('Notes / problems / missing parts',notes);if(draft.kind==='receipt'&&draft.purpose==='truck_replenishment'){const optional=element('details');optional.append(element('summary','Add a note (optional)'),notesLabel);form.append(optional);}else form.append(notesLabel);
   if(draft.kind==='receipt'){const review=element('section','','tc-receipt-comparison');review.dataset.receiptComparison='';review.setAttribute('aria-label','Receipt comparison');form.append(review);}
   const name=context.getProfile()?.full_name||context.getProfile()?.username||'';
   form.append(createDailySignoff({state:draft.signature,actorName:name,statementText:TRANSFER_STATEMENT,isBusy:()=>busy,onChange:()=>persist().catch(e=>message(e.message,true))}));
   const submit=element('button',draft.kind==='checkout'?'Sign & send handoff':draft.kind==='return'?'Sign & record return':draft.purpose==='truck_replenishment'?'Sign & confirm received':'Sign & verify received equipment');submit.type='submit';form.append(submit);root.append(form,element('p','A saved transfer does not update permanent truck stock, physical Field/Shop placement, or camera health.','tc-draft-note'));
   updateReceiptReview();
+  guideTransferForm(form,{state:guide,steps:[{title:draft.kind==='checkout'?'Choose equipment and recipient':'Confirm handoff',nodes:setupNodes,validate:()=>draft.kind==='checkout'&&!draft.items.length?'Add at least one equipment unit to this handoff.':null},...equipmentSteps,{title:'Review and sign',nodes:[...form.children].filter(node=>!beforeReview.has(node))}],onError:showSubmitError,onReview:()=>{
+   reviewSummary.replaceChildren(element('h2','Review before signing'),element('p','Purpose: '+transferPurposeLabel(draft.purpose)),element('p',draft.kind==='checkout'?name+' → '+(data.technicians.find(t=>t.id===draft.serviceActor)?.name||'Choose recipient'):transfer.it_name+' → '+transfer.service_name));
+   for(const item of draft.items){const row=element('p');try{row.textContent=item.missing?'Not received: '+item.family+' '+item.unit_tag:expectedText(itemInput(item,draft.purpose),draft.purpose);}catch{row.textContent=item.family+' '+item.unit_tag+' · complete the equipment details before signing.';}row.className='tc-review-manifest';reviewSummary.append(row);}
+   reviewSummary.append(element('small',draft.kind==='checkout'?'Sending creates a handoff awaiting the named Service technician’s receipt. It does not sign for them.':'Your signature records only your own checks and receipt.'));
+  }});
  }
  async function complete(transfer){
   if(busy)return;const issue=validateBeforeSubmit();if(issue){showSubmitError(issue.detail,issue.control);return;}busy=true;const controls=[...root.querySelectorAll('button,input,select,textarea')].map(n=>[n,n.disabled]);for(const [n] of controls)n.disabled=true;

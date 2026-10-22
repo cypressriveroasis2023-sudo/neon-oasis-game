@@ -19,7 +19,7 @@ test.afterEach(async({page},testInfo)=>{
   await writeFile(path,JSON.stringify({reads:state.reads,pendingDaily:state.pendingDaily,dailyResults:state.dailyResults,fleetReads:state.fleetReads,writes:state.writes,frames},null,2));
   await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
 });
-async function setup(page, { many = false, pausedClock = false } = {}) {
+async function setup(page, { many = false, pausedClock = false, simple = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
   state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
   await page.addInitScript(()=>{
@@ -39,6 +39,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     const request = route.request(), url = new URL(request.url());
     if(url.origin===origin){
       if(url.pathname==='/tv-harness')return route.fulfill({contentType:'text/html',body:harness});
+      if(url.pathname==='/custody-read.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../custody-read.js',import.meta.url),'utf8')});
       if(url.pathname==='/operations-host.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../operations-host.js',import.meta.url),'utf8')});
       if(url.pathname==='/field-map-display-host.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../field-map-display-host.js',import.meta.url),'utf8')});
       if(url.pathname.startsWith('/operations/dist/'))return route.fulfill({path:dist+url.pathname.slice('/operations/dist/'.length)});
@@ -74,10 +75,10 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows}});}
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
-  await page.goto('/tv-harness?tvBoard=1');
+  await page.goto('/tv-harness?tvBoard=1'+(simple?'&simpleTv=1':''));
   const frame=page.frameLocator('#cosOperationsFrame');
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  if(!simple)await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
   return {state,frame};
 }
 
@@ -119,7 +120,7 @@ test('network failure marks delayed data and authentication failure clears priva
   state.fail=503;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expect(frame.getByRole('alert')).toContainText('UPDATES DELAYED');
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  if(!simple)await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
   state.fail=401;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expectOperationsReloadRequired(frame);
@@ -350,4 +351,54 @@ test('Owner saves rotation time and a remote timing update changes the TV interv
  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','1');
  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','2');
  expect(state.fleetReads).toBe(3);
+});
+
+
+test('simple COS TV rotates all eight panels without job panels or writes',async({page},testInfo)=>{
+ await page.setViewportSize({width:1920,height:1080});
+ const {state,frame}=await setup(page,{simple:true,pausedClock:true});
+ const board=frame.getByRole('region',{name:'Tech Check TV Board'});
+ await expect(board).toHaveAttribute('data-section','overview');
+ await expect(frame.getByRole('heading',{name:'Fleet overview',exact:true})).toBeVisible();
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
+ await frame.getByText('TV rotation on this screen',{exact:true}).click();
+ await frame.getByLabel('Seconds per panel',{exact:true}).fill('5');
+ await frame.getByText('TV rotation on this screen',{exact:true}).click();
+ for(const section of ['camera','providers','inventory','map','power','routers','team']){
+  await page.clock.runFor(5000);
+  await expect(board).toHaveAttribute('data-section',section);
+  await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
+ }
+ await expect(frame.getByText('SAVED SOURCES · CHECK PANEL TIMESTAMPS',{exact:true})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('cos-eight-panel-tv-1920.png'),fullPage:true});
+ expect(state.writes).toEqual([]);
+});
+
+test('Owner sees saved custody and historical return dates through the real read-only host bridge',async({page},testInfo)=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ await page.evaluate(()=>{
+  window.custodyRpcCalls=[];
+  window.TechCheckContext.db.rpc=async name=>{
+   window.custodyRpcCalls.push(name);
+   const unit={equipment_key:'synthetic:001',family:'Sniper',unit_tag:'001',sims:['000000000123'],battery_count:null,parts:[]};
+   const sources={owner_service_truck_inventory_v1:[{service_tech_id:'synthetic-service',name:'Synthetic Service',units:[{equipment_type:'Sniper',unit_tag:'001',status:'assigned'}],sims:[{slot_no:1,sim_number:'000000000123',status:'assigned'}],stock:{recon_battery_qty:0}}],techcheck_transfer_context_v1:{version:1,transfers:[{id:'synthetic-handoff',it_name:'Synthetic IT',service_name:'Synthetic Service',service_actor:'synthetic-service',state:'awaiting_service',created_at:'2026-10-12T15:00:00Z',manifest:[unit]}]},techcheck_ticketfree_context_v1:{version:1,pending_count:1,returns:[{id:'synthetic-return',service_tech_id:'synthetic-service',service_tech_name:'Synthetic Service',returned_key:'synthetic:002',family:'Ranger',unit_tag:'002',state:'waiting_it',submitted_at:'2026-10-12T16:00:00Z'}]}};
+   return Object.hasOwn(sources,name)?{data:sources[name]}:{error:{message:'Fixture refuses unknown RPC'}};
+  };
+ });
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ const navigate=async name=>{await frame.getByRole('button',{name:'More',exact:true}).first().click();await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name,exact:true}).click();};
+ await navigate('Team & Tech Check');
+ const custody=frame.getByRole('region',{name:'Equipment custody and pending receipts',exact:true});
+ await expect(custody).toContainText('000000000123');
+ await expect(custody).toContainText('agm 12v 110ah Unavailable');
+ await expect(custody).toContainText('unavailable as a reconciled Product-ID total');
+ await expect(custody).toContainText('Ranger 002');
+ await page.screenshot({path:testInfo.outputPath('cos-saved-custody.png'),fullPage:true});
+ await navigate('Calendar');
+ const day=frame.getByRole('gridcell',{name:'2026-10-12',exact:true});
+ await expect(day).toContainText('Handoff recorded');await expect(day).toContainText('Return submitted');await expect(day).toContainText('Ranger 002');
+ await frame.getByRole('button',{name:'Day',exact:true}).click();await expect(day).toContainText('Handoff recorded');
+ await page.screenshot({path:testInfo.outputPath('cos-custody-calendar.png'),fullPage:true});
+ expect(await page.evaluate(()=>window.custodyRpcCalls.every(name=>['owner_service_truck_inventory_v1','techcheck_transfer_context_v1','techcheck_ticketfree_context_v1'].includes(name)))).toBe(true);
+ expect(state.writes).toEqual([]);
 });

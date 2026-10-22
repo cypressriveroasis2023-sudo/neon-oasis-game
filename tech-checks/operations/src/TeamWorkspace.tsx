@@ -1,3 +1,4 @@
+import CustodyOverview from './CustodyOverview';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api,openLegacy} from './api';
 import './directoryWorkspace.css';
@@ -55,6 +56,7 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
         <em>{member.active?'ACTIVE PROFILE':'INACTIVE PROFILE'}</em>
       </div>;
     }):<div className='loading'>{query||department?'No team members match this view.':'No active production technicians found.'}</div>}</div>}
+    <CustodyOverview/>
     <div className='purchase-actions'>
       {openWorkspace&&<button onClick={()=>openWorkspace('Daily Board')}>OPEN DAILY BOARD</button>}
       <button className='secondary' onClick={()=>openLegacy('team')}>EXISTING TECH CHECK TEAM</button>

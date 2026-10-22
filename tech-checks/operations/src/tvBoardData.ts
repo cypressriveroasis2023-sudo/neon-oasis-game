@@ -16,6 +16,7 @@ export function tvBoardLink(current: string, scope: BoardScope, department: stri
   url.pathname = url.pathname.replace(/operations\/dist\/index\.html$/, '');
   url.search = ''; url.hash = '';
   url.searchParams.set('tvBoard', '1');
+  url.searchParams.set('simpleTv', '1');
   if (scope === 'week') url.searchParams.set('tvScope', 'week');
   if (['it', 'service'].includes(department)) url.searchParams.set('tvDepartment', department);
   return url.href;

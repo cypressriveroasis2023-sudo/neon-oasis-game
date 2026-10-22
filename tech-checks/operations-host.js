@@ -1,3 +1,4 @@
+import {readOwnerCustody} from './custody-read.js';
 import {setFieldMapDisplay} from './field-map-display-host.js';
 // Isolate the Operations UI while retaining the existing Tech Check session and views.
 const ownerView = document.getElementById('view-owner');
@@ -155,7 +156,7 @@ function present() {
     const fieldRoute = mapParams.get('fleetDashboard')==='1'&&!fieldUnit?'#fleet-dashboard':mapParams.get('cameraView')==='1'?'#camera-health':fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#fleet-dashboard?unitLabel=' + encodeURIComponent(fieldUnit) : '#fleet-dashboard';
     const tvLaunch = mapParams.get('tvBoard') === '1';
     const tvParams = new URLSearchParams();
-    if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
+    if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('simpleTv')==='1')tvParams.set('simpleTv','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
     const locationParams=new URLSearchParams();if(mapParams.get('locationImport')==='1'&&/^HELIOS\s+\d{1,3}$/i.test(mapParams.get('locationUnit')||'')&&/^[a-f0-9-]{36}$/i.test(mapParams.get('locationNonce')||'')){for(const key of ['locationImport','locationUnit','locationNonce'])locationParams.set(key,mapParams.get(key));}
     frame.src = './operations/dist/index.html?v=' + (locationParams.size?'mhelp-location-import-20261012':'unified-fleet-20261013') + (locationParams.size?'&'+locationParams:'') + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
@@ -238,12 +239,20 @@ window.addEventListener('message', async event => {
   if(data?.type==='COS_TV_BOARD_DISPLAY_MODE'&&typeof data.active==='boolean'&&context()?.getEffectiveRole()==='owner'){
     setFieldMapDisplay(frame,data.active);
     if(!data.active&&new URLSearchParams(location.search).get('tvBoard')==='1'){
-      const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
+      const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment','simpleTv'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
     }
     return;
   }
   if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof data.active==='boolean'){setFieldMapDisplay(frame,data.active);return;}
   if (!data || typeof data !== 'object') return;
+  if(data.type==='COS_OWNER_CUSTODY_REQUEST'&&typeof data.requestId==='string'&&data.requestId.length<=100){
+    const subject=owner(),source=event.source,host=frame;
+    const current=()=>Boolean(subject&&owner()===subject&&frame===host&&source===frame?.contentWindow&&context()?.getEffectiveRole()==='owner'&&!document.getElementById('appView')?.classList.contains('hidden'));
+    if(!current())return;
+    try{const snapshot=await readOwnerCustody(context().db,current);if(current())source.postMessage({type:'COS_OWNER_CUSTODY_RESPONSE',requestId:data.requestId,snapshot},event.origin);}
+    catch{if(current())source.postMessage({type:'COS_OWNER_CUSTODY_RESPONSE',requestId:data.requestId,error:'Saved custody records unavailable.'},event.origin);}
+    return;
+  }
   if (data.type === 'COS_OPERATIONS_TOKEN_REQUEST' && typeof data.requestId === 'string' && data.requestId.length <= 100) {
     const requestedUser = owner();
     let token = null;
