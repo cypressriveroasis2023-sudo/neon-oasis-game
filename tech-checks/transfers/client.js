@@ -1,5 +1,6 @@
 // Uses the existing signed-in Supabase client. No new identity or credentials.
 import {transferReadiness,transferReadinessMessage} from './readiness.js';
+import {canRecordReceipt} from './model.js';
 export function transferClient(context) {
  const actor=context.getSession()?.user?.id,role=context.getRole();
  const current=()=>{const p=context.getProfile();return Boolean(actor&&context.getSession()?.user?.id===actor&&context.getRole()===role&&p?.user_id===actor&&p?.active===true&&!p?.archived_at);};
@@ -9,16 +10,22 @@ export function transferClient(context) {
  async function submit(args,photos,onProgress=()=>{}) {
   assert();const before=await read();
   const accepted=before.transfers.flatMap(t=>t.events||[]).find(e=>e.id===args.p_request_id);
+  const transfer=before.transfers.find(t=>t.id===args.p_transfer_id);
+  if(args.p_kind==='receipt'&&!accepted&&!canRecordReceipt(transfer))throw Object.assign(new Error('A new receipt cannot be recorded for this handoff. Reload its saved details; any recorded differences need IT / Owner review.'),{rejected:true,receiptRecorded:true});
+  if(args.p_kind==='receipt'&&!accepted&&transfer.revision!==args.p_expected_revision)throw Object.assign(new Error('The handoff changed before this receipt was saved. Review the current purpose and discard the stale draft before signing again.'),{rejected:true,staleDraft:true});
   for(let i=0;i<photos.length;i++){
    assert();if(!accepted){const {error}=await context.db.storage.from('techcheck-transfer-evidence').upload(args.p_photos[i].path,photos[i].blob,{contentType:'image/jpeg',upsert:false});assert();if(error&&String(error.statusCode)!=='409')throw new Error('Photo upload failed. Your draft is retained; reconnect and retry.');}
    onProgress(i+1,photos.length);
   }
-  const result=await rpc('submit_techcheck_transfer_v1',args);
+  // Frozen drafts from the previous client keep their original RPC and exact
+  // payload. New purpose-aware submissions always use the explicit v2 contract.
+  const result=await rpc(Object.hasOwn(args,'p_purpose')?'submit_techcheck_transfer_v2':'submit_techcheck_transfer_v1',args);
   if(result?.event_id!==args.p_request_id||result?.transfer_id!==args.p_transfer_id||!Number.isInteger(result.revision))throw new Error('The submission result could not be verified. Retry the same request.');
   return result;
  }
  async function paths(id,photos){const result=[];for(const p of photos){assert();const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await p.blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('');result.push({equipment_key:p.equipment_key||'',kind:p.kind,path:actor+'/'+id+'/'+hash+'.jpg'});}return result;}
- return {actor,current,assert,read,submit,paths,photoUrl:async path=>{assert();const {data,error}=await context.db.storage.from('techcheck-transfer-evidence').createSignedUrl(path,300);assert();if(error||!data?.signedUrl)throw new Error('Saved photo unavailable.');return data.signedUrl;}};
+ async function classify(args){const result=await rpc('classify_techcheck_transfer_purpose_v1',args);if(result?.event_id!==args.p_request_id||result?.transfer_id!==args.p_transfer_id||!Number.isInteger(result.revision))throw new Error('The purpose update could not be verified. Retry the same update.');return result;}
+ return {actor,current,assert,read,submit,classify,paths,photoUrl:async path=>{assert();const {data,error}=await context.db.storage.from('techcheck-transfer-evidence').createSignedUrl(path,300);assert();if(error||!data?.signedUrl)throw new Error('Saved photo unavailable.');return data.signedUrl;}};
 }
 let storePromise;
 function database(){if(!storePromise)storePromise=new Promise((resolve,reject)=>{const r=indexedDB.open('techcheck-transfer-drafts-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new Error('Device storage is unavailable. Enable storage before starting a handoff.'));});return storePromise;}

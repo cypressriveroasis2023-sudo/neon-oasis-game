@@ -28,13 +28,13 @@ test('desktop IT opens Fleet Map plus Camera Health; unrelated workspaces stay d
 test('phone IT has check-out/check-in only and creates a recipient-scoped handoff without truck inventory',async({page},info)=>{
  await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
  await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Check In / Return',exact:true})).toBeVisible();await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);await expect(page.locator('#legacy')).toBeHidden();await page.screenshot({path:info.outputPath('IT-phone-home.png'),fullPage:true});
- await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();await fillUnit(page);
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();await fillUnit(page);
  for(const check of await page.locator('fieldset input[type=checkbox]').all())await check.check();await sign(page,'Synthetic IT');await page.screenshot({path:info.outputPath('IT-phone-checkout.png'),fullPage:true});await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();await expect(page.getByText('Awaiting Service verification',{exact:true})).toBeVisible();
  const state=await f.db.query('select * from app_private.techcheck_transfers');expect(state.rows).toHaveLength(1);expect(state.rows[0].service_actor).toBe(SERVICE);expect(state.rows[0].state).toBe('awaiting_service');expect(f.calls.some(c=>/truck_inventory/.test(c.name||''))).toBe(false);expect(f.errors).toEqual([]);
 });
 test('phone IT receives actionable extra-parts validation and can send N/A without altering custody rules',async({page})=>{
  await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
- await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');
  await page.getByLabel('Receiving Service technician').selectOption(SERVICE);
  await page.getByLabel('Select equipment').selectOption('sniper:001');
  await page.getByRole('button',{name:'Add unit to handoff'}).click();
@@ -46,7 +46,7 @@ test('phone IT receives actionable extra-parts validation and can send N/A witho
  await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();
  await expect(page.locator('.tc-submit-error')).toContainText('Additional parts, line 1');
  await expect(parts).toBeFocused();
- expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v1')).toHaveLength(0);
+ expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v2')).toHaveLength(0);
  expect((await f.db.query('select count(*)::int n from app_private.techcheck_transfers')).rows[0].n).toBe(0);
  await parts.fill('N/A');
  await expect(page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true})).not.toBeChecked();
@@ -59,7 +59,7 @@ test('phone IT receives actionable extra-parts validation and can send N/A witho
 });
 test('IT handoff displays required-field and checklist errors instead of silently ignoring submit',async({page})=>{
  await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
- await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');
  await page.getByLabel('Receiving Service technician').selectOption(SERVICE);
  await page.getByLabel('Select equipment').selectOption('sniper:001');
  await page.getByRole('button',{name:'Add unit to handoff'}).click();
@@ -74,7 +74,7 @@ test('IT handoff displays required-field and checklist errors instead of silentl
  await sign(page,'Synthetic IT');
  await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();
  await expect(page.locator('.tc-submit-error')).toContainText('Finish the required equipment check');
- expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v1')).toHaveLength(0);
+ expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v2')).toHaveLength(0);
  expect(f.errors).toEqual([]);
 });
 test('Service sees only its own handoffs; mismatched number and SIM are recorded as unresolved',async({page},info)=>{

@@ -25,6 +25,7 @@ on:
       - 'tech-checks/it-daily-host.js'
       - 'tech-checks/it-daily-camera-host.js'
       - 'tech-checks/it-feature-availability.js'
+      - 'tech-checks/transfers/**'
       - 'tech-checks/it-mhelp-projection.js'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/operations/dist/**'
