@@ -3,8 +3,26 @@
 type Row=Record<string,any>;
 const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const identity=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v)?v:null;
-const safe=(v:unknown)=>v==null||typeof v==='boolean'||typeof v==='number'&&Number.isSafeInteger(v)||typeof v==='string'&&v.length<=600&&!/[\x00-\x1f\x7f<>]/.test(v)&&!/(password|token|secret|gate[ -]*code)\s*[:=]/i.test(v);
+// Service street lines use the same TAB/CR/LF formatting accepted by source.ts.
+// Preserve those bytes exactly; every other field keeps its single-line guard.
+const safe=(v:unknown,street=false)=>v==null||typeof v==='boolean'||typeof v==='number'&&Number.isSafeInteger(v)||typeof v==='string'&&v.length<=600&&!(street?/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/:/[\x00-\x1f\x7f<>]/).test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v);
 const customerFields=['customerId','portalId','name','isServiceLocation','isActive','address1','city','state','zip','countryId'];
+/** Structural counts only. Never retain the rows, requested parent or IDs. */
+export class InventoryCacheMembershipError extends Error{
+ readonly diagnostic:Readonly<Record<string,number>>;
+ constructor(rows:Row[],parent:string){
+  super('Invalid cached service membership');
+  const children=rows.map(r=>identity(r.serviceLocationId??r.customerId)),valid=children.filter((v):v is string=>v!==null);
+  this.diagnostic=Object.freeze({version:1,rows:rows.length,
+   missingChildIdentities:children.filter(v=>v===null).length,
+   explicitServiceIds:rows.filter(r=>r.serviceLocationId!=null).length,
+   parentMismatches:rows.filter(r=>r.serviceLocationId!=null&&identity(r.customerId)!==parent).length,
+   duplicateChildIdentities:valid.length-new Set(valid).size,
+   serviceIdEqualsCustomerId:rows.filter(r=>identity(r.serviceLocationId)!==null&&identity(r.serviceLocationId)===identity(r.customerId)).length,
+   serviceIdEqualsRequestedParent:rows.filter(r=>identity(r.serviceLocationId)===parent).length,
+   customerIdEqualsRequestedParent:rows.filter(r=>identity(r.customerId)===parent).length});
+ }
+}
 function spec(path:string){
  let m=path.match(/^\/customers\/([1-9][0-9]{0,14})\?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,city,state,zip,countryId$/);
  if(m)return {kind:'customer',id:m[1],page:0};
@@ -16,7 +34,7 @@ function spec(path:string){
 /** Drop every unrequested field before storage, even if the provider ignores Fields. */
 export function projectInventoryCache(path:string,value:unknown):unknown{
  const s=spec(path);
- const project=(r:unknown,fields:string[])=>{if(!object(r)||identity(r.portalId)!=='224643'||fields.some(k=>!safe(r[k])))throw Error('Invalid inventory cache response');return Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]));};
+ const project=(r:unknown,fields:string[])=>{if(!object(r)||identity(r.portalId)!=='224643'||fields.some(k=>!safe(r[k],k==='address1')))throw Error('Invalid inventory cache response');return Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]));};
  if(s.kind==='customer'){
   const r=project(value,customerFields);if(identity(r.customerId)!==s.id||typeof r.isServiceLocation!=='boolean'||typeof r.name!=='string'||!r.name.trim())throw Error('Invalid cached customer identity');return r;
  }
@@ -29,7 +47,7 @@ export function projectInventoryCache(path:string,value:unknown):unknown{
  const rows=object(value)?value.results??value.data:null;
  if(!object(value)||!Array.isArray(rows)||rows.length>200||!Number.isSafeInteger(value.totalRows)||value.totalRows<0||value.totalRows>5000||rows.length!==Math.min(200,Math.max(0,value.totalRows-s.page)))throw Error('Incomplete cached service page');
  const result=rows.map(r=>project(r,['serviceLocationId',...customerFields.filter(k=>k!=='isServiceLocation')]));
- if(result.some(r=>!identity(r.serviceLocationId??r.customerId)||(r.serviceLocationId!=null&&identity(r.customerId)!==s.id))||new Set(result.map(r=>identity(r.serviceLocationId??r.customerId))).size!==result.length)throw Error('Invalid cached service membership');
+ if(result.some(r=>!identity(r.serviceLocationId??r.customerId)||(r.serviceLocationId!=null&&identity(r.customerId)!==s.id))||new Set(result.map(r=>identity(r.serviceLocationId??r.customerId))).size!==result.length)throw new InventoryCacheMembershipError(result,s.id);
  return {totalRows:value.totalRows,results:result};
 }
 export const MHELP_RESOURCE_CACHE_TTL_MS=165*60*1000;
