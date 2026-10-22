@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readInventorySource} from '../../supabase/functions/cos-mhelp-inventory-sync/source.ts';
+import {createInventoryCache} from '../../supabase/functions/cos-mhelp-inventory-sync/cache.ts';
 const source={equipmentId:'1',portalId:'224643',name:'Ranger 029.2',model:null,active:true,equipmentTypeId:'2',customerId:'3',serviceLocationId:'4'};
 const review={liveAccessVerified:true,verifiedPortalId:'224643',partial:false,totalRows:1,items:[source]};
 const old={productId:'1',unitNumber:'Ranger 029.2',customerId:'3',customer:'Customer: Site',category:'Ranger',placement:'FIELD',lifecycle:'UNFLAGGED',sourceAddress:{street:'123 Main St',city:'Houston',state:'TX',zip:'77002'},binding:null};
@@ -29,4 +30,13 @@ test('cached customer/address/category dates remain older than the true equipmen
 test('new service membership refreshes the bounded cache once, while equipment consistency still rejects a concurrent move',async()=>{
  let refreshes=0;const now='2026-10-20T18:00:00Z';const v={...review,totalRows:2,items:[source,{...source,equipmentId:'2',name:'Ranger 030'}]};
  const r=await readInventorySource({review:v,baseline,now:()=>now,observedAt:()=>now,verifyEquipment:async()=>v,read:async(path,refresh)=>path.startsWith('/equipmentTypes')?catalog:path.includes('servicelocations')?(refresh?(refreshes++,{totalRows:1,results:[site]}):{totalRows:0,results:[]}):parent});assert.equal(refreshes,1);assert(r.records.every(r=>r.addressReview===null));
+});
+test('cached service addresses retain the exact multiline source text and older observation clocks',async()=>{
+ let now=Date.parse('2026-10-22T00:00:00Z'),reads=0;
+ const street='123 Main St\r\nSuite 2\tNorth',store=new Map();
+ const vendor=async path=>{reads++;return path.startsWith('/equipmentTypes')?catalog:path.includes('/servicelocations')?{totalRows:1,results:[{...site,address1:street}]}:parent;};
+ const cache=async(action,key,payload,observedAt)=>{if(action==='read'){const value=store.get(key);return value?{hit:true,...value}:{hit:false};}store.set(key,{payload,observedAt});return {saved:true};};
+ const run=async()=>{const resource=createInventoryCache({read:vendor,cache,now:()=>now});return readInventorySource({review,baseline,read:resource.read,observedAt:resource.observedAt,readStats:resource.stats,verifyEquipment:async()=>review,now:()=>new Date(now).toISOString()});};
+ const first=await run();assert.equal(first.records[0].sourceAddress.street,street);assert.equal(first.records[0].apiAssignment.placementProof.serviceVerified,true);assert.equal(reads,3);
+ now+=15*60*1000;const second=await run();assert.equal(second.records[0].sourceAddress.street,street);assert.equal(reads,3);assert.equal(second.sourceReads.cacheHits,3);assert.equal(second.records[0].sourceDates.apiAddressObservedAt,first.records[0].sourceDates.apiAddressObservedAt);assert.notEqual(second.readAt,first.readAt);assert.equal(second.records[0].apiAssignment.placementProof.version,1);
 });

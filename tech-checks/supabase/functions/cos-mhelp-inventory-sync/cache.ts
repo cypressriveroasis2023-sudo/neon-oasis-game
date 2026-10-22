@@ -3,7 +3,9 @@
 type Row=Record<string,any>;
 const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const identity=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v)?v:null;
-const safe=(v:unknown)=>v==null||typeof v==='boolean'||typeof v==='number'&&Number.isSafeInteger(v)||typeof v==='string'&&v.length<=600&&!/[\x00-\x1f\x7f<>]/.test(v)&&!/(password|token|secret|gate[ -]*code)\s*[:=]/i.test(v);
+// Service street lines use the same TAB/CR/LF formatting accepted by source.ts.
+// Preserve those bytes exactly; every other field keeps its single-line guard.
+const safe=(v:unknown,street=false)=>v==null||typeof v==='boolean'||typeof v==='number'&&Number.isSafeInteger(v)||typeof v==='string'&&v.length<=600&&!(street?/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/:/[\x00-\x1f\x7f<>]/).test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v);
 const customerFields=['customerId','portalId','name','isServiceLocation','isActive','address1','city','state','zip','countryId'];
 function spec(path:string){
  let m=path.match(/^\/customers\/([1-9][0-9]{0,14})\?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,city,state,zip,countryId$/);
@@ -16,7 +18,7 @@ function spec(path:string){
 /** Drop every unrequested field before storage, even if the provider ignores Fields. */
 export function projectInventoryCache(path:string,value:unknown):unknown{
  const s=spec(path);
- const project=(r:unknown,fields:string[])=>{if(!object(r)||identity(r.portalId)!=='224643'||fields.some(k=>!safe(r[k])))throw Error('Invalid inventory cache response');return Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]));};
+ const project=(r:unknown,fields:string[])=>{if(!object(r)||identity(r.portalId)!=='224643'||fields.some(k=>!safe(r[k],k==='address1')))throw Error('Invalid inventory cache response');return Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]));};
  if(s.kind==='customer'){
   const r=project(value,customerFields);if(identity(r.customerId)!==s.id||typeof r.isServiceLocation!=='boolean'||typeof r.name!=='string'||!r.name.trim())throw Error('Invalid cached customer identity');return r;
  }
