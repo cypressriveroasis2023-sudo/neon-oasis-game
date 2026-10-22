@@ -1008,7 +1008,12 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
   if (!state.session) return;
 
   if (!skipProfile) {
-    const { data: currentProfile } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
+    const { data: currentProfile, error: profileError, status: profileStatus } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
+    // A failed read does not establish that the account was removed or disabled.
+    // Keep the existing session; refreshData reports the failure without signing out.
+    if (profileError && (profileStatus === 0 || profileStatus === 408 || profileStatus === 429 || profileStatus >= 500)) {
+      throw new Error('Account connection interrupted. Your session remains open; try refreshing data when the connection returns.');
+    }
     if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
       await db.auth.signOut();
       return showAuth();

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {setImmediate} from 'node:timers/promises';
 import {readFileSync} from 'node:fs';
-import {createOperationsSessionRecovery,ownerSessionFingerprint,guardSessionCallback,SESSION_VERIFICATION_TIMEOUT_MS} from '../src/operationsSessionRecovery.ts';
+import {createOperationsSessionRecovery,ownerSessionFingerprint,guardSessionCallback,SESSION_VERIFICATION_TIMEOUT_MS,SESSION_RECOVERY_RETRY_MS} from '../src/operationsSessionRecovery.ts';
 const owner={authorized:true,legacyOwner:true,role:'Owner',name:'Synthetic Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:true,fleetPlacementEdit:true}};
 const flush=()=>setImmediate();
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
@@ -38,11 +38,11 @@ test('soft bursts coalesce, but a hard queued event dominates every later soft e
  const f=await fixture();f.controller.invalidate('token-renewed');f.controller.invalidate('parent-timeout');assert.equal(f.queue.length,1);f.run();assert.equal(f.requests.length,2);f.requests[1].resolve(owner);await flush();assert.ok(f.state.session);
  f.controller.invalidate('token-renewed');f.controller.invalidate('authentication-denied');f.controller.invalidate('parent-timeout');f.run();assert.equal(f.requests.length,2);assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);
 });
-for(const reason of ['token-renewed','parent-timeout','authentication-denied','security-hide',undefined])test('new '+String(reason)+' during verification fences its late successful response without reentrancy',async()=>{
+for(const reason of ['authentication-denied','security-hide',undefined])test('new '+String(reason)+' during verification fences its late successful response without reentrancy',async()=>{
  const f=await fixture();f.controller.invalidate('token-renewed');f.run();f.controller.invalidate(reason);f.requests[1].resolve(owner);await flush();f.run();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);assert.equal(f.requests.length,2);
 });
 test('mode changes before or during revalidation fail closed',async()=>{
- for(const stage of ['before','during']){const f=await fixture();f.controller.invalidate('token-renewed');if(stage==='before')f.mode='fleet';f.run();if(stage==='during')f.mode='fleet';f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);}
+ for(const stage of ['before','during']){const f=await fixture();f.controller.invalidate('token-renewed');if(stage==='before')f.mode='fleet';f.run();if(stage==='during'){f.mode='fleet';f.requests[1].resolve(owner);}else assert.equal(f.requests.length,1);await flush();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);}
 });
 test('revalidation network failure is terminal and does not retry automatically or replay a write',async()=>{
  const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.requests[1].reject(new Error('Synthetic unavailable'));await flush();f.run();f.controller.check();assert.equal(f.state.reloadRequired,true);assert.equal(f.requests.length,2);
@@ -96,10 +96,73 @@ test('a stalled initial account read leaves verification and supports a fresh ma
  requests[0].resolve(owner);await flush();assert.equal(states.at(-1).session,null);assert.equal(states.at(-1).checking,true);
  requests[1].resolve(owner);await retry;assert.equal(states.at(-1).session.authorized,true);assert.equal(states.at(-1).checking,false);controller.stop();
 });
-test('a stalled recovery requires reload and never restores a late authorized response',async t=>{
+test('a stalled recovery stays quarantined until a fresh scheduled read verifies the Owner',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  const f=await fixture();f.controller.invalidate('token-renewed');f.run();
  t.mock.timers.tick(SESSION_VERIFICATION_TIMEOUT_MS);await flush();
- assert.equal(f.state.checking,false);assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
- f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);f.controller.stop();
+ assert.equal(f.state.checking,true);assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,false);
+ f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);
+ t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS);assert.equal(f.requests.length,3);
+ f.requests[2].resolve(owner);await flush();assert.ok(f.state.session);f.controller.stop();
+});
+
+for (const first of ['parent-timeout','token-renewed']) test(first+' followed by renewal during verification requires a fresh verified read', async()=>{
+ const f=await fixture();f.controller.invalidate(first);f.run();
+ f.controller.invalidate('token-renewed');assert.equal(f.state.reloadRequired,false);assert.equal(f.state.session,null);
+ f.run();assert.equal(f.requests.length,3);
+ f.requests[1].resolve({...owner,productionOwnerUserId:'22222222-2222-4222-8222-222222222222'});await flush();assert.equal(f.state.session,null);
+ f.requests[2].resolve(owner);await flush();assert.equal(f.state.reloadRequired,false);assert.ok(f.state.session);f.controller.stop();
+});
+for(const change of [{productionOwnerUserId:'22222222-2222-4222-8222-222222222222'},{features:{...owner.features,vrmRead:false}},{authorized:false}]) test('replacement recovery rejects changed identity or permissions '+JSON.stringify(change),async()=>{
+ const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.controller.invalidate('token-renewed');f.run();
+ assert.equal(f.requests.length,3);f.requests[2].resolve({...owner,...change});await flush();assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);f.controller.stop();
+});
+test('replacement verification remains bounded and hard stops dominate',async()=>{
+ for(const reason of ['token-renewed','authentication-denied','security-hide']){
+  const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.controller.invalidate('token-renewed');f.run();assert.equal(f.requests.length,3);
+  f.controller.invalidate(reason);f.requests[1].resolve(owner);f.requests[2].resolve(owner);await flush();f.run();assert.equal(f.requests.length,3);assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);f.controller.stop();
+ }
+});
+test('obsolete verification cleanup cannot cancel the replacement deadline',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.controller.invalidate('token-renewed');f.run();
+ f.requests[1].resolve(owner);await flush();
+ t.mock.timers.tick(SESSION_VERIFICATION_TIMEOUT_MS);await flush();
+ assert.equal(f.state.reloadRequired,false);assert.equal(f.state.checking,true);assert.equal(f.state.session,null);
+ f.requests[2].resolve(owner);await flush();assert.equal(f.state.session,null);f.controller.stop();
+});
+test('renewal restart cannot accept a changed mode and a later independent renewal still recovers',async()=>{
+ const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.mode='fleet';f.controller.invalidate('token-renewed');f.run();assert.equal(f.state.reloadRequired,true);assert.equal(f.requests.length,2);f.requests[1].resolve(owner);await flush();f.controller.stop();
+ const g=await fixture();g.controller.invalidate('parent-timeout');g.run();g.controller.invalidate('token-renewed');g.run();g.requests[1].resolve(owner);g.requests[2].resolve(owner);await flush();
+ g.controller.invalidate('token-renewed');g.run();g.requests[3].resolve(owner);await flush();assert.ok(g.state.session);assert.equal(g.state.reloadRequired,false);g.controller.stop();
+});
+
+for(const status of [408,429,500,502,503,504])test('temporary session HTTP '+status+' retries only after 30 seconds without exposing private views',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=await fixture();f.controller.invalidate('token-renewed');f.run();
+ f.requests[1].reject(Object.assign(new Error('Synthetic transport failure'),{response:{status}}));await flush();
+ assert.equal(f.state.session,null);assert.equal(f.state.checking,true);assert.equal(f.state.reloadRequired,false);
+ t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS-1);assert.equal(f.requests.length,2);t.mock.timers.tick(1);assert.equal(f.requests.length,3);
+ f.requests[2].resolve(owner);await flush();assert.ok(f.state.session);f.controller.stop();
+});
+test('parent timeout during verification waits before a fresh same-Owner recovery',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=await fixture();f.controller.invalidate('parent-timeout');f.run();f.controller.invalidate('parent-timeout');
+ assert.equal(f.state.reloadRequired,false);f.requests[1].resolve(owner);await flush();assert.equal(f.state.session,null);
+ t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS);assert.equal(f.requests.length,3);f.requests[2].resolve(owner);await flush();assert.ok(f.state.session);f.controller.stop();
+});
+for(const event of ['authentication-denied','security-hide','stop','mode'])test(event+' cancels or rejects a delayed recovery',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=await fixture();f.controller.invalidate('token-renewed');f.run();f.requests[1].reject(new TypeError('Synthetic offline'));await flush();
+ if(event==='stop')f.controller.stop();else if(event==='mode')f.mode='fleet';else f.controller.invalidate(event);
+ t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS*3);await flush();assert.equal(f.requests.length,2);assert.equal(f.state.session,null);if(event!=='stop')assert.equal(f.state.reloadRequired,true);f.controller.stop();
+});
+for(const status of [400,401,403,404])test('session HTTP '+status+' never schedules recovery',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=await fixture();f.controller.invalidate('token-renewed');f.run();f.requests[1].reject(Object.assign(new Error('Denied'),{response:{status}}));await flush();
+ t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS*3);await flush();assert.equal(f.requests.length,2);assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);f.controller.stop();
+});
+test('extended offline period uses one verification read per retry interval and preserves the original Owner proof',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=await fixture();f.controller.invalidate('token-renewed');f.run();
+ for(let index=1;index<=5;index++){
+  f.requests[index].reject(new TypeError('Offline'));await flush();assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,false);
+  t.mock.timers.tick(SESSION_RECOVERY_RETRY_MS);assert.equal(f.requests.length,index+2);
+ }
+ f.requests[6].resolve({...owner,features:{...owner.features,vrmRead:false}});await flush();assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);f.controller.stop();
 });

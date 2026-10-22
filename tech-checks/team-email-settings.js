@@ -1,6 +1,6 @@
 const EMAIL_SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const EMAIL_SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
-const emailDb=supabase.createClient(EMAIL_SUPABASE_URL,EMAIL_SUPABASE_KEY);
+const emailDb=window.TechCheckDB || supabase.createClient(EMAIL_SUPABASE_URL,EMAIL_SUPABASE_KEY);
 
 function emailEsc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 async function loadTeamEmailSettings(){

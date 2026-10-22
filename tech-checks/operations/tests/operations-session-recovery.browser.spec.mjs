@@ -72,10 +72,12 @@ test('IT without a server-verified actor ID requires reload after token change',
  const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
 });
 for(const trigger of ['host-hide','pagehide','untyped-security-event','second-token-transition'])test(trigger+' during verification discards its late successful response',async({page})=>{
- const {app,state,initialSessions}=await mount(page),gate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ const {app,state,initialSessions}=await mount(page),gate=deferred(),replacementGate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ if(trigger==='second-token-transition')state.sessionGate=replacementGate;
  if(trigger==='host-hide')await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
  else await app.locator('body').evaluate((_,kind)=>dispatchEvent(kind==='pagehide'?new Event('pagehide'):kind==='second-token-transition'?new CustomEvent('cos-private-data-invalidated',{detail:{reason:'token-renewed'}}):new Event('cos-private-data-invalidated')),trigger);
- gate.resolve();await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+ if(trigger==='second-token-transition'){await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+2);await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'token-renewed'}})));}
+ gate.resolve();replacementGate.resolve();await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+(trigger==='second-token-transition'?2:1));readOnly(state);
 });
 test('verification 401 is one failed attempt with no recursive retry',async({page})=>{
  const {app,state,initialSessions}=await mount(page);state.sessionStatus=401;await renewal(page,app);await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
@@ -150,4 +152,34 @@ test('ordinary pageshow cannot reset an authentication hard stop',async({page})=
  const {app,state,initialSessions}=await mount(page);state.routerStatus=403;await refresh(app).click();await blocked(app);
  await app.locator('body').evaluate(()=>dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false})));
  await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
+});
+
+test('delayed parent renewal after a handshake timeout restores Owner without reload',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);
+ await page.evaluate(()=>{window.dropNextHandshake=true;window.syntheticSession='synthetic-session-b';});
+ await refresh(app).click();await page.clock.runFor(10000);
+ await expect.poll(()=>reasons(app)).toContain('parent-timeout');await page.clock.runFor(1);
+ await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);
+ await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.getByRole('alert')).toHaveCount(0);expect(state.sessionReads).toBe(initialSessions+2);readOnly(state);
+});
+
+for(const change of ['same Owner','changed Owner','changed permissions'])test('temporary session outage resumes only '+change+' after a delayed fresh check',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;
+ await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toHaveCount(0);
+ await expect(app.getByText('Connection interrupted. COS will reconnect automatically. Keep this window open.')).toBeVisible();
+ await page.clock.runFor(29999);expect(state.sessionReads).toBe(initialSessions+1);
+ state.sessionStatus=200;
+ if(change==='changed Owner')state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';
+ if(change==='changed permissions')state.session.features.vrmRead=false;
+ await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+2);
+ if(change==='same Owner'){await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');}
+ else await blocked(app);
+ readOnly(state);
+});
+test('logout boundary while offline cancels scheduled session recovery',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'authentication-denied'}})));
+ await blocked(app);state.sessionStatus=200;await page.clock.runFor(120000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
 });
