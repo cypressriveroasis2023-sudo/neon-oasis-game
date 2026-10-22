@@ -43,7 +43,7 @@ test('Owner Calendar has Day, Week and Month and never manufactures schedule ent
  const {app,state}=await mountFleet(page,false,{hash:'#fleet-dashboard'});
  const nav=await menuFor(app);
  await nav.getByRole('button',{name:'Calendar',exact:true}).click();
- const calendar=app.getByRole('region',{name:'COS Operations Calendar'});
+ const calendar=app.locator('.ops-calendar[aria-label="COS Operations Calendar"]');
  await expect(calendar).toBeVisible();
  for(const choice of ['Month','Week','Day'])await expect(calendar.getByRole('button',{name:choice,exact:true})).toBeVisible();
  await calendar.getByRole('button',{name:'Day',exact:true}).click();
