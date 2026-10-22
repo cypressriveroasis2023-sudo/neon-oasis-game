@@ -74,16 +74,18 @@ export function scheduledDay(value: unknown): string {
   if (typeof value !== 'string' || !value || value === 'Not scheduled') return '';
   try { const day = chicagoDay(value); dayDate(day); return day; } catch { return ''; }
 }
-export function calendarDays(cursor: string, view: 'Month' | 'Week'): string[] {
+export function calendarDays(cursor: string, view: 'Month' | 'Week' | 'Day'): string[] {
   const date = dayDate(cursor);
+  if (view === 'Day') return [dateDay(date)];
   if (view === 'Month') date.setUTCDate(1);
   date.setUTCDate(date.getUTCDate() - date.getUTCDay());
   return Array.from({ length: view === 'Week' ? 7 : 42 }, (_, offset) => {
     const next = new Date(date); next.setUTCDate(next.getUTCDate() + offset); return dateDay(next);
   });
 }
-export function moveCalendar(cursor: string, view: 'Month' | 'Week' | 'Year', direction: number): string {
+export function moveCalendar(cursor: string, view: 'Month' | 'Week' | 'Day' | 'Year', direction: number): string {
   const date = dayDate(cursor);
+  if (view === 'Day') { date.setUTCDate(date.getUTCDate() + direction); return dateDay(date); }
   if (view === 'Week') { date.setUTCDate(date.getUTCDate() + direction * 7); return dateDay(date); }
   const day = date.getUTCDate();
   date.setUTCDate(1);
