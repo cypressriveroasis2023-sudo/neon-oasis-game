@@ -2578,20 +2578,21 @@ function ownerBoardServiceTechCard(tech){
   const restocks=Array.isArray(tech.restock_requests)?tech.restock_requests:[];
   const missing=Array.isArray(tech.missing)?tech.missing:[];
   const ready=Boolean(tech.truck_ready);
+  const ownerException=Boolean(tech.owner_authorized)&&!inventory.ready;
   const truckState=inspection.truck_complete?'good':'bad';
   const trailerState=inspection.trailer_state==='not_taking'?'na':inspection.trailer_complete?'good':'bad';
   const trailerDetail=inspection.trailer_state==='not_taking'?'NOT TAKING':inspection.trailer_complete?'COMPLETE':'NOT COMPLETE';
   const stockComplete=Boolean(inventory.stock_complete);
   const verificationRequired=Boolean(inventory.verification_required);
-  const inventoryState=inventory.ready?'good':stockComplete&&verificationRequired?'na':'bad';
-  const inventoryDetail=inventory.ready?'COMPLETE':stockComplete&&verificationRequired?'AWAITING SERVICE VERIFY':'MISSING STOCK';
+  const inventoryState=inventory.ready?'good':ownerException?'na':stockComplete&&verificationRequired?'na':'bad';
+  const inventoryDetail=inventory.ready?'COMPLETE':ownerException?'OWNER CLEARED · NOT VERIFIED':stockComplete&&verificationRequired?'AWAITING SERVICE VERIFY':'MISSING STOCK';
   const unitCount=units.filter(u=>u.status==='assigned'&&u.unit_tag).length;
   const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
   const restockSummary=restocks.length
     ? '<div class="ownerCmdRestock"><b>⚠ '+restocks.length+' IT RESTOCK ITEM'+(restocks.length===1?'':'S')+'</b>'+restocks.map(r=>'<span>'+esc(r.item_type)+' · '+esc(String(r.status||'requested').replaceAll('_',' ').toUpperCase())+(r.original_ticket_no?' · #'+esc(r.original_ticket_no):'')+'</span>').join('')+'</div>'
     : '';
   return '<section class="ownerCmdTechCard '+(ready?'ready':'notReady')+'">'
-    +'<header class="ownerCmdTechHead"><div class="ownerCmdAvatar">'+esc(ownerBoardInitials(tech.name))+'</div><div><h2>'+esc(tech.name||'Service Tech')+'</h2><span>SERVICE TECHNICIAN</span></div><strong class="'+(ready?'ready':'danger')+'">'+(ready?'TRUCK READY':'NOT READY')+'</strong><button type="button" class="ownerTechControlButton" onclick="ownerOpenTechControl(\''+esc(tech.user_id||tech.service_tech_id||'')+'\')">OWNER CONTROL</button></header>'
+    +'<header class="ownerCmdTechHead"><div class="ownerCmdAvatar">'+esc(ownerBoardInitials(tech.name))+'</div><div><h2>'+esc(tech.name||'Service Tech')+'</h2><span>SERVICE TECHNICIAN</span></div><strong class="'+(ready?'ready':'danger')+'">'+(ownerException?'OWNER CLEARED':ready?'TRUCK READY':'NOT READY')+'</strong><button type="button" class="ownerTechControlButton" onclick="ownerOpenTechControl(\''+esc(tech.user_id||tech.service_tech_id||'')+'\')">OWNER CONTROL</button></header>'
     +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>DAILY READINESS</b><span>'+esc(dateLabel((state.ownerTechCommandBoard&&state.ownerTechCommandBoard.date)||localDateKey(new Date())))+'</span></div>'
       +ownerBoardCheckRow('Truck Inspection',truckState,inspection.truck_complete?'COMPLETE':'NOT COMPLETE',inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
       +ownerBoardCheckRow('Trailer Inspection',trailerState,trailerDetail,inspection.taking_trailer&&inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
@@ -2609,6 +2610,7 @@ function ownerBoardServiceTechCard(tech){
       +'</div>'
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
+      +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-daily-open="'+esc(tech.user_id||tech.service_tech_id)+'">COMPLETE DAILY REPORT AS OWNER</button>'
       +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-truck-edit="'+esc(tech.user_id||tech.service_tech_id)+'">✎ ADJUST THIS TRUCK INVENTORY</button>'
       +'<div id="ownerTruckEditor_'+esc(tech.user_id||tech.service_tech_id)+'" class="ownerCmdInventoryEditor" data-open="false"></div>'
     +'</div>'
@@ -2704,6 +2706,91 @@ async function ownerSaveAllTruckInventory(id){
  }
 }
 document.addEventListener('click',function(e){const close=e.target.closest?.('[data-owner-truck-close]');if(close){e.preventDefault();e.stopPropagation();return ownerCloseTruckInventoryEditor();}const edit=e.target.closest?.('[data-owner-truck-edit]');if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}const save=e.target.closest?.('[data-owner-save-all]');if(save){e.preventDefault();e.stopPropagation();return ownerSaveAllTruckInventory(save.dataset.ownerSaveAll);}},true);
+
+
+// Owner closes out an incomplete Service daily package under the Owner's actual
+// identity. Never write a Service receipt, physical verification or signature.
+function ownerDailyTakeoverClose(){
+  document.getElementById('ownerDailyTakeoverModal')?.remove();
+}
+function ownerDailyTakeoverOpen(userId){
+  if(state.profile?.role!=='owner')return alert('Owner account required.');
+  const id=String(userId||'');
+  const tech=(state.ownerTechCommandBoard?.service_techs||[]).find(t=>String(t.user_id||t.service_tech_id)===id);
+  if(!tech)return alert('Open today’s Team Board to load this technician.');
+  ownerCloseSimpleControl();
+  ownerDailyTakeoverClose();
+  const inspection=tech.inspection||{},inventory=tech.inventory_check||{},units=tech.units||[],sims=tech.sims||[],stock=tech.stock||{};
+  const date=localDateKey(new Date());
+  const rows=(items,format)=>items.map(format).join('');
+  const existing=[
+    '<section><b>Saved technician inspection</b><p>Truck: '+(inspection.truck_complete?'PASSED':'INCOMPLETE')+
+    ' · Trailer: '+(inspection.trailer_state==='not_taking'?'Not taking':inspection.trailer_complete?'PASSED':'INCOMPLETE')+
+    ' · Today’s inventory check: '+(inventory.ready?'VERIFIED':'NOT VERIFIED')+'</p></section>',
+    '<section><b>Last assigned truck inventory (not physically verified today)</b><p>'+
+      rows(units,u=>esc(u.equipment_type)+': '+esc(u.unit_tag||'Missing')+' · ')+
+      '</p><p>'+rows(sims,u=>'SIM '+esc(u.slot_no)+': '+esc(u.sim_number||'Missing')+' · ')+'</p>'+
+      '<p>Batteries: Recon '+esc(stock.recon_battery_qty??'?')+' · AGM 110Ah '+esc(stock.agm_12v_110ah_qty??'?')+
+      ' · LiTime 100Ah '+esc(stock.litime_12v_100ah_qty??'?')+' · 35Ah '+esc(stock.battery_12v_35ah_qty??'?')+'</p></section>'
+  ].join('');
+  const modal=document.createElement('div');
+  modal.id='ownerDailyTakeoverModal';
+  modal.className='ownerTruckInventoryModal';
+  modal.dataset.techId=id;
+  modal.dataset.checkDate=date;
+  modal.innerHTML='<div class="ownerTruckInventoryBackdrop" data-owner-daily-close></div>'+
+    '<section class="ownerTruckInventoryWorkspace" role="dialog" aria-modal="true" aria-label="Owner daily report closeout">'+
+    '<div class="ownerTruckEditorHead"><div><b>OWNER TAKEOVER · '+esc(tech.name||'Service Technician')+
+    '</b><span>'+esc(date)+' · Your account is recorded as the Owner, never as the technician.</span></div>'+
+    '<button type="button" data-owner-daily-close>✕ CLOSE</button></div>'+
+    '<div class="warn"><b>OWNER ADMINISTRATIVE CLOSEOUT</b><div>Existing inspections and assignments are read back. The technician’s inventory is NOT represented as checked or signed. No inventory quantities change.</div></div>'+
+    existing+
+    '<label style="display:block;margin-top:12px"><b>Why are you taking over?</b><textarea data-owner-daily-reason rows="3" minlength="12" maxlength="2000" placeholder="Required: explain why the technician cannot finish the report"></textarea></label>'+
+    '<label style="display:block;margin:12px 0"><input type="checkbox" data-owner-daily-dispatch> <b>Also authorize dispatch for today as Owner</b> (only if a passed safety inspection and complete recorded stock exist). Truck inventory remains explicitly UNVERIFIED; authorization automatically expires or is invalidated by stock changes.</label>'+
+    '<label style="display:block;margin:12px 0"><input type="checkbox" data-owner-daily-ack> I understand I am closing this report as the Owner, NOT signing for the technician, and recorded quantities are not proof of a physical inventory check today.</label>'+
+    '<p role="status" data-owner-daily-status>Owner report will be archived and emailed through the existing delivery queue.</p>'+
+    '<button type="button" data-owner-daily-submit>COMPLETE & SEND REPORT AS OWNER</button></section>';
+  document.body.appendChild(modal);
+  modal.querySelector('[data-owner-daily-reason]')?.focus();
+}
+async function ownerDailyTakeoverSubmit(){
+  const modal=document.getElementById('ownerDailyTakeoverModal');
+  if(!modal || state.profile?.role!=='owner')return;
+  const status=modal.querySelector('[data-owner-daily-status]');
+  const reason=modal.querySelector('[data-owner-daily-reason]')?.value.trim()||'';
+  const acknowledge=modal.querySelector('[data-owner-daily-ack]')?.checked===true;
+  const authorize=modal.querySelector('[data-owner-daily-dispatch]')?.checked===true;
+  if(reason.length<12){status.textContent='Enter a clear Owner reason (at least 12 characters).';return;}
+  if(!acknowledge){status.textContent='Confirm that this is your own Owner closeout, not the Service Tech’s signature.';return;}
+  if(!modal.dataset.reportId)modal.dataset.reportId=crypto.randomUUID();
+  const button=modal.querySelector('[data-owner-daily-submit]');
+  button.disabled=true;status.textContent='Saving your audited Owner closeout…';
+  try{
+    const {data,error}=await db.rpc('owner_takeover_service_daily_v1',{
+      p_report_id:modal.dataset.reportId,
+      p_service_tech_id:modal.dataset.techId,
+      p_check_date:modal.dataset.checkDate,
+      p_reason:reason,
+      p_authorize_departure:authorize,
+      p_owner_acknowledged:true
+    });
+    if(error)throw error;
+    if(!data?.id || (data?.delivery_status!=='queued' && !data?.replayed))throw new Error('Owner completion response could not be verified.');
+    status.textContent='OWNER CLOSEOUT SAVED · Report ID '+data.id+' · '+(data.owner_authorized?'Departure authorized as an Owner exception; inventory UNVERIFIED. ':'Inventory still requires technician verification. ')+'Drive/email delivery queued (normally checks every five minutes).';
+    status.setAttribute('data-owner-daily-complete','true');
+    button.remove();
+    await refreshData();
+  }catch(error){
+    status.textContent='Not completed: '+(error?.message||'Unknown error')+'. Your reason remains available to retry.';
+    button.disabled=false;
+  }
+}
+document.addEventListener('click',event=>{
+  const open=event.target.closest?.('[data-owner-daily-open]');
+  if(open){event.preventDefault();event.stopPropagation();ownerDailyTakeoverOpen(open.dataset.ownerDailyOpen);return;}
+  if(event.target.closest?.('[data-owner-daily-close]')){event.preventDefault();ownerDailyTakeoverClose();return;}
+  if(event.target.closest?.('[data-owner-daily-submit]')){event.preventDefault();void ownerDailyTakeoverSubmit();}
+},true);
 
 function ownerBoardITSupportHtml(itTechs){
   const techs=Array.isArray(itTechs)?itTechs:[];
@@ -2828,8 +2915,8 @@ function ownerTodayReadinessHtml(){
     const inspection=t.inspection||{},inv=t.inventory_check||{};
     const sims=Array.isArray(t.sims)?t.sims:[];
     const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
-    const ready=Boolean(t.truck_ready);
-    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(simCount===3?'good':'bad')+'">SIMs '+simCount+'/3</i><i class="'+(inv.ready?'good':inv.stock_complete?'neutral':'bad')+'">Inventory '+(inv.ready?'✓':inv.stock_complete?'VERIFY':'✕')+'</i></div></article>';
+    const ready=Boolean(t.truck_ready),ownerCleared=Boolean(t.owner_authorized)&&!inv.ready;
+    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ownerCleared?'OWNER CLEARED · VERIFY DUE':ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(simCount===3?'good':'bad')+'">SIMs '+simCount+'/3</i><i class="'+(inv.ready?'good':inv.stock_complete?'neutral':'bad')+'">Inventory '+(inv.ready?'✓':inv.stock_complete?'VERIFY':'✕')+'</i></div></article>';
   }).join('')+'</div></section>';
 }
 function ownerTodayJobsHtml(){
@@ -3115,7 +3202,7 @@ function ownerOpenTechControl(userId){
    +'<button type="button" onclick="ownerOpenAccount(\''+esc(id)+'\')"><b>ACCOUNT &amp; PASSWORD</b><span>View account details and reset their password</span></button>'
    +'<button class="primary" type="button" onclick="ownerTechAssignJob(\''+esc(id)+'\')"><b>GIVE JOB</b><span>Create or assign Tech Check work</span></button>'
    +'<button type="button" onclick="ownerTechHistory(\''+esc(id)+'\')"><b>VIEW HISTORY</b><span>See this technician’s recorded activity</span></button>'
-   +(role==='service'?'<button type="button" onclick="ownerTechManageTruck(\''+esc(id)+'\')"><b>MANAGE TRUCK</b><span>Adjust units, SIMs and truck stock</span></button>':'')
+   +(role==='service'?'<button type="button" data-owner-daily-open="'+esc(id)+'"><b>COMPLETE DAILY AS OWNER</b><span>Audited Owner closeout and optional departure exception</span></button><button type="button" onclick="ownerTechManageTruck(\''+esc(id)+'\')"><b>MANAGE TRUCK</b><span>Adjust units, SIMs and truck stock</span></button>':'')
    +'<button type="button" onclick="ownerTechTestScreen(\''+esc(role)+'\')"><b>TEST '+esc(role==='service'?'SERVICE':'IT')+' SCREEN</b><span>Open the technician-side workflow screen</span></button>'
    +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
   overlay.classList.add('open');
