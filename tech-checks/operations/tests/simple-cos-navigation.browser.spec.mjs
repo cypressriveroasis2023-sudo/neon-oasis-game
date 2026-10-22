@@ -5,7 +5,7 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 async function menuFor(app){
  const more=app.getByRole('button',{name:'More',exact:true});
  if(await more.isVisible())await more.click();
- return app.getByRole('navigation',{name:'COS daily navigation',exact:true});
+ return app.getByRole('navigation',{name:'COS Operations',exact:true});
 }
 
 test('Owner sees eight focused workspaces, an authenticated TV link, and verified fleet cards',async({page},info)=>{
