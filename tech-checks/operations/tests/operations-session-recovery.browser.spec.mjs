@@ -72,11 +72,12 @@ test('IT without a server-verified actor ID requires reload after token change',
  const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
 });
 for(const trigger of ['host-hide','pagehide','untyped-security-event','second-token-transition'])test(trigger+' during verification discards its late successful response',async({page})=>{
- const {app,state,initialSessions}=await mount(page),gate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ const {app,state,initialSessions}=await mount(page),gate=deferred(),replacementGate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ if(trigger==='second-token-transition')state.sessionGate=replacementGate;
  if(trigger==='host-hide')await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
  else await app.locator('body').evaluate((_,kind)=>dispatchEvent(kind==='pagehide'?new Event('pagehide'):kind==='second-token-transition'?new CustomEvent('cos-private-data-invalidated',{detail:{reason:'token-renewed'}}):new Event('cos-private-data-invalidated')),trigger);
  if(trigger==='second-token-transition'){await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+2);await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'token-renewed'}})));}
- gate.resolve();await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+(trigger==='second-token-transition'?2:1));readOnly(state);
+ gate.resolve();replacementGate.resolve();await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+(trigger==='second-token-transition'?2:1));readOnly(state);
 });
 test('verification 401 is one failed attempt with no recursive retry',async({page})=>{
  const {app,state,initialSessions}=await mount(page);state.sessionStatus=401;await renewal(page,app);await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
