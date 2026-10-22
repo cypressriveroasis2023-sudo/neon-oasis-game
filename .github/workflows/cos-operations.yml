@@ -167,7 +167,7 @@ jobs:
         id: build
       - name: Install pinned project browser
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-        timeout-minutes: 5
+        timeout-minutes: 15
         id: browser_install
       - name: Verify legacy camera saved reads and guarded placement
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
