@@ -1,0 +1,51 @@
+name: Rebuild approved PR273 helper
+on:
+  push:
+    branches:
+      - verify/pr273-helper-rebuild-20261022
+permissions:
+  contents: write
+jobs:
+  rebuild:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: verify/pr273-helper-rebuild-20261022
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package.json
+      - run: npm install --no-audit --no-fund
+      - name: Build and verify exact approved helper
+        run: |
+          node --input-type=module <<'NODE'
+          import {build} from 'esbuild';
+          import {createHash} from 'node:crypto';
+          import {writeFile,mkdir} from 'node:fs/promises';
+          import {resolve} from 'node:path';
+          const source=resolve('../supabase/functions/cos-operations-pages/mhelpEquipmentAssignmentReview.ts');
+          const built=await build({
+            stdin:{contents:`export {reviewOwnerEquipmentAssignments} from ${JSON.stringify(source)};`,resolveDir:resolve('.')},
+            bundle:true,write:false,format:'iife',globalName:'CosOwnerAssignmentReviewRelease',
+            platform:'neutral',target:'es2022',minifyWhitespace:true,minifySyntax:true
+          });
+          const helper=built.outputFiles[0].text+'\n';
+          const sha=createHash('sha256').update(helper).digest('hex');
+          if(sha!=='db75da92a418caac35a3678851a134f3406eaf13850fc9cf446913ec12e2c8c6') throw Error('Compiled helper SHA drift: '+sha);
+          await mkdir('review-artifacts',{recursive:true});
+          await writeFile('review-artifacts/pr273-compiled-helper.txt',helper);
+          await writeFile('review-artifacts/pr273-compiled-helper.sha256',sha+'  pr273-compiled-helper.txt\n');
+          NODE
+      - name: Save exact verified helper on temporary branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add review-artifacts/pr273-compiled-helper.txt review-artifacts/pr273-compiled-helper.sha256
+          git commit -m "chore: save verified PR273 helper [skip ci]"
+          git push
