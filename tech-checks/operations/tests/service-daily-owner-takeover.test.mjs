@@ -64,7 +64,7 @@ before(async()=>{
   return jsonb_build_object(
     'service_tech_id',p_service_tech_id,
     'inspection_ready',v_inspection_ready,
-    'inventory_ready',v_inventory_ready,
+    'inventory_ready',coalesce(v_inventory_ready,false),
     'units',v_units,'sims',v_sims,'stock',v_stock,'restock_requests',v_restocks,
     'departure_ready',coalesce(v_inspection_ready,false) and coalesce(v_inventory_ready,false),
     'stub',true
