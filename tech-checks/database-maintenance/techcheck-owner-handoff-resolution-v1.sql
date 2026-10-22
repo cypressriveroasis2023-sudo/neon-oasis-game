@@ -57,6 +57,7 @@ declare
  v_after_keys text[];
  v_reserved_keys text[];
  v_differences jsonb;
+ v_before_manifest jsonb;
  v_next_revision integer;
  v_snapshot jsonb;
 begin
@@ -150,7 +151,8 @@ begin
   end if;
  end loop;
 
- v_differences:=app_private.techcheck_transfer_differences_v2(v_t.manifest,v_items,p_purpose);
+ v_before_manifest:=v_t.manifest;
+ v_differences:=app_private.techcheck_transfer_differences_v2(v_before_manifest,v_items,p_purpose);
  if v_differences<>'[]'::jsonb then
   raise exception 'The selected Service receipt still has an equipment discrepancy. Resolve the exact unit, SIM or parts before completing it.';
  end if;
@@ -172,7 +174,7 @@ begin
   'version',1,'transfer_id',v_t.id,'state',v_t.state,'revision',v_t.revision,
   'purpose',v_t.purpose,'purpose_revision',v_t.purpose_revision,
   'it_name',v_t.it_name,'service_name',v_t.service_name,
-  'expected',v_t.manifest,'actual',v_items,'differences','[]'::jsonb,
+  'expected',v_before_manifest,'actual',v_items,'differences','[]'::jsonb,
   'selected_receipt_event_id',v_receipt.id,
   'selected_receipt_signed_by',v_receipt.actor_id,
   'selected_receipt_actor_name',v_receipt.actor_name,
