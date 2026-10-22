@@ -163,3 +163,22 @@ test('delayed parent renewal after a handshake timeout restores Owner without re
  await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  await expect(app.getByRole('alert')).toHaveCount(0);expect(state.sessionReads).toBe(initialSessions+2);readOnly(state);
 });
+
+for(const change of ['same Owner','changed Owner','changed permissions'])test('temporary session outage resumes only '+change+' after a delayed fresh check',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;
+ await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toHaveCount(0);
+ await page.clock.runFor(29999);expect(state.sessionReads).toBe(initialSessions+1);
+ state.sessionStatus=200;
+ if(change==='changed Owner')state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';
+ if(change==='changed permissions')state.session.features.vrmRead=false;
+ await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+2);
+ if(change==='same Owner'){await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');}
+ else await blocked(app);
+ readOnly(state);
+});
+test('logout boundary while offline cancels scheduled session recovery',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'authentication-denied'}})));
+ await blocked(app);state.sessionStatus=200;await page.clock.runFor(120000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+});
