@@ -3,7 +3,7 @@
  * PostgreSQL + authenticated integration tests. NO direct table writes.
  */
 import {previewMhelpEquipmentCsv,parseEquipmentCsv} from './mhelpEquipmentCsvPreview.ts';
-import {read2027CensusFromGoogle,type VerifiedProductCensus} from './mhelp2027ProductCensus.ts';
+import {read2027CensusFromGoogle,safeCensusFailureReason,type VerifiedProductCensus} from './mhelp2027ProductCensus.ts';
 import type {SheetsAssertionSigner} from './googleSheets.ts';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,7 +31,7 @@ export async function currentSource(o:BridgeOptions){
  const rows=parseEquipmentCsv(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
  let census:VerifiedProductCensus;
  try{census=await (o.verifyCensus||read2027CensusFromGoogle)({...o.google,sourceFilename:source.sourceFilename,candidate:rows});}
- catch{invalid('CURRENT_2027_PRODUCT_CENSUS_NOT_VERIFIED');}
+ catch(error){invalid('CURRENT_2027_PRODUCT_CENSUS_NOT_VERIFIED: '+safeCensusFailureReason(error));}
  if(!census||census.verifiedBy!=='cos_sheets_service'||!HASH.test(census.sourceSha256)||census.total!==rows.length||census.productRows?.length!==rows.length||census.field!==preview.inventory.field||census.shop!==preview.inventory.shop)invalid('current 2027 Product ID membership failed');
  const previous=o.previous as {sourceSha256?:unknown};
  if(!previous||typeof previous.sourceSha256!=='string'||!HASH.test(previous.sourceSha256))invalid('last reviewed source guard unavailable');

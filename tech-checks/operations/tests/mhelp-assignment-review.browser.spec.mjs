@@ -57,3 +57,21 @@ test('large continuity review stays compact, exposes the exact manifest, and kee
  await app.getByRole('button',{name:'Review current assignment identities'}).click();await expect(review.getByRole('alert')).toContainText('Product 7000100: Current link evidence is ambiguous');
  await review.getByRole('checkbox').check();await review.getByRole('textbox').fill('This note cannot authorize an unresolved current identity blocker.');await expect(approve).toBeDisabled();expect(approvals).toBe(1);
 });
+
+test('failed source proof shows safe diagnostics and keeps Stage hidden until a fresh verified preview',async({page})=>{
+ const {app}=await mountFleet(page,false,{features:{ownerEquipmentImportEnabled:true}});let verified=false,writes=0;
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fallback();
+  const request=route.request().postDataJSON();if(!request.path.startsWith('/api/mhelpdesk/equipment/'))return route.fallback();
+  if(!request.path.endsWith('/preview')){writes++;return route.abort();}
+  return route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{contract:'COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1',previewOnly:true,readyToCommit:false,sourceSha256:sha,inventory:{total:1001,field:284,shop:717,inactive:0},changes:{unchanged:1001,added:0,absent:0,placement:0,customer:0,address:0,identityReview:0},samples:[],censusStatus:verified?'verified':'unavailable',...(!verified?{censusFailureReason:'The tracker source-export evidence is incomplete or cites a different export. Reconcile the current source explicitly; preserve historical evidence.'}:{}),admission:{counts:{unchanged:1001,assignment_change:0,new_source_only:0},totalHeld:0},guardNotice:'Explicit Owner review required'}});
+ });
+ await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await app.getByLabel('Original mHelpDesk equipment CSV').setInputFiles({name:'ServiceItem_List_20261022134456.csv',mimeType:'text/csv',buffer:Buffer.from('synthetic complete CSV')});
+ await app.getByRole('button',{name:'Preview equipment changes'}).click();
+ await expect(app.getByText(/The tracker source-export evidence/)).toBeVisible();
+ await expect(app.getByRole('button',{name:'Stage reviewed inventory (no Fleet changes)'})).toHaveCount(0);
+ verified=true;await app.getByRole('button',{name:'Preview equipment changes'}).click();
+ await expect(app.getByRole('button',{name:'Stage reviewed inventory (no Fleet changes)'})).toBeEnabled();
+ await expect(app.getByText(/The tracker source-export evidence/)).toHaveCount(0);expect(writes).toBe(0);
+});

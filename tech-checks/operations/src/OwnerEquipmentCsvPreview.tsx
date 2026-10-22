@@ -100,6 +100,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
    <p><strong>2027 Product ID proof:</strong> {preview.censusStatus==='verified'?'Verified against current 2027 workbook':'Unavailable — no equipment writes permitted'}.</p>
    <p><strong>Admission review:</strong> {preview.admission.counts.unchanged} unchanged · {preview.admission.counts.assignment_change} assignment changes · {preview.admission.counts.new_source_only} new source records · {preview.admission.totalHeld} held for protected identity or placement review. An explicit guarded Owner commit is required.</p>
    <p role='status'>{preview.guardNotice}</p>
+   {preview.censusStatus==='unavailable'&&preview.censusFailureReason&&<p role='status'>{preview.censusFailureReason}</p>}
    {allowStage&&preview.censusStatus==='verified'&&!stage&&<button type='button' onClick={stageChanges} disabled={pending}>Stage reviewed inventory (no Fleet changes)</button>}
    {!allowStage&&<p>Protected equipment save is awaiting independently reviewed backend installation. Preview remains read-only.</p>}
    {stage&&!applied&&<section aria-label='Protected Owner approval'>

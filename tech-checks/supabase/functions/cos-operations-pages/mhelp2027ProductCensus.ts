@@ -16,7 +16,25 @@ const SCOPE='https://www.googleapis.com/auth/spreadsheets.readonly';
 type ObjectRow=Record<string,any>;
 const object=(v:unknown):v is ObjectRow=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const normalized=(v:string)=>v.trim().replace(/\s+/g,' ').toLowerCase();
-function fail(msg:string):never{throw new Error('Current 2027 workbook verification failed: '+msg);}
+const SAFE_CENSUS_REASONS:Readonly<Record<string,string>>={
+ 'mHelp source lookup is incomplete or stale':'The tracker source-export evidence is incomplete or cites a different export. Reconcile the current source explicitly; preserve historical evidence.',
+ 'current placement or customer assignment disagrees with mHelp':'Current tracker placement or customer assignment differs from the uploaded mHelp source.',
+ 'mHelp source and indexed identity/customer disagree':'The indexed mHelp unit identity or customer differs from the uploaded source.',
+ '2027 workbook does not match the uploaded mHelp Product IDs':'The complete tracker Product ID census differs from the uploaded source.',
+ 'the 2027 family-qualified unit identity is inconsistent with the index':'The tracker family-qualified unit identity differs from its index.',
+ 'Google Viewer configuration is invalid':'The protected Google Viewer configuration is unavailable.',
+ 'the protected Google Viewer connection is unavailable':'The protected Google Viewer connection is unavailable.',
+};
+class CensusVerificationError extends Error {}
+/** Only fixed server validation reasons may reach the Owner. Never expose provider errors. */
+export function safeCensusFailureReason(error:unknown):string{
+ if(error instanceof CensusVerificationError){
+  const detail=error.message.slice('Current 2027 workbook verification failed: '.length);
+  return SAFE_CENSUS_REASONS[detail]??'The protected current 2027 workbook verification failed. No equipment writes are permitted.';
+ }
+ return 'The protected current 2027 workbook verification is unavailable. No equipment writes are permitted.';
+}
+function fail(msg:string):never{throw new CensusVerificationError('Current 2027 workbook verification failed: '+msg);}
 export type VerifiedProductCensus={
   contract:'COS_VERIFIED_2027_PRODUCT_CENSUS_V1';sourceSha256:string;
   observedAt:string;verifiedBy:'cos_sheets_service';productIds:readonly string[];

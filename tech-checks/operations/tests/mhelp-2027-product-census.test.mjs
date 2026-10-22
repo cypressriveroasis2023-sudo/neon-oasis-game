@@ -86,3 +86,14 @@ test('real local 1,001-row source validates 287 Field / 714 Shop only with 2027-
 test('server Google Viewer rejects missing service-account secret',async()=>{
  await assert.rejects(read2027CensusFromGoogle({getServiceAccountJson:()=>null,sourceFilename:filename,candidate:candidate()}),/Viewer connection is unavailable/);
 });
+
+test('stale-source diagnostics are allowlisted while arbitrary provider text is redacted',async()=>{
+ const {safeCensusFailureReason}=await import('../../supabase/functions/cos-operations-pages/mhelp2027ProductCensus.ts');
+ let error;
+ try{await verify(mockRangeData(candidate(),{file:'ServiceItem_List_20261020172623.csv'}));}catch(e){error=e;}
+ assert.match(safeCensusFailureReason(error),/source-export evidence/);
+ assert.match(safeCensusFailureReason(error),/preserve historical evidence/);
+ assert.ok(!safeCensusFailureReason(new Error('Bearer SECRET customer@example.com')).includes('SECRET'));
+ const out=await verify(mockRangeData(candidate()));
+ assert.equal(out.total,2);
+});
