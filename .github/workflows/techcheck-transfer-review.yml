@@ -4,6 +4,8 @@ on:
     paths:
       - '.github/workflows/techcheck-transfer-review.yml'
       - 'tech-checks/transfers/**'
+      - 'tech-checks/app.js'
+      - 'tech-checks/index.html'
       - 'tech-checks/service-transfer-host.js'
       - 'tech-checks/service-signoff-ui.js'
       - 'tech-checks/it-daily-host.js'

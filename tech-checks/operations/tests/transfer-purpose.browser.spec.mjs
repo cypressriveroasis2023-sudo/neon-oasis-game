@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,IT,SERVICE} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,IT,SERVICE,OWNER} from './helpers/transfer-fixture.mjs';
 
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 const solar={equipment_key:'solar_spotter:039',family:'Solar Spotter',unit_tag:'039',sims:['00123456789012345670'],battery_count:null,battery_configuration:null,parts:[]};
@@ -152,5 +152,30 @@ test('audited legacy purpose update preserves four receipts and asks Service for
  const after=(await f.db.query('select id,request,snapshot,photos from app_private.techcheck_transfer_events order by id')).rows;
  expect(after.filter(event=>before.some(old=>old.id===event.id))).toEqual(before);expect(after).toHaveLength(7);
  expect((await f.db.query('select count(*)::int n from service_truck_units')).rows[0].n).toBe(0);
+ expect(f.errors).toEqual([]);
+});
+
+test('Owner opens equipment desk and completes legacy four-receipt replenishment with one audited resolution',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ f=await mountTransfers(page,{role:'service',seedHandoff:true,legacyHandoff:true,seedItems:[{...solar,battery_count:4}],legacyReceiptCounts:[0,0,0,4]});
+ const before=(await f.db.query('select * from app_private.techcheck_transfer_events order by signed_at,id')).rows;
+ const outbox=(await f.db.query('select count(*)::int n from app_private.techcheck_transfer_outbox')).rows[0].n;
+ await page.evaluate(async owner=>{fixture.actor=owner;fixture.role='owner';document.getElementById('appView').hidden=true;const root=document.createElement('section');document.body.append(root);const {mountTransferDesk}=await import('/tech-checks/transfers/desk.js');mountTransferDesk(root,TechCheckContext,{role:'it'});},OWNER);
+ await page.getByRole('button',{name:'Complete as Owner',exact:true}).click();
+ await expect(page.getByLabel('Owner handoff purpose')).toHaveValue('truck_replenishment');
+ await expect(page.getByLabel('Signed Service receipt').locator('option')).toHaveCount(4);
+ await page.getByLabel('Owner resolution reason').fill('Truck replenishment — batteries tracked separately in daily truck inventory.');
+ await page.getByRole('button',{name:'Complete handoff as Owner',exact:true}).click();
+ expect(f.calls.filter(c=>c.name==='owner_resolve_techcheck_transfer_v1')).toHaveLength(0);
+ await page.getByRole('button',{name:'View saved equipment photo',exact:true}).click();
+ await expect(page.getByRole('link',{name:'Open saved equipment photo'})).toBeVisible();
+ await page.getByLabel('I reviewed the saved equipment photo and confirm the exact unit identity',{exact:true}).check();
+ await page.getByRole('button',{name:'Complete handoff as Owner',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Owner completion saved');
+ const saved=(await f.db.query('select * from app_private.techcheck_transfers')).rows[0];
+ expect(saved.state).toBe('accepted');expect(saved.revision).toBe(6);expect(saved.purpose).toBe('truck_replenishment');expect(saved.manifest[0].battery_count).toBeNull();
+ const events=(await f.db.query('select * from app_private.techcheck_transfer_events order by signed_at,id')).rows;
+ expect(events.filter(e=>e.kind==='receipt')).toHaveLength(4);expect(events.filter(e=>e.kind==='owner_resolution')).toHaveLength(1);expect(events.filter(e=>e.kind!=='owner_resolution')).toEqual(before);expect(events.at(-1).actor_id).toBe(OWNER);
+ expect((await f.db.query('select count(*)::int n from app_private.techcheck_transfer_outbox')).rows[0].n).toBe(outbox);
  expect(f.errors).toEqual([]);
 });

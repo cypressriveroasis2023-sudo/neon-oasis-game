@@ -52,3 +52,14 @@ test('direct clients stop if the profile is disabled before submission',async()=
  const f=fixture();const client=transferClient(f.c);f.state.active=false;
  await assert.rejects(client.submit({p_request_id:id},[]),/session changed/);assert.deepEqual(f.calls,[]);
 });
+
+test('actual Owner uses the backend IT handoff scope without changing identity or accepting another role',async()=>{
+ const f=fixture(name=>({data:name===TRANSFER_READINESS_RPC?ready():{version:1,role:'it',transfers:[],equipment:[],technicians:[]}}));
+ f.state.role='owner';f.c.getProfile=()=>({user_id:f.state.id,role:f.state.role,active:true,archived_at:null});f.c.getEffectiveRole=()=>f.state.role;
+ assert.equal((await transferReadiness(f.c,'owner')).ready,true);
+ const client=transferClient(f.c);assert.equal(client.actor,id);assert.equal(client.owner(),true);assert.equal((await client.read()).role,'it');
+ for(const response of [{...ready(),role:'owner'},{...ready(),role:'service'},{...ready(),actor_id:'other'},{...ready(),ready:false}]){
+  const g=fixture({data:response});g.state.role='owner';g.c.getProfile=f.c.getProfile;assert.equal((await transferReadiness(g.c,'owner')).ready,false);
+ }
+ f.calls.length=0;f.c.getEffectiveRole=()=> 'it';assert.equal((await transferReadiness(f.c,'owner')).ready,false);assert.deepEqual(f.calls,[]);
+});
