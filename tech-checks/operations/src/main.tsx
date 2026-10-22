@@ -8,6 +8,7 @@ import './companyTheme.css';
 import './cameraHealthOverview.css';
 import './visionAreas.css';
 import './mhelpTicketPrivateSample.css';
+import './simpleCosNavigation.css';
 // The approved company workspace is dark, including technician assignment mode.
 document.documentElement.dataset.theme = 'dark';
 const root = document.getElementById('root');
