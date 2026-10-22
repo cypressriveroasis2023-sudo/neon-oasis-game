@@ -48,3 +48,13 @@ test('cache-looking errors with appended vendor details stay private',async()=>{
   const body=await (await handler(runRequest())).json();assert.equal(body.reason,undefined);assert.equal(body.failureStage,'resources');assert(!JSON.stringify(body).includes('synthetic-private'));
  }
 });
+test('scheduled membership rejection returns structural counts without IDs or source content',async()=>{
+ let writes=0;
+ const path='/customers/3/servicelocations?pageSize=200&rowIndex=0&Fields=serviceLocationId,customerId,portalId,name,isActive,address1,city,state,zip,countryId';
+ const handler=createInventoryComparisonHandler({authenticate:async()=>true,readEquipment:async()=>review,readBaseline:async()=>baseline,readSource:async()=>projectInventoryCache(path,{totalRows:1,results:[{serviceLocationId:987654,customerId:987654,portalId:224643,name:'synthetic-private-customer',address1:'synthetic-private-address'}]}),writeSource:async()=>{writes++;}});
+ const response=await handler(runRequest()),body=await response.json();assert.equal(response.status,503);assert.equal(body.failureStage,'resources');assert.equal(body.reason,'Invalid cached service membership');assert.equal(body.inventoryWrites,0);assert.equal(writes,0);
+ assert.deepEqual(body.cacheMembership,{version:1,rows:1,missingChildIdentities:0,explicitServiceIds:1,parentMismatches:1,duplicateChildIdentities:0,serviceIdEqualsCustomerId:1,serviceIdEqualsRequestedParent:0,customerIdEqualsRequestedParent:0});
+ assert(!JSON.stringify(body).includes('synthetic-private'));assert(!JSON.stringify(body).includes('987654'));
+ const forged=createInventoryComparisonHandler({authenticate:async()=>true,readEquipment:async()=>review,readBaseline:async()=>baseline,readSource:async()=>{throw Object.assign(Error('Invalid cached service membership'),{diagnostic:{token:'synthetic-private'}});}});
+ const rejected=await (await forged(runRequest())).json();assert.equal(rejected.cacheMembership,undefined);assert(!JSON.stringify(rejected).includes('synthetic-private'));
+});

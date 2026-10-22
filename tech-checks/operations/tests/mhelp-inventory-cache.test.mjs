@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {PGlite} from '@electric-sql/pglite';
-import {createInventoryCache,projectInventoryCache} from '../../supabase/functions/cos-mhelp-inventory-sync/cache.ts';
+import {createInventoryCache,projectInventoryCache,InventoryCacheMembershipError} from '../../supabase/functions/cos-mhelp-inventory-sync/cache.ts';
 const path='/customers/3?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,city,state,zip,countryId',key='224643:'+path;
 const parent={customerId:3,portalId:224643,name:'Synthetic customer',isServiceLocation:false,address1:'Original service street'};
 test('only fixed projected portal/customer/service/category identities enter the cache',()=>{
@@ -17,6 +17,16 @@ test('only the projected street field permits source-supported formatting whites
  for(const code of [0,1,8,11,12,14,31,127])assert.throws(()=>projectInventoryCache(path,{...parent,address1:'Street'+String.fromCharCode(code)+'Suite'}));
  for(const name of ['name','city','state','zip'])assert.throws(()=>projectInventoryCache(path,{...parent,[name]:'Line 1\nLine 2'}));
  assert.throws(()=>projectInventoryCache(service,{totalRows:1,results:[{...parent,serviceLocationId:4,customerId:9,address1}]}));
+});
+test('rejected membership distinguishes missing, mismatched and duplicate identities using counts only',()=>{
+ const service='/customers/3/servicelocations?pageSize=200&rowIndex=0&Fields=serviceLocationId,customerId,portalId,name,isActive,address1,city,state,zip,countryId';
+ const row={...parent,serviceLocationId:4,name:'synthetic-private-customer',address1:'synthetic-private-street'};
+ const cases=[[[{...row,serviceLocationId:0}],{missingChildIdentities:1,parentMismatches:0,duplicateChildIdentities:0}],[[{...row,customerId:9}],{missingChildIdentities:0,parentMismatches:1,duplicateChildIdentities:0}],[[row,row],{missingChildIdentities:0,parentMismatches:0,duplicateChildIdentities:1}],[[{...row,customerId:4}],{serviceIdEqualsCustomerId:1,parentMismatches:1}]];
+ for(const [rows,expected] of cases)assert.throws(()=>projectInventoryCache(service,{totalRows:rows.length,results:rows}),error=>{
+  assert(error instanceof InventoryCacheMembershipError);assert.equal(error.message,'Invalid cached service membership');assert.equal(error.diagnostic.version,1);assert.equal(error.diagnostic.rows,rows.length);
+  for(const [key,value] of Object.entries(expected))assert.equal(error.diagnostic[key],value);
+  assert(Object.isFrozen(error.diagnostic));assert(Object.values(error.diagnostic).every(v=>Number.isSafeInteger(v)&&v>=0&&v<=200));assert(!JSON.stringify(error).includes('synthetic-private'));assert(!Object.hasOwn(error,'rows'));assert(!Object.hasOwn(error,'parent'));return true;
+ });
 });
 test('cold workers reuse actual observations, refresh expired or newly assigned resources, and never claim an unconfirmed cache write',async()=>{
  let now=Date.parse('2026-10-20T00:00:00Z'),calls=0,street=parent.address1;const store=new Map();
