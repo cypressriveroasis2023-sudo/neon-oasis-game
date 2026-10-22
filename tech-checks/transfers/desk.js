@@ -92,6 +92,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    const receipt=latestReceiptEvent(t);
    if(!hasTransferPurpose(t.purpose)&&['awaiting_service','discrepancy'].includes(t.state))c.append(element('p','IT / Owner must record whether this equipment is for truck replenishment or installation. Service can confirm receipt after that purpose is saved.','tc-purpose-note'));
    if(t.can_classify_purpose)c.append(button('Choose handoff purpose',()=>classifyPurpose(t),true));
+   if(client.owner()&&receipt&&['awaiting_service','discrepancy'].includes(t.state))c.append(button('Complete as Owner',()=>ownerResolve(t)));
    if(role==='it'){
     const homeRevision=revision;void deviceDraft(client.actor+':purpose:'+t.id).then(savedPurpose=>{if(!current()||homeRevision!==revision||!c.isConnected||!savedPurpose?.request)return;c.append(button('Verify saved purpose update',()=>classifyPurpose(t),true));}).catch(()=>{});
    }
@@ -154,6 +155,52 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
     }
     busy=true;const controls=[...root.querySelectorAll('button,input,select,textarea')];for(const control of controls)control.disabled=true;
     try{guard();if(!navigator.onLine)throw new Error('Offline. Reconnect and retry the same purpose update.');await client.classify(state.request);guard();await deviceDraft(key,undefined,true);guard();await load('Purpose saved. Service must confirm receipt under the recorded purpose. Earlier signed receipts are unchanged.');}
+    catch(error){if(current()){if(error.rejected){state.request=null;await deviceDraft(key,state).catch(()=>{});}paint();showSubmitError(error.message);}}
+    finally{busy=false;for(const control of controls)if(control.isConnected)control.disabled=false;}
+   };
+   paint();
+  }catch(error){message(error.message,true);}
+ }
+ async function ownerResolve(transfer){
+  if(busy||!client.owner())return;
+  const receipts=(transfer.events||[]).filter(event=>event.kind==='receipt');
+  if(!receipts.length){message('No signed Service receipt is available for Owner completion.',true);return;}
+  const turn=++revision,key=client.actor+':owner-resolution:'+transfer.id;
+  try{
+   let saved=await deviceDraft(key);guard();if(turn!==revision)return;
+   const latest=latestReceiptEvent(transfer),state=saved||{id:crypto.randomUUID(),revision:transfer.revision,purpose:transfer.purpose||'truck_replenishment',receiptEventId:latest?.id||receipts.at(-1).id,reason:'',confirmed:false,request:null};
+   if(!state.request&&state.revision!==transfer.revision){await deviceDraft(key,undefined,true);await load('The handoff changed. Review its latest saved receipt before completing it as Owner.');return;}
+   const remember=()=>deviceDraft(key,state).catch(error=>message(error.message,true));
+   const paint=()=>{
+    reset();heading('Complete handoff as Owner','Review the saved Service receipt and equipment photo. This records your Owner decision; it does not replace or copy Josh’s or IT’s signature.');root.append(button('Back to handoffs',()=>load(),true));
+    if(state.request){root.append(element('p','This Owner completion may already be saved. Retry the exact same completion to verify the result.'),button('Retry same Owner completion',()=>save()));return;}
+    const form=element('form');form.noValidate=true;form.setAttribute('aria-label','Owner handoff completion');form.onsubmit=event=>{event.preventDefault();void save();};
+    const purpose=element('select');purpose.required=true;purpose.setAttribute('aria-label','Owner handoff purpose');
+    for(const [value,caption] of Object.entries(TRANSFER_PURPOSES)){const option=new Option(caption,value);if(transfer.purpose&&transfer.purpose!==value)option.disabled=true;if(!transfer.purpose&&value==='installation')option.disabled=true;purpose.append(option);}
+    purpose.value=state.purpose;purpose.onchange=()=>{state.purpose=purpose.value;state.confirmed=false;void remember();paint();};form.append(label('Handoff purpose',purpose));
+    if(!transfer.purpose)form.append(element('p','Legacy receipt: Truck replenishment can be completed from the saved equipment receipt. Installation still requires an existing Installation purpose and verified battery package.','tc-purpose-note'));
+    const receiptSelect=element('select');receiptSelect.required=true;receiptSelect.setAttribute('aria-label','Signed Service receipt');
+    for(const event of receipts)receiptSelect.append(new Option((event.actor_name||transfer.service_name)+' · '+new Date(event.signed_at).toLocaleString('en-US',{timeZone:'America/Chicago',hour12:false})+' Central',event.id));
+    receiptSelect.value=state.receiptEventId;receiptSelect.onchange=()=>{state.receiptEventId=receiptSelect.value;state.confirmed=false;void remember();paint();};form.append(label('Signed Service receipt to use',receiptSelect));
+    const selected=receipts.find(event=>event.id===state.receiptEventId)||latest||receipts.at(-1),actual=selected?.snapshot?.actual||[];
+    const received=element('section');received.append(element('h2','Service recorded'));
+    for(const item of actual)received.append(element('pre',expectedText(item,state.purpose),'tc-expected'));
+    if(selected?.snapshot?.differences?.length){const list=element('ul');for(const diff of selected.snapshot.differences)list.append(element('li',differenceText(diff)));received.append(list);}
+    for(const photo of selected?.photos||[]){if(photo.kind!=='unit')continue;received.append(button('View saved equipment photo',async()=>{try{const url=await client.photoUrl(photo.path);guard();const a=element('a','Open saved equipment photo');a.href=url;a.target='_blank';a.rel='noopener noreferrer';received.append(a);}catch(error){message(error.message,true);}},true));}
+    form.append(received);
+    const confirmed=element('input');confirmed.type='checkbox';confirmed.required=true;confirmed.checked=state.confirmed===true;confirmed.setAttribute('aria-label','I reviewed the saved equipment photo and confirm the exact unit identity');confirmed.onchange=()=>{state.confirmed=confirmed.checked;void remember();};form.append(label('I reviewed the saved Service equipment photo and confirm it shows the exact unit number recorded in this receipt.',confirmed));
+    const reason=input('textarea',state.reason,value=>{state.reason=value;void remember();});reason.required=true;reason.minLength=5;reason.maxLength=2000;reason.setAttribute('aria-label','Owner resolution reason');form.append(label('Owner resolution reason',reason));
+    form.append(element('p','Completing this handoff will accept the saved equipment receipt under your Owner account. Original checkout and Service receipt records remain unchanged.','tc-purpose-note'));
+    const submit=element('button','Complete handoff as Owner');submit.type='submit';form.append(submit);root.append(form);
+   };
+   const save=async()=>{
+    if(busy)return;
+    if(!state.request){
+     const invalid=[...root.querySelectorAll('input,select,textarea')].find(control=>control.willValidate&&!control.checkValidity());if(invalid){showSubmitError('Complete '+(invalid.getAttribute('aria-label')||'the required field')+'.',invalid);return;}
+     state.request={p_request_id:state.id,p_transfer_id:transfer.id,p_expected_revision:state.revision,p_purpose:state.purpose,p_receipt_event_id:state.receiptEventId,p_identity_confirmed:state.confirmed===true,p_reason:state.reason.trim()};await deviceDraft(key,state);
+    }
+    busy=true;const controls=[...root.querySelectorAll('button,input,select,textarea')];for(const control of controls)control.disabled=true;
+    try{guard();if(!navigator.onLine)throw new Error('Offline. Reconnect and retry the same Owner completion.');await client.ownerResolve(state.request);guard();await deviceDraft(key,undefined,true);guard();await load('Owner completion saved. The handoff is accepted under your Owner account; the original IT and Service signatures remain unchanged.');}
     catch(error){if(current()){if(error.rejected){state.request=null;await deviceDraft(key,state).catch(()=>{});}paint();showSubmitError(error.message);}}
     finally{busy=false;for(const control of controls)if(control.isConnected)control.disabled=false;}
    };
