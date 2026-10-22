@@ -233,15 +233,14 @@ begin
  execute v_replaced;
 end $patch_readiness$;
 
--- Team board still shows inventory NOT verified. Owner authorization is not a normal READY.
+-- Team board retains ordinary NOT READY and unverified inventory; Owner status is a separate flag.
 do $patch_board$
 declare v_src text;v_replaced text;
 begin
  v_src:=pg_get_functiondef('public.owner_tech_command_board_v2(date)'::regprocedure);
  v_replaced:=replace(v_src,
    '''truck_ready'',coalesce((t->>''truck_ready'')::boolean,false) and sc and vc,',
-   '''truck_ready'',(coalesce((t->>''truck_ready'')::boolean,false) and sc and vc)'||
-    ' or coalesce((d->>''owner_departure_authorized'')::boolean,false),'||E'\n'||
+   '''truck_ready'',coalesce((t->>''truck_ready'')::boolean,false) and sc and vc,'||E'\n'||
    '    ''owner_authorized'',coalesce((d->>''owner_departure_authorized'')::boolean,false),');
  if v_replaced=v_src then raise exception 'Owner team board readiness expression changed.';end if;
  execute v_replaced;
