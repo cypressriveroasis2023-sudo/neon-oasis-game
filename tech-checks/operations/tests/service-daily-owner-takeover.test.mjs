@@ -150,7 +150,7 @@ test('owner exception never changes inventory_ready and auto-revokes on stock ch
  assert.equal(d.owner_departure_authorized,true);
  assert.equal(d.departure_ready,true);
  const b=(await query("select public.owner_tech_command_board_v2() as d"))[0].d;
- assert.equal(b.owner_authorized,true);assert.equal(b.truck_ready,true);
+ assert.equal(b.owner_authorized,true);assert.equal(b.truck_ready,false);
  await query("update public.service_truck_stock set recon_battery_qty=24,updated_at=now()+interval '1 second' where service_tech_id=$1",[tech]);
  d=(await query("select public.service_departure_readiness_v1($1) as d",[tech]))[0].d;
  assert.equal(d.owner_departure_authorized,false);
