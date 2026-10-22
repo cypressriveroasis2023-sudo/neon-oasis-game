@@ -1,10 +1,8 @@
 import AnimatedEye from './AnimatedEye';
 import {fleetVrmReadAllowed} from './fleetDashboardModel';
-import { AreaIcon, primaryWorkspace } from './VisionAreas';
+import { AreaIcon } from './VisionAreas';
 import OperationsAreas from './OperationsAreas';
 import UnitsOnHand from './UnitsOnHand';
-import FleetInventoryOverview from './FleetInventoryOverview';
-import { primaryAreas } from './visionAreas';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 import {useOperationsSession} from './useOperationsSession';
@@ -17,8 +15,6 @@ import UnitTrackerWorkspace from './UnitTrackerWorkspace';
 import {trackerAccess} from './unitTracker';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
-import OwnerWatchfulShortcut from './OwnerWatchfulShortcut';
-import HomeFieldView from './HomeFieldView';
 import MhelpTicketImport from './MhelpTicketImport';
 import type { TicketType } from './ticketTypes';
 import {isTicketUnitId} from './ticketContext';
@@ -37,8 +33,11 @@ import DirectoryWorkspace from './DirectoryWorkspace';
 import EquipmentWorkspace from './EquipmentWorkspace';
 import TeamWorkspace from './TeamWorkspace';
 import { QuotesWorkspace, InvoicesWorkspace, PurchasingWorkspace } from './FinanceWorkspaces';
+import CosCompactOverview from './CosCompactOverview';
+import {areaSelected,itNavigation,ownerAdvancedAreas,ownerNavigation} from './simpleCosNavigation';
+import {tvBoardLink} from './tvBoardData';
 import './continuation.css';
-import { workspaces as nav, itWorkspaces, workspaceGroups, workspaceLabel, workspaceGroup, canonicalWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
+import { workspaces as nav, itWorkspaces, workspaceLabel, canonicalWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
 
 type Row = Record<string, any>;
 type NativeWorkspace = 'Today' | 'Daily Board' | 'Fleet Dashboard' | 'Unit Tracker' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
@@ -203,7 +202,6 @@ function OwnerApp() {
   useEffect(()=>{
     if(window.parent!==window)window.parent.postMessage({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:active},location.origin);
   },[active]);
-  const group=workspaceGroup(active);
   const focusedJob=route.jobId;
   const setRouteLocation=useCallback((next:WorkspaceRoute,replace=false,state:unknown=null)=>{
     const hash=workspaceHash(next);
@@ -236,7 +234,7 @@ function OwnerApp() {
   const fleetWorkspaces = useMemo(()=>(dailyOnly?[...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
   allowedFleetRoutes.current=fleetOnly?fleetWorkspaces:null;
-  const label=(name:string)=>dailyOnly?itDailyLabel(name):workspaceLabel(name);
+  const label=(name:string)=>({'Units On Hand':'Inventory & Transfers','Fleet Dashboard':'Fleet Map','Victron VRM':'Power & Routers','InHand Routers':'Power & Routers',Team:'Team & Tech Check'} as Record<string,string>)[name]||(dailyOnly?itDailyLabel(name):workspaceLabel(name));
   const [now,setNow]=useState(()=>new Date());
   const [toast,setToast]=useState('');
   const [menu,setMenu]=useState(false);
@@ -349,7 +347,7 @@ function OwnerApp() {
   },[fleetOnly,dailyOnly,active,setRouteLocation,fleetWorkspaces]);
   const condition=weather?(weather.weather_code===0?'Clear':weather.weather_code<=3?'Partly cloudy':weather.weather_code<=48?'Fog':weather.weather_code<=67?'Rain':weather.weather_code<=77?'Wintry':weather.weather_code<=82?'Showers':'Storms'):'Weather unavailable';
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
-  const selectedArea=fleetOnly||dailyOnly?active:primaryWorkspace(active);
+  const simpleAreas=fleetOnly||dailyOnly?itNavigation(fleetWorkspaces):ownerNavigation(trackerAccess(session));
   const ownerInitials=String(session?.name||'Owner').split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
   return <div className={'shell operations-shell company-shell'+(active==='Fleet Dashboard'?' operations-field-view':'')}>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
@@ -357,13 +355,17 @@ function OwnerApp() {
       <div className='company-brand'><AnimatedEye full/></div>
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
       <p className='company-nav-heading'>Your workspace</p>
-      <nav className='operations-area-nav' aria-label='COS Operations'>{(fleetOnly||dailyOnly?fleetWorkspaces.filter(workspace=>!dailyOnly||workspace!=='IT Dashboard').map(workspace=>({workspace,label:label(workspace),icon:({'IT Dashboard':'dashboard','Fleet Dashboard':'map','InHand Routers':'router','Camera Health':'camera','Victron VRM':'power','MHelp':'operations','Unit Tracker':'units','Tech Check':'operations'} as Record<string,string>)[workspace]||'dashboard'})):primaryAreas.filter(area=>area.workspace!=='Unit Tracker'||trackerAccess(session))).map(area=><button type='button' key={area.workspace} className={selectedArea===area.workspace?'active':''} onClick={()=>navigate(area.workspace)} aria-current={selectedArea===area.workspace?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
-      <div className='company-sidebar-footer'><div className='company-sidebar-actions'>{!dailyOnly&&<button type='button' onClick={()=>navigate('Tech Check')}>Tech Checks</button>}{!fleetOnly&&!dailyOnly&&<button type='button' onClick={()=>navigate('Vision')}>Vision assistant</button>}<button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
-    </aside>
+      <nav className='operations-area-nav' aria-label='COS daily navigation'>{simpleAreas.map(area=><button type='button' key={area.workspace} className={areaSelected(active,area.workspace)?'active':''} onClick={()=>navigate(area.workspace)} aria-current={areaSelected(active,area.workspace)?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
+       {authorized&&!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<>
+         <a className='cos-tv-mode-link' href={tvBoardLink(window.parent!==window?window.parent.location.href:location.href,'day','')} target='_blank' rel='noopener noreferrer'>TV Mode ↗</a>
+         <details className='cos-owner-advanced'><summary>Advanced · Owner only</summary><div>{ownerAdvancedAreas.map(area=><button type='button' key={area.workspace} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}</div></details>
+       </>}
+       <div className='company-sidebar-footer'><div className='company-sidebar-actions'><button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
+     </aside>
     <main className='owner-it-main' inert={menu}>
       <section className='company-utility-bar' aria-label='Workspace utilities'>
         <div className='company-mobile-brand'><AnimatedEye full/></div><span className='company-breadcrumb'>{route.createType?'Create ticket':label(active)}</span>
-        {!fleetOnly&&!dailyOnly&&<button type='button' className='company-search-trigger vision-nav-return' onClick={()=>navigate('Daily Board')}>Open dispatch board</button>}
+       
         <span className={'company-connection'+(!authorized?' company-connection-pending':'')} role='status'><i aria-hidden='true'/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</span>
         <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu <span aria-hidden='true'>☰</span></button>
       </section>
