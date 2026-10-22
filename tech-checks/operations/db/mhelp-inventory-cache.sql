@@ -29,7 +29,9 @@ begin
   if jsonb_typeof(rows) is distinct from 'array' or jsonb_array_length(rows)>10000
    or exists(select 1 from jsonb_array_elements(rows) item where jsonb_typeof(item) is distinct from 'object' or item->>'portalId' is distinct from '224643'
     or (kind='customer' and item->>'customerId' is distinct from owner_id)
-    or (kind='services' and item->'serviceLocationId' is not null and item->'serviceLocationId'<>'null'::jsonb and item->>'customerId' is distinct from owner_id)
+    or (kind='services' and item->'serviceLocationId' is not null and item->'serviceLocationId'<>'null'::jsonb
+     and ((item->>'serviceLocationId'=owner_id and item-array['serviceLocationId','portalId']<>'{}'::jsonb)
+      or (item->>'serviceLocationId' is distinct from owner_id and item->>'customerId' is distinct from owner_id)))
     or item-allowed<>'{}'::jsonb or exists(select 1 from jsonb_each(item) field where jsonb_typeof(field.value) in('object','array')))
    then raise exception 'Unverified cached resource';end if;
   insert into cos_mhelp_placement_private.inventory_resource_cache(cache_key,payload,observed_at) values(p_key,p_payload,p_observed_at)
