@@ -124,7 +124,7 @@ test('Owner administrative daily closeout is visibly NOT technician-signed or ph
  assert.match(html,/OWNER ADMINISTRATIVE CLOSEOUT/);
  assert.match(html,/Technician DID NOT sign/);
  assert.match(html,/NOT physically verified today/);
- assert.match(html,/Owner authorized/i);
+ assert.match(html,/Owner-authorized/i);
  assert.doesNotMatch(html,/The required inspection and inventory passed server validation/);
  const summary=summaryHtml(f.report,'folder','https://drive.google.com/file/d/summary/view');
  assert.match(summary,/OWNER CLOSEOUT/);
