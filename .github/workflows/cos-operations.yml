@@ -140,7 +140,9 @@ jobs:
           cache: npm
           cache-dependency-path: tech-checks/operations/package.json
       - name: Confirm existing technician workflows are unchanged
-        run: git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../app.js ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
+        run: |
+          node tests/verify-techcheck-auth-preservation.mjs
+          git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Verify real PostgreSQL intake concurrency
