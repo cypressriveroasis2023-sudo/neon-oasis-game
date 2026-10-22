@@ -16,7 +16,8 @@ for(const kind of ['owner','verified-it','daily-it'])test(kind+' troubleshooting
    if(url.pathname==='/diagnostics-host')return route.fulfill({contentType:'text/html',body:kind==='owner'?owner:itHomeFixture('it',true,{dashboard:kind==='daily-it'})});
    if(url.pathname==='/fleet-host-fixture.js')return route.fulfill({contentType:'text/javascript',body:read(kind==='daily-it'?'it-daily-host.js':'verified-it-fleet-host.js')});
    if(url.pathname==='/camera-health.html')return route.fulfill({contentType:'text/html',body:read('camera-health.html').replace('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>','<script>'+legacyMock+'</script>')});
-   if(url.pathname==='/operations/dist/index.html')return route.fulfill({status:302,headers:{location:'/'+url.search+'#fleet-dashboard'}});
+   // Serve the real embedded path below. Redirecting it to the parent root
+   // activates the IT host's existing top-level navigation guard and loses this fixture's session.
    const file=resolve(root,'tech-checks','.'+url.pathname);
    if(file.startsWith(root+'/tech-checks/')&&existsSync(file)&&statSync(file).isFile())return route.fulfill({path:file,contentType:{'.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.png':'image/png','.jpg':'image/jpeg','.woff':'font/woff'}[extname(file)]||'application/octet-stream'});
    return route.continue();

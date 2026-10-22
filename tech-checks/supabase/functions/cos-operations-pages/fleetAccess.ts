@@ -3,7 +3,8 @@
 export function verifiedItFleet(context: any): boolean {
   return context?.department === 'it' && context?.legacyOwner === false &&
     ((context.legacyId === '4f7044b5-86b6-411f-8898-39bb64b4ddbc' && context.actorId === 'd0757b64-9623-4adc-afff-21cc7853e88a') ||
-     (context.legacyId === 'b7cc3cbf-d11e-4d4a-9742-c07701857911' && context.actorId === '3caf7c00-627f-445f-bce4-ddeae574ee5c'));
+     (context.legacyId === 'b7cc3cbf-d11e-4d4a-9742-c07701857911' && context.actorId === '3caf7c00-627f-445f-bce4-ddeae574ee5c') ||
+     (context.legacyId === '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf' && context.actorId === 'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'));
 }
 export function fleetRouteAllowed(method: string, path: string): boolean {
   return method === 'GET' && (path === '/api/unit-tracker' || /^\/api\/unit-tracker\/(?:requests\/)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(path))

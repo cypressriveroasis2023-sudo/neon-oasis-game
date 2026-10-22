@@ -1,5 +1,5 @@
 /** Existing legacy profiles are authoritative here; native roles are rechecked by the native bridge. */
-const APPROVED_IT_IDS=new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911']);
+const APPROVED_IT_IDS=new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911','05bf20fe-19f7-4db7-ac05-5b2a5f681fdf']);
 export function createFleetVerifier(request:(path:string,init:RequestInit)=>Promise<any>,service:string){
  return async(authorization:string):Promise<boolean>=>{
   if(!/^Bearer [^\s]+$/i.test(authorization)||authorization.length>8192)return false;

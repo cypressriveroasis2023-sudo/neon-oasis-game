@@ -1,5 +1,28 @@
 # IT sign-in dashboard
 
+## Superseding note — 2026-10-22: ITTECH identity provisioned, release pending
+
+The pending parity release defines three exact IT pairs in source: Teddy Hopper,
+Victor Garcia and Test IT. Test IT's distinct native identity
+`c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7` was provisioned at approximately 14:54 UTC.
+Independent readback verified its native Auth user, active IT profile and
+existing IT Technician (`it_technician`) role in the same organization as the
+other two IT techs. The temporary provisioning helper was retired with a
+constant HTTP 410 response and verified source readback. See
+[the identity provisioning note](identity-and-auth-verification.md) for the
+exact identity pair and role. The Operations runtime and frontend release
+remain pending.
+
+After verified server Fleet capability succeeds, the updated host gives Test IT
+the same Operations Fleet dashboard and Camera Health as the other IT techs.
+Phone check-in/out remains the default, with explicit Fleet opt-in and the
+existing open-form guards. The tracker outbox helper change remains a source-only,
+undeployed draft. These notes record provisioning, not completed runtime or
+frontend deployment or signed-in production verification. The sections below retain the earlier
+two-IT-account dashboard release and its historical validation evidence.
+
+## Historical dashboard behavior
+
 The existing verified IT fleet host opens `#it-dashboard` after sign-in, as soon
 as current fleet access is confirmed. It does not wait for the legacy Home's
 all-source task loader. Explicit Field View deep links retain their destination.

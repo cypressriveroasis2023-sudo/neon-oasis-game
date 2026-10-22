@@ -9,6 +9,7 @@ const recordId = 'a2345678-1234-1234-1234-123456789abc';
 const technicians = {
   '4f7044b5-86b6-411f-8898-39bb64b4ddbc': {actorId:'d0757b64-9623-4adc-afff-21cc7853e88a',name:'Teddy Hopper',department:'it',roleCode:'it_technician'},
   'b7cc3cbf-d11e-4d4a-9742-c07701857911': {actorId:'3caf7c00-627f-445f-bce4-ddeae574ee5c',name:'Victor Garcia',department:'it',roleCode:'it_technician'},
+  '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf': {actorId:'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7',name:'Test IT',department:'it',roleCode:'it_technician'},
   '78e54fbd-c2db-4d18-8e3d-a9740adcf285': {actorId:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',name:'Abel Cervantes',department:'service',roleCode:'service_technician'},
   '49dce28e-099a-40bb-a8d8-b39f9ffbabee': {actorId:'1a7d3523-8a3c-488a-9216-4e37f4f7ecb9',name:'Josh Mireles',department:'service',roleCode:'service_technician'},
 };
@@ -24,7 +25,7 @@ function transport(scenario, calls) {
     calls.push({ url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null });
     if (url.includes('/auth/v1/user')) return scenario.invalidToken ? json({message:'Invalid JWT'},401) : json({id:scenario.userId || ownerId});
     if (url.includes('/rest/v1/profiles?')) return json([{user_id:scenario.userId || ownerId,full_name:scenario.legacyName || technician?.name || 'Owner',role:scenario.role || technician?.department || 'owner',active:!scenario.inactive,archived_at:scenario.archived ? '2026-01-01' : null}]);
-    if (url.includes('/rest/v1/user_profiles?')) return json([{user_id:mappedActor,display_name:scenario.platformName || technician?.name || 'Owner',active:!scenario.actorInactive,department:scenario.actorDepartment || technician?.department || 'owner'}]);
+    if (url.includes('/rest/v1/user_profiles?')) return json(scenario.actorMissing ? [] : [{user_id:scenario.wrongActorId || mappedActor,display_name:scenario.platformName || technician?.name || 'Owner',active:!scenario.actorInactive,department:scenario.actorDepartment || technician?.department || 'owner'}]);
     if (url.includes('/rest/v1/user_roles?')) return json(scenario.roleRevoked ? [] : [{role_id:recordId,roles:{code:scenario.wrongRole ? 'owner' : technician?.roleCode || 'owner',organization_id:scenario.wrongRoleOrg ? recordId : orgId}}]);
     if (url.includes('/rest/v1/visit_assignments?')) return json(scenario.outsideOrg ? [] : [{visit_id:recordId,user_id:scenario.otherAssignee ? actorId : mappedActor,assignment_role:'technician',status:'assigned',assigned_at:'2026-10-04T10:00:00Z',job_visits:{id:recordId,job_id:recordId,visit_number:1,visit_type:'IT_PREP',department:technician?.department || 'it',status:'scheduled',dispatch_status:'ready',scheduled_start:'2026-10-04T15:00:00Z',scheduled_end:'2026-10-04T16:00:00Z',jobs:{job_number:'COS 001',title:'Assigned Job',job_type:'DELIVERY',customers:{name:'Customer'},sites:{name:'Site'}}}}]);
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
@@ -128,6 +129,21 @@ const cases = [
  ['wrong exact removal confirmation denied', '/api/jobs/'+recordId+'/remove', 'POST', {confirmation:'DELETE COS 002'}, 400],
  ['native removal maps authoritative guard', '/api/jobs/'+recordId+'/remove', 'POST', {confirmation:'DELETE COS 001'}, 200],
  ['verified IT fleet session never borrows Owner identity', '/api/session','GET',{},200,{userId:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'}],
+ ['Test IT can read saved fleet', '/api/vrm-fleet', 'GET', {}, 200, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['Test IT inactive legacy profile denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',inactive:true}],
+ ['Test IT archived legacy profile denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',archived:true}],
+ ['Test IT inactive native identity denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',actorInactive:true}],
+ ['Test IT missing native identity denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',actorMissing:true}],
+ ['Test IT cannot borrow Teddy native identity', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',wrongActorId:'d0757b64-9623-4adc-afff-21cc7853e88a'}],
+ ['Test IT revoked native role denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',roleRevoked:true}],
+ ['Test IT wrong native role denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',wrongRole:true}],
+ ['Test IT wrong organization denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',wrongRoleOrg:true}],
+ ['Test IT changed legacy name denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',legacyName:'Different person'}],
+ ['Test IT changed native name denied', '/api/vrm-fleet', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',platformName:'Different person'}],
+ ['Test IT Owner equipment management denied', '/api/equipment', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['Test IT finance denied', '/api/ar', 'GET', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['Test IT provider sync denied', '/api/vrm-fleet/refresh', 'POST', {}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['Test IT native GPS edits denied', '/api/field-map/'+recordId+'/gps', 'POST', {latitude:30,longitude:-97}, 403, {userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
  ['Owner cannot borrow technician queue', '/api/tech/my-day','GET',{},403],
  ['unmapped technician keeps legacy access', '/api/tech/session','GET',{},200,{userId:'b9465a4e-c003-4205-8154-56792c9cfed9',role:'service'}],
  ['unmapped technician cannot load platform queue', '/api/tech/my-day','GET',{},403,{userId:'b9465a4e-c003-4205-8154-56792c9cfed9',role:'service'}],
@@ -245,4 +261,21 @@ test('verified IT saved fleet omits unavailable sharing URLs and cannot recover 
  const current=await handler(request('/api/vrm-fleet'));assert.equal(current.status,200);const data=await current.json();assert.equal(data.items[0].available,false);assert.equal(data.items[0].embedUrl,null);assert.equal(JSON.stringify(data).includes(secret),false);
  const old=await handler(request('/api/vrm-portal'));assert.equal(old.status,403);assert.equal((await old.text()).includes(secret),false);
  assert.equal(calls.some(call=>/cos_vrm_fleet_(?:begin|finish|fail)$/.test(call.url)),false);
+});
+
+test('Test IT, Teddy and Victor share IT capabilities and retain separate technician attribution',async()=>{
+ let expectedFeatures;
+ const ids=['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911','05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'];
+ const actorIds=new Set();
+ for(const userId of ids){
+  const calls=[],handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'test-server-key',fetch:transport({userId},calls)});
+  const response=await handler(request('/api/session'));assert.equal(response.status,200);
+  const session=await response.json();assert.equal(session.authorized,true);assert.equal(session.role,'IT');assert.equal(session.legacyOwner,false);assert.equal(session.productionOwnerUserId,null);assert.equal(session.name,technicians[userId].name);
+  expectedFeatures??=session.features;assert.deepEqual(session.features,expectedFeatures);
+  assert.equal(session.features.fleetAccess,true);assert.equal(session.features.fleetPlacementEdit,true);assert.equal(session.features.fleetConnectionEdit,true);assert.equal(session.features.fieldLocationVerification,false);assert.equal(session.features.mhelpTicketImport,false);
+  const tech=await(await handler(request('/api/tech/session'))).json();assert.equal(tech.authorized,true);assert.equal(tech.productionTechnicianUserId,technicians[userId].actorId);actorIds.add(tech.productionTechnicianUserId);
+  const day=await handler(request('/api/tech/my-day'));assert.equal(day.status,200);
+  const read=calls.find(call=>call.url.endsWith('/rpc/appdeploy_technician_my_day'));assert.equal(read.body.p_actor_user_id,technicians[userId].actorId);assert.equal(read.body.p_organization_id,orgId);
+ }
+ assert.equal(actorIds.size,3);assert.equal(actorIds.has(actorId),false);
 });

@@ -6,9 +6,6 @@ import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
 window.COS_IT_DAILY_ONLY = IT_DAILY_ONLY;
 const context = () => window.TechCheckContext;
-// Legacy COS account has no separate native-platform identity. The server RPC below
-// remains the authority for IT camera access; this ID only selects the camera UI.
-const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null, phoneBoard = false;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
@@ -136,7 +133,7 @@ async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
   if (!permitted) {
-    status(value.preview ? 'Test IT is a preview persona, not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
+    status(value.preview ? 'This IT preview persona is not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
     // An unverified actor cannot mount transfer controls or request private data.
     if(!value.phone){
       const link=document.createElement('a');link.href='./camera-health.html?itDaily=1';
@@ -171,11 +168,9 @@ async function open(value, generation, handoffFailure = null) {
     root.replaceChildren(phoneNavigation(value,generation),handoffFallback);
     return;
   }
-  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
+  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='Fleet Dashboard and Camera Health';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
-    ? './camera-health.html?itDaily=1&diagnostics=1'
-    : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=it-fleet-parity-20261022#fleet-dashboard';
   const board=document.createElement('section');board.className='cos-it-board-loading';board.style.position='relative';board.setAttribute('aria-busy','true');
   const pending=document.createElement('section');pending.className='cos-it-daily-status';pending.style.cssText='position:absolute;inset:0;z-index:1;margin:0;min-height:180px';
   const heading=document.createElement('h1');heading.textContent='Camera Health and Fleet Map';
@@ -204,13 +199,7 @@ async function open(value, generation, handoffFailure = null) {
     setFieldMapDisplay(currentFrame,false);scheduleFrameFit();
   });
   board.append(frame,pending);
-  const accessNotes=[];
-  if(value.role==='it'&&value.id===legacyCameraOnlyIT){
-    const note=document.createElement('section');note.className='cos-it-fleet-access-note';note.setAttribute('aria-label','Fleet access for this account');
-    note.textContent='Fleet map is not available for this account. Sign in with your individual IT account to use the shared Fleet dashboard. Camera diagnostics remain available here.';
-    accessNotes.push(note);
-  }
-  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),...accessNotes,board);
+  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),board);
   boardLoadTimer=setTimeout(()=>{if(!current())return;note.textContent='The board is taking longer than usual to open. You can keep waiting or retry.';retry.hidden=false;},20000);
   scheduleFrameFit();
 }
@@ -250,7 +239,6 @@ function present() {
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
   style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px;padding:10px 14px;background:#303a44;color:#fff;border:1px solid #6b7785;border-radius:9px}.cos-it-daily-status h1{font-size:24px;line-height:1.25;margin:0 0 12px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;padding:12px;font-size:16px;font-weight:700;border:1px solid #66717d;border-radius:10px;white-space:normal;background:#252d36;color:#fff}.cos-it-handoff-actions button[aria-pressed=true]{background:#97132c;border-color:#ed3652;color:#fff}.cos-it-handoff-actions button:disabled{opacity:1;background:#252d36;color:#cbd4dd;border-color:#566371;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
-  style.textContent+='.cos-it-fleet-access-note{padding:12px 16px;margin:0 0 12px;border:1px solid #2c3b51;border-radius:10px;background:#111b2a;color:#e6edf7}';
   document.head.append(style);
   // Runs before protected legacy delegated/inline handlers; inert also blocks keyboard entry.
   for (const type of ['click','submit','change','input']) window.addEventListener(type,event=>{

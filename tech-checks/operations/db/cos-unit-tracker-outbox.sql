@@ -51,7 +51,7 @@ begin
  join public.user_roles ur on ur.user_id=p.user_id join public.roles r on r.id=ur.role_id and r.organization_id=p.organization_id
  where p.user_id=p_actor and p.organization_id=p_org and p.active
  and ((p_actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1'::uuid and p.department='owner' and r.code='owner')
-  or(p_actor in ('d0757b64-9623-4adc-afff-21cc7853e88a'::uuid,'3caf7c00-627f-445f-bce4-ddeae574ee5c'::uuid) and p.department='it' and r.code='it_technician')) limit 1;
+  or(p_actor in ('d0757b64-9623-4adc-afff-21cc7853e88a'::uuid,'3caf7c00-627f-445f-bce4-ddeae574ee5c'::uuid,'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'::uuid) and p.department='it' and r.code='it_technician')) limit 1;
  if v_role is null then raise exception 'Existing Owner or verified IT account required.' using errcode='42501';end if;
  return v_role;
 end $$;
