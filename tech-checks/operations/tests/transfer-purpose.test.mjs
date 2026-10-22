@@ -27,7 +27,7 @@ before(async()=>{
  grant usage on schema auth,app_private,storage to authenticated;grant execute on function auth.uid() to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
  `);
  await db.query("insert into profiles values($1,'owner',true,null,'Synthetic Owner','owner')",[owner]);
- for(const name of ['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-transfer-purpose-v2.sql'])await db.exec(await readFile(new URL('../../database-maintenance/'+name,import.meta.url),'utf8'));
+ for(const name of ['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-transfer-purpose-v2.sql','techcheck-owner-handoff-resolution-v1.sql'])await db.exec(await readFile(new URL('../../database-maintenance/'+name,import.meta.url),'utf8'));
  await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
 });
 after(async()=>db?.close());
@@ -54,6 +54,7 @@ async function request({family='Sniper',purpose='truck_replenishment',legacy=fal
 }
 const rpc=(name,r,who=it)=>as(who,async()=>(await db.query(`select ${name}(${Object.keys(r).map((k,n)=>k+'=> $'+(n+1)).join(',')}) result`,Object.values(r))).rows[0].result);
 const classify=(r,who=it)=>rpc('public.classify_techcheck_transfer_purpose_v1',r,who);
+const ownerResolve=(r,who=owner)=>rpc('public.owner_resolve_techcheck_transfer_v1',r,who);
 async function legacy(r,who=it){await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[who]);return(await db.query(`select app_private.submit_techcheck_transfer_pre_purpose_v1(${Object.keys(r).map((k,n)=>k+'=> $'+(n+1)).join(',')}) result`,Object.values(r))).rows[0].result;}
 const row=async id=>(await db.query('select * from app_private.techcheck_transfers where id=$1',[id])).rows[0];
 const events=async id=>(await db.query('select id,actor_id,kind,request,snapshot,photos from app_private.techcheck_transfer_events where transfer_id=$1 order by signed_at,id',[id])).rows;
@@ -108,6 +109,19 @@ test('four legacy receipts remain immutable; Owner purpose audit permits exactly
  const classified=await classify(a,owner);assert.equal(classified.state,'awaiting_service');assert.equal(classified.revision,6);assert.equal(classified.purpose_revision,6);assert.equal(classified.applied_by.id,owner);assert.equal(classified.applied_by.role,'owner');assert.ok(!('signature' in classified));assert.equal((await classify(a,owner)).replayed,true);assert.equal(await count(r.p_transfer_id),6);assert.deepEqual((await events(r.p_transfer_id)).filter(e=>original.some(o=>o.id===e.id)),original);
  const t=(await context(svc)).transfers.find(t=>t.id===r.p_transfer_id);assert.equal(t.receipt_required,true);assert.equal(t.can_classify_purpose,false);const fresh=receipt({...r,p_purpose:'truck_replenishment',p_items:a.p_items},{revision:6});assert.equal((await submit(fresh,svc)).state,'accepted');assert.equal(await count(r.p_transfer_id),7);await assert.rejects(classify({...a,p_request_id:randomUUID(),p_expected_revision:7},owner),/already has a recorded purpose/);await assert.rejects(submit(receipt({...r,p_purpose:'truck_replenishment',p_items:a.p_items},{revision:7}),svc),/already saved/);assert.deepEqual((await events(r.p_transfer_id)).filter(e=>original.some(o=>o.id===e.id)),original);
 });
+test('Owner can complete the four-receipt replenishment case without replacing signatures or sending another handoff email',async()=>{
+ const r=await legacyIssue(),original=[];
+ for(let n=1;n<=4;n++){const s=receipt(r,{photos:true,revision:n});s.p_items[0].family='Solar spotter';s.p_items[0].battery_count=n===4?4:0;await seed(s);await legacy(s,svc);}
+ original.push(...await events(r.p_transfer_id));const latest=original.filter(e=>e.kind==='receipt').at(-1),beforeOutbox=await count(r.p_transfer_id);
+ const args={p_request_id:randomUUID(),p_transfer_id:r.p_transfer_id,p_expected_revision:5,p_purpose:'truck_replenishment',p_receipt_event_id:latest.id,p_identity_confirmed:true,p_reason:'Owner reviewed the saved Service photo and confirms this is the exact replenishment unit.'};
+ await assert.rejects(ownerResolve({...args,p_identity_confirmed:false}),/confirm the exact unit identity/);
+ await assert.rejects(ownerResolve(args,it),/Owner account required/);
+ const result=await ownerResolve(args);assert.equal(result.state,'accepted');assert.equal(result.revision,6);assert.equal(result.purpose,'truck_replenishment');assert.equal(result.purpose_revision,6);assert.equal(result.owner_resolution.applied_by,owner);assert.equal(result.selected_receipt_event_id,latest.id);assert.equal(result.actual[0].battery_count,null);assert.equal(result.actual[0].family,'Solar Spotter');
+ assert.equal(await count(r.p_transfer_id),beforeOutbox,'Owner resolution must not queue another transfer email');
+ const saved=await events(r.p_transfer_id);assert.deepEqual(saved.filter(e=>original.some(o=>o.id===e.id)),original);assert.equal(saved.at(-1).kind,'owner_resolution');assert.equal(saved.at(-1).actor_id,owner);assert.equal((await ownerResolve(args)).replayed,true);
+ const view=(await context(svc)).transfers.find(t=>t.id===r.p_transfer_id);assert.equal(view.state,'accepted');assert.equal(view.receipt_required,false);
+});
+
 test('legacy classification cannot change unit identity, SIMs, or create an installation without its readiness checks',async()=>{
  const r=await legacyIssue(),a=purposeArgs(r,1),wrong=structuredClone(a);wrong.p_items[0].unit_tag='WRONG';await assert.rejects(classify(wrong),/cannot change/);const sim=structuredClone(a);sim.p_items[0].sims=[];await assert.rejects(classify(sim),/cannot change/);await assert.rejects(classify({...a,p_expected_revision:0}),/changed/);await assert.rejects(classify(purposeArgs(r,1,'installation')),/lacks installation readiness/);assert.equal((await row(r.p_transfer_id)).purpose,null);
  const s=receipt(r,{photos:true});await seed(s);await legacy(s,svc);await assert.rejects(classify({...a,p_expected_revision:2}),/unaccepted/);
