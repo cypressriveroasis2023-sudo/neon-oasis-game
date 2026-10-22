@@ -27,6 +27,10 @@ function signoffHtml(report:any,links:Record<string,string>){
  const url=links['Technician signature:signature'];
  return '<h2>Technician signature</h2><table><tr><th>Signed by</th><td>'+escapeHtml(signature.name)+'</td></tr><tr><th>Account</th><td>'+escapeHtml(signature.username||signature.signed_by)+'</td></tr><tr><th>Completion date and time</th><td>'+escapeHtml(at)+' (America/Chicago)</td></tr><tr><th>Signature method</th><td>'+escapeHtml(signature.method)+'</td></tr></table><p>'+escapeHtml(signature.statement)+'</p>'+(url?'<p><a href="'+escapeHtml(url)+'">View handwritten signature</a></p>':'');
 }
+function transferReceiptHtml(r:any){
+ const s=r.snapshot||r,purpose=s.purpose==='truck_replenishment'?'Truck replenishment':s.purpose==='installation'?'Installation':'Purpose not recorded in this original handoff';
+ return '<p>'+escapeHtml(r.it_name??s.it_name)+' → '+escapeHtml(r.service_name??s.service_name)+' · '+escapeHtml(purpose)+' · '+escapeHtml(r.state??s.state)+' · '+escapeHtml(r.signed_at)+'<br>Handoff '+escapeHtml(r.transfer_id??s.transfer_id)+' · Receipt '+escapeHtml(r.event_id)+' · Revision '+escapeHtml(r.revision??s.revision)+'</p><ul>'+(r.actual||s.actual||[]).map((i:any)=>'<li>'+escapeHtml(i.family+' '+i.unit_tag)+' · SIMs '+escapeHtml((i.sims||[]).join(', ')||'None')+' · '+(s.purpose==='truck_replenishment'?'Batteries counted separately in daily truck inventory':'Batteries recorded: '+escapeHtml(Number.isInteger(i.battery_count)?i.battery_count:'Not recorded'))+'</li>').join('')+'</ul>';
+}
 export function reportHtml(report:any,photoLinks:Record<string,string>={}) {
  const s=report.snapshot, inventory=s.inventory;
  const row=(a:unknown,b:unknown)=>`<tr><th scope="row">${escapeHtml(a)}</th><td>${escapeHtml(b)}</td></tr>`;
@@ -38,7 +42,7 @@ export function reportHtml(report:any,photoLinks:Record<string,string>={}) {
  '<h2>Equipment on the truck</h2><table>'+inventory.units.map((u:any)=>row(u.equipment_type,u.unit_tag)).join('')+'</table>'+
  '<h2>SIM cards</h2><table>'+inventory.sims.map((v:any)=>row('SIM slot '+v.slot_no,v.sim_number)).join('')+'</table>'+
  '<h2>Battery stock</h2><table>'+[['Recon batteries','recon_battery_qty'],['AGM 12V 110Ah','agm_12v_110ah_qty'],['LiTime 12V 100Ah','litime_12v_100ah_qty'],['12V 35Ah','battery_12v_35ah_qty']].map(([label,key])=>row(label,inventory.stock[key])).join('')+'</table>'+
- '<h2>Equipment handoff receipts at sign-off</h2>'+((s.transfer_receipts||[]).length?(s.transfer_receipts||[]).map((r:any)=>'<p>'+escapeHtml(r.it_name)+' → '+escapeHtml(r.service_name)+' · '+escapeHtml(r.state)+' · '+escapeHtml(r.signed_at)+'<br>Handoff '+escapeHtml(r.transfer_id)+' · Receipt '+escapeHtml(r.event_id)+' · Revision '+escapeHtml(r.revision)+'</p><ul>'+(r.actual||[]).map((i:any)=>'<li>'+escapeHtml(i.family+' '+i.unit_tag)+' · SIMs '+escapeHtml((i.sims||[]).join(', '))+' · Batteries '+escapeHtml(i.battery_count)+'</li>').join('')+'</ul>').join(''):'<p>No equipment receipts recorded for this check date.</p>')+
+ '<h2>Equipment handoff receipts at sign-off</h2>'+((s.transfer_receipts||[]).length?(s.transfer_receipts||[]).map(transferReceiptHtml).join(''):'<p>No equipment receipts recorded for this check date.</p>')+
  '<h2>Photos and image attachments</h2>'+report.photos.filter((p:any)=>p.category!=='Technician signature').map((p:any)=>{const url=photoLinks[p.category+':'+p.view];return `<p>${escapeHtml(p.category)} · ${escapeHtml(p.view)}${p.filename?' · '+escapeHtml(p.filename):''}${url?` · <a href="${escapeHtml(url)}">View photo</a>`:''}</p>`;}).join('')+
  '<p>The required inspection and inventory passed server validation.</p>'+signoffHtml(report,photoLinks)+'</body></html>';
 }

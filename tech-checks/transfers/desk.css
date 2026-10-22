@@ -11,3 +11,8 @@
 
 .tc-transfer .tc-submit-error{border:1px solid #b57b83;border-left:4px solid #ffb3bd;background:#3b232a;color:#fff;padding:12px 14px;border-radius:8px;font-weight:700;line-height:1.45;margin:16px 0;overflow-wrap:anywhere}
 .tc-transfer [aria-invalid=true]{border-color:#ffb3bd!important;box-shadow:0 0 0 2px #8b4350}
+.tc-transfer .tc-receipt-saved,.tc-transfer .tc-receipt-comparison{margin:16px 0;padding:14px;border:1px solid #929b94;border-left:4px solid #a8dbb5;border-radius:8px;background:#243029;overflow-wrap:anywhere}
+.tc-transfer .tc-receipt-comparison h2{margin-top:0}.tc-transfer .tc-receipt-saved ul,.tc-transfer .tc-receipt-comparison ul{padding-left:22px}.tc-transfer .tc-receipt-saved li,.tc-transfer .tc-receipt-comparison li{margin:8px 0}
+.tc-transfer .tc-purpose{display:block;width:fit-content;max-width:100%;margin:8px 0;padding:5px 9px;border:1px solid #aeb9c6;border-radius:6px;color:#eef6ff;background:#293542;font-size:15px;overflow-wrap:anywhere}
+.tc-transfer .tc-purpose-note{padding:10px 12px;border-left:3px solid #aeb9c6;background:#252c33;line-height:1.5}
+.tc-transfer .tc-original-evidence{margin:12px 0}.tc-transfer .tc-original-evidence img{max-height:220px}.tc-transfer .tc-original-evidence figcaption{font-size:13px;color:#c6c6c6;overflow-wrap:anywhere}
