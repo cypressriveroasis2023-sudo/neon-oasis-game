@@ -7,6 +7,9 @@ on:
       - 'tech-checks/operations/scripts/prepareOwnerCanonicalEvidenceSql.mjs'
       - 'tech-checks/operations/scripts/prepareUploadSnapshotOnceSql.mjs'
       - 'tech-checks/operations/scripts/prepareOwnerAssignmentReviewIndexedSql.mjs'
+      - 'tech-checks/operations/scripts/prepareOwnerAssignmentApprovalIndexedSql.mjs'
+      - 'tech-checks/operations/tests/fixtures/assignment-approval-before-20261022.sql'
+      - 'tech-checks/operations/docs/drafts/cos-owner-assignment-approval-indexed-20261022.sql'
       - 'tech-checks/operations/scripts/prepareOwnerAssignmentTimestampRuntime.mjs'
       - 'tech-checks/operations/tests/fixtures/assignment-timestamps.mjs'
       - 'tech-checks/operations/tests/fixtures/assignment-review-before-20261021.sql'
@@ -77,6 +80,9 @@ jobs:
         run: |
           command -v psql
           node tests/mhelp-owner-postgres.ci.mjs
+      - name: Verify full-size assignment approval parity
+        timeout-minutes: 4
+        run: node --test --experimental-test-isolation=none tests/mhelp-assignment-approval-indexed.test.mjs
       - name: Verify assignment review against real PostgreSQL 17
         timeout-minutes: 4
         env:
@@ -89,4 +95,9 @@ jobs:
         run: node --test --experimental-test-isolation=none tests/mhelp-assignment-review-indexed.test.mjs
       - name: Typecheck COS Owner importer and existing app
         run: npm run typecheck
+      - name: Verify assignment approval against real PostgreSQL 17
+        timeout-minutes: 4
+        env:
+          COS_ASSIGNMENT_POSTGRES_CI: '1'
+        run: node --test --experimental-test-isolation=none tests/mhelp-assignment-approval-indexed.test.mjs
 
