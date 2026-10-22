@@ -13,7 +13,22 @@ const bool=(v:unknown):boolean=>typeof v==='boolean'?v:invalid();
 const id=(v:unknown):string=>typeof v==='string'&&ID.test(v)?v:invalid();
 const uuid=(v:unknown):string|null=>v===null?null:typeof v==='string'&&UUID.test(v)?v:invalid();
 const placement=(v:unknown):string=>v==='FIELD'||v==='SHOP'?v:invalid();
-const observedAt=(v:unknown):string=>typeof v==='string'&&v.length<=64&&/(Z|[+-][0-9]{2}:[0-9]{2})$/.test(v)&&Number.isFinite(Date.parse(v))?v:invalid();
+function observedAt(v:unknown):string{
+ // Historical evidence contains PostgreSQL timestamptz text with an explicit
+ // hour-only offset. Validate its calendar and timezone without rewriting the
+ // original string: fractional precision and evidence digests must stay exact.
+ if(typeof v!=='string'||v.length>64)return invalid();
+ const match=/^([0-9]{4})-([0-9]{2})-([0-9]{2})[T ]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,6}))?(Z|[+-]([0-9]{2})(?::([0-9]{2}))?)$/.exec(v);
+ if(!match||match[0]!==v)return invalid();
+ const [,yearText,monthText,dayText,hourText,minuteText,secondText,,zone,zoneHour,zoneMinute]=match;
+ const year=Number(yearText),month=Number(monthText),day=Number(dayText);
+ const leap=year%4===0&&(year%100!==0||year%400===0);
+ const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+ if(year<1||month<1||month>12||day<1||day>days[month-1]||
+  Number(hourText)>23||Number(minuteText)>59||Number(secondText)>59||
+  zone!=='Z'&&(Number(zoneHour)>15||Number(zoneMinute||0)>59)||!Number.isFinite(Date.parse(v)))invalid();
+ return v;
+}
 function assignment(v:unknown):Assignment{
  const a=object(v),address=object(a.address);
  return {placement:placement(a.placement),customer:text(a.customer),customerId:id(a.customerId),address:{street:text(address.street),city:text(address.city),state:text(address.state),zip:text(address.zip)}};
