@@ -358,7 +358,7 @@ function OwnerApp() {
       <div className='company-brand'><AnimatedEye full/></div>
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
       <p className='company-nav-heading'>Your workspace</p>
-      <nav className='operations-area-nav' aria-label='COS daily navigation'>{simpleAreas.map(area=><button type='button' key={area.workspace} className={areaSelected(active,area.workspace)?'active':''} onClick={()=>navigate(area.workspace)} aria-current={areaSelected(active,area.workspace)?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
+      <nav className='operations-area-nav' aria-label='COS Operations'>{simpleAreas.map(area=><button type='button' key={area.workspace} className={areaSelected(active,area.workspace)?'active':''} onClick={()=>navigate(area.workspace)} aria-current={areaSelected(active,area.workspace)?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
        {authorized&&!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<>
          <a className='cos-tv-mode-link' href={tvBoardLink(window.parent!==window?window.parent.location.href:location.href,'day','')} target='_blank' rel='noopener noreferrer'>TV Mode ↗</a>
          <details className='cos-owner-advanced'><summary>Advanced · Owner only</summary><div>{ownerAdvancedAreas.map(area=><button type='button' key={area.workspace} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}</div></details>
