@@ -137,7 +137,9 @@ test('Owner administrative daily closeout is visibly NOT technician-signed or ph
  assert.match(pdf,/Synthetic Owner/);
  const encoded=rawEmail(f.report,summary,'folder',undefined,summaryPdf(f.report));
  const raw=Buffer.from(encoded,'base64url').toString();
- assert.match(raw,/OWNER CLOSEOUT/);
+ const encodedSubject=raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)?.[1];
+ assert.ok(encodedSubject);
+ assert.match(Buffer.from(encodedSubject,'base64').toString('utf8'),/OWNER CLOSEOUT/);
  assert.equal((await (await f.post()).json()).status,'sent');
  assert.ok([...f.files.values()].some(v=>v.name.includes('Summary.pdf')));
 });
