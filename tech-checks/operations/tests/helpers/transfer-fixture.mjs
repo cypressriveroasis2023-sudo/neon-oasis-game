@@ -4,6 +4,7 @@ import {resolve,extname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {snapshot,resource} from '../fixtures/camera-evidence-fixtures.mjs';
 export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',TEST_IT='05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',SERVICE='00000000-0000-4000-8000-000000000002',OTHER='00000000-0000-4000-8000-000000000003';
+export const OWNER='00000000-0000-4000-8000-000000000004';
 const linkedIT=new Map([[IT,{name:'Synthetic IT',actorId:'d0757b64-9623-4adc-afff-21cc7853e88a'}],[TEST_IT,{name:'Test IT',actorId:'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'}]]);
 const root=new URL('../../../',import.meta.url).pathname;
 export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0}={}){
@@ -23,7 +24,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(bucket_id text,name text,metadata jsonb,unique(bucket_id,name));alter table storage.objects enable row level security;
  create function app_private.cos_verified_fleet_actor(p_id uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.profiles where user_id=p_id and active and archived_at is null and (role='owner' or role='it' and user_id in ('${IT}','${TEST_IT}')))$$;
- insert into profiles values('${itActor}','it',true,null,'${itIdentity.name}','it'),('${SERVICE}','service',true,null,'Synthetic Service','service'),('${OTHER}','service',true,null,'Other Service','other');
+ insert into profiles values('${itActor}','it',true,null,'${itIdentity.name}','it'),('${SERVICE}','service',true,null,'Synthetic Service','service'),('${OTHER}','service',true,null,'Other Service','other'),('${OWNER}','owner',true,null,'Synthetic Owner','owner');
  insert into equipment_master values('sniper:001','001','Sniper','Sniper','Sniper','Sniper 001','shop',now()),('ranger:002','002','Ranger','Ranger','Ranger','Ranger 002','shop',now()),('solar_spotter:039','039','Solar Spotter','Solar Spotter','Solar Spotter','Solar Spotter 039','shop',now());
  grant usage on schema auth,app_private,storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
  `);
@@ -47,6 +48,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  if(legacyHandoff)for(const count of legacyReceiptCounts){const receiptId=randomUUID(),receiptPath=serviceActor+'/'+receiptId+'/'+'b'.repeat(64)+'.jpg';await db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[receiptPath]);paths.set(receiptPath,photoBytes);const receipt={...args,p_request_id:receiptId,p_kind:'receipt',p_expected_revision:handoff.revision,p_items:items.map(item=>({...item,family:item.family==='Solar Spotter'?'Solar spotter':item.family,battery_count:count})),p_checks:{},p_signature:{method:'typed',name:'Synthetic Service',confirmed:true},p_photos:items.map(item=>({equipment_key:item.equipment_key,kind:'unit',path:receiptPath})),p_notes:'Synthetic pre-repair receipt.'};handoff=(await run(serviceActor,`select submit_techcheck_transfer_v1(${Object.keys(receipt).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(receipt))).rows[0].result;}
  }
  if(legacyHandoff)await db.exec(purposeMigration);
+ await db.exec(await readFile(root+'database-maintenance/techcheck-owner-handoff-resolution-v1.sql','utf8'));
  if(rollout==='missing')await db.exec('drop function public.techcheck_transfer_readiness_v1()');
  if(rollout==='disabled')await db.exec('update app_private.techcheck_transfer_settings set enabled=false');
  if(rollout==='reports-held')await db.exec('update app_private.techcheck_transfer_settings set reports_ready=false');
@@ -61,7 +63,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  if(name==='cos_verified_fleet_capabilities_v1')return {data:{fleetRead:fixture.role==='it'&&['${IT}','${TEST_IT}'].includes(fixture.actor)}};
  if(fixture.rpcFail)return {error:{message:'Synthetic connection interrupted'}};
  const response=await fetch('/synthetic/rpc',{method:'POST',headers:{'Content-Type':'application/json','x-actor':fixture.actor},body:JSON.stringify({name,args})});const result=await response.json();
- if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
+ if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
  },storage:{from:bucket=>({upload:async(path,blob)=>{if(fixture.uploadFail)return {error:{statusCode:503}};const r=await fetch('/synthetic/storage?name='+encodeURIComponent(path),{method:'POST',headers:{'x-actor':fixture.actor},body:blob});return r.ok?{}:{error:{statusCode:r.status}};},createSignedUrl:async path=>({data:{signedUrl:'/synthetic/photo?name='+encodeURIComponent(path)}})})}};
  window.TechCheckContext={db,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getProfile:()=>({full_name:name(),username:name(),user_id:fixture.actor,role:fixture.role,active:true,archived_at:null}),getSession:session};
  window.show=key=>{for(const v of ['it','svc','owner','morning'])document.getElementById('view-'+v).classList.toggle('hidden',key!==v);dispatchEvent(new Event('techcheck:view-changed'));};
@@ -76,7 +78,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
   const {name,args}=req.postDataJSON();calls.push({name,args});
   if(name==='techcheck_transfer_readiness_v1'&&readinessDelay)await new Promise(resolve=>setTimeout(resolve,readinessDelay));
   if(name==='techcheck_transfer_context_v1'&&rollout==='read-cache-missing')return route.fulfill({json:{error:{code:'PGRST202',message:'Synthetic missing schema cache'}}});
-  if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1'].includes(name)){unexpected.push(name);return route.abort();}
+  if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
   try{const rows=await run(req.headers()['x-actor'],`select public.${name}(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args));return route.fulfill({json:{data:rows.rows[0].result}});}catch(e){return route.fulfill({json:{error:{message:e.message,code:e.code==='42883'?'PGRST202':e.code}}});}
  }
  if(url.pathname==='/synthetic/storage'){

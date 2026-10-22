@@ -167,7 +167,9 @@ jobs:
         run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-address-geocodio/index.ts
       - run: npm run build
         id: build
-      - run: npx playwright install --with-deps chromium
+      - name: Install pinned project browser
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+        timeout-minutes: 15
         id: browser_install
       - name: Verify legacy camera saved reads and guarded placement
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
