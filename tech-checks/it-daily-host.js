@@ -1,4 +1,5 @@
 import {mountTransferDesk} from './transfers/desk.js';
+import {mountCorrectionDesk} from './transfers/corrections.js';
 import {isPhoneSurface} from './transfers/model.js';
 import {transferReadiness,transferReadinessMessage} from './transfers/readiness.js';
 import {IT_DAILY_ONLY} from './it-feature-availability.js';
@@ -49,7 +50,12 @@ function scope() {
   const preview=document.body.classList.contains('owner-test-role-preview');
   // An Owner's IT phone preview shows the intended actions as disabled; preview
   // remains unauthorized by verify() and cannot mount or submit transfers.
-  return {id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
+  const value={id, role, profileLive, phone:isPhoneSurface()&&(role==='it'||preview), preview, effective};
+  // Resizing must not dispose an open handoff form or correction workspace,
+  // including its pending-save and verified-readback screens. Keep only the
+  // mounted presentation; a change to any account or access field still clears it.
+  if(disposeTransfer && root?.querySelector('form, .tc-corrections') && key({...value,phone:!value.phone})===scopeKey)value.phone=!value.phone;
+  return value;
 }
 function key(value) { return value ? [value.id,value.role,value.effective,value.preview,value.profileLive,value.phone].join(':') : ''; }
 function clearFrame() {
@@ -205,6 +211,15 @@ async function open(value, generation, handoffFailure = null) {
   });
   board.append(frame,pending);
   root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),board);
+  // A narrow correction entry preserves the existing desktop Fleet landing,
+  // frame fitting, shields and auth lifecycle. Owner preview cannot use it.
+  if(!value.phone&&value.role==='it'){
+    const action=document.createElement('button');action.type='button';action.textContent='Handoff corrections';action.className='cos-it-corrections-link';
+    action.onclick=()=>{
+      if(!current())return;clearFrame();const turn=++revision;root.replaceChildren();const host=document.createElement('section');root.append(host);
+      disposeTransfer=mountCorrectionDesk(host,context(),{onClose:()=>{if(turn!==revision||key(scope())!==key(value))return;clearFrame();root.replaceChildren();void open(value,++revision);}});
+    };root.prepend(action);
+  }
   boardLoadTimer=setTimeout(()=>{if(!current())return;note.textContent='The board is taking longer than usual to open. You can keep waiting or retry.';retry.hidden=false;},20000);
   scheduleFrameFit();
 }
@@ -245,6 +260,7 @@ if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
   style.textContent='[data-cos-it-paused]{display:none!important}#cosITDailyHost{width:100%;min-width:0;display:block!important}#cosITDailyFrame{display:block;width:100%;height:60dvh;min-height:0;border:0;background:#0b111c}.cos-it-daily-status{padding:28px;background:#111b2a;border:1px solid #2c3b51;border-radius:16px;color:#e6edf7}.cos-it-daily-status button{min-height:44px;padding:10px 14px;background:#303a44;color:#fff;border:1px solid #6b7785;border-radius:9px}.cos-it-daily-status h1{font-size:24px;line-height:1.25;margin:0 0 12px}.cos-it-handoff-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.cos-it-handoff-actions button{min-height:58px;padding:12px;font-size:16px;font-weight:700;border:1px solid #66717d;border-radius:10px;white-space:normal;background:#252d36;color:#fff}.cos-it-handoff-actions button[aria-pressed=true]{background:#97132c;border-color:#ed3652;color:#fff}.cos-it-handoff-actions button:disabled{opacity:1;background:#252d36;color:#cbd4dd;border-color:#566371;cursor:not-allowed}@media(max-width:420px){.cos-it-handoff-actions{grid-template-columns:1fr}}';
   document.head.append(style);
+  const correctionStyle=document.createElement('style');correctionStyle.textContent='#cosITDailyHost .cos-it-corrections-link{min-height:44px;padding:10px 16px;margin:0 0 12px;background:#253243;color:#fff;border:1px solid #738197;border-radius:9px;font:700 15px Arial;cursor:pointer}';document.head.append(correctionStyle);
   // Runs before protected legacy delegated/inline handlers; inert also blocks keyboard entry.
   for (const type of ['click','submit','change','input']) window.addEventListener(type,event=>{
     if (!scope()) return;

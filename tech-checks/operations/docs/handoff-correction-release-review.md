@@ -1,0 +1,299 @@
+# Audited handoff corrections — release review
+
+## Status and scope
+
+This is the reconstructed, tested continuation of the interrupted correction
+task `01a15f72-aad2-7737-a3cd-f6e618d81015`. Recovery found its task transcript,
+but not its source branch, commit or patch. The user subsequently authorized
+reconstruction. The candidate starts at main commit
+`6ed563f6c7fd75ed4ea7c72a8765ffc4f8324852` and preserves the existing Owner import
+and IT lifecycle work. Source presence and passing local tests are not evidence
+of production deployment.
+
+The correction applies only to an `awaiting_service` handoff with a recorded
+Truck replenishment or Installation purpose and no receipt, return or
+cancellation. An audited purpose amendment is allowed; its purpose and purpose
+revision stay unchanged. An unclassified legacy handoff must have its purpose
+recorded before a correction can be saved. It updates that handoff's
+pending manifest, revision and reserved equipment in one transaction. It does
+not receive equipment, add truck stock, imply a return or change availability
+through the older truck-adjustment function.
+
+## User flow
+
+- Original submitting IT technician: open the submitted handoff and choose
+  **Correct this handoff**. The actual IT phone and desktop hosts expose the
+  correction desk. Desktop also has **Handoff corrections** above its existing
+  Fleet content.
+- Owner: **Operations → Tech Checks → Check handoffs & returns**. On another
+  technician's pending handoff, choose **Apply technician-confirmed correction**.
+  Verified IT may apply the same cited-evidence process when authorized by the
+  server. Preview personas cannot write.
+- Enter exact registered equipment identity, purpose-appropriate battery details,
+  parts/SIM details, a new
+  matching unit/tag photograph, the reason and explicit confirmation. Cited
+  confirmation additionally requires the original technician's documented
+  reply, its Central time and the stable evidence link. The actual applying
+  actor remains separate from the confirming technician.
+- The original signed event, answers, signature, photos and delivery manifest
+  remain unchanged. The revision contains before/after values, confirmation
+  provenance, the applying actor and server timestamps. No replacement signature
+  is solicited or invented.
+- Saving uses a frozen idempotent request and verifies a separate saved
+  readback before reporting success. A lost response remains retryable with the
+  same request. Stale revisions and duplicate/conflicting equipment reservations
+  are rejected.
+- Service sees the corrected pending manifest and its history. An older unsent
+  receipt draft can be explicitly discarded to review the latest revision.
+  Actual receipt observations start blank. A request with an uncertain outcome
+  is retained for exact retry; it is not silently discarded.
+
+Blank SIM lists are allowed. Service obtains SIM cards separately from James;
+a requested Simetry change belongs in the mHelp service ticket.
+
+## Security changes requiring explicit release approval
+
+The user specifically required approval for privileged/security changes.
+Preparing and testing these files does not authorize installing them. The user
+approved the following scope with **YES** on October 22, 2026. Deployment and
+activation still require the recorded release gates; approval is not evidence
+that those steps have occurred.
+
+1. **Database migration:**
+   `database-maintenance/techcheck-handoff-corrections-v1.sql`. Adds private,
+   RLS-protected correction settings, immutable corrections/audit and delivery
+   outbox tables; narrow context/submit RPCs for authenticated actors; a
+   service-only delivery RPC; and an extension of the existing evidence-path
+   helper. Public wrappers use the checked private implementations. Direct
+   table writes remain unavailable to application users. The existing evidence
+   bucket receives no new UPDATE or DELETE policy. New `enabled` and
+   `reports_ready` gates start false.
+2. **New Edge Function:** `techcheck-correction-delivery`, using `serve.ts`
+   and the reviewed dependencies. Its proposed gateway setting is
+   `verify_jwt=false` so the existing scheduler can call it. The handler itself
+   requires either a bearer token verified with `auth.getUser` or the existing
+   server-only Vault cron credential; the queue separately checks authorization
+   and its lease. No client-supplied actor or recipient is trusted.
+3. **Scheduler:**
+   `database-maintenance/techcheck-correction-delivery-schedule-v1.sql`, job
+   `techcheck-correction-delivery-v1`, every five minutes. It uses the existing
+   `service_daily_delivery_cron_secret` without exposing or rotating it.
+4. **Activation:** enable the new correction gates only after the approved
+   schema, worker, frontend and connection/readback checks are verified. No
+   release operation may amend the disputed handoff without its technician's
+   physical identity confirmation and matching photograph.
+5. **Ongoing filing:** `database-maintenance/techcheck-archive-routing-v1.sql`
+   adds three private tables, immutable folder reservations and a service-only
+   routing RPC bound to existing queue leases. Exact verified technician UUIDs
+   map to the existing folders. Redeploy the two original delivery workers with
+   the shared resolver, then explicitly enable its initially disabled routing
+   gate. This adds no new schedule, secret, sharing rule or recipient. See
+   [technician archive routing](technician-archive-routing.md).
+
+The correction evidence-path predicate and event request-ID guard take effect
+when the migration is installed, even while the new correction gates are false.
+The scheduler script registers an active five-minute job; its queue claims no
+work while the gates are false. These are part of the explicit approval scope.
+
+The target is project `goqrnolcvqnirjmzaeyk` and the existing COS GitHub Pages
+application. There is no new application, project, account, sharing policy or
+technician email distribution list.
+
+## Archive and notification
+
+The new worker adds actual PDF, HTML, audit JSON and JPEG files in a correction
+subfolder of the original package's saved Drive folder ID. It preserves the
+original folder even if that folder was moved into the technician/date layout.
+It verifies original-file fingerprints and saved correction file bytes and
+parents. It reserves provider IDs before creating files, and preserves an
+uncertain email result for review rather than sending again automatically.
+
+James alone receives the correction notification at the trusted existing
+configured address. It includes original/corrected details, actor/confirmation
+provenance and original/correction evidence links. The feature sends no
+technician follow-up. See [delivery contract](handoff-correction-delivery.md)
+for the exact deployment, retry and saved-readback requirements.
+
+## October 22 integration with the installed purpose release
+
+Main advanced to `c44fa65f35e4ddee0df3ec4d2ebfb1ca2a42810b` (PR 274) after
+release approval. The correction candidate has been integrated with that change
+before installation. Earlier hosted results remain historical evidence for
+their exact source; the combined candidate must pass the required workflows.
+
+The database preflight at 14:55:03 UTC verified that purpose v2 was already
+installed. The correction migration now checks the reviewed installed function
+fingerprints, including the evidence predicate it extends, before changing
+anything. It retains the installed one-receipt protection and immutable events.
+Corrections serialize with classification and receipt using the same transfer
+row; current purpose and purpose revision are copied into the immutable audit.
+
+Replenishment corrections preserve null battery count, configuration and required
+count. Installation corrections require the approved family-specific package.
+The correction PDF, HTML, notification and audit JSON all identify the saved
+purpose and preserve package details. Original signed battery counts and other
+answers remain in the unchanged original submission.
+
+Installed transfer worker v3 and daily worker v9 were downloaded and compared
+with the merged source. Their purpose renderers, signature treatment and original
+IT photo provenance are preserved. The worker compatibility tests passed 35
+named scenarios with no skips, and strict worker TypeScript passed. Database,
+browser and hosted checks must complete on the combined source before release.
+
+The integrated local checks subsequently passed 22 named SQL cases, 9
+client/model cases, all 20 correction browser cases with no retries or skips,
+90 additional existing/purpose regressions, and 25 archive-routing/provider
+cases. Application TypeScript and the production build passed. Six native
+PostgreSQL correction overlaps and the archive overlap gate were explicitly
+skipped locally because no isolated server was running; hosted CI requires
+those checks, including the new purpose-classification race. The installed
+purpose release's independent native receipt/retry gate remains in the workflow.
+
+Purpose amendments made by the Owner route to the immutable original checkout
+technician's folder, with the actual recorder retained separately. The
+service-only routing permission and current queue lease requirements are
+unchanged. Missing original provenance or a missing verified mapping blocks
+filing. The routing compatibility test passed without changing signed events,
+source outboxes or prior archives.
+
+## Historical verified local acceptance
+
+The candidate was checked with Node 22.23.3 and isolated synthetic accounts,
+equipment, storage and provider responses. No live correction, acceptance,
+inventory update, Drive upload or email was performed by these tests.
+
+| Gate | Result |
+| --- | --- |
+| Correction client/model | 7 named tests passed |
+| Correction SQL and authorization | 18 named tests passed |
+| Correction archive/provider/provenance | 15 named tests passed |
+| Real PostgreSQL 17.11 overlapping transactions | 5 passed, zero skipped |
+| Existing focused unit regressions | 77 named tests passed |
+| Correction phone/desktop browser acceptance | 17 passed, zero skipped/flaky |
+| Existing transfer, Service and IT browser regressions | 77 passed |
+| Existing application TypeScript and production build | Passed |
+| New worker strict TypeScript; synthetic PDF render review | Passed |
+| New archive routing/provider checks | 15 named tests passed |
+| Archive routing SQL | 10 passed, including verified seed preflight and two actual PostgreSQL overlap proofs |
+| All three Edge `serve.ts` entrypoints, actual Deno-aware check | Passed |
+
+The PostgreSQL gate observes distinct backend PIDs and actual blocking before
+commit. It covers competing corrections, correction versus receipt in both
+orders, competing reservations and exact parallel replay. Existing synthetic
+truck contents and signed originals remain unchanged.
+
+Browser acceptance uses the actual COS entry markup, hosts and correction
+modules with requests intercepted into disposable PGlite databases. It verifies
+390px and 1440px layouts, actual navigation, same-account refresh, account
+switching, offline/lost-response retry, saved provenance and photo bindings,
+immutable originals, and pending Service behavior. PGlite alone does not prove
+multi-session PostgreSQL locking; the separate gate supplies that proof.
+
+### Hosted acceptance findings and follow-up
+
+The hosted review of `55d8492e7b7fe4b0aab154e63b73f257317c38ba` found two
+specific failures. It is a preserved historical checkpoint, not a passing release.
+The 1440px correction test exposed an IT host remount when Chromium's full-page
+screenshot briefly resized the viewport to 1 × 1. The host now keeps an open
+handoff form or correction workspace mounted when only its presentation width
+changes, including the uncertain-save and verified-readback screens. Identity,
+role, effective role, preview and profile changes still invalidate that scope.
+
+The existing page-integrity test also needed an explicit allowlist entry for
+the new correction-host module. It now verifies that exact module URL once and
+in the reviewed order. The original eight-script count and baseline body/URL
+digest remain unchanged.
+
+The follow-up local run passed all 17 correction browser cases. Both actual IT
+routes retain the same editor node, values and confirmation across phone/desktop
+width changes and a deliberate 1 × 1 transition, then save and verify readback
+at the opposite layout width. Account switching still clears the correction
+workspace. The 31 existing IT host browser cases and 11 host availability/page
+integrity unit checks also passed. Hosted workflows must pass again on the final
+commit; these local results do not waive that gate.
+
+The hosted follow-up at `54501a420408a1ffbbb13198a5b2331c5d4af884` passed the
+dedicated transfer/correction review and every earlier Operations stage. Its full
+browser suite reported 3,276 passed, 2 failed and 190 skipped. Both failures were
+the existing daily-IT camera diagnostics fixture at desktop widths. Its special
+302 redirected the embedded Operations page to the parent root, activating the
+existing IT host navigation guard and leaving the signed-in synthetic fixture.
+All four hosted attempts' traces confirm that top-level navigation; both the
+fixture and guard predate this correction work.
+
+The fixture now serves the actual embedded `operations/dist/index.html` path
+through its existing file interceptor. No production code, access guard, test
+assertion, timeout or retry setting was changed for this repair. The exact nine
+local cases first reproduced both failures, then passed eight cases after the
+fixture change, with the one existing phone daily-IT exclusion still skipped and
+zero flaky cases. Hosted workflows must also pass on this follow-up commit.
+
+Reproduce from `tech-checks/operations` with Node 22:
+
+```sh
+node --import tsx --test --experimental-test-isolation=none --test-concurrency=1 tests/transfer-correction-client.test.mjs tests/transfer-correction-sql.test.mjs tests/transfer-correction-delivery.test.mjs
+npx playwright test --config tests/playwright.corrections.config.mjs
+npx playwright test --config tests/playwright.transfer.config.mjs
+npm run typecheck
+npm run build
+```
+
+For concurrency, use a dedicated disposable PostgreSQL 17 service and the
+explicit `COS_CORRECTION_POSTGRES_*` settings in the transfer-review workflow.
+That workflow requires the gate rather than allowing a skipped concurrency
+test. Never point the fixture at a production project. Check named test counts;
+a file-level test-runner exit alone is insufficient.
+
+## Production release evidence still required
+
+After explicit security approval, record the installed migration/source hash,
+worker version and auth configuration, frontend deployment commit and successful
+GitHub Pages deployment, scheduler job and gate values. Check actual authorized
+Owner/IT/Service context responses and unauthorized/preview denial. Verify the
+Edge worker's actual Google account and archive access without sending a test
+message or modifying the disputed record.
+
+The first authorized saved correction additionally needs its separate revision,
+audit, reservation and outbox readbacks; unchanged original fingerprints;
+actual correction folder/file IDs, parent IDs and byte hashes; and confirmed
+James notification ID. Local synthetic evidence is not a substitute for this
+production saved-readback proof. If no real correction has been authorized,
+report that production save/delivery proof is still pending.
+
+Rollback is to disable the new gates and scheduler and restore the previous
+frontend/worker version if necessary. Do not delete correction/audit records,
+rewrite originals, replay ambiguous email sends or reset accepted handoffs.
+
+## Explicit remaining workflow boundaries
+
+Read-only source/data-flow review confirms that the installed named receipt
+function records acceptance/discrepancy and signed receipt snapshots, but does
+not populate the inspected permanent truck-inventory tables. Installation/site,
+swap, partial-return and physical-check-in continuity are not established by
+this amendment feature. Existing independent ticket-free workflows do not
+bridge every named reservation. Preserve these gaps explicitly; never use the
+older truck adjustment operation to imply a physical return.
+
+The reviewed original transfer and Service daily-report producers now use the
+shared technician/date/category resolver for new packages. Existing moved
+packages keep their IDs and current parents; concurrent jobs converge on one
+reserved date/category identity. This routing source is not deployed yet and
+still requires approval and actual Edge Google
+access/readback. The correction worker follows the original's stable folder ID.
+IT Checks and ticket-free returns have no general Drive producer located in the
+audited modules. Do not claim those ongoing filing paths are complete from the
+earlier reorganization or this two-worker routing update alone.
+
+## Disputed real record
+
+`a314aad4-8129-4c51-b4c3-59539955ab13` remains Teddy Hopper → Josh Mireles,
+`discrepancy`, revision 5, in the production readback at October 22, 2026,
+14:50:25 UTC (09:50:25 CDT). Four receipt events were independently saved under
+Josh's actual account before this release. This task did not create them.
+The original manifest, photo references, request and snapshot fingerprints
+remain unchanged. This record is ineligible for the pending-only correction
+path; its receipt history must be preserved. Manifest 039 versus reported
+photo tag 41 remains unresolved. The original package and its stable links are
+preserved. There is no authorized value to write until Teddy supplies physically
+verified identity and a matching photo. The revised clarification email remains
+unsent pending James's review.

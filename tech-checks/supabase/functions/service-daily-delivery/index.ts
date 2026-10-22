@@ -1,5 +1,6 @@
 import {summaryPdf,summaryHtml} from './summary.ts';
-import {DRIVE_FOLDER,RECIPIENT,reportHtml,rawEmail} from './report.ts';
+import {RECIPIENT,reportHtml,rawEmail} from './report.ts';
+import {ArchiveDestinationBlocked,resolveTechnicianArchiveDestination} from '../_shared/technicianArchive.ts';
 import {summaryPdf as receiptPdf} from '../techcheck-transfer-delivery/report.ts';
 const ORIGINS=new Set(['https://cypressriveroasis2023-sudo.github.io','https://cos-vision-integration-preview.pages.dev']);
 export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}:any) {
@@ -42,7 +43,6 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
    // Require James's actual account. Never deliver using a guessed sender/account.
    const profile=await api('https://openidconnect.googleapis.com/v1/userinfo');
    if(profile.email?.toLowerCase()!==RECIPIENT || profile.email_verified!==true) {await finish('blocked','Connect the Operations Manager Google account.');return response({accepted:true,status:'blocked'});}
-   await api('https://www.googleapis.com/drive/v3/files/'+DRIVE_FOLDER+'?fields=id,mimeType&supportsAllDrives=true');
    const manifest=report.drive_manifest||{};
    const checkpoint=async()=>queue('checkpoint',{drive_manifest:manifest});
    // Persist provider-generated IDs before creating anything. Retrying a Drive
@@ -63,7 +63,8 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
     if(verify.appProperties?.techcheck_report_id!==report.id || verify.appProperties?.techcheck_part!==key || !verify.parents?.includes(parent))throw new Error('Drive archive verification failed.');
     entry.done=true;await checkpoint();return entry.id;
    };
-   const folder=await create('folder',report.check_date+' · '+report.actor_name+' · '+report.id.slice(0,8),DRIVE_FOLDER,'application/vnd.google-apps.folder');
+   const parent=await resolveTechnicianArchiveDestination({source:'daily',report,manifest,checkpoint,call,request,auth});
+   const folder=await create('folder',report.check_date+' · '+report.actor_name+' · '+report.id.slice(0,8),parent,'application/vnd.google-apps.folder');
    const links:Record<string,string>={};
    for(let n=0;n<report.photos.length;n++){
     const p=report.photos[n],part='photo_'+n;
@@ -108,10 +109,11 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
     await queue('checkpoint',{email_state:'sent',email_id:sent.id});report.email_state='sent';
    }
    await finish('sent');return response({accepted:true,status:'sent'});
-  }catch {
+  }catch(error) {
    // Never echo provider bodies, OAuth secrets, SIMs or image paths into logs.
-   if(report)try{await call('service_daily_delivery_v1',{p_action:'finish',p_id:report.id,p_lease:report.lease_token,p_data:{status:report.email_state==='sending'?'review':'retry',error:report.email_state==='sending'?'Verify email delivery before retrying.':'Delivery interrupted; saved report will retry.'}});}catch{}
-   return response({accepted:Boolean(report),status:report?'pending':'unavailable'},report?202:503);
+   const review=report?.email_state==='sending'||report?.email_state==='review',blocked=error instanceof ArchiveDestinationBlocked;
+   if(report)try{await call('service_daily_delivery_v1',{p_action:'finish',p_id:report.id,p_lease:report.lease_token,p_data:{status:review?'review':blocked?'blocked':'retry',error:review?'Verify email delivery before retrying.':blocked?(error as Error).message:'Delivery interrupted; saved report will retry.'}});}catch{}
+   return response({accepted:Boolean(report),status:report?(blocked&&!review?'blocked':'pending'):'unavailable'},report?202:503);
   }
  };
 }

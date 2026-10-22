@@ -2,6 +2,7 @@ import '../tech-check-rules.js';
 import {createDailySignoff,newSignature,signatureJpeg,hasSignatureInk} from '../service-signoff-ui.js';
 import {normalizeManifest,receiptDifferences,latestReceiptEvent,canRecordReceipt,TRANSFER_STATEMENT,INTAKE_CHECKS,transferTitle,TRANSFER_PURPOSES,transferPurposeLabel,hasTransferPurpose,installationBatteryPlan} from './model.js';
 import {transferClient,deviceDraft,transferJpeg} from './client.js';
+import {mountCorrectionDesk} from './corrections.js';
 const element=(tag,text='',className='')=>{const n=document.createElement(tag);n.textContent=text;if(className)n.className=className;return n;};
 const button=(text,fn,secondary=false)=>{const b=element('button',text,secondary?'tc-secondary':'');b.type='button';b.onclick=fn;return b;};
 const label=(text,input)=>{const l=element('label',text);l.append(input);return l;};
@@ -19,7 +20,7 @@ function loadStyle(){if(document.querySelector('[data-transfer-style]'))return;c
 // Mounts inside the original TechCheck page, using its current account and database.
 export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}){
  loadStyle();root.classList.add('tc-transfer');root.setAttribute('aria-label',role==='it'?'IT equipment check in and check out':'Equipment received from IT');
- const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
+ const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0,disposeCorrections=null;
  const current=()=>!disposed&&client.current()&&root.isConnected;
  const guard=()=>{client.assert();if(disposed||!root.isConnected)throw new Error('This transfer screen is no longer active.');};
  const message=(text,error=false)=>{if(!current())return;if(!statusNode?.isConnected){statusNode=element('p','','tc-status');root.append(statusNode);}statusNode.textContent=text;statusNode.setAttribute('role',error?'alert':'status');};
@@ -60,7 +61,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   if(draft.signature.method==='drawn'&&!hasSignatureInk(draft.signature))return {detail:'Draw your signature, or select Type signature and enter your account name.',control:form.querySelector('.cos-signature-canvas')};
   return null;
  }
- const reset=()=>{for(const url of urls)URL.revokeObjectURL(url);urls.clear();root.replaceChildren();statusNode=null;};
+ const reset=()=>{disposeCorrections?.();disposeCorrections=null;for(const url of urls)URL.revokeObjectURL(url);urls.clear();root.replaceChildren();statusNode=null;};
  const persist=async()=>{guard();await deviceDraft(storageKey,draft);guard();};
  const invalidate=()=>{if(draft?.signature)draft.signature.confirmed=false;const c=root.querySelector('.cos-daily-signoff input[type=checkbox]');if(c)c.checked=false;};
  const changed=()=>{invalidate();updateReceiptReview();persist().catch(e=>message(e.message,true));};
@@ -106,6 +107,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    }else if(t.state==='discrepancy')c.append(element('p','This handoff needs IT / Owner review. Reload to check its saved receipt details before continuing.'));
    if(role==='service'&&canRecordReceipt(t))c.append(button('Verify equipment received',()=>start('receipt',t)));
    if(role==='it'&&t.state==='accepted')c.append(button('Check in this handoff',()=>start('return',t)));
+   c.append(button(role==='it'&&t.it_actor===client.actor&&t.state==='awaiting_service'&&hasTransferPurpose(t.purpose)&&!(t.events||[]).some(event=>!['checkout','purpose_amendment'].includes(event.kind))?'Correct this handoff':'View original and corrections',()=>{reset();revision++;const host=element('section');root.append(host);disposeCorrections=mountCorrectionDesk(host,context,{transferId:t.id,onClose:()=>load()});},true));
    const details=element('details');details.append(element('summary','Saved checks, notes and evidence'));
    for(const e of t.events||[]){const block=element('div');block.append(element('p',`${e.actor_name} · ${e.kind} · ${new Date(e.signed_at).toLocaleString('en-US',{timeZone:'America/Chicago',hour12:false})} Central`),element('p',e.snapshot?.notes||''));
     if(e.report_url){const link=element('a',e.kind==='purpose_amendment'?'Open purpose update report':'Open signed handoff report');link.href=e.report_url;link.target='_blank';link.rel='noopener noreferrer';block.append(link);}
@@ -273,5 +275,5 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   finally{busy=false;for(const [n,disabled] of controls)if(n.isConnected)n.disabled=disabled;}
  }
  void load();
- return ()=>{disposed=true;revision++;for(const u of urls)URL.revokeObjectURL(u);urls.clear();root.replaceChildren();};
+ return ()=>{disposed=true;revision++;disposeCorrections?.();disposeCorrections=null;for(const u of urls)URL.revokeObjectURL(u);urls.clear();root.replaceChildren();};
 }
