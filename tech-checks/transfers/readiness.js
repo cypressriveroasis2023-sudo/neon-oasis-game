@@ -6,11 +6,12 @@ const unavailable = reason => ({ready:false,reason});
 function actorScope(context, role) {
   const id=context?.getSession?.()?.user?.id, profile=context?.getProfile?.();
   return id && context?.getRole?.()===role && profile?.user_id===id &&
-    profile?.active===true && !profile?.archived_at ? id : null;
+    profile?.active===true && !profile?.archived_at &&
+    (role!=='owner' || profile.role==='owner' && (!context.getEffectiveRole || context.getEffectiveRole()==='owner')) ? id : null;
 }
 export async function transferReadiness(context, role, {timeoutMs=TRANSFER_READINESS_TIMEOUT_MS}={}) {
   const actor=actorScope(context,role);
-  if(!actor || !['it','service'].includes(role)) return unavailable('access');
+  if(!actor || !['it','service','owner'].includes(role)) return unavailable('access');
   let timer;
   try {
     const response=await Promise.race([
@@ -23,7 +24,7 @@ export async function transferReadiness(context, role, {timeoutMs=TRANSFER_READI
     if(response?.error) return unavailable(response.error.code==='PGRST202'?'not_installed':
       ['42501','PGRST301','PGRST302'].includes(response.error.code)?'access':'unavailable');
     const data=response?.data;
-    if(data?.version!==1 || data.actor_id!==actor || data.role!==role || typeof data.ready!=='boolean') return unavailable('incompatible');
+    if(data?.version!==1 || data.actor_id!==actor || data.role!==(role==='owner'?'it':role) || typeof data.ready!=='boolean') return unavailable('incompatible');
     // Do not trust a lone `ready:true` from a partially upgraded server.
     const gates=[data.enabled,data.dependencies?.read,data.dependencies?.submit,data.dependencies?.privateEvidence,
       data.release?.reports,data.release?.receiptLink,data.release?.custody];
