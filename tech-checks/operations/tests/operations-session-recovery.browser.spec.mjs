@@ -168,6 +168,7 @@ for(const change of ['same Owner','changed Owner','changed permissions'])test('t
  const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;
  await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toHaveCount(0);
+ await expect(app.getByText('Connection interrupted. COS will reconnect automatically. Keep this window open.')).toBeVisible();
  await page.clock.runFor(29999);expect(state.sessionReads).toBe(initialSessions+1);
  state.sessionStatus=200;
  if(change==='changed Owner')state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';

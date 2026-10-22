@@ -56,7 +56,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
   const retry = () => {
     clearTimeout(retryTimer);
     phase = 'waiting';
-    publish({...state, session:null, checking:true, error:''});
+    publish({...state, session:null, checking:true, error:'Connection interrupted. COS will reconnect automatically. Keep this window open.'});
     retryTimer = setTimeout(() => {
       retryTimer = undefined;
       if (active && phase === 'waiting' && !state.reloadRequired) void verify(true);
