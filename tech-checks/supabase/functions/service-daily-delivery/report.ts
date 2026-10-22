@@ -39,7 +39,7 @@ export function reportHtml(report:any,photoLinks:Record<string,string>={}) {
  return '<!doctype html><html lang="en"><meta charset="utf-8"><title>TechCheck daily report</title><body><h1>TechCheck Truck/Trailer/Truck Inventory</h1>'+
  `<p>${escapeHtml(report.actor_name)} · ${escapeHtml(report.check_date)} (America/Chicago)</p><p>Submitted: ${escapeHtml(report.submitted_at)} · Report ${escapeHtml(report.id)}</p>`+
  (owner?'<p><b>OWNER ADMINISTRATIVE CLOSEOUT · Technician inventory verification MISSING.</b></p><p>Authorized departure exception: '+(owner.departure_authorized?'YES (Owner-authorized; unverified inventory)':'NO')+'.</p>':'')+
- '<h2>Truck inspection</h2>'+checks(truck,s.truck_checks,'truck_')+`<h2>Trailer inspection</h2><p>Taking a trailer: ${s.taking_trailer?'Yes':'No — trailer inspection not required'}</p>`+
+ '<h2>Truck inspection</h2>'+checks(truck,s.truck_checks,'truck_')+`<h2>Trailer inspection</h2><p>Taking a trailer: ${s.taking_trailer===null||s.taking_trailer===undefined?'Not recorded':s.taking_trailer?'Yes':'No — trailer inspection not required'}</p>`+
  (s.taking_trailer?checks(trailer,s.trailer_checks,'trailer_'):'')+
  '<h2>Equipment on the truck</h2><table>'+inventory.units.map((u:any)=>row(u.equipment_type,u.unit_tag)).join('')+'</table>'+
  '<h2>SIM cards</h2><table>'+inventory.sims.map((v:any)=>row('SIM slot '+v.slot_no,v.sim_number)).join('')+'</table>'+
