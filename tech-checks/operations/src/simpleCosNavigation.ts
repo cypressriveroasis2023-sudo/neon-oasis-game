@@ -4,7 +4,7 @@
  */
 export type CosSimpleArea = { workspace: string; label: string; icon: string };
 export const ownerMainAreas: readonly CosSimpleArea[] = [
-  {workspace:'Today',label:'Overview',icon:'dashboard'},
+  {workspace:'COS Overview',label:'Overview',icon:'dashboard'},
   {workspace:'Units On Hand',label:'Inventory & Transfers',icon:'units'},
   {workspace:'Camera Health',label:'Camera Health',icon:'camera'},
   {workspace:'Fleet Dashboard',label:'Fleet Map',icon:'map'},
@@ -14,6 +14,7 @@ export const ownerMainAreas: readonly CosSimpleArea[] = [
   {workspace:'Calendar',label:'Calendar',icon:'operations'},
 ];
 export const ownerAdvancedAreas: readonly CosSimpleArea[] = [
+  {workspace:'Today',label:'Legacy daily and job overview',icon:'dashboard'},
   {workspace:'Operations',label:'Existing Operations tools',icon:'operations'},
   {workspace:'Daily Board',label:'Existing TV and daily board controls',icon:'dashboard'},
   {workspace:'Owner Tasks',label:'Owner assignments',icon:'team'},
