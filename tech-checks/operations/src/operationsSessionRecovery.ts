@@ -24,8 +24,8 @@ export function ownerSessionFingerprint(session: OperationsSession | null, mode:
     keys.map(key => [key, features[key]])]);
 }
 
-/** One read-only revalidation, with every private view fenced by the same epoch.
- * A second transition during verification, or any hard reason, requires reload.
+/** Read-only revalidation, with every private view fenced by the same epoch.
+ * One overlapping token renewal may restart verification; other transitions require reload.
  * Neither verification failures nor previously submitted writes are replayed. */
 export function createOperationsSessionRecovery({read, mode, changed, defer = callback => setTimeout(callback, 0)}: {
   read: () => Promise<OperationsSession>;
@@ -35,6 +35,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
 }) {
   let active = true, epoch = 0, baseline: string | null = null, verifiedMode: string | null = null;
   let verificationTimer: ReturnType<typeof setTimeout> | undefined;
+  let renewalRestarted = false;
   let phase: 'idle' | 'queued' | 'verifying' = 'idle';
   let state: SessionRecoveryState = {session:null, checking:true, error:'', reloadRequired:false, generation:0};
   const publish = (next: SessionRecoveryState) => { state = next; if (active) changed(state); };
@@ -46,12 +47,14 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
     if (!active || state.reloadRequired) return;
     phase = 'verifying';
     const requestEpoch = epoch, requestMode = mode();
+    let requestTimer: ReturnType<typeof setTimeout> | undefined;
     publish({...state, session:null, checking:true, error:''});
     try {
       const data = await Promise.race([
         read(),
         new Promise<never>((_, reject) => {
-          verificationTimer = setTimeout(() => reject(new Error('Account verification timed out. Retry Operations access or reload the app.')), SESSION_VERIFICATION_TIMEOUT_MS);
+          requestTimer = setTimeout(() => reject(new Error('Account verification timed out. Retry Operations access or reload the app.')), SESSION_VERIFICATION_TIMEOUT_MS);
+          verificationTimer = requestTimer;
         }),
       ]);
       if (!active || requestEpoch !== epoch) return;
@@ -59,6 +62,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       if (!data || typeof data.authorized !== 'boolean') throw new Error('Operations authorization could not be verified.');
       const fingerprint = ownerSessionFingerprint(data, requestMode);
       if (recovering && (!baseline || fingerprint !== baseline)) { blocked(); return; }
+      renewalRestarted = false;
       baseline = fingerprint;
       verifiedMode = requestMode;
       phase = 'idle';
@@ -69,8 +73,8 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       phase = 'idle';
       publish({...state, session:null, checking:false, error:cause instanceof Error ? cause.message : 'Operations authorization could not be verified.'});
     } finally {
-      clearTimeout(verificationTimer);
-      verificationTimer = undefined;
+      clearTimeout(requestTimer);
+      if (verificationTimer === requestTimer) verificationTimer = undefined;
     }
   }
   const controller = {
@@ -88,10 +92,17 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       // Advance before clearing. Even a successful earlier read may not refill this view.
       epoch++;
       const verifying = phase === 'verifying';
+      // A delayed parent refresh can replace the token during recovery itself.
+      // Discard that read and verify the replacement against the original Owner.
+      // Bound this to one restart; never accept an old response or replay writes.
+      const restartRenewal = verifying && reason === 'token-renewed' && !renewalRestarted &&
+        Boolean(baseline) && verifiedMode === mode() && !state.reloadRequired;
+      clearTimeout(verificationTimer); verificationTimer = undefined;
       publish({...state, session:null, checking:false, error:'', generation:state.generation+1});
-      if (state.reloadRequired || verifying || typeof reason !== 'string' || !transientReasons.has(reason) || !baseline) {
+      if (state.reloadRequired || (verifying && !restartRenewal) || typeof reason !== 'string' || !transientReasons.has(reason) || !baseline) {
         blocked(); return;
       }
+      if (restartRenewal) renewalRestarted = true;
       publish({...state, checking:true});
       if (phase === 'queued') return;
       phase = 'queued';
