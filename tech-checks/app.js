@@ -1,4 +1,3 @@
-import {mountTransferDesk} from './transfers/desk.js';
 const SUPABASE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -2984,7 +2983,6 @@ function ownerAppFilterUnits(q){
   const rows=(state.unitRegistry||[]).filter(r=>!q||String(r.unit_tag||'').toLowerCase().includes(q)||String(r.equipment_type||'').toLowerCase().includes(q));
   const h=document.getElementById('ownerAppUnitResults');if(h)h.innerHTML=ownerAppUnitRows(rows.slice(0,100));
 }
-let disposeOwnerTransfers=null;
 function ownerAppHandoffs(){
   const active=(state.preps||[]).filter(p=>p.status!=='closed'), done=(state.preps||[]).filter(p=>p.status==='closed').slice(-20).reverse();
   const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
@@ -2999,7 +2997,7 @@ function ownerAppHandoffs(){
   if(waiting.length)body+='<section class="ownerAppGroup"><h2>Waiting for Service acceptance <span>'+waiting.length+'</span></h2>'+waiting.map(card).join('')+'</section>';
   if(preparing.length)body+='<section class="ownerAppGroup"><h2>IT preparing <span>'+preparing.length+'</span></h2>'+preparing.map(card).join('')+'</section>';
   if(done.length)body+='<section class="ownerAppGroup"><h2>Completed handoffs <span>'+done.length+'</span></h2>'+done.map(card).join('')+'</section>';
-  return ownerAppHeader('IT → SERVICE','Handoffs','Equipment preparation, Service acceptance, returns, IT Intake, and unresolved equipment workflow.')+'<section id="ownerEquipmentTransfers" aria-label="Equipment handoffs and returns"></section><details><summary>Ticket preparation and legacy returns</summary>'+(body||ownerAppEmpty('NO ACTIVE HANDOFF OR RETURN WORK'))+'</details>';
+  return ownerAppHeader('IT → SERVICE','Handoffs','Equipment preparation, Service acceptance, returns, IT Intake, and unresolved equipment workflow.')+(body||ownerAppEmpty('NO ACTIVE HANDOFF OR RETURN WORK'));
 }
 
 function ownerOpenTicketControlByNumber(ticketNo){
@@ -3314,7 +3312,6 @@ function ownerSetPersistentSurface(route){
   }
 }
 async function ownerAppRender(){
-  disposeOwnerTransfers?.();disposeOwnerTransfers=null;
   if(state.profile?.role!=='owner')return;
   const page=document.getElementById('ownerAppPage');
   const host=document.getElementById('ownerRouteView');
@@ -3339,9 +3336,6 @@ async function ownerAppRender(){
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
   host.innerHTML=(route==='today'?'':ownerGlobalSearchBarHtml())+html;
   window.techRepositionLiveIndicator?.();
-  if(route==='handoffs'&&window.TechCheckContext.getEffectiveRole()==='owner'){
-    disposeOwnerTransfers=mountTransferDesk(document.getElementById('ownerEquipmentTransfers'),window.TechCheckContext,{role:'it'});
-  }
   ownerSetPersistentSurface(route);
   const ownerWs=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ownerWs){

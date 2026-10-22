@@ -160,7 +160,7 @@ test('Owner opens equipment desk and completes legacy four-receipt replenishment
  f=await mountTransfers(page,{role:'service',seedHandoff:true,legacyHandoff:true,seedItems:[{...solar,battery_count:4}],legacyReceiptCounts:[0,0,0,4]});
  const before=(await f.db.query('select * from app_private.techcheck_transfer_events order by signed_at,id')).rows;
  const outbox=(await f.db.query('select count(*)::int n from app_private.techcheck_transfer_outbox')).rows[0].n;
- await page.evaluate(async owner=>{fixture.actor=owner;fixture.role='owner';document.getElementById('appView').hidden=true;const root=document.createElement('section');document.body.append(root);const {mountTransferDesk}=await import('/tech-checks/transfers/desk.js');mountTransferDesk(root,TechCheckContext,{role:'it'});},OWNER);
+ await page.evaluate(async owner=>{fixture.actor=owner;fixture.role='owner';show('owner');const view=document.getElementById('view-owner');view.dataset.ownerRoute='handoffs';view.innerHTML='<main id="ownerRouteView"><header class="ownerAppPageHeader">Owner handoffs</header><p>Legacy ticket preparation</p></main>';await import('/tech-checks/owner-transfer-host.js');},OWNER);
  await page.getByRole('button',{name:'Complete as Owner',exact:true}).click();
  await expect(page.getByLabel('Owner handoff purpose')).toHaveValue('truck_replenishment');
  await expect(page.getByLabel('Signed Service receipt').locator('option')).toHaveCount(4);
