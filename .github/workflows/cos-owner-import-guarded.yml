@@ -67,6 +67,33 @@ jobs:
       - name: Verify timestamp formats and guarded runtime replacement
         timeout-minutes: 2
         run: node --import tsx --test --experimental-test-isolation=none tests/mhelp-assignment-timestamps.test.mjs tests/mhelp-assignment-timestamp-runtime.test.mjs
+      - name: Rebuild exact approved PR273 helper artifact
+        timeout-minutes: 2
+        run: |
+          mkdir -p review-artifacts
+          node --input-type=module <<'NODE'
+          import {build} from 'esbuild';
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          import {resolve} from 'node:path';
+          const source=resolve('../supabase/functions/cos-operations-pages/mhelpEquipmentAssignmentReview.ts');
+          const built=await build({
+            stdin:{contents:`export {reviewOwnerEquipmentAssignments} from ${JSON.stringify(source)};`,resolveDir:resolve('.')},
+            bundle:true,write:false,format:'iife',globalName:'CosOwnerAssignmentReviewRelease',
+            platform:'neutral',target:'es2022',minifyWhitespace:true,minifySyntax:true
+          });
+          const helper=built.outputFiles[0].text+'\n';
+          const sha=createHash('sha256').update(helper).digest('hex');
+          if(sha!=='db75da92a418caac35a3678851a134f3406eaf13850fc9cf446913ec12e2c8c6') throw Error('Compiled helper SHA drift: '+sha);
+          await writeFile('review-artifacts/pr273-compiled-helper.txt',helper);
+          NODE
+      - name: Upload exact approved PR273 helper artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr273-compiled-helper
+          path: tech-checks/operations/review-artifacts/pr273-compiled-helper.txt
+          if-no-files-found: error
+          retention-days: 3
       - name: Verify full-size indexed assignment review
         timeout-minutes: 2
         run: node --test --experimental-test-isolation=none tests/mhelp-assignment-review-indexed.test.mjs
