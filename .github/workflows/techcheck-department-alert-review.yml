@@ -1,0 +1,34 @@
+name: TechCheck mandatory department alerts review
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/techcheck-department-alert-review.yml'
+      - 'tech-checks/database-maintenance/techcheck-department-alerts-*.sql'
+      - 'tech-checks/supabase/functions/techcheck-department-alerts/**'
+      - 'tech-checks/notifications-v1.js'
+      - 'tech-checks/operations/tests/department-alerts-*.test.mjs'
+permissions:
+  contents: read
+jobs:
+  department-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install locked test dependencies
+        run: npm ci
+        working-directory: tech-checks/operations
+      - name: Prove SQL triggers and private email delivery without production writes
+        run: node --import tsx --test tests/department-alerts-sql.test.mjs tests/department-alerts-delivery.test.mjs
+        working-directory: tech-checks/operations
+      - name: Verify notification UI syntax
+        run: node --check ../notifications-v1.js
+        working-directory: tech-checks/operations
+      - name: Preserve existing Operations types and build
+        run: npm run typecheck && npm run build
+        working-directory: tech-checks/operations
