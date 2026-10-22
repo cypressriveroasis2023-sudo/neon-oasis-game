@@ -42,3 +42,15 @@ test('unchanged host reproduces logout on a temporary profile failure',async()=>
  const f=fixture({value:{data:null,error:{message:'Temporary unavailable'},status:503}},baseline);
  await f.context.refresh();assert.equal(f.calls.signOut,1);assert.equal(f.state.session,null);
 });
+
+test('email settings reuse the canonical session client without starting a competing auth client',()=>{
+ const source=readFileSync(new URL('../../team-email-settings.js',import.meta.url),'utf8').split('\n').slice(0,3).join('\n');
+ const canonical={from(){return 'existing-client';}},calls=[];
+ const context=vm.createContext({window:{TechCheckDB:canonical},supabase:{createClient(...args){calls.push(args);throw new Error('Duplicate login client');}}});
+ vm.runInContext(source+'\nglobalThis.result=emailDb;',context);assert.equal(context.result,canonical);assert.equal(calls.length,0);
+});
+test('standalone email settings retain one normal fallback client when the host client is absent',()=>{
+ const source=readFileSync(new URL('../../team-email-settings.js',import.meta.url),'utf8').split('\n').slice(0,3).join('\n'),fallback={},calls=[];
+ const context=vm.createContext({window:{},supabase:{createClient(...args){calls.push(args);return fallback;}}});
+ vm.runInContext(source+'\nglobalThis.result=emailDb;',context);assert.equal(context.result,fallback);assert.equal(calls.length,1);assert.equal(calls[0][0],'https://goqrnolcvqnirjmzaeyk.supabase.co');
+});
