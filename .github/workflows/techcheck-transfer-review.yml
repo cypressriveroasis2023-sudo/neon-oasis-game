@@ -83,7 +83,9 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: tech-checks/operations
       - name: Synthetic handoff and camera-only browser tests
-        run: npx playwright test --config tests/playwright.transfer.config.mjs
+        run: |
+          npx playwright test --config tests/playwright.transfer.config.mjs
+          npx playwright test --config ../transfers/tests/playwright.config.mjs
         working-directory: tech-checks/operations
       - uses: actions/upload-artifact@v4
         if: always()

@@ -14,6 +14,10 @@ function sync(){
  if(!value||mounted)return;
  identity=value.id;pageFor=value.page;
  const host=document.createElement('section');host.id='ownerEquipmentTransfers';
+ // Keep desk controls out of the legacy Owner router, which otherwise treats
+ // the containing view's data-owner-route as a navigation click. Target handlers
+ // and default form/link actions still run normally.
+ host.addEventListener('click',event=>event.stopPropagation());
  const header=value.page.querySelector('.ownerAppPageHeader');
  if(header)header.after(host);else value.page.prepend(host);
  mounted=host;dispose=mountTransferDesk(host,value.c,{role:'it'});
