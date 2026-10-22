@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {fixture,reset,ORG,hash} from './fixtures/geocode-sources-database-fixture.mjs';
 import {checkedTrackerSnapshot,createUnitTracker,UNIT_TRACKER_WORKBOOK as BOOK} from '../../supabase/functions/cos-operations-pages/unitTracker.ts';
-const OWNER='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',IT='d0757b64-9623-4adc-afff-21cc7853e88a',IT2='3caf7c00-627f-445f-bce4-ddeae574ee5c',SERVICE='7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',OTHER=randomUUID();
+const OWNER='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',IT='d0757b64-9623-4adc-afff-21cc7853e88a',IT2='3caf7c00-627f-445f-bce4-ddeae574ee5c',TESTIT='c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7',SERVICE='7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',OTHER=randomUUID();
 let db;
 const actor=(who=OWNER)=>({p_actor_user_id:who,p_organization_id:ORG});
 async function rpc(name,args=actor(),role='service_role'){
@@ -34,7 +34,7 @@ before(async()=>{
   if not exists(select 1 from public.user_profiles where user_id=p and organization_id=o and active) then raise exception 'Actor denied' using errcode='42501';end if;end$$;
  create function app_private.has_permission(o uuid,p text) returns boolean language sql as $$select current_setting('request.deny_view',true) is distinct from 'yes'$$;
  revoke usage on schema app_private from service_role;`);
- for(const[id,dept,role]of[[OWNER,'owner','owner'],[IT,'it','it_technician'],[IT2,'it','it_technician'],[SERVICE,'service','service_technician'],[OTHER,'owner','owner']]){
+ for(const[id,dept,role]of[[OWNER,'owner','owner'],[IT,'it','it_technician'],[IT2,'it','it_technician'],[TESTIT,'it','it_technician'],[SERVICE,'service','service_technician'],[OTHER,'owner','owner']]){
   await db.query('insert into public.user_profiles values($1,$2,$3,true)',[id,ORG,dept]);await db.query('insert into public.roles values($1,$2,$3)',[id,ORG,role]);await db.query('insert into public.user_roles values($1,$1)',[id]);
  }
  for(const file of ['cos-geocode-sources-read-access.sql','cos-geocode-sources-admin-import.sql','cos-tracker-source-v2.sql','cos-unit-tracker-outbox.sql'])await db.exec(await readFile(new URL('../db/'+file,import.meta.url),'utf8'));
@@ -49,8 +49,8 @@ test('default off is readable; a disabled queue never accepts an add and connect
  assert.equal(snapshot.queueEnabled,false);assert.deepEqual(snapshot.connector,{enabled:false,state:'awaiting_sheets_connection'});assert.equal(snapshot.sources[0].unitId,record.nativeUnitId);
  await assert.rejects(queue(add()),/not enabled/);assert.equal(await count(),0);
 });
-test('only existing Owner and two exact verified IT actors can read and queue',async()=>{
- for(const who of [OWNER,IT,IT2])assert.equal((await rpc('snapshot',actor(who))).queueEnabled,false);
+test('only existing Owner and three exact verified IT actors can read and queue',async()=>{
+ for(const who of [OWNER,IT,IT2,TESTIT])assert.equal((await rpc('snapshot',actor(who))).queueEnabled,false);
  for(const who of [SERVICE,OTHER,randomUUID()])await assert.rejects(rpc('snapshot',actor(who)),/required|denied/);
  for(const role of ['anon','authenticated'])await assert.rejects(rpc('snapshot',actor(),role),/permission denied/);
  await assert.rejects(rpc('snapshot',{...actor(),p_organization_id:randomUUID()}),/service access/);

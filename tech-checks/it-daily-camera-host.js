@@ -7,13 +7,25 @@ const paused = () => IT_DAILY_ONLY && (explicit || role() !== 'owner');
 const daily = () => IT_DAILY_ONLY && (explicit || role() === 'it');
 const cameraUrl = href => daily() ? itDailyCameraUrl(href, '?itDaily=1') : href;
 const shielded = new Map(), links = new Map();
+const managementSelector='#importToggle,#manageUnitsBtn,#importPanel,#manageUnitsPanel';
+const management = new Map();
 function workflowLink(node) {
   if (!node?.matches?.('a[href]')) return false;
   try { const url = new URL(node.getAttribute('href'), location.href); return url.origin === location.origin && /\/(?:onsite-vision|it-send-repair)\.html$/.test(url.pathname); } catch { return false; }
 }
-function blocked(node) { return Boolean(node?.closest?.('.ticket-unit,[data-cos-it-camera-paused]') || workflowLink(node?.closest?.('a[href]'))); }
+function blocked(node) { return Boolean(node?.closest?.('.ticket-unit,[data-cos-it-camera-paused],'+managementSelector) || workflowLink(node?.closest?.('a[href]'))); }
 function present() {
   if (!IT_DAILY_ONLY) return;
+  // Keep the original display state owned by Camera Health. In particular, its
+  // asynchronous Owner profile check may reveal these buttons after startup.
+  for(const node of document.querySelectorAll(managementSelector)){
+    if(paused()){
+      if(!management.has(node))management.set(node,node.inert);
+      node.inert=true;node.setAttribute('data-cos-it-owner-control-paused','');
+    }else if(management.has(node)){
+      node.inert=management.get(node);node.removeAttribute('data-cos-it-owner-control-paused');management.delete(node);
+    }
+  }
   if (paused()) {
     for (const node of document.querySelectorAll('.ticket-unit,a[href]')) {
       if (!node.matches('.ticket-unit') && !workflowLink(node)) continue;
@@ -38,6 +50,7 @@ function present() {
   if (!daily()) links.clear();
 }
 if (IT_DAILY_ONLY) {
+  const style=document.createElement('style');style.textContent='[data-cos-it-owner-control-paused]{display:none!important}';document.head.append(style);
   // Capture before the protected legacy ticket handler, including programmatic
   // clicks. Existing monitoring, provider links, IP and placement tools remain.
   window.addEventListener('click', event => {

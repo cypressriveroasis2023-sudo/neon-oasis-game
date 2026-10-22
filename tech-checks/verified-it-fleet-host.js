@@ -2,7 +2,7 @@ import {setFieldMapDisplay} from './field-map-display-host.js';
 import {projectITMhelpTickets,projectITAssignments} from './it-mhelp-projection.js?v=it-assignment-queue-20261010';
 // Separate fleet-only frame; existing Owner shell and technician queues are untouched.
 const context=()=>window.TechCheckContext;
-const ids=new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911']);
+const ids=new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911','05bf20fe-19f7-4db7-ac05-5b2a5f681fdf']);
 let subject=null,allowed=false,pending=false,frame=null,dialog=null,button=null,trackerButton=null,opener=null,trackerAllowed=false,trackerChecked=false,trackerPending=false,dashboardButton=null,mhelpPending=null,assignmentsPending=null,assignmentView=null,assignmentRevision=0,epoch=0,authObserved=false,deepLinkOpened=false;
 const active=()=>{const c=context(),p=c?.getProfile(),id=c?.getSession()?.user?.id;return c?.getRole()==='it'&&c?.getEffectiveRole()==='it'&&p?.active===true&&!p?.archived_at&&p?.user_id===id&&!document.body.classList.contains('owner-test-role-preview')&&ids.has(id)&&!document.getElementById('appView')?.classList.contains('hidden')?id:null;};
 function close(restoreFocus=true){assignmentsPending=null;assignmentView=null;assignmentRevision++;setFieldMapDisplay(frame,false);frame?.remove();dialog?.remove();frame=null;dialog=null;if(restoreFocus&&(opener||button)?.isConnected)(opener||button).focus();opener=null;}

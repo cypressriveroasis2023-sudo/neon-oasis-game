@@ -6,7 +6,7 @@ const section=(start,end)=>{const from=legacy.indexOf(start),to=legacy.indexOf(e
 const renderer=[section('function esc(v)','function resetWizardPosition'),section('function ensureITCommandDashboardStyles()','async function showITHome()'),section('async function showITHome()','function startITCommandClockWeather()')].join('\n');
 const styles=['styles.css','vision-platform.css','company-host-theme.css'].map(name=>read('../../'+name)).join('\n');
 export function itHomeFixture(role='it',linked=true,options={}){
- const id=linked?(options.secondVerified?'b7cc3cbf-d11e-4d4a-9742-c07701857911':'4f7044b5-86b6-411f-8898-39bb64b4ddbc'):'33333333-3333-4333-8333-333333333333';
+ const id=linked?(options.testIT?'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf':options.secondVerified?'b7cc3cbf-d11e-4d4a-9742-c07701857911':'4f7044b5-86b6-411f-8898-39bb64b4ddbc'):'33333333-3333-4333-8333-333333333333';
  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${styles}</style><div id="appView"><span id="whoRole" hidden>IT Technician</span><span id="whoName" hidden>Synthetic Technician</span><div id="view-it"><div id="existing-it-tool">Existing IT tool</div></div></div><script>
  ${options.dashboard?'':"{const q=new URLSearchParams(location.search);q.set('itHome','checks');history.replaceState(null,'',location.pathname+'?'+q);}"}
  window.fixtureTokens=0;window.fixtureRole=${JSON.stringify(role)};window.fixtureSubject=${JSON.stringify(id)};window.fixtureCapability=${options.capability!==false};

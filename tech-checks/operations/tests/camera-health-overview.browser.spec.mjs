@@ -28,6 +28,19 @@ async function mount(page,{path='/tech-checks/camera-health.html?diagnostics=1',
  await page.route('**/*',route=>{const url=new URL(route.request().url());if(url.pathname==='/functions/v1/cos-operations-pages')return route.fallback();if(url.origin!==origin)return route.abort('blockedbyclient');if(url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:'<h1>Shared Camera Health and Field Map</h1>'});if(url.pathname==='/tech-checks/camera-health.html')return route.fulfill({contentType:'text/html',body:html.replace('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>','<script>'+mock+';window.fixtureRole='+JSON.stringify(role)+';window.fixtureFleetRead='+JSON.stringify(fleetRead)+';</script>')});const path=resolve(repo,'.'+decodeURIComponent(url.pathname));if(path.startsWith(repo+'/')&&existsSync(path))return route.fulfill({path,contentType:{'.js':'text/javascript','.css':'text/css','.woff':'font/woff','.png':'image/png','.jpg':'image/jpeg'}[extname(path)]||'application/octet-stream'});return route.abort('blockedbyclient')});
  const entry=new URL(path,origin).searchParams;await page.goto(path);if(entry.get('diagnostics')!=='1'&&!['q','unit','action','folder'].some(key=>entry.get(key))&&(role==='owner'||fleetRead)){await expect(page).toHaveURL(/\/tech-checks\/\?cameraView=1/);return;}if(!/[?&](q|folder|action)=/.test(path))await expect(page.locator('.compact-unit')).toHaveCount(3);else await expect(page.locator('#screenRefreshStatus')).toContainText('Screen updated');
 }
+for(const role of ['owner','it'])test(role+' camera diagnostics keeps management controls in the Owner view only',async({page})=>{
+ await mount(page,{role});
+ for(const id of ['importToggle','manageUnitsBtn']){
+  if(role==='owner')await expect(page.locator('#'+id)).toBeVisible();
+  else await expect(page.locator('#'+id)).toBeHidden();
+ }
+ if(role==='it'){
+  await page.evaluate(()=>{document.getElementById('importToggle').click();document.getElementById('manageUnitsBtn').click();});
+  await expect(page.locator('#importPanel')).toBeHidden();await expect(page.locator('#manageUnitsPanel')).toBeHidden();
+ }
+ await expect(page.getByLabel('Search units',{exact:true})).toBeVisible();
+});
+
 test('automatic reloads wait four minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
  await mount(page);await page.waitForFunction(()=>liveRefreshStarted);const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length);const calls=await page.evaluate(()=>functionCalls);
  await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:33:59Z');await liveRefresh(true)});

@@ -6,9 +6,6 @@ import {setFieldMapDisplay} from './field-map-display-host.js';
 // Reversible UI availability only. Existing authorization and records are unchanged.
 window.COS_IT_DAILY_ONLY = IT_DAILY_ONLY;
 const context = () => window.TechCheckContext;
-// Legacy COS account has no separate native-platform identity. The server RPC below
-// remains the authority for IT camera access; this ID only selects the camera UI.
-const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf';
 let disposeTransfer = null, phoneBoard = false;
 let root = null, frame = null, scopeKey = '', revision = 0, authObserved = false;
 let fitScheduled = false;
@@ -136,7 +133,7 @@ async function open(value, generation, handoffFailure = null) {
   const permitted = await verify(value);
   if (generation !== revision || key(scope()) !== key(value) || !root) return;
   if (!permitted) {
-    status(value.preview ? 'Test IT is a preview persona, not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
+    status(value.preview ? 'This IT preview persona is not a verified IT account. Sign in with an authorized account.' : 'Daily view access could not be verified. Sign in again with your authorized IT account.', !value.preview);
     // An unverified actor cannot mount transfer controls or request private data.
     if(!value.phone){
       const link=document.createElement('a');link.href='./camera-health.html?itDaily=1';
@@ -171,11 +168,9 @@ async function open(value, generation, handoffFailure = null) {
     root.replaceChildren(phoneNavigation(value,generation),handoffFallback);
     return;
   }
-  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title=value.role==='it'&&value.id===legacyCameraOnlyIT?'Camera Health (legacy COS account)':'Fleet Dashboard and Camera Health';
+  frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='Fleet Dashboard and Camera Health';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
-  frame.src=value.role==='it'&&value.id===legacyCameraOnlyIT
-    ? './camera-health.html?itDaily=1&diagnostics=1'
-    : './operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=named-handoffs-v1#fleet-dashboard';
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=it-fleet-parity-20261022#fleet-dashboard';
   const board=document.createElement('section');board.className='cos-it-board-loading';board.style.position='relative';board.setAttribute('aria-busy','true');
   const pending=document.createElement('section');pending.className='cos-it-daily-status';pending.style.cssText='position:absolute;inset:0;z-index:1;margin:0;min-height:180px';
   const heading=document.createElement('h1');heading.textContent='Camera Health and Fleet Map';

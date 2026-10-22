@@ -1,5 +1,31 @@
 # Phase 2 backend linkage and verification
 
+## Superseding note — 2026-10-22: ITTECH identity provisioned, release pending
+
+Current source defines three exact IT identity pairs: Teddy Hopper, Victor Garcia,
+and Test IT. Test IT's legacy UUID `05bf20fe-19f7-4db7-ac05-5b2a5f681fdf` maps to
+the distinct native identity `c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7`. Provisioning
+completed at approximately 14:54 UTC. The native Auth ID, email, name, metadata
+and email identity were independently read back. The existing
+`appdeploy_provision_team_member` RPC, called as the authorized Owner, created
+the active IT profile and assigned the existing IT Technician (`it_technician`)
+role. Readback confirmed all three active IT profiles share the intended
+organization and exact role ID `3c1728b2-ae72-4dea-a4f6-35dc1c019799`.
+
+The temporary fixed provisioning helper was replaced with a constant HTTP 410
+response, and its version 2 source was read back to verify retirement. The
+updated Operations runtime and frontend release remain pending; provisioning
+alone does not establish signed-in Fleet access. Exact identity, name,
+active-profile, department, organization and role checks remain required;
+no other technician or Owner actor is borrowed.
+
+The tracker outbox helper's third-IT-pair change is a source-only draft and is not
+deployed. The remaining sections preserve the earlier Phase 2 evidence: their
+four-technician counts, 85 test cases and no-provisioning statements describe that
+earlier verification, not completion of this pending parity release.
+
+## Historical Phase 2 scope
+
 This branch extends the existing COS bridge without creating accounts, changing roles or database policies, copying assignments, or altering the legacy IT Tech Check and Service Tech Check.
 
 The bridge uses the existing legacy bearer token only with the legacy Auth `/user` endpoint and the same user's `profiles` row. Server-side fixed UUID mappings select an existing same-person production actor. The active legacy role, unarchived profile, active production department, native role code, and organization are checked on each request. Caller-supplied actor or organization fields are rejected. Origin is restricted to the GitHub Pages origin; bearer authentication remains necessary even when no Origin header is supplied. The production service key remains server-side.

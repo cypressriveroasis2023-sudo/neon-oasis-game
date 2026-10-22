@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 
 const origin = 'http://127.0.0.1:4173';
 const read = name => readFileSync(new URL('../../' + name, import.meta.url), 'utf8');
-const deniedIds = ['visionLink', 'repairLink', 'ticketButton'];
+const deniedIds = ['visionLink', 'repairLink', 'ticketButton', 'importToggle', 'manageUnitsBtn', 'importPanel', 'manageUnitsPanel'];
 
 function fixture(role) {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>[hidden],.hidden{display:none!important}button,a{display:inline-block;min-height:44px;margin:5px}</style></head><body>
@@ -11,6 +11,10 @@ function fixture(role) {
     <a id="visionLink" href="./onsite-vision.html">OnSite Vision</a>
     <a id="repairLink" href="./it-send-repair.html">IT Send Repair</a>
     <button id="ticketButton" class="ticket-unit" onclick="fixtureActions.push('ticket')">Create service ticket</button>
+    <button id="importToggle" onclick="fixtureActions.push('import')">Import / Sync</button>
+    <button id="manageUnitsBtn" onclick="fixtureActions.push('manage')">Manage units</button>
+    <section id="importPanel"><button onclick="fixtureActions.push('import-submit')">Import saved file</button></section>
+    <section id="manageUnitsPanel"><button onclick="fixtureActions.push('manage-submit')">Add unit</button></section>
     <button id="editFieldBtn" onclick="fixtureActions.push('placement')">Edit field information</button>
     <button id="editIpButton" onclick="fixtureActions.push('ip')">Edit IP address</button>
     <button id="verifyBtn" onclick="fixtureActions.push('verify')">Verify now</button>
@@ -111,6 +115,23 @@ test('ordinary Owner keeps original camera links, dynamic controls and repair na
   await page.locator('#lateTicket').click(); expect(await page.evaluate(() => window.fixtureActions)).toEqual(['late-ticket']);
   await page.locator('#repairLink').click(); await expect(page).toHaveURL(origin + '/tech-checks/it-send-repair.html');
   expect(state.errors).toEqual([]);
+});
+
+test('a late camera redraw cannot reveal Owner management in IT or dispatch a hidden action', async ({page}) => {
+  await mount(page);
+  await page.evaluate(() => {
+    for (const id of ['importToggle','manageUnitsBtn','importPanel','manageUnitsPanel']) document.getElementById(id).style.display='block';
+    document.querySelector('#importPanel button').click();
+    document.querySelector('#manageUnitsPanel button').click();
+  });
+  await expectPaused(page);
+  await page.evaluate(() => window.fixtureSetProfile('owner'));
+  for(const id of ['importToggle','manageUnitsBtn','importPanel','manageUnitsPanel']) {
+    await expect(page.locator('#'+id)).toBeVisible();
+    expect(await page.locator('#'+id).evaluate(node=>node.inert)).toBe(false);
+  }
+  await page.locator('#manageUnitsBtn').click();
+  expect(await page.evaluate(()=>window.fixtureActions)).toEqual(['manage']);
 });
 
 test('scoped Owner diagnostic links preserve edit parameters and contain the destination after navigation', async ({page}) => {

@@ -92,13 +92,13 @@ test('direct ittech profile uses server fleet capability instead of the old two-
  assert.deepEqual(calls,Array(3).fill('cos_verified_fleet_capabilities_v1'));
  assert.doesNotMatch(host,/verifiedIT\.has\(value\.id\)/);
 });
-test('direct ittech routes only to existing COS-authenticated Camera Health; other IT route remains unchanged',()=>{
+test('verified IT accounts share the Fleet landing while legacy diagnostics remain an explicit tool',()=>{
  const host=read('it-daily-host.js');
- assert.match(host,/const legacyCameraOnlyIT = '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'/);
- assert.match(host,/frame\.src=value\.role==='it'&&value\.id===legacyCameraOnlyIT\s*\? '\.\/camera-health\.html\?itDaily=1&diagnostics=1'/);
- assert.match(host,/\: '\.\/operations\/dist\/index\.html\?mode='/);
+ assert.doesNotMatch(host,/legacyCameraOnlyIT|Fleet map is not available for this account/);
+ assert.match(host,/frame\.src='\.\/operations\/dist\/index\.html\?mode='/);
  assert.match(host,/const permitted = await verify\(value\)/);
  assert.match(host,/key\(scope\(\)\) !== key\(value\)/);
+ assert.match(host,/data.route==='camera-health'\) location.assign\('\.\/camera-health\.html\?itDaily=1&diagnostics=1'\)/);
  const app=read('app.js'),legacy=read('camera-health.html');
  assert.match(app,/const SUPABASE_URL = 'https:\/\/goqrnolcvqnirjmzaeyk.supabase.co'/);
  assert.match(legacy,/const SUPABASE_URL='https:\/\/goqrnolcvqnirjmzaeyk.supabase.co'/);

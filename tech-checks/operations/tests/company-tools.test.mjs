@@ -55,7 +55,7 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
       assert.equal(original.split(entry+reviewedGuard).length-1,1);
       navigationPreserved=original.replace(entry+reviewedGuard,entry);
     }
-    const html=navigationPreserved.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
+    const html=navigationPreserved.replace('<script type="module" src="./it-daily-camera-host.js?v=it-owner-controls-20261021"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261018-cos-centered').length-1,1);
     if(['camera-health','camera-detail'].includes(name))for(const helper of ['camera-placement-controls.js','camera-effective-placement.js'])assert.equal(html.split('src="./'+helper+'?v=20261015-placement-read-coalescing-v1"').length-1,1);

@@ -64,7 +64,7 @@ test('legacy endpoint retains method, origin, body and authorization gates',asyn
 });
 test('active Owner and approved IT only; Service and unapproved IT denied',async()=>{
  const approved='4f7044b5-86b6-411f-8898-39bb64b4ddbc',other='12345678-1234-1234-1234-123456789012';
- for(const [id,role,active,want] of [[other,'owner',true,true],[approved,'it',true,true],[other,'it',true,false],[approved,'service',true,false],[other,'owner',false,false]]){
+ for(const [id,role,active,want] of [[other,'owner',true,true],[approved,'it',true,true],['05bf20fe-19f7-4db7-ac05-5b2a5f681fdf','it',true,true],['05bf20fe-19f7-4db7-ac05-5b2a5f681fdf','it',false,false],['05bf20fe-19f7-4db7-ac05-5b2a5f681fdf','service',true,false],[other,'it',true,false],[approved,'service',true,false],[other,'owner',false,false]]){
   const check=createFleetVerifier(async(path)=>path==='/auth/v1/user'?{id}:[{user_id:id,role,active,archived_at:null}],'fixture-service');assert.equal(await check('Bearer fixture-user'),want);
  }
 });
@@ -78,8 +78,15 @@ test('frontend new estimates stay honest EST-only and do not become verified uni
  const u={...unit(),locationGeocode:await record()};for(const patch of [{placement:'UNKNOWN'},{placementStatus:'needs_identity_review'},{placementAuditId:'42'},{address:'101 Example Road, Test City, TX 77001'},{locationVerification:'owner_verified'}])assert.equal(await checkedAddressEstimate({...u,...patch}),null);
 });
 test('deferred free-only queue with an unchanged address has safe explanation',()=>{const u={...unit(),locationVerification:'address_only',locationGeocode:{status:'deferred'}};assert.equal(locationTag(u),'LOOKUP DELAYED');assert.match(locationExplanation(u),/without paid lookups/);});
-test('legacy auth and Census adapter unchanged; no logging or vendor query credentials',()=>{
- for(const [name,sha] of Object.entries(legacyBaselineHashes))assert.equal(createHash('sha256').update(readFileSync(new URL('../../supabase/functions/camera-field-geocode/'+name,import.meta.url))).digest('hex'),sha);
+test('legacy auth adds only approved Test IT and Census adapter remains unchanged; no logging or vendor query credentials',()=>{
+ for(const [name,sha] of Object.entries(legacyBaselineHashes)){
+  let source=readFileSync(new URL('../../supabase/functions/camera-field-geocode/'+name,import.meta.url),'utf8');
+  if(name==='fleetAuthorization.ts'){
+   const addition=",'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'";
+   assert.equal(source.split(addition).length,2);source=source.replace(addition,'');
+  }
+  assert.equal(createHash('sha256').update(source).digest('hex'),sha);
+ }
  const code=readFileSync(new URL('../../supabase/functions/camera-field-geocode/geocodioAddress.ts',import.meta.url),'utf8');assert.doesNotMatch(code,/console\.|api_key|Deno\.env/);
 });
 test('timeout produces only safe retry code',async(t)=>{

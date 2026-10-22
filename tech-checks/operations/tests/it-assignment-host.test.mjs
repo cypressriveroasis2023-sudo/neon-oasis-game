@@ -8,7 +8,7 @@ const projections = await import('data:text/javascript;base64,' + Buffer.from(re
 const subject = '4f7044b5-86b6-411f-8898-39bb64b4ddbc', other = 'b7cc3cbf-d11e-4d4a-9742-c07701857911';
 const row = patch => ({ id: '11111111-1111-4111-8111-111111111111', ticket_no: 'SYN-501', site: 'Synthetic shell site', work_type: 'service', scheduled_for: '2026-10-10', scheduled_time: '10:30', assigned_role: 'it', status: 'assigned', assignee_user_id: subject, assignment_scope: 'technician', job_lead_user_id: null, equipment_manifest: [], unit_summary: '', ...patch });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
-async function fixture() {
+async function fixture(id=subject) {
   const nodes = [], observers = [], events = {}, timers = new Map(), calls = [];
   let nextTimer = 0;
   class Node {
@@ -23,7 +23,7 @@ async function fixture() {
     showModal() {} focus() {} click() { this.onclick?.(); }
   }
   const body=new Node('body'),app=new Node(),home=new Node(),head=new Node();app.id='appView';home.id='wlItHome';body.append(app);app.append(home);home.append(head);
-  const state={id:subject,role:'it',effective:'it',profile:{user_id:subject,active:true},rows:[row()],capability:true};
+  const state={id,role:'it',effective:'it',profile:{user_id:id,active:true},rows:[row({assignee_user_id:id})],capability:true};
   state.fresh=()=>({data:{session:state.id?{user:{id:state.id},access_token:'synthetic-only'}:null}});
   state.rpc=name=>name==='my_available_assignments'?{data:state.rows}:name==='my_managed_tickets_v1'?{data:[]}:{data:{fleetRead:state.capability}};
   const context={getSession:()=>state.id?{user:{id:state.id}}:null,getRole:()=>state.role,getEffectiveRole:()=>state.effective,getProfile:()=>state.profile,db:{rpc:async(name,args)=>{calls.push({name,args});return state.rpc(name,args);},auth:{onAuthStateChange:fn=>{state.auth=fn;},getSession:async()=>state.fresh()}}};
@@ -46,6 +46,17 @@ async function fixture() {
   };
 }
 const queueCalls=f=>f.calls.filter(call=>call.name==='my_available_assignments');
+test('Test IT uses its own verified legacy Fleet entry and loses access when capability is revoked',async()=>{
+  const id='05bf20fe-19f7-4db7-ac05-5b2a5f681fdf',f=await fixture(id),frame=f.frame();
+  assert.ok(frame,'verified Test IT receives the shared Fleet frame');
+  assert.match(frame.src,/mode=fleet.*#fleet-dashboard$/);
+  await f.read();
+  assert.equal(f.responses(frame)[0].items[0].audience,'mine');
+  f.state.capability=false;
+  await f.emit({type:'COS_OPERATIONS_TOKEN_REQUEST',requestId:'revoked'});
+  assert.equal(frame.contentWindow.messages.at(-1).message.accessToken,null);
+  assert.equal(f.frame(),undefined);
+});
 test('actual host uses only the existing current-user IT RPC and projects null-lead own plus department shells',async()=>{
   const f=await fixture();f.state.rows.push(row({id:'22222222-2222-4222-8222-222222222222',assignee_user_id:null,assignment_scope:'department'}));
   const frame=f.frame();await f.read();
