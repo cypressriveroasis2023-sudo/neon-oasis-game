@@ -21,7 +21,9 @@ jobs:
           cache: npm
           cache-dependency-path: tech-checks/operations/package-lock.json
       - name: Check Owner dashboard JavaScript syntax
-        run: node --check tech-checks/app.js
+        run: |
+          node --check tech-checks/app.js
+          node --check tech-checks/owner-daily-takeover-host.js
       - name: Install existing test dependencies
         run: npm ci
         working-directory: tech-checks/operations
