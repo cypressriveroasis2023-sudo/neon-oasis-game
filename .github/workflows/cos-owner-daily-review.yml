@@ -1,0 +1,36 @@
+name: COS Owner daily takeover review
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cos-owner-daily-review.yml'
+      - 'tech-checks/app.js'
+      - 'tech-checks/database-maintenance/service-daily-owner-takeover-v1.sql'
+      - 'tech-checks/supabase/functions/service-daily-delivery/**'
+      - 'tech-checks/operations/tests/service-daily-*.test.mjs'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Check Owner dashboard JavaScript syntax
+        run: node --check tech-checks/app.js
+      - name: Install existing test dependencies
+        run: npm ci
+        working-directory: tech-checks/operations
+      - name: Test owner-only exception, existing daily reports and archive delivery
+        run: node --import tsx --test tests/service-daily-owner-takeover.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs
+        working-directory: tech-checks/operations
+      - name: Typecheck existing operations code
+        run: npm run typecheck
+        working-directory: tech-checks/operations
+      - name: Build existing operations application
+        run: npm run build
+        working-directory: tech-checks/operations
