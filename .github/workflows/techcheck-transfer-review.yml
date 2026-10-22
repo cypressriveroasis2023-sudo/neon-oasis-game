@@ -11,9 +11,12 @@ on:
       - 'tech-checks/database-maintenance/techcheck-named-handoffs-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-rollout-v2.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-integration-v3.sql'
+      - 'tech-checks/database-maintenance/techcheck-transfer-receipt-*.sql'
+      - 'tech-checks/database-maintenance/techcheck-transfer-purpose-v2.sql'
       - 'tech-checks/database-maintenance/techcheck-handoff-activation-v1.sql'
       - 'tech-checks/database-maintenance/techcheck-transfer-delivery-schedule-v1.sql'
       - 'tech-checks/supabase/functions/techcheck-transfer-delivery/**'
+      - 'tech-checks/supabase/functions/service-daily-delivery/report.ts'
       - 'tech-checks/operations/tests/transfer*'
       - 'tech-checks/operations/tests/helpers/transfer*'
       - 'tech-checks/operations/tests/helpers/service-basics-fixture.mjs'
@@ -25,6 +28,20 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: cos_transfer_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_transfer_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - name: Preserve exact review source
@@ -45,10 +62,16 @@ jobs:
         run: npm ci
         working-directory: tech-checks/operations
       - name: PostgreSQL, transfer and existing Service regressions
-        run: node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/transfer-delivery.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
+        run: node --import tsx --test tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/transfer-delivery.test.mjs tests/transfer-receipt-*.test.mjs tests/transfer-purpose.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
         working-directory: tech-checks/operations
       - name: TypeScript
         run: npm run typecheck
+        working-directory: tech-checks/operations
+      - name: Native PostgreSQL concurrent receipt and retry proof
+        timeout-minutes: 3
+        env:
+          COS_TRANSFER_POSTGRES_CI: '1'
+        run: node tests/transfer-purpose-concurrency.mjs
         working-directory: tech-checks/operations
       - name: Build existing application
         run: npm run build
