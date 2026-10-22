@@ -44,10 +44,16 @@ async function setup(){
    (await f.db.query('select source_sha256 from cos_mhelp_placement_private.owner_equipment_stages')).rows[0].source_sha256,row.verified_2027_sha256,action,digest,note])).rows[0].value;
  };
  const state=async()=>{
-  const r=(await f.db.query('select records,receipt,review_receipt from cos_mhelp_placement_private.owner_equipment_stages')).rows[0];
-  delete r.receipt?.assignmentApproval?.approvedAt;delete r.review_receipt?.assignmentReview?.approvedAt;
-  const calls=(await f.db.query('select * from cos_mhelp_placement_private.approval_validation_calls')).rows;
-  return {stage:r,calls};
+  // Compare all JSON values in PostgreSQL; do not print megabytes through psql.
+  // Only the nondeterministic approval time is excluded from the digest.
+  const stage=(await f.db.query(`select review_receipt ? 'assignmentReview' approved,
+   encode(sha256(convert_to((jsonb_build_object('records',records,'receipt',receipt,'review_receipt',review_receipt)
+    #- '{receipt,assignmentApproval,approvedAt}' #- '{review_receipt,assignmentReview,approvedAt}')::text,'UTF8')),'hex') fingerprint
+   from cos_mhelp_placement_private.owner_equipment_stages`)).rows[0];
+  const calls=(await f.db.query(`select count(*)::integer count,
+   encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(c) order by to_jsonb(c)::text),'[]')::text,'UTF8')),'hex') fingerprint
+   from cos_mhelp_placement_private.approval_validation_calls c`)).rows[0];
+  return {stage,calls};
  };
  return {...f,load,call,state};
 }
@@ -61,7 +67,7 @@ test('1001 records and 354 review items: complete approval output, stored rows, 
    const before=await f.db.query("select jsonb_agg(to_jsonb(u) order by id) v from public.equipment_units u");
    const start=performance.now(),approved=await f.call(),ms=performance.now()-start;
    assert.equal(approved.approved,true);assert.equal(approved.items.length,354);
-   const state=await f.state();assert.equal(state.calls.length,1);
+   const state=await f.state();assert.equal(state.calls.count,1);
    assert.deepEqual(await f.db.query("select jsonb_agg(to_jsonb(u) order by id) v from public.equipment_units u"),before);
    const replay=await f.call();assert.equal(replay.idempotent,true);
    assert.deepEqual(await f.state(),state,'Replay does not repeat validation or writes');
@@ -90,7 +96,10 @@ test('missing/duplicate/null IDs and ordered first-match tracker selection retai
    for(const [j,s] of scenarios.entries()){
     await f.db.exec('update cos_mhelp_placement_private.approval_fixture_flags set deny_actor=false,reject_validation=false');
     const d=reviewData(10,5);s.change?.(d);await f.load(d);await s.mutate?.();
-    let result;try{result={value:await f.call(),state:await f.state()};}catch(e){result={error:e.message};assert.equal((await f.state()).stage.review_receipt.assignmentReview,undefined);}
+    let result;try{result={value:await f.call(),state:await f.state()};}catch(e){
+     const error=String(e.stderr||e.message).match(/ERROR:\s*([^\n]+)/)?.[1]||e.message;
+     result={error};assert.equal((await f.state()).stage.approved,false);
+    }
     if(s.error)assert.match(result.error,s.error);
     if(repaired)assert.deepEqual(result,results[j],s.name);else results.push(result);
    }

@@ -31,7 +31,8 @@ match the reviewed production definition. A repeated installation aborts.
 
 Tests execute the complete original and candidate approval functions with a
 synthetic 1,001-record/354-review-item fixture and compare complete response JSON,
-stored stage rows, downstream admission inputs and idempotent replay. Only the
+SHA-256 fingerprints of complete stored stage rows and downstream admission inputs,
+and idempotent replay. Only the
 nondeterministic approval timestamp is excluded from stored-state comparison.
 External authorization, identity recovery, locks and full admission validation
 are fixture boundaries; the existing guarded transaction suites cover those
