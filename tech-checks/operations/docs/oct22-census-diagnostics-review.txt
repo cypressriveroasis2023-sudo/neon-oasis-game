@@ -1,0 +1,19 @@
+October 22 protected census review — LOCAL CANDIDATE ONLY
+
+Base main: 16fd7bbce9d463bbf9a800adf7c94f7baf2d0f0f.
+Existing repairs #268, #269, #272, #273 are already merged; do not repeat or replace them. PR #278 is a separate scheduled inventory diagnostic path and is not incorporated here.
+
+Comparison of the complete October22 original CSV with the live UNIT OVERVIEW and MHELP MATCH INDEX found 1001 unique Product IDs, 284 FIELD, 717 SHOP; no customer, indexed mHelp-name or family-qualified-key differences. The unchanged census validator rejects the actual captured index as stale. An explicitly OFFLINE proposal changing only its current-source export evidence passes all 1001 original rows, including current placement and lifecycle restrictions. This is not live server proof.
+
+85 overview labels differ: 79 Solar Stand labels add the family qualifier 72; five Solar Pole labels reorder 72 or retain hybrid/lifecycle annotations; one Spotter label omits its solar-compatibility annotation. All exact Product IDs and indexed original mHelp names agree. Do not rewrite labels, identity bindings or lifecycle flags to align display strings.
+
+Code change: fixed, allowlisted census failure reasons reach the Owner preview and protected write bridge; arbitrary provider/credential/customer messages are redacted. The UI still requires verified proof before showing Stage. No validator predicate, permission, timeout, census digest, database function, inventory write or import flag changes.
+
+Proposed separately approved source reconciliation:
+1. Preserve an exact dated archive copy of the existing index, with original source filenames unchanged. Keep an archive manifest with original sheet ID, captured cells and checksum.
+2. Rebuild the current index from the original October22 bytes, retaining current authoritative tab ID 1900169011 and existing Product ID/key associations. Record original uploaded filename ServiceItem_List_20261022134456(1).csv, canonical export filename ServiceItem_List_20261022134456.csv and original bytes SHA256 8f0d8ac0b677ad3b2d23c8f6604a3933821c1613d78d5fd39640a4ede1019599 in explicit provenance evidence. Do not silently relabel the October20 archive.
+3. Full readback; fresh server-side Google proof; fresh authenticated Owner preview, Stage, assignment review. Do not apply final production import without explicit Owner approval.
+
+The UI/backend currently require a canonical export filename and will reject a browser copy with (1). Provide a deliberately named byte-identical canonical copy for the protected import while retaining the original filename and bytes as evidence. No filename-normalization bypass is added.
+
+Approval boundaries: remote branch/draft-PR publication; exact-head CI; separate merge/deployment authorization; separate tracker source-evidence refresh authorization; then final Owner approval of the fresh protected staged import. No October22 committed import receipt or production readback exists from this work. Do not claim synchronization is live.

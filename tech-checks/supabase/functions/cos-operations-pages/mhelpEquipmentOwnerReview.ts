@@ -4,12 +4,13 @@
  */
 import {previewMhelpEquipmentCsv,parseEquipmentCsv,type EquipmentPreview} from './mhelpEquipmentCsvPreview.ts';
 import {prepareMhelpEquipmentAdmission,summarizeMhelpAdmission} from './mhelpEquipmentAdmissionPlan.ts';
-import {read2027CensusFromGoogle,type VerifiedProductCensus} from './mhelp2027ProductCensus.ts';
+import {read2027CensusFromGoogle,safeCensusFailureReason,type VerifiedProductCensus} from './mhelp2027ProductCensus.ts';
 import type {SheetsAssertionSigner} from './googleSheets.ts';
 
 export type OwnerEquipmentReview = EquipmentPreview & {
   admission:ReturnType<typeof summarizeMhelpAdmission>;
   censusStatus:'verified'|'unavailable';
+  censusFailureReason?:string;
 };
 export async function ownerEquipmentCsvReview(args:{
   body:unknown;previous:unknown;
@@ -23,11 +24,11 @@ export async function ownerEquipmentCsvReview(args:{
  const bytes=Uint8Array.from(atob(request.bytesBase64),x=>x.charCodeAt(0));
  const rows=parseEquipmentCsv(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
  const filename=request.sourceFilename;
- let census:VerifiedProductCensus|undefined;
+ let census:VerifiedProductCensus|undefined,censusFailureReason:string|undefined;
  if(filename){
   try{census=await (args.verifyCensus??read2027CensusFromGoogle)({
    ...args.google,sourceFilename:filename,candidate:rows,
-  });}catch{/* Fail closed: preview remains readable; never claim current source authority. */}
+  });}catch(error){censusFailureReason=safeCensusFailureReason(error);/* Remain fail closed. */}
  }
  const previous=args.previous as {sourceSha256:string};
  const plan=prepareMhelpEquipmentAdmission(rows,args.previous,{
@@ -35,5 +36,5 @@ export async function ownerEquipmentCsvReview(args:{
   ...(census?{tracker:census}:{}),currentNativeGuardsVerified:false,
  });
  return {...preview,admission:summarizeMhelpAdmission(plan),
-  censusStatus:census?'verified':'unavailable'};
+  censusStatus:census?'verified':'unavailable',...(!census&&censusFailureReason?{censusFailureReason}:{})};
 }

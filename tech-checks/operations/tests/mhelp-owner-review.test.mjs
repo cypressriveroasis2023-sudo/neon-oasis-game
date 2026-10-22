@@ -35,3 +35,12 @@ test('changed assignment is held even if the 2027 source confirms it',async()=>{
  assert.equal(out.admission.totalHeld,1);
  assert.equal(out.admission.gates.canCommit,false);
 });
+test('unknown provider failures are redacted and never grant source proof',async()=>{
+ for(const message of ['Bearer secret-token customer@example.com','Current 2027 workbook verification failed: mHelp source lookup is incomplete or stale']){
+  const out=await ownerEquipmentCsvReview({body,previous:receipt,google,verifyCensus:async()=>{throw new Error(message);}});
+  assert.equal(out.censusStatus,'unavailable');
+  assert.equal(out.admission.gates.current2027CensusVerified,false);
+  assert.match(out.censusFailureReason,/verification is unavailable/);
+  assert.ok(!JSON.stringify(out).includes(message));
+ }
+});
