@@ -61,6 +61,9 @@ function inject(){
     }
   }
   if(cache?.service_techs)decorateOwnerStatuses(cache);
+  else if(document.querySelector('.ownerCmdTechCard') && !reading && Date.now()-lastRead>30000){
+    lastRead=Date.now();void fetchBoard(true).catch(()=>{});
+  }
 }
 function schedule(){
   if(scheduled)return;scheduled=true;
@@ -84,13 +87,14 @@ async function fetchBoard(force=false){
 }
 function decorateOwnerStatuses(board){
   if(!owner())return;
-  for(const tech of board?.service_techs||[]){
-    if(!tech.owner_authorized || tech.inventory_check?.ready)return;
-    const id=String(tech.service_tech_id||tech.user_id||'');
-    const card=[...document.querySelectorAll('.ownerCmdTechCard')].find(node=>
-      node.querySelector('[data-owner-truck-edit]')?.dataset.ownerTruckEdit===id);
-    if(!card)continue;
-    if(card.querySelector('.cosOwnerDailyStatus'))continue;
+  const techs=board?.service_techs||[];
+  for(const card of document.querySelectorAll('.ownerCmdTechCard')){
+    const id=String(card.querySelector('[data-owner-truck-edit]')?.dataset.ownerTruckEdit||'');
+    const tech=techs.find(t=>String(t.service_tech_id||t.user_id||'')===id);
+    const approved=Boolean(tech?.owner_authorized && !tech?.inventory_check?.ready);
+    const existing=card.querySelector('.cosOwnerDailyStatus');
+    if(!approved){existing?.remove();continue;}
+    if(existing)continue;
     const info=document.createElement('strong');
     info.className='cosOwnerDailyStatus';
     info.textContent='OWNER AUTHORIZED — Daily inventory NOT physically verified';
@@ -98,6 +102,7 @@ function decorateOwnerStatuses(board){
     (head||card).after(info);
   }
 }
+
 function dismiss(){
   if(busy)return;
   currentModal?.remove();
