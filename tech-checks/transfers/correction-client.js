@@ -1,4 +1,5 @@
 import {sameManifest} from './correction-model.js';
+import {hasTransferPurpose,installationBatteryPlan} from './model.js';
 
 export function correctionClient(context) {
   const actor=context.getSession()?.user?.id,role=context.getRole();
@@ -27,9 +28,11 @@ export function correctionClient(context) {
     }
     return result;
   }
-  function verified(saved,args) {
+  function verified(saved,args,expected) {
     try{
       const confirmation=args.p_confirmation,captured=saved?.confirmation;
+      if(!hasTransferPurpose(expected?.purpose)||saved?.purpose!==expected.purpose||saved.purpose_revision!==expected.purpose_revision)return false;
+      const requiredCount=item=>saved.purpose==='truck_replenishment'?null:installationBatteryPlan(item.family,item.battery_configuration).exact?installationBatteryPlan(item.family,item.battery_configuration).count:item.battery_count;
       const photos=value=>JSON.stringify(value.map(photo=>({equipment_key:photo.equipment_key,kind:photo.kind,path:photo.path})).sort((a,b)=>(a.equipment_key+'|'+a.kind+'|'+a.path).localeCompare(b.equipment_key+'|'+b.kind+'|'+b.path)));
       const time=value=>typeof value==='string'?Date.parse(value):NaN;
       const confirmed=time(captured?.confirmed_at),applied=time(saved?.created_at);
@@ -40,10 +43,10 @@ export function correctionClient(context) {
         &&Number.isFinite(confirmed)&&Number.isFinite(applied)&&confirmed<=applied&&time(saved.confirmed_by.confirmed_at)===confirmed
         &&(confirmation.mode==='self'?confirmed===applied&&!saved.technician_reply&&!saved.evidence_reference:
           confirmed===time(confirmation.technician_confirmed_at)&&saved.technician_reply===confirmation.technician_reply&&captured.technician_reply===confirmation.technician_reply&&saved.evidence_reference===confirmation.evidence_reference&&captured.evidence_reference===confirmation.evidence_reference)
-        &&saved.reason===args.p_reason&&sameManifest(saved.after,args.p_items)&&photos(saved.photos)===photos(args.p_photos);
+        &&saved.reason===args.p_reason&&sameManifest(saved.after,args.p_items,{purpose:expected.purpose})&&saved.after.every(item=>item.required_battery_count===requiredCount(item))&&photos(saved.photos)===photos(args.p_photos);
     }catch{return false;}
   }
-  async function submit(args,photos,onProgress=()=>{}) {
+  async function submit(args,photos,onProgress=()=>{},expected=null) {
     assert();const before=await read(args.p_transfer_id),existing=before.transfers.flatMap(t=>t.corrections||[]).find(c=>c.correction_id===args.p_request_id);
     if(!existing){
       if(!before.ready)throw Object.assign(new Error('Corrections are not enabled. Your draft is kept on this device.'),{rejected:true});
@@ -60,7 +63,7 @@ export function correctionClient(context) {
       }
     }
     const result=await rpc('submit_techcheck_transfer_correction_v1',args);
-    if(!verified(result,args))throw new Error('The correction save reply could not be verified. Retry the same correction.');
+    if(!verified(result,args,expected||before.transfers.find(row=>row.id===args.p_transfer_id)))throw new Error('The correction save reply could not be verified. Retry the same correction.');
     return result;
   }
   async function photoUrl(path) {

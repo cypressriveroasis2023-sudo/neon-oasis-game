@@ -57,7 +57,11 @@ filing destinations remain a separate change.
 The subfolder holds actual PDF, HTML, audit JSON and JPEG files. The correction
 records the previous and corrected manifest, original technician, actual
 applying actor, confirmation mode/time/recording actor, reason, technician reply
-and cited source, original links and evidence links. The authoritative
+and cited source, original links and evidence links. The saved current purpose
+and purpose revision appear in PDF, HTML/email and audit JSON. Replenishment
+retains null battery fields and identifies the separate daily inventory count;
+installation retains its approved package, recorded quantity and required
+quantity in both before/after values. The authoritative
 `confirmation.recorded_by` UUID remains unchanged in JSON; display names resolve
 only through the exact matching saved actor. Self-confirmation uses its saved
 authenticated statement, without inventing an external reply or new signature.
@@ -97,7 +101,7 @@ handoff must remain unchanged until its technician confirms physical identity.
 
 ## Local verification
 
-The 15 named provider/provenance tests include authorization, immutable originals,
+The provider/provenance tests include authorization, immutable originals,
 shared photo evidence, concurrent claims, JSONB retry, saved-byte readback and
 uncertain-email holds. In environments where isolated child tests report only a
 file-level pass, use Node 22 with `--experimental-test-isolation=none` and verify

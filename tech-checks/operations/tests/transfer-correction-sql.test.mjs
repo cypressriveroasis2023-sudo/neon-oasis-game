@@ -8,11 +8,12 @@ import {correctionActors,correctionActorNames,correctionMigrationNames,correctio
 // Synthetic local PostgreSQL only. Never calls a live project or production handoff.
 const {it,svc,other,unverified,owner,secondIT}=correctionActors;
 const names=correctionActorNames;
-let db,contract;
+let db,contract,correctionSql;
 before(async()=>{
  db=new PGlite();contract=JSON.parse(await readFile(new URL('../../transfers/checklist-contract.json',import.meta.url),'utf8'));
  await db.exec(correctionFixtureSchema);
- for(const name of correctionMigrationNames){
+ correctionSql=await readFile(new URL('../../database-maintenance/techcheck-handoff-corrections-v1.sql',import.meta.url),'utf8');
+ for(const name of correctionMigrationNames.filter(name=>name!=='techcheck-handoff-corrections-v1.sql')){
   await db.exec(await readFile(new URL('../../database-maintenance/'+name,import.meta.url),'utf8'));
  }
  await db.exec(correctionLegacyReadySql);
@@ -26,7 +27,15 @@ const call=(name,r={},who=it,role='authenticated')=>as(who,async()=>{
  const args=Object.keys(r).map((k,n)=>k+'=> $'+(n+1)).join(',');
  return (await db.query(`select public.${name}(${args}) as result`,Object.values(r))).rows[0].result;
 },role);
-const submit=(r,who=it)=>call('submit_techcheck_transfer_v1',r,who);
+const submit=(r,who=it)=>call('submit_techcheck_transfer_v2',r,who);
+const classify=(r,who=it)=>call('classify_techcheck_transfer_purpose_v1',r,who);
+// Fixture-only legacy seeding runs as the local database owner. The production
+// public legacy wrapper still rejects fresh unclassified checkout and receipts.
+async function legacySubmit(r,who=it){
+ await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[who]);
+ const args=Object.keys(r).map((k,n)=>k+'=> $'+(n+1)).join(',');
+ return(await db.query(`select app_private.submit_techcheck_transfer_pre_purpose_v1(${args}) result`,Object.values(r))).rows[0].result;
+}
 const correct=(r,who=it)=>call('submit_techcheck_transfer_correction_v1',r,who);
 const context=(id,who=it)=>call('techcheck_transfer_correction_context_v1',{p_transfer_id:id},who);
 const queue=(r)=>call('techcheck_correction_delivery_v1',r,null,'service_role');
@@ -34,10 +43,14 @@ const count=async(table)=>(await db.query('select count(*)::int n from app_priva
 const state=async(id)=>(await db.query('select * from app_private.techcheck_transfers where id=$1',[id])).rows[0];
 const reservations=async(id)=>(await db.query('select equipment_key from app_private.techcheck_transfer_reservations where transfer_id=$1 order by equipment_key',[id])).rows.map(r=>r.equipment_key);
 const originalFingerprint=async(id)=>(await db.query(`select md5((to_jsonb(e)||jsonb_build_object('original_archive',o.drive_manifest))::text) hash from app_private.techcheck_transfer_events e join app_private.techcheck_transfer_outbox o on o.event_id=e.id where e.id=$1`,[id])).rows[0].hash;
-async function equipment(family='Solar Spotter'){
+const plans={Sniper:['sniper_2x_12v_35ah',2],Ranger:['lifepo4_1x',1],Spotter:['none',0],'Solar Spotter':['agm_4x_12v_110ah',4],Helios:['helios_battery_box',1],'Recon 2':['recon_configured',3]};
+async function equipment(family='Solar Spotter',purpose='truck_replenishment'){
  const id=randomUUID(),key=family+':TEST-'+id,tag='TEST-'+id.slice(0,10);
  await db.query('insert into equipment_master(equipment_key,unit_tag,source_family,canonical_family,workflow_type,source_label,tracker_state) values($1,$2,$3,$3,$3,$4,\'shop\')',[key,tag,family,family+' '+tag]);
- return {equipment_key:key,family,unit_tag:tag,sims:[],battery_count:1,parts:[]};
+ const item={equipment_key:key,family,unit_tag:tag,sims:[],battery_count:1,parts:[]};
+ if(purpose==='truck_replenishment')Object.assign(item,{battery_count:null,battery_configuration:null,required_battery_count:null});
+ if(purpose==='installation')Object.assign(item,{battery_count:plans[family][1],battery_configuration:plans[family][0],required_battery_count:plans[family][1]});
+ return item;
 }
 async function upload(r,who=it){
  for(const path of [...new Set(r.p_photos.map(p=>p.path))]){
@@ -45,20 +58,34 @@ async function upload(r,who=it){
  }
 }
 function photos(items,id,who=it,both=false){return items.flatMap(i=>(both?['unit','tag']:['unit']).map(kind=>({equipment_key:i.equipment_key,kind,path:who+'/'+id+'/'+createHash('sha256').update(i.equipment_key).digest('hex')+'.jpg'})));}
-async function issue(items,who=it){
- items??=[await equipment()];const id=randomUUID();
+async function issue(items,who=it,{purpose='truck_replenishment',legacy=false}={}){
+ items??=[await equipment('Solar Spotter',legacy?'legacy':purpose)];const id=randomUUID();
  const r={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:svc,p_items:items,
   p_checks:Object.fromEntries(items.map(i=>[i.equipment_key,Object.fromEntries(contract.families[i.family].bool_fields.map(f=>[f,true]))])),
   p_signature:{method:'typed',name:names[who],confirmed:true},p_photos:photos(items,id,who),p_notes:'Synthetic original signed submission'};
- await upload(r,who);await submit(r,who);return r;
+ if(!legacy){r.p_purpose=purpose;if(purpose==='installation')for(const item of items)for(const field of ['delivery_monitoring_ok','delivery_ticket_count_ok','delivery_customer_email_app_ok'])if(item.family!=='Helios'||field!=='delivery_ticket_count_ok')r.p_checks[item.equipment_key][field]=true;}
+ await upload(r,who);await(legacy?legacySubmit(r,who):submit(r,who));return r;
 }
 async function correction(original,{who=it,items,revision=1,mode='self'}={}){
- const id=randomUUID();items??=[await equipment()];
+ const id=randomUUID();items??=[await equipment('Solar Spotter',original.p_purpose||'truck_replenishment')];
  const confirmation={mode,confirmed:true,technician_id:it};
  if(mode==='cited')Object.assign(confirmation,{technician_confirmed_at:new Date().toISOString(),technician_reply:'The corrected unit and the attached matching tag photo are confirmed by Synthetic IT.',evidence_reference:'https://drive.google.com/file/d/synthetic-confirmation/view'});
  return {p_request_id:id,p_transfer_id:original.p_transfer_id,p_expected_revision:revision,p_items:items,p_photos:photos(items,id,who,true),p_reason:'Correct the recorded unit identity after physically verifying its tag.',p_confirmation:confirmation};
 }
 function receipt(original,items=original.p_items,revision=1){const id=randomUUID();return {...original,p_request_id:id,p_kind:'receipt',p_expected_revision:revision,p_items:items,p_checks:{},p_signature:{method:'typed',name:names[svc],confirmed:true},p_photos:photos(items,id,svc)};}
+
+test('correction install rejects prerequisite drift before replacing evidence authorization or creating tables',async()=>{
+ for(const [change,message] of [
+  ["alter function app_private.techcheck_transfer_file(text,boolean) set search_path='public'",/function drift/],
+  ["alter function app_private.techcheck_transfer_manifest_v2(jsonb,text,boolean,boolean) rename to unavailable_manifest_v2",/purpose v2 is required/],
+  ["alter table app_private.techcheck_transfer_events disable trigger techcheck_transfer_event_immutable_v2",/immutable signed handoff event guard/]
+ ]){
+  await db.exec('begin;'+change+';');
+  try{await assert.rejects(db.exec(correctionSql),message);}finally{await db.exec('rollback');}
+  assert.equal((await db.query("select to_regclass('app_private.techcheck_transfer_corrections') existing")).rows[0].existing,null);
+ }
+ await db.exec(correctionSql);
+});
 
 test('review migration is disabled by default; clients cannot enable or write private tables',async()=>{
  const o=await issue(),r=await correction(o),c=await context(o.p_transfer_id,owner);
@@ -76,6 +103,7 @@ test('original technician corrects pending manifest and reservations without rew
  await db.query("insert into service_truck_units values($1,'Synthetic old equipment','TEST-OLD','assigned')",[svc]);
  await upload(r);const saved=await correct(r),fresh=await context(o.p_transfer_id,svc),t=fresh.transfers[0];
  assert.equal(saved.revision,2);assert.equal(saved.state,'awaiting_service');assert.equal(saved.applied_by.id,it);assert.equal(saved.confirmed_by.mode,'self');
+ assert.equal(saved.purpose,'truck_replenishment');assert.equal(saved.purpose_revision,1);
  assert.deepEqual(saved.before,o.p_items);assert.deepEqual(saved.after,r.p_items);assert.equal(saved.original_snapshot.signature.signed_by,it);
  assert.equal(await originalFingerprint(o.p_request_id),hash);assert.equal(await count('techcheck_transfer_events'),events);
  assert.deepEqual(await reservations(o.p_transfer_id),r.p_items.map(i=>i.equipment_key));assert.deepEqual(t.manifest,r.p_items);
@@ -83,6 +111,8 @@ test('original technician corrects pending manifest and reservations without rew
  assert.equal(t.corrections[0].correction_id,r.p_request_id);assert.equal(t.can_correct_self,false);assert.equal(t.can_apply_cited,false);
  assert.equal((await db.query('select count(*)::int n from service_truck_units where service_tech_id=$1',[svc])).rows[0].n,1);
  assert.equal((await state(o.p_transfer_id)).service_actor,svc);
+ assert.equal(t.purpose,'truck_replenishment');assert.equal(t.purpose_revision,1);
+ assert.equal(t.manifest[0].battery_count,null);assert.equal(t.manifest[0].battery_configuration,null);assert.equal(t.manifest[0].required_battery_count,null);
 });
 
 test('cited Owner and other verified IT preserve technician attribution and actual acting user separately',async()=>{
@@ -180,17 +210,80 @@ test('receipt ordering: correction rejects stale acceptance; current actual equi
 
 test('acceptance or discrepancy arriving first blocks subsequent correction without replacing signed receipt',async()=>{
  for(const discrepancy of [false,true]){
-  const o=await issue(),rec=receipt(o);if(discrepancy)rec.p_items=rec.p_items.map(i=>({...i,battery_count:0}));await upload(rec,svc);await submit(rec,svc);
+  const o=await issue(),rec=receipt(o);if(discrepancy)rec.p_items=rec.p_items.map(i=>({...i,sims:['0099']}));await upload(rec,svc);await submit(rec,svc);
   const r=await correction(o,{revision:2});await upload(r);await assert.rejects(correct(r),/receipt or custody change/);
   assert.equal((await state(o.p_transfer_id)).state,discrepancy?'discrepancy':'accepted');
  }
 });
 
 test('empty SIMs remain valid; later revisions retain each before/after and original signature',async()=>{
- const o=await issue(),items=structuredClone(o.p_items);items[0].battery_count=2;const r=await correction(o,{items});await upload(r);await correct(r);
- const nextItems=structuredClone(items);nextItems[0].parts=[{name:'Synthetic cable',quantity:1}];const next=await correction(o,{items:nextItems,revision:2});await upload(next);await correct(next);
+ const o=await issue(),items=structuredClone(o.p_items);items[0].parts=[{name:'Synthetic cable',quantity:1}];const r=await correction(o,{items});await upload(r);await correct(r);
+ const nextItems=structuredClone(items);nextItems[0].parts[0].quantity=2;const next=await correction(o,{items:nextItems,revision:2});await upload(next);await correct(next);
  const t=(await context(o.p_transfer_id,svc)).transfers[0];assert.equal(t.revision,3);assert.equal(t.corrections.length,2);assert.deepEqual(t.manifest[0].sims,[]);
  assert.deepEqual(t.corrections[1].before,t.corrections[0].after);assert.equal(t.original.snapshot.signature.name,names[it]);
+});
+
+test('purpose-aware correction retains all approved installation configurations and rejects invalid packages',async()=>{
+ for(const family of Object.keys(plans)){
+  const o=await issue([await equipment(family,'installation')],it,{purpose:'installation'});
+  const replacement=await equipment(family,'installation'),r=await correction(o,{items:[replacement]}),original=await originalFingerprint(o.p_request_id);
+  await upload(r);
+  const noPlan=structuredClone(r);delete noPlan.p_items[0].battery_configuration;
+  await assert.rejects(correct(noPlan),/approved installation battery configuration/);
+  const badCount=structuredClone(r);badCount.p_items[0].battery_count=family==='Recon 2'?0:replacement.battery_count+1;
+  await assert.rejects(correct(badCount),/battery quantity/);
+  const saved=await correct(r),t=await state(o.p_transfer_id);
+  assert.equal(saved.purpose,'installation');assert.equal(saved.purpose_revision,1);
+  assert.deepEqual(saved.before,o.p_items);assert.deepEqual(saved.after,r.p_items);
+  assert.deepEqual(t.manifest,r.p_items);assert.equal(t.purpose,'installation');assert.equal(t.purpose_revision,1);
+  assert.equal(await originalFingerprint(o.p_request_id),original);
+  const audit=(await db.query('select provenance from app_private.techcheck_transfer_correction_audit where correction_id=$1',[r.p_request_id])).rows[0].provenance;
+  assert.equal(audit.purpose,'installation');assert.equal(audit.purpose_revision,1);
+ }
+ const o=await issue(),r=await correction(o);await upload(r);
+ const invented=structuredClone(r);invented.p_items[0].battery_count=0;
+ await assert.rejects(correct(invented),/does not include a battery quantity/);
+ const plan=structuredClone(r);plan.p_items[0].battery_configuration='agm_4x_12v_110ah';
+ await assert.rejects(correct(plan),/does not include a battery quantity/);
+ assert.equal((await state(o.p_transfer_id)).revision,1);
+});
+
+test('legacy purpose classification permits a pending correction without changing its purpose revision or signed original',async()=>{
+ const o=await issue(undefined,it,{legacy:true}),r=await correction(o),hash=await originalFingerprint(o.p_request_id);
+ await upload(r);let t=(await context(o.p_transfer_id)).transfers[0];
+ assert.equal(t.purpose,null);assert.equal(t.can_correct_self,false);assert.match(t.correction_block_reason,/confirm the handoff purpose/);
+ await assert.rejects(correct(r),/confirm the handoff purpose/);
+ const a={p_request_id:randomUUID(),p_transfer_id:o.p_transfer_id,p_expected_revision:1,p_purpose:'truck_replenishment',
+  p_items:o.p_items.map(i=>({...i,battery_count:null,battery_configuration:null,required_battery_count:null})),p_reason:'Owner verified the original handoff replenishes truck spares.'};
+ await classify(a,owner);t=(await context(o.p_transfer_id)).transfers[0];
+ assert.equal(t.revision,2);assert.equal(t.purpose_revision,2);assert.equal(t.can_correct_self,true);
+ await assert.rejects(correct(r),/Handoff changed/);
+ const saved=await correct({...r,p_expected_revision:2});
+ assert.equal(saved.revision,3);assert.equal(saved.purpose,'truck_replenishment');assert.equal(saved.purpose_revision,2);
+ assert.equal(saved.original_snapshot.purpose,undefined);assert.equal(await originalFingerprint(o.p_request_id),hash);
+ assert.equal((await state(o.p_transfer_id)).purpose_revision,2);
+ assert.equal((await db.query("select count(*)::int n from app_private.techcheck_transfer_events where transfer_id=$1 and kind='receipt'",[o.p_transfer_id])).rows[0].n,0);
+});
+
+test('four historical discrepancy receipts block correction at revision five and remain blocked after purpose classification',async()=>{
+ const o=await issue(undefined,it,{legacy:true});
+ for(let revision=1;revision<=4;revision++){
+  const rec=receipt(o,o.p_items.map(i=>({...i,family:'Solar spotter',battery_count:revision})),revision);
+  await upload(rec,svc);assert.equal((await legacySubmit(rec,svc)).state,'discrepancy');
+ }
+ const events=async()=> (await db.query('select id,actor_id,kind,request,snapshot,photos,signed_at from app_private.techcheck_transfer_events where transfer_id=$1 order by signed_at,id',[o.p_transfer_id])).rows;
+ const originalEvents=await events(),r=await correction(o,{revision:5});await upload(r);
+ assert.equal((await state(o.p_transfer_id)).revision,5);assert.equal(originalEvents.filter(e=>e.kind==='receipt').length,4);
+ assert.ok(originalEvents.filter(e=>e.kind==='receipt').every(e=>e.actor_id===svc));
+ await assert.rejects(correct(r),/receipt or custody change/);
+ const a={p_request_id:randomUUID(),p_transfer_id:o.p_transfer_id,p_expected_revision:5,p_purpose:'truck_replenishment',
+  p_items:o.p_items.map(i=>({...i,battery_count:null,battery_configuration:null,required_battery_count:null})),p_reason:'Synthetic Owner classifies an unresolved historical handoff.'};
+ await classify(a,owner);const t=(await context(o.p_transfer_id)).transfers[0];
+ assert.equal(t.state,'awaiting_service');assert.equal(t.purpose_revision,6);assert.equal(t.can_correct_self,false);assert.equal(t.can_apply_cited,false);
+ assert.match(t.correction_block_reason,/receipt or custody change/);
+ await assert.rejects(correct({...r,p_expected_revision:6}),/receipt or custody change/);
+ assert.deepEqual((await events()).filter(e=>originalEvents.some(original=>original.id===e.id)),originalEvents);
+ assert.equal((await state(o.p_transfer_id)).revision,6);assert.equal(t.corrections.length,0);
 });
 
 test('removal-only correction needs one retained equipment photo pair and releases only the removed reservation',async()=>{

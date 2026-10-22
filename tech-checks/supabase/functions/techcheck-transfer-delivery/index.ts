@@ -85,9 +85,18 @@ export function createDeliveryHandler({admin,userClient,env,fetch:request=fetch}
     if(!manifest[part]?.done){const {data,error}=await admin.storage.from('techcheck-transfer-evidence').download(p.path);if(error||!data)throw new Error('Saved photo could not be read.');await create(part,p.category+' - '+p.view+'.jpg',folder,'image/jpeg',data);}
     links[p.category+':'+p.view]='https://drive.google.com/file/d/'+manifest[part].id+'/view';
    }
+   // A matched truck receipt may reuse the original IT photo. Archive a copy
+   // with its immutable source identity; never present it as a new Service photo.
+   const originalEvidence=report.snapshot.original_evidence||[];
+   for(let n=0;n<originalEvidence.length;n++){
+    const p=originalEvidence[n],part='original_it_photo_'+n;
+    if(p.kind!=='unit'||typeof p.path!=='string'||!p.path.startsWith(p.source_actor_id+'/'+p.source_event_id+'/')||!/^[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9]{64}\.jpg$/.test(p.path))throw new Error('Original evidence identity is invalid.');
+    if(!manifest[part]?.done){const {data,error}=await admin.storage.from('techcheck-transfer-evidence').download(p.path);if(error||!data)throw new Error('Original IT photo could not be read.');await create(part,'Original IT photo - '+p.equipment_key+' - '+p.source_actor_name+'.jpg',folder,'image/jpeg',data);}
+    links['Original IT photo: '+p.equipment_key]='https://drive.google.com/file/d/'+manifest[part].id+'/view';
+   }
    const html=reportHtml(report,links);
    await create('report','Handoff '+report.kind+' '+report.check_date+'.html',folder,'text/html',new Blob([html],{type:'text/html'}));
-   await create('answers','Handoff '+report.kind+' '+report.check_date+'.json',folder,'application/json',new Blob([JSON.stringify({id:report.id,actor_name:report.actor_name,check_date:report.check_date,submitted_at:report.submitted_at,snapshot:report.snapshot,photos:report.photos.map((p:any)=>({category:p.category,view:p.view,url:links[p.category+':'+p.view]}))},null,2)],{type:'application/json'}));
+   await create('answers','Handoff '+report.kind+' '+report.check_date+'.json',folder,'application/json',new Blob([JSON.stringify({id:report.id,actor_name:report.actor_name,check_date:report.check_date,submitted_at:report.submitted_at,snapshot:report.snapshot,photos:report.photos.map((p:any)=>({category:p.category,view:p.view,url:links[p.category+':'+p.view]})),original_evidence:originalEvidence.map((p:any)=>({...p,url:links['Original IT photo: '+p.equipment_key]}))},null,2)],{type:'application/json'}));
    let signature:Uint8Array|undefined;
    const signaturePhoto=report.photos.find((p:any)=>p.category==='Technician signature'&&p.view==='signature');
    if(report.snapshot.signature?.method==='drawn'){

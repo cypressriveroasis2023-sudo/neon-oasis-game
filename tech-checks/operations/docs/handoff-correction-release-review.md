@@ -10,8 +10,11 @@ reconstruction. The candidate starts at main commit
 and IT lifecycle work. Source presence and passing local tests are not evidence
 of production deployment.
 
-The correction applies only to an `awaiting_service` handoff with no receipt,
-return, cancellation or other post-checkout event. It updates that handoff's
+The correction applies only to an `awaiting_service` handoff with a recorded
+Truck replenishment or Installation purpose and no receipt, return or
+cancellation. An audited purpose amendment is allowed; its purpose and purpose
+revision stay unchanged. An unclassified legacy handoff must have its purpose
+recorded before a correction can be saved. It updates that handoff's
 pending manifest, revision and reserved equipment in one transaction. It does
 not receive equipment, add truck stock, imply a return or change availability
 through the older truck-adjustment function.
@@ -26,7 +29,8 @@ through the older truck-adjustment function.
   technician's pending handoff, choose **Apply technician-confirmed correction**.
   Verified IT may apply the same cited-evidence process when authorized by the
   server. Preview personas cannot write.
-- Enter exact registered equipment identity, battery/parts/SIM details, a new
+- Enter exact registered equipment identity, purpose-appropriate battery details,
+  parts/SIM details, a new
   matching unit/tag photograph, the reason and explicit confirmation. Cited
   confirmation additionally requires the original technician's documented
   reply, its Central time and the stable evidence link. The actual applying
@@ -50,7 +54,10 @@ a requested Simetry change belongs in the mHelp service ticket.
 ## Security changes requiring explicit release approval
 
 The user specifically required approval for privileged/security changes.
-Preparing and testing these files does not authorize installing them.
+Preparing and testing these files does not authorize installing them. The user
+approved the following scope with **YES** on October 22, 2026. Deployment and
+activation still require the recorded release gates; approval is not evidence
+that those steps have occurred.
 
 1. **Database migration:**
    `database-maintenance/techcheck-handoff-corrections-v1.sql`. Adds private,
@@ -107,7 +114,49 @@ provenance and original/correction evidence links. The feature sends no
 technician follow-up. See [delivery contract](handoff-correction-delivery.md)
 for the exact deployment, retry and saved-readback requirements.
 
-## Verified local acceptance
+## October 22 integration with the installed purpose release
+
+Main advanced to `c44fa65f35e4ddee0df3ec4d2ebfb1ca2a42810b` (PR 274) after
+release approval. The correction candidate has been integrated with that change
+before installation. Earlier hosted results remain historical evidence for
+their exact source; the combined candidate must pass the required workflows.
+
+The database preflight at 14:55:03 UTC verified that purpose v2 was already
+installed. The correction migration now checks the reviewed installed function
+fingerprints, including the evidence predicate it extends, before changing
+anything. It retains the installed one-receipt protection and immutable events.
+Corrections serialize with classification and receipt using the same transfer
+row; current purpose and purpose revision are copied into the immutable audit.
+
+Replenishment corrections preserve null battery count, configuration and required
+count. Installation corrections require the approved family-specific package.
+The correction PDF, HTML, notification and audit JSON all identify the saved
+purpose and preserve package details. Original signed battery counts and other
+answers remain in the unchanged original submission.
+
+Installed transfer worker v3 and daily worker v9 were downloaded and compared
+with the merged source. Their purpose renderers, signature treatment and original
+IT photo provenance are preserved. The worker compatibility tests passed 35
+named scenarios with no skips, and strict worker TypeScript passed. Database,
+browser and hosted checks must complete on the combined source before release.
+
+The integrated local checks subsequently passed 22 named SQL cases, 9
+client/model cases, all 20 correction browser cases with no retries or skips,
+90 additional existing/purpose regressions, and 25 archive-routing/provider
+cases. Application TypeScript and the production build passed. Six native
+PostgreSQL correction overlaps and the archive overlap gate were explicitly
+skipped locally because no isolated server was running; hosted CI requires
+those checks, including the new purpose-classification race. The installed
+purpose release's independent native receipt/retry gate remains in the workflow.
+
+Purpose amendments made by the Owner route to the immutable original checkout
+technician's folder, with the actual recorder retained separately. The
+service-only routing permission and current queue lease requirements are
+unchanged. Missing original provenance or a missing verified mapping blocks
+filing. The routing compatibility test passed without changing signed events,
+source outboxes or prior archives.
+
+## Historical verified local acceptance
 
 The candidate was checked with Node 22.23.3 and isolated synthetic accounts,
 equipment, storage and provider responses. No live correction, acceptance,
@@ -238,7 +287,12 @@ earlier reorganization or this two-worker routing update alone.
 ## Disputed real record
 
 `a314aad4-8129-4c51-b4c3-59539955ab13` remains Teddy Hopper → Josh Mireles,
-`awaiting_service`, revision 1, with no receipt. Manifest 039 versus reported
+`discrepancy`, revision 5, in the production readback at October 22, 2026,
+14:50:25 UTC (09:50:25 CDT). Four receipt events were independently saved under
+Josh's actual account before this release. This task did not create them.
+The original manifest, photo references, request and snapshot fingerprints
+remain unchanged. This record is ineligible for the pending-only correction
+path; its receipt history must be preserved. Manifest 039 versus reported
 photo tag 41 remains unresolved. The original package and its stable links are
 preserved. There is no authorized value to write until Teddy supplies physically
 verified identity and a matching photo. The revised clarification email remains

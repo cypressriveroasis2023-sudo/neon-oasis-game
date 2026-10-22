@@ -52,6 +52,16 @@ test('daily archive includes exact signed receipt event and revision as a readab
  assert.equal((await (await f.post()).json()).status,'sent');
  assert.ok([...f.files.values()].some(v=>v.name==='Equipment receipt '+event+' - revision 2.pdf'));
 });
+test('daily receipt summary separates truck batteries and preserves historical or installation quantities',()=>{
+ const f=fixture(),original=JSON.stringify(f.report.snapshot.inventory);
+ const item={equipment_key:'solar_spotter:001',family:'Solar Spotter',unit_tag:'001',sims:[],battery_count:null,parts:[]};
+ const receipt={event_id:'synthetic-receipt',revision:2,signed_at:f.report.submitted_at,snapshot:{transfer_id:'synthetic-handoff',state:'accepted',revision:2,purpose:'truck_replenishment',it_name:'Synthetic IT',service_name:'Synthetic Service',actual:[item]}};
+ f.report.snapshot.transfer_receipts=[receipt];let html=reportHtml(f.report);
+ assert.match(html,/Truck replenishment/);assert.match(html,/Solar Spotter 001/);assert.match(html,/Batteries counted separately in daily truck inventory/);assert.doesNotMatch(html,/Batteries recorded: (?:0|null|undefined)/);
+ receipt.snapshot.purpose='installation';item.battery_count=4;html=reportHtml(f.report);assert.match(html,/Installation/);assert.match(html,/Batteries recorded: 4/);
+ delete receipt.snapshot.purpose;item.battery_count=1;html=reportHtml(f.report);assert.match(html,/Purpose not recorded in this original handoff/);assert.match(html,/Batteries recorded: 1/);
+ assert.equal(JSON.stringify(f.report.snapshot.inventory),original);
+});
 test('missing Google configuration persists blocked status and never claims sent',async()=>{
  const f=fixture({configured:false});const r=await f.post();assert.equal((await r.json()).status,'blocked');assert.equal(f.status(),'blocked');assert.equal(f.calls.some(c=>c.url),false);
 });

@@ -57,7 +57,8 @@ create trigger techcheck_archive_folder_immutable before update or delete on app
 -- BEGIN VERIFIED TECHNICIAN FOLDER BINDINGS
 -- Reviewed against the existing Drive metadata and an exact, four-row COS
 -- profile readback on 2026-10-21. This is an installation preflight only;
--- runtime routing always uses the saved source actor UUID, never its name.
+-- Runtime routing uses immutable event UUID provenance, never a display name.
+-- Purpose amendments use the original checkout technician, retaining their actual recorder.
 do $$
 begin
  if (select count(*) from public.profiles p join (values
@@ -82,7 +83,7 @@ create function app_private.techcheck_archive_destination_v1(
  p_action text,p_source text,p_id uuid,p_lease uuid,p_data jsonb default '{}'
 ) returns jsonb language plpgsql security definer set search_path='' as $$
 declare
- v_actor uuid;v_actor_name text;v_day date;v_saved_day date;v_category text;v_lease_until timestamptz;
+ v_actor uuid;v_actor_name text;v_source_actor uuid;v_source_actor_name text;v_day date;v_saved_day date;v_category text;v_lease_until timestamptz;
  v_settings app_private.techcheck_archive_routing_settings%rowtype;
  v_technician app_private.techcheck_archive_technicians%rowtype;
  v_slot app_private.techcheck_archive_folders%rowtype;
@@ -101,10 +102,16 @@ begin
  -- Validate the exact current source lease. Row locks prevent the queue lease
  -- from being changed during this call; no source row is updated here.
  if p_source='transfer' then
-  select e.actor_id,e.actor_name,timezone('America/Chicago',e.signed_at)::date,q.locked_until
-   into v_actor,v_actor_name,v_day,v_lease_until
+  -- A purpose amendment belongs to the original technician's handoff archive.
+  -- Its actual Owner/IT recorder stays on the immutable event and report.
+  select case when e.kind='purpose_amendment' then original.actor_id else e.actor_id end,
+   case when e.kind='purpose_amendment' then original.actor_name else e.actor_name end,
+   e.actor_id,e.actor_name,timezone('America/Chicago',e.signed_at)::date,q.locked_until
+   into v_actor,v_actor_name,v_source_actor,v_source_actor_name,v_day,v_lease_until
   from app_private.techcheck_transfer_outbox q
   join app_private.techcheck_transfer_events e on e.id=q.event_id and e.transfer_id=q.transfer_id
+  left join app_private.techcheck_transfer_events original on e.kind='purpose_amendment'
+   and original.id::text=e.snapshot->>'original_event_id' and original.transfer_id=e.transfer_id and original.kind='checkout'
   where q.event_id=p_id and q.status='processing' and q.lease_token=p_lease and q.locked_until>clock_timestamp()
   for share of q;
   v_category:='Equipment Transfers';
@@ -114,6 +121,7 @@ begin
   from app_private.service_daily_reports r
   where r.id=p_id and r.delivery_status='processing' and r.lease_token=p_lease and r.locked_until>clock_timestamp()
   for share of r;
+  v_source_actor:=v_actor;v_source_actor_name:=v_actor_name;
   v_category:='Truck Inspections';
  end if;
  if v_actor is null or v_day is null or v_lease_until is null then raise exception 'Archive delivery lease is unavailable or expired.';end if;
@@ -137,6 +145,7 @@ begin
   'ready',coalesce(v_settings.enabled,false) and v_technician.actor_id is not null,
   'status',case when not coalesce(v_settings.enabled,false) then 'disabled' when v_technician.actor_id is null then 'mapping_required' else 'ready' end,
   'source',p_source,'source_id',p_id,'actor_id',v_actor,'actor_name',v_actor_name,
+  'source_actor_id',v_source_actor,'source_actor_name',v_source_actor_name,
   'check_date',to_char(v_day,'YYYY-MM-DD'),'category',v_category,
   'root_folder',jsonb_build_object('id',v_settings.root_folder_id,'name','Technicians','adopted',true),
   'technician_folder',case when v_technician.actor_id is not null then jsonb_build_object('id',v_technician.folder_id,

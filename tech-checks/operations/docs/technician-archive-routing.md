@@ -9,7 +9,11 @@ and enabling its routing gate require approval. The gate starts disabled.
 
 New original packages use the saved source actor and original Central submission
 date. A mutable display name, the current operator and the delivery retry date
-cannot choose the destination.
+cannot choose the destination. An Owner/IT purpose amendment uses the technician
+from its immutable original checkout, verified by the original event ID and same
+transfer. Its actual applying actor stays on the event, report and routing
+context. No Owner folder is guessed or created, and a missing or unmapped
+original technician blocks filing.
 
 | Existing source worker | Canonical destination for a new package |
 | --- | --- |

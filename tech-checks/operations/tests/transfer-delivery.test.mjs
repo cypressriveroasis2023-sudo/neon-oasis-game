@@ -7,7 +7,7 @@ const id='00000000-0000-4000-8000-000000000003';
 function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
  const report={id,kind:'checkout',actor_name:'Synthetic <script> & Tech',check_date:'2026-10-16',submitted_at:'2026-10-16T12:00:00Z',lease_token:'lease',drive_manifest:{},email_state:'pending',photos:[{category:'Sniper',view:'front',path:'private/photo.jpg'}],snapshot:{truck_checks:Object.fromEntries(Array.from({length:8},(_,i)=>['truck_'+(i+1),true])),taking_trailer:false,trailer_checks:{},inventory:{units:[{equipment_type:'Sniper',unit_tag:'SN-0001'}],sims:[{slot_no:1,sim_number:'00123456789012345670'}],stock:{recon_battery_qty:25,agm_12v_110ah_qty:4,litime_12v_100ah_qty:2,battery_12v_35ah_qty:4}}}};
  report.snapshot={transfer_id:id,state:'awaiting_service',revision:1,it_name:'Synthetic IT',service_name:'Synthetic Service',expected:[],actual:[{equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:['00123456789012345670'],battery_count:2,parts:[]}],checks:{},differences:[],notes:'Synthetic only',signature:{name:'Synthetic IT',signed_at:report.submitted_at,method:'typed',statement:'I checked this equipment.'}};
- const calls=[],files=new Map();let status='queued',counter=0;
+ const calls=[],files=new Map(),downloads=[];let status='queued',counter=0;
  const technician=TECHNICIAN_FOLDERS[0],folder=(id,name,parent)=>({id,name,mimeType:'application/vnd.google-apps.folder',parents:parent?[parent]:[],trashed:false});
  const destinations=new Map([TECHNICIANS_ROOT,...TECHNICIAN_FOLDERS].map(v=>[v.id,folder(v.id,v.name,v.id===TECHNICIANS_ROOT.id?null:TECHNICIANS_ROOT.id)]));
  destinations.set('existing-date',folder('existing-date',report.check_date,technician.id));destinations.set('existing-category',folder('existing-category','Equipment Transfers','existing-date'));
@@ -18,7 +18,7 @@ function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
   if(args.p_action==='claim')return {data:status==='sent'||status==='review'?null:structuredClone(report)};
   if(args.p_action==='checkpoint'){Object.assign(report,structuredClone(args.p_data));return {data:{ok:true}};}
   if(args.p_action==='finish'){status=args.p_data.status;return {data:{ok:true}};}
- },storage:{from:()=>({download:async()=>({data:new Blob(['synthetic image'],{type:'image/jpeg'})})})}};
+ },storage:{from:()=>({download:async(path)=>{downloads.push(path);return {data:new Blob(['synthetic image'],{type:'image/jpeg'})};}})}};
  const fetch=async(url,opts={})=>{
   calls.push({url,method:opts.method||'GET'});
   const result=body=>new Response(JSON.stringify(body),{headers:{'Content-Type':'application/json'}});
@@ -41,7 +41,7 @@ function fixture({configured=true,sendTimeout=false,uploadFailure=false}={}){
  const handler=createDeliveryHandler({admin,userClient:{auth:{getUser:async token=>token==='good'?{data:{user:{id:'actor'}}}:{error:{}}}},env:()=>configured?'synthetic-credential':undefined,fetch});
  const post=(headers={authorization:'Bearer good'})=>handler(new Request('https://function.example',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify({report_id:id})}));
  const checkConnection=()=>handler(new Request('https://function.example',{method:'POST',headers:{'Content-Type':'application/json','x-techcheck-cron':'trusted'},body:JSON.stringify({action:'check_connection'})}));
- return {post,checkConnection,report,calls,files,status:()=>status};
+ return {post,checkConnection,report,calls,files,downloads,status:()=>status};
 }
 test('rejects unsigned requests and untrusted scheduler; missing Google configuration never claims success',async()=>{
  const f=fixture({configured:false});assert.equal((await f.post({})).status,401);assert.equal((await f.post({'x-techcheck-cron':'bad'})).status,401);
@@ -69,4 +69,24 @@ test('twenty-unit PDF retains every unit, discrepancies, event revision and the 
  r.snapshot.differences=[{equipment_key:'sniper:19',field:'battery_count',expected:2,actual:1}];
  const pdf=new TextDecoder().decode(summaryPdf(r));assert.match(pdf,/\/Count 20/);assert.match(pdf,/Sniper 019/);assert.match(pdf,/00123419/);assert.match(pdf,/DISCREPANCIES/);assert.match(pdf,/SIGNED BY Synthetic IT/);
  r.snapshot.signature.method='drawn';assert.throws(()=>summaryPdf(r),/Handwritten signature required/);
+});
+test('simple replenishment archives original IT photo with provenance and sends only once',async()=>{
+ const f=fixture();f.report.kind='receipt';f.report.photos=[];
+ f.report.snapshot.purpose='truck_replenishment';f.report.snapshot.actual[0].battery_count=null;
+ const original={equipment_key:'sniper:001',kind:'unit',source_actor_id:'00000000-0000-4000-8000-000000000001',source_event_id:'00000000-0000-4000-8000-000000000002',source_actor_name:'Synthetic IT',source_signed_at:'2026-10-15T12:00:00Z'};
+ original.path=original.source_actor_id+'/'+original.source_event_id+'/'+'a'.repeat(64)+'.jpg';
+ f.report.snapshot.original_evidence=[original];
+ assert.equal((await (await f.post()).json()).status,'sent');
+ assert.deepEqual(f.downloads,[original.path]);
+ assert.ok([...f.files.values()].some(file=>file.name==='Original IT photo - sniper:001 - Synthetic IT.jpg'&&file.appProperties.techcheck_part==='original_it_photo_0'));
+ assert.equal(f.report.drive_manifest.original_it_photo_0.done,true);
+ await f.post();assert.equal(f.calls.filter(c=>c.url?.includes('messages/send')).length,1);
+});
+test('purpose amendment archives and delivers without a manufactured signature',async()=>{
+ const f=fixture();f.report.kind='purpose_amendment';f.report.photos=[];
+ delete f.report.snapshot.signature;
+ Object.assign(f.report.snapshot,{purpose:'truck_replenishment',applied_by:{name:'Synthetic Owner',role:'owner'},recorded_at:f.report.submitted_at,statement:'The Service technician must independently confirm receipt.',original_event_id:id,previous_revision:1,previous_state:'awaiting_service'});
+ assert.equal((await (await f.post()).json()).status,'sent');
+ assert.equal(f.files.size,4);assert.equal(f.downloads.length,0);
+ assert.equal(f.calls.filter(c=>c.url?.includes('messages/send')).length,1);
 });

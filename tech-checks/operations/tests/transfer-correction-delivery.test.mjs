@@ -7,11 +7,11 @@ import {correctionRecord,correctionHtml,correctionAnswers,correctionPdf,correcti
 const id='00000000-0000-4000-8000-000000000101',transfer='00000000-0000-4000-8000-000000000102',event='00000000-0000-4000-8000-000000000103';
 const owner={id:'00000000-0000-4000-8000-000000000104',name:'Synthetic Owner'},tech={id:'00000000-0000-4000-8000-000000000105',name:'Synthetic IT'},service={id:'00000000-0000-4000-8000-000000000106',name:'Synthetic Service'};
 const photo=Buffer.from([255,216,255,224,0,4,0,0,255,217]),sha=b=>createHash('sha256').update(b).digest('hex');
-const item=tag=>({equipment_key:'solar_spotter:'+tag,family:'Solar Spotter',unit_tag:tag,sims:[],battery_count:1,parts:[]});
+const item=tag=>({equipment_key:'solar_spotter:'+tag,family:'Solar Spotter',unit_tag:tag,sims:[],battery_count:4,battery_configuration:'agm_4x_12v_110ah',required_battery_count:4,parts:[]});
 export function syntheticCorrection(){
  const confirmed_at='2026-10-21T17:01:00Z';
  const photos=['tag','unit'].map(kind=>({kind,equipment_key:'solar_spotter:002',path:owner.id+'/'+id+'/'+sha(photo)+'.jpg'}));
- return {id,correction_id:id,transfer_id:transfer,revision:2,created_at:'2026-10-21T17:05:00Z',submitted_at:'2026-10-21T17:05:00Z',original_submitted_at:'2026-10-21T16:00:00Z',original_check_date:'2026-10-21',original_event_id:event,actor_id:owner.id,actor_name:owner.name,original_technician:tech,service_recipient:service,applied_by:owner,confirmed_by:{...tech,mode:'cited',confirmed_at},confirmation_recorded_by:owner.id,confirmation:{mode:'cited',technician_id:tech.id,technician_name:tech.name,confirmed_at,recorded_by:owner.id,technician_reply:'I physically checked the tag and confirm unit 002. The new tag photo matches.',evidence_reference:'https://mail.google.com/mail/u/0/#inbox/synthetic-confirmation'},mode:'cited',reason:'Technician confirmed the correct equipment tag after reviewing the photographed unit.',technician_reply:'I physically checked the tag and confirm unit 002. The new tag photo matches.',evidence_reference:'https://mail.google.com/mail/u/0/#inbox/synthetic-confirmation',before:[item('001')],after:[item('002')],state:'awaiting_service',photos,original_drive_manifest:{complete:true,folder:{id:'original-folder',done:true},summary_pdf_v1:{id:'original-summary',done:true},answers:{id:'original-answers',done:true},photo_0:{id:'original-photo',done:true}},drive_manifest:{},email_state:'pending',email_id:null,lease_token:'00000000-0000-4000-8000-000000000107'};
+ return {id,correction_id:id,transfer_id:transfer,revision:2,purpose:'installation',purpose_revision:1,created_at:'2026-10-21T17:05:00Z',submitted_at:'2026-10-21T17:05:00Z',original_submitted_at:'2026-10-21T16:00:00Z',original_check_date:'2026-10-21',original_event_id:event,actor_id:owner.id,actor_name:owner.name,original_technician:tech,service_recipient:service,applied_by:owner,confirmed_by:{...tech,mode:'cited',confirmed_at},confirmation_recorded_by:owner.id,confirmation:{mode:'cited',technician_id:tech.id,technician_name:tech.name,confirmed_at,recorded_by:owner.id,technician_reply:'I physically checked the tag and confirm unit 002. The new tag photo matches.',evidence_reference:'https://mail.google.com/mail/u/0/#inbox/synthetic-confirmation'},mode:'cited',reason:'Technician confirmed the correct equipment tag after reviewing the photographed unit.',technician_reply:'I physically checked the tag and confirm unit 002. The new tag photo matches.',evidence_reference:'https://mail.google.com/mail/u/0/#inbox/synthetic-confirmation',before:[item('001')],after:[item('002')],state:'awaiting_service',photos,original_drive_manifest:{complete:true,folder:{id:'original-folder',done:true},summary_pdf_v1:{id:'original-summary',done:true},answers:{id:'original-answers',done:true},photo_0:{id:'original-photo',done:true}},drive_manifest:{},email_state:'pending',email_id:null,lease_token:'00000000-0000-4000-8000-000000000107'};
 }
 export const sampleLinks={originalFolder:'https://drive.google.com/drive/folders/original-folder',originalPdf:'https://drive.google.com/file/d/original-summary/view',correctionFolder:'https://drive.google.com/drive/folders/correction-folder',correctionPdf:'https://drive.google.com/file/d/correction-summary/view',answers:'https://drive.google.com/file/d/correction-json/view',evidence:[{label:'Matching tag photo',url:'https://drive.google.com/file/d/correction-photo/view'},{label:'Matching whole-unit photo',url:'https://drive.google.com/file/d/correction-photo/view'}]};
 
@@ -172,4 +172,26 @@ test('long correction PDF retains all before/after units and audit fields withou
  const r=syntheticCorrection();r.before=Array.from({length:20},(_,n)=>item(String(n).padStart(3,'0')));r.after=Array.from({length:20},(_,n)=>item(String(n+20).padStart(3,'0')));r.reason='A complete recheck confirmed the exact equipment and component counts. '.repeat(20);
  const pdf=new TextDecoder().decode(correctionPdf(r,sampleLinks));assert.ok(pdf.startsWith('%PDF-1.4'));for(const tag of ['000','019','020','039'])assert.match(pdf,new RegExp('Solar Spotter '+tag));assert.match(pdf,/Confirmation supplied by: Synthetic IT/);assert.match(pdf,/Applied by: Synthetic Owner/);assert.match(pdf,/Before this correction - revision 1/);assert.match(pdf,/After this correction - revision 2/);assert.doesNotMatch(pdf,/SIGNED BY|\/Sig|\/Subtype \/Image/);assert.match(pdf,/Page 1 of /);
  assert.match(Buffer.from(correctionRawEmail(r,correctionHtml(r,sampleLinks),correctionPdf(r,sampleLinks)),'base64url').toString(),/application\/pdf/);
+});
+
+
+test('purpose-aware corrections archive replenishment without inventing battery stock or installation acceptance',async()=>{
+ const f=fixture();f.report.purpose='truck_replenishment';f.report.purpose_revision=2;f.report.revision=3;
+ for(const list of [f.report.before,f.report.after])for(const item of list)Object.assign(item,{battery_count:null,battery_configuration:null,required_battery_count:null});
+ assert.equal((await (await f.post()).json()).status,'sent');
+ const html=correctionHtml(f.report,f.report.drive_manifest.links),pdf=new TextDecoder().decode(correctionPdf(f.report,f.report.drive_manifest.links));
+ for(const output of [html,pdf]){assert.match(output,/Truck replenishment/);assert.match(output,/counted separately in daily truck inventory/);assert.doesNotMatch(output,/Batteries \/ battery boxes: null|Installation package:/);}
+ const audit=JSON.parse(f.media.get(f.report.drive_manifest.answers_json.id).toString());
+ assert.equal(audit.purpose,'truck_replenishment');assert.equal(audit.purpose_revision,2);assert.equal(audit.before[0].battery_count,null);assert.equal(audit.after[0].battery_count,null);assert.equal(audit.service_acceptance_recorded,false);
+ assert.deepEqual([...f.files].filter(([id])=>id.startsWith('original-')),f.originals);
+ assert.equal(f.calls.filter(c=>c.url?.includes('/messages/send')).length,1);
+});
+
+test('installation correction reports preserve required package details and reject incompatible or missing purpose data',()=>{
+ const r=syntheticCorrection(),html=correctionHtml(r,sampleLinks),pdf=new TextDecoder().decode(correctionPdf(r,sampleLinks));
+ for(const output of [html,pdf]){assert.match(output,/Installation/);assert.match(output,/4 x 12V 110Ah batteries/);assert.match(output,/agm_4x_12v_110ah/);assert.match(output,/required: 4/);}
+ const audit=JSON.parse(correctionAnswers(r,sampleLinks));assert.equal(audit.purpose,'installation');assert.equal(audit.after[0].required_battery_count,4);
+ for(const change of [v=>delete v.purpose,v=>v.purpose_revision=v.revision,v=>v.after[0].battery_count=1,v=>v.after[0].battery_configuration='helios_battery_box',v=>v.after[0].required_battery_count=1,v=>{v.purpose='truck_replenishment';}]){
+  const invalid=structuredClone(r);change(invalid);assert.throws(()=>correctionRecord(invalid),/provenance/);
+ }
 });

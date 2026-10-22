@@ -7,7 +7,7 @@ export const correctionActors={
 };
 const {it,svc,other,unverified,owner,secondIT}=correctionActors;
 export const correctionActorNames={[it]:'Synthetic IT',[svc]:'Synthetic Service',[other]:'Other Service',[owner]:'Synthetic Owner',[secondIT]:'Second IT'};
-export const correctionMigrationNames=['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-handoff-corrections-v1.sql'];
+export const correctionMigrationNames=['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-transfer-purpose-v2.sql','techcheck-handoff-corrections-v1.sql'];
 export const correctionFixtureSchema=`
  create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;

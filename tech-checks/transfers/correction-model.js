@@ -1,8 +1,12 @@
-import {normalizeManifest} from './model.js';
+import {normalizeManifest,hasTransferPurpose,installationBatteryPlan} from './model.js';
 
 export const SELF_CONFIRMATION = 'I physically checked these unit details and the matching photo.';
 export const CITED_CONFIRMATION = 'I am recording the technician’s documented confirmation and applying this correction as myself.';
-export const sameManifest = (a,b) => JSON.stringify(normalizeManifest(a)) === JSON.stringify(normalizeManifest(b));
+function normalizeCorrectionManifest(items,{purpose=null,...options}={}) {
+  if(purpose==='truck_replenishment'&&Array.isArray(items)&&items.some(item=>item.battery_configuration!=null))throw new Error('Truck replenishment does not record an installation battery setup.');
+  return normalizeManifest(items,{...options,purpose});
+}
+export const sameManifest = (a,b,{purpose=null}={}) => JSON.stringify(normalizeCorrectionManifest(a,{purpose})) === JSON.stringify(normalizeCorrectionManifest(b,{purpose}));
 export const centralTime = value => value ? new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',dateStyle:'medium',timeStyle:'long'}) : 'Not recorded';
 export function httpsEvidence(value) {
   try { const url=new URL(String(value).trim());return url.protocol==='https:'&&!url.username&&!url.password ? url.href : null; } catch { return null; }
@@ -18,16 +22,16 @@ export function centralDateTimeToISO(value) {
   if(candidates.length!==1)throw new Error('That Central clock time is invalid or repeats during a daylight-saving change. Use a confirmed unambiguous time.');
   return candidates[0].toISOString();
 }
-export function changedItems(before,after) {
-  const previous=normalizeManifest(before),next=normalizeManifest(after);
+export function changedItems(before,after,{purpose=null}={}) {
+  const previous=normalizeCorrectionManifest(before,{purpose}),next=normalizeCorrectionManifest(after,{purpose});
   return next.filter(item=>JSON.stringify(item)!==JSON.stringify(previous.find(old=>old.equipment_key===item.equipment_key)));
 }
-export function correctionChanges(before,after) {
-  const previous=normalizeManifest(before),next=normalizeManifest(after),changes=[];
+export function correctionChanges(before,after,{purpose=null}={}) {
+  const previous=normalizeCorrectionManifest(before,{purpose,requirePlan:false}),next=normalizeCorrectionManifest(after,{purpose,requirePlan:false}),changes=[];
   for(const item of previous){
     const updated=next.find(row=>row.equipment_key===item.equipment_key);
     if(!updated){changes.push({equipment_key:item.equipment_key,field:'Unit',before:item.family+' '+item.unit_tag,after:'Removed from pending handoff'});continue;}
-    for(const [field,label] of [['family','Family'],['unit_tag','Unit tag'],['sims','SIM cards'],['battery_count','Battery count'],['parts','Additional parts']]){
+    for(const [field,label] of [['family','Family'],['unit_tag','Unit tag'],['sims','SIM cards'],['battery_count','Battery count'],['battery_configuration','Installation battery setup'],['parts','Additional parts']]){
       if(JSON.stringify(item[field])!==JSON.stringify(updated[field]))changes.push({equipment_key:item.equipment_key,field:label,before:item[field],after:updated[field]});
     }
   }
@@ -35,25 +39,31 @@ export function correctionChanges(before,after) {
   return changes;
 }
 const textLines=value=>String(value||'').split(/\r?\n/).map(text=>text.trim()).filter(Boolean);
-export function draftItems(manifest) {
-  return normalizeManifest(manifest).map(item=>({...item,simText:item.sims.join('\n'),batteryText:String(item.battery_count),partsText:item.parts.map(part=>part.name+' | '+part.quantity).join('\n')}));
+export function draftItems(manifest,{purpose=null}={}) {
+  return normalizeCorrectionManifest(manifest,{purpose}).map(item=>({...item,simText:item.sims.join('\n'),batteryText:item.battery_count===null?'':String(item.battery_count),batteryConfiguration:item.battery_configuration??'',partsText:item.parts.map(part=>part.name+' | '+part.quantity).join('\n')}));
 }
-export function manifestFromDraft(items) {
-  return normalizeManifest(items.map(item=>({equipment_key:item.equipment_key,family:item.family,unit_tag:item.unit_tag,sims:textLines(item.simText),battery_count:item.batteryText===''?NaN:Number(item.batteryText),parts:/^(?:none|n\/?a)$/i.test(item.partsText.trim())?[]:textLines(item.partsText).map((line,index)=>{
+export function manifestFromDraft(items,{purpose=null}={}) {
+  return normalizeCorrectionManifest(items.map(item=>({equipment_key:item.equipment_key,family:item.family,unit_tag:item.unit_tag,sims:textLines(item.simText),battery_count:purpose==='truck_replenishment'?null:item.batteryText===''?NaN:Number(item.batteryText),...(hasTransferPurpose(purpose)?{battery_configuration:purpose==='truck_replenishment'?null:item.batteryConfiguration}:{}),parts:/^(?:none|n\/?a)$/i.test(item.partsText.trim())?[]:textLines(item.partsText).map((line,index)=>{
     const match=line.match(/^(.+?)\s*\|\s*(\d+)$/);if(!match)throw new Error('Additional parts, line '+(index+1)+': use part name | quantity.');
     return {name:match[1].trim(),quantity:Number(match[2])};
-  })})));
+  })})),{purpose});
 }
 export function validateCorrection({transfer,items,equipment,reason,photos,confirmation}) {
-  const after=normalizeManifest(items);
-  if(sameManifest(transfer.manifest,after))throw new Error('The corrected details must change the saved pending handoff.');
+  const purpose=transfer.purpose;
+  if(!hasTransferPurpose(purpose))throw new Error('IT / Owner must record the handoff purpose before correcting its equipment.');
+  const after=normalizeCorrectionManifest(items,{purpose});
+  if(sameManifest(transfer.manifest,after,{purpose}))throw new Error('The corrected details must change the saved pending handoff.');
   if(typeof reason!=='string'||reason.trim().length<5||reason.trim().length>2000)throw new Error('Enter a reason for correction, from 5 to 2,000 characters.');
   for(const item of after){
     const exact=equipment.find(row=>row.equipment_key===item.equipment_key);
     if(!exact||exact.family!==item.family||exact.unit_tag!==item.unit_tag)throw new Error('Select the exact registered unit; its family, tag and saved identity must match.');
+    if(purpose==='installation'){
+      const plan=installationBatteryPlan(item.family,item.battery_configuration);
+      if(!plan.configuration||plan.configuration!==item.battery_configuration||item.battery_count<plan.minimum||plan.exact&&item.battery_count!==plan.count)throw new Error(item.family+' '+item.unit_tag+' requires '+plan.description+'. Verify the actual installation battery quantity.');
+    }
   }
   if(!photos.length)throw new Error('Add a matching unit and tag photo for the corrected handoff.');
-  for(const item of changedItems(transfer.manifest,after))if(!photos.some(photo=>photo.equipment_key===item.equipment_key))throw new Error('Add a matching unit and tag photo for '+item.family+' '+item.unit_tag+'.');
+  for(const item of changedItems(transfer.manifest,after,{purpose}))if(!photos.some(photo=>photo.equipment_key===item.equipment_key))throw new Error('Add a matching unit and tag photo for '+item.family+' '+item.unit_tag+'.');
   if(!confirmation?.confirmed)throw new Error('Confirm the corrected details and matching photo before saving.');
   if(confirmation.technician_id!==transfer.original?.actor_id)throw new Error('The confirmation must identify the original submitting technician.');
   if(confirmation.mode==='cited'){

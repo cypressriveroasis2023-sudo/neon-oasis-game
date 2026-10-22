@@ -22,7 +22,7 @@ const actors={
  [OTHER_SERVICE]:{role:'service',name:'Other Service'},
 };
 
-export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held=false}={}){
+export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held=false,purpose='installation'}={}){
  const db=new PGlite(),calls=[],unexpected=[],errors=[],paths=new Map();
  await db.exec(`create role anon;create role authenticated;create role service_role;
  create schema auth;create schema storage;create schema app_private;
@@ -44,7 +44,7 @@ export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held
  `);
  for(const [id,p] of Object.entries(actors))await db.query('insert into profiles values($1,$2,true,null,$3,$4)',[id,p.role,p.name,p.name.toLowerCase().replaceAll(' ','_')]);
  for(const tag of ['101','102','103'])await db.query("insert into equipment_master values($1,$2,'Solar Spotter','Solar Spotter','Solar Spotter',$3,'shop',now())",['solar_spotter:'+tag,tag,'Solar Spotter '+tag]);
- for(const name of ['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-handoff-corrections-v1.sql'])await db.exec(await readFile(root+'database-maintenance/'+name,'utf8'));
+ for(const name of ['techcheck-named-handoffs-v1.sql','techcheck-transfer-rollout-v2.sql','techcheck-transfer-integration-v3.sql','techcheck-transfer-purpose-v2.sql','techcheck-handoff-corrections-v1.sql'])await db.exec(await readFile(root+'database-maintenance/'+name,'utf8'));
  await db.exec('update app_private.techcheck_transfer_settings set enabled=true,reports_ready=true,receipt_link_ready=true,custody_ready=true');
  await db.exec(`update app_private.techcheck_transfer_correction_settings set enabled=${!held},reports_ready=${!held}`);
  // One fixture connection is explicitly serialized. This harness cannot prove
@@ -59,8 +59,8 @@ export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held
  await db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[originalPath]);
  paths.set(originalPath,Buffer.from(PHOTO.buffer));
  const rules=JSON.parse(await readFile(root+'transfers/checklist-contract.json','utf8'));
- const originalRequest={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:SERVICE,p_items:[{equipment_key:ORIGINAL_KEY,family:'Solar Spotter',unit_tag:'101',sims:[],battery_count:1,parts:[]}],p_checks:{[ORIGINAL_KEY]:Object.fromEntries(rules.families['Solar Spotter'].bool_fields.map(field=>[field,true]))},p_signature:{method:'typed',name:'Synthetic IT',confirmed:true},p_photos:[{equipment_key:ORIGINAL_KEY,kind:'unit',path:originalPath}],p_notes:'Synthetic pending handoff; no SIM was supplied by IT.'};
- await rpc(IT,'submit_techcheck_transfer_v1',originalRequest);
+ const originalRequest={p_request_id:id,p_transfer_id:id,p_kind:'checkout',p_expected_revision:0,p_service_actor:SERVICE,p_items:[{equipment_key:ORIGINAL_KEY,family:'Solar Spotter',unit_tag:'101',sims:[],battery_count:purpose==='installation'?4:null,battery_configuration:purpose==='installation'?'agm_4x_12v_110ah':null,parts:[]}],p_checks:{[ORIGINAL_KEY]:Object.fromEntries([...rules.families['Solar Spotter'].bool_fields,...(purpose==='installation'?['delivery_monitoring_ok','delivery_ticket_count_ok','delivery_customer_email_app_ok']:[])].map(field=>[field,true]))},p_signature:{method:'typed',name:'Synthetic IT',confirmed:true},p_photos:[{equipment_key:ORIGINAL_KEY,kind:'unit',path:originalPath}],p_notes:'Synthetic pending handoff; no SIM was supplied by IT.',p_purpose:purpose};
+ await rpc(IT,'submit_techcheck_transfer_v2',originalRequest);
  await db.query("update app_private.techcheck_transfer_outbox set drive_manifest=$2 where event_id=$1",[id,{summary_pdf_v1:{done:true,id:'synthetic-original-pdf'},folder:{done:true,id:'synthetic-original-folder'},complete:true}]);
  const originalEvent=(await db.query('select to_jsonb(e) as data from app_private.techcheck_transfer_events e where id=$1',[id])).rows[0].data;
  const originalOutbox=(await db.query('select to_jsonb(o) as data from app_private.techcheck_transfer_outbox o where event_id=$1',[id])).rows[0].data;
@@ -108,7 +108,7 @@ export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held
   if(url.origin==='http://127.0.0.1:4173'&&url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:parentHtml});
   if(url.pathname==='/synthetic/rpc'){
    const {name,args}=req.postDataJSON();calls.push({name,args});
-   if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','techcheck_transfer_correction_context_v1','submit_techcheck_transfer_correction_v1'].includes(name)){unexpected.push(name);return route.abort();}
+   if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','techcheck_transfer_correction_context_v1','submit_techcheck_transfer_correction_v1'].includes(name)){unexpected.push(name);return route.abort();}
    try{return route.fulfill({json:{data:await rpc(req.headers()['x-actor'],name,args)}});}catch(error){return route.fulfill({json:{error:{message:error.message,code:error.code==='42883'?'PGRST202':error.code}}});}
   }
   if(url.pathname==='/synthetic/storage'){
@@ -135,5 +135,5 @@ export async function mountCorrectionFixture(page,{actor=OWNER,entry='desk',held
   unexpected.push(url.pathname);return route.abort();
  });
  await page.goto('http://127.0.0.1:4173/tech-checks/'+(entry==='owner'?'#tech-checks':''));
- return {db,run,rpc,calls,unexpected,errors,paths,transferId:id,originalEvent,originalOutbox,originalPath,close:async()=>{await pending;await db.close();}};
+ return {db,run,rpc,calls,unexpected,errors,paths,purpose,transferId:id,originalEvent,originalOutbox,originalPath,close:async()=>{await pending;await db.close();}};
 }

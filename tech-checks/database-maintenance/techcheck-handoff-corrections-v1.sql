@@ -1,8 +1,34 @@
 -- REVIEW CANDIDATE. Requires explicit Owner approval of the privileged migration.
--- Install after named-handoffs-v1, transfer-rollout-v2 and transfer-integration-v3.
+-- Install after named-handoffs-v1, rollout-v2, integration-v3 and purpose-v2.
 -- Both correction release gates remain FALSE. No existing submission is changed.
 -- The original event, signature, answers, evidence and delivery manifest remain immutable.
 begin;
+
+-- This revision is reviewed against the installed purpose-aware handoff paths.
+-- In particular, do not overwrite a changed evidence authorization predicate.
+do $$
+declare expected record; installed regprocedure;
+begin
+ for expected in select * from (values
+  ('app_private.submit_techcheck_transfer_core_v1(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text)','d82ec0cda915424ed64b46ea4400618e'),
+  ('app_private.submit_techcheck_transfer_v2(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text,text)','2fe8e0f559032d2337489d17bbbd848e'),
+  ('public.submit_techcheck_transfer_v2(uuid,uuid,text,integer,uuid,jsonb,jsonb,jsonb,jsonb,text,text)','8d8d223f28c49830afcf90b7f3409576'),
+  ('app_private.techcheck_transfer_manifest_v2(jsonb,text,boolean,boolean)','2b92ebb095a2e08ed2443ff294711294'),
+  ('app_private.classify_techcheck_transfer_purpose_v1(uuid,uuid,integer,text,jsonb,text)','77a7ee51c2b12d22b3f3e4955ff36dda'),
+  ('public.techcheck_transfer_context_v1()','502cbb6c8ffef53607bce63aaaab2408'),
+  ('app_private.techcheck_transfer_file(text,boolean)','52261635338d3294d129ae9f284af720')
+ ) reviewed(signature,source_md5) loop
+  installed:=to_regprocedure(expected.signature);
+  if installed is null then raise exception 'Installed handoff purpose v2 is required: %.',expected.signature;end if;
+  if md5(pg_get_functiondef(installed)) is distinct from expected.source_md5 then
+   raise exception 'Installed handoff function drift detected: %. Review the current function before release.',expected.signature;
+  end if;
+ end loop;
+ if not exists(select 1 from pg_trigger where tgrelid='app_private.techcheck_transfer_events'::regclass
+  and tgname='techcheck_transfer_event_immutable_v2' and tgenabled='O' and not tgisinternal) then
+  raise exception 'The installed immutable signed handoff event guard is required.';
+ end if;
+end$$;
 
 create table app_private.techcheck_transfer_correction_settings (
  singleton boolean primary key default true check(singleton),
@@ -139,9 +165,10 @@ begin
     'drive_folder_id',case when q.drive_manifest->'folder'->>'done'='true' then q.drive_manifest->'folder'->>'id' end)
     order by c.revision),'[]') from app_private.techcheck_transfer_corrections c
     left join app_private.techcheck_transfer_correction_outbox q on q.correction_id=c.id where c.transfer_id=t.id),
-  'can_correct_self',v_ready and v_role='it' and t.it_actor=v_actor and eligible.ok,
-  'can_apply_cited',v_ready and v_role='it' and t.it_actor<>v_actor and eligible.ok,
+  'can_correct_self',v_ready and v_role='it' and t.it_actor=v_actor and eligible.ok and coalesce(t.purpose in ('truck_replenishment','installation'),false),
+  'can_apply_cited',v_ready and v_role='it' and t.it_actor<>v_actor and eligible.ok and coalesce(t.purpose in ('truck_replenishment','installation'),false),
   'correction_block_reason',case when not eligible.ok then 'Equipment has a receipt or custody change. Resolve it with IT before correcting.'
+   when t.purpose is null then 'The original submitting technician or Owner must confirm the handoff purpose before correcting equipment.'
    when not v_ready then 'Corrections are awaiting release approval.'
    when v_role='service' then 'The submitting technician or an authorized Owner/IT user must record this correction.' end)
   order by t.created_at desc),'[]') into v_transfers
@@ -150,7 +177,7 @@ begin
  left join lateral(select * from app_private.techcheck_transfer_events z where z.transfer_id=t.id and z.kind='checkout' order by z.signed_at,z.id limit 1) e on true
  left join app_private.techcheck_transfer_outbox o on o.event_id=e.id
  cross join lateral(select t.state='awaiting_service' and e.id is not null
-  and not exists(select 1 from app_private.techcheck_transfer_events r where r.transfer_id=t.id and r.kind<>'checkout') as ok) eligible;
+  and not exists(select 1 from app_private.techcheck_transfer_events r where r.transfer_id=t.id and r.kind not in ('checkout','purpose_amendment')) as ok) eligible;
  select coalesce(jsonb_agg(e||jsonb_build_object('reservation_transfer_id',r.transfer_id)),'[]') into v_equipment
  from jsonb_array_elements(v_base->'equipment') e left join app_private.techcheck_transfer_reservations r on r.equipment_key=e->>'equipment_key';
  return jsonb_build_object('version',1,'actor_id',v_actor,'role',v_actual_role,'ready',v_ready,
@@ -192,8 +219,11 @@ begin
  select * into v_t from app_private.techcheck_transfers where id=p_transfer_id for update;
  if not found then raise exception 'Handoff unavailable for your account.' using errcode='42501';end if;
  if p_expected_revision is distinct from v_t.revision then raise exception 'Handoff changed. Reload before correcting.';end if;
- if v_t.state<>'awaiting_service' or exists(select 1 from app_private.techcheck_transfer_events where transfer_id=v_t.id and kind<>'checkout') then
+ if v_t.state<>'awaiting_service' or exists(select 1 from app_private.techcheck_transfer_events where transfer_id=v_t.id and kind not in ('checkout','purpose_amendment')) then
   raise exception 'Equipment has a receipt or custody change. Resolve it with IT before correcting.';
+ end if;
+ if v_t.purpose is null or v_t.purpose not in ('truck_replenishment','installation') then
+  raise exception 'The original submitting technician or Owner must confirm the handoff purpose before correcting equipment.';
  end if;
  select * into v_original from app_private.techcheck_transfer_events where transfer_id=v_t.id and kind='checkout' order by signed_at,id limit 1;
  if not found or v_original.actor_id<>v_t.it_actor then raise exception 'Original signed handoff is unavailable. Owner review required.';end if;
@@ -219,7 +249,9 @@ begin
  else raise exception 'Choose personal confirmation or cited technician evidence.';
  end if;
  select coalesce(nullif(btrim(full_name),''),username),role::text into v_actor_name,v_actor_role from public.profiles where user_id=v_actor;
- v_items:=app_private.techcheck_transfer_manifest(p_items,false);
+ -- The locked saved purpose is authoritative. Correction cannot reclassify it,
+ -- invent replenishment batteries, or drop an approved installation plan.
+ v_items:=app_private.techcheck_transfer_manifest_v2(p_items,v_t.purpose,false,true);
  if v_items is not distinct from v_t.manifest then raise exception 'No changed equipment details to save.';end if;
  select array_agg(value->>'equipment_key' order by value->>'equipment_key') into v_before_keys from jsonb_array_elements(v_t.manifest);
  select array_agg(value->>'equipment_key' order by value->>'equipment_key') into v_after_keys from jsonb_array_elements(v_items);
@@ -277,6 +309,7 @@ begin
    else 'I reviewed the cited reply and matching photo from the original submitting technician. I am applying their confirmed correction under my own account; I am not signing or accepting equipment for either technician.' end);
  v_snapshot:=jsonb_build_object('version',1,'correction_id',p_request_id,'transfer_id',v_t.id,'original_event_id',v_original.id,
   'base_revision',v_t.revision,'revision',v_t.revision+1,'state','awaiting_service','before',v_t.manifest,'after',v_items,
+  'purpose',v_t.purpose,'purpose_revision',v_t.purpose_revision,
   'reason',btrim(p_reason),'mode',v_mode,'applied_by',jsonb_build_object('id',v_actor,'name',v_actor_name,'role',v_actor_role),
   'original_technician',jsonb_build_object('id',v_t.it_actor,'name',v_t.it_name),
   'service_recipient',jsonb_build_object('id',v_t.service_actor,'name',v_t.service_name),
@@ -290,7 +323,8 @@ begin
   v_confirmed_at,btrim(p_reason),v_t.manifest,v_items,v_photos,v_request,v_snapshot);
  insert into app_private.techcheck_transfer_correction_audit(correction_id,transfer_id,actor_id,action,provenance)
  values(p_request_id,v_t.id,v_actor,'correction_applied',jsonb_build_object('original_event_id',v_original.id,
-  'base_revision',v_t.revision,'revision',v_t.revision+1,'confirmation',v_confirmation,'applied_by',v_snapshot->'applied_by'));
+  'base_revision',v_t.revision,'revision',v_t.revision+1,'purpose',v_t.purpose,'purpose_revision',v_t.purpose_revision,
+  'confirmation',v_confirmation,'applied_by',v_snapshot->'applied_by'));
  delete from app_private.techcheck_transfer_reservations where transfer_id=v_t.id and not equipment_key=any(v_after_keys);
  insert into app_private.techcheck_transfer_reservations(equipment_key,transfer_id)
   select k,v_t.id from unnest(v_after_keys) k where not k=any(v_before_keys);

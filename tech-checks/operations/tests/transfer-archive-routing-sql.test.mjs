@@ -20,7 +20,7 @@ const schema=`
  create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('role',current_setting('test.jwt_role',true))$$;
  grant usage on schema auth,app_private to authenticated,service_role;
  create table public.profiles(user_id uuid primary key,full_name text,role text default 'it',active boolean default true,archived_at timestamptz);
- create table app_private.techcheck_transfer_events(id uuid primary key,transfer_id uuid not null,actor_id uuid not null references public.profiles(user_id),actor_name text,signed_at timestamptz,snapshot jsonb default '{}',photos jsonb default '[]');
+ create table app_private.techcheck_transfer_events(id uuid primary key,transfer_id uuid not null,actor_id uuid not null references public.profiles(user_id),actor_name text,signed_at timestamptz,kind text default 'checkout',snapshot jsonb default '{}',photos jsonb default '[]');
  create table app_private.techcheck_transfer_outbox(event_id uuid primary key references app_private.techcheck_transfer_events(id),transfer_id uuid,status text,lease_token uuid,locked_until timestamptz,drive_manifest jsonb default '{}');
  create table app_private.service_daily_reports(id uuid primary key,service_tech_id uuid not null references public.profiles(user_id),actor_name text,submitted_at timestamptz,check_date date,delivery_status text,lease_token uuid,locked_until timestamptz,snapshot jsonb default '{}',drive_manifest jsonb default '{}');
  insert into public.profiles(user_id,full_name) values('${actor}','Synthetic Technician'),('${other}','Other Synthetic Technician'),('${unmapped}','Synthetic Technician');
@@ -45,10 +45,15 @@ const rpc=(args,role='service_role',jwt=role)=>as(role,jwt,async()=>
  (await db.query(`select public.techcheck_archive_destination_v1(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args))).rows[0].result);
 const context=(job,data={})=>rpc({p_action:'context',p_source:job.source,p_id:job.id,p_lease:job.lease,p_data:data});
 const reserve=(job,kind,candidate,parent,adopted=false)=>rpc({p_action:'reserve',p_source:job.source,p_id:job.id,p_lease:job.lease,p_data:{kind,candidate_id:candidate,parent_id:parent,adopted}});
-async function job({source:kind='transfer',who=actor,at='2026-10-22T04:59:59Z',day='2026-10-21',status='processing',expires='10 minutes'}={}){
+async function job({source:kind='transfer',who=actor,at='2026-10-22T04:59:59Z',day='2026-10-21',status='processing',expires='10 minutes',eventKind='checkout',originalActor=actor}={}){
  const id=randomUUID(),lease=randomUUID(),transfer=randomUUID();
  if(kind==='transfer'){
-  await db.query('insert into app_private.techcheck_transfer_events(id,transfer_id,actor_id,actor_name,signed_at,snapshot,photos) values($1,$2,$3,$4,$5,$6,$7)',[id,transfer,who,'Saved signer name',at,{signed:'unchanged'},[{path:'synthetic-original-photo'}]]);
+  let originalId;
+  if(eventKind==='purpose_amendment'){
+   originalId=randomUUID();await db.query('insert into app_private.techcheck_transfer_events(id,transfer_id,actor_id,actor_name,signed_at) values($1,$2,$3,$4,$5)',[originalId,transfer,originalActor,'Original submitting technician',at]);
+  }
+  await db.query('insert into app_private.techcheck_transfer_events(id,transfer_id,actor_id,actor_name,signed_at,snapshot,photos) values($1,$2,$3,$4,$5,$6,$7)',[id,transfer,who,'Saved signer name',at,{signed:'unchanged',...(originalId?{original_event_id:originalId}:{})},[{path:'synthetic-original-photo'}]]);
+  if(eventKind!=='checkout')await db.query('update app_private.techcheck_transfer_events set kind=$1 where id=$2',[eventKind,id]);
   await db.query("insert into app_private.techcheck_transfer_outbox values($1,$2,$3,$4,now()+$5::interval,'{\"original\":\"untouched\"}')",[id,transfer,status,lease,expires]);
  }else await db.query("insert into app_private.service_daily_reports values($1,$2,$3,$4,$5,$6,$7,now()+$8::interval,'{\"signed\":\"unchanged\"}','{\"original\":\"untouched\"}')",[id,who,'Saved daily signer',at,day,status,lease,expires]);
  return {source:kind,id,lease};
@@ -126,6 +131,16 @@ test('source actor UUID and Central date determine routing without a display-nam
  await assert.rejects(context(await job(),{actor_id:other}),/cannot accept/);
 });
 
+test('Owner purpose amendment files under the immutable original technician while retaining the actual recorder',async()=>{
+ const j=await job({who:unmapped,eventKind:'purpose_amendment'}),before=await originalHash(),c=await context(j);
+ assert.equal(c.ready,true);assert.equal(c.actor_id,actor);assert.equal(c.actor_name,'Original submitting technician');
+ assert.equal(c.source_actor_id,unmapped);assert.equal(c.source_actor_name,'Saved signer name');assert.equal(c.technician_folder.id,folder);
+ const day=await reserve(j,'date','synthetic-purpose-date',folder);await reserve(j,'category','synthetic-purpose-category',day.id);
+ assert.equal(await originalHash(),before);
+ const missing=await job({who:unmapped,eventKind:'purpose_amendment',originalActor:unmapped});assert.equal((await context(missing)).status,'mapping_required');
+ await db.query("update app_private.techcheck_transfer_events set snapshot='{}'::jsonb where id=$1",[missing.id]);await assert.rejects(context(missing),/unavailable/);
+});
+
 test('date and category slots have exact canonical parents and cannot accept actor, name or date injection',async()=>{
  const j=await job({at:'2026-10-23T18:00:00Z'});
  await assert.rejects(reserve(j,'category','synthetic-category-before-date','synthetic-date-before-reserved'),/Reserve the canonical date/);
@@ -192,7 +207,7 @@ test('real PostgreSQL: different delivery jobs converge on one date/category ID 
  function session(label,database=name){
   const env={PATH:process.env.PATH,LANG:'C.UTF-8',PGAPPNAME:label,PGCONNECT_TIMEOUT:'5',PGOPTIONS:'-c statement_timeout=15000 -c lock_timeout=12000 -c idle_in_transaction_session_timeout=20000'};
   if(process.env.COS_CORRECTION_PG_LIBRARY_PATH)env.LD_LIBRARY_PATH=process.env.COS_CORRECTION_PG_LIBRARY_PATH;
-  if(host==='127.0.0.1')env.PGPASSWORD='synthetic-correction-only';
+  if(host==='127.0.0.1')env.PGPASSWORD='synthetic-ci-only';
   const child=spawn(process.env.COS_CORRECTION_PSQL||'psql',['-X','--no-password','-h',host,'-p',port,'-U',user,'-d',database,'-v','ON_ERROR_STOP=1','-qAt'],{env,stdio:['pipe','pipe','pipe']});
   children.add(child);let out='',err='',done=false;child.stdout.on('data',b=>out+=b);child.stderr.on('data',b=>err+=b);
   const completion=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',code=>{done=true;children.delete(child);resolve({code,out,err});});});

@@ -25,11 +25,11 @@ async function openCorrection(page,{self=false}={}){
 async function fillCorrection(page,{self=false,photo=true}={}){
  await page.getByLabel('Reason for correction',{exact:true}).fill('The technician confirmed the actual unit and provided a matching tag photograph.');
  await page.getByLabel('Corrected unit',{exact:true}).selectOption(CORRECTED_KEY);
- await page.getByLabel('Battery count',{exact:true}).fill('1');
+ if(f.purpose==='installation')await page.getByLabel('Battery count',{exact:true}).fill('4');
  await page.getByLabel('SIM cards',{exact:true}).fill('');
  if(!self){
   await page.getByLabel('Technician confirmation date and time',{exact:true}).fill(await centralConfirmation());
-  await page.getByLabel('Technician reply',{exact:true}).fill('I physically checked Solar Spotter 102. The matching photograph shows the unit tag. One battery; no SIM supplied by IT.');
+  await page.getByLabel('Technician reply',{exact:true}).fill('I physically checked Solar Spotter 102. The matching photograph shows the unit tag. No SIM supplied by IT; the recorded handoff purpose and matching equipment were confirmed.');
   await page.getByLabel('Technician evidence link',{exact:true}).fill('https://drive.google.com/file/d/synthetic-confirmation/view');
  }
  if(photo){await page.getByLabel('Matching unit and tag photo',{exact:true}).setInputFiles(PHOTO);await expect(page.locator('.tc-evidence img')).toBeVisible();}
@@ -54,7 +54,7 @@ for(const width of [390,1440])test(`Owner applies cited technician evidence, pre
  await page.getByRole('button',{name:'Save correction',exact:true}).click();
  await expect(savedStatus(page)).toBeVisible();
  const t=await savedTransfer();expect(t.revision).toBe(2);expect(t.state).toBe('awaiting_service');
- expect(t.manifest[0]).toMatchObject({equipment_key:CORRECTED_KEY,unit_tag:'102',sims:[],battery_count:1});
+ expect(t.manifest[0]).toMatchObject({equipment_key:CORRECTED_KEY,unit_tag:'102',sims:[],battery_count:4,battery_configuration:'agm_4x_12v_110ah',required_battery_count:4});
  const revision=t.corrections.at(-1);
  expect(revision.before[0].equipment_key).toBe(ORIGINAL_KEY);expect(revision.after[0].equipment_key).toBe(CORRECTED_KEY);
  expect(revision.applied_by.id).toBe(OWNER);expect(revision.original_technician.id).toBe(IT);
@@ -178,7 +178,7 @@ test('another saved correction invalidates the open form and cannot be overwritt
  await f.db.query("insert into storage.objects values('techcheck-transfer-evidence',$1,'{\"mimetype\":\"image/jpeg\",\"size\":1234}')",[path]);
  await f.rpc(OWNER,'submit_techcheck_transfer_correction_v1',{
   p_request_id:id,p_transfer_id:f.transferId,p_expected_revision:1,
-  p_items:[{equipment_key:key,family:'Solar Spotter',unit_tag:'103',sims:[],battery_count:1,parts:[]}],
+  p_items:[{equipment_key:key,family:'Solar Spotter',unit_tag:'103',sims:[],battery_count:4,battery_configuration:'agm_4x_12v_110ah',parts:[]}],
   p_photos:[{equipment_key:key,kind:'unit',path},{equipment_key:key,kind:'tag',path}],
   p_reason:'Independent synthetic correction saved while the first form was open.',
   p_confirmation:{mode:'cited',confirmed:true,technician_id:IT,technician_confirmed_at:f.originalEvent.signed_at,technician_reply:'I verified Solar Spotter 103 and its matching unit tag.',evidence_reference:'https://drive.google.com/file/d/synthetic-concurrent-confirmation/view'},
@@ -205,7 +205,7 @@ test('Service reviews the corrected manifest and can discard an older unsent rec
  await page.getByRole('button',{name:'Verify equipment received',exact:true}).click();
  await page.getByLabel('Unit family / name 1',{exact:true}).fill('Solar Spotter');
  await page.getByLabel('Unit number 1',{exact:true}).fill('101');
- await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('1');
+ await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('4');
  await expect.poll(()=>page.evaluate(async({actor,id})=>{
   const {deviceDraft}=await import('/tech-checks/transfers/client.js');return (await deviceDraft(actor+':receipt:'+id))?.items?.[0]?.unit_tag;
  },{actor:SERVICE,id:f.transferId})).toBe('101');
@@ -227,7 +227,7 @@ test('Service reviews the corrected manifest and can discard an older unsent rec
  await expect(page.getByRole('button',{name:'Sign & verify received equipment',exact:true})).toBeVisible();
  const serviceContext=await f.rpc(SERVICE,'techcheck_transfer_context_v1');
  expect(serviceContext.transfers.find(row=>row.id===f.transferId)).toMatchObject({revision:2,state:'awaiting_service',manifest:[{equipment_key:CORRECTED_KEY,unit_tag:'102'}]});
- expect(f.calls.filter(call=>call.name==='submit_techcheck_transfer_v1')).toHaveLength(0);
+ expect(f.calls.filter(call=>['submit_techcheck_transfer_v1','submit_techcheck_transfer_v2'].includes(call.name))).toHaveLength(0);
  expect((await f.db.query('select count(*)::int n from service_truck_units')).rows[0].n).toBe(0);
  await expectOriginalUnchanged();expect(f.errors).toEqual([]);expect(f.unexpected).toEqual([]);
 });
@@ -315,4 +315,39 @@ test('an Owner preview persona cannot mount correction controls on the actual Ow
  await expect(page.locator('#view-owner')).toHaveAttribute('data-owner-route','handoffs');
  await expect(page.locator('#cosOwnerHandoffCorrections')).toHaveCount(0);
  expect(writes()).toHaveLength(0);expect((await savedTransfer()).revision).toBe(1);
+});
+
+for(const width of [390,1440])test(`truck replenishment correction preserves purpose and null battery fields through saved refresh at ${width}px`,async({page},info)=>{
+ await page.setViewportSize({width,height:900});f=await mountCorrectionFixture(page,{purpose:'truck_replenishment'});
+ await openCorrection(page);
+ await expect(page.getByLabel('Battery count',{exact:true})).toHaveCount(0);
+ await expect(page.locator('#correction-test-root')).toContainText('Spare batteries are recorded separately in daily truck inventory.');
+ await fillCorrection(page);await page.getByRole('button',{name:'Save correction',exact:true}).click();
+ await expect(savedStatus(page)).toBeVisible();
+ const t=await savedTransfer();expect(t).toMatchObject({purpose:'truck_replenishment',purpose_revision:1,revision:2,state:'awaiting_service'});
+ expect(t.manifest[0]).toMatchObject({equipment_key:CORRECTED_KEY,battery_count:null,battery_configuration:null,required_battery_count:null});
+ expect(t.corrections[0]).toMatchObject({purpose:'truck_replenishment',purpose_revision:1});
+ const service=(await f.rpc(SERVICE,'techcheck_transfer_context_v1')).transfers.find(row=>row.id===f.transferId);
+ expect(service).toMatchObject({receipt_required:true,purpose:'truck_replenishment',purpose_revision:1,revision:2});
+ expect((await f.db.query('select count(*)::int n from service_truck_units')).rows[0].n).toBe(0);
+ await expectOriginalUnchanged();await page.reload();
+ await expect(page.locator('#correction-test-root')).toContainText('Correction revision 2');
+ await expect(page.locator('#correction-test-root')).not.toContainText('Battery count: null');
+ await info.attach('synthetic-replenishment-correction-readback',{contentType:'application/json',body:Buffer.from(JSON.stringify({environment:'Disposable local synthetic fixture',viewport:width,submitted_request:writes()[0].args,saved_transfer:t,service_context:service},null,2))});
+ expect(writes()).toHaveLength(1);expect(f.errors).toEqual([]);expect(f.unexpected).toEqual([]);
+});
+test('installation correction requires its approved battery package before upload or save',async({page})=>{
+ f=await mountCorrectionFixture(page);await openCorrection(page);await fillCorrection(page);
+ await expect(page.locator('#correction-test-root')).toContainText('Required installation package: 4 × 12V 110Ah per Solar Stand');
+ await page.getByLabel('Battery count',{exact:true}).fill('1');
+ await page.getByRole('checkbox',{name:citedLabel,exact:true}).check();
+ await page.getByRole('button',{name:'Save correction',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('requires 4 × 12V 110Ah');
+ expect(writes()).toHaveLength(0);expect(f.paths.size).toBe(1);
+ await page.getByLabel('Battery count',{exact:true}).fill('4');
+ await page.getByRole('checkbox',{name:citedLabel,exact:true}).check();
+ await page.getByRole('button',{name:'Save correction',exact:true}).click();await expect(savedStatus(page)).toBeVisible();
+ const t=await savedTransfer();expect(t).toMatchObject({purpose:'installation',purpose_revision:1,revision:2});
+ expect(t.manifest[0]).toMatchObject({battery_count:4,battery_configuration:'agm_4x_12v_110ah',required_battery_count:4});
+ await expectOriginalUnchanged();expect(f.errors).toEqual([]);
 });
