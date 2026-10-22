@@ -28,10 +28,13 @@ test('Owner sees eight focused workspaces, an authenticated TV link, and verifie
 test('IT navigation uses only its existing permitted routes and cannot open Owner Advanced',async({page},info)=>{
  const {app,state}=await mountFleet(page,true,{hash:'#fleet-dashboard'});
  const nav=await menuFor(app);
- for(const name of ['Overview','Inventory & Transfers','Camera Health','Fleet Map','Power & Routers','Unit Tracker'])
+ // Production's IT_DAILY_ONLY gate intentionally allows just Fleet and Camera.
+ // Do not bypass that release gate while simplifying presentation.
+ await expect(nav.getByRole('button')).toHaveCount(2);
+ for(const name of ['Camera Health','Fleet Map'])
    await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(1);
- await expect(nav.getByRole('button',{name:'Team & Tech Check',exact:true})).toHaveCount(0);
- await expect(nav.getByRole('button',{name:'Calendar',exact:true})).toHaveCount(0);
+ for(const name of ['Overview','Inventory & Transfers','Power & Routers','Unit Tracker','Team & Tech Check','Calendar'])
+   await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);
  await expect(app.locator('details.cos-owner-advanced')).toHaveCount(0);
  await expect(app.getByRole('link',{name:/TV Mode/})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('cos-simple-it-menu.png'),fullPage:true});
