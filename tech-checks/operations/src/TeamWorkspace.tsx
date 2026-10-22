@@ -31,7 +31,7 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
   const key=query.trim().toLowerCase();
   const rows=(members||[]).filter(member=>(!department||String(member.department).toLowerCase()===department)&&(!key||[member.displayName,member.department].some(value=>String(value).toLowerCase().includes(key))));
   return <section className='panel module operations-team' aria-label='Team Workspace'>
-    <div className='panelhead'><h2>Team Workspace</h2><span>Production profiles and assigned work</span></div>
+    <div className='panelhead'><h2>Team Workspace</h2><span>Active technicians, latest checks and equipment handoffs</span></div>
     <div className='purchase-actions'>
       <button className='secondary' disabled={loading} onClick={()=>void load()}>{loading?'REFRESHING…':'REFRESH TEAM'}</button>
       <input aria-label='Search production team' value={query} onChange={event=>setQuery(event.target.value)} placeholder='Search team member or department…'/>
@@ -49,8 +49,8 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
       const techChecks=assigned.filter(job=>job.techCheck&&!job.techCheck.complete);
       return <div className='record op-record' key={member.userId}>
         <div><strong>{member.displayName}</strong><small>{String(member.department).toUpperCase()} Technician · {jobs?teamJobCount(member,jobs)+' active assigned jobs':'Assigned jobs unavailable'}</small>
-          <div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span><span>Dispatch blockers: {jobs?blocked.length:'—'}</span><span>Tech Checks in progress: {jobs?techChecks.length:'—'}</span><span>Field work active: {jobs?inProgress.length:'—'}</span></div>
-          {jobs&&assigned.length>0&&<div className='team-readiness-jobs'>{assigned.slice(0,6).map(job=><div key={job.id}><b>{job.jobNumber}</b><span>{job.site||job.customer} · {job.status}</span><small>{job.techCheck?(job.techCheck.complete?'Tech Check complete':'Tech Check step '+(Number(job.techCheck.step||0)+1)):blocked.includes(job)?'Waiting for physical unit identification':'Workflow ready for current stage'}</small></div>)}{assigned.length>6&&<small>+ {assigned.length-6} more assigned jobs</small>}</div>}
+          <p>Latest completed check: {check?.completedAt?new Date(check.completedAt).toLocaleString():checks?'No completed check in the current saved snapshot':'Unavailable'}</p><div className='purchase-actions'><button onClick={()=>openLegacy('handoffs')}>Review equipment & outstanding transfers</button><button className='secondary' onClick={()=>openLegacy('team')}>Review technician check evidence</button></div><details><summary>Existing work and required check records</summary><div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span><span>Dispatch blockers: {jobs?blocked.length:'—'}</span><span>Tech Checks in progress: {jobs?techChecks.length:'—'}</span><span>Field work active: {jobs?inProgress.length:'—'}</span></div>
+          {jobs&&assigned.length>0&&<div className='team-readiness-jobs'>{assigned.slice(0,6).map(job=><div key={job.id}><b>{job.jobNumber}</b><span>{job.site||job.customer} · {job.status}</span><small>{job.techCheck?(job.techCheck.complete?'Tech Check complete':'Tech Check step '+(Number(job.techCheck.step||0)+1)):blocked.includes(job)?'Waiting for physical unit identification':'Workflow ready for current stage'}</small></div>)}{assigned.length>6&&<small>+ {assigned.length-6} more assigned jobs</small>}</div>}</details>
         </div>
         <em>{member.active?'ACTIVE PROFILE':'INACTIVE PROFILE'}</em>
       </div>;
@@ -58,7 +58,7 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
     <div className='purchase-actions'>
       {openWorkspace&&<button onClick={()=>openWorkspace('Daily Board')}>OPEN DAILY BOARD</button>}
       <button className='secondary' onClick={()=>openLegacy('team')}>EXISTING TECH CHECK TEAM</button>
-      <button className='secondary' onClick={()=>openLegacy('accounts')}>ACCOUNTS & PERMISSIONS</button>
+      <details><summary>Advanced</summary><button className='secondary' onClick={()=>openLegacy('accounts')}>ACCOUNTS & PERMISSIONS</button></details>
     </div>
   </section>;
 }

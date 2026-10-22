@@ -29,6 +29,7 @@ const fieldStates=['online','offline','unverified','online','offline','unlinked'
 const health=()=>{
  const f=fixture();return {total:7,items:f.records.filter(x=>x.placement==='FIELD').map((x,i)=>({
   productId:x.productId,unitNumber:x.unitNumber,state:fieldStates[i],
+  evidence:{association:'synthetic-reviewed-association',basis:'camera',observations:[{kind:'camera',observedAt:new Date(now).toISOString(),currentState:fieldStates[i]}]},
   reason:'Saved observation for '+x.unitNumber,unitId:i<5?'00000000-0000-0000-0000-000000000001':null,recordId:null
  }))};
 };

@@ -8,7 +8,7 @@ const origin = 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const time = '2026-10-12T15:00:00Z';
 const cors = {'access-control-allow-origin': origin};
-const dist = fileURLToPath(new URL('../dist/', import.meta.url));
+const dist = process.env.COS_TEST_DIST ? process.env.COS_TEST_DIST.replace(/\/$/,'')+'/' : fileURLToPath(new URL('../dist/', import.meta.url));
 const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{width:100%;height:600px;border:0}.hidden{display:none}</style></head><body><header id="hostToolbar">Host tools</header><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
 const diagnostics=new WeakMap();
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
@@ -213,7 +213,7 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect.poll(()=>state.dailyResults.at(-1)).toEqual({read:dailyReads+2,status:401});expect(state.reads).toBe(dailyReads+2);expect(state.writes).toEqual([]);
 });
 
-test('TV uses the Field Map background and retains pins when optional feeds fail',async({page})=>{
+test('TV uses the Field Map background and retains pins when optional feeds fail',async({page},testInfo)=>{
  const {state,frame}=await setup(page);
  state.settings={sections:['map'],revision:1,updatedAt:time};
  state.fleetFailures={'/api/camera-health/summary-v3':503,'/api/routers':503};
@@ -223,6 +223,9 @@ test('TV uses the Field Map background and retains pins when optional feeds fail
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health: Connection unavailable');
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Routers: Connection unavailable');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('1 unverified');
+ await expect(frame.locator('.tech-check-tv-footer')).toContainText('UPDATES DELAYED / UNVERIFIED');
+ await expect(frame.locator('.tech-check-tv-footer')).not.toContainText('LIVE BOARD');
+ await page.screenshot({path:testInfo.outputPath('cos-tv-unavailable-data.png'),fullPage:true});
  await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/tile\.openstreetmap\.org\//);
  expect(state.writes).toEqual([]);
 });
