@@ -3,6 +3,7 @@
  * This module never probes devices, edits placements, or declares outage
  * duration from a single status snapshot.
  */
+import {verifiedVisionFieldFleet} from './visionFieldAuthority.ts';
 const OPERATIONS_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const SOURCE_FRESH_MS = 20 * 60 * 1000;
 type Dict = Record<string, any>;
@@ -87,17 +88,17 @@ function resourceType(row: Dict): 'camera' | 'detector' | 'recorder' | null {
     ['detector', 'reconeyez detector'].includes(type) ? 'detector' : type === 'nvr' ? 'recorder' : null;
 }
 /** All counts are *saved source records*, never an estimate of physical channels. */
-export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: FleetQuestion, now = Date.now()) {
+export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: FleetQuestion, now = Date.now(), options: {allPlacements?:boolean}={}) {
   assertHealth(health, now);
   const locations = makeLocations(fieldMap);
-  const limit = Math.max(1, Math.min(Number(filters?.limit) || 30, 100));
+  const limit = Math.max(1, Math.min(Number(filters?.limit) || 30, options.allPlacements===true?5000:100));
   const unitFilter = unitKey(filters?.unit_reference || '');
   const areaFilter = text(filters?.location_query).toLowerCase();
   const rows: Dict[] = [];
   const service: Dict[] = [];
   let unmatchedLocations = 0;
   for (const row of health.rows) {
-    if (row.scope !== 'field') continue; // Shop, inactive, and unresolved scope do NOT become Field outages.
+    if (row.scope !== 'field' && !(options.allPlacements===true && row.scope!=='inactive')) continue; // Source-only reads require a separate placement proof before Field classification.
     const type = resourceType(row);
     const direct = !row.trackerOnly && !type &&
       /^(?:CAM[\s-]*V|SNIPER(?:\s*[24])?)[\s#-]*0*\d+/i.test(text(row.unit));
@@ -172,7 +173,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     items: chosen.sort(order).slice(0,limit),
     service_items: (scope === 'offline' ? filteredService.filter(r => r.status === 'offline') :
       scope === 'online' ? filteredService.filter(r => r.status === 'online') :
-      scope === 'attention' ? filteredService.filter(r => r.status !== 'online') : filteredService).sort(order).slice(0, Math.min(limit,30)),
+      scope === 'attention' ? filteredService.filter(r => r.status !== 'online') : filteredService).sort(order).slice(0, options.allPlacements===true?limit:Math.min(limit,30)),
     location_filter_unverifiable: Boolean(areaFilter && !locations),
     limitations: [
       'ONLINE means fresh saved provider status, not that video playback was independently tested.',
@@ -210,7 +211,11 @@ export async function readVisionFleetHealth(token: string, question: FleetQuesti
       // Map location is optional; Camera Health census is not.
       read('/api/field-map').catch(() => null),
     ]);
-    return projectVisionFleet(health, map, question, Date.now());
+    const observedAt=Date.now();
+    // Never use provider folder / legacy Camera Health 'field' heuristics as physical
+    // placement. Reconcile ALL saved provider rows to the current identity + map.
+    const source=projectVisionFleet(health,map,{scope:'summary',unit_reference:'',location_query:'',limit:5000},observedAt,{allPlacements:true});
+    return verifiedVisionFieldFleet(source,health,map,question,observedAt);
   } finally { clearTimeout(deadline); }
 }
 
