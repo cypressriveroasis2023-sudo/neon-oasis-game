@@ -120,8 +120,8 @@ test('Owner agent only performs authorized, read-only saved Health and Map GET e
   assert.equal(data.items.length,0); // A label match is not a verified equipment-to-camera Field link.
   assert.equal(data.review_items.length,1);
   assert.equal(data.review_items[0].location,null);
-  assert.equal(data.provider_source_counts.cameras.offline,1);
-  assert.equal(data.placement_review_counts.cameras.offline,1);
+  assert.equal(data.provider_source_counts.cameras.unverified,1); // A stale provider observation cannot be certified OFFLINE.
+  assert.equal(data.placement_review_counts.cameras.unverified,1);
 });
 
 test('Vision routes camera fleet questions to the source tool, not the separate offline-case queue',()=>{
