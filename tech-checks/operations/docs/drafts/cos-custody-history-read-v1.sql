@@ -10,6 +10,7 @@ declare v_actor uuid:=auth.uid();v_role text;v_token text;v_total bigint;v_pendi
 begin
  v_role:=app_private.techcheck_transfer_role();
  if v_actor is null or v_role is null or v_role not in ('it','service') then raise exception 'Verified transfer role required' using errcode='42501';end if;
+ if not app_private.techcheck_transfer_ready_v1() then raise exception 'Named handoffs are held for release review.' using errcode='42501';end if;
  if p_limit is null or p_limit<1 or p_limit>100 or (p_after_id is not null and p_snapshot_token is null) or (p_snapshot_token is not null and p_snapshot_token!~'^[a-f0-9]{64}$') then raise exception 'Invalid history page' using errcode='22023';end if;
  select count(*),count(*) filter(where t.state in ('awaiting_service','discrepancy')),
   encode(sha256(convert_to(coalesce(string_agg(t.id::text||':'||t.revision::text||':'||t.updated_at::text,',' order by t.id),''),'UTF8')),'hex')

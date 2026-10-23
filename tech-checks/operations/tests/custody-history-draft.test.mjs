@@ -8,6 +8,7 @@ test('uninstalled history draft pages >100 exact records, scopes Service and rej
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema app_private;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
  create function app_private.techcheck_transfer_role() returns text language sql stable as $$select nullif(current_setting('test.role',true),'')$$;
+ create function app_private.techcheck_transfer_ready_v1() returns boolean language sql stable as $$select coalesce(current_setting('test.ready',true),'true')<>'false'$$;
  create table app_private.techcheck_transfers(id uuid primary key,it_actor uuid,service_actor uuid,it_name text,service_name text,manifest jsonb,state text,revision integer,created_at timestamptz,updated_at timestamptz);
  alter table app_private.techcheck_transfers enable row level security;revoke all on app_private.techcheck_transfers from public,anon,authenticated,service_role;
  insert into app_private.techcheck_transfers select ('10000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'${actor}',case when i<=130 then '${actor}'::uuid else '${other}'::uuid end,'Synthetic IT','Synthetic Service','[{"equipment_key":"synthetic-only"}]','awaiting_service',1,now(),now() from generate_series(1,205)i;
@@ -19,6 +20,7 @@ test('uninstalled history draft pages >100 exact records, scopes Service and rej
  do{last=await run('it',after,token);token=last.snapshot_token;for(const row of last.items){assert.ok(!seen.has(row.id));seen.add(row.id);assert.equal('snapshot' in row,false);}after=last.next_after_id;}while(after);
  assert.equal(seen.size,205);assert.equal(last.total,205);assert.equal(last.pending_count,205);assert.equal(last.complete,true);
  const service=await run('service');assert.equal(service.total,130);assert.ok(service.items.every(row=>row.service_actor===actor));
+ await db.exec("select set_config('test.ready','false',false)");await assert.rejects(run('it'),/held for release review/);await db.exec("select set_config('test.ready','true',false)");
  await assert.rejects(run(''),/Verified transfer role/);await assert.rejects(run('owner'),/Verified transfer role/); // Real helper maps verified Owner to it.
  await assert.rejects(run('it',service.next_after_id,null),/Invalid history page/);
  await assert.rejects(run('it',null,null,101),/Invalid history page/);
