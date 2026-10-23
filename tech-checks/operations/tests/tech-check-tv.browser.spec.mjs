@@ -480,3 +480,21 @@ test('TV reconciles Field Product IDs and refreshes saved camera reads without r
  await page.screenshot({path:testInfo.outputPath('tv-authoritative-census-stale.png')});
  expect(state.writes).toEqual([]);
 });
+
+for(const viewport of [{width:1920,height:1080},{width:3840,height:2160}]){
+ test(`TV map fills the viewport with readable labels at ${viewport.width}`,async({page},testInfo)=>{
+  await page.setViewportSize(viewport);
+  const {state,frame}=await setup(page,{pausedClock:true});
+  state.settings={sections:['map'],revision:1,updatedAt:time};
+  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+  await expect(frame.locator('.tv-fleet-summary')).toBeVisible();
+  const metrics=await frame.locator('.tech-check-tv-content').evaluate(el=>({width:el.getBoundingClientRect().width,viewport:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth,summary:parseFloat(getComputedStyle(document.querySelector('.tv-fleet-summary')).fontSize),legend:parseFloat(getComputedStyle(document.querySelector('.tv-map-legend')).fontSize)}));
+  expect(metrics.viewport).toBe(viewport.width);
+  expect(metrics.width).toBeGreaterThan(viewport.width*.9);
+  expect(metrics.overflow).toBe(false);
+  expect(metrics.summary).toBeGreaterThanOrEqual(viewport.width===3840?32:20);
+  expect(metrics.legend).toBeGreaterThanOrEqual(viewport.width===3840?28:16);
+  await page.screenshot({path:testInfo.outputPath('tv-map-readable.png'),fullPage:true});
+  expect(state.writes).toEqual([]);
+ });
+}

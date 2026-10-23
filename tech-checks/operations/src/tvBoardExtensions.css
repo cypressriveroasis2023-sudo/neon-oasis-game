@@ -42,3 +42,10 @@
 .tech-check-tv .tv-map-legend{bottom:10px;left:10px;right:10px;font-size:12px;gap:7px 15px;padding:8px 12px}
 .tech-check-tv .tv-map-area{top:10px;right:10px;padding:8px 12px;font-size:14px;max-width:50%}
 @media(max-width:900px){.tech-check-tv .tv-fleet-summary{font-size:12px;gap:5px 9px}.tech-check-tv .tv-map-legend{font-size:10px;gap:5px 9px}.cos-compact-group-popup-wrap .leaflet-popup-content{min-width:0}}
+
+@media(min-width:1800px){
+ .tech-check-tv .tv-fleet-summary{font-size:clamp(20px,1.05vw,40px);gap:clamp(12px,.8vw,30px)}
+ .tech-check-tv .tv-fleet-summary small,.tech-check-tv .tv-fleet-warning,.tech-check-tv .tv-map-legend{font-size:clamp(16px,.85vw,32px)}
+ .tech-check-tv .tv-map-area,.tech-check-tv .tv-map-area span{font-size:clamp(16px,.85vw,32px)}
+ .tech-check-tv .tv-map-area strong{font-size:clamp(20px,1.05vw,40px)}
+}
