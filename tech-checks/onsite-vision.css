@@ -1448,3 +1448,8 @@ body.vision-voice-session .vision-results>.vision-turn.assistant{display:block!i
 .vision-fleet-channel b{font-size:11px}
 .vision-fleet-channel span,.vision-fleet-channel small{display:block;color:#aebecd;font-size:10px;line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
 .vision-fleet-count-note{font-size:10px;line-height:1.6;color:#aebecd;margin:0 0 10px}
+
+/* Optional mHelp Product-ID hints are reconciliation-only, not Field confirmations. */
+.vision-fleet-unit summary .vision-mhelp-candidate{display:block;margin-top:7px;padding:7px 9px;border:1px solid #435571;border-radius:7px;background:#18283b;color:#d1ddeb;font-size:10px;line-height:1.5}
+.vision-fleet-unit summary .vision-mhelp-candidate b{display:inline;color:#e4ba74;font-size:10px}
+.vision-fleet-unit summary .vision-mhelp-variant{display:block;margin-top:7px;padding:7px 9px;border-left:3px solid #b98947;background:#242530;color:#e0ceb4;font-size:10px;line-height:1.5}
