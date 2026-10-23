@@ -1,0 +1,24 @@
+name: Vision Fleet Intelligence targeted verification
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/onsite-vision.js'
+      - 'tech-checks/operations/tests/vision-fleet-intelligence.test.mjs'
+      - 'tech-checks/supabase/functions/onsite-vision-agent/**'
+      - '.github/workflows/vision-fleet-intelligence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-vision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate browser assistant syntax
+        run: node --check tech-checks/onsite-vision.js
+      - name: Verify live-read fleet projections and routing
+        run: node --experimental-strip-types --test tech-checks/operations/tests/vision-fleet-intelligence.test.mjs
