@@ -133,6 +133,8 @@ test('intermediate-width stage cards preserve all labels, counts and arrows', as
 });
 
 test('approved red eye branding stays readable through responsive navigation and menu dismissal', async ({ page }, testInfo) => {
+  // Seven complete host mounts plus the Owner Advanced navigation at each width.
+  test.setTimeout(120000);
   for (const width of [320, 375, 390, 700, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: width <= 700 ? 844 : 1000 });
     const { frame } = await mount(page);

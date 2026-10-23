@@ -23,7 +23,7 @@ async function mount(page, denied = false) {
     requests.push(request);
     expect(request.method).toBe('GET');
     const stamp = new Date().toISOString();
-    const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', reason:denied?'Fixture access denied':'' }
+    const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', features:{unitTracker:!denied}, reason:denied?'Fixture access denied':'' }
       : request.path === '/api/routers' ? { items:[], source:'camera_health', gpsAvailable:false, generatedAt:stamp }
       : request.path === '/api/camera-health/summary-v3' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
       : request.path === '/api/daily-board' ? { jobs:[], tasks:[], readiness:[], asOf:stamp }
@@ -56,7 +56,7 @@ test('Single menu, focus trapping, Escape and return focus work without changing
   await expect(close).toBeFocused();
   expect((await auditDarkPresentation(menu)).failures).toEqual([]);
   await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button')).toHaveCount(8);
-  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
+  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button',{name:'Power & Routers',exact:true})).toBeVisible();
   await expect(menu.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
   await close.focus();await close.press('Shift+Tab');
   await expect(menu.getByRole('button',{name:'Sign out',exact:true})).toBeFocused();

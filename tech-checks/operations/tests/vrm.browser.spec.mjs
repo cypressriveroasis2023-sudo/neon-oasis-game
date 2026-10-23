@@ -263,7 +263,7 @@ for(const capability of ['omitted','denied'])test('IT with '+capability+' Victro
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
- await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Power & Routers',exact:true})).toHaveCount(0);
  expect(requests.some(request=>request.path.startsWith('/api/vrm-'))).toBeFalsy();
  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
@@ -273,7 +273,7 @@ test('IT with explicit Victron read capability keeps a read-only Fleet entry wit
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
- await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Power & Routers',exact:true})).toHaveCount(0);
  expect(requests.every(request=>request.method==='GET')).toBe(true);
  expect(requests.some(request=>request.path==='/api/vrm-fleet/refresh')).toBe(false);
 });
@@ -298,7 +298,7 @@ test('An initial failed read recovers through one explicit fleet refresh',async(
 });
 
 test('Overview Battery & solar opens the saved fleet and new installations arrive without discovery',async({page})=>{
- await page.clock.install({time:new Date('2026-10-09T12:00:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
+ await page.clock.install({time:new Date('2026-10-09T11:59:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
  let items=[syntheticUnit(3300001,'Initial installation')];
  const {frame,requests}=await mount(page,{initialHash:'#today',onVrmRequest:async()=>({data:fleet(items)})});
  await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Battery & solar',exact:true}).click();
@@ -332,7 +332,7 @@ test('A forbidden dynamic fleet never falls back to a legacy installation list',
 });
 
 test('Overview Battery & solar uses 404-only saved-fleet fallback and hard-stops on a later denial',async({page})=>{
- await page.clock.install({time:new Date('2026-10-09T12:00:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
+ await page.clock.install({time:new Date('2026-10-09T11:59:00Z')});await page.clock.pauseAt(new Date('2026-10-09T12:00:00Z'));
  let forbidden=false;
  const {frame,requests}=await mount(page,{initialHash:'#today',onVrmRequest:async request=>request.path==='/api/vrm-portal'?{data:{items:vrmPortalConfig().items}}:{status:forbidden?403:404,data:{error:forbidden?'Synthetic access denied':'Route unavailable'}}});
  await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Battery & solar',exact:true}).click();
@@ -341,7 +341,7 @@ test('Overview Battery & solar uses 404-only saved-fleet fallback and hard-stops
  forbidden=true;await page.clock.runFor(60000);
  await expectOperationsReloadRequired(frame);await expect(frame.locator('.vrm-workspace')).toHaveCount(0);await expect(fleetButton(frame)).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  // Retained static navigation stays generation-fenced after genuine denial.
- const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true});
+ const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Power & Routers',exact:true});
  if(await sidebarPower.isVisible())await sidebarPower.click();
  await expectOperationsReloadRequired(frame);await expect(frame.locator('.vrm-workspace')).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet']);
@@ -373,7 +373,7 @@ test('The dashboard uses old-backend fallback only for an absent dynamic fleet r
  await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(dashboard.getByRole('button',{name:'Refresh fleet',exact:true})).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  // Static navigation is not private fleet content. Even its retained desktop
  // button must remain generation-fenced and cannot reopen or reread the fleet.
- const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true});
+ const sidebarPower=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Power & Routers',exact:true});
  if(await sidebarPower.isVisible())await sidebarPower.click();
  await expectOperationsReloadRequired(frame);await expect(dashboard).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);
  expect(requests.filter(request=>request.path.startsWith('/api/vrm-')).map(request=>request.path)).toEqual(['/api/vrm-fleet','/api/vrm-portal','/api/vrm-fleet/refresh']);

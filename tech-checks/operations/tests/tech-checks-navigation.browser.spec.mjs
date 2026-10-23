@@ -31,6 +31,11 @@ async function mount(page,path='/tech-checks/') {
     const url=new URL(route.request().url());
     if(url.origin===origin){
       if(url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:html});
+      if(url.pathname.startsWith('/tech-checks/operations/dist/')&&process.env.COS_TEST_DIST){
+        const root=resolve(process.env.COS_TEST_DIST),file=resolve(root,'.'+decodeURIComponent(url.pathname.slice('/tech-checks/operations/dist'.length)));
+        if(file.startsWith(root+'/')&&existsSync(file))return route.fulfill({path:file,contentType:types[extname(file)]||'application/octet-stream'});
+        return route.abort('blockedbyclient');
+      }
       const file=resolve(repo,'.'+decodeURIComponent(url.pathname));
       if(file.startsWith(repo+'/')&&existsSync(file))return route.fulfill({path:file,contentType:types[extname(file)]||'application/octet-stream'});
       return route.abort('blockedbyclient');
@@ -48,20 +53,25 @@ async function mount(page,path='/tech-checks/') {
 async function openChecks(frame){
   await frame.getByRole('button',{name:'More',exact:true}).click();
   const menu=frame.getByRole('dialog',{name:'Operations navigation'});
-  await expect(menu.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(1);
+  await expect(menu.getByRole('button',{name:'Team & Tech Check',exact:true})).toHaveCount(1);
   await expect(menu.getByRole('button',{name:'Accounts & Permissions',exact:true})).toHaveCount(0);
-  await menu.getByRole('button',{name:'Tech Checks',exact:true}).click();
+  await menu.getByRole('button',{name:'Team & Tech Check',exact:true}).click();
+  await frame.getByRole('navigation',{name:'Technician views'}).getByRole('button',{name:'Tech Checks & transfers',exact:true}).click();
   await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
 }
 
 test('one Tech Checks front door contains IT, Service and preserved check tools',async({page},testInfo)=>{
   const {frame,requests}=await mount(page);await openChecks(frame);
   const hub=frame.getByRole('region',{name:'Tech Check workspaces'});
-  await expect(hub.getByRole('button',{name:/^IT Preparation/})).toBeVisible();
-  await expect(hub.getByRole('button',{name:/^Service Truck/})).toBeVisible();
-  await expect(hub).toContainText('dispatch jobs are in Operations');
+  await expect(hub.getByRole('button',{name:'IT Check equipment out and check returns back into IT',exact:true})).toBeVisible();
+  await expect(hub.getByRole('button',{name:'Service Receive equipment, review assigned equipment and return to IT',exact:true})).toBeVisible();
+  await expect(hub).toContainText('Pending handoffs do not establish received custody.');
   await page.screenshot({path:testInfo.outputPath('one-tech-checks-hub.png')});
   for(const [label,route] of [['Technician accounts','accounts'],['Check assignments','assign'],['Truck & team readiness','team'],['Review completed checks','review'],['Check handoffs & returns','handoffs'],['Check schedule','calendar'],['Checks needing attention','attention'],['Checked equipment','units'],['Check history','history'],['Check activity','activity']]){
+    if(['accounts','assign','calendar','units','activity'].includes(route)){
+      const advanced=hub.locator('details.cos-owner-advanced');
+      if(await advanced.getAttribute('open')===null)await advanced.getByText('Advanced check administration',{exact:true}).click();
+    }
     await hub.getByRole('button',{name:new RegExp('^'+label)}).click();
     await expect(page.locator('#cosTechCheckToolTitle')).toHaveText(label);
 
@@ -106,6 +116,7 @@ test('IT and Service checks return to the same hub and preserve in-progress inpu
 test('old dashboard links and browser Back return to Tech Checks rather than a second dashboard',async({page})=>{
   const {frame}=await mount(page);await openChecks(frame);
   const hub=frame.getByRole('region',{name:'Tech Check workspaces'});
+  await hub.getByText('Advanced check administration',{exact:true}).click();
   await hub.getByRole('button',{name:/^Technician accounts/}).click();
   await page.getByRole('button',{name:'Old dashboard link'}).click();
   await expect(hub).toBeVisible();await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
@@ -133,7 +144,7 @@ test('leaving Tech Checks clears the scoped bookmark without hijacking another w
   await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
   await frame.getByRole('button',{name:'More',exact:true}).click();
   await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Overview',exact:true}).click();
-  await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet overview',exact:true})).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe('');
   await page.reload();
   await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
