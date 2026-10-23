@@ -81,10 +81,10 @@ const tally = (rows: Dict[]) => ({
   offline: rows.filter(x => x.status === 'offline').length,
   unverified: rows.filter(x => x.status === 'unverified').length,
 });
-function resourceType(row: Dict): 'camera' | 'detector' | null {
+function resourceType(row: Dict): 'camera' | 'detector' | 'recorder' | null {
   const type = text(row.type).toLowerCase();
   return ['ipc', 'camera'].includes(type) ? 'camera' :
-    ['detector', 'reconeyez detector'].includes(type) ? 'detector' : null;
+    ['detector', 'reconeyez detector'].includes(type) ? 'detector' : type === 'nvr' ? 'recorder' : null;
 }
 /** All counts are *saved source records*, never an estimate of physical channels. */
 export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: FleetQuestion, now = Date.now()) {
@@ -135,6 +135,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
   })).filter(r => r.total > 0);
   const cameraRows = rows.filter(row => row.kind === 'camera');
   const detectorRows = rows.filter(row => row.kind === 'detector');
+  const recorderRows = rows.filter(row => row.kind === 'recorder');
   const allowed = (r: Dict) => (!unitFilter || unitKey(r.unit) === unitFilter) &&
     (!areaFilter || Boolean(r.location && [r.location.customer,r.location.site,r.location.address]
       .some((v: unknown) => text(v).toLowerCase().includes(areaFilter))));
@@ -154,13 +155,16 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
       total:health.fieldDevices,notice:'All Field resources, including non-camera resources; NOT a count of camera channels'},
     monitored_cameras: tally(cameraRows),
     monitored_detectors: tally(detectorRows),
-    camera_and_detector_records_by_provider: bySource,
+    monitored_recorders: tally(recorderRows),
+    camera_and_detector_records_by_provider: bySource.map(({provider}) => ({provider,...tally([...cameraRows,...detectorRows].filter(r => r.provider === provider))})).filter(r => r.total > 0),
+    recorder_records_by_provider: bySource.map(({provider}) => ({provider,...tally(recorderRows.filter(r => r.provider === provider))})).filter(r => r.total > 0),
     service_port_checks: tally(service),
     unknown_scope_resources: health.inventory.unknownScopeRecords,
     shop_resources_excluded: health.inventory.activeShopRecords,
     unmatched_field_resource_locations: unmatchedLocations,
     query: {scope,unit_reference: filters?.unit_reference || '',location_query:filters?.location_query || ''},
-    matching_cameras_and_detectors: tally(filtered),
+    matching_cameras_and_detectors: tally(filtered.filter(r => r.kind !== 'recorder')),
+    matching_recorders: tally(filtered.filter(r => r.kind === 'recorder')),
     matching_service_port_checks: tally(filteredService),
     items_returned: Math.min(chosen.length, limit),
     items_truncated: chosen.length > limit,
@@ -171,6 +175,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     limitations: [
       'ONLINE means fresh saved provider status, not that video playback was independently tested.',
       'IP/port reachability is listed separately from verified camera/detector status.',
+      'NVR recorder observations are reported separately from cameras; recorder availability is not proof of every individual video channel.',
       'UNVERIFIED means missing, stale, conflicting or unmapped evidence; it must not count as OFFLINE.',
       'A latest offline observation and last_online_at do NOT establish total outage duration. A persisted first-offline transition is required.',
       'Recorded address is a service placement, not a new GPS measurement; location may be missing or ambiguous.',
