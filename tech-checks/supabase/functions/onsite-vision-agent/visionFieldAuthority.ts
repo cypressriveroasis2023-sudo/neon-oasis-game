@@ -3,6 +3,7 @@
  * A source can be OFFLINE without being deployed; no provider evidence is
  * allowed to move equipment or establish a Field service address.
  */
+import {readMhelpCandidates,candidateForSourceUnit} from './visionMhelpCandidates.ts';
 type Row=Record<string,any>;
 const obj=(x:unknown):x is Row=>!!x&&typeof x==='object'&&!Array.isArray(x);
 const str=(x:unknown)=>typeof x==='string'?x.trim():'';
@@ -131,6 +132,9 @@ function subset(rows:Row[],scope:string,q:Row,limit:number){
  * retained as separate provider observations, never as deployed outages. */
 export function verifiedVisionFieldFleet(raw:Row,health:Row,fieldMap:unknown,question:Row,now=Date.now()){
   const authority=mapAuthority(fieldMap,now),claims=verifiedAssociations(health,authority,now);
+  // Protected MHelp Product IDs are hints for UNLINKED cameras only; they can
+  // never be promoted to Field or Shop without the audited camera-resource join.
+  const sourceCandidates=readMhelpCandidates(fieldMap,now);
   const byId=new Map(health.rows.map((r:Row)=>[String(r.id),r]));
   // A capped source projection is not a complete fleet. Reject it rather than
   // turning an incomplete page into a deceptively small Field outage count.
@@ -161,7 +165,7 @@ export function verifiedVisionFieldFleet(raw:Row,health:Row,fieldMap:unknown,que
         proof?.place==='shop'?'shop_verified':'inactive_source',
         placement_source:proof?'Verified COS equipment identity and placement':'Source inactive marker'});
     }else{
-      review.push({...record,placement:'needs_review',
+      review.push({...record,mhelp_product_candidate:candidateForSourceUnit(source.unit,sourceCandidates),placement:'needs_review',
         placement_review_reason:authority?
           'No complete current COS Field/Shop placement and resource-identity proof for this camera. Provider customer folder is not Field authority.':
           'COS Field Map placement authority is unavailable; provider location cannot prove Field status.'});
@@ -184,6 +188,9 @@ export function verifiedVisionFieldFleet(raw:Row,health:Row,fieldMap:unknown,que
     field_resource_census:{...raw.field_resource_census,
       notice:'Legacy Camera Health provider-scope classification only; not a verified Field deployment census'},
     placement_review_counts:reviewKind,shop_or_inactive_counts:shopKind,
+    review_candidate_field_source_count:review.filter(r=>r.mhelp_product_candidate?.state==='exact_mhelp_product_candidate'&&r.mhelp_product_candidate.placement==='FIELD').length,
+    review_candidate_shop_source_count:review.filter(r=>r.mhelp_product_candidate?.state==='exact_mhelp_product_candidate'&&r.mhelp_product_candidate.placement==='SHOP').length,
+    review_candidate_variant_source_count:review.filter(r=>['unit_variant_review','ambiguous_source_products'].includes(r.mhelp_product_candidate?.state)).length,
     confirmed_field_resource_count:field.length,unverified_placement_resource_count:review.length,
     shop_or_inactive_resource_count:shop.length,
     unmatched_field_resource_locations:field.filter(x=>!x.location?.address).length,
