@@ -67,3 +67,14 @@ receipt or write checks, and retains the existing 10-second request timeout.
 Oversized advertised or streamed responses, malformed JSON and invalid UTF-8
 still reject before source admission. Regression tests exercise the actual
 deployed-entry baseline callback using synthetic saved records and hard bounds.
+## Equipment pass deadline diagnostic
+
+Scheduled failures may include the fixed reason `equipment_pass_deadline_exceeded`
+when the Partner reader's existing whole-pass abort signal fired. That pass includes
+account verification, pagination, and shared budget admission waits. The reason
+does not establish which operation consumed the time or that the provider returned
+an error. It carries no request, source record, response body, or credential data.
+The Owner preview remains bounded at 20 seconds and maintenance at 40 seconds.
+Both complete equipment passes, identity/membership checks, source clocks, quota
+holds, and confirmed-write protections remain unchanged; a timed-out pass fails
+closed and releases its read lease.
