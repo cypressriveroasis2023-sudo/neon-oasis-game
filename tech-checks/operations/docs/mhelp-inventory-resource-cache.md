@@ -55,3 +55,15 @@ A request may receive a pacing timestamp after that timestamp has passed on its 
 This is a shared-wrapper correction. Release it to every currently covered active reader using fresh runtime files, preserving all unowned code/configuration and existing compiled reliability overlays. Do not reinstall SQL, clear holds, change schedules, bypass admission or invoke a manual full scan. Exact-head real PostgreSQL CI exercises the actual SQL timestamp through this wrapper; local reproduction and green CI do not prove the production 429's exact cause or a completed inventory sync.
 
 For an existing compiled Operations or placement overlay, use `patch-mhelp-pacing-runtime.mjs`, not the original unextended-bridge builder. It requires exactly one admission factory with the reviewed SHA-256 `7f92ef2d04072aeca6d20774eb9d072755bb4266473985cd9633347f7ed0da42` and replaces only its pacing condition and bounded wait argument. Every surrounding byte and other file is retained. A changed or already-patched factory fails closed for inspection. Fresh Operations118 and placement16 shared that exact owned factory when this change was prepared; those versions are observations, not future deployment targets. Read all current files/configuration again before release. The four module-based readers receive only the matching shared budget module; preserve their newer inventory/cache/renewal/source code. Keep all six active readers covered, with unchanged JWT/import maps, SQL and schedules, then observe ordinary scheduled results.
+# Saved baseline transport
+
+The scheduled inventory reader bounds the native saved-baseline response at
+4 MiB, separately from vendor responses and the default 2 MiB JSON reader.
+After the October 23 accepted 1001-record source, the native snapshot measured
+2,150,688 bytes including placement evidence and current binding guards. Its
+RPC returned HTTP 200 while the old transport reader rejected its size. This
+limit changes no source completeness, membership, duplicate, comparison, clock,
+receipt or write checks, and retains the existing 10-second request timeout.
+Oversized advertised or streamed responses, malformed JSON and invalid UTF-8
+still reject before source admission. Regression tests exercise the actual
+deployed-entry baseline callback using synthetic saved records and hard bounds.
