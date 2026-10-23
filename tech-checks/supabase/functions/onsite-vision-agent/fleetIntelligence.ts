@@ -62,8 +62,11 @@ function assertHealth(health: unknown, now: number): asserts health is Dict {
     throw new Error('Camera Health census does not reconcile; do not report fleet counts.');
 }
 function makeLocations(map: unknown): Map<string, Dict[]> | null {
-  if (!object(map) || !Array.isArray(map.items) ||
-    map.items.some((u: unknown) => !object(u) || typeof u.id !== 'string' || typeof u.unitNumber !== 'string')) return null;
+  if (!object(map) || !Array.isArray(map.items) || !object(map.summary) ||
+    !Number.isSafeInteger(map.summary.fieldUnits) || map.summary.fieldUnits !== map.items.length ||
+    map.items.some((u: unknown) => !object(u) || typeof u.id !== 'string' || !u.id ||
+      typeof u.unitNumber !== 'string')) return null;
+  if (new Set(map.items.map((u: Dict) => u.id)).size !== map.items.length) return null;
   const byUnit = new Map<string, Dict[]>();
   for (const unit of map.items) {
     const k = unitKey(unit.unitNumber);
@@ -97,14 +100,15 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     if (row.scope !== 'field') continue; // Shop, inactive, and unresolved scope do NOT become Field outages.
     const type = resourceType(row);
     const direct = !row.trackerOnly && !type &&
-      /^(?:CAMV|SNIPER(?: ?[24])?)[\s#-]*0*\d+/i.test(text(row.unit));
+      /^(?:CAM[\s-]*V|SNIPER(?:\s*[24])?)[\s#-]*0*\d+/i.test(text(row.unit));
     if (!type && !direct) continue;
     const matches = locations?.get(unitKey(row.unit)) || [];
     const location = matches.length === 1 ? {
       customer: text(matches[0].customer) || null,
       site: text(matches[0].site) || null,
       address: text(matches[0].address) || null,
-      source: 'COS Field Map / recorded service address (not live GPS)',
+      source: 'COS Field Map recorded service address (not live GPS)',
+      matching_method: 'uniquely matching unit label; not a verified camera-to-unit binding',
     } : null;
     if (!location) unmatchedLocations++;
     const active = text(row.activationState).toUpperCase() === 'ACTIVE';
@@ -119,6 +123,8 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
       status, location,
       observed_at: object(e) ? verifiedTime(e.observedAt, now) : null,
       last_online_at: object(e) ? verifiedTime(e.lastOnlineAt, now) : null,
+      minutes_since_last_reported_online: object(e) && verifiedTime(e.lastOnlineAt, now) ?
+        Math.floor((now - Date.parse(verifiedTime(e.lastOnlineAt, now)!)) / 60000) : null,
       outage_started_at: null,
       outage_duration: 'NOT RECORDED — last online is not proof of the first offline transition',
     };
@@ -174,7 +180,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
 }
 /** Existing Owner bridge authenticates this same legacy user and enforces its own COS permissions. */
 export async function readVisionFleetHealth(token: string, question: FleetQuestion,
-  fetcher: typeof fetch = fetch, now = Date.now()) {
+  fetcher: typeof fetch = fetch) {
   if (!token || typeof token !== 'string') throw new Error('Verified Owner session required.');
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), 55000);
