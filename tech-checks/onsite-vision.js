@@ -2073,8 +2073,21 @@ async function ownerReviewQueueHtml(raw){
     +rows.slice(0,12).map(card).join('');
 }
 
+function cameraFleetIntent(value){
+  const text=String(value||'').trim(),lower=text.toLowerCase();
+  // An explicit Tech Check escalation is a different source from camera-provider status.
+  if(/\b(escalations?|waiting (?:on|for) it|failed unit|owner decision|it intake|backup swap|troubleshooting already|mhelpdesk (?:ticket|job))\b/i.test(text))return false;
+  const subject=/\b(cameras?|camera health|fleet|star4live|vigilant|avigilon|reconeyez|spotters?|solar spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text);
+  const status=/\b(online|offline|down|up|outage|outages|status|health|unverified|last online|last seen|needs? attention|where|located|location|address|site|customer|monitor(?:ing)?|working|not working)\b/i.test(text);
+  return subject&&status&&(/\b(cameras?|fleet|star4live|vigilant|avigilon|reconeyez)\b/i.test(text)||
+    /\b(spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text));
+}
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
+  if(cameraFleetIntent(raw)){
+    const response=await serverAgentAnswer(raw);
+    return response || '<div class="vision-direct warn"><b>Camera Health cannot be verified by Vision right now.</b>The saved fleet data has not been retrieved. Use Camera Health directly; Vision will not substitute Tech Check escalation counts for live camera evidence.</div>';
+  }
   const current=chat();
   if(current?.draft){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
