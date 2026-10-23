@@ -2,7 +2,7 @@ import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import {readRecordedRoster,type RecordedRoster} from './fleetRecordedRoster';
 import {isSupportEquipment,unitHealthLabel} from './fieldCameraHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
-import {fieldProductEvidence,type FieldProductEvidence} from './fieldProductEvidence';
+import {currentFieldCameraState,fieldProductEvidence,type FieldProductEvidence} from './fieldProductEvidence';
 
 export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
@@ -44,8 +44,14 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state=row!.cameraState==='online'?'online':row!.cameraState==='offline'?'offline':'unverified';
    reason=unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
   }
+  let evidence=fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now);
+  if((state==='online'||state==='offline')&&!currentFieldCameraState(evidence,state,now)){
+   state='unverified';
+   reason='Camera status unverified. '+(evidence.basis!=='camera'?'Only '+(evidence.basis||'unclassified')+' evidence is available. ':'Current complete camera/detector evidence is unavailable. ')+reason;
+   evidence=fieldProductEvidence(row,state,now);
+  }
   counts[state]++;
-  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now)};
+  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence};
  });
  return {total:authority.field,counts,items,receivedAt:authority.receivedAt,sourceSha256:authority.sourceSha256};
 }

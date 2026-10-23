@@ -20,9 +20,10 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);
  await expect(board.locator('.cos-command-metadata')).toContainText('7 Field + 1 Shop = 8');
  await expect(board.getByRole('heading',{name:'Victron / Helios',exact:true})).toBeVisible();
- await board.getByRole('button',{name:/Offline linked equipment/}).click();
+ await board.getByRole('button',{name:/Equipment with cameras offline/}).click();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(1);
  await expect(board.locator('.cos-command-rows')).toContainText('Spotter 1');
+ await expect(board.locator('.cos-command-metadata')).toContainText('7 Field + 1 Shop = 8');
  await board.getByRole('button',{name:'Clear filters'}).click();
  await board.getByRole('searchbox',{name:'Search all Field Product IDs'}).fill('1006');
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(1);

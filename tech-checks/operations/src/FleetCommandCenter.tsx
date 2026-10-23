@@ -83,8 +83,8 @@ export default function FleetCommandCenter({
   {!data.healthVerified&&<p role="status" className="cos-command-source-warning">Camera Health is incomplete or its latest read failed. Camera-capable units are Unverified, not automatically Offline.</p>}
   <div className="cos-command-kpis" aria-label="Full equipment and camera summary">
    <button type="button" onClick={()=>filter('all')}><span>Field equipment</span><strong>{data.field}</strong><small>All recorded Field products</small></button>
-   <button type="button" className="cos-command-positive" onClick={()=>filter('all','online')}><span>Online linked equipment</span><strong>{data.counts.online}</strong><small>Saved camera / connection observations</small></button>
-   <button type="button" className="cos-command-negative" onClick={()=>filter('all','offline')}><span>Offline linked equipment</span><strong>{data.counts.offline}</strong><small>Only verified recent outage evidence</small></button>
+   <button type="button" className="cos-command-positive" onClick={()=>filter('all','online')}><span>Equipment with cameras online</span><strong>{data.counts.online}</strong><small>Current saved camera / detector observations</small></button>
+   <button type="button" className="cos-command-negative" onClick={()=>filter('all','offline')}><span>Equipment with cameras offline</span><strong>{data.counts.offline}</strong><small>Only verified recent outage evidence</small></button>
    <button type="button" className="cos-command-muted" onClick={()=>filter('all','unverified')}><span>Camera status unverified</span><strong>{data.counts.unverified}</strong><small>Unknown, missing or stale observations</small></button>
    <button type="button" onClick={onShop}><span>Shop / ROOT</span><strong>{data.shop}</strong><small>Excluded from Field map</small></button>
    <button type="button" onClick={()=>filter('all')}><span>Total COS inventory</span><strong>{data.total}</strong><small>Field + Shop · unique Product IDs</small></button>
@@ -130,6 +130,7 @@ export default function FleetCommandCenter({
      {onImport&&<button type="button" onClick={onImport}>mHelpDesk CSV / sync →</button>}
     </div>
    </div>
+   <p>Summary counts cover all Field equipment. Search and filters apply to the list below.</p>
    <div className="cos-command-filters">
     <label>Find equipment, Product ID, customer or address
      <input aria-label="Search all Field Product IDs" type="search" value={query} placeholder="Unit, Product ID, customer or address…" onChange={e=>{setQuery(e.target.value);setLimit(35);}}/>

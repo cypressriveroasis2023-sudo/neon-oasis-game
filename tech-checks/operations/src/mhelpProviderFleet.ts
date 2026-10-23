@@ -1,4 +1,4 @@
-import {cameraTimestamp} from './cameraEvidence';
+import {currentFieldCameraState} from './fieldProductEvidence';
 import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import type {FieldProduct} from './mhelpFieldHealth';
 
@@ -34,16 +34,6 @@ export function mhelpProviderFamily(category:unknown,unitNumber:unknown):FieldPr
  return 'other';
 }
 
-/** The reviewed join is necessary but port or recorder health is insufficient.
- * Require every attributed camera/detector observation to agree and be current. */
-function currentProductCameraState(product:FieldProduct|null,now:number):'online'|'offline'|null {
- const evidence=product?.evidence;
- if(!product||!['online','offline'].includes(product.state)||!evidence?.association||evidence.basis!=='camera')return null;
- const cameras=evidence.observations.filter(row=>['camera','detector'].includes(row.kind));
- return cameras.length>0&&cameras.every(row=>cameraTimestamp(row.observedAt,now).fresh&&row.currentState===product.state)
-  ?product.state as 'online'|'offline':null;
-}
-
 type ReviewedHealth={total:number;items:FieldProduct[]};
 type CensusRecord={productId:string;placement:string;unitNumber?:string;category?:string;customer?:string;uploadLifecycle?:string};
 
@@ -71,7 +61,7 @@ export function mhelpProviderFleet(
   const provider=mhelpProviderFamily(product.category,product.unitNumber);
   const linked=healthById.get(product.productId)||null;
   const healthStatus:ProviderHealthStatus=provider==='support'?'not_applicable':
-   usable&&currentProductCameraState(linked,now)||'unverified';
+   usable&&currentFieldCameraState(linked?.evidence,linked?.state||'unverified',now)||'unverified';
   const reason=provider==='support'?'Support equipment has no camera-health requirement. Verify its power separately.':
     !usable?'Latest Field camera health is unavailable. No offline condition is inferred.':
     product.uploadLifecycle&&product.uploadLifecycle!=='UNFLAGGED'?'Source is marked Do Not Use / Missing. Do not activate from a saved connection.':

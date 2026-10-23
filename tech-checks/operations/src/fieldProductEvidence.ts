@@ -13,6 +13,13 @@ export type FieldProductEvidence={
  video:'not_verified';
  observations:{resourceId:string;source:string;kind:string;observedAt:string|null;fresh:boolean;reportedStatus:string;currentState:string}[];
 };
+/** Camera-only status shared by Field rows and provider totals. */
+export function currentFieldCameraState(evidence:FieldProductEvidence|undefined,state:string,now=Date.now()):'online'|'offline'|null {
+ if(!['online','offline'].includes(state)||!evidence?.association||evidence.basis!=='camera')return null;
+ const cameras=evidence.observations.filter(row=>['camera','detector'].includes(row.kind));
+ return cameras.length>0&&cameras.every(row=>cameraTimestamp(row.observedAt,now).fresh&&row.currentState===state)?state as 'online'|'offline':null;
+}
+
 /** Only the classifier's complete reviewed resource set supplies product health.
  * Never infer a device link from a product label, IP, address or provider family.
  * Source times remain source times; a successful saved read cannot renew them. */

@@ -26,7 +26,7 @@ test('malformed, incomplete or duplicate-source receipts cannot produce a certif
 });
 test('service reachability retains its basis and never claims verified video',()=>{
  const f=fieldProductFixture();f.rows[0].camera={...f.rows[0].camera,basis:'connection',observation:undefined,reason:'A service port responded; video is unverified.'};
- const item=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0];assert.equal(item.state,'online');assert.match(item.reason,/IP \/ PORT ONLINE/);assert.match(item.reason,/video is unverified/);
+ const item=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0];assert.equal(item.state,'unverified');assert.equal(item.evidence.basis,'connection');assert.match(item.reason,/IP \/ PORT ONLINE/);assert.match(item.reason,/video is unverified/);
 });
 test('all 287 Field Product IDs reconcile without importing the 714 Shop records into health',()=>{
  const f=fieldProductFixture();
@@ -38,4 +38,35 @@ test('all 287 Field Product IDs reconcile without importing the 714 Shop records
  Object.assign(f.upload.summary,{totalRecords:1001,fieldRecords:287,shopRecords:714,unflaggedFieldRecords:286,unflaggedShopRecords:714});
  Object.assign(f.roster.summary,{totalRecords:1001,activeRecords:1000,field:285,shop:714,sourceOnlyRecords:997});
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.total,287);assert.equal(view.items.length,287);assert.equal(view.counts.unlinked,281);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),287);
+});
+
+test('Field and provider totals use the same camera-only rule',async()=>{
+ const {mhelpProviderFleet}=await import('../src/mhelpProviderFleet.ts');
+ for(const basis of ['connection','recorder','camera']){
+  const f=fieldProductFixture();f.rows[0].camera.basis=basis;
+  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now),providers=mhelpProviderFleet(f.upload,view,true,f.now);
+  const item=providers.groups.flatMap(g=>g.items).find(p=>p.productId==='1001');
+  assert.equal(item.healthStatus,view.items[0].state);assert.equal(item.healthStatus,basis==='camera'?'online':'unverified');
+  assert.equal(view.total,7);assert.equal(providers.total,7);
+ }
+});
+test('expired source observations cannot retain online or offline counts',()=>{
+ const f=fieldProductFixture(),before=structuredClone(f),view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now+21*60*1000);
+ assert.equal(view.counts.online,0);assert.equal(view.counts.offline,0);assert.equal(view.items[0].state,'unverified');assert.deepEqual(f,before);
+});
+
+test('missing, mixed, future and connection-only failures stay unverified in both counts',async()=>{
+ const {mhelpProviderFleet}=await import('../src/mhelpProviderFleet.ts');
+ for(const change of [
+  f=>{f.rows[0].camera.rows=[];},
+  f=>{const row=structuredClone(f.rows[0].camera.rows[0]);row.id=999;row.evidence.status='offline';f.rows[0].camera.rows.push(row);},
+  f=>{f.rows[0].camera.rows[0].evidence.observedAt=new Date(f.now+60000).toISOString();},
+  f=>{f.rows[1].camera.basis='connection';}
+ ]){
+  const f=fieldProductFixture();change(f);const before=structuredClone(f);
+  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now),provider=mhelpProviderFleet(f.upload,view,true,f.now);
+  const items=provider.groups.flatMap(g=>g.items);
+  for(const p of view.items.filter(p=>['1001','1002'].includes(p.productId)))assert.equal(items.find(i=>i.productId===p.productId).healthStatus,p.state);
+  assert.equal(view.counts.online+view.counts.offline,1);assert.deepEqual(f,before);
+ }
 });
