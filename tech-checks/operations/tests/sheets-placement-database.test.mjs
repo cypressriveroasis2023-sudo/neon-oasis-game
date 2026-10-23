@@ -59,3 +59,28 @@ test('failure preserves the exact pending intent for recovery; held results neve
   const done=(await db.query('select public.cos_sheets_placement_finish($1,$2) value',[recover,[{equipmentId:'123',state:'recovered',cells:intended}]])).rows[0].value;assert.equal(done.recovered,1);
  }finally{await db.close();}
 });
+
+test('existing publisher finish queues guarded evidence without advancing clocks or changing ACLs',async()=>{
+ const db=await fixture();try{
+ await db.exec(`create schema cos_operational_private;create table cos_operational_private.current_placements(product_id text primary key);
+ create function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql as $$select '{}'::jsonb$$;`);
+ const acl=(await db.query("select proacl::text acl from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure")).rows;
+ await db.exec(await readFile(new URL('../db/mhelp-publisher-freshness.sql',import.meta.url),'utf8'));
+ assert.deepEqual((await db.query("select proacl::text acl from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure")).rows,acl);
+ await db.exec("update cos_sheets_placement_private.control set enabled=true;update cos_mhelp_placement_private.links set observed_at=clock_timestamp()-interval '2 hours'");
+ const before=(await db.query('select observed_at from cos_mhelp_placement_private.links')).rows;
+ const lease=(await begin(db)).leaseId;
+ const finish=async(reason,id=lease)=>(await db.query('select public.cos_sheets_placement_finish($1,$2) value',[id,[{equipmentId:'123',state:'held',reason}]])).rows[0].value;
+ assert.equal((await finish('source_refresh_requested',null)).committed,false);
+ assert.equal((await finish('source_refresh_requested')).committed,true);
+ assert.deepEqual((await db.query('select public.cos_mhelp_inventory_baseline() v')).rows[0].v.publisherRefreshEquipmentIds,['123']);
+ assert.deepEqual((await db.query('select observed_at from cos_mhelp_placement_private.links')).rows,before);
+ await db.exec("insert into cos_operational_private.current_placements values('123')");
+ assert.deepEqual((await db.query('select public.cos_mhelp_inventory_baseline() v')).rows[0].v.publisherRefreshEquipmentIds,[]);
+ await db.exec("delete from cos_operational_private.current_placements;update cos_sheets_placement_private.refresh_requests set requested_at=clock_timestamp()-interval '3 hours'");
+ assert.deepEqual((await db.query('select public.cos_mhelp_inventory_baseline() v')).rows[0].v.publisherRefreshEquipmentIds,[]);
+ await db.exec('update cos_sheets_placement_private.control set last_attempt_at=null');const next=(await begin(db)).leaseId;
+ await finish('manual_sheet_change',next);assert.equal((await db.query('select count(*) n from cos_sheets_placement_private.refresh_requests')).rows[0].n,0);
+ await db.exec('set role authenticated');await assert.rejects(db.query('select * from cos_sheets_placement_private.refresh_requests'));await db.exec('reset role');
+ }finally{await db.close();}
+});

@@ -137,6 +137,6 @@ test('Multiple distinct provider camera channels on one unit appear as one expan
   assert.match(html,/SolarSpotter 029_4/);
   assert.match(html,/Solar Spotter 029HDC2/);
   assert.match(html,/Source record 1/);
-  assert.match(html,/No uniquely verified COS Field Map/);
+  assert.match(html,/Verified equipment, but recorded COS service address is unavailable/);
   assert.doesNotMatch(html,/4 units offline/i);
 });

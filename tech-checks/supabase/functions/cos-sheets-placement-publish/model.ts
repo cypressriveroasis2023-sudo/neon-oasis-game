@@ -95,3 +95,11 @@ export function assertPublishRequests(requests:Row[]){
   const key=[g.sheetId,g.startRowIndex,g.startColumnIndex].join(':');if(seen.has(key))throw Error('Duplicate publisher cell');seen.add(key);
  }
 }
+
+/** Request fresh evidence only for otherwise eligible proposed writes. This is
+ * not write authority: the normal planner and stage RPC must run again later. */
+export function publisherRefreshCandidates(bindings:Row[],rows:Row[]):string[]{
+ const candidates=bindings.filter(b=>b.sourceCurrent===false&&!b.pending&&b.observation?.state==='confirmed');
+ const planned=planPublishing(candidates.map(b=>({...b,sourceCurrent:true})),rows);
+ return planned.intents.map(i=>i.equipmentId).slice(0,60);
+}

@@ -1,4 +1,4 @@
-import {equal,planPublishing} from './model.ts';
+import {equal,planPublishing,publisherRefreshCandidates} from './model.ts';
 type Row=Record<string,any>;
 export class PublisherServiceError extends Error {
  constructor(public service:'rpc'|'google_auth'|'google_read'|'google_write',public status:number){super('Publisher service unavailable');}
@@ -38,6 +38,8 @@ export function createPublisherHandler(options:{authenticate:(req:Request)=>Prom
      if(live.length!==1||!live[0].unique||live[0].label!==b.label||!equal(live[0].cells,r.cells))plan.results[i]={equipmentId:r.equipmentId,state:'held',reason:'readback_mismatch'};
     }
    }
+   const refresh=new Set(publisherRefreshCandidates(start.bindings,rows));
+   for(const r of plan.results)if(r.state==='held'&&r.reason==='source_unverified'&&refresh.has(r.equipmentId))r.reason='source_refresh_requested';
    phase='finish';const done=await options.rpc('cos_sheets_placement_finish',{p_lease_id:lease,p_results:plan.results});
    if(done?.committed!==true)throw Error('Lost publisher lease');
    return reply({state:'current',...done});
