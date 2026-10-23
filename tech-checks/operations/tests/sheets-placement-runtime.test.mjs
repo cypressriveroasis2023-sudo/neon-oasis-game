@@ -25,6 +25,7 @@ function fixture({wrongAccount=false,googleDenied=false,nativeUrl=native}={}){
   if(String(url).startsWith(native+'/rest/v1/rpc/')){const name=String(url).split('/').at(-1),v=JSON.parse(init.body);
    if(name.endsWith('begin'))return json({leaseId:'synthetic-lease',bindings:[b]});
    if(name.endsWith('stage')){b={...b,pending:v.p_intents[0].cells};return json({committed:true});}
+   if(name.endsWith('request_refresh'))return json({accepted:true});
    if(name.endsWith('finish')){if(v.p_results[0].state==='published')b={...b,baseline:b.pending,pending:null};return json({committed:true,published:v.p_results.filter(x=>x.state==='published').length,held:0,sheetsPublisher:true});}
    if(name.endsWith('fail'))return json(null);throw Error('Unexpected RPC');
   }

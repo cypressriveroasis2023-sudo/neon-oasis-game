@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planPublishing,snapshotCell,tabLayout,trackerRanges,projectTracker,UNIT_TRACKER_WORKBOOK} from '../../supabase/functions/cos-sheets-placement-publish/model.ts';
+import {publisherRefreshCandidates,planPublishing,snapshotCell,tabLayout,trackerRanges,projectTracker,UNIT_TRACKER_WORKBOOK} from '../../supabase/functions/cos-sheets-placement-publish/model.ts';
 import {createPublisherHandler} from '../../supabase/functions/cos-sheets-placement-publish/index.ts';
 import {TRACKER_TABS} from '../../supabase/functions/cos-operations-pages/googleSheets.ts';
 const cell=(s,validation=null)=>snapshotCell({userEnteredValue:{stringValue:s},...(validation?{dataValidation:validation}:{})});
@@ -63,7 +63,16 @@ test('publish requires exact readback; a collaborator change is held and cannot 
  for(const correct of [true,false]){
   let reads=0,writes=0,results;
   const expected=planPublishing([binding],[row]).intents[0].cells;
-  const h=createPublisherHandler({authenticate:async()=>true,rpc:async(name,body)=>{if(name.endsWith('begin'))return {leaseId:'lease',bindings:[binding]};if(name.endsWith('stage'))return {committed:true};if(name.endsWith('finish')){results=body.p_results;return {committed:true,sheetsPublisher:true};}throw Error('Unexpected call');},read:async()=>{reads++;return[{...row,cells:reads===3?(correct?expected:[base[0],base[1],base[2],cell('Manual job')]):base}];},write:async requests=>{writes++;assert.equal(requests.length,3);}});
+  const h=createPublisherHandler({authenticate:async()=>true,rpc:async(name,body)=>{if(name.endsWith('begin'))return {leaseId:'lease',bindings:[binding]};if(name.endsWith('stage'))return {committed:true};if(name.endsWith('request_refresh'))return {accepted:true};if(name.endsWith('finish')){results=body.p_results;return {committed:true,sheetsPublisher:true};}throw Error('Unexpected call');},read:async()=>{reads++;return[{...row,cells:reads===3?(correct?expected:[base[0],base[1],base[2],cell('Manual job')]):base}];},write:async requests=>{writes++;assert.equal(requests.length,3);}});
   assert.equal((await h(request())).status,200);assert.equal(writes,1);assert.equal(results[0].state,correct?'published':'held');
  }
+});
+
+test('only otherwise writable stale changes request evidence; manual corrections and pending writes never do',()=>{
+ const stale={...binding,sourceCurrent:false};
+ assert.deepEqual(publisherRefreshCandidates([stale],[row]),['123']);
+ assert.equal(planPublishing([stale],[row]).requests.length,0);
+ for(const b of [{...stale,pending:base},{...stale,observation:{state:'held'}},{...stale,sourceCurrent:true}])assert.deepEqual(publisherRefreshCandidates([b],[row]),[]);
+ assert.deepEqual(publisherRefreshCandidates([stale],[{...row,cells:[base[0],base[1],cell('Manual correction'),base[3]]}]),[]);
+ assert.deepEqual(publisherRefreshCandidates([stale],[{...row,unique:false}]),[]);
 });
