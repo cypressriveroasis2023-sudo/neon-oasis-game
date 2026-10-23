@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { readVisionFleetHealth } from './fleetIntelligence.ts'
+import { readVisionFleetHealth, enrichVisionOfflineHistory } from './fleetIntelligence.ts'
 import './tech-check-rules.js'
 import './company-knowledge.js'
 import './workflow-engine.js'
@@ -870,12 +870,13 @@ Deno.serve(async (req) => {
       if (name === 'get_camera_fleet_health') {
         const scope = clean(args.scope).toLowerCase()
         if (!['summary','offline','attention','unit','location','history'].includes(scope)) throw new Error('Invalid camera fleet scope.')
-        return await readVisionFleetHealth(token, {
+        const savedFleet = await readVisionFleetHealth(token, {
           scope: scope as 'summary'|'offline'|'attention'|'unit'|'location'|'history',
           unit_reference: clean(args.unit_reference),
           location_query: clean(args.location_query),
           limit: Math.max(1, Math.min(Number(args.limit || 30), 100)),
-        }) as Json
+        })
+        return await enrichVisionOfflineHistory(savedFleet, userClient) as Json
       }
 
       if (name === 'get_offline_escalations') {
@@ -1349,7 +1350,7 @@ Deno.serve(async (req) => {
       '- For permanent historical questions about a technician, numbered unit, or customer/site, call get_company_history before answering. History remains available after job closeout and after equipment returns to Shop Inventory.',
       '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
       '- For camera health, the number online/offline/unverified, down cameras, provider status, saved locations, outage age or camera-specific attention, call get_camera_fleet_health before answering. Distinguish source camera/detector records from equipment inventory and independent IP/port reachability. State the snapshot time and evidence limitations.',
-      '- A provider last_online_at or latest OFFLINE observation does not prove when an outage started. Without a persisted first-offline transition, report outage duration as MISSING INFORMATION, never as an estimate from last-online.',
+      '- Provider last_online_at is not evidence of actual outage onset. The fleet history tool may return outage_observation_span_minutes when source-matched saved OFFLINE history exists. That is a span of recorded offline observations, NOT verified uninterrupted downtime; say this clearly. When the historical source cannot be verified, report outage duration as MISSING INFORMATION.',
       '- Keep Shop, inactive and unresolved-placement resources out of confirmed Field camera outages. If live Camera Health cannot be verified, never report zero or reuse old counts. If Field Map is unavailable, locations cannot be verified.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
