@@ -41,3 +41,27 @@ test('cancellation before and after admission never starts a request',async()=>{
 test('nonvendor requests do not debit the mHelp allowance',async()=>{
  let calls=0;const b=createMhelpRequestBudget({admit:async()=>{throw Error();},fetch:async()=>{calls++;return new Response();}});await b.fetch('https://tughscoxralhofrckvxy.supabase.co/rest/v1/rpc/example');assert.equal(calls,1);
 });
+
+test('elapsed and sub-millisecond pacing deadlines require a fresh admission, never a local 429 or permission reuse',async()=>{
+ for(const retryAt of ['1970-01-01T00:00:00.400500Z','1970-01-01T00:00:00.400Z','1970-01-01T00:00:00.399Z']){
+  let now=400,admissions=0,starts=0;const waits=[];
+  const b=createMhelpRequestBudget({now:()=>now,wait:async ms=>{waits.push(ms);now+=ms;},admit:async()=>++admissions===1?{allowed:false,reason:'pacing',retryAt}:{allowed:true,reason:null,retryAt:null},fetch:async()=>{starts++;return new Response();}});
+  assert.equal((await b.fetch(data)).status,200);assert.equal(admissions,2);assert.deepEqual(waits,[1]);assert.equal(starts,1);
+ }
+});
+test('a changed hold or lost acknowledgment after elapsed pacing still prevents all vendor I/O',async()=>{
+ for(const reason of ['provider_wait','daily_budget','usage_not_yet_measured','lost_ack']){
+  let admissions=0,starts=0;
+  const b=createMhelpRequestBudget({now:()=>400,wait:async()=>{},admit:async()=>{if(++admissions===1)return{allowed:false,reason:'pacing',retryAt:'1970-01-01T00:00:00.400500Z'};if(reason==='lost_ack')throw Error('Synthetic lost acknowledgment');return{allowed:false,reason,retryAt:'1970-01-01T00:01:00Z'};},fetch:async()=>{starts++;return new Response();}});
+  if(reason==='lost_ack')await assert.rejects(b.fetch(data));else assert.equal((await b.fetch(data)).status,429);
+  assert.equal(admissions,2);assert.equal(starts,0);
+ }
+});
+test('elapsed pacing retries remain bounded and cancellation stops before another admission',async()=>{
+ let now=400,admissions=0,starts=0,waits=0;
+ const b=createMhelpRequestBudget({now:()=>now,wait:async ms=>{assert.equal(ms,1);waits++;now+=ms;},admit:async()=>{admissions++;return{allowed:false,reason:'pacing',retryAt:new Date(now).toISOString()};},fetch:async()=>{starts++;return new Response();}});
+ assert.equal((await b.fetch(data)).status,429);assert.equal(admissions,80);assert.equal(waits,79);assert.equal(starts,0);
+ const controller=new AbortController();let canceledAdmissions=0;
+ const canceled=createMhelpRequestBudget({now:()=>400,wait:async(ms,signal)=>{assert.equal(ms,1);assert.equal(signal,controller.signal);controller.abort();},admit:async()=>{canceledAdmissions++;return{allowed:false,reason:'pacing',retryAt:'1970-01-01T00:00:00.400500Z'};},fetch:async()=>{starts++;return new Response();}});
+ await assert.rejects(canceled.fetch(data,{signal:controller.signal}),/canceled/);assert.equal(canceledAdmissions,1);assert.equal(starts,0);
+});
