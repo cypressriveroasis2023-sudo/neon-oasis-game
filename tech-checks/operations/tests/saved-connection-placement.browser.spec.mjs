@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {port,resource,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
 test('fresh connection survives inactive inventory; refresh and aging never change placement',async({page},testInfo)=>{
  const origin='http://127.0.0.1:4173',id='11111111-1111-4111-8111-111111111111',writes=[];
@@ -15,18 +16,19 @@ test('fresh connection survives inactive inventory; refresh and aging never chan
   const request=route.request().postDataJSON();if(request.method!=='GET'){writes.push(request);return route.fulfill({status:400,headers,body:JSON.stringify({error:'No synthetic writes'})});}
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:[unit],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:new Date(now).toISOString()}
-   :request.path==='/api/camera-health/summary-v3'?snapshot([row])
+   :request.path==='/api/camera-health/summary-v3'?withReviewedResources(snapshot([row]),[{unit,ids:[row.id],kind:'owner_confirmed_native'}])
    :request.path==='/api/equipment'?{items:[unit],models:[]}
    :request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:new Date(now).toISOString()}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/saved-connection-fixture');const frame=page.frameLocator('iframe');
  await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT ONLINE');
+ await expect(frame.locator('.camera-unit-detail')).toContainText('Camera video is not verified');
  await expect(frame.locator('.camera-unit-detail')).toContainText('PLACEMENT CONFLICT');
  await expect(frame.locator('.camera-unit-detail')).toContainText('INACTIVE');
  await expect(frame.locator('.camera-health-native')).toContainText('Last reported service result: ONLINE');
  await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT ONLINE');
  await page.screenshot({path:testInfo.outputPath('saved-online-placement-conflict.png')});
- await page.clock.fastForward(16*60*1000);await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT UNKNOWN');
+ await page.clock.fastForward(16*60*1000);await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT UNVERIFIED');
  await expect(frame.locator('.camera-health-native')).toContainText('Last reported service result: ONLINE');expect(writes).toHaveLength(0);expect(row.activationState).toBe('deactivated');expect(row.serviceEvidence.observedAt).toBe(fresh);
 });

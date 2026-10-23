@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {readFile} from 'node:fs/promises';
 import {resource,port,snapshot,withStatus,fresh,now} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_DIAGNOSTIC_TEST_ORIGIN||'http://127.0.0.1:4173';
@@ -8,7 +9,7 @@ async function mount(page,{selected=false,oldApi=false,hostile=false}={}){
  const state={requests:[],writes:[],fail:false,hold:false,release:null};
  const units=ids.map((id,i)=>({id,unitNumber:['Ranger 1','Ranger 2','Sniper 3','Solar Stand 72 044'][i],modelName:i===2?'SNIPERS':i===3?'SOLAR STANDS 72':'Ranger',status:'installed',currentLocationType:'site',installedSiteId:site,customer:'Synthetic customer',site:'Synthetic site',address:'100 Synthetic Road'}));
  const rows=[withStatus(resource(101,'Ranger 1',{name:hostile?'Front <img src=x onerror="window.reportXss=true"> {"password":"hidden-password"} //private.test/path?token=hidden-token user@example.com':'Front camera',connection:{publicIp:'203.0.113.50',ports:[80,443,554]},source_metadata:{password:'raw-metadata-secret'},serviceEvidence:port({lastOnlineAt:'2026-10-05T12:00:00Z'})}),'offline'),withStatus(resource(102,'Ranger 2',{name:'Older camera'}),'offline','2026-10-05T12:00:00Z')];
- const health={...snapshot(rows),...(oldApi?{evidenceVersion:1,inventory:undefined}:{})};
+ const health=oldApi?{...snapshot(rows),evidenceVersion:1,inventory:undefined}:withReviewedResources(snapshot(rows),units.slice(0,2).map((unit,i)=>({unit,ids:[101+i]})));
  await page.clock.install({time:new Date(now)});
  await page.addInitScript(()=>{window.copiedReports=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(window.rejectClipboard)throw new Error('Synthetic clipboard denial');window.copiedReports.push(text);}}});});
  await page.route('**/*',async route=>{
