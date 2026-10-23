@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { readVisionFleetHealth } from './fleetIntelligence.ts'
 import './tech-check-rules.js'
 import './company-knowledge.js'
 import './workflow-engine.js'
@@ -401,6 +402,23 @@ const tools = [
       type: 'object',
       properties: {},
       required: [],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_camera_fleet_health',
+    description: 'Read existing COS Operations saved Camera Health and Field Map for this authenticated Owner. Use for online/offline/unverified camera status, source/provider breakdown, individual camera/units, customer/site/address locations and camera attention. IP/port reachability does not prove camera video. A saved last-online time does not prove outage duration; Shop and unresolved placements never count as Field outages.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['summary','offline','attention','unit','location','history'] },
+        unit_reference: { type: 'string', description: 'Exact unit label if given, or empty string.' },
+        location_query: { type: 'string', description: 'Site, customer or address substring if given, or empty string.' },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      required: ['scope','unit_reference','location_query','limit'],
       additionalProperties: false,
     },
   },
@@ -847,6 +865,17 @@ Deno.serve(async (req) => {
         const { data, error } = await userClient.rpc('owner_review_queue_v1', { p_limit: 40 })
         if (error) throw error
         return { reviews: Array.isArray(data) ? data : [] } as Json
+      }
+
+      if (name === 'get_camera_fleet_health') {
+        const scope = clean(args.scope).toLowerCase()
+        if (!['summary','offline','attention','unit','location','history'].includes(scope)) throw new Error('Invalid camera fleet scope.')
+        return await readVisionFleetHealth(token, {
+          scope: scope as 'summary'|'offline'|'attention'|'unit'|'location'|'history',
+          unit_reference: clean(args.unit_reference),
+          location_query: clean(args.location_query),
+          limit: Math.max(1, Math.min(Number(args.limit || 30), 100)),
+        }) as Json
       }
 
       if (name === 'get_offline_escalations') {
@@ -1319,6 +1348,9 @@ Deno.serve(async (req) => {
       '- For questions about a named company person, employee, technician, owner, or whether someone exists in Tech Check, call find_people. This lookup includes Owner/IT/Service and active/inactive/archived profile records.',
       '- For permanent historical questions about a technician, numbered unit, or customer/site, call get_company_history before answering. History remains available after job closeout and after equipment returns to Shop Inventory.',
       '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
+      '- For camera health, the number online/offline/unverified, down cameras, provider status, saved locations, outage age or camera-specific attention, call get_camera_fleet_health before answering. Distinguish source camera/detector records from equipment inventory and independent IP/port reachability. State the snapshot time and evidence limitations.',
+      '- A provider last_online_at or latest OFFLINE observation does not prove when an outage started. Without a persisted first-offline transition, report outage duration as MISSING INFORMATION, never as an estimate from last-online.',
+      '- Keep Shop, inactive and unresolved-placement resources out of confirmed Field camera outages. If live Camera Health cannot be verified, never report zero or reuse old counts. If Field Map is unavailable, locations cannot be verified.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
       '- For truck readiness, departure readiness, battery minimums, or backup-unit readiness, call get_departure_readiness before answering. Never assume unrecorded equipment is on the truck.',
@@ -1343,6 +1375,7 @@ Deno.serve(async (req) => {
       'OPERATIONS ORCHESTRATION:',
       '- For broad Owner requests such as "what needs attention today", "give me the rundown", "what is behind", "who has room", "who can take this", "what do I need to deal with", "how are operations looking", or a daily/morning operations brief, call get_operations_snapshot FIRST for the relevant date.',
       '- The operations snapshot is intentionally broad: scheduled work, workflow blockers, overdue work, team Tech Check load, Owner Review, offline escalations, and damage holds. Use it to synthesize one coherent answer instead of making the Owner ask each subsystem separately.',
+      '- For daily briefings and broad needs-attention summaries, call get_camera_fleet_health with scope attention as well, and keep the camera/provider read separate from Tech Check escalations. A recorded case is not proof the current provider shows OFFLINE.',
       '- If the snapshot identifies one ticket whose exact details matter, then call analyze_job or get_job_context for that ticket before making a ticket-specific factual claim.',
       '- Prioritize concrete Owner action items: unresolved Owner decisions, damaged-equipment holds, Owner Review/corrections, overdue jobs, then workflow blockers. Do not manufacture urgency when the data does not show it.',
       '- When asked who can take additional work, compare technician_loads only as recorded Tech Check workload. Say "lighter Tech Check load" rather than claiming someone is truly free or available. Travel, PTO, geography, and skill fit are MISSING INFORMATION unless recorded elsewhere.',
