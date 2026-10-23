@@ -125,6 +125,24 @@
     const categoryText=['camera','detector','recorder','IP/port connection (not camera-video verification)']
       .map(kind=>categoryCounts(records,kind)).filter(Boolean).join(' · ');
     const needsPlacementReview=records.every(row=>row.placement==='needs_review');
+    const candidate=needsPlacementReview&&records[0]?.mhelp_product_candidate&&
+      records.every(row=>JSON.stringify(row.mhelp_product_candidate||null)===JSON.stringify(records[0].mhelp_product_candidate))
+      ?records[0].mhelp_product_candidate:null;
+    // A similar name alone is never a confirmed resource-to-equipment link.
+    const sourceCandidateNote=candidate?.state==='exact_mhelp_product_candidate'
+      ?'<small class="vision-mhelp-candidate"><b>MHELP SOURCE CANDIDATE · '+escape(candidate.placement)+'</b>'+
+         (candidate.customer?' · '+escape(candidate.customer):'')+
+         (candidate.source_address?' · '+escape(candidate.source_address):'')+
+         (candidate.product_id?' · Product ID '+escape(candidate.product_id):'')+
+         ' · Source observed '+escape(stamp(candidate.source_received_at))+
+         ' · Camera-resource association NOT YET VERIFIED</small>'
+      :candidate?.state==='unit_variant_review'
+        ?'<small class="vision-mhelp-variant">POSSIBLE MHELP UNIT: '+escape(candidate.mhelp_unit||'')+
+           ' · Product ID '+escape(candidate.product_id||'not verified')+
+           ' · Number matches but suffix/description differs — placement and address withheld pending identity review.</small>'
+        :candidate?.state==='ambiguous_source_products'
+          ?'<small class="vision-mhelp-variant">Multiple MHelp source products share a related unit number. Manual identity review required.</small>'
+          :'';
     const firstLocation=records[0]?.location;
     const addressKey=x=>x&&typeof x==='object'
       ?[x.customer||'',x.site||'',x.address||''].join('\u0001'):null;
@@ -145,7 +163,7 @@
       ?'<a href="./camera-health.html?q='+encodeURIComponent(unit)+'">Open Camera Health ↗</a>' : '';
     return '<details class="vision-fleet-unit'+(needsPlacementReview?' vision-fleet-placement-review':'')+'"'+(expand?' open':'')+'>' +
       '<summary><b>'+escape(unitLabel)+' · '+escape(needsPlacementReview?'PLACEMENT REVIEW · '+status:status)+'</b>' +
-      '<span>'+escape(categoryText)+'</span><small>'+where+'</small>'+lastOnline+'</summary>' +
+      '<span>'+escape(categoryText)+'</span><small>'+where+'</small>'+sourceCandidateNote+lastOnline+'</summary>' +
       '<div class="vision-fleet-unit-details"><div class="vision-fleet-unit-link">'+link+
       '</div>'+records.map(entry).join('')+'</div></details>';
   }
@@ -196,7 +214,14 @@
         ' offline camera record'+(shop.cameras.offline===1?'':'s')+
         ' have a verified Shop/inactive exclusion. They do not count as confirmed Field camera outages.</div>';
       const fieldGroups=groupByUnit(fleet.items);
-      const reviewGroups=groupByUnit(fleet.review_items);
+      const reviewPriority=group=>{
+        const c=group.rows[0]?.mhelp_product_candidate;
+        return c?.state==='exact_mhelp_product_candidate'&&c.placement==='FIELD'?0:
+          c?.state==='exact_mhelp_product_candidate'&&c.placement==='SHOP'?1:
+          c?.state==='unit_variant_review'?2:3;
+      };
+      const reviewGroups=groupByUnit(fleet.review_items).sort((a,b)=>reviewPriority(a)-reviewPriority(b)||
+        String(a.unit).localeCompare(String(b.unit),undefined,{numeric:true}));
       const selectedField='<div class="vision-context-block"><h3>Confirmed Field matches · '+fieldGroups.length+
         ' unit group'+(fieldGroups.length===1?'':'s')+'</h3>'+
         (fieldGroups.length?'':'<p>No confirmed Field match for this question. This does not mean other provider cameras are online.</p>')+
@@ -204,7 +229,12 @@
         '<div class="vision-fleet-group-list">'+fieldGroups.map(group=>unitRow(group,fieldGroups.length===1)).join('')+'</div></div>';
       const selectedReview='<div class="vision-context-block"><h3>Star4Live / provider placement review · '+
         reviewGroups.length+' unit group'+(reviewGroups.length===1?'':'s')+'</h3>'+
-        '<p class="vision-fleet-count-note">These saved source observations have no complete verified COS equipment-to-camera Field link. They are NOT confirmed Field outages; provider customer names are hints for Owner reconciliation only.</p>'+
+        '<p class="vision-fleet-count-note">These provider observations have no complete verified COS equipment-to-camera Field link and are NOT confirmed Field outages. Current protected MHelp source candidates, when available, are shown below for review only — they do not certify resource identity, change placement or open a service call.</p>'+
+        '<p class="vision-fleet-count-note">From the protected MHelp snapshot: '+
+        escape(Number(fleet.review_candidate_field_source_count||0))+' source records suggest FIELD, '+
+        escape(Number(fleet.review_candidate_shop_source_count||0))+' suggest SHOP, and '+
+        escape(Number(fleet.review_candidate_variant_source_count||0))+
+        ' have variant/ambiguous labels. These counts are candidates, NOT confirmed deployments.</p>'+
         (fleet.review_items_truncated?'<p>More records require placement review; refine by unit or customer folder.</p>':'')+
         '<div class="vision-fleet-group-list">'+reviewGroups.map(group=>unitRow(group,false)).join('')+'</div></div>';
       const threshold=/\b(?:more than|over|longer than|for at least)\s+\d+\s*(?:hours?|days?|hrs?)\b/i.test(question.raw||'')
