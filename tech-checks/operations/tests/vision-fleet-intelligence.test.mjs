@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import {projectVisionFleet,readVisionFleetHealth} from '../../supabase/functions/onsite-vision-agent/fleetIntelligence.ts';
+import {projectVisionFleet,readVisionFleetHealth,enrichVisionOfflineHistory} from '../../supabase/functions/onsite-vision-agent/fleetIntelligence.ts';
 
 const NOW=Date.parse('2026-10-23T15:00:00Z');
 const stamp=(minutes=1)=>new Date(NOW-minutes*60000).toISOString();
@@ -127,4 +127,48 @@ test('Vision routes camera fleet questions to the source tool, not the separate 
     'Show me active Tech Check jobs.',
     'What is Josh working on?',
   ])assert.equal(cameraFleetIntent(message),false,message);
+});
+
+function historicalClient(events,withError=false){
+  return {from(table){
+    assert.equal(table,'camera_health_history');
+    const predicates=[];
+    let desc=true;
+    return {
+      select(){return this;},
+      eq(key,val){predicates.push(row=>String(row[key])===String(val));return this;},
+      neq(key,val){predicates.push(row=>String(row[key])!==String(val));return this;},
+      lte(key,val){predicates.push(row=>Date.parse(row[key])<=Date.parse(val));return this;},
+      gt(key,val){predicates.push(row=>Date.parse(row[key])>Date.parse(val));return this;},
+      order(key,opt){assert.equal(key,'observed_at');desc=!opt.ascending;return this;},
+      async limit(n){return withError?{data:null,error:{message:'Source unavailable'}}:
+        {data:events.filter(row=>predicates.every(pred=>pred(row)))
+          .sort((a,b)=>(desc?-1:1)*(Date.parse(a.observed_at)-Date.parse(b.observed_at)))
+          .slice(0,n),error:null};}
+    };
+  }};
+}
+test('Observed offline span uses matching archived provider observations rather than lastOnlineAt',async()=>{
+  const health=snapshot([row(13,'Helios 007','offline')]);
+  const projected=projectVisionFleet(health,fieldMap,question({scope:'history'}),NOW);
+  const e=(status,at,source='vigilant_star4live')=>({camera_device_id:13,check_source:source,status,observed_at:stamp(at)});
+  const events=[
+    e('online',150),e('offline',100),e('offline',20),e('offline',2),
+    e('offline',500,'reconeyez_webhook'),
+  ];
+  const answer=await enrichVisionOfflineHistory(projected,historicalClient(events));
+  assert.equal(answer.history_enrichment.matched,1);
+  assert.equal(answer.items[0].outage_observation_span_minutes,99);
+  assert.equal(answer.items[0].outage_observed_since,stamp(100));
+  assert.match(answer.items[0].outage_duration,/Actual continuous downtime.*unverified/);
+});
+test('History mismatch and failed owner-scoped queries leave duration unverified',async()=>{
+  const data=projectVisionFleet(snapshot([row(13,'Helios 007','offline')]),fieldMap,question({scope:'offline'}),NOW);
+  const mismatched=[{camera_device_id:13,check_source:'vigilant_star4live',status:'online',observed_at:stamp(2)}];
+  const wrong=await enrichVisionOfflineHistory(data,historicalClient(mismatched));
+  assert.equal(wrong.history_enrichment.matched,0);
+  assert.equal(wrong.items[0].outage_observed_since,undefined);
+  const failed=await enrichVisionOfflineHistory(data,historicalClient([],true));
+  assert.equal(failed.history_enrichment.failed,1);
+  assert.equal(failed.items[0].outage_observed_since,undefined);
 });
