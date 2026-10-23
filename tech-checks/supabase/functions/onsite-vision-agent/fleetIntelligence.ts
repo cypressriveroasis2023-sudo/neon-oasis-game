@@ -206,3 +206,69 @@ export async function readVisionFleetHealth(token: string, question: FleetQuesti
     return projectVisionFleet(health, map, question, Date.now());
   } finally { clearTimeout(deadline); }
 }
+
+
+/** Enrich *source-observed* offline spans from existing RLS-protected history.
+ * A span of logged OFFLINE observations is not proof of continuous downtime:
+ * sources poll periodically, may miss recoveries, and recorded placement can change.
+ * Never turn a missing/stale history read into a synthesized outage time.
+ */
+export async function enrichVisionOfflineHistory(
+  fleet: ReturnType<typeof projectVisionFleet>,
+  client: {from: (table: string) => any},
+): Promise<ReturnType<typeof projectVisionFleet> & Dict> {
+  const historySource: Dict = {Star4Live: 'vigilant_star4live', Reconeyez: 'reconeyez_webhook'};
+  const offline = fleet.items.filter(item => item.status === 'offline' &&
+    (item.kind === 'camera' || item.kind === 'detector') &&
+    Boolean(historySource[item.provider]) &&
+    /^[1-9]\\d{0,15}$/.test(String(item.resource_id)) && item.observed_at);
+  const targets = offline.slice(0, 30);
+  let matched = 0, failed = 0;
+  const read = async (id: string, source: string, direction: 'newest'|'first', cutoff: string, since?: string) => {
+    let query = client.from('camera_health_history').select('observed_at,status,check_source')
+      .eq('camera_device_id',id).eq('check_source',source)
+      .lte('observed_at',cutoff);
+    if (since) query=query.gt('observed_at',since);
+    const {data,error}=await query.order('observed_at',{ascending:direction==='first'}).limit(1);
+    if (error) throw Error('Camera history source unavailable');
+    return Array.isArray(data) && data.length===1 && object(data[0]) ? data[0] as Dict : null;
+  };
+  const find = async (item: Dict) => {
+    const id=String(item.resource_id),source=historySource[item.provider],asOf=item.observed_at;
+    try {
+      const latest=await read(id,source,'newest',asOf);
+      if (!latest || latest.status!=='offline') return;
+      const latestAt=verifiedTime(latest.observed_at,Date.parse(asOf));
+      if (!latestAt || Date.parse(asOf)-Date.parse(latestAt)>SOURCE_FRESH_MS) return;
+
+      // Locate the latest online, degraded, unknown or verifying observation.
+      // Any non-offline observation breaks the recorded offline window.
+      const {data, error}=await client.from('camera_health_history')
+        .select('observed_at,status').eq('camera_device_id',id)
+        .eq('check_source',source).neq('status','offline')
+        .lte('observed_at',latestAt).order('observed_at',{ascending:false}).limit(1);
+      if (error) throw Error('Camera history source unavailable');
+      const boundary=Array.isArray(data)&&data.length===1?verifiedTime(data[0]?.observed_at,Date.parse(latestAt)):null;
+      const first=await read(id,source,'first',latestAt,boundary || undefined);
+      if (!first || first.status!=='offline')return;
+      const firstAt=verifiedTime(first.observed_at,Date.parse(latestAt));
+      if (!firstAt || boundary && Date.parse(firstAt)<=Date.parse(boundary))return;
+      const minutes=Math.floor((Date.parse(asOf)-Date.parse(firstAt))/60000);
+      if (!Number.isSafeInteger(minutes) || minutes<0) return;
+      matched++;
+      item.outage_observed_since=firstAt;
+      item.outage_observed_through=asOf;
+      item.outage_observation_span_minutes=minutes;
+      item.outage_duration='SOURCE OBSERVATIONS: '+minutes+
+        ' minutes from the first logged OFFLINE status after the latest recorded non-offline status through this saved OFFLINE observation. Actual continuous downtime and exact physical outage onset are unverified.';
+      item.outage_duration_basis='RLS-protected camera_health_history; '+source+' observations for this exact resource ID';
+    } catch { failed++; }
+  };
+  // Bounded read-only fan-out; no provider requests or database writes.
+  for(let i=0;i<targets.length;i+=4) await Promise.all(targets.slice(i,i+4).map(find));
+  return {...fleet,history_enrichment:{
+    eligible_offline_records:offline.length,checked:targets.length,matched,failed,
+    truncated:offline.length>targets.length,
+    note:'A recorded OFFLINE observation span is not a verified uninterrupted camera outage. Unverified duration remains unavailable.',
+  }};
+}
