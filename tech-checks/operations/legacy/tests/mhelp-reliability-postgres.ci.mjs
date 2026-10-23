@@ -48,7 +48,9 @@ export async function main(){
   assert.equal((await budget.fetch('https://connect.mhelpdesk.com/api/v1.0/portal/224643/equipment')).status,200);assert.equal(admissions,2);assert.deepEqual(waits,[1]);assert.equal(starts,1);
  }
  assert.equal((await query("select admitted from cos_mhelp_placement_private.request_budget_day where utc_day='2030-02-01'"))[0].admitted,2);
- await exec('update cos_mhelp_placement_private.request_budget_pace set next_start_at=null');
+ // Remove only this isolated future-day fixture before the existing cap test
+ // inspects its latest ledger row. This harness never targets production.
+ await exec("delete from cos_mhelp_placement_private.request_budget_day where utc_day='2030-02-01';update cos_mhelp_placement_private.request_budget_pace set next_start_at=null");
 
  const pacing=await race('select public.cos_mhelp_request_budget(false);','select public.cos_mhelp_request_budget(false);','allowance-pacing');assert.equal(pacing[0].allowed,true);assert.equal(pacing[1].allowed,false);assert.equal(pacing[1].reason,'pacing');
  await exec("update cos_mhelp_placement_private.request_budget_config set daily_limit=3,essential_reserve=1;update cos_mhelp_placement_private.request_budget_pace set next_start_at=null;update cos_mhelp_placement_private.request_budget_day set admitted=1,essential_admitted=0");
