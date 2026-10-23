@@ -65,7 +65,14 @@ test('existing publisher finish queues guarded evidence without advancing clocks
  await db.exec(`create schema cos_operational_private;create table cos_operational_private.current_placements(product_id text primary key);
  create function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql as $$select '{}'::jsonb$$;`);
  const acl=(await db.query("select proacl::text acl from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure")).rows;
+ const prior=(await db.query("select pg_get_functiondef('public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure) definition")).rows[0].definition;
  await db.exec(await readFile(new URL('../db/mhelp-publisher-freshness.sql',import.meta.url),'utf8'));
+ // Production rejects unqualified DELETE. Exercise the post-rollback repair too.
+ await db.exec(prior);
+ await db.exec(await readFile(new URL('../db/mhelp-publisher-refresh-safe-cleanup.sql',import.meta.url),'utf8'));
+ const repaired=(await db.query("select pg_get_functiondef('public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure) definition")).rows[0].definition;
+ assert.match(repaired,/delete from cos_sheets_placement_private\.refresh_requests where equipment_id=any\(seen\)/);
+ assert.doesNotMatch(repaired,/delete from cos_sheets_placement_private\.refresh_requests\s*;/);
  assert.deepEqual((await db.query("select proacl::text acl from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure")).rows,acl);
  await db.exec("update cos_sheets_placement_private.control set enabled=true;update cos_mhelp_placement_private.links set observed_at=clock_timestamp()-interval '2 hours'");
  const before=(await db.query('select observed_at from cos_mhelp_placement_private.links')).rows;
