@@ -7,7 +7,7 @@ const OPERATIONS_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/co
 const SOURCE_FRESH_MS = 20 * 60 * 1000;
 type Dict = Record<string, any>;
 export type FleetQuestion = {
-  scope: 'summary' | 'offline' | 'attention' | 'unit' | 'location' | 'history';
+  scope: 'summary' | 'online' | 'offline' | 'attention' | 'unit' | 'location' | 'history';
   unit_reference: string;
   location_query: string;
   limit: number;
@@ -142,6 +142,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
   const filtered = rows.filter(allowed), filteredService = service.filter(allowed);
   const scope = filters?.scope || 'summary';
   const chosen = scope === 'offline' ? filtered.filter(r => r.status === 'offline') :
+    scope === 'online' ? filtered.filter(r => r.status === 'online') :
     scope === 'attention' ? filtered.filter(r => r.status !== 'online') : filtered;
   const order = (a: Dict, b: Dict) => (a.status === 'offline' ? 0 : a.status === 'unverified' ? 1 : 2) -
     (b.status === 'offline' ? 0 : b.status === 'unverified' ? 1 : 2) ||
@@ -170,6 +171,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     items_truncated: chosen.length > limit,
     items: chosen.sort(order).slice(0,limit),
     service_items: (scope === 'offline' ? filteredService.filter(r => r.status === 'offline') :
+      scope === 'online' ? filteredService.filter(r => r.status === 'online') :
       scope === 'attention' ? filteredService.filter(r => r.status !== 'online') : filteredService).sort(order).slice(0, Math.min(limit,30)),
     location_filter_unverifiable: Boolean(areaFilter && !locations),
     limitations: [
