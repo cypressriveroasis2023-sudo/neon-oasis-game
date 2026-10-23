@@ -67,8 +67,8 @@ function verifiedAssociations(health:Row,authority:ReturnType<typeof mapAuthorit
   const sets=[health.unitIdentities,health.ownerConfirmedUnitIdentities||[],health.reconProviderUnitIdentities||[]];
   if(sets.some(s=>!Array.isArray(s)||s.length>2000))return out;
   const claims=sets.flat();
-  if(health.ownerConfirmedIdentityVersion!==undefined&&health.ownerConfirmedIdentityVersion!==1||
-     health.reconProviderIdentityVersion!==undefined&&health.reconProviderIdentityVersion!==1)return out;
+  if(health.ownerConfirmedUnitIdentities!==undefined&&health.ownerConfirmedIdentityVersion!==1||
+     health.reconProviderUnitIdentities!==undefined&&health.reconProviderIdentityVersion!==1)return out;
   const unitUses=new Map<string,number>();
   for(const claim of claims)if(obj(claim)&&uuid(claim.unitId))
     unitUses.set(claim.unitId,(unitUses.get(claim.unitId)||0)+1);
@@ -132,6 +132,14 @@ function subset(rows:Row[],scope:string,q:Row,limit:number){
 export function verifiedVisionFieldFleet(raw:Row,health:Row,fieldMap:unknown,question:Row,now=Date.now()){
   const authority=mapAuthority(fieldMap,now),claims=verifiedAssociations(health,authority,now);
   const byId=new Map(health.rows.map((r:Row)=>[String(r.id),r]));
+  // A capped source projection is not a complete fleet. Reject it rather than
+  // turning an incomplete page into a deceptively small Field outage count.
+  if(raw.items_truncated===true||
+    !obj(raw.monitored_cameras)||!obj(raw.monitored_detectors)||!obj(raw.monitored_recorders)||
+    !obj(raw.service_port_checks)||
+    raw.items.length!==raw.monitored_cameras.total+raw.monitored_detectors.total+raw.monitored_recorders.total||
+    raw.service_items.length!==raw.service_port_checks.total)
+    throw Error('Complete saved camera resource census is unavailable.');
   const rawItems=[...(raw.items||[]),...(raw.service_items||[])];
   if(rawItems.some(row=>!obj(row)||!statuses.has(row.status)||!byId.has(String(row.resource_id)))||
     new Set(rawItems.map(row=>String(row.resource_id))).size!==rawItems.length)
