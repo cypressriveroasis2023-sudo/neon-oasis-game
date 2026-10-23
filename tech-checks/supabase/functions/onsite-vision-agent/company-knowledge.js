@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v12
+ * Version: company-knowledge-v16
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v12",
+  "version": "company-knowledge-v16",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -241,7 +241,7 @@
         "1 × LiTime 12V 110Ah battery attached/ready",
         "MPPT firmware/configuration updated",
         "MPPT tested",
-        "solar charging verified through the MPPT with the battery attached",
+        "MPPT tested in the shop without requiring a solar-panel hookup; Service verifies PV / solar charging after the IT → Service handoff",
         "camera/network online",
         "router ports 81 and 554 available/configured",
         "camera video works",
@@ -317,7 +317,7 @@
         "Submit the completed Sniper work for finalization/completion so the Owner can review it in the Owner app."
       ],
       "swap_return_rule": "After a Sniper SWAP, bring the old field Sniper back and record it through the normal Service Return → IT Intake flow.",
-      "truck_spare_rule": "A Sniper BACKUP / truck spare follows the existing checked-out spare workflow. If unused, return it to Shop Inventory and remove it from the Service truck. If used for a swap, the replaced field Sniper returns through Service Return → IT Intake.",
+      "truck_spare_rule": "A Sniper BACKUP / truck spare follows the existing checked-out spare workflow. If unused, return it through Service Return → IT Intake so IT can verify it after transport before it becomes available Shop Inventory again. If used for a swap, the replaced field Sniper returns through Service Return → IT Intake.",
       "evidence": [
         "IT: exactly one clear handoff photo per unit with visible matching unit tag plus IT signature",
         "Service: field pictures of the installed Sniper and unit number/tag",
@@ -603,7 +603,7 @@
       "Matching-tag photo and IT signature are required by the existing prep workflow.",
       "IT explicitly checks out the spare before the IT → Service handoff.",
       "Service resolves the spare after the field call as used or returned_unused.",
-      "Unused spare units return directly to Shop Inventory and do not create an IT Intake return.",
+      "Unused complete backup units return through Service Return → IT Intake so IT can verify them after transport before they become available Shop Inventory again.",
       "If a spare unit is used for a swap, the failed/replaced field unit follows the normal Service Return → IT Intake flow."
     ],
     "battery_batches": [
@@ -621,11 +621,20 @@
       "Checked-out batches are locked from editing by the existing database workflow."
     ],
     "manifest_rule": "Truck spares remain separate from the customer/job equipment manifest.",
+    "morning_requirement": false,
+    "start_day_rule": "Truck spares are optional job-specific contingency equipment. They are not required to complete the Service Tech morning Truck / Trailer Check.",
     "known_limits": [
       "The current database does not accept a standalone Sniper spare-battery batch.",
       "The current database does not accept a standalone Spotter spare-battery batch.",
       "Recon II Battery is an accepted database label, but its exact physical model/specification is still undocumented."
     ]
+  },
+  "retired_equipment": {
+    "Solar Pole": {
+      "status": "retired",
+      "rule": "Solar Pole is retired from the Cameras On Site operating system and must not be offered or created as current equipment.",
+      "replacement_note": "Standalone Pole remains a valid equipment type. Do not treat Pole and Solar Pole as the same product."
+    }
   },
   "phase_7_gap_inventory": {
     "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
@@ -765,6 +774,35 @@
         "completion"
       ]
     },
+    "unit_swap_resolution": {
+      "label": "Unit SWAP field outcome",
+      "rules": [
+        "Every prepared SWAP replacement unit gets one Service field decision after the IT → Service handoff: YES — SWAP HAPPENED or NO — DID NOT USE IT.",
+        "If Service answers NO, the exact unused replacement unit returns through Service Return → IT Intake before it can become Shop Inventory again.",
+        "If Service answers YES, the replacement unit remains at the customer/site and the OLD field unit must return through Service Return → IT Intake.",
+        "A YES answer records the replacement unit at the ticket/customer site in Tech Check and creates a ready-only IT site-registration task.",
+        "IT confirms the site-registration task only after Service says the SWAP happened. IT must not see or perform that site-registration task before the Service field decision.",
+        "The Tech Check cannot close a SWAP while a replacement unit still has no YES/NO outcome or while a required unit return is missing.",
+        "An unused SWAP replacement does not require field installation checks that only apply to an installed replacement.",
+        "The old field unit return and an unused replacement-unit return are different records. Tech Check must not count the replacement unit as the old unit."
+      ]
+    },
+    "it_supplied_card_replacements": {
+      "label": "IT-supplied SIM / SD replacements",
+      "categories": [
+        "SIM Card Swap",
+        "SD / Micro SD Card Replacement"
+      ],
+      "rules": [
+        "SIM Card Swap means remove the old SIM card and install the new SIM card.",
+        "SD / Micro SD Card Replacement means remove the old card and install the replacement card.",
+        "Replacement SIM and SD/micro SD cards are supplied by the IT Department.",
+        "When Service performs the field work, SIM and SD/micro SD replacement jobs follow IT → Service.",
+        "IT prepares the exact replacement card quantity and includes it in the Tech Check handoff.",
+        "Service physically verifies the exact SIM / SD card quantity received from IT before leaving the shop.",
+        "A Service-only path must not bypass IT supply when a replacement SIM or SD/micro SD card is required."
+      ]
+    },
     "handoff": {
       "label": "IT → Service Handoff",
       "default_flow": [
@@ -814,6 +852,77 @@
       "CHECK_IN",
       "OWNER_APPROVE"
     ]
+  },
+  "operations_governance": {
+    "owner_closeout": {
+      "rule": "Technicians complete their required IT and Service work; the Owner is the final closeout authority.",
+      "owner_summary": "Before closeout, present a simple chronological overview: Owner assignment → IT prep/verification → IT → Service handoff → Service field work → equipment/returns accounted for → evidence complete → Owner review.",
+      "owner_actions": ["CLOSE JOB", "RETURN FOR CORRECTION"],
+      "correction_rule": "Return for Correction keeps the job open and routes it back to the responsible IT or Service stage. Corrected work returns to Owner review.",
+      "audit_rule": "Owner overrides and corrections never erase history."
+    },
+    "owner_override": {
+      "rule": "The established workflow is always the default. The Owner may intentionally change or override a workflow state when needed.",
+      "audit": "Record the prior state, new state, Owner identity, timestamp, and reason/context as an Owner override.",
+      "ai_limit": "OnSite Vision must not independently waive a required workflow step."
+    },
+    "damage_escalation": {
+      "rule": "IT or Service documents damaged equipment and tells the Owner what equipment or part needs replacement.",
+      "inventory_gate": "Damaged or unresolved equipment is not cleared as ready Shop Inventory.",
+      "parts_policy": "Cameras On Site does not maintain a general replacement-parts stock. Replacement parts are purchased as needed.",
+      "ai_limit": "Do not tell a technician to take a replacement part from inventory unless live Tech Check data confirms one exists."
+    },
+    "unresolved_troubleshooting": {
+      "rule": "Service troubleshoots and verifies power, then calls IT. Service and IT troubleshoot together. If the unit cannot be repaired onsite, IT authorizes use of the appropriate checked-out backup unit for the swap. The failed unit returns through Service Return → IT Intake. If Service and IT still cannot determine a solution, escalate to the Owner.",
+      "sequence": [
+        "Service troubleshoots the offline unit and verifies power.",
+        "Service calls IT and Service + IT troubleshoot together.",
+        "If onsite repair is not possible, IT authorizes the appropriate backup-unit swap.",
+        "The failed unit returns through Service Return → IT Intake.",
+        "If Service + IT still cannot determine a solution, escalate to Owner with a short complete summary."
+      ],
+      "owner_view": "Show MHelpDesk ticket/job, unit, original problem, Service power/troubleshooting checks, IT checks/actions, whether a backup swap was authorized, returned-unit status, and what remains unresolved."
+    },
+    "proactive_alerting": {
+      "rule": "OnSite Vision proactively notifies the Owner of detected issues and also keeps each issue visible on the Owner dashboard until resolved.",
+      "resolution": "Resolved alerts remain in permanent audit history."
+    },
+    "permanent_history": {
+      "technician": "Keep permanent work history for each IT and Service Tech from forward-going Tech Check activity.",
+      "unit": "Keep a permanent lifecycle history for every numbered surveillance unit. Returning to Shop Inventory never erases history.",
+      "customer_site": "Build permanent customer/site history from forward-going Tech Check activity.",
+      "linkage": "Normal workflow should automatically connect Technician History ↔ Unit History ↔ Customer/Site History without duplicate technician data entry."
+    },
+    "inventory_location": {
+      "canonical_ready_location": "Shop Inventory",
+      "rule": "Workflow/custody states such as IT Intake, IT → Service handoff, and Service truck are not separate ready-inventory locations unless explicitly documented."
+    },
+    "truck_readiness": {
+      "service_owner": "Service Tech",
+      "current_start_day_rule": "At this time, Tech Check start-day readiness requires only the weekday Truck Check and, when taking one, the Trailer Check.",
+      "start_day_sequence": [
+        "Truck Check",
+        "Trailer Check when taking a trailer",
+        "Today’s Tasks"
+      ],
+      "battery_count_gate": false,
+      "spare_unit_gate": false,
+      "spare_unit_rule": "A truck spare is optional and job-specific. It is not required by the morning Truck / Trailer Check.",
+      "gate": "After the required Truck / Trailer Check is submitted, Service proceeds directly to Today’s Tasks.",
+      "solar_role_rule": "IT does not connect solar panels to units in the shop. Service performs applicable solar-panel / PV charging verification after the IT → Service handoff.",
+      "unused_spare_return": "If an optional spare is actually checked out for a job and returns unused, it still goes through IT Intake before returning to Shop Inventory."
+    },
+    "delivery_signage": {
+      "rule": "Every delivery requires 4 Cameras On Site surveillance signs.",
+      "placement": ["2 large signs on the customer/site fence", "2 small signs on the surveillance unit"],
+      "evidence": "Final Tech Check evidence must show required signs installed."
+    },
+    "direct_transfer": {
+      "rule": "A direct Pickup Ticket A → Delivery Ticket B transfer must link the correct destination MHelpDesk delivery ticket.",
+      "verification": "Pickup condition/tag evidence carries forward. IT verifies the unit still works and deployment requirements are met before transfer clearance.",
+      "failure": "If verification fails, the direct transfer stops.",
+      "destination": "Site B still requires the full installation and evidence process."
+    }
   }
 };
   const shared=root.TechCheckRules;

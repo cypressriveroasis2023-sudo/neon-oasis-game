@@ -378,7 +378,7 @@
     if(prep.status==='draft') return {stage:'it_prep',next:'IT completes the product-specific Tech Check and creates the IT → Service handoff.',blockers};
     if(prep.status==='released'){
       const svc=assignments.find(a=>a.assigned_role==='service' && !['completed','cancelled'].includes(a.status));
-      if(!svc) return {stage:'service_assignment',next:'Assign a Service Tech or the Service department queue so Service can receive the released IT handoff.',blockers};
+      if(!svc) return {stage:'service_assignment',next:'Assign a Service Tech or the Service department queue so Service can receive the IT → Service handoff.',blockers};
       const helios=(j.items||prep.prep_items||[]).some(i=>i.equipment_type==='Helios'&&['DELIVERY','SWAP'].includes(i.purpose));
       if(helios){
         if(!serviceCheck?.completed_at) return {stage:'service_yard',next:'Service completes the Helios yard solar/Victron verification and required proof.',blockers};

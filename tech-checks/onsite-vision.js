@@ -655,7 +655,7 @@ function sanitizeAssistantHtml(value){
 function welcome(){
   return '<div class="vision-welcome vision-welcome-minimal vision-welcome-v36"><button type="button" class="vision-orb vision-orb-v36" data-vision-voice aria-label="Talk to OnSite Vision"><span class="vision-behind-word" aria-hidden="true">VISI<span class="vision-brand-o">O</span>N</span><span class="vision-orb-glow"></span><span class="vision-scan-ring"></span><span class="vision-eye-stage"><img src="./resources/vision-ai.jpg?v=2" alt="OnSite Vision AI"></span></button><div class="vision-mode-label" aria-live="polite"></div><div class="vision-rotating-prompt" aria-live="polite"><span id="visionPromptSuggestion">Ask Vision anything about Tech Check</span></div></div>';
 }
-const VISION_PROMPT_SUGGESTIONS=['Ask Vision anything about Tech Check','“Give me my morning briefing”','“What needs my attention?”','“How many jobs does IT have today?”','“Create a delivery for Josh tomorrow”','“Is everything ready for tomorrow?”','“Show me my active jobs”'];
+const VISION_PROMPT_SUGGESTIONS=['Ask Vision about Tech Check or camera health','“How many cameras are offline right now?”','“Show offline cameras and their sites”','“Which camera records need attention?”','“Give me my morning briefing”','“What needs my attention?”','“How many jobs does IT have today?”','“Create a delivery for Josh tomorrow”'];
 let visionPromptSuggestionTimer=null,visionPromptSuggestionIndex=0;
 function startVisionPromptSuggestions(){clearInterval(visionPromptSuggestionTimer);if(!$('visionPromptSuggestion'))return;visionPromptSuggestionTimer=setInterval(()=>{const live=$('visionPromptSuggestion');if(!live){clearInterval(visionPromptSuggestionTimer);return;}live.classList.add('fade-out');setTimeout(()=>{const current=$('visionPromptSuggestion');if(!current)return;visionPromptSuggestionIndex=(visionPromptSuggestionIndex+1)%VISION_PROMPT_SUGGESTIONS.length;current.textContent=VISION_PROMPT_SUGGESTIONS[visionPromptSuggestionIndex];current.classList.remove('fade-out');},650);},4200);}
 function message(m){
@@ -2073,8 +2073,21 @@ async function ownerReviewQueueHtml(raw){
     +rows.slice(0,12).map(card).join('');
 }
 
+function cameraFleetIntent(value){
+  const text=String(value||'').trim(),lower=text.toLowerCase();
+  // An explicit Tech Check escalation is a different source from camera-provider status.
+  if(/\b(escalations?|waiting (?:on|for) it|failed unit|owner decision|it intake|backup swap|troubleshooting already|mhelpdesk (?:ticket|job))\b/i.test(text))return false;
+  const subject=/\b(cameras?|camera health|fleet|star4live|vigilant|avigilon|reconeyez|recorders?|nvrs?|spotters?|solar spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text);
+  const status=/\b(online|offline|down|up|outage|outages|status|health|unverified|last online|last seen|needs? attention|where|located|location|address|site|customer|monitor(?:ing)?|working|not working)\b/i.test(text);
+  return subject&&status&&(/\b(cameras?|fleet|star4live|vigilant|avigilon|reconeyez|recorders?|nvrs?)\b/i.test(text)||
+    /\b(spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text));
+}
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
+  if(cameraFleetIntent(raw)){
+    const response=await serverAgentAnswer(raw);
+    return response || '<div class="vision-direct warn"><b>Camera Health cannot be verified by Vision right now.</b>The saved fleet data has not been retrieved. Use Camera Health directly; Vision will not substitute Tech Check escalation counts for live camera evidence.</div>';
+  }
   const current=chat();
   if(current?.draft){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
