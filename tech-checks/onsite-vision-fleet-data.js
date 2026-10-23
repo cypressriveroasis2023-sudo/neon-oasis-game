@@ -74,24 +74,76 @@
   }
   function entry(row) {
     const status=['online','offline','unverified'].includes(row.status)?row.status:'unverified';
-    const where=row.location&&typeof row.location==='object'
-      ?[row.location.customer,row.location.site,row.location.address].filter(Boolean).map(escape).join(' · ')
-      :'Field customer/site/address not verified';
     const direct=row.kind==='IP/port connection (not camera-video verification)';
     const note=status==='offline' ? observedSpan(row) : '';
     const onlineTime=row.last_online_at?'Last source-reported ONLINE: '+stamp(row.last_online_at):'Last source-reported ONLINE: not recorded';
-    const unit=String(row.unit||'').trim();
-    const link=unit&&unit!=='Unit identity unavailable'
-      ?' <a href="./camera-health.html?q='+encodeURIComponent(unit)+'">Camera Health ↗</a>' : '';
-    return '<div class="vision-context-row" style="display:block">' +
-      '<b>'+escape(unit||row.name||'Unnamed resource')+' · '+escape(status.toUpperCase())+'</b>' +
-      '<span>'+escape(row.kind||'camera')+' · '+escape(row.provider||'Source not confirmed')+'</span>' +
-      '<small style="display:block">'+where+'</small>' +
-      '<small style="display:block">Observed: '+escape(stamp(row.observed_at))+
-        ' · '+escape(onlineTime)+'</small>' +
-      (note?'<small style="display:block">'+escape(note)+'</small>':'') +
-      (direct?'<small style="display:block">IP/port response is not a video test.</small>':'') +
-      link+'</div>';
+    // A unit may contain several cameras; retain each resource's own identity.
+    const name=String(row.name||row.unit||'Unnamed source resource').trim();
+    return '<div class="vision-context-row vision-fleet-channel">' +
+      '<b>'+escape(name)+' · '+escape(status.toUpperCase())+'</b>' +
+      '<span>'+escape(row.kind||'camera')+' · '+escape(row.provider||'Source not confirmed')+
+        ' · Source record '+escape(row.resource_id||'not available')+'</span>' +
+      '<small>Observed: '+escape(stamp(row.observed_at))+'</small>' +
+      '<small>'+escape(onlineTime)+'</small>' +
+      (note?'<small>'+escape(note)+'</small>':'') +
+      (direct?'<small>IP/port response is not a video test.</small>':'') +
+      '</div>';
+  }
+  /** Exact normalized provider-unit label only. Do not collapse different
+   * numbered assets or suffix variants such as 029 and 029HDC2. */
+  function groupByUnit(rows) {
+    const groups=new Map();
+    for (const row of rows) {
+      const unit=String(row.unit||'').trim();
+      const known=unit && unit!=='Unit identity unavailable';
+      const normalized=unit.toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const key=known&&normalized?'unit:'+normalized:'resource:'+String(row.resource_id||row.name||'unknown');
+      if (!groups.has(key)) groups.set(key,{unit:known?unit:'Unmatched source resource',rows:[]});
+      groups.get(key).rows.push(row);
+    }
+    return [...groups.values()];
+  }
+  function categoryCounts(rows,kind) {
+    const items=rows.filter(row=>row.kind===kind);
+    if (!items.length) return '';
+    const offline=items.filter(row=>row.status==='offline').length;
+    const unverified=items.filter(row=>row.status!=='offline'&&row.status!=='online').length;
+    const online=items.length-offline-unverified;
+    const noun={camera:'camera',detector:'detector',recorder:'recorder',
+      'IP/port connection (not camera-video verification)':'service-port'}[kind]||'source';
+    const plural=items.length===1?noun:noun+'s';
+    return offline ? offline+'/'+items.length+' '+plural+' OFFLINE'+(unverified?' · '+unverified+' unverified':'') :
+      unverified ? unverified+'/'+items.length+' '+plural+' UNVERIFIED'+(online?' · '+online+' online':'') :
+      online+'/'+items.length+' '+plural+' online';
+  }
+  function unitRow(group,expand=false) {
+    const records=group.rows;
+    const cameraRows=records.filter(row=>row.kind==='camera');
+    const statuses=records.map(row=>row.status);
+    const status=statuses.includes('offline')?'OFFLINE OBSERVATIONS':
+      statuses.includes('unverified')?'NEEDS VERIFICATION':'ONLINE OBSERVATIONS';
+    const categoryText=['camera','detector','recorder','IP/port connection (not camera-video verification)']
+      .map(kind=>categoryCounts(records,kind)).filter(Boolean).join(' · ');
+    const firstLocation=records[0]?.location;
+    const addressKey=x=>x&&typeof x==='object'
+      ?[x.customer||'',x.site||'',x.address||''].join('\u0001'):null;
+    const verified=firstLocation&&records.every(row=>addressKey(row.location)===addressKey(firstLocation));
+    const where=verified
+      ?[firstLocation.customer,firstLocation.site,firstLocation.address].filter(Boolean).map(escape).join(' · ')
+      :'No uniquely verified COS Field Map customer/site/address for this provider unit';
+    const firstObserved=records.map(row=>row.observed_at).filter(Boolean);
+    const sameLastOnline=records.every(row=>row.last_online_at&&row.last_online_at===records[0].last_online_at);
+    const lastOnline=sameLastOnline ? '<small>Each source last reported ONLINE: '+
+      escape(stamp(records[0].last_online_at))+' (not a proven outage start)</small>' : '';
+    const unit=String(group.unit||'Unmatched source resource');
+    const unitLabel=unit.replace(/^SOLAR\s*SPOTTER\b/i,'Solar Spotter');
+    const link=unit!=='Unmatched source resource'
+      ?'<a href="./camera-health.html?q='+encodeURIComponent(unit)+'">Open Camera Health ↗</a>' : '';
+    return '<details class="vision-fleet-unit"'+(expand?' open':'')+'>' +
+      '<summary><b>'+escape(unitLabel)+' · '+escape(status)+'</b>' +
+      '<span>'+escape(categoryText)+'</span><small>'+where+'</small>'+lastOnline+'</summary>' +
+      '<div class="vision-fleet-unit-details"><div class="vision-fleet-unit-link">'+link+
+      '</div>'+records.map(entry).join('')+'</div></details>';
   }
   function render(fleet, question) {
     if (!fleet || typeof fleet !== 'object' || !Array.isArray(fleet.items) ||
@@ -112,10 +164,12 @@
     const filter=question.location_query||question.unit_reference
       ?'<div class="vision-system-note">Filter: '+escape([question.unit_reference,question.location_query].filter(Boolean).join(' · '))+'</div>':'';
     const listed=fleet.items.concat(fleet.service_items);
-    const title='<div class="vision-context-block"><h3>Matching saved records</h3>'+
+    const grouped=groupByUnit(listed);
+    const title='<div class="vision-context-block"><h3>Matching source records · '+grouped.length+' unit group'+(grouped.length===1?'':'s')+'</h3>'+
+      '<p class="vision-fleet-count-note">'+listed.length+' source record'+(listed.length===1?'':'s')+' shown. Multiple camera channels on one unit are grouped together; source counts are unchanged.</p>'+
       (fleet.items_truncated?'<p>More provider records exist than are shown. Narrow the request by unit or customer/site.</p>':'')+
       (!listed.length?'<p>No matching verified source records in this request. This is not proof that every camera is working.</p>':'')+
-      '<div class="vision-context-list">'+listed.map(entry).join('')+'</div></div>';
+      '<div class="vision-fleet-group-list">'+grouped.map(group=>unitRow(group,grouped.length===1)).join('')+'</div></div>';
     const locationWarning=fleet.location_data&&fleet.location_data.startsWith('unavailable')
       ?'<div class="vision-direct warn"><b>Recorded Field locations unavailable.</b>The source map could not be verified; no customer location was inferred.</div>':'';
     const caveat=question.scope==='offline'&&/\b(?:more than|over|longer than|for at least)\s+\d+\s*(?:hours?|days?|hrs?)\b/i.test(question.raw||'')
