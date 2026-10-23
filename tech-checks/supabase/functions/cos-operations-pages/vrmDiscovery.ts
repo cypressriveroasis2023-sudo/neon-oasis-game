@@ -105,9 +105,10 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
         if (!approvals || typeof approvals !== 'object' || Array.isArray(approvals)) throw new Error('Invalid private dashboard approvals');
         // vrmPortalConfig validates every approval against its exact immutable installation ID.
         const checked = vrmPortalConfig(JSON.stringify(approvals),base.items,sync);
-        const byId = new Map(checked.items.filter(item => item.embedUrl !== null).map(item => [item.installationId,item.embedUrl]));
+        // Explicit null revokes a saved approval; absent entries retain legacy approvals.
+        const byId = new Map(checked.items.filter(item => Object.hasOwn(approvals,String(item.installationId))).map(item => [item.installationId,item.embedUrl]));
         fleet = readVrmFleetConfig({items:base.items.map(item => ({
-          ...item,embedUrl:item.available === false ? null : byId.get(item.installationId) ?? item.embedUrl,
+          ...item,embedUrl:item.available === false ? null : byId.has(item.installationId) ? byId.get(item.installationId)! : item.embedUrl,
         })),sync:base.sync});
       } catch {
         // A private approval lookup failure cannot remove existing approved dashboards or the saved fleet.
