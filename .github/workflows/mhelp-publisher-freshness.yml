@@ -1,0 +1,42 @@
+name: Verify mHelp publisher freshness
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/supabase/functions/cos-mhelp-inventory-sync/**'
+      - 'tech-checks/supabase/functions/cos-sheets-placement-publish/**'
+      - 'tech-checks/operations/db/mhelp-publisher-freshness.sql'
+      - 'tech-checks/operations/legacy/tests/mhelp-publisher-postgres.ci.mjs'
+      - '.github/workflows/mhelp-publisher-freshness.yml'
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: cos_mhelp_intake_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_mhelp_intake_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Verify concurrent publisher evidence handoff
+        env:
+          COS_MHELP_POSTGRES_CI: '1'
+        run: node --import tsx legacy/tests/mhelp-publisher-postgres.ci.mjs
