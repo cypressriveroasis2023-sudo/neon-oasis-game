@@ -67,6 +67,11 @@ function verifiedAssociations(health:Row,authority:ReturnType<typeof mapAuthorit
   const sets=[health.unitIdentities,health.ownerConfirmedUnitIdentities||[],health.reconProviderUnitIdentities||[]];
   if(sets.some(s=>!Array.isArray(s)||s.length>2000))return out;
   const claims=sets.flat();
+  if(health.ownerConfirmedIdentityVersion!==undefined&&health.ownerConfirmedIdentityVersion!==1||
+     health.reconProviderIdentityVersion!==undefined&&health.reconProviderIdentityVersion!==1)return out;
+  const unitUses=new Map<string,number>();
+  for(const claim of claims)if(obj(claim)&&uuid(claim.unitId))
+    unitUses.set(claim.unitId,(unitUses.get(claim.unitId)||0)+1);
   const overlaps=new Map<string,number>();
   for(const claim of claims){
     if(!obj(claim)||!Array.isArray(claim.deviceIds))continue;
@@ -74,7 +79,7 @@ function verifiedAssociations(health:Row,authority:ReturnType<typeof mapAuthorit
   }
   const byId=new Map(health.rows.map((r:Row)=>[String(r.id),r]));
   for(const claim of claims){
-    if(!obj(claim)||!uuid(claim.unitId)||!hash(claim.proof)||
+    if(!obj(claim)||!uuid(claim.unitId)||unitUses.get(claim.unitId)!==1||!hash(claim.proof)||
        !['native_provider','owner_placement','owner_confirmed_native','reconeyez_area'].includes(claim.kind)||
        !Array.isArray(claim.deviceIds)||!claim.deviceIds.length||!Array.isArray(claim.unitKeys)||!claim.unitKeys.length||
        claim.deviceIds.some((id:unknown)=>typeof id!=='string'||!/^[1-9]\d*$/.test(id)||overlaps.get(id)!==1)||
@@ -94,6 +99,7 @@ function verifiedAssociations(health:Row,authority:ReturnType<typeof mapAuthorit
     if(claim.kind==='native_provider'&&rows.some(row=>row.evidence?.source!=='Star4Live'||row.evidence?.kind!=='provider'))continue;
     if(claim.kind==='reconeyez_area'&&
       (!Number.isFinite(Date.parse(claim.providerArea?.inventoryObservedAt))||
+      now<Date.parse(claim.providerArea.inventoryObservedAt)||
       now-Date.parse(claim.providerArea.inventoryObservedAt)>20*60000||
       rows.some(row=>row.evidence?.source!=='Reconeyez')))continue;
     const state=placement(unit,authority.version);
