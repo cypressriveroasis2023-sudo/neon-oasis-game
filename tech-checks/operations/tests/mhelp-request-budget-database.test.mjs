@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
+import {createMhelpRequestBudget} from '../../supabase/functions/cos-operations-pages/mhelpRequestBudget.ts';
 const sql=await readFile(new URL('../db/mhelp-request-budget.sql',import.meta.url),'utf8');
 async function setup(){
  const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema cos_mhelp_placement_private;
@@ -50,5 +51,18 @@ test('browser roles cannot call budget, forge clock, or change counters; service
  await assert.rejects(db.query("select cos_mhelp_placement_private.admit_request_budget(false,'2026-10-20T00:00Z')"),/permission denied/);
  assert.equal((await db.query('select public.cos_mhelp_request_budget(false) r')).rows[0].r.reason,'usage_not_yet_measured');
  await assert.rejects(db.query('update cos_mhelp_placement_private.request_budget_config set initial_hold_until=null'),/permission denied/);
+ }finally{await db.close();}
+});
+
+test('actual SQL microsecond pacing survives parsing and RPC transit without skipping fresh authority',async()=>{
+ const db=await setup();try{
+  await db.exec('update cos_mhelp_placement_private.request_budget_config set initial_hold_until=null');
+  for(const transit of [0,50]){
+   await db.exec("update cos_mhelp_placement_private.request_budget_pace set next_start_at='2030-02-01T00:00:00.400500Z'");
+   let server=Date.parse('2030-02-01T00:00:00.400Z'),client=server+transit,admissions=0,starts=0;const waits=[];
+   const budget=createMhelpRequestBudget({now:()=>client,wait:async ms=>{waits.push(ms);server+=ms;client+=ms;},admit:async essential=>{admissions++;const gate=await call(db,new Date(server).toISOString(),essential);if(admissions===1){assert.equal(gate.reason,'pacing');assert.equal(Date.parse(gate.retryAt),Date.parse('2030-02-01T00:00:00.400Z'));}return gate;},fetch:async()=>{starts++;return new Response();}});
+   assert.equal((await budget.fetch('https://connect.mhelpdesk.com/api/v1.0/portal/224643/equipment')).status,200);assert.equal(admissions,2);assert.deepEqual(waits,[1]);assert.equal(starts,1);
+  }
+  assert.equal((await db.query("select admitted from cos_mhelp_placement_private.request_budget_day where utc_day='2030-02-01'")).rows[0].admitted,2);
  }finally{await db.close();}
 });

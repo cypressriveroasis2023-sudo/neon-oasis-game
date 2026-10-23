@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {setTimeout as sleep} from 'node:timers/promises';import {resolve} from 'node:path';import {fileURLToPath} from 'node:url';
 import {assertCiContext,validateIsolatedServer,parameters,openPsql} from './mhelp-postgres-concurrency.ci.mjs';
 import {statusFixture} from '../../tests/mhelp-reliability-status-fixture.mjs';
+import {createMhelpRequestBudget} from '../../../supabase/functions/cos-operations-pages/mhelpRequestBudget.ts';
 export {assertCiContext};
 const json=s=>s.split(/\r?\n/).filter(x=>/^[\[{]/.test(x.trim())).map(x=>JSON.parse(x));
 const exec=sql=>openPsql(sql).done;
@@ -38,6 +39,17 @@ export async function main(){
  for(const role of ['anon','authenticated','service_role'])assert.equal((await query("select has_table_privilege($1,'cos_mhelp_placement_private.inventory_resource_cache','select,insert,update,delete') allowed",[role]))[0].allowed,false);
 
  await exec('update cos_mhelp_placement_private.request_budget_config set initial_hold_until=null');
+ // Use the unchanged real SQL authority and its microsecond JSON timestamp,
+ // then model the client clock after zero/50ms RPC transit. No vendor I/O.
+ for(const transit of [0,50]){
+  await exec("update cos_mhelp_placement_private.request_budget_pace set next_start_at='2030-02-01T00:00:00.400500Z'");
+  let server=Date.parse('2030-02-01T00:00:00.400Z'),client=server+transit,admissions=0,starts=0;const waits=[];
+  const budget=createMhelpRequestBudget({now:()=>client,wait:async ms=>{waits.push(ms);server+=ms;client+=ms;},admit:async essential=>{admissions++;const gate=json(await exec(parameters('select cos_mhelp_placement_private.admit_request_budget($1,$2::timestamptz);',[essential,new Date(server).toISOString()]))).at(-1);if(admissions===1){assert.equal(gate.reason,'pacing');assert.equal(Date.parse(gate.retryAt),Date.parse('2030-02-01T00:00:00.400Z'));}return gate;},fetch:async()=>{starts++;return new Response();}});
+  assert.equal((await budget.fetch('https://connect.mhelpdesk.com/api/v1.0/portal/224643/equipment')).status,200);assert.equal(admissions,2);assert.deepEqual(waits,[1]);assert.equal(starts,1);
+ }
+ assert.equal((await query("select admitted from cos_mhelp_placement_private.request_budget_day where utc_day='2030-02-01'"))[0].admitted,2);
+ await exec('update cos_mhelp_placement_private.request_budget_pace set next_start_at=null');
+
  const pacing=await race('select public.cos_mhelp_request_budget(false);','select public.cos_mhelp_request_budget(false);','allowance-pacing');assert.equal(pacing[0].allowed,true);assert.equal(pacing[1].allowed,false);assert.equal(pacing[1].reason,'pacing');
  await exec("update cos_mhelp_placement_private.request_budget_config set daily_limit=3,essential_reserve=1;update cos_mhelp_placement_private.request_budget_pace set next_start_at=null;update cos_mhelp_placement_private.request_budget_day set admitted=1,essential_admitted=0");
  const capped=await race('select public.cos_mhelp_request_budget(false);','select public.cos_mhelp_request_budget(false);','allowance-cap');assert.equal(capped[0].allowed,true);assert.equal(capped[1].reason,'daily_budget');
@@ -67,6 +79,6 @@ export async function main(){
  assert.equal((await call("select public.cos_mhelp_inventory_read_lease('acquire');")).reason,'inventory_paused');
  assert.equal((await call('select public.cos_mhelp_placement_from_inventory();')).vendorReads,0);
  for(const role of ['anon','authenticated'])for(const sql of ["select public.cos_mhelp_renewal_failure(9);","select public.cos_mhelp_auth_observation(9);","select public.cos_mhelp_reliability_status();","select public.cos_mhelp_request_budget(false);","select public.cos_mhelp_renewal_guard('check');",parameters("select public.cos_mhelp_inventory_cache('read',$1);",[key])])await assert.rejects(exec('begin;set local role '+role+";select set_config('request.jwt.claim.role','service_role',true);"+sql+'commit;'),e=>e.sqlstate==='42501');
- console.log('PASS real distinct-client allowance pacing/cap/reserve, UTC reset/provider hold, guarded identity-only parent-reference migration/ACL/CAS/child rejection, observed cache TTL, lease-bound rejected-grant suppression/revision recovery native pause/auth evidence and denied client roles');
+ console.log('PASS real distinct-client allowance pacing/cap/reserve, elapsed/microsecond pacing through actual SQL authority, UTC reset/provider hold, guarded identity-only parent-reference migration/ACL/CAS/child rejection, observed cache TTL, lease-bound rejected-grant suppression/revision recovery native pause/auth evidence and denied client roles');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.message);process.exitCode=1;});

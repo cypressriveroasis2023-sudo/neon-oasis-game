@@ -35,7 +35,9 @@ export function createMhelpRequestBudget(options:{fetch:typeof fetch;admit:(esse
    if(signal?.aborted)throw Error('Request canceled');
    if(gate.allowed)return options.fetch(input,init);
    const delay=Date.parse(gate.retryAt!)-now();
-   if(gate.reason==='pacing'&&delay>0&&delay<=1000&&tries<79){await wait(delay,signal);continue;}
+   // RPC transit and PostgreSQL sub-millisecond timestamps can leave a pacing
+   // deadline elapsed in this clock. Recheck authority after a bounded yield.
+   if(gate.reason==='pacing'&&delay<=1000&&tries<79){await wait(Math.max(1,delay),signal);continue;}
    return new Response('{"error":"mHelpDesk request is waiting for its automatic retry window"}',{status:429,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-COS-Mhelp-Deferred':'1','X-COS-Mhelp-Budget':'1','Retry-After':String(Math.max(1,Math.ceil(Math.max(0,delay)/1000)))}});
   }
   throw Error('mHelpDesk request allowance unavailable');
