@@ -6,6 +6,7 @@ on:
       - 'tech-checks/supabase/functions/cos-sheets-placement-publish/**'
       - 'tech-checks/operations/db/mhelp-publisher-freshness.sql'
       - 'tech-checks/operations/db/mhelp-publisher-refresh-safe-cleanup.sql'
+      - 'tech-checks/operations/db/mhelp-publisher-reviewed-bindings.sql'
       - 'tech-checks/operations/legacy/tests/mhelp-publisher-postgres.ci.mjs'
       - '.github/workflows/mhelp-publisher-freshness.yml'
 permissions:
