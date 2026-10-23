@@ -457,7 +457,7 @@ const tools = [
   {
     type: 'function',
     name: 'get_departure_readiness',
-    description: 'Read live Tech Check truck/day departure readiness: charged battery minimums and IT-checked-out backup units. Use before saying Service is ready to leave the shop.',
+    description: 'Read current Service start-day readiness. The current start-day gate is Truck Check, then Trailer Check when taking a trailer, then Today’s Tasks. Battery counts and spare-unit checkout do not block the morning check.',
     strict: true,
     parameters: { type: 'object', properties: { ticket_no: { type: 'string' } }, required: ['ticket_no'], additionalProperties: false },
   },
@@ -546,7 +546,7 @@ const outputSchema = {
       properties: {
         type: {
           type: 'string',
-          enum: ['none', 'create_job', 'assign', 'schedule', 'update', 'handoff', 'verify', 'complete', 'cancel', 'return', 'check_out', 'check_in', 'owner_approve'],
+          enum: ['none', 'create_job', 'assign', 'schedule', 'parts_update', 'update', 'handoff', 'verify', 'complete', 'cancel', 'return', 'check_out', 'check_in', 'owner_approve'],
         },
         ticket_no: { type: 'string' },
         work_type: { type: 'string' },
@@ -555,9 +555,14 @@ const outputSchema = {
         date: { type: 'string' },
         time: { type: 'string' },
         summary: { type: 'string' },
+        solar_panel_qty: { type: 'integer', minimum: 0, maximum: 999 },
+        battery_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+        camera_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+        sim_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+        micro_sd_qty: { type: 'integer', minimum: 0, maximum: 999 },
         requires_confirmation: { type: 'boolean' },
       },
-      required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'summary', 'requires_confirmation'],
+      required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'summary', 'solar_panel_qty', 'battery_replacement_qty', 'camera_replacement_qty', 'sim_replacement_qty', 'micro_sd_qty', 'requires_confirmation'],
       additionalProperties: false,
     },
     action_plan: {
@@ -574,7 +579,7 @@ const outputSchema = {
               sequence: { type: 'integer', minimum: 1, maximum: 12 },
               type: {
                 type: 'string',
-                enum: ['create_job', 'assign', 'schedule', 'update', 'handoff', 'verify', 'complete', 'cancel', 'return', 'check_out', 'check_in', 'owner_approve'],
+                enum: ['create_job', 'assign', 'schedule', 'parts_update', 'update', 'handoff', 'verify', 'complete', 'cancel', 'return', 'check_out', 'check_in', 'owner_approve'],
               },
               ticket_no: { type: 'string' },
               work_type: { type: 'string' },
@@ -583,11 +588,16 @@ const outputSchema = {
               date: { type: 'string' },
               time: { type: 'string' },
               summary: { type: 'string' },
+              solar_panel_qty: { type: 'integer', minimum: 0, maximum: 999 },
+              battery_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+              camera_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+              sim_replacement_qty: { type: 'integer', minimum: 0, maximum: 999 },
+              micro_sd_qty: { type: 'integer', minimum: 0, maximum: 999 },
               reason: { type: 'string' },
               execution_mode: { type: 'string', enum: ['audited', 'guided', 'needs_input'] },
               requires_confirmation: { type: 'boolean' },
             },
-            required: ['sequence','type','ticket_no','work_type','role','technician_name','date','time','summary','reason','execution_mode','requires_confirmation'],
+            required: ['sequence','type','ticket_no','work_type','role','technician_name','date','time','summary','solar_panel_qty','battery_replacement_qty','camera_replacement_qty','sim_replacement_qty','micro_sd_qty','reason','execution_mode','requires_confirmation'],
             additionalProperties: false,
           },
         },
@@ -673,7 +683,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v31',
+        agent_version: 'onsite-vision-agent-v35',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -687,6 +697,10 @@ Deno.serve(async (req) => {
         owner_correction_learning_enabled: true,
         operations_orchestration_enabled: true,
         multi_action_planning_enabled: true,
+        simplified_technician_flow_enabled: true,
+        owner_parts_update_enabled: true,
+        it_supplied_sim_sd_handoff_enabled: true,
+        swap_outcome_and_site_registration_enabled: true,
       })
     }
 
@@ -724,8 +738,69 @@ Deno.serve(async (req) => {
     const toolCall = async (name: string, args: any): Promise<Json> => {
       toolTrace.push({ name, args })
       if (name === 'get_job_context') {
-        const context = await getContext(args.ticket_no)
-        return compactJobContext(context) as Json
+        const ticket=clean(args.ticket_no)
+        const context = await getContext(ticket)
+        const [assignmentPartsResult,prepPartsResult,swapResult]=await Promise.all([
+          userClient.from('job_assignments')
+            .select('solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,status,updated_at')
+            .eq('ticket_no',ticket)
+            .in('status',['assigned','started'])
+            .order('updated_at',{ascending:false,nullsFirst:false})
+            .limit(1),
+          userClient.from('prep_tickets')
+            .select('solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,status,created_at')
+            .eq('ticket_no',ticket)
+            .in('status',['draft','released'])
+            .order('created_at',{ascending:false})
+            .limit(1),
+          userClient.from('prep_tickets')
+            .select('id,ticket_no,site,status,created_at,prep_items(id,unit_tag,equipment_type,purpose,swap_outcome,swap_outcome_by_name,swap_outcome_at,swap_installed_site,swap_site_registration_status,swap_site_registered_by_name,swap_site_registered_at)')
+            .eq('ticket_no',ticket)
+            .order('created_at',{ascending:false})
+            .limit(1)
+        ])
+        if(assignmentPartsResult.error)throw assignmentPartsResult.error
+        if(prepPartsResult.error)throw prepPartsResult.error
+        if(swapResult.error)throw swapResult.error
+        const prepParts=Array.isArray(prepPartsResult.data)?prepPartsResult.data[0]:null
+        const assignmentParts=Array.isArray(assignmentPartsResult.data)?assignmentPartsResult.data[0]:null
+        const source=prepParts||assignmentParts||{}
+        const swapPrep=Array.isArray(swapResult.data)?swapResult.data[0]:null
+        const swapItems=(Array.isArray(swapPrep?.prep_items)?swapPrep.prep_items:[]).filter((row:any)=>row?.purpose==='SWAP')
+        return stripNulls({
+          ...(compactJobContext(context)||{}),
+          parts:{
+            solar_panel_qty:Number(source.solar_panel_qty||0),
+            battery_replacement_qty:Number(source.battery_replacement_qty||0),
+            camera_replacement_qty:Number(source.camera_replacement_qty||0),
+            sim_replacement_qty:Number(source.sim_replacement_qty||0),
+            micro_sd_qty:Number(source.micro_sd_qty||0),
+            source:prepParts?'active_prep':assignmentParts?'active_assignment':'none'
+          },
+          swap_workflow:swapItems.length?{
+            site:swapPrep?.site||null,
+            replacement_units:swapItems.map((row:any)=>({
+              item_id:row.id,
+              unit_tag:row.unit_tag,
+              equipment_type:row.equipment_type,
+              service_outcome:row.swap_outcome||'awaiting_service_yes_no',
+              service_outcome_by:row.swap_outcome_by_name||null,
+              service_outcome_at:row.swap_outcome_at||null,
+              installed_site:row.swap_installed_site||null,
+              it_site_registration_status:row.swap_site_registration_status||(
+                row.swap_outcome==='installed'?'pending_it':row.swap_outcome==='returned_unused'?'not_required':'not_ready'
+              ),
+              it_site_registered_by:row.swap_site_registered_by_name||null,
+              it_site_registered_at:row.swap_site_registered_at||null
+            })),
+            rules:[
+              'Service must answer YES — SWAP HAPPENED or NO — DID NOT USE IT for every replacement SWAP unit.',
+              'NO routes the exact unused replacement through IT Intake.',
+              'YES keeps the replacement at the customer/site, requires the OLD field unit through IT Intake, and creates the IT site-registration task.',
+              'IT site registration is not ready before Service confirms YES.'
+            ]
+          }:null
+        }) as Json
       }
 
       if (name === 'analyze_job') {
@@ -755,7 +830,7 @@ Deno.serve(async (req) => {
 
         let query = userClient
           .from('unit_registry')
-          .select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at')
+          .select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,current_site,site_registered_at,site_registered_by_name,last_event,updated_at')
           .order('updated_at', { ascending: false })
           .limit(20)
 
@@ -768,7 +843,7 @@ Deno.serve(async (req) => {
         if ((!data || !data.length) && numeric) {
           const retry = await userClient
             .from('unit_registry')
-            .select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at')
+            .select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,current_site,site_registered_at,site_registered_by_name,last_event,updated_at')
             .ilike('unit_tag', '%' + numeric + '%')
             .order('updated_at', { ascending: false })
             .limit(20)
@@ -843,7 +918,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v31',
+            agent_version: 'onsite-vision-agent-v35',
           }
         } as Json
       }
@@ -1031,29 +1106,62 @@ Deno.serve(async (req) => {
 
       if (name === 'get_departure_readiness') {
         const ticketNo=clean(args.ticket_no)
-        let batteryQuery=userClient.from('truck_spare_batteries').select('ticket_no,equipment_type,battery_type,qty_prepared,ready_ok,service_tech_name,status,it_checked_out_at,it_checked_out_by_name,resolved_at').neq('status','resolved').is('resolved_at',null).limit(250)
-        if(ticketNo)batteryQuery=batteryQuery.eq('ticket_no',ticketNo)
-        const batteryResult=await batteryQuery
-        if(batteryResult.error)throw batteryResult.error
-        const batteries=Array.isArray(batteryResult.data)?batteryResult.data:[]
+        const date=todayCentral()
+        const weekday=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',weekday:'short'}).format(new Date())
+        const inspectionRequired=!['Sat','Sun'].includes(weekday)
 
-        let spareQuery=userClient.from('prep_items').select('equipment_type,purpose,unit_tag,power_ok,functions_ok,safe_ok,verified_at,spare_outcome,spare_checked_out_at,spare_checked_out_to_name,spare_it_checked_out_at,spare_it_checked_out_by_name,prep_tickets!inner(ticket_no,work_type,status)').eq('purpose','spare').limit(250)
-        if(ticketNo)spareQuery=spareQuery.eq('prep_tickets.ticket_no',ticketNo)
-        const spareResult=await spareQuery
-        if(spareResult.error)throw spareResult.error
-        const spares=(Array.isArray(spareResult.data)?spareResult.data:[]).filter((row:any)=>!['returned','used'].includes(clean(row.spare_outcome).toLowerCase()))
+        let serviceTechIds:string[]=[]
+        let serviceAssignments:any[]=[]
+        if(ticketNo){
+          const assignmentResult=await userClient
+            .from('job_assignments')
+            .select('ticket_no,assignee_user_id,assignee_name,assigned_role,status,scheduled_for,scheduled_time')
+            .eq('ticket_no',ticketNo)
+            .eq('assigned_role','service')
+            .neq('status','cancelled')
+            .order('updated_at',{ascending:false})
+            .limit(20)
+          if(assignmentResult.error)throw assignmentResult.error
+          serviceAssignments=Array.isArray(assignmentResult.data)?assignmentResult.data:[]
+          serviceTechIds=[...new Set(serviceAssignments.map((row:any)=>clean(row.assignee_user_id)).filter(Boolean))]
+        }
 
-        const readyBatteries=batteries.filter((row:any)=>row.ready_ok===true&&Boolean(row.it_checked_out_at))
-        const standardQty=readyBatteries.filter((row:any)=>/110\s*ah/i.test(clean(row.battery_type))).reduce((sum:number,row:any)=>sum+Number(row.qty_prepared||0),0)
-        const litimeQty=readyBatteries.filter((row:any)=>/litime/i.test(clean(row.battery_type))&&/100\s*ah/i.test(clean(row.battery_type))).reduce((sum:number,row:any)=>sum+Number(row.qty_prepared||0),0)
-        const eligibleBackup=spares.filter((row:any)=>['spotter','sniper','solar spotter'].includes(clean(row.equipment_type).toLowerCase())&&row.power_ok===true&&row.functions_ok===true&&row.safe_ok===true&&Boolean(row.verified_at)&&Boolean(row.spare_it_checked_out_at)&&Boolean(row.spare_checked_out_at))
-        return {
-          ticket_no:ticketNo,batteries,spares,
-          counts:{standard_12v_110ah:standardQty,litime_12v_100ah:litimeQty,eligible_backup_units:eligibleBackup.length},
-          minimums:{standard_12v_110ah:4,litime_12v_100ah:2,eligible_backup_units:1},
-          ready:standardQty>=4&&litimeQty>=2&&eligibleBackup.length>=1,
-          rules:['Minimum 4 x charged 12V 110Ah batteries.','Minimum 2 x charged LiTime 12V 100Ah batteries.','One IT-checked-out Spotter, Sniper, or Solar Spotter backup appropriate for the day. Solar Pole is retired.','Anything not recorded is MISSING INFORMATION.']
-        } as Json
+        const recent=await userClient
+          .from('morning_checks')
+          .select('id,service_tech_id,submitted_at,taking_trailer,truck_checks,trailer_checks')
+          .order('submitted_at',{ascending:false})
+          .limit(120)
+        if(recent.error)throw recent.error
+
+        const centralDate=(value:any)=>new Intl.DateTimeFormat('en-CA',{
+          timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'
+        }).format(new Date(value))
+        let checks=(Array.isArray(recent.data)?recent.data:[]).filter((row:any)=>centralDate(row.submitted_at)===date)
+        if(ticketNo&&serviceTechIds.length)checks=checks.filter((row:any)=>serviceTechIds.includes(clean(row.service_tech_id)))
+
+        let ready:any=null
+        if(!inspectionRequired)ready=true
+        else if(ticketNo&&serviceTechIds.length)ready=serviceTechIds.every((id:string)=>checks.some((row:any)=>clean(row.service_tech_id)===id))
+
+        return stripNulls({
+          ticket_no:ticketNo,
+          date,
+          inspection_required:inspectionRequired,
+          ready,
+          service_assignments:serviceAssignments,
+          morning_checks:checks,
+          start_day_sequence:['Truck Check','Trailer Check when taking a trailer','Today’s Tasks'],
+          spare_unit_required:false,
+          battery_count_gate:false,
+          rules:[
+            'At this time the Tech Check start-day gate is Truck Check → Trailer Check when taking a trailer → Today’s Tasks.',
+            'A backup/spare unit is not required to complete the morning Truck / Trailer Check.',
+            'Battery counts are not part of the current morning Truck / Trailer Check gate.',
+            'Optional job-specific spares remain separate and are handled only when a specific job actually uses them.',
+            'IT does not connect solar panels to units in the shop. Applicable solar / PV charging verification belongs to Service after the IT → Service handoff.',
+            'Weekend Truck / Trailer inspections are not required.'
+          ]
+        }) as Json
       }
 
       if (name === 'get_workload') {
@@ -1354,7 +1462,7 @@ Deno.serve(async (req) => {
       '- Keep Shop, inactive and unresolved-placement resources out of confirmed Field camera outages. If live Camera Health cannot be verified, never report zero or reuse old counts. If Field Map is unavailable, locations cannot be verified.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
-      '- For truck readiness, departure readiness, battery minimums, or backup-unit readiness, call get_departure_readiness before answering. Never assume unrecorded equipment is on the truck.',
+      '- For Service start-day or departure-readiness questions, call get_departure_readiness. The current gate is Truck Check → Trailer Check when taking a trailer → Today’s Tasks. Do not require battery counts or a backup/spare unit for the morning check.',
       '- For questions about how many jobs are scheduled on a date, call get_workload. If the current message names a technician, filter to that technician. If it names only IT or Service, filter to that department. If it asks broadly how many jobs today / total jobs / jobs scheduled today with no explicit technician or department, use role="" and technician_name="" for the company-wide distinct-ticket total. Do NOT inherit a previously named technician from working memory for a new broad workload question. If both IT and Service are named, use the company-wide result and department_ticket_counts; explain that department counts can overlap because one ticket can flow through both. MHelpDesk remains separate.',
       '- A live needs_replacement hold means the unit is NOT available Shop Inventory. Do not say it may return to Shop Inventory through a generic path while that hold exists.',
       '- Treat Owner notification as VERIFIED DATABASE FACT only when the matching app_notifications row is present. A permanent report alone does not prove the notification row is still recorded.',
@@ -1362,6 +1470,7 @@ Deno.serve(async (req) => {
       '- For offline escalations, resolved_at is authoritative for active vs resolved. A failed_unit_in_it_intake record is resolved because the failed-unit return reached Service Return → IT Intake.',
       '- If a requested offline-escalation fact was never recorded, label it MISSING INFORMATION instead of inferring it.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
+      '- IT never needs to connect solar panels to units for shop testing. Ranger/Helios physical solar-panel / PV charging verification belongs to Service after the IT → Service handoff. IT may still perform documented non-solar shop configuration such as Ranger MPPT update/test and Helios Cerbo/VRM/hardware/programming checks.',
       '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
       '- If company knowledge marks something partial/unknown, say what is missing instead of inventing an answer.',
@@ -1387,7 +1496,7 @@ Deno.serve(async (req) => {
       '- When the Owner asks to handle several changes together, says "take care of everything you can", "do all of that", "make those changes", "fix everything you safely can", or gives multiple assignment/schedule/cancel/Owner-approval instructions in one message, create action_plan.detected=true.',
       '- Re-read the relevant live state before building the plan. For a broad operations request, call get_operations_snapshot again rather than relying on an older conversational rundown.',
       '- action_plan.steps must be ordered so prerequisites come before dependent steps. Keep the plan to at most 12 concrete steps.',
-      '- execution_mode="audited" only for actions that can safely go through the existing Vision audit validator: assign, schedule, cancel, and owner_approve. The client will prepare each audited step and the Owner will see one explicit confirmation before execution.',
+      '- execution_mode="audited" only for actions that can safely go through the existing Vision audit validator: assign, schedule, cancel, owner_approve, and parts_update. The client will prepare each audited step and the Owner will see explicit confirmation before execution.',
       '- execution_mode="guided" for create_job, handoff, verify, complete, return, check_out, check_in, or update when the existing Tech Check workflow requires evidence/checklists or guided data collection.',
       '- execution_mode="needs_input" when a required decision is missing, such as which technician, which ticket, a date/time, exact unit, or an Owner judgment that cannot be derived from company rules.',
       '- Do not pick a named technician solely because they have a lighter recorded workload unless the Owner explicitly authorizes load-based assignment in this request. A lighter Tech Check load is not proof of travel, PTO, geography, skill fit, or true availability.',
@@ -1403,6 +1512,22 @@ Deno.serve(async (req) => {
       '- Resolve a partial technician name only when it uniquely matches one active IT or Service technician. If more than one matches, ask one short natural clarification instead of guessing.',
       '- Understand assignment phrasing such as "put Josh on this", "have Josh handle it", "give this to IT", or "let Mike take that one" as assignment intent.',
       '- Understand creation phrasing such as "make me a delivery", "throw in a pickup tomorrow", "start a swap", or "I need a service call" as create_job intent even if the words job or ticket are omitted.',
+      '- Understand parts/supplies changes in ordinary speech. Examples: "add 2 SIM cards", "remove one replacement battery", "take the solar panel off", "change the camera quantity to 3", "we do not need the micro SD cards", or "make it 2 batteries and 1 SIM". These are parts_update actions, not generic update actions.',
+      '- Treat "SIM Card Swap" as a first-class replacement category: remove the old SIM card and install the new SIM card. Treat "SD / Micro SD Card Replacement" the same way for storage cards.',
+      '- Replacement SIM and SD/micro SD cards are supplied by IT. When Service will perform the field work, the workflow is IT → Service: IT prepares the exact card quantity, then Service physically verifies the cards in the handoff before leaving.',
+      '- Natural phrases such as "replace the SIM", "swap the SIM", "replace the SD card", "swap the micro SD", or "we need a Simetry/Simmetry SIM" identify the replacement category. If no quantity is stated for a singular swap, interpret it as quantity 1 unless the context is genuinely ambiguous.',
+      '- During new-job guided creation, if a work description already clearly says to replace/swap a SIM or SD/micro SD card, do not ask the Owner the same generic parts question again. Carry that replacement into the draft and continue to the next missing field.',
+      '- A Service-only or Service → IT flow must not be used for a non-pickup job that needs a replacement SIM or SD/micro SD card. Use IT → Service so IT supplies the card(s).',
+      '- For every prepared SWAP replacement unit, Service must make one explicit field decision after the handoff: YES — SWAP HAPPENED or NO — DID NOT USE IT.',
+      '- If Service says NO, the exact unused replacement returns through IT Intake before Shop Inventory. Do not require an old-unit return because no swap occurred.',
+      '- If Service says YES, the replacement remains at the customer/site, the OLD field unit must return through IT Intake, and a ready-only IT site-registration task is created for that replacement unit.',
+      '- IT must never be told to perform the SWAP site-registration task before Service confirms the replacement was actually installed.',
+      '- When asked about a SWAP status, call get_job_context and use swap_workflow. Distinguish awaiting Service YES/NO, unused replacement waiting Intake, installed replacement waiting old-unit return, and IT site registration pending/completed.',
+      '- Before proposing parts_update, call get_job_context for the ticket and use the returned parts object as the current authoritative quantity baseline.',
+      '- For parts_update, proposed_action must contain the FINAL ABSOLUTE quantities for all five supported part types: solar_panel_qty, battery_replacement_qty, camera_replacement_qty, sim_replacement_qty, and micro_sd_qty. Preserve unchanged quantities from the live ticket.',
+      '- Relative wording must be computed against live quantities: "add 2 SIM cards" means current SIM quantity + 2; "remove 1 battery" means current replacement-battery quantity - 1. Never allow a negative final quantity.',
+      '- "Set/change/make X to N" is absolute. "Remove all/no more/do not need X" means final quantity 0. If "remove the X" is ambiguous because more than one is currently recorded and the Owner did not say all or give a quantity, ask one short clarification instead of guessing.',
+      '- Parts changes are Owner-controlled: explain the proposed final list and set requires_confirmation=true. The OnSite Vision client displays editable quantities so the Owner can override the AI proposal before approval. MHelpDesk remains separate.',
       '- For create_job, fill proposed_action.work_type, date, time, and technician_name whenever the Owner already supplied or clearly implied them. The client’s guided draft will ask only for required details that are still missing, including MHelpDesk number, site, equipment, unit numbers, work description, parts, assignment, and notes.',
       '- For questions about how Tech Check is programmed or why its workflow behaves a certain way, use live database facts, get_company_knowledge, workflow rules, and system health. Clearly distinguish code/company rules from live job data. If source-level implementation detail is not available through these tools, say that detail is not exposed here instead of inventing it.',
       '- Keep conversational context across follow-ups such as "him", "her", "that one", "this job", "move it to tomorrow", and "give it to Service" when the prior messages make the referent clear.',
@@ -1421,7 +1546,7 @@ Deno.serve(async (req) => {
       '',
       'ACTION SAFETY:',
       '- This server agent is READ ONLY. It has no mutation tools.',
-      '- If the owner asks to create, assign, reschedule, update, hand off, complete, cancel, return, check out, check in, verify, or approve something, explain the proposed action and populate proposed_action.',
+      '- If the owner asks to create, assign, reschedule, change parts/supplies, update, hand off, complete, cancel, return, check out, check in, verify, or approve something, explain the proposed action and populate proposed_action.',
       '- For proposed schedule actions, proposed_action.date must be YYYY-MM-DD and proposed_action.time should be HH:MM in local Central time when known.',
       '- For proposed assignment actions, use role exactly "it" or "service" when known.',
       '- If the Owner names a technician in an assignment request (for example "assign it to Josh"), call list_technicians when needed and ALWAYS put that exact matched active technician in proposed_action.technician_name. Do not propose a department queue when the Owner explicitly named a technician.',
@@ -1531,6 +1656,11 @@ Deno.serve(async (req) => {
           date: '',
           time: '',
           summary: '',
+          solar_panel_qty: 0,
+          battery_replacement_qty: 0,
+          camera_replacement_qty: 0,
+          sim_replacement_qty: 0,
+          micro_sd_qty: 0,
           requires_confirmation: false,
         },
         action_plan: {
@@ -1557,7 +1687,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v31',
+      agent_version: 'onsite-vision-agent-v35',
       model,
       tool_trace: toolTrace,
       ...parsed,
