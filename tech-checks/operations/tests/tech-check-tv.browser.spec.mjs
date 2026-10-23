@@ -39,6 +39,7 @@ async function setup(page, { many = false, pausedClock = false, simple = false }
     const request = route.request(), url = new URL(request.url());
     if(url.origin===origin){
       if(url.pathname==='/tv-harness')return route.fulfill({contentType:'text/html',body:harness});
+      if(url.pathname==='/schedule-read.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../schedule-read.js',import.meta.url),'utf8')});
       if(url.pathname==='/custody-read.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../custody-read.js',import.meta.url),'utf8')});
       if(url.pathname==='/operations-host.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../operations-host.js',import.meta.url),'utf8')});
       if(url.pathname==='/field-map-display-host.js')return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../field-map-display-host.js',import.meta.url),'utf8')});
@@ -120,7 +121,7 @@ test('network failure marks delayed data and authentication failure clears priva
   state.fail=503;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expect(frame.getByRole('alert')).toContainText('UPDATES DELAYED');
-  if(!simple)await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
   state.fail=401;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expectOperationsReloadRequired(frame);
@@ -378,6 +379,13 @@ test('Owner sees saved custody and historical return dates through the real read
  const {state,frame}=await setup(page,{pausedClock:true});
  await page.evaluate(()=>{
   window.custodyRpcCalls=[];
+  window.scheduleReadCalls=[];
+  window.TechCheckContext.db.from=table=>{
+   window.scheduleReadCalls.push(table);
+   const query={};for(const method of ['select','gte','lte','neq','order'])query[method]=()=>query;
+   query.limit=async()=>({count:1,data:[{id:'synthetic-appointment',ticket_no:'SYN-APPOINTMENT',site:'Synthetic service desk',work_type:'Equipment handoff appointment',scheduled_for:'2026-10-12',scheduled_time:'10:30:00',status:'assigned',assigned_role:'service'}]});return query;
+  };
+
   window.TechCheckContext.db.rpc=async name=>{
    window.custodyRpcCalls.push(name);
    const unit={equipment_key:'synthetic:001',family:'Sniper',unit_tag:'001',sims:['000000000123'],battery_count:null,parts:[]};
@@ -393,12 +401,14 @@ test('Owner sees saved custody and historical return dates through the real read
  await expect(custody).toContainText('agm 12v 110ah Unavailable');
  await expect(custody).toContainText('unavailable as a reconciled Product-ID total');
  await expect(custody).toContainText('Ranger 002');
- await page.screenshot({path:testInfo.outputPath('cos-saved-custody.png'),fullPage:true});
+ await custody.locator('.record').first().screenshot({path:testInfo.outputPath('cos-saved-custody.png')});
  await navigate('Calendar');
  const day=frame.getByRole('gridcell',{name:'2026-10-12',exact:true});
  await expect(day).toContainText('Handoff recorded');await expect(day).toContainText('Return submitted');await expect(day).toContainText('Ranger 002');
+ await expect(frame.getByRole('region',{name:'Existing Tech Check appointments',exact:true})).toContainText('SYN-APPOINTMENT');
+ expect(await page.evaluate(()=>window.scheduleReadCalls.every(table=>table==='job_assignments'))).toBe(true);
  await frame.getByRole('button',{name:'Day',exact:true}).click();await expect(day).toContainText('Handoff recorded');
- await page.screenshot({path:testInfo.outputPath('cos-custody-calendar.png'),fullPage:true});
+ await day.screenshot({path:testInfo.outputPath('cos-custody-calendar.png')});
  expect(await page.evaluate(()=>window.custodyRpcCalls.every(name=>['owner_service_truck_inventory_v1','techcheck_transfer_context_v1','techcheck_ticketfree_context_v1'].includes(name)))).toBe(true);
  expect(state.writes).toEqual([]);
 });

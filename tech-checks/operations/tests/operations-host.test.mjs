@@ -5,7 +5,8 @@ import vm from 'node:vm';
 
 const displaySource = readFileSync(new URL('../../field-map-display-host.js', import.meta.url), 'utf8').replace('export function','function');
 const custodySource=readFileSync(new URL('../../custody-read.js',import.meta.url),'utf8').replaceAll('export function','function').replaceAll('export async function','async function');
-const hostSource = custodySource+'\n'+displaySource+'\n'+readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm,'');
+const scheduleSource=readFileSync(new URL('../../schedule-read.js',import.meta.url),'utf8').replace('export async function','async function');
+const hostSource = scheduleSource+'\n'+custodySource+'\n'+displaySource+'\n'+readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm,'');
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
 const ownerId = '00000000-0000-4000-8000-000000000001';
 const secondOwnerId = '11111111-2222-4333-8444-555555555555';

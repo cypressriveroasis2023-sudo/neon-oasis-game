@@ -262,7 +262,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   }
   const setupNodes=[...form.children],equipmentSteps=[];
   draft.items.forEach((item,index)=>{
-   const expected=transfer?.manifest.find(i=>i.equipment_key===item.equipment_key),group=element('fieldset');group.append(element('legend',(expected?.family||item.family)+' '+(expected?.unit_tag||item.unit_tag)));
+   const expected=transfer?.manifest.find(i=>i.equipment_key===item.equipment_key),group=element('fieldset');group.append(element('legend',(expected?.family||item.family)+' '+(expected?.unit_tag||item.unit_tag)),element('small','Saved equipment key: '+item.equipment_key));
    const simpleReceipt=draft.kind==='receipt'&&draft.purpose==='truck_replenishment',asListed=simpleReceipt&&item.receiptMode!=='difference';
    if(expected)group.append(element('pre','IT sent:\n'+expectedText(expected,draft.purpose),'tc-expected'));
    if(simpleReceipt){
@@ -305,7 +305,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   updateReceiptReview();
   guideTransferForm(form,{state:guide,steps:[{title:draft.kind==='checkout'?'Choose equipment and recipient':'Confirm handoff',nodes:setupNodes,validate:()=>draft.kind==='checkout'&&!draft.items.length?'Add at least one equipment unit to this handoff.':null},...equipmentSteps,{title:'Review and sign',nodes:[...form.children].filter(node=>!beforeReview.has(node))}],onError:showSubmitError,onReview:()=>{
    reviewSummary.replaceChildren(element('h2','Review before signing'),element('p','Purpose: '+transferPurposeLabel(draft.purpose)),element('p',draft.kind==='checkout'?name+' → '+(data.technicians.find(t=>t.id===draft.serviceActor)?.name||'Choose recipient'):transfer.it_name+' → '+transfer.service_name));
-   for(const item of draft.items){const row=element('p');try{row.textContent=item.missing?'Not received: '+item.family+' '+item.unit_tag:expectedText(itemInput(item,draft.purpose),draft.purpose);}catch{row.textContent=item.family+' '+item.unit_tag+' · complete the equipment details before signing.';}row.className='tc-review-manifest';reviewSummary.append(row);}
+   for(const item of draft.items){const row=element('p');try{row.textContent=item.missing?'Not received: '+item.family+' '+item.unit_tag:expectedText(itemInput(item,draft.purpose),draft.purpose);}catch{row.textContent=item.family+' '+item.unit_tag+' · complete the equipment details before signing.';}row.className='tc-review-manifest';reviewSummary.append(row,element('small','Saved equipment key: '+item.equipment_key));}
    reviewSummary.append(element('small',draft.kind==='checkout'?'Sending creates a handoff awaiting the named Service technician’s receipt. It does not sign for them.':'Your signature records only your own checks and receipt.'));
   }});
  }

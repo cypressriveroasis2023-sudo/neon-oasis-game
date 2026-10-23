@@ -101,6 +101,12 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
    :call.path==='/api/vrm-fleet'?{items:[],sync:{state:'current',scheduleActive:true}}:undefined;
   if(!payload){unexpected.push(call);return route.fulfill({status:403,headers,json:{error:'Unavailable in synthetic fixture'}});}return route.fulfill({headers,json:payload});
  }
+ const candidateDist=process.env.COS_TEST_DIST||process.env.COS_IT_DAILY_TEST_DIST;
+ if(candidateDist&&url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/operations/dist/')){
+  const base=resolve(candidateDist),path=resolve(base,url.pathname.slice('/tech-checks/operations/dist/'.length));
+  if(!path.startsWith(base+'/'))return route.abort();
+  return route.fulfill({path});
+ }
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname.startsWith('/tech-checks/')){const path=resolve(root,'.'+url.pathname.slice('/tech-checks'.length));if(path.startsWith(root)){try{if((await stat(path)).isFile())return route.fulfill({body:await readFile(path),contentType:{'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml'}[extname(path)]||'application/octet-stream'});}catch{}}}
  unexpected.push(url.pathname);return route.abort();
  });

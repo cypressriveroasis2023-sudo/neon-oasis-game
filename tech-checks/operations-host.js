@@ -1,3 +1,4 @@
+import {readOwnerSchedule} from './schedule-read.js';
 import {readOwnerCustody} from './custody-read.js';
 import {setFieldMapDisplay} from './field-map-display-host.js';
 // Isolate the Operations UI while retaining the existing Tech Check session and views.
@@ -245,6 +246,14 @@ window.addEventListener('message', async event => {
   }
   if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof data.active==='boolean'){setFieldMapDisplay(frame,data.active);return;}
   if (!data || typeof data !== 'object') return;
+  if(data.type==='COS_OWNER_SCHEDULE_REQUEST'&&typeof data.requestId==='string'&&data.requestId.length<=100){
+    const subject=owner(),source=event.source,host=frame;
+    const current=()=>Boolean(subject&&owner()===subject&&frame===host&&source===frame?.contentWindow&&context()?.getEffectiveRole()==='owner'&&!document.getElementById('appView')?.classList.contains('hidden'));
+    if(!current())return;
+    try{const snapshot=await readOwnerSchedule(context().db,current,data.from,data.to);if(current())source.postMessage({type:'COS_OWNER_SCHEDULE_RESPONSE',requestId:data.requestId,snapshot},event.origin);}
+    catch{if(current())source.postMessage({type:'COS_OWNER_SCHEDULE_RESPONSE',requestId:data.requestId,error:'Saved Tech Check schedule unavailable.'},event.origin);}
+    return;
+  }
   if(data.type==='COS_OWNER_CUSTODY_REQUEST'&&typeof data.requestId==='string'&&data.requestId.length<=100){
     const subject=owner(),source=event.source,host=frame;
     const current=()=>Boolean(subject&&owner()===subject&&frame===host&&source===frame?.contentWindow&&context()?.getEffectiveRole()==='owner'&&!document.getElementById('appView')?.classList.contains('hidden'));

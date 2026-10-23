@@ -1,3 +1,4 @@
+import SavedTechCheckSchedule from './SavedTechCheckSchedule';
 import {useOwnerCustody} from './CustodyOverview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api';
@@ -41,6 +42,7 @@ export default function OperationsCalendar({show,onOpenJob}:Props) {
       {view==='Year'?<div className='calendar-year'>{Array.from({length:12},(_,index)=>{const monthKey=String(year)+'-'+String(index+1).padStart(2,'0');return <button key={monthKey} onClick={()=>{setCursor(monthKey+'-01');setView('Month');}}><b>{date(monthKey+'-01').toLocaleDateString('en-US',{timeZone:'UTC',month:'long'})}</b><span>{scheduled.filter(job=>scheduledDay(job.scheduled).startsWith(monthKey)).length} scheduled</span></button>;})}</div>:<div className={'calendar-grid '+view.toLowerCase()} role='grid' aria-label={label}>{days.map(day=>{const items=scheduled.filter(job=>scheduledDay(job.scheduled)===day);return <div role='gridcell' aria-label={day} className={'calendar-day '+(view==='Month'&&day.slice(0,7)!==month?'muted':'')} key={day}><b>{date(day).toLocaleDateString('en-US',{timeZone:'UTC',weekday:view==='Week'?'short':undefined,day:'numeric'})}</b>{custodyEvents.filter(event=>chicagoDay(new Date(event.date))===day).map(event=><div key={event.id} className='calendar-custody-event'><strong>{event.label}</strong><p>{event.detail}</p><small>{new Date(event.date).toLocaleString('en-US',{timeZone:'America/Chicago'})} CT</small></div>)}{items.map(job=><button key={job.id} aria-label={job.jobNumber+' · '+job.customer} onClick={()=>open(job)}><strong>{job.jobNumber}</strong><span>{job.customer}</span><small>{job.stage||job.status} · {job.technician||'Unassigned'}</small></button>)}</div>;})}</div>}
       {jobs&&scheduled.length===0&&<p>No jobs in the loaded records currently have a valid schedule.</p>}
     </>}
+    {days.length>0&&<SavedTechCheckSchedule from={days[0]} to={days[days.length-1]}/>}
     {selected&&<section className='quote-card' aria-label='Calendar job details'><div className='quote-section-head'><h3>{selected.jobNumber} · {selected.customer}</h3><button className='secondary' onClick={()=>setSelected(null)}>Close details</button></div><p>{selected.site} · {selected.jobType} · {selected.stage||selected.status}</p><p>{selected.scheduled} CT · {selected.technician||'Unassigned'} · {selected.equipmentUnitTag||selected.equipment||'Equipment not assigned'}</p></section>}
   </div>;
 }

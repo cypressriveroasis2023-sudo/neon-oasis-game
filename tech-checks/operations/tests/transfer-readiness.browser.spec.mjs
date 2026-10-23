@@ -90,7 +90,7 @@ test('direct linked Test IT desktop opens the shared Fleet board without probing
  await expect(frame.getByRole('heading',{name:'Fleet Dashboard',exact:true})).toBeVisible();
  await expect(frame.locator('.company-owner')).toContainText('Test IT');
  await expect(nav.getByRole('button')).toHaveCount(2);
- await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav.getByRole('button',{name:'Fleet Map',exact:true})).toHaveAttribute('aria-current','page');
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toHaveAttribute('data-fleet-view','fleet');
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toHaveAttribute('aria-current','page');
