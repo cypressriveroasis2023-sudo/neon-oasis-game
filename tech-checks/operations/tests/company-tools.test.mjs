@@ -46,6 +46,15 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
     const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     let navigationPreserved=original;
+    if(name==='onsite-vision'&&original.includes('onsite-vision-fleet-data.js')){
+      // Reviewed main be5ebf13 additions: preserve the exact prior baseline after
+      // asserting each new asset entry once. Vision behavior has its own tests.
+      const fleet='<script src="./onsite-vision-fleet-data.js?v=vision-mhelp-candidates-20261023" defer></script>\n  ';
+      const script='onsite-vision.js?v=vision-fleet-direct-20261023';
+      const style='onsite-vision.css?v=vision-fleet-unit-groups-20261023';
+      for(const entry of [fleet,script,style])assert.equal(original.split(entry).length-1,1);
+      navigationPreserved=original.replace(fleet,'').replace(script,'onsite-vision.js?v=vision-composer-20261006a').replace(style,'onsite-vision.css?v=vision-integrated-20260927');
+    }
     if(name==='camera-health'){
       const entry='function openSharedCameraHealth(){\n';
       const reviewedGuard='  // The parent chose diagnostics for this embedded board. Redirecting to the\n'

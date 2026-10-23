@@ -40,3 +40,27 @@ test('cached service addresses retain the exact multiline source text and older 
  const first=await run();assert.equal(first.records[0].sourceAddress.street,street);assert.equal(first.records[0].apiAssignment.placementProof.serviceVerified,true);assert.equal(reads,3);
  now+=15*60*1000;const second=await run();assert.equal(second.records[0].sourceAddress.street,street);assert.equal(reads,3);assert.equal(second.sourceReads.cacheHits,3);assert.equal(second.records[0].sourceDates.apiAddressObservedAt,first.records[0].sourceDates.apiAddressObservedAt);assert.notEqual(second.readAt,first.readAt);assert.equal(second.records[0].apiAssignment.placementProof.version,1);
 });
+
+test('publisher refresh rereads only selected resource paths, preserves category age and rejects changed equipment',async()=>{
+ const now='2026-10-23T18:00:00Z',oldTime='2026-10-23T16:00:00Z';let calls=[];const dates=new Map();
+ const options={review,baseline:{...baseline,publisherRefreshEquipmentIds:['1']},now:()=>now,observedAt:path=>dates.get(path)||oldTime,verifyEquipment:async()=>review,
+ read:async(path,refresh)=>{calls.push({path,refresh});if(refresh)dates.set(path,now);return path.startsWith('/equipmentTypes')?catalog:path.includes('/servicelocations')?{totalRows:1,results:[site]}:parent;}};
+ const r=await readInventorySource(options);assert.equal(calls.filter(c=>c.refresh).length,2);assert.equal(r.records[0].sourceDates.apiCustomerObservedAt,now);assert.equal(r.records[0].sourceDates.apiAddressObservedAt,now);assert.equal(r.records[0].sourceDates.apiCategoryObservedAt,oldTime);
+ await assert.rejects(readInventorySource({...options,verifyEquipment:async()=>({...review,items:[{...source,customerId:'9'}]})}),/changed/);
+ await assert.rejects(readInventorySource({...options,baseline:{...baseline,publisherRefreshEquipmentIds:Array(7).fill('1')}}),/selection/);
+ await assert.rejects(readInventorySource({...options,read:async()=>{throw Error('provider wait');}}),/provider wait/);
+});
+
+test('queued refresh caps actual forced paths and drains failed workers before returning',async()=>{
+ let forced=0,inFlight=0,verified=0;const now='2026-10-23T18:00:00Z';
+ const sources=Array.from({length:6},(_,i)=>({...source,equipmentId:String(i+1),name:'Synthetic '+i,customerId:String(100+i),serviceLocationId:String(1000+i)}));
+ const r={...review,totalRows:6,items:sources},b={...baseline,publisherRefreshEquipmentIds:sources.map(e=>e.equipmentId),records:sources.map(e=>({...old,productId:e.equipmentId,unitNumber:e.name,customerId:e.customerId}))};
+ await assert.rejects(readInventorySource({review:r,baseline:b,now:()=>now,observedAt:()=>now,verifyEquipment:async()=>{verified++;return r;},read:async(path,refresh)=>{
+  if(path.startsWith('/equipmentTypes'))return catalog;
+  assert.equal(refresh,true);forced++;inFlight++;try{await new Promise(resolve=>setTimeout(resolve,1));const u=new URL(path,'https://example.test'),customer=Number(u.pathname.split('/')[2]);
+   if(path.includes('/servicelocations')){const offset=Number(u.searchParams.get('rowIndex'));return {totalRows:5000,results:Array.from({length:200},(_,i)=>({...site,customerId:customer,serviceLocationId:10000+offset+i}))};}
+   return {...parent,customerId:customer};
+  }finally{inFlight--;}
+ }}),/bound exceeded/);
+ assert.equal(forced,12);assert.equal(inFlight,0);assert.equal(verified,0);
+});

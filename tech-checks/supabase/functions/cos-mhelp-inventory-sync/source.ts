@@ -6,7 +6,19 @@ const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v
 const text=(v:unknown,max=600)=>v==null?'':typeof v==='number'&&Number.isSafeInteger(v)?String(v):typeof v==='string'&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/.test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v)?v.trim():(()=>{throw Error('Unsafe source field');})();
 const same=(a:Row,b:Row)=>['equipmentId','name','model','equipmentTypeId','customerId','serviceLocationId','active','updatedAt'].every(k=>a[k]===b[k]);
 export async function readInventorySource(options:{review:Row;baseline:Row;read:(path:string,refresh?:boolean)=>Promise<any>;observedAt?:(path:string)=>string|undefined;readStats?:()=>{cacheHits:number;resourceCacheMisses:number};verifyEquipment:()=>Promise<any>;now?:()=>string}){
- const {review,baseline,read}=options;const comparison=compareInventoryEquipment(review,baseline);
+ const {review,baseline}=options;
+ const requested=baseline.publisherRefreshEquipmentIds??[];
+ if(!Array.isArray(requested)||requested.length>6||requested.some(v=>!id(v))||new Set(requested).size!==requested.length)throw Error('Invalid publisher refresh selection');
+ const refreshCustomers=new Set<string>(review.items.filter((e:Row)=>requested.includes(e.equipmentId)).map((e:Row)=>e.customerId));
+ const refreshPaths=new Map<string,Promise<any>>();
+ const read:typeof options.read=async(path,refresh=false)=>{
+  const customer=path.match(/^\/customers\/([1-9][0-9]*)(?:\?|\/)/)?.[1];
+  if(customer&&refreshCustomers.has(customer)){
+   if(!refreshPaths.has(path)){if(refreshPaths.size>=12)throw Error('Publisher refresh read bound exceeded');refreshPaths.set(path,options.read(path,true));}
+   return refreshPaths.get(path)!;
+  }
+  return options.read(path,refresh);
+ }; const comparison=compareInventoryEquipment(review,baseline);
  const companyIds=baseline.companyCustomerIds;if(!Array.isArray(companyIds)||!companyIds.length||companyIds.some(v=>!id(v)))throw Error('Shop identities unavailable');
  const companies=new Set(companyIds),parents=new Map<string,Promise<Row>>(),services=new Map<string,Promise<Row[]>>(),refreshedServices=new Set<string>(),observations=new Map<string,string>();
  const observe=(key:string,path:string)=>{if(!options.observedAt)return;const at=options.observedAt(path),now=Date.parse((options.now||(()=>new Date().toISOString()))());if(!at||!Number.isFinite(Date.parse(at))||Date.parse(at)>now+30000||Date.parse(at)<now-3*3600000)throw Error('Resource observation unavailable');const before=observations.get(key);if(!before||Date.parse(at)<Date.parse(before))observations.set(key,at);};
@@ -28,7 +40,7 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
  const categories=new Map<string,string>();for(const c of categoryRows){const key=id(c.equipmentTypeId);if(!key||categories.has(key)||id(c.portalId)!=='224643'||!text(c.category,250))throw Error('Invalid equipment category');categories.set(key,text(c.category,250));}
  if(review.items.some((r:Row)=>!categories.has(r.equipmentTypeId)))throw Error('Equipment category needs review');
  const records:Row[]=new Array(review.items.length);let next=0;
- await Promise.all(Array.from({length:3},async()=>{while(next<review.items.length){const index=next++,e=review.items[index],old=prior.get(e.equipmentId);if(!id(e.customerId))throw Error('Equipment customer unavailable');const p=await parent(e.customerId);
+ const workers=await Promise.allSettled(Array.from({length:3},async()=>{while(next<review.items.length){const index=next++,e=review.items[index],old=prior.get(e.equipmentId);if(!id(e.customerId))throw Error('Equipment customer unavailable');const p=await parent(e.customerId);
   const shop=companies.has(e.customerId);let site:Row|null=null,addressReview:string|null=null;
   if(!shop){const siteId=e.serviceLocationId||(p.isServiceLocation===true?e.customerId:null);
    if(!siteId)addressReview='service_location_not_assigned';
@@ -55,6 +67,7 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
      siteLabel:siteName,serviceVerified:site!==null&&addressReview===null,serviceActive:site?.isActive??null}},addressReview,
   };
  }}));
+ const failed=workers.find((r):r is PromiseRejectedResult=>r.status==='rejected');if(failed)throw failed.reason;
  const fresh=await options.verifyEquipment();compareInventoryEquipment(fresh,baseline);
  if(fresh.items.length!==review.items.length||fresh.items.some((r:Row,i:number)=>!same(r,review.items[i])))throw Error('Equipment changed during source read');
  return {comparison,records,readAt:(options.now||(()=>new Date().toISOString()))(),portalId:'224643',complete:true,
