@@ -1,3 +1,4 @@
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -19,6 +20,11 @@ test.afterEach(async({page},testInfo)=>{
   await writeFile(path,JSON.stringify({reads:state.reads,pendingDaily:state.pendingDaily,dailyResults:state.dailyResults,fleetReads:state.fleetReads,writes:state.writes,frames},null,2));
   await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
 });
+function tvPlacementFixture(units){
+ const f=fieldProductFixture(),records=units.map((unit,i)=>({...f.upload.records[0],productId:String(8001+i),recordId:'mhelp_product:'+String(8001+i),unitNumber:unit.unitNumber,category:unit.modelName,binding:{state:'linked',unitIds:[unit.id],candidateUnitIds:[],placementHeld:false}}));
+ const items=units.map((unit,i)=>({...f.roster.items[0],id:'cos_unit:'+unit.id,unitId:unit.id,unit,unitNumber:unit.unitNumber,productIds:[records[i].productId],sourceRecordIds:[records[i].recordId],representedUnitIds:[unit.id],observedAt:time}));
+ return {uploadInventory:{...f.upload,receivedAt:time,records,summary:{totalRecords:units.length,fieldRecords:units.length,shopRecords:0,unflaggedFieldRecords:units.length,unflaggedShopRecords:0,doNotUseRecords:0,missingRecords:0}},fleetRoster:{...f.roster,items,summary:{totalRecords:units.length,activeRecords:units.length,field:units.length,shop:0,review:0,excludedLifecycle:0,sourceOnlyRecords:0,linkedUnitRecords:units.length}}};
+}
 async function setup(page, { many = false, pausedClock = false, simple = false, recoverable = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
   state.expectedToken='synthetic-owner-session';state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
@@ -33,8 +39,8 @@ async function setup(page, { many = false, pausedClock = false, simple = false, 
   if(pausedClock)await page.clock.pauseAt(new Date(time));
   state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetFailures={};
   if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
-  const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
-  state.fleetUnits=[unit];state.cameraRows=[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
+  const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',placement:'FIELD',currentLocationType:'field',activeInventoryEligible:true,site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
+  state.fleetUnits=[unit];state.cameraRows=[{id:'1',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if(url.origin===origin){
@@ -75,9 +81,9 @@ async function setup(page, { many = false, pausedClock = false, simple = false, 
       return;
     }
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
-    if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
+    if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...tvPlacementFixture(state.fleetUnits),...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
-    if(path==='/api/camera-health/summary-v3'){state.fleetReads++;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows}});}
+    if(path==='/api/camera-health/summary-v3'){state.fleetReads++;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,identityVersion:1,unitIdentities:state.fleetUnits.map(unit=>({unitId:unit.id,unitNumber:unit.unitNumber,kind:'native_provider',deviceIds:state.cameraRows.filter(row=>row.unit===unit.unitNumber).map(row=>String(row.id)),unitKeys:[unit.unitNumber],proof:'a'.repeat(64)})).filter(identity=>identity.deviceIds.length),identityWarnings:[],...(state.healthSnapshot||{})}});}
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1'+(simple?'&simpleTv=1':''));
@@ -240,7 +246,7 @@ test('TV reads the same complete mHelp Field address layer as Fleet, groups dens
  const {state,frame}=await setup(page);
  state.fleetUnits[0]={...state.fleetUnits[0],latitude:32.77,longitude:-96.79}; // Distinct native site, not a claimed mHelp Product-ID duplicate.
  const source='a'.repeat(64),payload='b'.repeat(64);
- const head={sourceSha256:source,payloadSha256:payload,summary:{totalRecords:1001},records:Array.from({length:1001},(_,i)=>({productId:String(i+1),placement:i<287?'FIELD':'SHOP'}))};
+ const head={...fieldProductFixture().upload,sourceSha256:source,payloadSha256:payload,receivedAt:time,summary:{totalRecords:1001,fieldRecords:287,shopRecords:714,unflaggedFieldRecords:287,doNotUseRecords:0,missingRecords:0},records:Array.from({length:1001},(_,i)=>({productId:String(i+1),recordId:'mhelp_product:'+String(i+1),unitNumber:'Field unit '+String(i+1),category:'Spotter',placement:i<287?'FIELD':'SHOP',uploadLifecycle:'UNFLAGGED'}))};
  const address={contract:'COS_MHELP_CENSUS_ADDRESS_MAP_V1',sourceSha256:source,payloadSha256:payload,totalProducts:1001,fieldProducts:287,shopProducts:714,verifiedGps:false,liveGps:false,confidence:'mhelpdesk_customer_address_reference_only',
   items:Array.from({length:287},(_,i)=>({productId:String(i+1),sourceRowSha256:'c'.repeat(64),unitNumber:'Field unit '+String(i+1),customer:'Saved customer',category:'Spotter',placement:'FIELD',lifecycle:'UNFLAGGED',placementHeld:false,sourceAddress:{street:'123 Example Rd',city:'Houston',state:'TX',zip:'77064'},status:'matched',reason:null,matchedAddress:'123 EXAMPLE RD, HOUSTON, TX, 77064',latitude:29.9,longitude:-95.3,geocodedAt:time,geocodeSource:'us_census_address_range',verified:false,liveGps:false,confidence:'mhelpdesk_address_census_range_unverified'}))};
  state.fieldMapExtras={uploadInventory:head,mhelpAddressMap:address};
@@ -249,17 +255,17 @@ test('TV reads the same complete mHelp Field address layer as Fleet, groups dens
  const map=frame.locator('.tv-fleet-map'),groups=map.locator('.cos-compact-group-marker');
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('287 mHelp address pins');
- await expect(frame.locator('.tv-fleet-summary')).toContainText('1 GPS-verified');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('0 GPS-verified');
  await expect(groups).toHaveCount(1);
- await expect(groups).toHaveAttribute('data-group-count','287'); // All 287 Product IDs remain selectable; the native unit is separately located.
+ await expect(groups).toHaveAttribute('data-group-count','287'); // All authoritative Product IDs remain selectable; the unbound native row cannot add a Field unit.
  await groups.click();
  await expect(frame.locator('.cos-compact-group-popup')).toContainText('287 equipment at nearby locations');
  await expect(frame.locator('.cos-compact-show-all')).toBeVisible();
  expect(state.writes).toEqual([]);
 });
 
-function fieldUnit(index,latitude=29.986,longitude=-95.311){return {id:'bbbbbbbb-bbbb-4bbb-8bbb-'+String(index).padStart(12,'0'),unitNumber:'Sniper '+(312+index),modelName:'SNIPER',status:'installed',site:'Field site '+index,address:'Field address '+index,latitude,longitude,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};}
-function cameraRow(unit,status){return {id:'resource-'+unit.id,name:unit.unitNumber+' connection',unit:unit.unitNumber,status,scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status,active:true,resource:'service',observedAt:time,lastOnlineAt:status==='online'?time:'2026-10-12T14:00:00Z',reachable:status==='online',confirmedOutage:status==='offline'}};}
+function fieldUnit(index,latitude=29.986,longitude=-95.311){return {id:'bbbbbbbb-bbbb-4bbb-8bbb-'+String(index).padStart(12,'0'),unitNumber:'Sniper '+(312+index),modelName:'SNIPER',status:'installed',placement:'FIELD',currentLocationType:'field',activeInventoryEligible:true,site:'Field site '+index,address:'Field address '+index,latitude,longitude,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};}
+function cameraRow(unit,status){return {id:String(Number(unit.id.slice(-12))+1),name:unit.unitNumber+' camera',unit:unit.unitNumber,type:'IPC',status,scope:'field',activationState:'active',evidence:{kind:'provider',source:'Star4Live',status,active:true,resource:'camera',observedAt:time,lastOnlineAt:status==='online'?time:'2026-10-12T14:00:00Z'}};}
 
 test('Camera Health rotates every red outage and never lists green or unknown units',async({page},testInfo)=>{
  // This exact page-by-page test owns elapsed time; wall-clock progress must not
@@ -448,5 +454,29 @@ test('manual TV View survives repeated same-Owner recovery and six hours of refr
  await expect(board).toHaveCount(0);await expect(page.locator('#hostToolbar')).toBeVisible();
  expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
  expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('tvBoard'))).toBe(false);
+ expect(state.writes).toEqual([]);
+});
+
+
+test('TV reconciles Field Product IDs and refreshes saved camera reads without renewing stale evidence',async({page},testInfo)=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ const original=fieldProductFixture();
+ const f=JSON.parse(JSON.stringify(original).replaceAll(original.fresh,time));
+ state.fleetUnits=f.units;state.fieldMapExtras=f.field;state.healthSnapshot=f.health;
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ const summary=frame.locator('.tv-fleet-summary');
+ await expect(summary).toContainText('1 online');await expect(summary).toContainText('1 offline');
+ await expect(summary).toContainText('4 unverified');await expect(summary).toContainText('6 camera-capable Field units');
+ await expect(summary).toContainText('1 support equipment');await expect(summary).toContainText('7 Field Product IDs');
+ const before=state.fleetReads;
+ await page.clock.fastForward(4*60*1000);
+ await expect.poll(()=>state.fleetReads).toBeGreaterThan(before);
+ // Successful subsequent reads retain the original observation times.
+ await page.clock.fastForward(21*60*1000);
+ await expect(summary).toContainText('0 online');await expect(summary).toContainText('0 offline');
+ await expect(summary).toContainText('6 unverified');
+ await expect(frame.locator('.tv-fleet-warning')).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('tv-authoritative-census-stale.png')});
  expect(state.writes).toEqual([]);
 });
