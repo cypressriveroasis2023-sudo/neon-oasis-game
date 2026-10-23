@@ -239,6 +239,9 @@ window.addEventListener('message', async event => {
   }
   if(data?.type==='COS_TV_BOARD_DISPLAY_MODE'&&typeof data.active==='boolean'&&context()?.getEffectiveRole()==='owner'){
     setFieldMapDisplay(frame,data.active);
+    if(data.active){
+      const url=new URL(location.href);url.searchParams.set('tvBoard','1');history.replaceState(history.state,'',url);
+    }
     if(!data.active&&new URLSearchParams(location.search).get('tvBoard')==='1'){
       const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment','simpleTv'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
     }

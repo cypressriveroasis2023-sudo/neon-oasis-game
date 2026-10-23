@@ -9,7 +9,7 @@ const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operatio
 const time = '2026-10-12T15:00:00Z';
 const cors = {'access-control-allow-origin': origin};
 const dist = process.env.COS_TEST_DIST ? process.env.COS_TEST_DIST.replace(/\/$/,'')+'/' : fileURLToPath(new URL('../dist/', import.meta.url));
-const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{width:100%;height:600px;border:0}.hidden{display:none}</style></head><body><header id="hostToolbar">Host tools</header><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
+const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{width:100%;height:600px;border:0}.hidden{display:none}</style></head><body><header id="hostToolbar">Host tools</header><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:window.tvToken||"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
 const diagnostics=new WeakMap();
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
 test.afterEach(async({page},testInfo)=>{
@@ -19,9 +19,9 @@ test.afterEach(async({page},testInfo)=>{
   await writeFile(path,JSON.stringify({reads:state.reads,pendingDaily:state.pendingDaily,dailyResults:state.dailyResults,fleetReads:state.fleetReads,writes:state.writes,frames},null,2));
   await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
 });
-async function setup(page, { many = false, pausedClock = false, simple = false } = {}) {
+async function setup(page, { many = false, pausedClock = false, simple = false, recoverable = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
-  state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
+  state.expectedToken='synthetic-owner-session';state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
   await page.addInitScript(()=>{
     window.tvLifecycleEvents=[];
     addEventListener('cos-private-data-invalidated',event=>window.tvLifecycleEvents.push({type:'invalidated',reason:event.detail?.reason??'untyped',at:Date.now()}));
@@ -49,7 +49,11 @@ async function setup(page, { many = false, pausedClock = false, simple = false }
     if(url.href!==edge)return route.abort('blockedbyclient');
     if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'}});
     const {path,method,body}=request.postDataJSON();
-    expect(await request.headerValue('authorization')).toBe('Bearer synthetic-owner-session');
+    expect(await request.headerValue('authorization')).toBe('Bearer '+state.expectedToken);
+    if(path==='/api/session'&&recoverable){
+      state.sessionReads=(state.sessionReads||0)+1;const gate=state.sessionGate;state.sessionGate=null;if(gate)await gate.promise;
+      return route.fulfill({headers:cors,json:{authorized:true,legacyOwner:true,name:'Fixture Owner',role:'Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:false}}});
+    }
     if(path==='/api/tv-board/settings'){
       if(method==='POST'){
         state.writes.push({path,method,body});
@@ -410,5 +414,39 @@ test('Owner sees saved custody and historical return dates through the real read
  await frame.getByRole('button',{name:'Day',exact:true}).click();await expect(day).toContainText('Handoff recorded');
  await day.screenshot({path:testInfo.outputPath('cos-custody-calendar.png')});
  expect(await page.evaluate(()=>window.custodyRpcCalls.every(name=>['owner_service_truck_inventory_v1','techcheck_transfer_context_v1','techcheck_ticketfree_context_v1'].includes(name)))).toBe(true);
+ expect(state.writes).toEqual([]);
+});
+
+
+test('manual TV View survives repeated same-Owner recovery and six hours of refresh until explicit exit',async({page},testInfo)=>{
+ const {state,frame}=await setup(page,{pausedClock:true,recoverable:true});
+ const board=frame.getByRole('region',{name:'Tech Check TV Board'});
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
+ await frame.getByRole('button',{name:'TV View',exact:true}).click();
+ await expect(board).toBeVisible();
+ for(let cycle=1;cycle<=3;cycle++){
+  const gate=deferred(),reads=state.sessionReads;state.sessionGate=gate;
+  state.expectedToken='synthetic-owner-session-'+cycle;await page.evaluate(token=>window.tvToken=token,state.expectedToken);
+  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.clock.runFor(1);
+  await expect.poll(()=>state.sessionReads).toBe(reads+1);
+  await expect(board).toHaveCount(0);
+  await expect(frame.getByText('Verifying your current Operations account…')).toBeVisible();
+  gate.resolve();await expect(board).toBeVisible();
+  await expect(page.locator('#hostToolbar')).toBeHidden();
+ }
+ for(let halfHour=0;halfHour<12;halfHour++){
+  await expect.poll(()=>state.pendingDaily).toBe(0);
+  const reads=state.reads;await page.clock.fastForward(30*60000);
+  await expect.poll(()=>state.reads).toBeGreaterThan(reads);
+  await expect.poll(()=>state.pendingDaily).toBe(0);await expect(board).toBeVisible();
+ }
+ state.expectedToken='synthetic-owner-session';await page.reload();await expect(board).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('tv-persistence-after-recovery.png')});
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ await expect(board).toHaveCount(0);await expect(page.locator('#hostToolbar')).toBeVisible();
+ expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
+ expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('tvBoard'))).toBe(false);
  expect(state.writes).toEqual([]);
 });
