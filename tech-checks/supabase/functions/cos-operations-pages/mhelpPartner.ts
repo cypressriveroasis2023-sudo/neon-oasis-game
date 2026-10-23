@@ -9,6 +9,10 @@ const FIELDS = 'equipmentId,portalId,equipmentTypeId,name,model,customerId,servi
 export class MhelpPartnerError extends Error {
   constructor(message: string, public status = 503, public provider?: {operation:'account_read'|'equipment_read';httpStatus:number}) { super(message); }
 }
+/** The existing whole-pass timer fired; this does not identify a vendor failure. */
+export class MhelpPartnerReadDeadlineError extends MhelpPartnerError {
+  constructor() { super('The mHelpDesk read timed out. Retry the preview.'); }
+}
 type ObjectValue = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
 export type PartnerEquipment = {
@@ -70,7 +74,7 @@ async function boundedJson(response: Response, signal: AbortSignal, maxBytes = 1
   const decoder = new TextDecoder('utf-8', {fatal: true});
   try {
     while (true) {
-      if (signal.aborted) fail('The mHelpDesk read timed out. Retry the preview.');
+      if (signal.aborted) throw new MhelpPartnerReadDeadlineError();
       const {done, value} = await reader.read(); if (done) break;
       size += value.byteLength;
       if (size > maxBytes) { await reader.cancel(); fail('mHelpDesk returned an oversized response.'); }
@@ -79,6 +83,7 @@ async function boundedJson(response: Response, signal: AbortSignal, maxBytes = 1
     raw += decoder.decode(); return JSON.parse(raw);
   } catch (cause) {
     if (cause instanceof MhelpPartnerError) throw cause;
+    if (signal.aborted) throw new MhelpPartnerReadDeadlineError();
     return fail('mHelpDesk returned an incomplete response. Retry the preview.');
   } finally { reader.releaseLock(); }
 }
@@ -114,7 +119,7 @@ export function createMhelpPartnerHandler(options: {
       const read = async (url: string, maxBytes?: number) => {
         let response: Response;
         try { response = await options.fetch(url, {method: 'GET', headers: {Authorization: 'Bearer ' + config.accessToken, Accept: 'application/json'}, redirect: 'error', cache: 'no-store', signal: controller.signal}); }
-        catch { return fail('mHelpDesk could not be reached. Retry the preview.'); }
+        catch { if (controller.signal.aborted) throw new MhelpPartnerReadDeadlineError(); return fail('mHelpDesk could not be reached. Retry the preview.'); }
         if (response.status===401 && url===CURRENT_USER_API && options.renewAccess && !renewed) {
           renewed=true; await response.body?.cancel().catch(()=>{});
           try { config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess); } catch { return fail('mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.'); }
