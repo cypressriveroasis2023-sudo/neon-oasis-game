@@ -95,8 +95,10 @@ export function readMhelpCandidates(fieldMap:unknown,now=Date.now()):Map<string,
       });}
       continue;
     }
-    const row=rows[0],key=typedUnit(row.unitNumber)!.key;
-    if(found.has(key))continue;
+    const row=rows[0];
+    // Retain the exact full-key candidate AND a separate concern-key review
+    // hint for an unsuffixed provider label. The hint never contains Field,
+    // Shop, customer or address evidence and cannot promote placement.
     found.set('review:'+concern,{
       state:'unit_variant_review',product_id:row.productId,mhelp_unit:row.unitNumber,
       placement:null,customer:null,source_address:null,
