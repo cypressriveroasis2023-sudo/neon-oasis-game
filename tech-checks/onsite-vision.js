@@ -135,7 +135,7 @@ function agentHistory(currentText=''){
 function renderAgentNotice(){
   const notice=$('visionAgentNotice');if(!notice)return;
   notice.textContent=state.agentStatus==='online'?'':state.agentStatus==='unavailable'
-    ?'AI is not configured. Basic answers from connected Tech Check data are still available.'
+    ?'Conversational AI is not configured. Verified Camera Health and Tech Check data can still be read.'
     :'AI connection could not be verified. Basic Tech Check answers may still be available.';
   notice.classList.toggle('hidden',state.agentStatus==='online');
 }
@@ -2078,15 +2078,19 @@ function cameraFleetIntent(value){
   // An explicit Tech Check escalation is a different source from camera-provider status.
   if(/\b(escalations?|waiting (?:on|for) it|failed unit|owner decision|it intake|backup swap|troubleshooting already|mhelpdesk (?:ticket|job))\b/i.test(text))return false;
   const subject=/\b(cameras?|camera health|fleet|star4live|vigilant|avigilon|reconeyez|recorders?|nvrs?|spotters?|solar spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text);
-  const status=/\b(online|offline|down|up|outage|outages|status|health|unverified|last online|last seen|needs? attention|where|located|location|address|site|customer|monitor(?:ing)?|working|not working)\b/i.test(text);
+  const status=/\b(online|offline|down|up|outage|outages|status|health|unverified|last online|last seen|needs? attention|where|located|location|address|site|customer|monitor(?:ing)?|working|not working|how many|counts?|totals?|summary|rundown|report|history|which)\b/i.test(text);
   return subject&&status&&(/\b(cameras?|fleet|star4live|vigilant|avigilon|reconeyez|recorders?|nvrs?)\b/i.test(text)||
     /\b(spotters?|helios|snipers?|cam\s*v|rangers?|recon\s*(?:2|ii))\b/i.test(text));
 }
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   if(cameraFleetIntent(raw)){
-    const response=await serverAgentAnswer(raw);
-    return response || '<div class="vision-direct warn"><b>Camera Health cannot be verified by Vision right now.</b>The saved fleet data has not been retrieved. Use Camera Health directly; Vision will not substitute Tech Check escalation counts for live camera evidence.</div>';
+    // Verified camera data is a deterministic Owner read, not an OpenAI chat
+    // request: DATA LIVE must still answer when the model key is absent.
+    const fleet=window.OnSiteVisionFleetData;
+    return fleet?.answer
+      ? await fleet.answer(raw,db)
+      : '<div class="vision-direct warn"><b>Camera Health reader is unavailable.</b>Reload the Vision page and retry. No camera statuses were inferred.</div>';
   }
   const current=chat();
   if(current?.draft){

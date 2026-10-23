@@ -3,7 +3,10 @@ on:
   pull_request:
     paths:
       - 'tech-checks/onsite-vision.js'
+      - 'tech-checks/onsite-vision.html'
+      - 'tech-checks/onsite-vision-fleet-data.js'
       - 'tech-checks/operations/tests/vision-fleet-intelligence.test.mjs'
+      - 'tech-checks/operations/tests/vision-fleet-direct-fallback.test.mjs'
       - 'tech-checks/supabase/functions/onsite-vision-agent/**'
       - '.github/workflows/vision-fleet-intelligence.yml'
   workflow_dispatch:
@@ -19,9 +22,9 @@ jobs:
         with:
           node-version: '22'
       - name: Validate browser assistant syntax
-        run: node --check tech-checks/onsite-vision.js
+        run: node --check tech-checks/onsite-vision.js && node --check tech-checks/onsite-vision-fleet-data.js
       - name: Verify live-read fleet projections and routing
-        run: node --experimental-strip-types --test tech-checks/operations/tests/vision-fleet-intelligence.test.mjs
+        run: node --experimental-strip-types --test tech-checks/operations/tests/vision-fleet-intelligence.test.mjs tech-checks/operations/tests/vision-fleet-direct-fallback.test.mjs
       - name: Install existing COS Operations dependencies
         working-directory: tech-checks/operations
         run: npm ci --no-audit --no-fund
