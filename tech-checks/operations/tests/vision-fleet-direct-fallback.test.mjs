@@ -108,3 +108,35 @@ test('Server bypasses absent OpenAI key only AFTER active Owner authentication',
   assert.match(section,/read_only: true, model_required: false/);
   assert.doesNotMatch(section,/service_role|\.update\(|\.insert\(|\.delete\(/);
 });
+
+test('Multiple distinct provider camera channels on one unit appear as one expandable unit',()=>{
+  const rows=[1,2,3,4].map(id=>({
+    id,name:'SolarSpotter 029_'+id,unit:'SOLARSPOTTER 029',type:'IPC',
+    scope:'field',activationState:'ACTIVE',status:'offline',
+    evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,
+      status:'offline',observedAt:t,lastOnlineAt:new Date(Date.now()-86400000).toISOString()}
+  }));
+  const more={...rows[0],id:5,name:'Solar Spotter 029HDC2',unit:'Solar Spotter 029HDC2',
+    status:'online',evidence:{...rows[0].evidence,status:'online'}};
+  const cameraRows=[...rows,more];
+  const result=projectVisionFleet({
+    evidenceVersion:2,refreshedAt:t,rows:cameraRows,totalDevices:5,
+    fieldDevices:5,shopRoot:0,online:1,offline:4,review:0,
+    inventory:{allRecords:5,activeFieldRecords:5,activeShopRecords:0,
+      inactiveRecords:0,unknownScopeRecords:0}
+  },map,{scope:'summary',unit_reference:'',location_query:'',limit:60});
+  assert.equal(result.monitored_cameras.total,5);
+  assert.equal(result.monitored_cameras.offline,4);
+  const html=fleetReader.render(result,{scope:'summary'});
+  assert.equal((html.match(/class="vision-fleet-unit"/g)||[]).length,2);
+  assert.match(html,/Solar Spotter 029 · OFFLINE OBSERVATIONS/);
+  assert.match(html,/4\/4 cameras OFFLINE/);
+  assert.match(html,/SolarSpotter 029_1/);
+  assert.match(html,/SolarSpotter 029_2/);
+  assert.match(html,/SolarSpotter 029_3/);
+  assert.match(html,/SolarSpotter 029_4/);
+  assert.match(html,/Solar Spotter 029HDC2/);
+  assert.match(html,/Source record 1/);
+  assert.match(html,/No uniquely verified COS Field Map/);
+  assert.doesNotMatch(html,/4 units offline/i);
+});
