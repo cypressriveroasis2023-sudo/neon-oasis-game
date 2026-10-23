@@ -106,7 +106,7 @@ test('Complete provider identity can correct a heuristic SHOP scope when current
 });
 test('Conflicting linked resource IDs and map snapshot contradiction fail closed',()=>{
  const f=source();
- f.health.unitIdentities.push(claim(field,[155,156,157,158],['SOLARSPOTTER 029']));
+ f.health.unitIdentities.push(claim({id:uid(4),unitNumber:'Another Camera Identity'},[155,156,157,158],['SOLARSPOTTER 029']));
  const conflict=classifySource(f);
  assert.equal(conflict.monitored_cameras.total,1);
  assert.equal(conflict.placement_review_counts.cameras.offline,4);
