@@ -1,3 +1,4 @@
+import {resource,snapshot,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet as mount} from './fleet-dashboard-fixtures.mjs';
@@ -8,3 +9,17 @@ test('location queue contains only unverified field installations and can open c
 test('failed refresh preserves placements and turns camera colors unverified; retry recovers',async({page})=>{const {app,state}=await mount(page);state.fail=true;for(const unit of [...state.field.items,...state.field.inventoryItems])if(unit.unitNumber==='Helios 1')unit.site='Latest saved installation';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'})).toContainText('Latest saved installation');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();state.fail=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');});
 test('session invalidation quarantines unit records and details until reload',async({page})=>{const {app,state}=await mount(page);await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();await app.locator('.cos-fleet-dashboard').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));await expect(app.getByRole('dialog')).toHaveCount(0);await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(0);await expectOperationsReloadRequired(app);await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);await expect(app.locator('.cos-fleet-stat-field strong')).toHaveCount(0);await expect(app.locator('body')).not.toContainText('Helios 1');expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);});
 test('map-only fullscreen keeps unit details usable and returns to the dashboard',async({page})=>{const {app}=await mount(page);await app.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(app.locator('.cos-fleet-map-expanded')).toBeVisible();await app.locator('.cos-dashboard-marker').first().click();await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();await app.getByRole('button',{name:'Close unit details'}).click();await app.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();await expect(app.locator('.cos-fleet-map-expanded')).toHaveCount(0);});
+
+test('unreviewed resource labels cannot establish Fleet online or offline equipment counts',async({page})=>{
+ const health=snapshot([resource(1,'Helios 1'),withStatus(resource(2,'Spotter 1'),'offline'),resource(3,'Spotter 2')]);
+ const {app,state}=await mount(page,false,{health});
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('3');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(3);
+ await app.getByLabel('Fleet status',{exact:true}).selectOption('unknown');
+ await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(3);
+ expect(state.calls.every(call=>call.method==='GET')).toBeTruthy();
+ expect(state.errors).toEqual([]);
+});
