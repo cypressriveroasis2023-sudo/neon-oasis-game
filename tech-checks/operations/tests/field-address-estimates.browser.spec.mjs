@@ -1,5 +1,6 @@
 import {revealMapFilters,revealMapInfo,revealInstallationEvidence} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {createHash} from 'node:crypto';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173',now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
@@ -29,7 +30,8 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
   if(request.method!=='GET'){state.writes.push(request);return route.fulfill({status:400,headers,body:'{}'});}
   if(request.path==='/api/field-map')state.reads++;
   if(request.path==='/api/field-map'&&state.mapFailure)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Imported address lookup results are unavailable. The map could not be refreshed.'})});
-  const health=snapshot((noCameras?[]:state.units).map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
+  const rawHealth=snapshot((noCameras?[]:state.units).map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
+  const health=withReviewedResources(rawHealth,(noCameras?[]:state.units).map((unit,i)=>({unit,ids:[i+1],kind:'owner_confirmed_native'})));
   const data=request.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:1,unitGps:0,missingGps:state.units.length-1},generatedAt:now}
    :request.path==='/api/camera-health/summary-v3'?health
