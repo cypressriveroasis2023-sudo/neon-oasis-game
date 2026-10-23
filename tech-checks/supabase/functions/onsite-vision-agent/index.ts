@@ -408,7 +408,7 @@ const tools = [
   {
     type: 'function',
     name: 'get_camera_fleet_health',
-    description: 'Read existing COS Operations saved Camera Health and Field Map for this authenticated Owner. Use for online/offline/unverified camera status, source/provider breakdown, individual camera/units, customer/site/address locations and camera attention. IP/port reachability does not prove camera video. A saved last-online time does not prove outage duration; Shop and unresolved placements never count as Field outages.',
+    description: 'Read existing COS Operations saved Camera Health and Field Map for this authenticated Owner. Use for online/offline/unverified camera status, source/provider breakdown, individual camera/units, customer/site/address locations and camera attention. NVR recorder status is separate from camera channels. IP/port reachability does not prove camera video. A saved last-online time does not prove outage duration; Shop and unresolved placements never count as Field outages.',
     strict: true,
     parameters: {
       type: 'object',
@@ -1349,7 +1349,7 @@ Deno.serve(async (req) => {
       '- For questions about a named company person, employee, technician, owner, or whether someone exists in Tech Check, call find_people. This lookup includes Owner/IT/Service and active/inactive/archived profile records.',
       '- For permanent historical questions about a technician, numbered unit, or customer/site, call get_company_history before answering. History remains available after job closeout and after equipment returns to Shop Inventory.',
       '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
-      '- For camera health, the number online/offline/unverified, down cameras, provider status, saved locations, outage age or camera-specific attention, call get_camera_fleet_health before answering. Distinguish source camera/detector records from equipment inventory and independent IP/port reachability. State the snapshot time and evidence limitations.',
+      '- For camera health, the number online/offline/unverified, down cameras, provider status, saved locations, outage age or camera-specific attention, call get_camera_fleet_health before answering. Distinguish source camera/detector records, separate NVR recorder status, equipment inventory and independent IP/port reachability. State the snapshot time and evidence limitations.',
       '- Provider last_online_at is not evidence of actual outage onset. The fleet history tool may return outage_observation_span_minutes when source-matched saved OFFLINE history exists. That is a span of recorded offline observations, NOT verified uninterrupted downtime; say this clearly. When the historical source cannot be verified, report outage duration as MISSING INFORMATION.',
       '- Keep Shop, inactive and unresolved-placement resources out of confirmed Field camera outages. If live Camera Health cannot be verified, never report zero or reuse old counts. If Field Map is unavailable, locations cannot be verified.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
