@@ -3,6 +3,7 @@ import {mountTransfers,SERVICE} from './helpers/transfer-fixture.mjs';
 test('guided checkout searches identities and preserves recipient across steps',async({page},testInfo)=>{
  const fixture=await mountTransfers(page,{guided:true});
  try{
+  if(page.viewportSize().width>900)await page.getByRole('navigation',{name:'IT daily views'}).getByRole('button',{name:'Check out / check in',exact:true}).click();
   await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
   await expect(page.locator('[data-transfer-progress]')).toContainText('Choose equipment and recipient');
   await expect(page.getByRole('button',{name:'Sign & send handoff'})).toBeHidden();

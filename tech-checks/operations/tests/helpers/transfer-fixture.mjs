@@ -73,6 +73,8 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
  const req=route.request(),url=new URL(req.url());
+ // Desktop starts on Fleet; serve only its fixed basemap tiles locally.
+ if(req.method()==='GET'&&url.origin==='https://tile.openstreetmap.org'&&/^\/\d+\/\d+\/\d+\.png$/.test(url.pathname)&&!url.search)return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')});
  if(url.origin==='http://127.0.0.1:4173'&&url.pathname==='/tech-checks/')return route.fulfill({contentType:'text/html',body:html});
  if(url.pathname==='/synthetic/rpc'){
   const {name,args}=req.postDataJSON();calls.push({name,args});

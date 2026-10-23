@@ -142,9 +142,9 @@ async function open(value, generation, handoffFailure = null) {
     }
     return;
   }
-  // Handoffs remain the phone default. Fleet is an explicit verified read view,
+  // Handoffs remain the phone default and are reachable on desktop. Fleet is a verified read view,
   // never an automatic substitute for an unavailable transfer backend.
-  const handoffSelected=value.phone&&!phoneBoard;
+  const handoffSelected=!phoneBoard;
   let handoffFallback = null;
   if(handoffSelected){
     const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
@@ -163,7 +163,7 @@ async function open(value, generation, handoffFailure = null) {
     const title=document.createElement('h1');title.textContent='Equipment Check Out / Check In';
     handoffFallback.append(title,actions,note,retry);
   }
-  if(value.phone&&!phoneBoard) {
+  if(handoffSelected) {
     // A failed rollout must not display a substitute workflow on the phone.
     root.replaceChildren(phoneNavigation(value,generation),handoffFallback);
     return;
@@ -199,7 +199,7 @@ async function open(value, generation, handoffFailure = null) {
     setFieldMapDisplay(currentFrame,false);scheduleFrameFit();
   });
   board.append(frame,pending);
-  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),board);
+  root.replaceChildren(phoneNavigation(value,generation),board);
   boardLoadTimer=setTimeout(()=>{if(!current())return;note.textContent='The board is taking longer than usual to open. You can keep waiting or retry.';retry.hidden=false;},20000);
   scheduleFrameFit();
 }
@@ -234,7 +234,7 @@ function present() {
   if (value.role==='it') for (const id of ['view-owner','view-svc','view-morning']) shield(document.getElementById(id));
   scheduleFrameFit();
   if (next===scopeKey) return;
-  revision++;scopeKey=next;phoneBoard=false;clearFrame();status(value.phone?'Opening equipment Check Out / Check In…':'Opening Camera Health and Fleet Map…');void open(value,revision);
+  revision++;scopeKey=next;phoneBoard=!value.phone;clearFrame();status(value.phone?'Opening equipment Check Out / Check In…':'Opening Camera Health and Fleet Map…');void open(value,revision);
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
