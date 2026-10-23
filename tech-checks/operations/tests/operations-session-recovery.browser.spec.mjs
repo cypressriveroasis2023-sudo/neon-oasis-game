@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {resource,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
 
 // Synthetic same-origin parent and saved read responses only. Never read real tokens,
@@ -7,10 +8,11 @@ const origin='http://127.0.0.1:4173';
 const owner={authorized:true,legacyOwner:true,role:'Owner',name:'Synthetic Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:true,fleetPlacementEdit:false,fieldLocationVerification:false}};
 const unitId='90000000-0000-4000-8000-000000000001';
 const unit={id:unitId,unitNumber:'Helios 1',modelName:'Helios',status:'field',currentLocationType:'field',address:'100 Synthetic Road',customer:'Synthetic customer',latitude:29.7,longitude:-95.4,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh};
-const health=snapshot([resource('9001','Helios 1')]);
+const rawHealth=snapshot([resource('9001','Helios 1')]);
+const health=withReviewedResources(rawHealth,[{unit,ids:['9001']}]);
 const field={items:[unit],inventoryItems:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:0,missingGps:0},generatedAt:fresh};
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
-async function mount(page,{it=false,locationWrites=false}={}){
+async function mount(page,{it=false,locationWrites=false,unreviewed=false}={}){
  const session={...structuredClone(owner),features:{...owner.features,fieldLocationVerification:locationWrites}};
  const state={session:it?{...session,legacyOwner:false,role:'IT',productionOwnerUserId:null}:session,calls:[],errors:[],sessionGate:null,healthGate:null,routerStatus:200,sessionStatus:200,sessionReads:0};
  page.on('pageerror',error=>state.errors.push(error.message));
@@ -34,7 +36,7 @@ async function mount(page,{it=false,locationWrites=false}={}){
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
   if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
-  const data=body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
+  const data=body.path==='/api/camera-health/summary-v3'?(unreviewed?rawHealth:health):body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
@@ -182,4 +184,18 @@ test('logout boundary while offline cancels scheduled session recovery',async({p
  const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'authentication-denied'}})));
  await blocked(app);state.sessionStatus=200;await page.clock.runFor(120000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+});
+
+
+test('same Owner recovery cannot promote an unreviewed camera label into verified online equipment',async({page})=>{
+ const {app,state,initialSessions}=await mount(page,{unreviewed:true});
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await renewal(page,app);
+ await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await expect(refresh(app)).toBeEnabled();
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ readOnly(state);
 });
