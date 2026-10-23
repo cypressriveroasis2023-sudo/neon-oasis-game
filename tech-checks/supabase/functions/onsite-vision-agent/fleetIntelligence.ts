@@ -226,7 +226,7 @@ export async function enrichVisionOfflineHistory(
   const offline = fleet.items.filter(item => item.status === 'offline' &&
     (item.kind === 'camera' || item.kind === 'detector') &&
     Boolean(historySource[item.provider]) &&
-    /^[1-9]\\d{0,15}$/.test(String(item.resource_id)) && item.observed_at);
+    /^[1-9]\d{0,15}$/.test(String(item.resource_id)) && item.observed_at);
   const targets = offline.slice(0, 30);
   let matched = 0, failed = 0;
   const read = async (id: string, source: string, direction: 'newest'|'first', cutoff: string, since?: string) => {
