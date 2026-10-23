@@ -97,7 +97,7 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     if (row.scope !== 'field') continue; // Shop, inactive, and unresolved scope do NOT become Field outages.
     const type = resourceType(row);
     const direct = !row.trackerOnly && !type &&
-      /^(?:CAMV|SNIPER(?: ?[24])?)[\\s#-]*0*\\d+/i.test(text(row.unit));
+      /^(?:CAMV|SNIPER(?: ?[24])?)[\s#-]*0*\d+/i.test(text(row.unit));
     if (!type && !direct) continue;
     const matches = locations?.get(unitKey(row.unit)) || [];
     const location = matches.length === 1 ? {
@@ -159,7 +159,9 @@ export function projectVisionFleet(health: unknown, fieldMap: unknown, filters: 
     items_returned: Math.min(chosen.length, limit),
     items_truncated: chosen.length > limit,
     items: chosen.sort(order).slice(0,limit),
-    service_items: filteredService.sort(order).slice(0, Math.min(limit,30)),
+    service_items: (scope === 'offline' ? filteredService.filter(r => r.status === 'offline') :
+      scope === 'attention' ? filteredService.filter(r => r.status !== 'online') : filteredService).sort(order).slice(0, Math.min(limit,30)),
+    location_filter_unverifiable: Boolean(areaFilter && !locations),
     limitations: [
       'ONLINE means fresh saved provider status, not that video playback was independently tested.',
       'IP/port reachability is listed separately from verified camera/detector status.',
@@ -192,6 +194,6 @@ export async function readVisionFleetHealth(token: string, question: FleetQuesti
     // When Field Map is unavailable, retain honest Camera Health counts and
     // explicitly suppress location claims rather than fabricating locations.
     const map = await read('/api/field-map').catch(() => null);
-    return projectVisionFleet(health, map, question, now);
+    return projectVisionFleet(health, map, question, Date.now());
   } finally { clearTimeout(deadline); }
 }
