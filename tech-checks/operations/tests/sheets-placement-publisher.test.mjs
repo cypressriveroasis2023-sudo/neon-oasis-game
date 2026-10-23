@@ -63,7 +63,7 @@ test('publish requires exact readback; a collaborator change is held and cannot 
  for(const correct of [true,false]){
   let reads=0,writes=0,results;
   const expected=planPublishing([binding],[row]).intents[0].cells;
-  const h=createPublisherHandler({authenticate:async()=>true,rpc:async(name,body)=>{if(name.endsWith('begin'))return {leaseId:'lease',bindings:[binding]};if(name.endsWith('stage'))return {committed:true};if(name.endsWith('request_refresh'))return {accepted:true};if(name.endsWith('finish')){results=body.p_results;return {committed:true,sheetsPublisher:true};}throw Error('Unexpected call');},read:async()=>{reads++;return[{...row,cells:reads===3?(correct?expected:[base[0],base[1],base[2],cell('Manual job')]):base}];},write:async requests=>{writes++;assert.equal(requests.length,3);}});
+  const h=createPublisherHandler({authenticate:async()=>true,rpc:async(name,body)=>{if(name.endsWith('begin'))return {leaseId:'lease',bindings:[binding]};if(name.endsWith('stage'))return {committed:true};if(name.endsWith('finish')){results=body.p_results;return {committed:true,sheetsPublisher:true};}throw Error('Unexpected call');},read:async()=>{reads++;return[{...row,cells:reads===3?(correct?expected:[base[0],base[1],base[2],cell('Manual job')]):base}];},write:async requests=>{writes++;assert.equal(requests.length,3);}});
   assert.equal((await h(request())).status,200);assert.equal(writes,1);assert.equal(results[0].state,correct?'published':'held');
  }
 });

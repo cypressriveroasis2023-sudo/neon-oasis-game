@@ -38,8 +38,8 @@ export function createPublisherHandler(options:{authenticate:(req:Request)=>Prom
      if(live.length!==1||!live[0].unique||live[0].label!==b.label||!equal(live[0].cells,r.cells))plan.results[i]={equipmentId:r.equipmentId,state:'held',reason:'readback_mismatch'};
     }
    }
-   phase='refresh_request';const queued=await options.rpc('cos_sheets_placement_request_refresh',{p_lease_id:lease,p_equipment_ids:publisherRefreshCandidates(start.bindings,rows)});
-   if(queued?.accepted!==true)throw Error('Refresh request unavailable');
+   const refresh=new Set(publisherRefreshCandidates(start.bindings,rows));
+   for(const r of plan.results)if(r.state==='held'&&r.reason==='source_unverified'&&refresh.has(r.equipmentId))r.reason='source_refresh_requested';
    phase='finish';const done=await options.rpc('cos_sheets_placement_finish',{p_lease_id:lease,p_results:plan.results});
    if(done?.committed!==true)throw Error('Lost publisher lease');
    return reply({state:'current',...done});
