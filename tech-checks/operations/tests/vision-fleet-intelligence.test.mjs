@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 import {projectVisionFleet,readVisionFleetHealth} from '../../supabase/functions/onsite-vision-agent/fleetIntelligence.ts';
 
 const NOW=Date.parse('2026-10-23T15:00:00Z');
@@ -103,4 +105,26 @@ test('Owner agent only performs authorized, read-only saved Health and Map GET e
   assert.equal(requests.length,2);
   assert.equal(data.items.length,1);
   assert.equal(data.items[0].location.customer,'Acuity');
+});
+
+test('Vision routes camera fleet questions to the source tool, not the separate offline-case queue',()=>{
+  const source=readFileSync(new URL('../../onsite-vision.js',import.meta.url),'utf8');
+  const start=source.indexOf('function cameraFleetIntent(');
+  const end=source.indexOf('\nasync function answer(',start);
+  assert.ok(start>0&&end>start);
+  const cameraFleetIntent=vm.runInNewContext(source.slice(start,end)+'\ncameraFleetIntent');
+  for(const message of [
+    'How many cameras are offline right now?',
+    'Which cameras have been down for 24 hours?',
+    'Where is Spotter 046 located?',
+    'Is Sniper 2 039 offline?',
+    'Show me Star4Live cameras online in Baytown.',
+    'Show me the Avigilon camera health.'
+  ])assert.equal(cameraFleetIntent(message),true,message);
+  for(const message of [
+    'How many offline escalations are waiting on IT?',
+    'What troubleshooting has already been done on offline case 12?',
+    'Show me active Tech Check jobs.',
+    'What is Josh working on?',
+  ])assert.equal(cameraFleetIntent(message),false,message);
 });
