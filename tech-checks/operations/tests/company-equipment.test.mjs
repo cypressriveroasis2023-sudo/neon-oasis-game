@@ -11,7 +11,7 @@ test('company equipment reads only validated camera and stored router sources', 
   const paths = [];
   const result = await loadCompanyEquipment({ get: async path => { paths.push(path); return { data: path.includes('camera-health') ? camera : routers }; } });
   assert.deepEqual(paths.sort(), ['/api/camera-health/summary-v3', '/api/routers']);
-  assert.equal(cameraDashboardSummary(result.camera,Date.parse('2026-10-06T18:00:00Z')).attention,2);
+  const summary=cameraDashboardSummary(result.camera,Date.parse('2026-10-06T18:00:00Z'));assert.equal(summary.attention,3);assert.match(summary.headline,/equipment identity review/);assert.equal(summary.coverage.online,0);assert.equal(summary.coverage.offline,0);
   assert.equal(result.routers.items.length, 0);
   assert.equal(result.routers.gpsAvailable, false);
   assert.deepEqual(result.errors, {});

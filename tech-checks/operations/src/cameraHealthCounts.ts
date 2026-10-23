@@ -13,22 +13,22 @@ export function cameraOverview(health:Health,now=Date.now(),fieldUnits:FieldHeal
   const resourceUnits=new Map<string,string>();
   for(const identity of health.identityVersion===1?allVerifiedUnitIdentities(health):[]){const match=resolveVerifiedUnitIdentity({id:identity.unitId,unitNumber:identity.unitNumber},health,now);if(match.state==='verified')for(const id of identity.deviceIds)resourceUnits.set(id,'UNIT:'+identity.unitId);}
   const buckets=new Map<string,CameraRow[]>();
-  for(const row of records.values()){const key=resourceUnits.get(String(row.id))||(typeof row.unit==='string'&&row.unit.trim()?row.unit.trim().replace(/\s+/g,' ').toUpperCase():'UNLINKED:'+row.id);buckets.set(key,[...(buckets.get(key)||[]),row]);}
+  for(const row of records.values()){const key=resourceUnits.get(String(row.id))||(row.trackerOnly&&String(row.id).startsWith('field:')?'FIELD:'+String(row.id).slice(6):null)||(typeof row.unit==='string'&&row.unit.trim()?row.unit.trim().replace(/\s+/g,' ').toUpperCase():'UNLINKED:'+row.id);buckets.set(key,[...(buckets.get(key)||[]),row]);}
   const groups=Array.from(buckets,([key,rows]):CameraUnitGroup=>{
     const identityResult=groupIdentityForRows(rows,health,now);
     const identityConflict=identityResult.state==='conflict'?identityResult.reason:undefined;
     const sourceClassification=classifyCameraUnit(rows,now);
     const classification=identityConflict?{...sourceClassification,state:'verifying' as const,providerState:'verifying' as const,cameraState:'verifying' as const,serviceState:'verifying' as const,recorderOffline:false}:sourceClassification;
     const states=rows.filter(row=>row.scope!=='inactive'&&['cameras','detectors'].includes(resourceKind(row))).map(row=>cameraState(row,now));
-    const linkedIdentity=!key.startsWith('UNLINKED:')&&!identityConflict;
+    const linkedIdentity=identityResult.state==='verified';
     const identity=identityResult.state==='verified'?identityResult.identity:null;
     const fieldUnit=identity&&fieldUnits.filter(unit=>unit.id===identity.unitId).length===1?fieldUnits.find(unit=>unit.id===identity.unitId):undefined;
     const fieldRecorder=identity&&fieldUnit?fieldRecorderObservation(fieldUnit,identity,rows,health,now):null;
     const observation=identity?fieldRecorder||linkedUnitObservation(rows,now):undefined;
     const associated=identity&&observation?{unitIdentity:identity,observation,...(fieldRecorder?{scope:'field' as const,fieldRecorderVerified:true,recorderOffline:fieldRecorder.state==='offline'}:{}),...(['field','unknown'].includes(classification.scope)?{state:observation.providerState!=='verifying'?observation.providerState:observation.serviceState==='online'?'service' as const:classification.state==='mapping'?'mapping' as const:'verifying' as const,providerState:observation.providerState,cameraState:observation.cameraState,serviceState:observation.serviceState}: {})}:{};
-    const keyIdentity=canonicalCameraUnit(rows[0].unit||''),matches=identity?fieldUnits.filter(unit=>unit.id===identity.unitId&&unit.unitNumber===identity.unitNumber):keyIdentity?fieldUnits.filter(unit=>canonicalCameraUnit(unit.unitNumber)===keyIdentity):[];
+    const matches=identity?fieldUnits.filter(unit=>unit.id===identity.unitId&&unit.unitNumber===identity.unitNumber):[];
     const shared=matches.length===1?fieldCameraHealth(matches[0],fieldUnits,health,now):null;
-    // Match the displayed shared/verified basis. Unlinked groups keep their existing provider/port classification.
+    // Raw resource rows remain available for review; only accepted identities enter equipment counts.
     const active=rows.filter(row=>row.scope!=='inactive'),providers=active.filter(providerRecord);
     const direct=(cameraFamily(rows,'sniper')||cameraFamily(rows,'camv'))&&['field','unknown'].includes(classification.scope)&&classification.providerState==='verifying';
     const sourceBasis:HealthObservationBasis=direct||classification.state==='service'?'connection':classification.systemKind==='recorder'?'recorder':providers.length&&providers.every(cameraRecord)?'camera':'provider';
@@ -37,7 +37,7 @@ export function cameraOverview(health:Health,now=Date.now(),fieldUnits:FieldHeal
     const lastObservedAt=identityConflict?null:shared?shared.checkedAt:observation?observation.checkedAt:healthObservationTime(active,sourceBasis,observedState,now);
     const lastObservedLabel=healthObservationLabel(identityConflict?undefined:basis,identityConflict?undefined:observedState);
     const placement=matches[0] as any;
-    const reviewReason=identityConflict||placement?.mhelpPlacementReview||placement?.mhelpLocationReviewReason||shared?.reason||(!rows.some(row=>!row.trackerOnly)?'This unit is in the tracker, but has no linked camera-provider resource.':classification.scope==='unknown'?'Field or Shop/ROOT placement has not been verified.':'Provider observations are missing, stale, mixed or unverified.');
+    const reviewReason=identityConflict||(!linkedIdentity?'Equipment identity is unverified. Source labels alone cannot establish equipment placement or online/offline status.':null)||placement?.mhelpPlacementReview||placement?.mhelpLocationReviewReason||shared?.reason||(!rows.some(row=>!row.trackerOnly)?'This unit is in the tracker, but has no linked camera-provider resource.':classification.scope==='unknown'?'Field or Shop/ROOT placement has not been verified.':'Provider observations are missing, stale, mixed or unverified.');
     return {...classification,...associated,...(matches.length===1&&inventoryPlacement(matches[0])!=='unknown'?{scope:inventoryPlacement(matches[0])}:health.fleetFieldUnits&&classification.scope!=='inactive'?{scope:'unknown' as const}:{}),...(shared?{sharedState:shared.state,sharedLabel:unitHealthLabel(shared)}:{}),reviewReason,identityConflict,key,name:identity?.unitNumber||(!key.startsWith('UNLINKED:')?rows[0].unit:'Unlinked resource · '+rows[0].name),site:matches.length===1?[matches[0].customer,matches[0].site,matches[0].address].filter(Boolean).join(' · '):[...new Set(rows.map(row=>row.organization).filter(Boolean))].join(' · '),rows,online:states.filter(s=>s==='online').length,offline:states.filter(s=>s==='offline').length,unknown:states.filter(s=>!['online','offline'].includes(s)).length,lastObservedAt,lastObservedLabel,linkedIdentity};
   }).sort((a,b)=>({offline:0,degraded:1,verifying:2,mapping:2,service:3,online:4,shop:5,inactive:6}[a.state]-{offline:0,degraded:1,verifying:2,mapping:2,service:3,online:4,shop:5,inactive:6}[b.state])||a.name.localeCompare(b.name));
   const kinds:Record<ResourceKind,number>={cameras:0,detectors:0,recorders:0,unitInventory:0,other:0};for(const row of records.values())kinds[resourceKind(row)]++;
@@ -67,7 +67,7 @@ export function cameraResourcePath(row:CameraRow) {
 
 export const sniperShopGroup=(group:UnitEvidence&{rows?:CameraRow[];identityConflict?:string})=>!group.identityConflict&&group.scope==='shop'&&Boolean(group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv')));
 export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
-  if(group.identityConflict)return 'verifying';
+  if(group.identityConflict||(group as Partial<CameraUnitGroup>).linkedIdentity===false)return 'verifying';
   if(sniperShopGroup(group))return 'shop';
   if((group as CameraUnitGroup).sharedState&&(group.scope==='shop'||group.scope==='inactive'))return group.scope;
   const shared=(group as CameraUnitGroup).sharedState;if(shared)return shared==='unknown'?'verifying':shared;
@@ -76,7 +76,7 @@ export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];obs
   return direct&&['field','unknown'].includes(group.scope)&&group.providerState==='verifying'?group.serviceState:group.state;
 }
 export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
-  if(group.identityConflict)return 'EQUIPMENT LINK UNVERIFIED';
+  if(group.identityConflict||(group as Partial<CameraUnitGroup>).linkedIdentity===false)return 'EQUIPMENT LINK UNVERIFIED';
   if(sniperShopGroup(group))return 'SHOP';
   if((group as CameraUnitGroup).sharedState&&group.scope==='shop')return 'SHOP / ROOT';if((group as CameraUnitGroup).sharedState&&group.scope==='inactive')return 'INACTIVE';
   if((group as CameraUnitGroup).sharedLabel)return (group as CameraUnitGroup).sharedLabel!;
@@ -94,14 +94,14 @@ export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[],n
   // Actual devices, field equipment and unverified/stale groups are never removed.
   const replaced=health.rows.filter(row=>row.trackerOnly&&row.type==='tracker_unit'&&row.scope==='unknown'&&String(row.id).startsWith('tracker:')&&reviewed.some(identity=>identity.unitNumber===row.unit));
   if(replaced.length&&health.inventory)health={...health,rows:health.rows.filter(row=>!replaced.includes(row)),totalDevices:health.totalDevices-replaced.length,inventory:{...health.inventory,allRecords:health.inventory.allRecords-replaced.length,unknownScopeRecords:(health.inventory.unknownScopeRecords||0)-replaced.length}};
-  const represented=new Set(health.rows.map(row=>canonicalCameraUnit(row.unit)).filter(Boolean));
-  for(const identity of reviewed){const key=canonicalCameraUnit(identity.unitNumber);if(key)represented.add(key);}
+  const represented=new Set(health.rows.filter(row=>row.trackerOnly&&String(row.id).startsWith('field:')).map(row=>String(row.id).slice(6)));
+  for(const unit of units)if(resolveVerifiedUnitIdentity(unit,health,now).state==='verified')represented.add(unit.id);
   const additions:CameraRow[]=[];
   for(const unit of units){
     if(isSupportEquipment(unit))continue;
-    const key=canonicalCameraUnit(unit.unitNumber);
-    if(!key||represented.has(key)||units.filter(peer=>canonicalCameraUnit(peer.unitNumber)===key).length!==1)continue;
-    represented.add(key);
+    // Inventory IDs establish these review rows; labels never bind a resource.
+    if(!unit.id||!unit.unitNumber.trim()||represented.has(unit.id)||units.filter(peer=>peer.id===unit.id).length!==1)continue;
+    represented.add(unit.id);
     additions.push({id:'field:'+unit.id,name:unit.unitNumber,unit:unit.unitNumber,type:'tracker_unit',organization:[unit.customer,unit.site,unit.address].filter(Boolean).join(' · '),status:'review',activationState:'',scope:inventoryPlacement(unit),trackerOnly:true});
   }
   if(!additions.length||!health.inventory)return health;

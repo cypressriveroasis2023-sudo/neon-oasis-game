@@ -1,3 +1,4 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {readFileSync} from 'node:fs';import vm from 'node:vm';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {fieldCameraHealth,unitHealthLabel,unitDiagnosticsPath,validateCameraHealth} from '../src/fieldCameraHealth.ts';
@@ -7,15 +8,15 @@ test('imported SNIPERS and CAM V & RSU families retain exact identity and direct
  for(const [unitNumber,modelName] of [['Sniper 334','SNIPERS'],['Sniper 2 344','SNIPERS'],['Sniper 4 100','SNIPERS'],['CAMV 010','CAM V & RSU']])for(const status of ['online','offline'])for(const scope of ['field','unknown','shop']){
   const unit={id:'fixture-unit',unitNumber,modelName,readOnly:true,address:'100 Synthetic Road'};
   const row=resource(1,unitNumber,{type:'tracker_unit',scope,evidence:undefined,serviceEvidence:port({status,reachable:status==='online',confirmedOutage:status==='offline'})});
-  const result=fieldCameraHealth(unit,[unit],snapshot([row]),now);assert.equal(result.identity,'matched');assert.equal(result.state,status);assert.equal(unitHealthLabel(result),'IP / PORT '+status.toUpperCase());assert.match(result.reason,/video is not verified/);assert.equal(unit.latitude,undefined);
+  const result=fieldCameraHealth(unit,[unit],withReviewedResources(snapshot([row]),[{unit,ids:[row.id],kind:'owner_confirmed_native'}]),now);assert.equal(result.identity,'matched');assert.equal(result.state,status);assert.equal(unitHealthLabel(result),'IP / PORT '+status.toUpperCase());assert.match(result.reason,/video is not verified/);assert.equal(unit.latitude,undefined);
  }
 });
 test('missing stale or ambiguous evidence stays unknown; inactive placement retains a fresh observation warning',()=>{
  const unit={id:'fixture',unitNumber:'Sniper 2 344',modelName:'SNIPERS'};
  for(const evidence of [undefined,port({observedAt:'2020-01-01T00:00:00Z'}),port({status:'unknown',reachable:null}),port({observedAt:'2030-01-01T00:00:00Z'})]){
-  const row=resource(1,unit.unitNumber,{type:'Sniper 2',evidence:undefined,serviceEvidence:evidence});assert.equal(fieldCameraHealth(unit,[unit],snapshot([row]),now).state,'unknown');
+  const row=resource(1,unit.unitNumber,{type:'Sniper 2',evidence:undefined,serviceEvidence:evidence});assert.equal(fieldCameraHealth(unit,[unit],withReviewedResources(snapshot([row]),[{unit,ids:[row.id],kind:'owner_confirmed_native'}]),now).state,'unknown');
  }
- const row=resource(1,unit.unitNumber,{type:'Sniper 2',scope:'inactive',activationState:'deactivated',evidence:undefined,serviceEvidence:port()});const observation=fieldCameraHealth(unit,[unit],snapshot([row]),now);assert.equal(observation.state,'online');assert.match(observation.reason,/PLACEMENT CONFLICT/);assert.equal(cameraOverview(snapshot([row]),now).summary.monitored,0);
+ const row=resource(1,unit.unitNumber,{type:'Sniper 2',scope:'inactive',activationState:'deactivated',evidence:undefined,serviceEvidence:port()});const observation=fieldCameraHealth(unit,[unit],withReviewedResources(snapshot([row]),[{unit,ids:[row.id],kind:'owner_confirmed_native'}]),now);assert.equal(observation.state,'online');assert.match(observation.reason,/PLACEMENT CONFLICT/);assert.equal(cameraOverview(withReviewedResources(snapshot([row]),[{unit,ids:[row.id],kind:'owner_confirmed_native'}]),now).summary.monitored,0);
  assert.equal(fieldCameraHealth(unit,[unit,{...unit,id:'duplicate'}],snapshot([]),now).identity,'ambiguous');
 });
 test('36 existing field identities remain visible in overview without importing or fabricating health',()=>{
@@ -23,8 +24,9 @@ test('36 existing field identities remain visible in overview without importing 
  const empty=snapshot([]),augmented=healthWithFieldInventory(empty,units);assert.equal(augmented.rows.length,36);validateCameraHealth(augmented);
  const overview=cameraOverview(augmented,now);assert.equal(overview.groups.length,36);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(empty.rows.length,0);
  for(const row of augmented.rows){assert.equal(row.trackerOnly,true);assert.equal(row.serviceEvidence,undefined);assert.match(row.organization,/Synthetic installed address/);assert.ok(unitDiagnosticsPath({id:row.id,unitNumber:row.unit}));}
- const existing=resource(1,units[0].unitNumber,{type:'Sniper',serviceEvidence:port()});const kept=healthWithFieldInventory(snapshot([existing]),units);assert.equal(kept.rows.length,36);assert.equal(kept.rows[0],existing);
- assert.equal(healthWithFieldInventory(empty,[units[0],{...units[0],id:'conflict'}]).rows.length,0);
+ const existing=resource(1,units[0].unitNumber,{type:'Sniper',serviceEvidence:port()});const kept=healthWithFieldInventory(snapshot([existing]),units);assert.equal(kept.rows.length,37);assert.equal(kept.rows[0],existing);assert.equal(kept.rows.filter(row=>String(row.id).startsWith('field:')).length,36);
+ const sameLabel=healthWithFieldInventory(empty,[units[0],{...units[0],id:'conflict'}]);assert.equal(sameLabel.rows.length,2);assert(sameLabel.rows.every(row=>row.trackerOnly&&row.status==='review'));
+ assert.equal(healthWithFieldInventory(empty,[units[0],{...units[0]}]).rows.length,0);
  assert.equal(unitDiagnosticsPath({id:'bad',unitNumber:'../fake'}),null);
 });
 

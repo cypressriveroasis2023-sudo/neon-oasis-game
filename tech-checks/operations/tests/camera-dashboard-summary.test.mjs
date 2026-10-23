@@ -1,7 +1,10 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {cameraDashboardSummary} from '../src/cameraDashboardSummary.ts';
 import {cameraOverview} from '../src/cameraHealthCounts.ts';
-import {resource,port,snapshot,withStatus,now} from './fixtures/camera-evidence-fixtures.mjs';
+import {resource,port,snapshot as rawSnapshot,withStatus,now} from './fixtures/camera-evidence-fixtures.mjs';
+// Explicit synthetic equipment receipts for these source/coverage tests.
+const snapshot=rows=>withReviewedResources(rawSnapshot(rows),[...new Set(rows.filter(r=>/^[1-9]\d*$/.test(String(r.id))).map(r=>r.unit))].map((name,i)=>({unit:{id:'reviewed-fixture-'+i,unitNumber:name},ids:rows.filter(r=>r.unit===name).map(r=>String(r.id)),kind:'owner_confirmed_native'})));
 const dataset=()=>snapshot([resource(1,'Helios 1',{type:'NVR'}),withStatus(resource(2,'Helios 2'),'offline'),resource(3,'Helios 3'),withStatus(resource(4,'Helios 3'),'offline'),resource(5,'Helios 4',{type:'Sniper',serviceEvidence:port(),scope:'unknown'}),resource(6,'RII-001',{type:'detector',scope:'unknown'}),resource(7,'Helios 7',{scope:'shop'}),resource(8,'Helios 8',{scope:'inactive',activationState:'deactivated'})]);
 test('both dashboards derive provider-system, camera and placement counts from native v2 coverage',()=>{
  const health=dataset(),dashboard=cameraDashboardSummary(health,now),native=cameraOverview(health,now);assert.equal(dashboard.available,true);assert.deepEqual(dashboard.coverage,native.coverage);assert.deepEqual(dashboard.scopes,native.scopes);assert.equal(dashboard.headline,'3 provider systems need review');
@@ -29,7 +32,7 @@ test('all new consumers use the versioned route and never fall back to old aggre
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 test('paired home summaries use the same field unit status as the map and exclude confirmed Shop',()=>{
  const units=[1,2,3].map(n=>({id:'80000000-0000-4000-8000-'+String(n).padStart(12,'0'),unitNumber:'Helios '+n,modelName:'Helios',status:'field',currentLocationType:n===3?'shop':'field',placement:n===3?'SHOP':'FIELD'}));
- const data=snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),resource(3,'Helios 3')]);
+ const data=withReviewedResources(rawSnapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),resource(3,'Helios 3')]),units.map((unit,i)=>({unit,ids:[String(i+1)]})));
  const pair=reconcileFleetSnapshot(data,{items:units.slice(0,2),inventoryItems:units,summary:{fieldUnits:2,mappedUnits:0,unitGps:0,missingGps:2},generatedAt:new Date(now).toISOString()},now),v=cameraDashboardSummary(pair.health,now);
  assert.equal(v.systems,'Field units: 1 online · 1 offline · 0 need review');assert.equal(v.coverage.online,1);assert.equal(v.coverage.offline,1);assert.equal(v.scopes.shop,1);
 });

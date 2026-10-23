@@ -13,9 +13,9 @@ const render=(f,units=f.units)=>renderToStaticMarkup(React.createElement(CameraH
 
 test('broader provider review records cannot inflate the Field unverified headline',()=>{
  const f=fieldProductFixture();
- f.health=snapshot([...f.health.rows,...Array.from({length:385},(_,i)=>resource(100+i,'Unresolved '+i,{scope:'unknown'}))]);
+ f.health={...f.health,...snapshot([...f.health.rows,...Array.from({length:385},(_,i)=>resource(100+i,'Unresolved '+i,{scope:'unknown'}))])};
  const before=structuredClone(f);
- assert(cameraOverview(f.health,f.now,f.units).operational.unknown>380);
+ assert.equal(cameraOverview(f.health,f.now,f.units).unlinked,385);
  const count=fleetDashboardSummary(filterFleetDashboard(fleetDashboardRows(f.units,f.health,null,null,f.now),initialFleetFilters,'fleet'));
  const html=render(f);
  assert.deepEqual(kpis(html),[String(count.online+count.offline+count.unknown),String(count.online),String(count.offline),String(count.unknown)]);

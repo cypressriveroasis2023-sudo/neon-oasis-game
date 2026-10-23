@@ -1,3 +1,4 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -205,7 +206,7 @@ test('router observations age without inventing a cellular outage or remaining r
 });
 
 test('camera metrics use source-separated coverage and old evidence becomes review rather than outage', () => {
-  const f = fixture(), data = snapshot([resource(1, 'Helios 1'), withStatus(resource(2, 'Helios 2'), 'offline')]);
+  const f = fixture(), data = withReviewedResources(snapshot([resource(1, 'Helios 1'), withStatus(resource(2, 'Helios 2'), 'offline')]),[1,2].map(id=>({unit:{id:'synthetic-'+id,unitNumber:'Helios '+id},ids:[id]})));
   const current = f.summarizeITCameras(data, now);
   assert.equal(current.count, 2); assert.equal(current.metrics[0].value, 1); assert.equal(current.metrics[1].value, 1);
   const old = f.summarizeITCameras(data, now + 60 * 60_000);

@@ -19,7 +19,7 @@ test('a similar or duplicate name never moves real provider resources; partial i
  const duplicated=map([unit,{...unit}]);assert.throws(()=>reconcileFleetSnapshot(unknown,duplicated,now),/inconsistent/);
 });
 test('known shop inventory with no provider resource appears in Shop and never becomes unknown-field health',()=>{
- const shop={...unit,placement:'SHOP',currentLocationType:'shop'},h=healthWithFieldInventory(snapshot([]),[shop],now),overview=cameraOverview(h,now,[shop]);validateCameraHealth(h);assert.equal(overview.scopes.shop,1);assert.equal(overview.operational.unknown,0);assert.equal(overview.summary.monitored,0);
+ const shop={...unit,placement:'SHOP',currentLocationType:'shop'},h=healthWithFieldInventory(snapshot([]),[shop],now),overview=cameraOverview(h,now,[shop]);validateCameraHealth(h);assert.equal(overview.scopes.shop,0);assert.equal(overview.groups[0].scope,'shop');assert.equal(overview.groups[0].linkedIdentity,false);assert.equal(overview.operational.unknown,0);assert.equal(overview.summary.monitored,0);
 });
 test('complete multiple source keys become one verified native unit in both views',()=>{
  const rows=[resource(1,'Helios 1'),resource(2,'Helios secondary')],h=health(rows),pair=reconcileFleetSnapshot(h,map([unit]),now),overview=cameraOverview(pair.health,now,[unit]);assert.equal(overview.groups.length,1);assert.equal(overview.groups[0].name,'Helios 1');assert.equal(cameraUnitDisplayState(overview.groups[0]),fieldCameraHealth(unit,[unit],pair.health,now).state);
