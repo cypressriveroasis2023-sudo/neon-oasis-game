@@ -78,3 +78,25 @@ The Owner preview remains bounded at 20 seconds and maintenance at 40 seconds.
 Both complete equipment passes, identity/membership checks, source clocks, quota
 holds, and confirmed-write protections remain unchanged; a timed-out pass fails
 closed and releases its read lease.
+
+## Bounded equipment page overlap
+
+After resolving the zero/one-based boundary serially on each maintenance pass,
+the reader may have at most two remaining equipment pages in flight. It retains
+the existing page size, offsets, boundary retry and successful-pass request count. Results
+are checked in offset order even when responses complete in the opposite order.
+Every page must have its exact expected length, unchanged total, correct portal,
+strictly ordered identities and no duplicates or overlap. A failed batch cannot
+start the next batch or publish a partial census. All owned requests settle
+before the busy guard and inventory read lease are released. A failing pair can
+consume both admissions; neither admission is refunded or reused.
+
+This scheduling change addresses accumulated serial waits within the existing
+40-second pass; it does not increase that deadline or identify the vendor's
+underlying latency cause. The 20-second/50-record Owner preview is unchanged.
+Both complete passes and their assignment comparison remain required. Each
+request, including a boundary retry, still goes through the same durable shared
+admission, 400ms pacing, daily cap/reserve, current-token read and provider hold.
+No permission or observation clock is cached to enable overlap. Synthetic slow
+1001-record cases verify both index modes and reversed completion order; actual
+scheduled success and failure receipts remain the production acceptance evidence.

@@ -161,21 +161,35 @@ export function createMhelpPartnerHandler(options: {
         let indexBase=0, boundaryChecked=false;
         while (rows.length<total) {
           if (!rows.length || rows.length%pageSize!==0) fail('mHelpDesk returned an incomplete equipment page.');
-          url.searchParams.set('rowIndex',String(rows.length+indexBase));
-          let next=await read(url.href);
+          // Resolve the boundary serially on every pass. Only then overlap at
+          // most two remaining page reads; each still uses the supplied shared
+          // admission/backoff transport and the same whole-pass abort signal.
+          const offsets=[rows.length+indexBase];
+          if (boundaryChecked && rows.length+pageSize<total) offsets.push(rows.length+pageSize+indexBase);
+          const pending=offsets.map(offset=>{
+            const pageUrl=new URL(url);
+            pageUrl.searchParams.set('rowIndex',String(offset));
+            return read(pageUrl.href);
+          });
+          // Settle every owned request before releasing the busy/read lease.
+          // A failed sibling cannot become an unhandled or detached request.
+          const results=await Promise.allSettled(pending);
           const pageOf=(value:ObjectValue) => {
             if (!Array.isArray(value.results) || value.results.length>pageSize || value.totalRows!==total) fail('mHelpDesk equipment changed during the read. Retry the review.');
             return (value.results as unknown[]).map(row=>projectPartnerEquipment(row,verifiedPortalId));
           };
-          let page=pageOf(next);
-          if (!boundaryChecked && page.length && page[0].equipmentId===rows[rows.length-1].equipmentId) {
-            indexBase=1;
-            url.searchParams.set('rowIndex',String(rows.length+indexBase));
-            next=await read(url.href); page=pageOf(next);
+          for (const result of results) {
+            if (result.status==='rejected') throw result.reason;
+            let page=pageOf(result.value);
+            if (!boundaryChecked && page.length && page[0].equipmentId===rows[rows.length-1].equipmentId) {
+              indexBase=1;
+              url.searchParams.set('rowIndex',String(rows.length+indexBase));
+              page=pageOf(await read(url.href));
+            }
+            boundaryChecked=true;
+            if (!page.length || page.length!==Math.min(pageSize,total-rows.length) || !ordered(page) || Number(page[0].equipmentId)<=Number(rows[rows.length-1].equipmentId) || page.some(row=>seen.has(row.equipmentId)) || rows.length+page.length>total) fail('mHelpDesk returned overlapping or incomplete equipment pages.');
+            for (const row of page) { seen.add(row.equipmentId); rows.push(row); }
           }
-          boundaryChecked=true;
-          if (!page.length || !ordered(page) || Number(page[0].equipmentId)<=Number(rows[rows.length-1].equipmentId) || page.some(row=>seen.has(row.equipmentId)) || rows.length+page.length>total) fail('mHelpDesk returned overlapping or incomplete equipment pages.');
-          for (const row of page) { seen.add(row.equipmentId); rows.push(row); }
         }
       }
       const nativeUnits = await options.readNativeUnits();
