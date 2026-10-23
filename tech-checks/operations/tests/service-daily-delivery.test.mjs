@@ -103,3 +103,43 @@ test('adding summary to an already emailed report preserves sent email state',as
  assert.ok([...f.files.values()].some(v=>v.mimeType==='application/pdf'));
  assert.equal(f.report.email_id,'existing-message');
 });
+
+
+test('Owner administrative daily closeout is visibly NOT technician-signed or physically inventory-verified in every output',async()=>{
+ const f=fixture();
+ f.report.snapshot.owner_takeover={
+   owner_id:'00000000-0000-4000-8000-000000000101',
+   owner_name:'Synthetic Owner',
+   reason:'Service was unavailable; Owner authorized an administrative exception.',
+   departure_authorized:true,inventory_physically_verified:false
+ };
+ f.report.snapshot.signature={
+   method:'owner_administrative',name:'Synthetic Owner',
+   signed_by:f.report.snapshot.owner_takeover.owner_id,
+   signed_at:f.report.submitted_at,
+   statement:'OWNER ADMINISTRATIVE CLOSEOUT. This is not the Service technician signature or physical daily inventory verification.'
+ };
+ f.report.photos=[];
+ const html=reportHtml(f.report);
+ assert.match(html,/OWNER ADMINISTRATIVE CLOSEOUT/);
+ assert.match(html,/Technician DID NOT sign/);
+ assert.match(html,/NOT physically verified today/);
+ assert.match(html,/Owner-authorized/i);
+ assert.doesNotMatch(html,/The required inspection and inventory passed server validation/);
+ const summary=summaryHtml(f.report,'folder','https://drive.google.com/file/d/summary/view');
+ assert.match(summary,/OWNER CLOSEOUT/);
+ assert.match(summary,/NOT VERIFIED/);
+ assert.match(summary,/Synthetic Owner/);
+ assert.match(summary,/Synthetic &lt;script&gt; &amp; Tech/);
+ const pdf=new TextDecoder().decode(summaryPdf(f.report));
+ assert.match(pdf,/Owner Daily Closeout/);
+ assert.match(pdf,/INVENTORY NOT PHYSICALLY VERIFIED BY TECHNICIAN/);
+ assert.match(pdf,/Synthetic Owner/);
+ const encoded=rawEmail(f.report,summary,'folder',undefined,summaryPdf(f.report));
+ const raw=Buffer.from(encoded,'base64url').toString();
+ const encodedSubject=raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)?.[1];
+ assert.ok(encodedSubject);
+ assert.match(Buffer.from(encodedSubject,'base64').toString('utf8'),/OWNER CLOSEOUT/);
+ assert.equal((await (await f.post()).json()).status,'sent');
+ assert.ok([...f.files.values()].some(v=>v.name.includes('Summary.pdf')));
+});

@@ -4,12 +4,12 @@ export function summaryLines(r:any){
  const count=(answers:any,prefix:string,n:number)=>Array.from({length:n},(_,k)=>answers?.[prefix+(k+1)]===true).filter(Boolean).length;
  const truck=count(s.truck_checks,'truck_',8), trailer=count(s.trailer_checks,'trailer_',7);
  const time=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',dateStyle:'medium',timeStyle:'medium',hour12:false}).format(new Date(sig?.signed_at||r.submitted_at));
- return {name:sig?.name||r.actor_name,time,truck:truck===8?'PASSED - 8 of 8 checks':`REVIEW - ${truck} of 8 passed`,trailer:s.taking_trailer?(trailer===7?'PASSED - 7 of 7 checks':`REVIEW - ${trailer} of 7 passed`):'Not taking a trailer - not required',units:i.units.map((u:any)=>`${u.equipment_type}: ${u.unit_tag}`),sims:i.sims.map((v:any)=>`SIM ${v.slot_no}: ${v.sim_number}`),batteries:[['Recon batteries','recon_battery_qty'],['AGM 12V 110Ah','agm_12v_110ah_qty'],['LiTime 12V 100Ah','litime_12v_100ah_qty'],['12V 35Ah','battery_12v_35ah_qty']].map(([label,key])=>`${label}: ${i.stock[key]}`),photos:r.photos.filter((p:any)=>p.category!=='Technician signature').length,signature:sig};
+ return {name:s.owner_takeover?r.actor_name:(sig?.name||r.actor_name),owner:s.owner_takeover||null,time,truck:truck===8?'PASSED - 8 of 8 checks':`REVIEW - ${truck} of 8 passed`,trailer:s.taking_trailer==null?'Not recorded - incomplete':s.taking_trailer?(trailer===7?'PASSED - 7 of 7 checks':`REVIEW - ${trailer} of 7 passed`):'Not taking a trailer - not required',units:i.units.map((u:any)=>`${u.equipment_type}: ${u.unit_tag}`),sims:i.sims.map((v:any)=>`SIM ${v.slot_no}: ${v.sim_number}`),batteries:[['Recon batteries','recon_battery_qty'],['AGM 12V 110Ah','agm_12v_110ah_qty'],['LiTime 12V 100Ah','litime_12v_100ah_qty'],['12V 35Ah','battery_12v_35ah_qty']].map(([label,key])=>`${label}: ${i.stock[key]}`),photos:r.photos.filter((p:any)=>p.category!=='Technician signature').length,signature:sig};
 }
 export function summaryHtml(r:any,folderId:string,pdfUrl:string){
  const s=summaryLines(r),e=escapeHtml;
  const rows=(items:string[])=>items.map(v=>'<div style="padding:3px 0">'+e(v)+'</div>').join('');
- return `<!doctype html><html><meta charset="utf-8"><body style="font:16px Arial,sans-serif;color:#17212b;background:#fff;max-width:720px;margin:20px auto;padding:20px"><h1 style="font-size:26px">TechCheck Daily Summary</h1><p><b>${e(s.name)}</b><br>${e(s.time)} Central Time</p><p><b>Truck:</b> ${e(s.truck)}<br><b>Trailer:</b> ${e(s.trailer)}</p><h2 style="font-size:18px">Equipment on truck</h2>${rows(s.units)}<h2 style="font-size:18px">SIM cards</h2>${rows(s.sims)}<h2 style="font-size:18px">Battery quantities</h2>${rows(s.batteries)}<p>${s.photos} supporting photos saved in Drive.</p><h2 style="font-size:18px">Technician sign-off</h2>${s.signature?`<p>${e(s.signature.statement)}</p>${s.signature.method==='drawn'?'<img src="cid:techcheck-signature" alt="Technician handwritten signature" style="width:300px;max-width:100%;height:90px;object-fit:contain">':`<p style="font:italic 24px Georgia">${e(s.name)}</p>`}<p><b>${e(s.name)}</b> · ${e(s.time)} Central Time</p>`:'<p>No signature captured in this earlier report.</p>'}<p><a href="${e(pdfUrl)}">Open one-page PDF with signature</a> · <a href="https://drive.google.com/drive/folders/${e(folderId)}">Open all photos and full answers</a></p></body></html>`;
+ return `<!doctype html><html><meta charset="utf-8"><body style="font:16px Arial,sans-serif;color:#17212b;background:#fff;max-width:720px;margin:20px auto;padding:20px"><h1 style="font-size:26px">${s.owner?'TechCheck Owner Daily Closeout':'TechCheck Daily Summary'}</h1><p><b>${e(s.name)}</b><br>${e(s.time)} Central Time</p><p><b>Truck:</b> ${e(s.truck)}<br><b>Trailer:</b> ${e(s.trailer)}</p><h2 style="font-size:18px">Equipment on truck</h2>${rows(s.units)}<h2 style="font-size:18px">SIM cards</h2>${rows(s.sims)}<h2 style="font-size:18px">Battery quantities</h2>${rows(s.batteries)}<p>${s.photos} supporting photos saved in Drive.</p>${s.owner?`<p style="border:2px solid #9b5509;padding:10px"><b>OWNER CLOSEOUT — TECHNICIAN INVENTORY NOT VERIFIED</b><br>Authorized departure exception: ${s.owner.departure_authorized?'YES':'NO'}<br>Reason: ${e(s.owner.reason)}</p><h2 style="font-size:18px">Owner administrative sign-off</h2>`:'<h2 style="font-size:18px">Technician sign-off</h2>'}${s.signature?`<p>${e(s.signature.statement)}</p>${s.signature.method==='drawn'?'<img src="cid:techcheck-signature" alt="Technician handwritten signature" style="width:300px;max-width:100%;height:90px;object-fit:contain">':`<p style="font:italic 24px Georgia">${e(s.owner?s.signature.name:s.name)}</p>`}<p><b>${e(s.owner?s.signature.name:s.name)}</b> · ${e(s.time)} Central Time</p>`:'<p>No signature captured in this earlier report.</p>'}<p><a href="${e(pdfUrl)}">Open one-page PDF with signature</a> · <a href="https://drive.google.com/drive/folders/${e(folderId)}">Open all photos and full answers</a></p></body></html>`;
 }
 // Self-contained one-page PDF; JPEG signature bytes remain embedded privately.
 export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
@@ -20,7 +20,7 @@ export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
  let commands='';
  const text=(v:string,x:number,y:number,size=11,bold=false)=>{commands+=`BT /${bold?'F2':'F1'} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${safe(v)}) Tj ET\n`;};
  const wrap=(v:string,max=88)=>{const out=[];let rest=ascii(v);while(rest.length>max){let n=rest.lastIndexOf(' ',max);if(n<max/2)n=max;out.push(rest.slice(0,n));rest=rest.slice(n).trimStart();}out.push(rest);return out;};
- text('CAMERAS ONSITE',40,752,10,true);text('TechCheck Daily Summary',40,724,24,true);
+ text('CAMERAS ONSITE',40,752,10,true);text(s.owner?'Owner Daily Closeout':'TechCheck Daily Summary',40,724,24,true);
  text(s.name,40,698,13,true);text(s.time+' Central Time',40,680);
  text('TRUCK INSPECTION',40,646,11,true);text(s.truck,220,646);
  text('TRAILER INSPECTION',40,626,11,true);text(s.trailer,220,626);
@@ -34,7 +34,8 @@ export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
  if(y<220)throw new Error('Summary exceeds one-page stock layout.');
  text(`${s.photos} supporting photos saved with the full answers in the same Drive folder.`,40,y,10);
  if(r.snapshot.transfer_receipts?.length){y-=16;text(`${r.snapshot.transfer_receipts.length} signed equipment receipt(s) linked in full answers; exact event IDs preserved.`,40,y,9);}
- y-=30;text('TECHNICIAN SIGN-OFF',40,y,11,true);y-=20;
+ y-=30;text(s.owner?'OWNER ADMINISTRATIVE CLOSEOUT':'TECHNICIAN SIGN-OFF',40,y,11,true);y-=20;
+ if(s.owner){text('INVENTORY NOT PHYSICALLY VERIFIED BY TECHNICIAN',40,y,9,true);y-=15;}
  if(s.signature){for(const line of wrap(s.signature.statement,94)){text(line,40,y,10);y-=13;}}
  else {text('No signature captured in this earlier report.',40,y);y-=16;}
  let dimensions:number[]|null=null;
@@ -43,8 +44,8 @@ export function summaryPdf(r:any,signature?:Uint8Array):Uint8Array{
   if(!dimensions||dimensions[2]!==3)throw new Error('Signature JPEG could not be embedded.');
   commands+=`q 240 0 0 72 40 ${y-78} cm /Sig Do Q\n`;y-=90;
  } else if(s.signature?.method==='drawn')throw new Error('Handwritten signature required for summary.');
- else if(s.signature){text(s.name,40,y-22,19);y-=40;}
- text(s.name+' | '+s.time+' Central Time',40,y,10,true);
+ else if(s.signature){text(s.owner?s.signature.name:s.name,40,y-22,19);y-=40;}
+ text((s.owner?s.signature?.name:s.name)+' | '+s.time+' Central Time',40,y,10,true);
  text('Report '+r.id,40,35,8);
  const obj=(n:number,body:string)=>{offsets[n]=length;put(`${n} 0 obj\n${body}\nendobj\n`);};
  put('%PDF-1.4\n');obj(1,'<< /Type /Catalog /Pages 2 0 R >>');obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
