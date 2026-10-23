@@ -58,3 +58,19 @@ Rollback: restore the prior worker source and the previous three schedule
 strings from the guarded artifact; do not remove pending publisher intents,
 change credentials or delete saved source history. The advisory queue can expire
 without affecting existing read/write authority. Do not deploy with failed gates.
+
+## Production safe-update compatibility
+
+The first publisher receipt after PR #298 failed at `finish`: production rejects
+DELETE statements without a WHERE clause. Inventory and placement succeeded, and
+the publisher transaction rolled back without changing Sheet baselines or
+pending intents. The prior finish definition and publisher worker were restored.
+The 30-minute schedules and successful inventory worker remain active.
+
+Queue replacement now deletes only equipment IDs already validated into `seen`
+by the current complete result set. It does not disable the safe-update guard.
+Fresh installations use the corrected primary artifact. For the existing queue
+after rollback, use `mhelp-publisher-refresh-safe-cleanup.sql`, then redeploy the
+tested publisher worker after required checks pass. The repair refuses a missing
+queue or an already-installed handoff. Verify a real scheduled finish receipt
+before claiming the publisher repair complete; never reset tracker baselines.

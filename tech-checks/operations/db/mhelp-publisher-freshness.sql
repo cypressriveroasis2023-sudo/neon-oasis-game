@@ -20,7 +20,7 @@ begin
  if (length(next)-length(replace(next,anchor,'')))/length(anchor)<>1 then raise exception 'Publisher finish changed';end if;
  next:=replace(next,anchor,$queue$
  if (select count(*) from jsonb_array_elements(p_results) x where x->>'reason'='source_refresh_requested')>60 then raise exception 'Refresh selection exceeds bound';end if;
- delete from cos_sheets_placement_private.refresh_requests;
+ delete from cos_sheets_placement_private.refresh_requests where equipment_id=any(seen);
  insert into cos_sheets_placement_private.refresh_requests(equipment_id)
  select target_binding.equipment_id from cos_sheets_placement_private.bindings target_binding join cos_mhelp_placement_private.links l using(equipment_id)
  join jsonb_array_elements(p_results) result on result->>'equipmentId'=target_binding.equipment_id

@@ -21,7 +21,13 @@ await exec(`create schema cos_operational_private;create table cos_operational_p
  update cos_sheets_placement_private.control set enabled=true;`);
 const before=await query('select observed_at from cos_mhelp_placement_private.links');
 const acl=await query("select proacl::text from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure");
+const prior=(await query("select pg_get_functiondef('public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure) definition"))[0].definition;
 await exec(await readFile(new URL('../../db/mhelp-publisher-freshness.sql',import.meta.url),'utf8'));
+await exec(prior);
+await exec(await readFile(new URL('../../db/mhelp-publisher-refresh-safe-cleanup.sql',import.meta.url),'utf8'));
+const repaired=(await query("select pg_get_functiondef('public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure) definition"))[0].definition;
+assert.match(repaired,/delete from cos_sheets_placement_private\.refresh_requests where equipment_id=any\(seen\)/);
+assert.doesNotMatch(repaired,/delete from cos_sheets_placement_private\.refresh_requests\s*;/);
 assert.deepEqual(await query("select proacl::text from pg_proc where oid='public.cos_sheets_placement_finish(uuid,jsonb)'::regprocedure"),acl);
 const lease=(await query('select public.cos_sheets_placement_begin() value'))[0].value.leaseId;
 const finish=parameters('select public.cos_sheets_placement_finish($1,$2::jsonb);',[lease,JSON.stringify([{equipmentId:'123',state:'held',reason:'source_refresh_requested'}])]);
