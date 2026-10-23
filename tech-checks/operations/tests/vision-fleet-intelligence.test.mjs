@@ -166,12 +166,18 @@ function historicalClient(events,withError=false){
 test('Observed offline span uses matching archived provider observations rather than lastOnlineAt',async()=>{
   const health=snapshot([row(13,'Helios 007','offline')]);
   const projected=projectVisionFleet(health,fieldMap,question({scope:'history'}),NOW);
+  assert.equal(projected.items[0].status,'offline');
+  assert.equal(projected.items[0].provider,'Star4Live');
+  assert.equal(projected.items[0].resource_id,'13');
+  assert.equal(projected.items[0].observed_at,stamp());
   const e=(status,at,source='vigilant_star4live')=>({camera_device_id:13,check_source:source,status,observed_at:stamp(at)});
   const events=[
     e('online',150),e('offline',100),e('offline',20),e('offline',2),
     e('offline',500,'reconeyez_webhook'),
   ];
   const answer=await enrichVisionOfflineHistory(projected,historicalClient(events));
+  assert.equal(answer.history_enrichment.eligible_offline_records,1);
+  assert.equal(answer.history_enrichment.checked,1);
   assert.equal(answer.history_enrichment.matched,1);
   assert.equal(answer.items[0].outage_observation_span_minutes,99);
   assert.equal(answer.items[0].outage_observed_since,stamp(100));
@@ -181,6 +187,7 @@ test('History mismatch and failed owner-scoped queries leave duration unverified
   const data=projectVisionFleet(snapshot([row(13,'Helios 007','offline')]),fieldMap,question({scope:'offline'}),NOW);
   const mismatched=[{camera_device_id:13,check_source:'vigilant_star4live',status:'online',observed_at:stamp(2)}];
   const wrong=await enrichVisionOfflineHistory(data,historicalClient(mismatched));
+  assert.equal(wrong.history_enrichment.eligible_offline_records,1);
   assert.equal(wrong.history_enrichment.matched,0);
   assert.equal(wrong.items[0].outage_observed_since,undefined);
   const failed=await enrichVisionOfflineHistory(data,historicalClient([],true));
