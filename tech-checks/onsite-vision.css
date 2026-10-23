@@ -1428,3 +1428,23 @@ body.vision-voice-session .vision-results>.vision-turn.assistant{display:block!i
   body.vision-voice-session .vision-mode-label{font-size:23px!important;margin-top:24px!important}
 }
 
+
+/* Vision fleet: one expandable unit with individually identifiable channels. */
+.vision-fleet-group-list{display:grid;gap:9px}
+.vision-fleet-unit{border:1px solid #33485b;border-radius:11px;background:#132333;overflow:hidden}
+.vision-fleet-unit summary{cursor:pointer;list-style:none;padding:12px 12px 11px;min-height:54px;display:block;position:relative;padding-right:34px;overflow-wrap:anywhere}
+.vision-fleet-unit summary::-webkit-details-marker{display:none}
+.vision-fleet-unit summary::after{content:"+";position:absolute;right:12px;top:10px;font-size:18px;color:#c5d3df;font-weight:600}
+.vision-fleet-unit[open] summary::after{content:"−"}
+.vision-fleet-unit summary b{display:block;color:#f4f8fa;font-size:12px;line-height:1.4}
+.vision-fleet-unit summary span{display:block;color:#ffb2b7;font-size:10px;font-weight:700;margin-top:4px;line-height:1.5}
+.vision-fleet-unit summary small{display:block;color:#aebecd;font-size:10px;margin-top:3px;line-height:1.5}
+.vision-fleet-unit summary:focus-visible{outline:2px solid #e6444e;outline-offset:-2px}
+.vision-fleet-unit-details{border-top:1px solid #2c4054;padding:10px 12px 12px;background:#0c1927}
+.vision-fleet-unit-link{margin-bottom:8px;font-size:11px}
+.vision-fleet-unit-link a{color:#a7c9ed;text-decoration:underline;text-underline-offset:3px}
+.vision-fleet-channel{margin-top:8px;padding-top:8px;border-top:1px solid #263a4d}
+.vision-fleet-channel:first-of-type{margin-top:0}
+.vision-fleet-channel b{font-size:11px}
+.vision-fleet-channel span,.vision-fleet-channel small{display:block;color:#aebecd;font-size:10px;line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
+.vision-fleet-count-note{font-size:10px;line-height:1.6;color:#aebecd;margin:0 0 10px}
