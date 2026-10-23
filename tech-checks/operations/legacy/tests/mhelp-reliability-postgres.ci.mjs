@@ -16,7 +16,27 @@ async function race(sqlA,sqlB,name){const first=openPsql('begin;'+service(sqlA),
 export async function main(){
  assertCiContext();validateIsolatedServer((await query('select current_database() database,current_user account,inet_server_port() port'))[0]);
  await exec(`create schema if not exists cos_mhelp_placement_private;create table if not exists cos_mhelp_placement_private.read_backoff(singleton boolean primary key,blocked_until timestamptz,probe_until timestamptz);insert into cos_mhelp_placement_private.read_backoff(singleton) values(true) on conflict do nothing;update cos_mhelp_placement_private.read_backoff set blocked_until=null,probe_until=null;`);
- for(const name of ['mhelp-request-budget.sql','mhelp-renewal-guard.sql','mhelp-inventory-cache.sql'])await exec(await readFile(new URL('../../db/'+name,import.meta.url),'utf8'));
+ const migration=await readFile(new URL('../../db/mhelp-cache-parent-reference.sql',import.meta.url),'utf8');
+ const oldPredicate=migration.match(/\$old\$([\s\S]*?)\$old\$/)[1],newPredicate=migration.match(/\$new\$([\s\S]*?)\$new\$/)[1];
+ for(const name of ['mhelp-request-budget.sql','mhelp-renewal-guard.sql','mhelp-inventory-cache.sql']){
+  let sql=await readFile(new URL('../../db/'+name,import.meta.url),'utf8');
+  if(name==='mhelp-inventory-cache.sql'){assert(sql.includes(newPredicate));sql=sql.replace(newPredicate,oldPredicate);}await exec(sql);
+ }
+ const cacheDefinition=async()=>(await query("select pg_get_functiondef('public.cos_mhelp_inventory_cache(text,text,jsonb,timestamptz)'::regprocedure) definition,proacl::text acl,prosecdef,proconfig from pg_proc where oid='public.cos_mhelp_inventory_cache(text,text,jsonb,timestamptz)'::regprocedure"))[0];
+ const beforeCache=await cacheDefinition();assert.equal((await query("select md5(pg_get_functiondef('public.cos_mhelp_inventory_cache(text,text,jsonb,timestamptz)'::regprocedure)) hash"))[0].hash,'9147de2d58b413a3c4fc490640a12604');
+ const serviceKey='224643:/customers/3/servicelocations?pageSize=200&rowIndex=0&Fields=serviceLocationId,customerId,portalId,name,isActive,address1,city,state,zip,countryId';
+ const parentPage={totalRows:2,results:[{serviceLocationId:3,portalId:224643},{serviceLocationId:4,customerId:3,portalId:224643,address1:'Synthetic child street'}]};
+ const serviceWrite=(payload,at=new Date().toISOString())=>call('select public.cos_mhelp_inventory_cache($1,$2,$3::jsonb,$4::timestamptz);',['write',serviceKey,JSON.stringify(payload),at]);
+ await assert.rejects(serviceWrite(parentPage));await exec(migration);
+ assert.deepEqual(await cacheDefinition(),{...beforeCache,definition:beforeCache.definition.replace(oldPredicate,newPredicate)});
+ const parentObserved=new Date().toISOString();assert.equal((await serviceWrite(parentPage,parentObserved)).saved,true);
+ const serviceRead=()=>call('select public.cos_mhelp_inventory_cache($1,$2);',['read',serviceKey]);
+ assert.deepEqual((await serviceRead()).payload,parentPage);assert.equal(Date.parse((await serviceRead()).observedAt),Date.parse(parentObserved));
+ assert.equal((await serviceWrite(parentPage,new Date(Date.now()-2000).toISOString())).saved,false);
+ for(const row of [{serviceLocationId:3,customerId:99,portalId:224643,address1:'Synthetic unrelated street'},{serviceLocationId:3,customerId:3,portalId:224643},{serviceLocationId:3,portalId:9},{serviceLocationId:4,customerId:9,portalId:224643}])await assert.rejects(serviceWrite({totalRows:1,results:[row]}));
+ assert.deepEqual((await serviceRead()).payload,parentPage);await assert.rejects(exec(migration),/Unexpected inventory cache definition/);
+ for(const role of ['anon','authenticated','service_role'])assert.equal((await query("select has_table_privilege($1,'cos_mhelp_placement_private.inventory_resource_cache','select,insert,update,delete') allowed",[role]))[0].allowed,false);
+
  await exec('update cos_mhelp_placement_private.request_budget_config set initial_hold_until=null');
  const pacing=await race('select public.cos_mhelp_request_budget(false);','select public.cos_mhelp_request_budget(false);','allowance-pacing');assert.equal(pacing[0].allowed,true);assert.equal(pacing[1].allowed,false);assert.equal(pacing[1].reason,'pacing');
  await exec("update cos_mhelp_placement_private.request_budget_config set daily_limit=3,essential_reserve=1;update cos_mhelp_placement_private.request_budget_pace set next_start_at=null;update cos_mhelp_placement_private.request_budget_day set admitted=1,essential_admitted=0");
@@ -47,6 +67,6 @@ export async function main(){
  assert.equal((await call("select public.cos_mhelp_inventory_read_lease('acquire');")).reason,'inventory_paused');
  assert.equal((await call('select public.cos_mhelp_placement_from_inventory();')).vendorReads,0);
  for(const role of ['anon','authenticated'])for(const sql of ["select public.cos_mhelp_renewal_failure(9);","select public.cos_mhelp_auth_observation(9);","select public.cos_mhelp_reliability_status();","select public.cos_mhelp_request_budget(false);","select public.cos_mhelp_renewal_guard('check');",parameters("select public.cos_mhelp_inventory_cache('read',$1);",[key])])await assert.rejects(exec('begin;set local role '+role+";select set_config('request.jwt.claim.role','service_role',true);"+sql+'commit;'),e=>e.sqlstate==='42501');
- console.log('PASS real distinct-client allowance pacing/cap/reserve, UTC reset/provider hold, observed cache TTL, lease-bound rejected-grant suppression/revision recovery native pause/auth evidence and denied client roles');
+ console.log('PASS real distinct-client allowance pacing/cap/reserve, UTC reset/provider hold, guarded identity-only parent-reference migration/ACL/CAS/child rejection, observed cache TTL, lease-bound rejected-grant suppression/revision recovery native pause/auth evidence and denied client roles');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.message);process.exitCode=1;});

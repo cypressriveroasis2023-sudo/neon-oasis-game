@@ -7,6 +7,9 @@ const identity=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?St
 // Preserve those bytes exactly; every other field keeps its single-line guard.
 const safe=(v:unknown,street=false)=>v==null||typeof v==='boolean'||typeof v==='number'&&Number.isSafeInteger(v)||typeof v==='string'&&v.length<=600&&!(street?/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/:/[\x00-\x1f\x7f<>]/).test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v);
 const customerFields=['customerId','portalId','name','isServiceLocation','isActive','address1','city','state','zip','countryId'];
+// A page can refer to its requested parent. Keep only that reference's actual
+// identity and portal for paging/duplicate checks; it is never child evidence.
+const parentReference=(r:Row,parent:string)=>identity(r.serviceLocationId)===parent&&Object.keys(r).every(k=>k==='serviceLocationId'||k==='portalId');
 /** Structural counts only. Never retain the rows, requested parent or IDs. */
 export class InventoryCacheMembershipError extends Error{
  readonly diagnostic:Readonly<Record<string,number>>;
@@ -46,8 +49,8 @@ export function projectInventoryCache(path:string,value:unknown):unknown{
  }
  const rows=object(value)?value.results??value.data:null;
  if(!object(value)||!Array.isArray(rows)||rows.length>200||!Number.isSafeInteger(value.totalRows)||value.totalRows<0||value.totalRows>5000||rows.length!==Math.min(200,Math.max(0,value.totalRows-s.page)))throw Error('Incomplete cached service page');
- const result=rows.map(r=>project(r,['serviceLocationId',...customerFields.filter(k=>k!=='isServiceLocation')]));
- if(result.some(r=>!identity(r.serviceLocationId??r.customerId)||(r.serviceLocationId!=null&&identity(r.customerId)!==s.id))||new Set(result.map(r=>identity(r.serviceLocationId??r.customerId))).size!==result.length)throw new InventoryCacheMembershipError(result,s.id);
+ const result:Row[]=rows.map(r=>{const row=project(r,['serviceLocationId',...customerFields.filter(k=>k!=='isServiceLocation')]);return identity(row.serviceLocationId)===s.id?{serviceLocationId:row.serviceLocationId,portalId:row.portalId}:row;});
+ if(result.some(r=>!identity(r.serviceLocationId??r.customerId)||(r.serviceLocationId!=null&&identity(r.customerId)!==s.id&&!parentReference(r,s.id)))||new Set(result.map(r=>identity(r.serviceLocationId??r.customerId))).size!==result.length)throw new InventoryCacheMembershipError(result,s.id);
  return {totalRows:value.totalRows,results:result};
 }
 export const MHELP_RESOURCE_CACHE_TTL_MS=165*60*1000;
