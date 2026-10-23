@@ -23,7 +23,7 @@ const snapshot=(rows,generated=stamp())=>{
     inventory:{allRecords:rows.length,activeFieldRecords:counts.field,
       activeShopRecords:counts.shop,inactiveRecords:counts.inactive,unknownScopeRecords:counts.unknown}};
 };
-const fieldMap={items:[
+const fieldMap={summary:{fieldUnits:2},items:[
   {id:'u1',unitNumber:'Helios 7',customer:'Acuity',site:'Baytown yard',address:'101 Main St, Baytown, TX'},
   {id:'u2',unitNumber:'Spotter 46',customer:'Other',site:'Katy site',address:'456 Second St, Katy, TX'},
 ]};
@@ -75,7 +75,7 @@ test('Unverified or missing locations never manufacture a current address',()=>{
   const noMap=projectVisionFleet(snapshot(rows),null,question({scope:'location',location_query:'baytown'}),NOW);
   assert.equal(noMap.location_filter_unverifiable,true);
   assert.equal(noMap.items.length,0);
-  const duplicate={items:[...fieldMap.items,{id:'u3',unitNumber:'Helios 007',customer:'Other',site:'Different'}]};
+  const duplicate={summary:{fieldUnits:3},items:[...fieldMap.items,{id:'u3',unitNumber:'Helios 007',customer:'Other',site:'Different'}]};
   const ambiguous=projectVisionFleet(snapshot(rows),duplicate,question(),NOW);
   assert.equal(ambiguous.items[0].location,null);
   assert.equal(ambiguous.unmatched_field_resource_locations,1);
@@ -99,7 +99,7 @@ test('Owner agent only performs authorized, read-only saved Health and Map GET e
     assert.equal(options.headers.Authorization,'Bearer verified-owner-session');
     return {ok:true,json:async()=>path.endsWith('summary-v3')?health:fieldMap};
   };
-  const data=await readVisionFleetHealth('verified-owner-session',question({scope:'offline'}),fetcher);
+  const data=await readVisionFleetHealth('verified-owner-session',question({scope:'summary'}),fetcher);
   assert.equal(requests.length,2);
   assert.equal(data.items.length,1);
   assert.equal(data.items[0].location.customer,'Acuity');
