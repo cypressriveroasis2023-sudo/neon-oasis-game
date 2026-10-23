@@ -59,6 +59,20 @@ test('Stale, incomplete or untrusted provider status becomes unverified, never o
   assert.equal(data.items.every(x=>x.status==='unverified'),true);
   assert.equal(data.field_resource_census.offline,3); // raw source census, clearly distinguished.
 });
+test('NVR recorders remain separately counted but surface in urgent attention',()=>{
+  const rows=[
+    row(1,'Spotter 046','online'),
+    row(7,'Spotter 046','review',{type:'NVR',evidence:provider('offline',{resource:'recorder'})}),
+  ];
+  const data=projectVisionFleet(snapshot(rows),fieldMap,question({scope:'attention'}),NOW);
+  assert.deepEqual(data.monitored_cameras,{total:1,online:1,offline:0,unverified:0});
+  assert.deepEqual(data.monitored_recorders,{total:1,online:0,offline:1,unverified:0});
+  assert.equal(data.recorder_records_by_provider[0].provider,'Star4Live');
+  assert.equal(data.items.length,1);
+  assert.equal(data.items[0].kind,'recorder');
+  assert.equal(data.items[0].status,'offline');
+  assert.equal(data.items[0].outage_started_at,null);
+});
 test('Direct service ports never inflate camera-online or camera-offline counts',()=>{
   const port={kind:'service_port',source:'Direct service-port check',active:true,
     status:'offline',observedAt:stamp(),reachable:false,confirmedOutage:true,lastOnlineAt:stamp(120)};
@@ -119,7 +133,8 @@ test('Vision routes camera fleet questions to the source tool, not the separate 
     'Where is Spotter 046 located?',
     'Is Sniper 2 039 offline?',
     'Show me Star4Live cameras online in Baytown.',
-    'Show me the Avigilon camera health.'
+    'Show me the Avigilon camera health.',
+    'Which NVR recorders are offline?'
   ])assert.equal(cameraFleetIntent(message),true,message);
   for(const message of [
     'How many offline escalations are waiting on IT?',
