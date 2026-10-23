@@ -22,3 +22,12 @@ jobs:
         run: node --check tech-checks/onsite-vision.js
       - name: Verify live-read fleet projections and routing
         run: node --experimental-strip-types --test tech-checks/operations/tests/vision-fleet-intelligence.test.mjs
+      - name: Install existing COS Operations dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck COS Operations
+        working-directory: tech-checks/operations
+        run: npm run typecheck
+      - name: Build COS Operations
+        working-directory: tech-checks/operations
+        run: npm run build
