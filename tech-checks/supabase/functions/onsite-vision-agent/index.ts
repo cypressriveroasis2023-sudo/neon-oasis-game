@@ -413,7 +413,7 @@ const tools = [
     parameters: {
       type: 'object',
       properties: {
-        scope: { type: 'string', enum: ['summary','offline','attention','unit','location','history'] },
+        scope: { type: 'string', enum: ['summary','online','offline','attention','unit','location','history'] },
         unit_reference: { type: 'string', description: 'Exact unit label if given, or empty string.' },
         location_query: { type: 'string', description: 'Site, customer or address substring if given, or empty string.' },
         limit: { type: 'integer', minimum: 1, maximum: 100 },
@@ -683,9 +683,10 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v35',
+        agent_version: 'onsite-vision-agent-v36',
         model,
         model_configured: Boolean(apiKey),
+        fleet_health_direct_read_enabled: true,
         knowledge_version: KNOWLEDGE?.version || 'unknown',
         knowledge_coverage: knowledgeCoverage(),
         workflow_engine_version: ENGINE?.version || 'unknown',
@@ -702,6 +703,39 @@ Deno.serve(async (req) => {
         it_supplied_sim_sd_handoff_enabled: true,
         swap_outcome_and_site_registration_enabled: true,
       })
+    }
+
+    if (body.mode === 'fleet_health') {
+      // Deterministic, source-verified reads must not require conversational AI.
+      // Authentication and Owner profile validation have already completed.
+      const question = body.question
+      if (!question || typeof question !== 'object' || Array.isArray(question)) {
+        return json({ error: 'A fleet question is required.' }, 400)
+      }
+      const scope = clean(question.scope).toLowerCase()
+      const allowed = ['summary', 'online', 'offline', 'attention', 'unit', 'location', 'history']
+      if (!allowed.includes(scope) ||
+          typeof question.unit_reference !== 'string' || question.unit_reference.length > 120 ||
+          typeof question.location_query !== 'string' || question.location_query.length > 120 ||
+          !Number.isSafeInteger(question.limit) || question.limit < 1 || question.limit > 100) {
+        return json({ error: 'Invalid fleet question.' }, 400)
+      }
+      try {
+        const saved = await readVisionFleetHealth(token, {
+          scope: scope as 'summary' | 'online' | 'offline' | 'attention' | 'unit' | 'location' | 'history',
+          unit_reference: clean(question.unit_reference),
+          location_query: clean(question.location_query),
+          limit: question.limit,
+        })
+        const fleet = await enrichVisionOfflineHistory(saved, userClient)
+        return json({ ok: true, fleet, read_only: true, model_required: false })
+      } catch (cause) {
+        console.error('Vision authorized camera source read failed', cause instanceof Error ? cause.message : 'unknown error')
+        return json({
+          error: 'Saved COS Camera Health could not be verified. No fleet counts are confirmed by this request.',
+          code: 'CAMERA_HEALTH_UNVERIFIED',
+        }, 503)
+      }
     }
 
     const message = clean(body.message)
@@ -918,7 +952,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v35',
+            agent_version: 'onsite-vision-agent-v36',
           }
         } as Json
       }
@@ -944,9 +978,9 @@ Deno.serve(async (req) => {
 
       if (name === 'get_camera_fleet_health') {
         const scope = clean(args.scope).toLowerCase()
-        if (!['summary','offline','attention','unit','location','history'].includes(scope)) throw new Error('Invalid camera fleet scope.')
+        if (!['summary','online','offline','attention','unit','location','history'].includes(scope)) throw new Error('Invalid camera fleet scope.')
         const savedFleet = await readVisionFleetHealth(token, {
-          scope: scope as 'summary'|'offline'|'attention'|'unit'|'location'|'history',
+          scope: scope as 'summary'|'online'|'offline'|'attention'|'unit'|'location'|'history',
           unit_reference: clean(args.unit_reference),
           location_query: clean(args.location_query),
           limit: Math.max(1, Math.min(Number(args.limit || 30), 100)),
@@ -1687,7 +1721,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v35',
+      agent_version: 'onsite-vision-agent-v36',
       model,
       tool_trace: toolTrace,
       ...parsed,
