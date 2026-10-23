@@ -196,10 +196,13 @@ export async function readVisionFleetHealth(token: string, question: FleetQuesti
     return response.json();
   };
   try {
-    const health = await read('/api/camera-health/summary-v3');
-    // When Field Map is unavailable, retain honest Camera Health counts and
-    // explicitly suppress location claims rather than fabricating locations.
-    const map = await read('/api/field-map').catch(() => null);
+    // Both source reads start together so a slow map cannot steal the entire
+    // request budget after the health request has already settled.
+    const [health, map] = await Promise.all([
+      read('/api/camera-health/summary-v3'),
+      // Map location is optional; Camera Health census is not.
+      read('/api/field-map').catch(() => null),
+    ]);
     return projectVisionFleet(health, map, question, Date.now());
   } finally { clearTimeout(deadline); }
 }
