@@ -40,3 +40,23 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);
 });
+ 
+test('Map camera-status tiles open the exact matching mHelp Product IDs, not a different COS roster',async({page})=>{
+ const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health});
+ const navigation=app.getByRole('navigation',{name:'Fleet dashboard views'});
+ const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
+ const scopes=[{tile:'online',state:'online',count:1,unit:'Helios 1'},
+  {tile:'offline',state:'offline',count:1,unit:'Spotter 1'},
+  {tile:'unknown',state:'unverified',count:4,unit:'Ranger 902'}];
+ for(const item of scopes){
+  await expect(app.locator('.cos-fleet-stat-'+item.tile+' strong')).toHaveText(String(item.count));
+  await app.locator('.cos-fleet-stat-'+item.tile).click();
+  await expect(board).toBeVisible();
+  await expect(board.getByRole('combobox',{name:'Filter all Field products by connectivity status'})).toHaveValue(item.state);
+  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(item.count);
+  await expect(board.locator('.cos-command-rows')).toContainText(item.unit);
+  await navigation.getByRole('button',{name:/Map/}).click();
+ }
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ expect(state.errors).toEqual([]);
+});

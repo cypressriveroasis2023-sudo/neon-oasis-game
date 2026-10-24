@@ -150,7 +150,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  state.gate.resolve();state.gate=null;
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
- await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('—');
  await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
  // Settled partial data was not promoted into a complete current snapshot.
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();

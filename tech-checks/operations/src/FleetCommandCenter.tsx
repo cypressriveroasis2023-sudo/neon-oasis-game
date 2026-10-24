@@ -9,6 +9,7 @@ import './fleetCommandCenter.css';
 
 type Props={
  initialFamily?:string;
+ initialStatus?:'all'|FleetCommandStatus;
  uploadInventory:unknown;
  fieldHealth:{total:number;items:FieldProduct[]}|null;
  healthReadSucceeded:boolean;
@@ -43,11 +44,11 @@ function verificationSummary(products:FleetCommandProduct[]):string{
 }
 
 export default function FleetCommandCenter({
- initialFamily='all',uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
+ initialFamily='all',initialStatus='all',uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt,
  onOpen,onShop,onMap,onImport,onRefresh
 }:Props){
  const [query,setQuery]=useState(''),[family,setFamily]=useState<FamilyFilter>(['all','star4live','avigilon','reconeyez','victron'].includes(initialFamily)?initialFamily as FamilyFilter:'all');
- const [status,setStatus]=useState<StatusFilter>('all'),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState(''),[focus,setFocus]=useState<FocusFilter>('all');
+ const [status,setStatus]=useState<StatusFilter>(initialStatus),[limit,setLimit]=useState(35),[selectedId,setSelectedId]=useState(''),[focus,setFocus]=useState<FocusFilter>('all');
  const data=useMemo(()=>buildFleetCommandCenter(
    uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt),
    [uploadInventory,fieldHealth,healthReadSucceeded,rows,addressMap,vrm,now,cameraCheckedAt]);
@@ -155,6 +156,7 @@ export default function FleetCommandCenter({
      <span className={'cos-command-dot cos-command-dot-'+p.status} aria-hidden="true">●</span>
      <span className="cos-command-row-main"><strong>{p.unitNumber}</strong><small>Product {p.productId} · {p.category||'Unclassified'}</small>
       <small>{p.customer||'Customer not supplied'}{p.address?' · '+p.address:''}</small>
+      {(p.status==='online'||p.status==='offline')&&p.linked?.evidence?.observedAt&&<small>Reported camera / detector observation: {date(p.linked.evidence.observedAt)} · video not verified</small>}
       {p.mappingIssue&&<small className="cos-command-issue">Address pin needs mapping — remains in Field inventory</small>}
      </span>
      <span className={'cos-command-status-pill cos-command-pill-'+p.status}>{productHealthLabel(p.status,p.linked?.evidence)}</span>
