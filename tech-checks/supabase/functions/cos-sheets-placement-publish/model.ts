@@ -47,8 +47,8 @@ const shop=(s:string)=>['cameras onsite','cameras onsite llc'].includes(s.trim()
 const normalized=(s:string)=>s.trim().replace(/\s+/g,' ').toLowerCase();
 export function desiredCustomer(b:Row,o:Row):string{
  const old=b.baseline.map(cellText),customer=o.customerLabel,site=o.siteLabel;
- const oldCustomer=normalized(old[2]??''),oldSite=normalized(old[3]??'');
- const combined=b.customerStyle==='combined'||(old[1]==='FIELD'&&oldSite.length>0&&oldCustomer.endsWith(': '+oldSite)&&oldCustomer.length>oldSite.length+2);
+ const oldCustomer=normalized(old[2]??'');
+ const combined=b.customerStyle==='combined';
  const desired=o.placement==='FIELD'&&combined?customer+': '+site:customer;
  return oldCustomer===normalized(desired)||(o.placement==='SHOP'&&shop(old[2]??''))?old[2]:desired;
 }

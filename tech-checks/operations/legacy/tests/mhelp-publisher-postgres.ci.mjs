@@ -74,3 +74,7 @@ assert.equal((await query('select row_number from cos_sheets_placement_private.b
 await assert.rejects(exec(repairSql),/changed|ERROR/);
 for(const role of ['anon','authenticated','service_role'])assert.equal((await query("select has_function_privilege($1,'cos_sheets_placement_private.repair_bindings(jsonb,text,timestamptz,text)','execute') allowed",[role]))[0].allowed,false);
 console.log('PASS: real PostgreSQL reviewed repair serialization, one-use audit, native preservation and private ACLs');
+const plainCells=['Synthetic Unit','FIELD','Builder: Division','Division'].map(s=>({entered:{stringValue:s},validation:null,rich:false}));
+const plainObservation={placement:'FIELD',customerLabel:'Builder: Division',siteLabel:'Division'};
+assert.equal((await query('select cos_sheets_placement_private.customer_value($1::jsonb,$2::jsonb,$3) value',[JSON.stringify(plainCells),JSON.stringify(plainObservation),'plain']))[0].value,'Builder: Division');
+console.log('PASS: explicit plain style preserves punctuation in the actual parent customer name');

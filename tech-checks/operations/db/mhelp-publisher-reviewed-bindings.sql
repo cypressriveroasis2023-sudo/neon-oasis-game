@@ -6,7 +6,7 @@ declare old_customer text:=cells->2->'entered'->>'stringValue';old_site text:=ce
 begin
  n:=regexp_replace(lower(btrim(coalesce(old_customer,''))),'\s+',' ','g');s:=regexp_replace(lower(btrim(coalesce(old_site,''))),'\s+',' ','g');
  desired:=o->>'customerLabel';
- if o->>'placement'='FIELD' and (style='combined' or (cells->1->'entered'->>'stringValue'='FIELD' and length(s)>0 and right(n,length(s)+2)=': '||s and length(n)>length(s)+2)) then desired:=desired||': '||(o->>'siteLabel');end if;
+ if o->>'placement'='FIELD' and style='combined' then desired:=desired||': '||(o->>'siteLabel');end if;
  if n=regexp_replace(lower(btrim(desired)),'\s+',' ','g') or (o->>'placement'='SHOP' and n in('cameras onsite','cameras onsite llc')) then return old_customer;end if;
  return desired;
 end $$;
