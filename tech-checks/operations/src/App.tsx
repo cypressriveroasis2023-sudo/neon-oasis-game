@@ -1,4 +1,5 @@
 import CustodyOverview from './CustodyOverview';
+import {operationsPlatformEntry} from './operationsPlatformEntry';
 import AnimatedEye from './AnimatedEye';
 import {fleetVrmReadAllowed} from './fleetDashboardModel';
 import { AreaIcon } from './VisionAreas';
@@ -346,6 +347,7 @@ function OwnerApp() {
     else setRouteLocation({workspace:'Today',jobId:route.jobId,detail:false},true);
   }),[guardCurrent,route.jobId,setRouteLocation]);
   const authorized=session?.authorized===true;
+  const standaloneEntry=window.parent===window?operationsPlatformEntry(location.pathname):null;
   useEffect(()=>{
     if(fleetOnly&&!fleetWorkspaces.includes(active)) setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false},true);
   },[fleetOnly,dailyOnly,active,setRouteLocation,fleetWorkspaces]);
@@ -375,7 +377,7 @@ function OwnerApp() {
       </section>
 
       {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&(active!=='Camera Health'||route.diagnostics)&&!route.createType&&<header className='command-page-header'><div><label>{active==='Fleet Dashboard'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
-      {checking&&!session?<section className='panel module' role='status'><p>{sessionError||'Verifying your current Operations account…'}</p><button type='button' onClick={()=>window.location.reload()}>Reload app</button></section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p>{!reloadRequired&&<div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>}{!dailyOnly&&<TechChecksWorkspace/>}</section>
+      {checking&&!session?<section className='panel module' role='status'><p>{sessionError||'Verifying your current Operations account…'}</p><button type='button' onClick={()=>window.location.reload()}>Reload app</button></section>:!authorized?<section className='panel module operations-access' role='alert'><h2>{standaloneEntry?'Open COS from its sign-in page':'Operations access needs attention'}</h2><p>{standaloneEntry?'This Operations page needs your signed-in COS platform. Open the sign-in page on this same site, then enter your workspace.':session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'>{standaloneEntry?<a className='button' href={standaloneEntry}>Open COS sign-in</a>:reloadRequired?<button type='button' onClick={()=>window.location.reload()}>Reload COS Operations</button>:!reloadRequired&&<button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button>}</div>{!standaloneEntry&&!dailyOnly&&<TechChecksWorkspace/>}</section>
         :<Fragment key={sessionGeneration}>{fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Fleet Dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='COS Overview'?<CosCompactOverview session={session!} navigate={navigate}/>
         :active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<FleetInventoryOverview navigate={navigate}/><nav className='cos-daily-shortcuts' aria-label='Daily work shortcuts'><button onClick={()=>navigate('Daily Board')}>Today’s work</button><button onClick={()=>navigate('Units On Hand')}>Shop / ROOT</button><button onClick={()=>openLegacy('it')}>IT check out / check in</button><button onClick={()=>openLegacy('service')}>Service work & returns</button>{trackerAccess(session)&&<button onClick={()=>navigate('Unit Tracker')}>2027 Unit Tracker</button>}</nav><TicketActions createTicket={createTicket}/>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={guardCurrent(unit=>{setHeliosUnit(unit);navigate('Victron VRM');})} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>

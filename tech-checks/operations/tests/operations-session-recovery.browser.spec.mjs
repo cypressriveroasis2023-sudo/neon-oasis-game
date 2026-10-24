@@ -73,6 +73,13 @@ for(const status of [401,403])test('true source '+status+' stays blocked without
 test('IT without a server-verified actor ID requires reload after token change',async({page})=>{
  const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
 });
+test('explicit reload rechecks the parent and server without bypassing a continuing denial',async({page})=>{
+ const {app,state,initialSessions}=await mount(page);state.routerStatus=403;await refresh(app).click();await blocked(app);
+ const reload=app.getByRole('button',{name:'Reload COS Operations',exact:true});await expect(reload).toBeEnabled();
+ await reload.click();await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);await blocked(app);
+ state.routerStatus=200;await reload.click();await expect.poll(()=>state.sessionReads).toBe(initialSessions+2);
+ await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');readOnly(state);
+});
 for(const trigger of ['host-hide','pagehide','untyped-security-event','second-token-transition'])test(trigger+' during verification discards its late successful response',async({page})=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred(),replacementGate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  if(trigger==='second-token-transition')state.sessionGate=replacementGate;
