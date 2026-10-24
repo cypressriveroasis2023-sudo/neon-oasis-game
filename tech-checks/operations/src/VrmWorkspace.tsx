@@ -48,6 +48,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
+  const previewReadBlocked = error === 'Temporary preview permits approved saved reads only.';
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const mounted = useRef(false);
@@ -125,9 +126,9 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
   return <section className={'panel module vrm-workspace' + (expanded ? ' vrm-expanded' : '')} aria-label='Victron VRM Helios fleet'>
     <div className='panelhead vrm-fleet-heading'><div><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2><span>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</span></div>
-      <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
+      <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated || previewReadBlocked}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
     </div>
-    {error && <p role='alert'>{error}{privateInvalidated ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
+    {error && <p role='alert'>{previewReadBlocked ? 'This saved fleet read is outside the temporary preview allowance. Reloading cannot enable it.' : error}{privateInvalidated || previewReadBlocked ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
     {sync && <div className='vrm-sync-status' role='status'><p>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)} {sync.error || ''}</p><p>{lastSuccess ? 'Last successful fleet sync: ' + lastSuccess + '. ' : 'No successful fleet sync recorded. '}{sync.scheduleActive ? 'Automatic discovery runs every 15 minutes.' : 'Automatic discovery is not active.'}{nextSync ? ' Next scheduled sync: ' + nextSync + '.' : ''}</p></div>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}

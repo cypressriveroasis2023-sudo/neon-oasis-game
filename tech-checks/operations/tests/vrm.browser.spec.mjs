@@ -502,3 +502,11 @@ test('Native charge keeps distinct battery and system sources visible without an
  await captureNativePower(page,frame.getByRole('region',{name:'HELIOS 098 read-only power dashboard'}),testInfo,'vrm-native-distinct-charge-sources');
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
+
+
+test('Temporary preview read restriction never suggests a retry or permits discovery',async({page})=>{
+ const {frame,requests}=await mount(page,{onVrmRequest:async()=>({status:405,data:{error:'Temporary preview permits approved saved reads only.'}})});await openVrm(frame);
+ await expect(frame.getByRole('alert')).toHaveText('This saved fleet read is outside the temporary preview allowance. Reloading cannot enable it.');
+ await expect(fleetButton(frame)).toBeDisabled();await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
+ expect(requests.some(request=>request.path==='/api/vrm-fleet/refresh')).toBe(false);
+});

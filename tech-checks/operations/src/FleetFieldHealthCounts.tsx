@@ -13,7 +13,7 @@ export default function FleetFieldHealthCounts({value,onOpen}:Props){
   <h2>All {value.total} Field equipment records accounted for</h2>
   <button type='button' onClick={exportEvidence}>Export every Field Product ID and health evidence</button>
   <p>{entries.filter(([,count])=>count>0).map(([state,count])=>count+' '+fieldHealthLabels[state].toLowerCase()).join(' + ')} = <strong>{value.total} Field records</strong>.</p>
-  <p>These counts use each mHelpDesk Product ID once. The linked-unit health tiles above cover camera-capable COS units; solar support, unlinked products, protected reviews and inactive inventory have separate categories. Online includes recorder or IP / port evidence and does not verify camera video.</p>
+  <p>These counts use each mHelpDesk Product ID once. Online and offline require fresh, reviewed camera or detector evidence. Recorder and IP / port observations alone do not establish camera health. Solar support, unlinked products, protected reviews and inactive inventory remain separate categories.</p>
   <details><summary>Review every Field product and its status</summary>
    <label>Field record status <select aria-label='Field inventory status' value={filter} onChange={event=>{setFilter(event.target.value);setLimit(40);}}><option value='all'>All Field products ({value.total})</option>{entries.map(([state,count])=><option key={state} value={state}>{fieldHealthLabels[state]} ({count})</option>)}</select></label>
    <label>Find a Field product <input aria-label='Search Field inventory' value={query} placeholder='Unit number or Product ID' onChange={event=>{setQuery(event.target.value);setLimit(40);}}/></label>
