@@ -46,3 +46,35 @@ await exec("delete from cos_operational_private.current_placements;update cos_sh
 assert.deepEqual((await query('select public.cos_mhelp_inventory_baseline() value'))[0].value.publisherRefreshEquipmentIds,[]);
 for(const role of ['anon','authenticated','service_role'])assert.equal((await query("select has_table_privilege($1,'cos_sheets_placement_private.refresh_requests','select,insert,update,delete') allowed",[role]))[0].allowed,false);
 console.log('PASS: real PostgreSQL concurrent finish, unchanged source clocks/ACLs, operational override, expiry, private queue');
+
+// Review-only mechanism: isolated PostgreSQL concurrency/ACL gate, never production.
+await exec(`create table cos_mhelp_placement_private.live_inventory_control(singleton boolean,enabled boolean,error_code text,active_source_sha256 text);
+ create table cos_mhelp_placement_private.live_inventory_candidates(source_sha256 text primary key,records jsonb);
+ update cos_mhelp_placement_private.control set enabled=true,last_success_at=clock_timestamp();`);
+const reviewSource='d'.repeat(64),reviewAuthorization='e'.repeat(64);
+const observation={equipmentId:'123',state:'confirmed',customerId:'2',serviceLocationId:'3',placement:'FIELD',customerLabel:'Synthetic Builder',siteLabel:'Synthetic Job'};
+await exec(parameters('update cos_mhelp_placement_private.links set observation=$1::jsonb,observed_at=clock_timestamp();insert into cos_mhelp_placement_private.live_inventory_control values(true,true,null,$2);insert into cos_mhelp_placement_private.live_inventory_candidates values($2,$3::jsonb);',[JSON.stringify(observation),reviewSource,JSON.stringify([{productId:'123',holdReason:null}])]));
+const stageAcl=await query("select proacl::text from pg_proc where oid='public.cos_sheets_placement_stage(uuid,jsonb)'::regprocedure");
+await exec(await readFile(new URL('../../db/mhelp-publisher-reviewed-bindings.sql',import.meta.url),'utf8'));
+assert.deepEqual(await query("select proacl::text from pg_proc where oid='public.cos_sheets_placement_stage(uuid,jsonb)'::regprocedure"),stageAcl);
+const current={sheetId:2017346590,row:2,label:'Spotter 023.1',cells,customerStyle:'plain'};
+const target={...current,row:3,customerStyle:'combined',cells:cells.map((c,i)=>i===2?{...c,entered:{stringValue:'Synthetic Builder: Synthetic Job'}}:c)};
+const repairSql=parameters('select cos_sheets_placement_private.repair_bindings($1::jsonb,$2,clock_timestamp(),$3);',[JSON.stringify([{equipmentId:'123',before:current,after:target,observation}]),reviewSource,reviewAuthorization]);
+const nativeBefore=await query('select to_jsonb(t) value from app_private.vision_tracker_locations t');
+const repairFirst=openPsql('begin;'+repairSql,{held:true,application:'review-first'});
+try{
+ await repairFirst.ready;
+ const repairSecond=openPsql('begin;'+repairSql+'commit;',{application:'review-second'});
+ await assert.rejects(repairSecond.done,/lock|ERROR/);
+ await repairFirst.release();
+}finally{await repairFirst.release().catch(()=>repairFirst.abort());}
+assert.deepEqual(await query('select to_jsonb(t) value from app_private.vision_tracker_locations t'),nativeBefore);
+assert.equal((await query('select count(*)::int n from cos_sheets_placement_private.binding_reviews'))[0].n,1);
+assert.equal((await query('select row_number from cos_sheets_placement_private.bindings'))[0].row_number,3);
+await assert.rejects(exec(repairSql),/changed|ERROR/);
+for(const role of ['anon','authenticated','service_role'])assert.equal((await query("select has_function_privilege($1,'cos_sheets_placement_private.repair_bindings(jsonb,text,timestamptz,text)','execute') allowed",[role]))[0].allowed,false);
+console.log('PASS: real PostgreSQL reviewed repair serialization, one-use audit, native preservation and private ACLs');
+const plainCells=['Synthetic Unit','FIELD','Builder: Division','Division'].map(s=>({entered:{stringValue:s},validation:null,rich:false}));
+const plainObservation={placement:'FIELD',customerLabel:'Builder: Division',siteLabel:'Division'};
+assert.equal((await query('select cos_sheets_placement_private.customer_value($1::jsonb,$2::jsonb,$3) value',[JSON.stringify(plainCells),JSON.stringify(plainObservation),'plain']))[0].value,'Builder: Division');
+console.log('PASS: explicit plain style preserves punctuation in the actual parent customer name');

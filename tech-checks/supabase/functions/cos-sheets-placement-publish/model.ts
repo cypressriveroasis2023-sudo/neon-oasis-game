@@ -45,6 +45,13 @@ export function projectTracker(metadata:Row,grid:Row){
 }
 const shop=(s:string)=>['cameras onsite','cameras onsite llc'].includes(s.trim().toLowerCase());
 const normalized=(s:string)=>s.trim().replace(/\s+/g,' ').toLowerCase();
+export function desiredCustomer(b:Row,o:Row):string{
+ const old=b.baseline.map(cellText),customer=o.customerLabel,site=o.siteLabel;
+ const oldCustomer=normalized(old[2]??'');
+ const combined=b.customerStyle==='combined';
+ const desired=o.placement==='FIELD'&&combined?customer+': '+site:customer;
+ return oldCustomer===normalized(desired)||(o.placement==='SHOP'&&shop(old[2]??''))?old[2]:desired;
+}
 function allowed(c:Row,value:string){
  if(c.rich||cellText(c)===null)return false;
  const rule=c.validation;if(!rule)return true;
@@ -63,9 +70,8 @@ export function planPublishing(bindings:Row[],rows:Row[]){
   if(!['SHOP','FIELD'].includes(o.placement)||typeof o.customerLabel!=='string'||typeof o.siteLabel!=='string'||!o.customerLabel.trim()||!o.siteLabel.trim()||(o.placement==='SHOP')!==shop(o.customerLabel)){hold('source_unverified');continue;}
   const old=b.baseline.map(cellText);
   if(old.some((v:any)=>v===null)||b.baseline.some((c:Row)=>c.rich)){hold('unsupported_sheet_cell');continue;}
-  const desired=[old[0],o.placement,o.customerLabel,o.siteLabel];
+  const desired=[old[0],o.placement,desiredCustomer(b,o),o.siteLabel];
   // Preserve equivalent existing spelling and the two established Shop accounts.
-  if(normalized(old[2]!)===normalized(o.customerLabel)||(o.placement==='SHOP'&&shop(old[2]!)))desired[2]=old[2];
   if(normalized(old[3]!)===normalized(o.siteLabel)||(o.placement==='SHOP'&&old[1]==='SHOP'&&['shop','main cos shop','cameras onsite shop'].includes(normalized(old[3]!))))desired[3]=old[3];
   const changed=[1,2,3].filter(i=>old[i]!==desired[i]);
   const cells=b.baseline.map((c:Row,i:number)=>changed.includes(i)?{...c,entered:{stringValue:desired[i]}}:c);
