@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import OwnerActionQueue from './OwnerActionQueue';
 import WorkspaceOverview from './WorkspaceOverview';
 import CompanyOverview from './CompanyOverview';
 import { api } from './api';
@@ -40,6 +41,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
   };
   return <div className={'owner-command-home company-command-home'+(detailOpen?' overview-detail-open':'')} aria-busy={loading}>
     {!detailOpen && <>
+      <OwnerActionQueue data={data} openWorkspace={setActive} openJob={openJob}/>
       <CompanyOverview data={data} equipment={null} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
         <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
