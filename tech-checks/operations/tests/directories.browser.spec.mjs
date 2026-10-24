@@ -168,6 +168,7 @@ test('Team shows only actual roster, exact assignment and readiness without prov
   const workspace=await open(frame,'Team');
   await expect(workspace.getByText('Fixture IT',{exact:true})).toBeVisible();
   await expect(workspace.getByText('IT Technician · 1 active assigned jobs',{exact:true})).toBeVisible();
+  await workspace.locator('.record.op-record').filter({hasText:'Fixture IT'}).getByText('Existing work and required check records',{exact:true}).click();
   await expect(workspace.getByText('Readiness: Ready',{exact:true})).toBeVisible();
   await workspace.getByLabel('Department',{exact:true}).selectOption('service');
   await expect(workspace.locator('.record.op-record')).toHaveCount(1);

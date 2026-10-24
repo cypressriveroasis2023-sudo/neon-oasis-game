@@ -64,7 +64,17 @@ async function mount(page,{sourceCases=false,overview=false,diagnostics=false,pa
  await page.goto('/verified-health-identity-fixture');
  const frame=page.frameLocator('iframe');
  if(overview)await frame.getByLabel('Camera Health unit filter').selectOption('all');
- await expect(frame.locator(overview?'.camera-overview-card':'.cos-fleet-unit-row')).toHaveCount(overview?(sourceCases?5:1):state.units.length);
+ await expect(frame.locator(overview?'.camera-overview-card':'.cos-fleet-unit-row')).toHaveCount(overview?(sourceCases?7:2):state.units.length);
+ if(overview){
+  // Unlinked inventory remains visible separately from raw provider label groups.
+  for(const label of sourceCases?[labels.unlinked,labels.unbound]:[labels.unlinked]){
+   const review=frame.locator('.camera-overview-card').filter({has:frame.locator('.camera-card-main strong').filter({hasText:new RegExp('^'+label+'$')})});
+   await expect(review).toHaveCount(1);
+   await expect(review.locator('.camera-status-pill')).toHaveText('EQUIPMENT LINK UNVERIFIED');
+   await expect(review).toContainText('excluded from unit totals');
+   await expect(review.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit='+encodeURIComponent(label));
+  }
+ }
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBeGreaterThan(0);
  return {frame,state};
 }
@@ -227,13 +237,16 @@ test('scheduled supporting-source refresh rejects a revoked parent before the ne
 
 for(const conflict of ['scoped identity warning','duplicate resource ownership'])test(conflict+' removes overview unit proof without hiding independent source records',async({page})=>{
  const {frame,state}=await mount(page,{sourceCases:true,overview:true});
- const owner=frame.locator('.camera-overview-card').filter({has:frame.locator('.camera-card-main strong').filter({hasText:new RegExp('^'+ownerKey+'$')})});
+ const ownerCards=frame.locator('.camera-overview-card').filter({has:frame.locator('.camera-card-main strong').filter({hasText:new RegExp('^'+ownerKey+'$')})});
+ const owner=ownerCards.filter({has:frame.locator('small').filter({hasText:/^4 camera records$/})});
  await expect(owner.locator('.camera-status-pill')).toHaveText('CAMERA RECORDS ONLINE');
  if(conflict==='scoped identity warning'){
   state.warnings=[{unitId:ids.owner,reason:'Saved unit identity needs review.',deviceIds:ownerIds,unitKeys:[ownerKey]}];
   state.identities=state.identities.filter(identity=>identity.unitId!==ids.owner);
  }else state.identities.push({...state.identities[0],unitId:ids.unlinked,unitNumber:labels.unlinked,kind:'native_provider'});
  await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();
+ await expect(ownerCards).toHaveCount(2);
+ await expect(ownerCards.locator('.camera-status-pill')).toHaveText(['EQUIPMENT LINK UNVERIFIED','EQUIPMENT LINK UNVERIFIED']);
  await expect(owner.locator('.camera-status-pill')).toHaveText('EQUIPMENT LINK UNVERIFIED');
  await expect(owner.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveCount(0);
  await expect(owner).toContainText('excluded from unit totals');

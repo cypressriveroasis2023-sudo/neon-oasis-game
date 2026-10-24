@@ -1,3 +1,4 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
@@ -15,6 +16,7 @@ const identity={unitId:unit.id,unitNumber:unit.unitNumber,kind:'native_provider'
 const raw=(rows=[resource(1)])=>({...snapshot(rows),identityVersion:1,unitIdentities:[identity],identityWarnings:[]});
 const map=(units=[unit])=>({items:units,inventoryItems:units,summary:{fieldUnits:units.length,mappedUnits:0,unitGps:0,missingGps:units.length},generatedAt:fresh});
 const pair=(health=raw(),units=[unit])=>reconcileFleetSnapshot(health,map(units),now);
+const reviewedPair=(health,units=[unit])=>pair(withReviewedResources(health,[{unit:units[0],ids:health.rows.map(r=>String(r.id)),kind:'owner_confirmed_native'}]),units);
 const current=(fleet,time=now)=>fieldCameraHealth(fleet.fieldMap.items[0],fleet.fieldMap.items,fleet.health,time);
 const last=(history,fleet,time=now)=>lastKnownCamera(history,fleet.fieldMap.items[0],fleet.fieldMap.items,current(fleet,time));
 const expired=now+16*60000;
@@ -68,7 +70,7 @@ test('changed membership, identity proof, placement and authorization guards can
 });
 
 test('new canonical alias membership or duplicate unit blocks legacy-name historical fallback',()=>{
- const fleet=pair(snapshot([resource(1)])),history=rememberCameraHistory(new Map(),fleet,now);
+ const fleet=reviewedPair(snapshot([resource(1)])),history=rememberCameraHistory(new Map(),fleet,now);
  const alias={...fleet,health:snapshot([resource(1),resource(2,'HELIOS 001')])};assert.equal(current(alias,expired).state,'unknown');assert.equal(rememberCameraHistory(history,alias,expired).size,0);
  const duplicate={...fleet,fieldMap:map([unit,{...unit,id:'duplicate'}])};assert.equal(rememberCameraHistory(history,duplicate,expired).size,0);
 });
@@ -76,21 +78,21 @@ test('new canonical alias membership or duplicate unit blocks legacy-name histor
 test('recorder, detector and saved service-port history retain their actual basis',()=>{
  const cases=[
   [pair(raw([resource(1,'Helios 1',{type:'NVR'})])),'recorder','RECORDER ONLINE'],
-  [pair(snapshot([resource(1,'Helios 1',{type:'detector'})])),'camera','DETECTOR RECORDS ONLINE'],
-  [pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]),'connection','IP / PORT ONLINE'],
+  [reviewedPair(snapshot([resource(1,'Helios 1',{type:'detector'})])),'camera','DETECTOR RECORDS ONLINE'],
+  [reviewedPair(snapshot([resource(1,'Sniper 1',{type:'Sniper',serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]),'connection','IP / PORT ONLINE'],
  ];
  for(const [fleet,basis,label] of cases){const history=rememberCameraHistory(new Map(),fleet,now),result=last(history,fleet,expired);assert.equal(result.basis,basis);assert.equal(result.label,label);}
 });
 
 test('camera history cannot borrow a newer recorder, port or opposite-state observation time',()=>{
  const newer=new Date(now-60000).toISOString();
- const fleet=pair(snapshot([resource(1),resource(2,'Helios 1',{type:'NVR',evidence:{...resource(2,'Helios 1',{type:'NVR'}).evidence,observedAt:newer},serviceEvidence:port({observedAt:newer})})]));
- const history=rememberCameraHistory(new Map(),fleet,now),historical=last(history,fleet,expired);assert.equal(historical.basis,'camera');assert.equal(historical.observedAt,new Date(fresh).toISOString());assert.equal(historical.oldestObservedAt,historical.observedAt);
- const outage=pair(snapshot([withStatus(resource(1),'offline'),withStatus(resource(2),'online',newer)])),negative=last(rememberCameraHistory(new Map(),outage,now),outage,expired);assert.equal(negative.state,'offline');assert.equal(negative.observedAt,new Date(fresh).toISOString());
- const direct=pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:{...resource(1).evidence,observedAt:newer},serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]);
+ const fleet=reviewedPair(snapshot([resource(1),resource(2,'Helios 1',{type:'NVR',evidence:{...resource(2,'Helios 1',{type:'NVR'}).evidence,observedAt:newer},serviceEvidence:port({observedAt:newer})})]));
+ const history=rememberCameraHistory(new Map(),fleet,now),historical=last(history,fleet,expired);assert.equal(historical.basis,'provider');assert.equal(historical.observedAt,newer);assert.equal(historical.oldestObservedAt,new Date(fresh).toISOString());assert.equal(fleet.health.rows[0].evidence.observedAt,fresh);
+ const outage=reviewedPair(snapshot([withStatus(resource(1),'offline'),withStatus(resource(2),'online',newer)])),negative=last(rememberCameraHistory(new Map(),outage,now),outage,expired);assert.equal(current(outage).state,'unknown');assert.equal(negative,null);
+ const direct=reviewedPair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:{...resource(1).evidence,observedAt:newer},serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]);
  const service=last(rememberCameraHistory(new Map(),direct,now),direct,expired);assert.equal(service.basis,'connection');assert.equal(service.observedAt,new Date(fresh).toISOString());
- const detector=pair(snapshot([withStatus(resource(1,'Helios 1',{type:'detector'}),'offline'),withStatus(resource(2,'Helios 1',{type:'NVR'}),'online',newer)]));
- const detected=last(rememberCameraHistory(new Map(),detector,now),detector,expired);assert.equal(detected.label,'DETECTOR RECORDS OFFLINE');assert.equal(detected.observedAt,new Date(fresh).toISOString());
+ const detector=reviewedPair(snapshot([withStatus(resource(1,'Helios 1',{type:'detector'}),'offline'),withStatus(resource(2,'Helios 1',{type:'NVR'}),'online',newer)]));
+ const detected=last(rememberCameraHistory(new Map(),detector,now),detector,expired);assert.equal(current(detector).state,'unknown');assert.equal(detected,null);assert.equal(detector.health.rows[0].evidence.observedAt,fresh);
 });
 
 test('historical presentation is neutral, clearly stale, and preserves the observation range',()=>{
@@ -111,22 +113,24 @@ test('the selected unit card retains its unknown current badge beside historical
 test('accepted current timestamps and remembered source times agree on the timestamp-corrected baseline',()=>{
  const newer=new Date(now-60000).toISOString();
  const cases=[
-  pair(snapshot([resource(1),resource(2,'Helios 1',{type:'NVR',serviceEvidence:port({observedAt:newer}),evidence:{...resource(2,'Helios 1',{type:'NVR'}).evidence,observedAt:newer}})])),
-  pair(snapshot([withStatus(resource(1),'offline'),withStatus(resource(2),'online',newer)])),
+  reviewedPair(snapshot([resource(1),resource(2,'Helios 1',{type:'NVR',serviceEvidence:port({observedAt:newer}),evidence:{...resource(2,'Helios 1',{type:'NVR'}).evidence,observedAt:newer}})])),
+  reviewedPair(snapshot([withStatus(resource(1),'offline'),withStatus(resource(2),'online',newer)])),
   pair(raw([resource(1,'Helios 1',{serviceEvidence:port({observedAt:newer})})])),
-  pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:port(),serviceEvidence:port({observedAt:newer})})]),[{...unit,unitNumber:'Sniper 1',modelName:'Sniper'}]),
+  reviewedPair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:port(),serviceEvidence:port({observedAt:newer})})]),[{...unit,unitNumber:'Sniper 1',modelName:'Sniper'}]),
  ];
  for(const fleet of cases){
-  const result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now),saved=history.get(unit.id).observation;
+  const result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now);
+  if(result.state==='unknown'){assert.equal(history.size,0);continue;}
+  const saved=history.get(unit.id).observation;
   assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.basis,result.basis);assert.equal(saved.state,result.state);
  }
 });
 
 test('new mixed evidence with unchanged membership clears history until a new definitive observation is accepted',()=>{
- const initial=pair(snapshot([resource(1),resource(2)])),history=rememberCameraHistory(new Map(),initial,now);
- const changed=pair(snapshot([resource(1),withStatus(resource(2),'unknown',new Date(now-60000).toISOString())]));
+ const initial=reviewedPair(snapshot([resource(1),resource(2)])),history=rememberCameraHistory(new Map(),initial,now);
+ const changed=reviewedPair(snapshot([resource(1),withStatus(resource(2),'unknown',new Date(now-60000).toISOString())]));
  assert.equal(current(changed).state,'unknown');const cleared=rememberCameraHistory(history,changed,now);assert.equal(cleared.size,0);assert.equal(last(cleared,changed),null);
- const observedAt=new Date(now).toISOString(),restored=pair(snapshot([withStatus(resource(1),'online',observedAt),withStatus(resource(2),'online',observedAt)]));
+ const observedAt=new Date(now).toISOString(),restored=reviewedPair(snapshot([withStatus(resource(1),'online',observedAt),withStatus(resource(2),'online',observedAt)]));
  const freshHistory=rememberCameraHistory(cleared,restored,now);assert.equal(freshHistory.get(unit.id).observation.observedAt,observedAt);assert.equal(last(freshHistory,restored),null);
 });
 
@@ -137,12 +141,13 @@ test('a new accepted connection basis replaces camera history using only the con
  const saved=rememberCameraHistory(history,next,later).get(unit.id).observation;assert.equal(saved.basis,'connection');assert.equal(saved.observedAt,portTime);assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.label,'IP / PORT ONLINE');
 });
 
-for(const state of ['online','offline'])test('legacy '+state+' history cannot borrow a newer inactive sibling observation',()=>{
+for(const state of ['online','offline'])test('unreviewed '+state+' labels cannot create history or borrow inactive sibling times',()=>{
  const rows=[withStatus(resource(1),state),withStatus(resource(2,'Helios 1',{scope:'inactive',organization:'RETIRED'}),state,new Date(now-60000).toISOString())];
- const fleet=pair(snapshot(rows)),result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now),saved=history.get(unit.id).observation;
- assert.equal(result.state,state);assert.equal(result.association,undefined);assert.equal(result.checkedAt,new Date(fresh).toISOString());assert.equal(saved.observedAt,result.checkedAt);assert.equal(saved.oldestObservedAt,result.checkedAt);
- const newerRows=[rows[0],withStatus(rows[1],state,new Date(now).toISOString())],next=pair(snapshot(newerRows));
- const refreshed=rememberCameraHistory(history,next,now).get(unit.id).observation;assert.equal(refreshed.observedAt,result.checkedAt);assert.equal(refreshed.oldestObservedAt,result.checkedAt);
+ const fleet=pair(snapshot(rows)),result=current(fleet),history=rememberCameraHistory(new Map(),fleet,now);
+ assert.equal(result.state,'unknown');assert.equal(result.association,undefined);assert.equal(result.checkedAt,null);assert.equal(history.size,0);
+ assert.equal(result.rows[0].evidence.observedAt,fresh);
+ const next=pair(snapshot([rows[0],withStatus(rows[1],state,new Date(now).toISOString())]));
+ assert.equal(rememberCameraHistory(history,next,now).size,0);
 });
 
 for(const state of ['online','offline'])test('durable '+state+' history preserves accepted placement-independent sibling times',()=>{

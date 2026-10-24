@@ -1,11 +1,14 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {cameraOverview,resourceKind} from '../src/cameraHealthCounts.ts';
 import {classifyCameraUnit,cameraEvidenceLabel,unitEvidenceLabel} from '../src/cameraEvidence.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
-import {resource,port,snapshot,withStatus,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+import {resource,port,snapshot as rawSnapshot,withStatus,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+// Explicit synthetic equipment receipts for these source/coverage tests.
+const snapshot=rows=>withReviewedResources(rawSnapshot(rows),[...new Set(rows.filter(r=>/^[1-9]\d*$/.test(String(r.id))).map(r=>r.unit))].map((name,i)=>({unit:{id:'reviewed-fixture-'+i,unitNumber:name},ids:rows.filter(r=>r.unit===name).map(r=>String(r.id)),kind:'owner_confirmed_native'})));
 test('all inventory scopes reconcile without silently dropping location-review groups',()=>{
  const rows=[resource(1),resource(2,'Helios 2',{scope:'unknown'}),resource(3,'Helios 3',{scope:'shop'}),resource(4,'Helios 4',{scope:'inactive',activationState:'deactivated'})];
- const health=snapshot(rows),overview=cameraOverview(health,now);assert.equal(validateCameraHealth(health),health);assert.equal(overview.scopeVerified,true);assert.equal(overview.groups.length,4);assert.equal(overview.summary.monitored,2);assert.deepEqual(overview.scopes,{field:1,unknown:1,shop:1,inactive:1});assert.equal(overview.groups.find(g=>g.key==='HELIOS 2').scope,'unknown');
+ const health=snapshot(rows),overview=cameraOverview(health,now);assert.equal(validateCameraHealth(health),health);assert.equal(overview.scopeVerified,true);assert.equal(overview.groups.length,4);assert.equal(overview.summary.monitored,2);assert.deepEqual(overview.scopes,{field:1,unknown:1,shop:1,inactive:1});assert.equal(overview.groups.find(g=>g.name==='Helios 2').scope,'unknown');
 });
 test('NVR-only online and offline are useful recorder observations with no camera channels',()=>{
  for(const status of ['online','offline']){const overview=cameraOverview(snapshot([withStatus(resource(1,'Helios 1',{type:'NVR'}),status)]),now),group=overview.groups[0];assert.equal(group.providerState,status);assert.equal(group.cameraState,'mapping');assert.equal(group.systemKind,'recorder');assert.equal(overview.cameras.total,0);assert.equal(overview.summary[status],1);assert.equal(unitEvidenceLabel(group),'RECORDER '+status.toUpperCase());assert.equal(cameraEvidenceLabel(group.cameraState),'Camera channel status unavailable');}
@@ -16,11 +19,11 @@ test('detectors are camera evidence, separate from IPC totals, and mixed observa
 });
 test('mixed camera/recorder provider status cannot collapse into an all-offline unit',()=>{
  const rows=[resource(1),withStatus(resource(2,'Helios 1',{type:'NVR'}),'offline'),resource(3,'Helios 2')],overview=cameraOverview(snapshot(rows),now);
- assert.equal(overview.groups[0].providerState,'degraded');assert.equal(overview.groups[0].cameraState,'online');assert.equal(overview.groups[0].recorderOffline,true);assert.deepEqual(overview.summary,{monitored:2,online:1,offline:0,unknown:1});assert.deepEqual(overview.cameras,{total:2,online:2,offline:0,unknown:0});
+ assert.equal(overview.groups[0].providerState,'degraded');assert.equal(overview.groups[0].cameraState,'degraded');assert.equal(overview.groups[0].recorderOffline,true);assert.deepEqual(overview.summary,{monitored:2,online:1,offline:0,unknown:1});assert.deepEqual(overview.cameras,{total:2,online:2,offline:0,unknown:0});
 });
 test('port-only and tracker-only successes remain service-reachable without provider evidence',()=>{
  const rows=[resource(1,'Sniper 1',{type:'Sniper',serviceEvidence:port()}),resource('tracker:spotter|002','Spotter 2',{type:'tracker_unit',trackerOnly:true,scope:'unknown',evidence:undefined,serviceEvidence:port({source:'Witness service-port check'})})];
- const overview=cameraOverview(snapshot(rows),now);assert.equal(overview.summary.online,0);assert.equal(overview.coverage.serviceReachable,2);assert.equal(overview.coverage.cameraUnavailable,2);for(const group of overview.groups){assert.equal(group.state,'service');assert.equal(unitEvidenceLabel(group),'SERVICE REACHABLE');assert.equal(group.providerState,'verifying');}
+ const overview=cameraOverview(snapshot(rows),now);assert.equal(overview.summary.online,0);assert.equal(overview.coverage.serviceReachable,1);assert.equal(overview.coverage.cameraUnavailable,1);assert.equal(overview.groups.find(g=>g.rows[0].trackerOnly).linkedIdentity,false);for(const group of overview.groups){assert.equal(group.state,'service');assert.equal(unitEvidenceLabel(group),'SERVICE REACHABLE');assert.equal(group.providerState,'verifying');}
 });
 test('service failures and reachable ports cannot supply or override provider camera evidence',()=>{
  const row=withStatus(resource(1),'offline');let group=classifyCameraUnit([{...row,serviceEvidence:port()}],now);assert.equal(group.providerState,'offline');assert.equal(group.cameraState,'offline');assert.equal(group.serviceState,'online');
@@ -46,7 +49,7 @@ test('duplicates, malformed evidence and invalid inventory cannot certify the sn
  const wrong=snapshot([row]);wrong.inventory.activeFieldRecords=0;assert.throws(()=>validateCameraHealth(wrong),/reconciled/);
 });
 test('old API versions fail safely, even when old provider fields claim all online',()=>{
- for(const evidenceVersion of [undefined,1]){const health={...snapshot([resource(1)]),evidenceVersion};const overview=cameraOverview(health,now);assert.equal(overview.scopeVerified,false);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].scope,'unknown');}
+ for(const evidenceVersion of [undefined,1]){const health={...rawSnapshot([resource(1)]),evidenceVersion};const overview=cameraOverview(health,now);assert.equal(overview.scopeVerified,false);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].scope,'unknown');}
 });
 
 test('stored Shop placement never invalidates healthy field camera evidence',()=>{

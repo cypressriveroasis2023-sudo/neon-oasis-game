@@ -33,7 +33,7 @@ test('native family selection retains reachable, failed and unknown unit cards w
   assert.equal(overview.groups.length,3);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);
   assert.equal(overview.groups.filter(group=>cameraFamily(group.rows,family.startsWith('SNIPER')?'sniper':'camv')).length,3);
   assert.deepEqual(overview.groups.map(g=>g.serviceState).sort(),['offline','online','verifying']);
-  for(const group of overview.groups){assert.equal(group.cameraState,'mapping');assert.equal(cameraUnitStatusLabel(group),'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',verifying:'UNVERIFIED'}[group.serviceState]));}
+  for(const group of overview.groups){assert.equal(group.cameraState,'mapping');assert.equal(group.linkedIdentity,false);assert.equal(cameraUnitStatusLabel(group),'EQUIPMENT LINK UNVERIFIED');}
  }
 });
 

@@ -102,7 +102,7 @@ for(const source of ['health','fieldMap'])test('a pair never adopts one successf
 const historyUnit={id:'11111111-1111-4111-8111-111111111111',unitNumber:'Helios 1',modelName:'Helios',status:'field',currentLocationType:'field',placement:'FIELD'};
 const historyMap={...fieldMap,items:[historyUnit],inventoryItems:[historyUnit],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1}};
 const observationAt=new Date(start-60000).toISOString();
-const historyHealth={...health,totalDevices:1,fieldDevices:1,review:1,inventory:{...health.inventory,allRecords:1,activeFieldRecords:1},rows:[{id:1,unit:'Helios 1',name:'Synthetic camera',type:'IPC',activationState:'active',scope:'field',status:'review',evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:'online',observedAt:observationAt,lastOnlineAt:observationAt}}]};
+const historyHealth={...health,identityVersion:1,unitIdentities:[{unitId:historyUnit.id,unitNumber:historyUnit.unitNumber,kind:'native_provider',deviceIds:['1'],unitKeys:['Helios 1'],proof:'a'.repeat(64)}],identityWarnings:[],totalDevices:1,fieldDevices:1,review:1,inventory:{...health.inventory,allRecords:1,activeFieldRecords:1},rows:[{id:1,unit:'Helios 1',name:'Synthetic camera',type:'IPC',activationState:'active',scope:'field',status:'review',evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:'online',observedAt:observationAt,lastOnlineAt:observationAt}}]};
 async function bootHistory(){const f=fixture(),hook=f.mount();await flush();f.answer(0,historyHealth);f.answer(1,historyMap);await flush();assert.equal(hook.cameraHistory.size,1);return {f,hook};}
 
 test('the real hook retains actual accepted history through read failure, then drops newer unknown evidence',async()=>{

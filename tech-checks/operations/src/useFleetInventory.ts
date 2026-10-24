@@ -9,7 +9,9 @@ export function fleetInventorySnapshot(map:any,now=Date.now()){
  const authority=readMhelpInventoryAuthority(upload,now);
  if(!authority)throw Error('Current reviewed equipment inventory is unavailable. Open Fleet or retry.');
  const roster=readRecordedRoster(map?.fleetRoster,map?.inventoryItems||map?.items).roster;
- return {authority,records:upload.records as Record<string,any>[],roster};
+ const productIds=new Set(upload.records.map((row:any)=>row.productId));
+ const unresolvedProducts=roster?new Set(roster.items.filter(row=>row.kind==='identity_review'||row.placement==='unknown').flatMap(row=>row.productIds).filter(id=>productIds.has(id))).size:null;
+ return {authority,records:upload.records as Record<string,any>[],roster,unresolvedProducts};
 }
 export function useFleetInventory(api:Api){
  const [value,setValue]=useState<ReturnType<typeof fleetInventorySnapshot>|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);

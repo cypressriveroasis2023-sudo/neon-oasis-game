@@ -33,8 +33,8 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} explicit menu and repeated
  for(let repeat=0;repeat<2;repeat++){
   await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
   await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
-  await open();await enter('Fleet Dashboard');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
-  await open();await enter('Fleet Dashboard');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
+  await open();await enter('Fleet Map');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
+  await open();await enter('Fleet Map');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
  }
  // A fresh source selection performs its own unitless onSelectUnit transition and must remain open.
  await open();await app.getByRole('button',{name:'Close equipment details'}).click();await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);

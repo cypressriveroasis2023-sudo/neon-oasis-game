@@ -5,8 +5,8 @@ import { dailyBoardCards } from '../src/dailyBoardData.ts';
 
 test('TV links launch the authenticated host and omit unrelated URL state', () => {
   const host = 'https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/tech-checks/';
-  assert.equal(tvBoardLink(host + '?token=private&fieldUnit=old#jobs?job=old', 'day', ''), host + '?tvBoard=1');
-  assert.equal(tvBoardLink(host + 'operations/dist/index.html?mode=fleet', 'week', 'it'), host + '?tvBoard=1&tvScope=week&tvDepartment=it');
+  assert.equal(tvBoardLink(host + '?token=private&fieldUnit=old#jobs?job=old', 'day', ''), host + '?tvBoard=1&simpleTv=1');
+  assert.equal(tvBoardLink(host + 'operations/dist/index.html?mode=fleet', 'week', 'it'), host + '?tvBoard=1&simpleTv=1&tvScope=week&tvDepartment=it');
   assert.deepEqual(tvBoardOptions('?tvBoard=1&tvScope=week&tvDepartment=service'), {enabled:true,scope:'week',department:'service'});
   assert.deepEqual(tvBoardOptions('?tvBoard=yes&tvScope=invalid&tvDepartment=owner'), {enabled:false,scope:'day',department:''});
 });

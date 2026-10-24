@@ -1,6 +1,7 @@
 // Isolated fixture only. All external traffic is blocked; counts and locations are synthetic.
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {snapshot,resource,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const units=Array.from({length:319},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,unitNumber:i<223?'Solar Spotter '+(i+1):'ST '+String(i-222).padStart(3,'0'),modelName:i<223?'Solar Spotter':'STANDS',status:'installed',currentLocationType:'site',address:'Synthetic address '+(i+1),site:'Fixture site',latitude:i<10?29.70+i*.05:null,longitude:i<10?-95.40+i*.02:null,locationVerification:i<10?'owner_verified':'address_only',gpsRecordedAt:i<10?fresh:null,locationVerifiedAt:i<10?fresh:null,coordinateSource:i<10?'site':null,hasUnitGps:false,readOnly:true}));
@@ -19,7 +20,7 @@ async function mount(page,{fail=false,legacySelection=false,customUnits=units}={
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();state.calls.push(request);expect(request.method).toBe('GET');
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,body:JSON.stringify({error:'Synthetic load failed'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner'}:request.path==='/api/field-map'?{items:customUnits,summary:{fieldUnits:customUnits.length,mappedUnits:customUnits.filter(u=>u.latitude!==null).length,unitGps:0,missingGps:customUnits.filter(u=>u.latitude===null).length},generatedAt:new Date(now).toISOString(),placementReviews:[{unitNumber:'SOLARSPOTTER REVIEW',reason:'Fixture placement needs identity review',placementAuditId:null}]}:request.path==='/api/camera-health/summary-v3'?snapshot(customUnits.slice(0,116).map((u,i)=>resource(i+1,u.unitNumber))):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(now).toISOString()}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner'}:request.path==='/api/field-map'?{items:customUnits,summary:{fieldUnits:customUnits.length,mappedUnits:customUnits.filter(u=>u.latitude!==null).length,unitGps:0,missingGps:customUnits.filter(u=>u.latitude===null).length},generatedAt:new Date(now).toISOString(),placementReviews:[{unitNumber:'SOLARSPOTTER REVIEW',reason:'Fixture placement needs identity review',placementAuditId:null}]}:request.path==='/api/camera-health/summary-v3'?withReviewedResources(snapshot(customUnits.slice(0,116).map((u,i)=>resource(i+1,u.unitNumber))),customUnits.slice(0,116).map((unit,i)=>({unit,ids:[i+1]}))):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(now).toISOString()}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});

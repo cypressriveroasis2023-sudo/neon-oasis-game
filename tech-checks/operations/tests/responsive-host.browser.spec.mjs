@@ -46,8 +46,10 @@ async function mount(page) {
     const url = new URL(route.request().url());
     if (url.origin === origin) {
       if (url.pathname === appPath) return route.fulfill({ contentType:'text/html', body:parentHtml });
-      const path = resolve(repo, '.' + decodeURIComponent(url.pathname));
-      if (path.startsWith(repo + '/') && existsSync(path)) return route.fulfill({ path, contentType:types[extname(path)] || 'application/octet-stream' });
+      const candidate=process.env.COS_TEST_DIST&&url.pathname.startsWith('/tech-checks/operations/dist/');
+      const root=candidate?resolve(process.env.COS_TEST_DIST):repo;
+      const path = resolve(root, '.' + decodeURIComponent(candidate?url.pathname.slice('/tech-checks/operations/dist'.length):url.pathname));
+      if (path.startsWith(root + '/') && existsSync(path)) return route.fulfill({ path, contentType:types[extname(path)] || 'application/octet-stream' });
       return route.abort('blockedbyclient');
     }
     if (url.href !== edge) return route.abort('blockedbyclient');
@@ -90,8 +92,9 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   await expect(menu).toBeVisible();
   await responsiveLayout(page,frame);
   await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
-  await menu.getByRole('button',{name:'Tech Checks',exact:true}).click();
+  await menu.getByRole('button',{name:'Team & Tech Check',exact:true}).click();
   await expect(menu).toHaveCount(0);
+  await frame.getByRole('navigation',{name:'Technician views'}).getByRole('button',{name:'Tech Checks & transfers',exact:true}).click();
   await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#tech-check');
   await more.click();
@@ -156,6 +159,8 @@ test('the same app link gives the embedded Operations app the full device viewpo
 });
 
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
+  // Nine viewport transitions retain every frame, route and unsaved-input check.
+  test.setTimeout(120000);
   const { frame } = await mount(page);
   await openWorkspace(frame,'Jobs');
   const search = frame.getByRole('searchbox', { name:'Find a job' });
@@ -187,8 +192,8 @@ test('old VISION bookmarks preserve route and query parameters under the approve
 
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
   const { frame } = await mount(page);
-  await frame.getByRole('button', { name:'More', exact:true }).click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+  await openWorkspace(frame,'Tech Check');
+  await frame.getByText('Advanced check administration',{exact:true}).click();
   await frame.getByRole('button',{name:/Technician accounts/}).click();
   await expect(page.locator('body')).toHaveClass(/cos-operations-legacy/);
   await expect(page.locator('#cosOperationsMount')).toBeHidden();
@@ -225,8 +230,8 @@ for (const colorScheme of ['light','dark']) {
     await page.emulateMedia({colorScheme});
     const {frame}=await mount(page);
     for (const [label,heading] of [['Technician accounts','Technician Accounts'],['Owner test center','Test Center']]) {
-      await frame.getByRole('button',{name:'More',exact:true}).click();
-      await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+      await openWorkspace(frame,'Tech Check');
+      await frame.getByText('Advanced check administration',{exact:true}).click();
       await frame.getByRole('button',{name:new RegExp(label)}).click();
       await expect(page.locator('#ownerAppPage h1')).toHaveText(heading);
       const contentWidth=await page.locator('#ownerAppPage').evaluate(e=>e.getBoundingClientRect().width);

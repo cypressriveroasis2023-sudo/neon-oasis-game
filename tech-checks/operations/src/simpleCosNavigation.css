@@ -1,0 +1,29 @@
+/* Presentation-only COS simplification. Existing role checks and data sources remain unchanged. */
+#root .company-shell .cos-owner-advanced{margin:16px 6px 20px;padding:12px 0;border-top:1px solid #2c3b51;border-bottom:1px solid #2c3b51}
+#root .company-shell .cos-owner-advanced summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 10px;color:#a3b3ca;font-size:12px;font-weight:650;line-height:1.4}
+#root .company-shell .cos-owner-advanced>div{display:grid;gap:6px;padding:5px 4px 12px}
+#root .company-shell .cos-owner-advanced button{width:100%;min-height:44px;padding:10px;text-align:left;white-space:normal;background:#111b2a;color:#c0cee0;border:1px solid #2c3b51;border-radius:8px;font:inherit;font-size:12px}
+#root .company-shell .cos-tv-mode-link{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;margin:12px 8px 0;padding:10px 12px;border:1px solid #367a90;border-radius:9px;background:#10394d;color:#e9f9fc;font-size:13px;font-weight:750;text-decoration:none}
+#root .company-shell .cos-tv-mode-link:hover{background:#155167}
+#root .company-shell .cos-simple-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+#root .company-shell .cos-simple-actions button{min-height:50px;padding:12px 14px;border:1px solid #367a90;border-radius:10px;background:#13334a;color:#e6edf7;text-align:left;font:inherit;font-size:14px;font-weight:650;white-space:normal}
+#root .company-shell .cos-section-switcher{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+#root .company-shell .cos-section-switcher button{min-height:44px;padding:10px 16px;border:1px solid #394b64;border-radius:9px;background:#14233a;color:#d8e5f6;font:inherit;cursor:pointer}
+#root .company-shell .cos-section-switcher button[aria-current=page]{border-color:#76aac7;background:#203456;color:#fff;font-weight:700}
+#root .company-shell .cos-compact-overview>header{margin:0 0 16px}
+#root .company-shell .cos-compact-overview>header h1{font-size:clamp(24px,3vw,36px);margin:0 0 6px}
+#root .company-shell .cos-compact-overview>header p{color:#a3b3ca;margin:0}
+#root .company-shell .cos-compact-overview .it-dashboard-grid{margin-top:18px}
+.ops-calendar .calendar-grid.day{grid-template-columns:minmax(0,1fr)}
+.ops-calendar .calendar-grid.day .calendar-day{min-height:260px}
+@media(max-width:1100px){
+  /* The old mobile stylesheet hid the only navigation list after pressing Menu. */
+  #root .company-shell>.operations-sidebar-open .company-nav-heading{display:block!important}
+  #root .company-shell>.operations-sidebar-open .operations-area-nav{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}
+  #root .company-shell>.operations-sidebar-open .company-sidebar-footer{display:block!important}
+  #root .company-shell>.operations-sidebar-open{overflow-y:auto!important;overscroll-behavior:contain}
+}
+@media(max-width:560px){
+  #root .company-shell .cos-simple-actions{grid-template-columns:minmax(0,1fr)}
+  #root .company-shell .cos-section-switcher button{flex:1 1 auto}
+}

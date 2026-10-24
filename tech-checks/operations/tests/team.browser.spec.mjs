@@ -7,7 +7,7 @@ const firstId = '11111111-1111-4111-8111-111111111111';
 const secondId = '22222222-2222-4222-8222-222222222222';
 const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style></head><body><iframe id="operations" src="/?theme=classic#team" title="Synthetic team workspace"></iframe><script>addEventListener('message',event=>{const frame=document.getElementById('operations');if(event.origin!==location.origin||event.source!==frame.contentWindow||event.data.type!=='COS_OPERATIONS_TOKEN_REQUEST')return;event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,accessToken:'synthetic-team-token',role:'owner'},location.origin);});</script></body></html>`;
 
-test('Team details and readiness follow authoritative technician UUIDs and active-job counts', async ({ page }) => {
+test('Team details and readiness follow authoritative technician UUIDs and active-job counts', async ({ page },testInfo) => {
   const writes = [];
   const jobs = [
     { id:'33333333-3333-4333-8333-333333333333', jobNumber:'SYN-OWN', technicianUserId:firstId, technician:'Previous display name', status:'Assigned', site:'Own active site', techCheck:{complete:false,step:1} },
@@ -45,6 +45,9 @@ test('Team details and readiness follow authoritative technician UUIDs and activ
   const first = workspace.locator('.record.op-record').filter({has:frame.getByText('Same Name',{exact:true})});
   const second = workspace.locator('.record.op-record').filter({has:frame.getByText('Other Person',{exact:true})});
   await expect(first).toContainText('SERVICE Technician · 1 active assigned jobs');
+  await expect(first.getByText('No completed check in the current saved snapshot',{exact:false})).toBeVisible();
+  await first.locator('summary').click();
+  await second.locator('summary').click();
   await expect(first).toContainText('Dispatch blockers: 1');
   await expect(first).toContainText('Tech Checks in progress: 1');
   await expect(first).toContainText('SYN-OWN');
@@ -54,5 +57,6 @@ test('Team details and readiness follow authoritative technician UUIDs and activ
   await expect(second).toContainText('IT Technician · 1 active assigned jobs');
   await expect(second).toContainText('SYN-OTHER');
   await expect(second).not.toContainText('SYN-OWN');
+  await page.screenshot({path:testInfo.outputPath('cos-team-oversight.png'),fullPage:true});
   expect(writes).toHaveLength(0);
 });

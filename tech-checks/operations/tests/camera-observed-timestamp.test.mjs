@@ -27,12 +27,11 @@ const render=(Component,props)=>renderToStaticMarkup(React.createElement(Compone
 
 for(const status of ['online','offline'])test(`${status} camera time cannot be renewed by a newer service-port observation`,()=>{
   const rows=[camera(1,status,cameraAt,{serviceEvidence:service()})],before=structuredClone(rows),value=field(rows),view=overview(rows);
-  assert.equal(value.state,status);assert.equal(value.basis,'camera');assert.equal(value.checkedAt,iso(cameraAt));
-  assert.deepEqual(value.classification,classifyCameraUnit(rows,now));
-  assert.equal(value.classification.providerState,status);assert.equal(value.classification.serviceState,'online');
-  assert.equal(view.groups[0].lastObservedAt,value.checkedAt);assert.equal(cameraUnitDisplayState(view.groups[0]),status);
+  assert.equal(value.state,'unknown');assert.equal(value.identity,'missing');assert.equal(value.checkedAt,null);assert.equal(healthObservationTime(rows,'camera',status,now),iso(cameraAt));
+  assert.equal(value.classification,null);assert.equal(classifyCameraUnit(rows,now).providerState,status);assert.equal(classifyCameraUnit(rows,now).serviceState,'online');
+  assert.equal(view.groups[0].lastObservedAt,iso(cameraAt));assert.equal(cameraUnitDisplayState(view.groups[0]),'verifying');assert.equal(view.groups[0].linkedIdentity,false);
   assert.equal(view.groups[0].lastObservedLabel,`Latest ${status} camera/detector record observation`);
-  assert.deepEqual(view.operational,{monitored:1,online:status==='online'?1:0,offline:status==='offline'?1:0,unknown:0});
+  assert.deepEqual(view.operational,{monitored:0,online:0,offline:0,unknown:1});
   assert.deepEqual(view.cameras,{total:1,online:status==='online'?1:0,offline:status==='offline'?1:0,unknown:0});
   assert.deepEqual(rows,before);
 });
@@ -41,9 +40,9 @@ test('an offline witness keeps its own time beside a newer online camera and por
   const outageAt='2026-10-14T15:41:00Z',onlineAt='2026-10-14T15:58:00Z';
   const rows=[camera(1,'offline',outageAt,{serviceEvidence:service()}),camera(2,'online',onlineAt)];
   const value=field(rows),shared=overview(rows),unlinked=overview(rows,[]);
-  assert.equal(value.state,'offline');assert.equal(value.checkedAt,iso(outageAt));assert.equal(value.classification.cameraState,'degraded');
-  assert.equal(shared.groups[0].lastObservedAt,iso(outageAt));assert.equal(shared.groups[0].lastObservedLabel,'Latest offline camera/detector record observation');
-  assert.equal(cameraUnitDisplayState(unlinked.groups[0]),'degraded');assert.equal(unlinked.groups[0].lastObservedAt,iso(onlineAt));
+  assert.equal(value.state,'unknown');assert.equal(value.checkedAt,null);assert.equal(classifyCameraUnit(rows,now).cameraState,'degraded');assert.equal(healthObservationTime(rows,'camera','offline',now),iso(outageAt));
+  assert.equal(shared.groups[0].lastObservedAt,iso(onlineAt));assert.equal(shared.groups[0].lastObservedLabel,'Latest camera/detector record observation');
+  assert.equal(cameraUnitDisplayState(unlinked.groups[0]),'verifying');assert.equal(unlinked.groups[0].lastObservedAt,iso(onlineAt));
   assert.equal(unlinked.groups[0].lastObservedLabel,'Latest camera/detector record observation');
   assert.deepEqual(shared.summary,unlinked.summary);assert.deepEqual(shared.cameras,{total:2,online:1,offline:1,unknown:0});
 });
@@ -51,8 +50,8 @@ test('an offline witness keeps its own time beside a newer online camera and por
 test('recorders and inactive cameras cannot donate a fallback camera observation time',()=>{
   const rows=[camera(),camera(2,'offline',portAt,{type:'NVR'}),camera(3,'offline',portAt,{scope:'inactive'})];
   const value=field(rows),view=overview(rows);
-  assert.equal(value.state,'online');assert.equal(value.checkedAt,iso(cameraAt));assert.equal(value.classification.recorderOffline,true);
-  assert.equal(value.classification.providerState,'degraded');assert.equal(view.groups[0].lastObservedAt,iso(cameraAt));
+  assert.equal(value.state,'unknown');assert.equal(value.checkedAt,null);assert.equal(classifyCameraUnit(rows,now).recorderOffline,true);
+  assert.equal(classifyCameraUnit(rows,now).providerState,'degraded');assert.equal(view.groups[0].lastObservedAt,iso(portAt));assert.equal(healthObservationTime(rows,'camera','online',now),iso(cameraAt));
   assert.deepEqual(view.kinds,{cameras:2,detectors:0,recorders:1,unitInventory:0,other:0});
   assert.deepEqual(view.cameras,{total:1,online:1,offline:0,unknown:0});
   assert.equal(field([rows[1]]).checkedAt,null);
@@ -60,9 +59,9 @@ test('recorders and inactive cameras cannot donate a fallback camera observation
 
 for(const [name,at,expected] of [['stale',staleAt,iso(staleAt)],['missing',null,null],['invalid','bad',null],['future','2026-10-14T16:01:00Z',null]])test(`${name} camera evidence stays unverified without borrowing the fresh port time`,()=>{
   const rows=[camera(1,'online',at,{serviceEvidence:service()})],value=field(rows),view=overview(rows);
-  assert.equal(value.state,'unknown');assert.equal(value.basis,'camera');assert.equal(value.checkedAt,expected);
-  assert.equal(value.classification.cameraState,'verifying');assert.equal(value.classification.serviceState,'online');
-  assert.equal(cameraUnitDisplayState(view.groups[0]),'verifying');assert.equal(view.groups[0].lastObservedAt,expected);
+  assert.equal(value.state,'unknown');assert.equal(value.basis,undefined);assert.equal(value.checkedAt,null);
+  assert.equal(classifyCameraUnit(rows,now).cameraState,'verifying');assert.equal(classifyCameraUnit(rows,now).serviceState,'online');assert.equal(healthObservationTime(rows,'camera','verifying',now),expected);
+  assert.equal(cameraUnitDisplayState(view.groups[0]),'verifying');assert.equal(view.groups[0].linkedIdentity,false);
   assert.deepEqual(view.cameras,{total:1,online:0,offline:0,unknown:1});
   assert.equal(value.rows[0].evidence.observedAt,at);
 });
@@ -81,7 +80,7 @@ test('unaccepted source kind, activation, resource and provider do not supply a 
 for(const embedded of [false,true])for(const status of ['online','offline'])test(`${embedded?'embedded':'separate'} ${status} port evidence supplies its actual connection time`,()=>{
   const direct={...unit,unitNumber:'Sniper 1',modelName:'Sniper'},evidence=service({status,reachable:status==='online',confirmedOutage:status==='offline'});
   const row=resource(1,direct.unitNumber,{type:'Sniper',...(embedded?{evidence}:{serviceEvidence:evidence})}),value=field([row],direct),group=overview([row],[direct]).groups[0];
-  assert.equal(savedConnectionObservation(row,now),status);assert.equal(value.state,status);assert.equal(value.basis,'connection');assert.equal(value.checkedAt,iso(portAt));
+  assert.equal(savedConnectionObservation(row,now),status);assert.equal(value.state,'unknown');assert.equal(value.basis,undefined);assert.equal(value.checkedAt,null);assert.equal(healthObservationTime([row],'connection',status,now),iso(portAt));
   assert.equal(group.lastObservedAt,iso(portAt));assert.equal(group.lastObservedLabel,`Latest ${status} IP / port record observation`);
   assert.equal(linkedUnitObservation([row],now).checkedAt,iso(portAt));
 });
@@ -90,7 +89,7 @@ test('connection timestamps preserve stale time and exact source precedence with
   const direct={...unit,unitNumber:'Sniper 1',modelName:'Sniper'};
   for(const [at,expected] of [[staleAt,iso(staleAt)],[null,null],['bad',null],['2026-10-14T16:01:00Z',null]]){
     const row=resource(1,direct.unitNumber,{type:'Sniper',evidence:service({observedAt:at})}),value=field([row],direct);
-    assert.equal(value.state,'unknown');assert.equal(value.checkedAt,expected);assert.equal(linkedUnitObservation([row],now).checkedAt,expected);
+    assert.equal(value.state,'unknown');assert.equal(value.checkedAt,null);assert.equal(linkedUnitObservation([row],now).checkedAt,expected);
   }
   const row=resource(1,direct.unitNumber,{type:'Sniper',evidence:service(),serviceEvidence:service({observedAt:null,status:'unknown'})});
   assert.equal(savedConnectionObservation(row,now),'verifying');assert.equal(field([row],direct).checkedAt,null);assert.equal(linkedUnitObservation([row],now).checkedAt,null);
@@ -130,20 +129,20 @@ test('verified embedded service-port and identity-conflict timestamps remain hon
 });
 
 test('rendered unit and overview cards label the correct record time while raw port history stays separate',()=>{
-  const rows=[camera(1,'offline',cameraAt,{serviceEvidence:service()})],h=health(rows),row=fleetDashboardRows([unit],h,[],null,now)[0];
+  const rows=[camera(1,'offline',cameraAt,{serviceEvidence:service()})],h=verified(rows),row=fleetDashboardRows([unit],h,[],null,now)[0];
   const card=render(FleetUnitHealth,{row,now}),grid=render(CameraHealthOverview,{health:h,now,units:[unit]});
   for(const html of [card,grid])assert.ok(html.includes('Latest offline camera/detector record observation: '+cameraTime(cameraAt,now)));
   const cameraSection=card.split('aria-label="Selected unit camera health"')[1].split('</section>')[0];assert.ok(!cameraSection.includes(cameraTime(portAt,now)));
   const raw=render(CameraResourceObservations,{rows,now});assert.ok(raw.includes(cameraTime(cameraAt,now)));assert.ok(raw.includes(cameraTime(portAt,now)));assert.match(raw,/Last reported service result: ONLINE/);
   const unknownRows=[camera(1,'online',null,{serviceEvidence:service()})],unknown=fleetDashboardRows([unit],health(unknownRows),[],null,now)[0];
-  assert.match(render(FleetUnitHealth,{row:unknown,now}),/Latest camera\/detector record observation: Not recorded \/ invalid/);
+  assert.equal(unknown.camera.identity,'missing');assert.equal(unknown.camera.checkedAt,null);assert.match(render(FleetUnitHealth,{row:unknown,now}),/UNVERIFIED|unverified/i);
 });
 
 test('display selector and labels never claim a common group observation or change freshness boundaries',()=>{
   assert.equal(healthObservationLabel('camera','offline'),'Latest offline camera/detector record observation');
   assert.equal(healthObservationLabel('provider','degraded'),'Latest provider record observation');
   const boundary='2026-10-14T15:40:00Z',rows=[camera(1,'online',boundary)];
-  assert.equal(field(rows).state,'online');assert.equal(field(rows).checkedAt,iso(boundary));
-  const after=fieldCameraHealth(unit,[unit],health(rows),now+1);assert.equal(after.state,'unknown');assert.equal(after.checkedAt,iso(boundary));
+  assert.equal(field(rows,unit,verified(rows)).state,'online');assert.equal(field(rows,unit,verified(rows)).checkedAt,iso(boundary));
+  const after=fieldCameraHealth(unit,[unit],verified(rows),now+1);assert.equal(after.state,'unknown');assert.equal(after.checkedAt,iso(boundary));
   assert.equal(healthObservationTime([camera(1,'online',cameraAt),camera(2,'online',portAt)],'camera','online',now),iso(portAt));
 });

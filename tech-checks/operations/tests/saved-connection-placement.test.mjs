@@ -1,3 +1,4 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {fieldCameraHealth} from '../src/fieldCameraHealth.ts';
 import {cameraOverview} from '../src/cameraHealthCounts.ts';
@@ -6,9 +7,9 @@ import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 import {resource,port,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
 const field={id:'synthetic-sniper-901',unitNumber:'Sniper 901',modelName:'SNIPERS',address:'123 Synthetic St'};
 const row={...resource(9901,'SNIPER 901',{type:'Sniper'}),scope:'inactive',activationState:'deactivated',organization:'root',evidence:undefined,serviceEvidence:{...port(),active:false,observedAt:fresh,status:'online',reachable:true}};
-const project=(record=row,time=now)=>fieldCameraHealth(field,[field],snapshot([record]),time);
+const project=(record=row,time=now)=>fieldCameraHealth(field,[field],withReviewedResources(snapshot([record]),[{unit:field,ids:[record.id],kind:'owner_confirmed_native'}]),time);
 test('901-style placement conflict preserves a fresh saved connection without changing inventory or totals',()=>{
- const result=project();assert.equal(result.state,'online');assert.equal(result.basis,'connection');assert.equal(result.classification.scope,'inactive');assert.match(result.reason,/PLACEMENT CONFLICT/);assert.match(result.reason,/does not move the unit/);
+ const result=project();assert.equal(result.state,'online');assert.equal(result.basis,'connection');assert.equal(result.classification.scope,'inactive');assert.match(result.reason,/PLACEMENT CONFLICT/);assert.match(result.reason,/does not move equipment/);
  assert.equal(result.rows[0].activationState,'deactivated');assert.equal(result.rows[0].organization,'root');assert.equal(cameraOverview(snapshot([row]),now).summary.monitored,0);
 });
 test('stale or invalid service observation stays unknown and keeps its original timestamp',()=>{
@@ -22,4 +23,10 @@ test('a failed single check or conflicting response is not a confirmed offline c
 test('shop placement and a reachable service do not turn provider cameras or counts online',()=>{
  const shop={...row,scope:'shop',activationState:'active'};assert.equal(project(shop).state,'online');assert.equal(cameraOverview(snapshot([shop]),now).summary.monitored,0);
  const other={...field,unitNumber:'Solar Spotter 901',modelName:'Solar Spotter'};assert.equal(fieldCameraHealth(other,[other],snapshot([{...row,unit:'SOLAR SPOTTER 901'}]),now).state,'unknown');
+});
+
+test('an unreviewed service label cannot establish current equipment connectivity',()=>{
+ const result=fieldCameraHealth(field,[field],snapshot([row]),now);
+ assert.equal(result.state,'unknown');assert.equal(result.identity,'missing');assert.equal(result.checkedAt,null);
+ assert.equal(result.rows[0].serviceEvidence.observedAt,fresh);
 });

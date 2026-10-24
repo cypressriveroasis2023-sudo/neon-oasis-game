@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { snapshot, resource } from './fixtures/camera-evidence-fixtures.mjs';
-const repo = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
+const repo = resolve(process.env.COS_TEST_DIST || fileURLToPath(new URL('../dist/', import.meta.url)));
 const origin = process.env.COS_MAP_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333'];
 const now = '2026-10-06T18:00:00Z',
@@ -124,7 +125,7 @@ async function mount(page, label, units = defaultUnits, {
         missingGps: 0
       },
       generatedAt: now
-    } : request.path === '/api/camera-health/summary-v3' ? snapshot([...state.units.map((u, i) => resource(i + 1, u.unitNumber)),...(storedShop?[resource(999,'Sniper 312',{scope:'shop',activationState:'deactivated',organization:'ROOT',evidence:{...resource(999).evidence,active:false}})]:[])]) : request.path === '/api/routers' ? {
+    } : request.path === '/api/camera-health/summary-v3' ? withReviewedResources(snapshot([...state.units.map((u, i) => resource(i + 1, u.unitNumber)),...(storedShop?[resource(999,'Sniper 312',{scope:'shop',activationState:'deactivated',organization:'ROOT',evidence:{...resource(999).evidence,active:false}})]:[])]),state.units.map((unit,index)=>({unit,ids:[index+1]}))) : request.path === '/api/routers' ? {
       items: [],
       source: 'camera_health',
       gpsAvailable: false,

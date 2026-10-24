@@ -65,6 +65,6 @@ test('only exact synthetic placeholders are replaced while a complete current ar
  const f=await fixture(),h=await health(f),placeholder={id:'tracker:recon 2|901',unit:f.units[0].unitNumber,name:f.units[0].unitNumber,type:'tracker_unit',trackerOnly:true,scope:'unknown',activationState:'',status:'review'};
  const source={...h,rows:[...h.rows,placeholder],totalDevices:h.totalDevices+1,inventory:{...h.inventory,allRecords:h.inventory.allRecords+1,unknownScopeRecords:h.inventory.unknownScopeRecords+1}};
  const display=healthWithFieldInventory(source,f.units,now);validateCameraHealth(display);assert.equal(display.rows.length,2);assert.equal(source.rows.length,3);assert.deepEqual(display.rows,h.rows);
- const expired=healthWithFieldInventory(source,f.units,now+1200001);assert.equal(expired.rows.length,3);assert(expired.rows.includes(placeholder));
+ const expired=healthWithFieldInventory(source,f.units,now+1200001);assert.equal(expired.rows.length,4);assert(expired.rows.includes(placeholder));assert(expired.rows.some(row=>row.id==='field:'+f.units[0].id));
  const actual={...source,rows:source.rows.map(row=>row===placeholder?{...row,trackerOnly:false}:row)};assert.equal(healthWithFieldInventory(actual,f.units,now).rows.length,3);
 });

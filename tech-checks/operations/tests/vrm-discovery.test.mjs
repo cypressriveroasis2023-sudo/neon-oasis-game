@@ -115,3 +115,15 @@ test('Failed, malformed and mismatched private approvals preserve original fleet
  const checked=await createVrmFleetReader({rpc:db.rpc,getAccessToken:()=>undefined,readDashboardEmbeds:async()=>({'1045297':'https://vrm.victronenergy.com/installation/1045297/embed/synthetic_new'})})();
  assert.equal(checked.items.find(x=>x.installationId===1045297).embedUrl,null);
 });
+
+test('saved approval refresh discovers a new site, rechecks evidence and honors explicit revocation',async()=>{
+ const original='https://vrm.victronenergy.com/installation/7/embed/synthetic_old';
+ const added='https://vrm.victronenergy.com/installation/8/embed/synthetic_new';
+ const db=storage({items:[{installationId:7,name:'HELIOS 007',available:true,lastSeenAt:null},{installationId:8,name:'HELIOS 008',available:true,lastSeenAt:null}]});
+ let approvals={};let reads=0;
+ const reader=createVrmFleetReader({rpc:db.rpc,getAccessToken:()=>undefined,embeds:JSON.stringify({'7':original}),readDashboardEmbeds:async()=>{reads++;return approvals;}});
+ assert.equal((await reader()).items.find(x=>x.installationId===8).embedUrl,null);
+ approvals={'8':added};assert.equal((await reader()).items.find(x=>x.installationId===8).embedUrl,added);
+ approvals={'7':null,'8':null};const revoked=await reader();assert(revoked.items.every(x=>x.embedUrl===null));
+ assert.equal(reads,3);assert(db.calls.every(x=>x.name==='cos_vrm_fleet_snapshot'));
+});

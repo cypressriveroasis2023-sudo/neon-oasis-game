@@ -18,13 +18,14 @@ const tools = [
 
 export default function TechChecksWorkspace() {
   return <section className='panel module operations-tools' aria-label='Tech Check workspaces'>
-    <div className='panelhead'><h2>Start or continue a check</h2><span>Use your existing account</span></div>
+    <div className='panelhead'><h2>Technician oversight</h2><span>Equipment custody, outstanding checks and saved evidence</span></div>
     <div className='operations-tool-grid'>
-      <button onClick={()=>openLegacy('it')}><b>IT</b><span>Preparation, readiness, assigned work and checklists</span></button>
-      <button onClick={()=>openLegacy('service')}><b>Service</b><span>Truck checks, field work, returns and checklists</span></button>
+      <button onClick={()=>openLegacy('it')}><b>IT</b><span>Check equipment out and check returns back into IT</span></button>
+      <button onClick={()=>openLegacy('service')}><b>Service</b><span>Receive equipment, review assigned equipment and return to IT</span></button>
     </div>
-    <p className='tech-check-record-note'>Continue existing IT and Service work here. Check assignments and saved evidence stay with their original records; dispatch jobs are in Operations → Job flow.</p>
-    <h3>Manage Tech Checks</h3>
-    <div className='operations-tool-grid'>{tools.map(tool=><button className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div>
+    <p className='tech-check-record-note'>Pending handoffs do not establish received custody. Review the existing signed records and Owner completion audit before resolving an exception.</p>
+    <h3>Review technicians and equipment</h3>
+    <div className='operations-tool-grid'>{tools.filter(tool=>['team','review','handoffs','attention','history'].includes(tool.route)).map(tool=><button className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div>
+    <details className='cos-owner-advanced'><summary>Advanced check administration</summary><div className='operations-tool-grid'>{tools.filter(tool=>!['team','review','handoffs','attention','history'].includes(tool.route)).map(tool=><button className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div></details>
   </section>;
 }

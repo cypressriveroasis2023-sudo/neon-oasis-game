@@ -26,6 +26,7 @@ function fixture(){
 }
 const saved=()=>({total:7,items:tuples.slice(0,7).map(([unitNumber,, ,state],i)=>({
  productId:productId(i),unitNumber,state,
+ evidence:{association:'synthetic-reviewed-association',basis:'camera',observations:[{kind:'camera',observedAt:time,currentState:state}]},
  reason:'Verified synthetic observation',unitId:i===3?'11111111-1111-1111-1111-111111111111':null,recordId:null
 }))});
 function addressMap(){

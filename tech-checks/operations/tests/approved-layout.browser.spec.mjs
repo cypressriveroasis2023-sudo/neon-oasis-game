@@ -39,6 +39,8 @@ test('old VISION links open only the approved workspace and keep native navigati
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));
   expect(size.content).toBeLessThanOrEqual(size.width);
  }
+ // Legacy Today lives in Advanced; use a main destination to verify its active styling.
+ await openWorkspace(frame,'Team');
  await frame.getByRole('button',{name:'More',exact:true}).click();
  const nav=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('navigation',{name:'COS Operations',exact:true});
  const styles=await nav.locator('button').evaluateAll(buttons=>buttons.map(button=>({active:button.getAttribute('aria-current'),color:getComputedStyle(button).color})));

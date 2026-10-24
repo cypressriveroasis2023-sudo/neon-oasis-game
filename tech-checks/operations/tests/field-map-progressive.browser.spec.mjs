@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {snapshot,resource,now} from './fixtures/camera-evidence-fixtures.mjs';
 
 const origin='http://127.0.0.1:4173';
@@ -21,7 +22,7 @@ async function mount(page,{workspace='field-map',healthFail=false}={}){
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
   if(request.path==='/api/camera-health/summary-v3'&&healthFail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic camera read unavailable'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?withReviewedResources(snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]),units.slice(0,2).map((unit,index)=>({unit,ids:[index+1]}))):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/progressive-map-fixture');

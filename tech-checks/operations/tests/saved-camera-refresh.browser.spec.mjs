@@ -14,7 +14,9 @@ async function mount(page){
  const state={calls:[],errors:[],failed:false,gate:deferred()};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.addInitScript(()=>{window.savedRefreshInvalidations=[];window.addEventListener('cos-private-data-invalidated',()=>window.savedRefreshInvalidations.push(Date.now()));});
- await page.clock.install({time:new Date(start)});await page.clock.pauseAt(new Date(start));
+ // Pause at the exact baseline before mounting; allow setup time without asking
+ // Playwright to move an already-running clock backwards under parallel load.
+ await page.clock.install({time:new Date(start-60000)});await page.clock.pauseAt(new Date(start));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/saved-camera-refresh-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-saved-refresh-only'},location.origin)})</script>`});
@@ -148,7 +150,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  state.gate.resolve();state.gate=null;
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
- await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('—');
  await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
  // Settled partial data was not promoted into a complete current snapshot.
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();

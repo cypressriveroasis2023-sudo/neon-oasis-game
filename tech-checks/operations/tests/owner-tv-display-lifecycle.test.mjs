@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import * as navigation from '../src/workspaceNavigation.ts';
+import * as simpleNavigation from '../src/simpleCosNavigation.ts';
+import * as tvBoardData from '../src/tvBoardData.ts';
 import {primaryAreas} from '../src/visionAreas.ts';
 import {createOperationsSessionRecovery,guardSessionCallback} from '../src/operationsSessionRecovery.ts';
 
@@ -39,7 +41,7 @@ async function fixture(){
  const hooks=hookHost(),messages=[],host=new URL('https://synthetic.example/tech-checks/?tvBoard=1');
  const location=new URL('https://synthetic.example/operations/dist/?tvBoard=1#daily-board');
  const history={state:null,replaceState(state,_title,value){this.state=state;if(value)location.href=new URL(value,location).href;}};
- const parent={postMessage(message,origin){assert.equal(origin,location.origin);messages.push({...message});if(message.type==='COS_TV_BOARD_DISPLAY_MODE'&&!message.active)for(const key of ['tvBoard','tvScope','tvDepartment'])host.searchParams.delete(key);}};
+ const parent={location:host,postMessage(message,origin){assert.equal(origin,location.origin);messages.push({...message});if(message.type==='COS_TV_BOARD_DISPLAY_MODE'&&!message.active)for(const key of ['tvBoard','tvScope','tvDepartment'])host.searchParams.delete(key);}};
  const window={parent,location,dispatchEvent(){},scrollTo(){}};
  let state,invalidated;
  const controller=createOperationsSessionRecovery({read:async()=>owner,mode:()=>'',changed:next=>state=next});await controller.check();
@@ -47,6 +49,7 @@ async function fixture(){
  const modules={
   react:hooks.hooks,'react/jsx-runtime':{Fragment:'fragment',jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},
   './useOperationsSession':sessionHook,'./api':{api:{},openLegacy(){assert.fail('No legacy navigation is expected');}},
+  './simpleCosNavigation':simpleNavigation,'./tvBoardData':tvBoardData,
   './workspaceNavigation':{...navigation,readWorkspaceRoute:()=>navigation.readWorkspaceRoute(location.hash)},
   './visionAreas':{primaryAreas},'./VisionAreas':{default:'VisionAreas',AreaIcon:'AreaIcon',primaryWorkspace:active=>active},
   './unitTracker':{trackerAccess:()=>false},'../../it-feature-availability':{IT_DAILY_ONLY:false},

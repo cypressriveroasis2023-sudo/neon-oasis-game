@@ -1,3 +1,4 @@
+import {currentFieldCameraState} from './fieldProductEvidence';
 import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import type {FieldProduct} from './mhelpFieldHealth';
 
@@ -16,7 +17,7 @@ export type ProviderSummary={provider:FieldProvider;count:number;counts:Provider
 export type ProviderFleet={total:number;healthVerified:boolean;receivedAt:string;stale:boolean;groups:ProviderSummary[]};
 
 export const providerTitles:Record<FieldProvider,string>={
- star4live:'Star4Live',avigilon:'Avigilon',reconeyez:'Recon II',walle:'Wall-E',
+ star4live:'Star4Live',avigilon:'Avigilon',reconeyez:'Reconeyez',walle:'Wall-E',
  support:'Solar stands / support',other:'Other equipment'
 };
 export const providerOrder:FieldProvider[]=['star4live','avigilon','reconeyez','walle','support','other'];
@@ -60,10 +61,12 @@ export function mhelpProviderFleet(
   const provider=mhelpProviderFamily(product.category,product.unitNumber);
   const linked=healthById.get(product.productId)||null;
   const healthStatus:ProviderHealthStatus=provider==='support'?'not_applicable':
-   usable&&(linked?.state==='online'||linked?.state==='offline')?linked.state:'unverified';
+   usable&&currentFieldCameraState(linked?.evidence,linked?.state||'unverified',now)||'unverified';
   const reason=provider==='support'?'Support equipment has no camera-health requirement. Verify its power separately.':
     !usable?'Latest Field camera health is unavailable. No offline condition is inferred.':
     product.uploadLifecycle&&product.uploadLifecycle!=='UNFLAGGED'?'Source is marked Do Not Use / Missing. Do not activate from a saved connection.':
+    linked?.evidence?.basis&&linked.evidence.basis!=='camera'?'Only '+linked.evidence.basis+' evidence is available; camera video is unverified.':
+    healthStatus==='unverified'&&linked&&['online','offline'].includes(linked.state)?'Current complete camera/detector evidence is unavailable. The saved connection result does not establish video status.':
     linked?.reason||'No verified Product-ID-to-camera association. Not counted as an outage.';
   const group=groupByProvider.get(provider)!;
   group.count++;

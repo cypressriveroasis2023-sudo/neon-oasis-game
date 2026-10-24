@@ -1,8 +1,10 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canonicalCameraUnit,fieldCameraHealth,isSupportEquipment} from '../src/fieldCameraHealth.ts';
 import {resource,port,snapshot,now} from './fixtures/camera-evidence-fixtures.mjs';
 import {importedFamilyPolicy} from './fixtures/imported-family-policy.mjs';
+const reviewed=(unit,rows)=>withReviewedResources(snapshot(rows),[{unit,ids:rows.map(r=>r.id),kind:'owner_confirmed_native'}]);
 const direct=key=>['SNIPER','SNIPER2','SNIPER4','CAMV'].includes(key?.split('|')[0]);
 const field=r=>({id:'synthetic-unit',unitNumber:r.unit,modelName:r.equipmentType});
 const evidence=r=>resource(1,r.unit,direct(r.key)?{type:'tracker_unit',evidence:undefined,serviceEvidence:port()}:{type:r.family.startsWith('RECON')?'detector':'IPC'});
@@ -13,17 +15,19 @@ test('policy fixtures cover all ten observed equipment labels and eighteen famil
  assert.equal(new Set(importedFamilyPolicy.map(r=>r.family)).size,18);
 });
 for(const row of importedFamilyPolicy)test('imported labels: '+row.equipmentType+' / '+row.family,()=>{
- const unit=field(row),record=evidence(row),health=snapshot([record]);
+ const unit=field(row),record=evidence(row),health=row.policy==='supported'?reviewed(unit,[record]):snapshot([record]);
  assert.equal(canonicalCameraUnit(row.unit),row.key);
  const result=fieldCameraHealth(unit,[unit],health,now);
  if(row.policy==='supported'){
   assert.equal(result.identity,'matched');assert.equal(result.state,'online');
   assert.equal(result.basis,direct(row.key)?'connection':'camera');
   const collision=fieldCameraHealth(unit,[unit,{...unit,id:'synthetic-collision'}],health,now);
-  assert.equal(collision.identity,'ambiguous');assert.equal(collision.state,'unknown');
+  assert.equal(collision.identity,'matched');assert.equal(collision.state,'online'); // Exact reviewed ID wins over a second similar label.
+  const unreviewedCollision=fieldCameraHealth(unit,[unit,{...unit,id:'synthetic-collision'}],snapshot([record]),now);
+  assert.equal(unreviewedCollision.identity,'ambiguous');assert.equal(unreviewedCollision.state,'unknown');
   const other=row.family==='RANGER'?'Helios 901':'Ranger 901';
   assert.equal(fieldCameraHealth(unit,[unit],snapshot([{...record,unit:other}]),now).identity,'missing');
-  assert.equal(fieldCameraHealth({...unit,modelName:'Unverified equipment'},[{...unit,modelName:'Unverified equipment'}],health,now).identity,'missing');
+  assert.equal(fieldCameraHealth({...unit,modelName:'Unverified equipment'},[{...unit,modelName:'Unverified equipment'}],snapshot([record]),now).identity,'missing');
  }else{
   assert.equal(result.identity,'missing');assert.equal(result.state,isSupportEquipment(unit)?'support':'unknown');assert.equal(result.classification,null);
   // A camera, responding router/service port, or matching numeric tag cannot make this family supported.
@@ -33,7 +37,7 @@ for(const row of importedFamilyPolicy)test('imported labels: '+row.equipmentType
 test('known intrinsic family names remain valid separately from ambiguous source-tab grouping',()=>{
  for(const family of ['SPOTTER','SS HYBRID']){
   const unit={id:'synthetic-known',unitNumber:family+' 901',modelName:family};
-  assert.equal(fieldCameraHealth(unit,[unit],snapshot([resource(1,unit.unitNumber)]),now).identity,'matched');
+  assert.equal(fieldCameraHealth(unit,[unit],reviewed(unit,[resource(1,unit.unitNumber)]),now).identity,'matched');
  }
 });
 test('base Sniper and Recon asset digits cannot be consumed as generation discriminators',()=>{
@@ -50,13 +54,13 @@ test('base Sniper and Recon asset digits cannot be consumed as generation discri
 test('same-number Sniper generations and Recon generations never cross-link health',()=>{
  for(const families of [['Sniper','Sniper 2','Sniper 4'],['Recon','Recon 2']])for(const family of families){
   const unit={id:'synthetic-generation',unitNumber:family+' 901',modelName:family};
-  for(const other of families){const result=fieldCameraHealth(unit,[unit],snapshot([resource(1,other+' 901',{serviceEvidence:port()})]),now);assert.equal(result.identity,other===family?'matched':'missing');}
+  for(const other of families){const result=fieldCameraHealth(unit,[unit],(other===family?reviewed(unit,[resource(1,other+' 901',{serviceEvidence:port()})]):snapshot([resource(1,other+' 901',{serviceEvidence:port()})])),now);assert.equal(result.identity,other===family?'matched':'missing');}
  }
 });
 test('RECONS exact model alias preserves tag, generation, ambiguity and recency guards',()=>{
  const unit={id:'synthetic-recon',unitNumber:'Recon 901',modelName:'RECONS'};
  const row=resource(1,'RI901',{type:'detector'});
- assert.equal(fieldCameraHealth(unit,[unit],snapshot([row]),now).state,'online');
+ assert.equal(fieldCameraHealth(unit,[unit],reviewed(unit,[row]),now).state,'online');
  for(const label of ['Recon 902','RII-901','Sniper 901'])assert.equal(fieldCameraHealth(unit,[unit],snapshot([{...row,unit:label}]),now).identity,'missing');
  assert.equal(fieldCameraHealth(unit,[unit,{...unit,id:'synthetic-duplicate'}],snapshot([row]),now).identity,'ambiguous');
  assert.equal(fieldCameraHealth(unit,[unit],snapshot([{...row,evidence:{...row.evidence,observedAt:'2000-01-01T00:00:00Z'}}]),now).state,'unknown');

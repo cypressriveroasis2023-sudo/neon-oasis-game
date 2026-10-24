@@ -4,7 +4,9 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const displaySource = readFileSync(new URL('../../field-map-display-host.js', import.meta.url), 'utf8').replace('export function','function');
-const hostSource = displaySource+'\n'+readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8').replace(/import \{setFieldMapDisplay\} from .*;\n/,'');
+const custodySource=readFileSync(new URL('../../custody-read.js',import.meta.url),'utf8').replaceAll('export function','function').replaceAll('export async function','async function');
+const scheduleSource=readFileSync(new URL('../../schedule-read.js',import.meta.url),'utf8').replace('export async function','async function');
+const hostSource = scheduleSource+'\n'+custodySource+'\n'+displaySource+'\n'+readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm,'');
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
 const ownerId = '00000000-0000-4000-8000-000000000001';
 const secondOwnerId = '11111111-2222-4333-8444-555555555555';
@@ -578,4 +580,23 @@ test('an identity replacement while legacy tools hide Operations destroys the pr
  const h=harness(),initial=h.frame();await h.navigate('assign');h.flushMutations();const pendingAuth=deferred();h.state.getFreshSession=()=>pendingAuth.promise;const pending=h.token('old-hidden-owner');
  h.state.session={user:{id:secondOwnerId}};h.state.profile={user_id:secondOwnerId,role:'owner',active:true};h.state.authListener('SIGNED_IN',h.state.session);h.flushMutations();assert.equal(initial.removed,true);assert.notEqual(h.frame(),initial);
  const before=initial.contentWindow.messages.length;pendingAuth.resolve({data:{session:{user:{id:ownerId},access_token:'late-old-hidden-token'}}});await pending;assert.equal(initial.contentWindow.messages.length,before,'old identity may not receive a late handoff');
+});
+
+test('custody bridge reads only fixed Owner RPCs and ignores foreign frames and preview roles',async()=>{
+ const h=harness(),calls=[];
+ h.window.TechCheckContext.db.rpc=async name=>{calls.push(name);return {error:{message:'Synthetic source unavailable'}};};
+ const request={type:'COS_OWNER_CUSTODY_REQUEST',requestId:'custody',rpc:'delete_inventory',args:{}};
+ await h.message(request,{},origin);await h.message(request,h.frame().contentWindow,'https://foreign.invalid');assert.equal(calls.length,0);
+ await h.message(request);
+ assert.deepEqual(calls,['owner_service_truck_inventory_v1','techcheck_transfer_context_v1','techcheck_ticketfree_context_v1']);
+ const result=h.frame().contentWindow.messages.find(message=>message.value.type==='COS_OWNER_CUSTODY_RESPONSE');
+ assert.ok(result.value.snapshot.sources.handoffs.error);assert.doesNotMatch(JSON.stringify(result),/token|delete_inventory/);
+ h.state.effectiveRole='service';await h.message(request);assert.equal(calls.length,3);
+});
+test('custody bridge discards an in-flight response when the Owner subject changes',async()=>{
+ const h=harness(),pending=deferred(),source=h.frame().contentWindow;
+ h.window.TechCheckContext.db.rpc=async()=>{await pending.promise;return {error:{}};};
+ const result=h.message({type:'COS_OWNER_CUSTODY_REQUEST',requestId:'old-owner'});
+ h.state.session={user:{id:secondOwnerId}};pending.resolve();await result;
+ assert.equal(source.messages.some(message=>message.value.type==='COS_OWNER_CUSTODY_RESPONSE'),false);
 });

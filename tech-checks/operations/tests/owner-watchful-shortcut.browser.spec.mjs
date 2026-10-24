@@ -97,7 +97,7 @@ for (const account of [
     if (page.viewportSize().width <= 700) await frame.getByRole('button', {name: 'More', exact: true}).click();
     const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
     await expect(nav.getByRole('button')).toHaveCount(2);
-    await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toBeVisible();
+    await expect(nav.getByRole('button',{name:'Fleet Map',exact:true})).toBeVisible();
     await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
     await expect(frame.getByRole('button',{name:'Register in COS inventory →',exact:true})).toHaveCount(0);
   } else if (account.authorized === false) await expect(frame.getByRole('heading', {name: 'Operations access needs attention'})).toBeVisible();

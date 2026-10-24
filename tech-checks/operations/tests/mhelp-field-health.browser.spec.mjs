@@ -3,6 +3,10 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Field product and inspect held or linked records',async({page})=>{
  const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field,health:fixture.health});
+ const scope=app.getByRole('note',{name:'Field inventory and list scope'});
+ await expect(scope).toContainText('7 Field Product IDs in inventory.');
+ await expect(scope).toContainText('1 inactive record(s) and 1 record(s) requiring identity / placement review');
+ await expect(scope).toContainText('not removed from inventory');
  const disclosure=app.locator('.cos-fleet-accounting');
  await expect(disclosure).not.toHaveAttribute('open','');
  await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();

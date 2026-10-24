@@ -90,7 +90,7 @@ test('direct linked Test IT desktop opens the shared Fleet board without probing
  await expect(frame.getByRole('heading',{name:'Fleet Dashboard',exact:true})).toBeVisible();
  await expect(frame.locator('.company-owner')).toContainText('Test IT');
  await expect(nav.getByRole('button')).toHaveCount(2);
- await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav.getByRole('button',{name:'Fleet Map',exact:true})).toHaveAttribute('aria-current','page');
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toHaveAttribute('data-fleet-view','fleet');
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toHaveAttribute('aria-current','page');
@@ -123,4 +123,20 @@ test('IT phone keeps an open handoff form when Fleet is selected',async({page})=
  await expect(page.getByRole('status').filter({hasText:'Finish or close the current handoff form'})).toBeVisible();
  await expect(page.getByLabel('Receiving Service technician')).toBeVisible();await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
  expect(f.calls.some(c=>c.name==='submit_techcheck_transfer_v1')).toBe(false);
+});
+
+test('desktop handoff selection retains readiness denials and can return to Fleet',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ f=await mountTransfers(page,{rollout:'missing',itActor:TEST_IT});
+ const nav=page.getByRole('navigation',{name:'IT daily views',exact:true});
+ await nav.getByRole('button',{name:'Check out / check in',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Equipment handoff availability'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Check In / Return',exact:true})).toBeDisabled();
+ await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+ expect(f.calls.filter(c=>['techcheck_transfer_context_v1','submit_techcheck_transfer_v1'].includes(c.name))).toHaveLength(0);
+ expect(f.paths.size).toBe(0);
+ await nav.getByRole('button',{name:'Fleet map & troubleshooting',exact:true}).click();
+ await expect(page.frameLocator('#cosITDailyFrame').getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+ expect(f.unexpected).toEqual([]);expect(f.errors).toEqual([]);
 });

@@ -178,7 +178,7 @@ test('native Jobs ignores a pre-write passive snapshot after an unknown write ou
   expect(state.requests.filter(request=>request.method==='POST'&&request.path===path)).toHaveLength(1);
 });
 
-test('native Calendar Month, Week and Year views show real scheduled records without viewport overflow',async({page})=>{
+test('native Calendar Month, Week and Day views show real scheduled records without viewport overflow',async({page})=>{
   const {frame}=await openFixture(page,'calendar');
   await expect(frame.getByRole('grid')).toBeVisible();
   await expect(frame.getByRole('button',{name:'FIX-102 · Fixture Review Yard',exact:true})).toBeVisible();
@@ -186,9 +186,10 @@ test('native Calendar Month, Week and Year views show real scheduled records wit
   await frame.getByRole('button',{name:'Week',exact:true}).click();
   await expect(frame.getByRole('gridcell')).toHaveCount(7);
   await noOverflow(page);
-  await frame.getByRole('button',{name:'Year',exact:true}).click();
-  await expect(frame.locator('.calendar-year button')).toHaveCount(12);
-  await expect(frame.locator('.calendar-year button').filter({hasText:'October'})).toContainText('1 scheduled');
+  await frame.getByRole('button',{name:'Day',exact:true}).click();
+  await expect(frame.getByRole('gridcell')).toHaveCount(1);
+  await expect(frame.getByRole('button',{name:'FIX-102 · Fixture Review Yard',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Day',exact:true})).toHaveAttribute('aria-pressed','true');
   await noOverflow(page);
 });
 

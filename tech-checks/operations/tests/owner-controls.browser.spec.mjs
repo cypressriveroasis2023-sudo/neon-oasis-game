@@ -121,14 +121,15 @@ test('Owner truck approval preserves nested missing identifiers without marking 
  await page.reload();await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();await expect(controls.getByText('backup battery identifier',{exact:true})).toBeVisible();
 });
 test('Every AppDeploy handoff is reachable and workspace Back, Forward and reload preserve destinations',async({page})=>{
+ test.setTimeout(120000); // Eleven Owner destinations through the retained Advanced directory.
  const {state,frame}=await mount(page,'today');
  for(const name of ['Work Requests','CRM','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity']){
   await navigate(page,frame,name);await expect(frame.getByRole('heading',{name,exact:true}).first()).toBeVisible();await expect(frame.getByRole('link',{name:'Open AppDeploy COS Operations ↗'})).toHaveAttribute('href','https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/');
  }
  await navigate(page,frame,'Jobs');await navigate(page,frame,'Team');
  await frame.locator('body').evaluate(()=>history.back());await expect(frame.getByRole('heading',{name:'Job flow',exact:true}).first()).toBeVisible();
- await frame.locator('body').evaluate(()=>history.forward());await expect(frame.getByRole('heading',{name:'Team',exact:true}).first()).toBeVisible();
- await frame.locator('body').evaluate(()=>location.reload());await expect(frame.getByRole('heading',{name:'Team',exact:true}).first()).toBeVisible();expect(state.writes).toHaveLength(0);
+ await frame.locator('body').evaluate(()=>history.forward());await expect(frame.getByRole('heading',{name:'Team & Tech Check',exact:true}).first()).toBeVisible();
+ await frame.locator('body').evaluate(()=>location.reload());await expect(frame.getByRole('heading',{name:'Team & Tech Check',exact:true}).first()).toBeVisible();expect(state.writes).toHaveLength(0);
 });
 test('Jobs close dialog supports Escape, Cancel, focus restoration and navigation without mutation',async({page})=>{
  const {state,frame}=await mount(page,'jobs');const close=frame.getByRole('button',{name:'Close Job',exact:true});

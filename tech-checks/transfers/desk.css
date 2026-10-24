@@ -16,3 +16,6 @@
 .tc-transfer .tc-purpose{display:block;width:fit-content;max-width:100%;margin:8px 0;padding:5px 9px;border:1px solid #aeb9c6;border-radius:6px;color:#eef6ff;background:#293542;font-size:15px;overflow-wrap:anywhere}
 .tc-transfer .tc-purpose-note{padding:10px 12px;border-left:3px solid #aeb9c6;background:#252c33;line-height:1.5}
 .tc-transfer .tc-original-evidence{margin:12px 0}.tc-transfer .tc-original-evidence img{max-height:220px}.tc-transfer .tc-original-evidence figcaption{font-size:13px;color:#c6c6c6;overflow-wrap:anywhere}
+.tc-transfer .tc-guide-controls{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.tc-transfer .tc-transfer-review{padding:14px;border:1px solid #aeb9c6;border-radius:10px;background:#252c33}.tc-transfer [data-transfer-progress]{font-size:20px;overflow-wrap:anywhere}
+
+.tc-transfer .tc-review-manifest{white-space:pre-wrap;overflow-wrap:anywhere}

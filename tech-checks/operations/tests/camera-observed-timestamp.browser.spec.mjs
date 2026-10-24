@@ -1,3 +1,4 @@
+import {withReviewedResources} from './fixtures/reviewed-camera-fixtures.mjs';
 import {test,expect} from '@playwright/test';
 import {resource,port,snapshot,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
 
@@ -22,7 +23,7 @@ async function mount(page,status){
     withStatus(resource(901,units[0].unitNumber,{serviceEvidence:service('online')}),status,cameraAt),
     resource(902,units[1].unitNumber,{type:'Sniper',evidence:undefined,serviceEvidence:service(status)}),
   ];
-  const health={...snapshot(rows),refreshedAt:now};
+  const health=withReviewedResources({...snapshot(rows),refreshedAt:now},units.map((unit,index)=>({unit,ids:[String(901+index)],kind:index===1?'owner_confirmed_native':'native_provider'})));
   await page.route('**/*',async route=>{
     const url=route.request().url();
     if(url===origin+'/camera-observed-timestamp-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:'owner',accessToken:'synthetic-observation-time-only'},location.origin)})</script>`});
@@ -52,7 +53,7 @@ for(const status of ['online','offline'])test(`${status} camera and port observa
   expect(await app.locator('body').evaluate(()=>({now:new Date(Date.now()).toISOString(),zone:Intl.DateTimeFormat().resolvedOptions().timeZone}))).toEqual({now:'2026-10-14T16:00:00.000Z',zone:'UTC'});
   await expect(app.locator('.cos-fleet-stat-field strong,.cos-fleet-stat-online strong,.cos-fleet-stat-offline strong,.cos-fleet-stat-unknown strong')).toHaveText(status==='online'?['2','2','0','0']:['2','0','2','0']);
   const scenarios=[
-    {unit:units[0],basis:'camera/detector',time:cameraTime,label:status==='online'?'Camera records online':'Camera outage observed',service:'ONLINE'},
+    {unit:units[0],basis:'camera/detector',time:cameraTime,label:'CAMERA RECORDS '+status.toUpperCase(),service:'ONLINE'},
     {unit:units[1],basis:'IP / port',time:portTime,label:'IP / PORT '+status.toUpperCase(),service:status.toUpperCase()},
   ];
   for(const scenario of scenarios){

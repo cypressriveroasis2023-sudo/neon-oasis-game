@@ -59,7 +59,7 @@ test('partial and warned source groups do not become verified equipment cards or
  }
 });
 test('warning source claims prevent alternate-name fallback without suppressing unrelated equipment',()=>{
- const base={id:'unreviewed-base',unitNumber:'Solar Spotter 051',modelName:'Solar Spotter'};const other={id:'other',unitNumber:'Helios 100',modelName:'HELIOS'};const h=health([...rows,resource(3,'HELIOS 100')],[],{identityWarnings:[{unitId:unit.id,reason:'Reviewed link changed',deviceIds:['1','2'],unitKeys:['SOLARSPOTTER 051']}]});
+ const base={id:'unreviewed-base',unitNumber:'Solar Spotter 051',modelName:'Solar Spotter'};const other={id:'other',unitNumber:'Helios 100',modelName:'HELIOS'};const h=health([...rows,resource(3,'HELIOS 100')],[{...identity,unitId:other.id,unitNumber:other.unitNumber,deviceIds:['3'],unitKeys:['HELIOS 100']}],{identityWarnings:[{unitId:unit.id,reason:'Reviewed link changed',deviceIds:['1','2'],unitKeys:['SOLARSPOTTER 051']}]});
  assert.equal(project(h,base,[base,other]).state,'unknown');assert.equal(project(h,other,[base,other]).state,'online');const summary=cameraOverview(h,now);assert.equal(summary.summary.monitored,1);assert.equal(summary.summary.online,1);assert.equal(summary.records,3);
 });
 test('Owner partial provider observations cannot filter an unverified expected IPC out of rollup',()=>{

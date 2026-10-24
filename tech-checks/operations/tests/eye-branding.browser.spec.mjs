@@ -141,7 +141,8 @@ test('Operations desktop and mobile use a complete animated company logo',async(
   for(const workspace of ['Overview','Fleet Dashboard']){
   if(workspace==='Fleet Dashboard'){
     await page.setViewportSize({width:390,height:900});
-    await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
+    await frame.getByRole('button',{name:'More',exact:true}).first().click();
+    await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Fleet Map',exact:true}).click();
     await expect(frame.locator('.operations-field-view')).toBeVisible();
   }
   for(const width of [320,390,430,1024,1440]){

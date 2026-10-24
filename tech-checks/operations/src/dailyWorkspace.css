@@ -27,3 +27,4 @@
  #root .company-shell:has(.cos-inventory-overview) .command-page-header{padding-top:12px;margin-bottom:12px}
  #root .company-shell:has(.cos-inventory-overview) .command-page-header h1{font-size:24px}
 }
+.cos-custody-overview{padding:20px;margin:18px 0;border:1px solid #465367;border-radius:12px;overflow-wrap:anywhere}.cos-custody-overview header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}.cos-custody-overview input{max-width:100%;min-height:44px}.cos-custody-overview button{min-height:44px}.cos-custody-overview .record{display:block;min-width:0}.calendar-custody-event{padding:10px;margin:8px 0;border:1px solid #52677e;border-radius:8px;overflow-wrap:anywhere}.calendar-custody-event p{margin:6px 0}

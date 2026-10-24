@@ -103,6 +103,11 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
 
   useEffect(()=>{
     onTvChange?.(tv);
+    // Keep only the display preference across verified session remounts/reloads.
+    // Private records are still discarded by the session recovery boundary.
+    if(tv){
+      const url=new URL(location.href);url.searchParams.set('tvBoard','1');history.replaceState(history.state,'',url);
+    }
     if(!tv&&new URLSearchParams(location.search).get('tvBoard')==='1'){
       const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
     }

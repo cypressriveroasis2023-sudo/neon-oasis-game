@@ -13,7 +13,7 @@ test('desktop IT opens Fleet Map plus Camera Health; unrelated workspaces stay d
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  const nav=frame.locator('nav[aria-label="COS Operations"]');
  await expect(nav.getByRole('button')).toHaveCount(2);
- await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav.getByRole('button',{name:'Fleet Map',exact:true})).toHaveAttribute('aria-current','page');
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
  await expect(page.locator('#legacy')).toBeHidden();
  await expect(frame.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
