@@ -5,7 +5,7 @@ import {fixture} from '../../tests/mhelp-address-automation-fixture.mjs';
 import {assertCiContext,validateIsolatedServer,parameters,openPsql} from './mhelp-postgres-concurrency.ci.mjs';
 assertCiContext();
 const exec=sql=>openPsql(sql).done;
-const query=async(sql,args=[])=>{const raw=await exec("select coalesce(json_agg(row_to_json(x)),'[]'::json) from ("+parameters(sql,args).replace(/;\s*$/,'')+")x;");return {rows:JSON.parse(raw.trim().split(/\r?\n/).at(-1))};};
+const query=async(sql,args=[])=>{args=args.map(value=>value!==null&&typeof value==='object'?JSON.stringify(value):value);if(!/^\s*(select|with)\b/i.test(sql)){await exec(parameters(sql,args));return {rows:[]};}const raw=await exec("select coalesce(json_agg(row_to_json(x)),'[]'::json) from ("+parameters(sql,args).replace(/;\s*$/,'')+")x;");return {rows:JSON.parse(raw.trim().split(/\r?\n/).at(-1))};};
 validateIsolatedServer((await query('select current_database() database,current_user account,inet_server_port() port')).rows[0]);
 const db={exec,query,close:async()=>{}};
 const f=await fixture({database:db,indexedCache:false});
