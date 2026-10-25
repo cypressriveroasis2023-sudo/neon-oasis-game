@@ -6,9 +6,9 @@ import { api } from './api';
 import { dashboardSources, emptyTodayDashboard, loadTodayDashboard, type DashboardData } from './todayDashboardData';
 import type { CompanyStageId } from './companyLifecycle';
 
-type Props = { setActive: (workspace: string) => void; openJob?: (id:string, workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
+type Props = { ownerAuthorized:boolean; setActive: (workspace: string) => void; openJob?: (id:string, workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
 
-export default function LiveTodayDashboard({ setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
+export default function LiveTodayDashboard({ ownerAuthorized, setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
   const [data, setData] = useState<DashboardData>(emptyTodayDashboard);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<CompanyStageId | null>(null);
@@ -41,7 +41,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
   };
   return <div className={'owner-command-home company-command-home'+(detailOpen?' overview-detail-open':'')} aria-busy={loading}>
     {!detailOpen && <>
-      <OwnerActionQueue data={data} openWorkspace={setActive} openJob={openJob}/>
+      {ownerAuthorized&&<OwnerActionQueue ownerAuthorized={ownerAuthorized} data={data} openWorkspace={setActive} openJob={openJob}/>}
       <CompanyOverview data={data} equipment={null} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
         <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
