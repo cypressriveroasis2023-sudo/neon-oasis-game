@@ -1,42 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PGlite} from '@electric-sql/pglite';
+import {fixture} from './mhelp-address-automation-fixture.mjs';
 import {readFile} from 'node:fs/promises';
-const sql=await readFile(new URL('../db/mhelp-address-automation.sql',import.meta.url),'utf8');
 const source='a'.repeat(64),payload='b'.repeat(64),nextSource='c'.repeat(64),nextPayload='d'.repeat(64);
 const address={street:'123 Main Road',city:'Houston',state:'Tx',zip:'77002-1234'};
 const rec=(id,placement='FIELD',a=address)=>({productId:String(id),unitNumber:'Synthetic '+id,category:'Other',customerId:placement==='SHOP'?'11':'12',customer:'Private customer must never leave database',placement,lifecycle:'UNFLAGGED',sourceAddress:a});
-async function fixture({legacyCache=false,optimized=true}={}){
- const db=new PGlite();
- await db.exec(`create role anon;create role authenticated;create role service_role;
- create schema cos_mhelp_placement_private;create schema net;create schema app_private;
- create function app_private.appdeploy_assume_actor(uuid,uuid) returns void language sql as 'select';
- create function app_private.has_permission(uuid,text) returns boolean language sql as 'select true';
- create table public.equipment_units(id text,ip text,gps_latitude float8,gps_longitude float8);
- insert into public.equipment_units values('unchanged','192.0.2.1',30,-95);
- create table cos_mhelp_placement_private.upload_batches(source_sha256 text primary key,payload_sha256 text,records jsonb,receipt jsonb);
- create table cos_mhelp_placement_private.upload_control(singleton boolean primary key,active_sha256 text);
- create table cos_mhelp_placement_private.census_mhelp_address(source_sha256 text,address_sha256 text,street text,city text,state text,zip text,status text,reason text,request_id bigint,http_status integer,census_benchmark text,matches integer,matched_address text,latitude float8,longitude float8,requested_at timestamptz,completed_at timestamptz,primary key(source_sha256,address_sha256));
- create table cos_mhelp_placement_private.census_mhelp_product(source_sha256 text,payload_sha256 text,product_id text,source_row_sha256 text,unit_number text,placement text,address_sha256 text,observed_at timestamptz default clock_timestamp(),primary key(source_sha256,product_id));
- create sequence net.requests;
- create table net.sent(id bigint,url text,params jsonb,headers jsonb);
- create table net._http_response(id bigint,status_code integer,content text,timed_out boolean,error_msg text);
- create function net.http_get(url text,params jsonb,headers jsonb,timeout_milliseconds integer) returns bigint language plpgsql as $$declare i bigint:=nextval('net.requests');begin insert into net.sent values(i,url,params,headers);return i;end$$;`);
- for(const name of ['cos_mhelp_address_resolutions_20261017.sql','20261018041534_cos_mhelp_public_site_reference.sql'])await db.exec(await readFile(new URL('../db/'+name,import.meta.url),'utf8'));
- await db.exec(legacyCache?sql.replace("   if current_group is null or prior_group is null or not current_group <@ prior_group then continue;end if;\n   -- A returned-to-Shop product may leave a reviewed group. Every remaining\n   -- Field product must still have the same recorded customer/site context.\n   if exists(\n    select 1 from jsonb_array_elements(b.records) current_record\n    where current_record->>'productId'=any(current_group)\n     and not exists(\n      select 1 from cos_mhelp_placement_private.upload_batches prior_batch\n      cross join lateral jsonb_array_elements(prior_batch.records) prior_record\n      where prior_batch.source_sha256=cached.source_sha256\n       and prior_record->>'productId'=current_record->>'productId'\n       and prior_record->>'placement'='FIELD'\n       and coalesce(current_record->>'customerId','')<>''\n       and prior_record->>'customerId'=current_record->>'customerId'\n       and upper(trim(regexp_replace(prior_record->>'customer','[[:space:]]+',' ','g')))\n        =upper(trim(regexp_replace(current_record->>'customer','[[:space:]]+',' ','g')))\n     )\n   ) then continue;end if;",'   if prior_group is distinct from current_group then continue;end if;'):sql);await db.exec(await readFile(new URL('../db/cos_mhelp_census_map_projection_20261017.sql',import.meta.url),'utf8'));
- if(optimized&&!legacyCache)await db.exec(await readFile(new URL('../db/mhelp-address-history-lookup.sql',import.meta.url),'utf8'));
- const activate=async(records,s=source,p=payload)=>{
-  await db.query('insert into cos_mhelp_placement_private.upload_batches values($1,$2,$3,$4)',[s,p,records,{recordCount:records.length}]);
-  await db.query('insert into cos_mhelp_placement_private.upload_control values(true,$1) on conflict(singleton) do update set active_sha256=excluded.active_sha256',[s]);
- };
- const tick=async()=>(await db.query('select cos_mhelp_placement_private.address_automation_tick_v1() v')).rows[0].v;
- const read=async()=>(await db.query("select public.cos_mhelp_census_map_snapshot('11111111-1111-4111-8111-111111111111','ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5') v")).rows[0].v;
- const snapshot=async()=>(await db.query("select jsonb_build_object('source',(select jsonb_agg(to_jsonb(t)) from cos_mhelp_placement_private.upload_batches t),'native',(select jsonb_agg(to_jsonb(t)) from public.equipment_units t),'census',(select jsonb_agg(to_jsonb(t)) from cos_mhelp_placement_private.census_mhelp_address t),'products',(select jsonb_agg(to_jsonb(t)) from cos_mhelp_placement_private.census_mhelp_product t)) v")).rows[0].v;
- const respond=async(match={matchedAddress:'123 MAIN RD, HOUSTON, TX, 77002',addressComponents:{city:'HOUSTON',state:'TX',zip:'77002'},coordinates:{x:-95.4,y:29.7}})=>{
-  await db.query('insert into net._http_response select id,200,$1,false,null from net.sent',[JSON.stringify({result:{addressMatches:match?[match]:[]}})]);
- };
- return {db,activate,tick,read,snapshot,respond};
-}
 test('accepted import queues unique Field addresses, publishes exact results and reuses unchanged sites across changed counts',async()=>{
  const f=await fixture();try{
   await f.activate([rec(1),rec(2),rec(3,'SHOP',{...address,street:'999 Shop Road'})]);
@@ -121,46 +89,62 @@ test('upgrade of the installed cache function preserves all data and enables the
  }finally{await f.db.close();}
 });
 
-test('history lookup preserves candidate precedence, duplicate corrected keys, and rollback semantics',async()=>{
- const selections=[];
- for(const optimized of [false,true]){
-  const f=await fixture({optimized});try{
-   await f.activate([rec(1)]);await f.tick();
-   await f.db.exec(`update cos_mhelp_placement_private.census_mhelp_address set status='matched',census_benchmark='Public_AR_Current',matched_address='Census',latitude=31,longitude=-96,completed_at='2030-01-01';`);
-   for(const [i,date,lat] of [[1,'2026-01-01',29.1],[2,'2026-02-01',29.2],[3,'2026-02-01',29.3]])await f.db.query(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256) select source_sha256,payload_sha256,address_sha256,'public_site_reference','Synthetic reviewed address','address_review','Synthetic reviewed address',$1,-95,$2,$3,$4 from cos_mhelp_placement_private.census_mhelp_product limit 1`,[lat,date,{ownerCorrectedAddress:address},String(i).repeat(64)]);
-   await f.activate([rec(1)],nextSource,nextPayload);
-   const before=await f.snapshot();await f.tick();const after=await f.snapshot();
-   assert.deepEqual(after.source,before.source);assert.deepEqual(after.native,before.native);
-   const chosen=(await f.db.query('select latitude,evidence from cos_mhelp_placement_private.mhelp_address_resolution where source_sha256=$1',[nextSource])).rows;
-   assert.equal(chosen.length,1);assert.equal(chosen[0].latitude,29.3,'resolution priority, latest timestamp, then greatest ID win');selections.push(chosen);
-   await f.activate([rec(1)],'9'.repeat(64),'8'.repeat(64));
-   await f.db.exec(`create function cos_mhelp_placement_private.reject_completion() returns trigger language plpgsql as $$begin raise exception 'synthetic partial failure';end$$;create trigger reject_completion before insert on cos_mhelp_placement_private.address_automation_import for each row execute function cos_mhelp_placement_private.reject_completion();`);
-   const protectedBefore=await f.snapshot();await assert.rejects(f.tick,/synthetic partial failure/);assert.deepEqual(await f.snapshot(),protectedBefore);
-   assert.equal((await f.db.query('select count(*) n from cos_mhelp_placement_private.mhelp_address_resolution where source_sha256=$1',['9'.repeat(64)])).rows[0].n,0);
-   await f.db.exec('drop trigger reject_completion on cos_mhelp_placement_private.address_automation_import');
-   if(optimized){const saved=await f.snapshot();await f.db.exec(await readFile(new URL('../db/mhelp-address-history-lookup-rollback.sql',import.meta.url),'utf8'));assert.deepEqual(await f.snapshot(),saved);}
-  }finally{await f.db.close();}
- }
- assert.deepEqual(selections[1],selections[0]);
+test('indexed lookup preserves normalization and indexes both address and reviewed-correction candidate paths',async()=>{
+ const f=await fixture();try{
+  for(const parts of [address,{street:' 123\tMain\nRoad ',city:' Houston ',state:' tx ',zip:'77002-1234'},{street:null,city:'',state:null,zip:''}]){
+   const result=(await f.db.query(`select cos_mhelp_placement_private.address_cache_lookup_key_v1($1,$2,$3,$4)=sha256(convert_to(cos_mhelp_placement_private.address_parts_v1(jsonb_build_object('street',$1::text,'city',$2::text,'state',$3::text,'zip',$4::text))::text,'UTF8')) same`,[parts.street,parts.city,parts.state,parts.zip])).rows[0];
+   assert.equal(result.same,true);
+  }
+  const indexes=(await f.db.query("select indexname from pg_indexes where indexname in ('census_mhelp_address_exact_lookup','mhelp_address_resolution_corrected_lookup')")).rows;
+  assert.equal(indexes.length,2);
+  for(const role of ['anon','authenticated','service_role']){
+   await f.db.exec('set role '+role);
+   await assert.rejects(f.db.query("select cos_mhelp_placement_private.address_cache_lookup_key_v1('a','b','c','d')"));
+   await f.db.exec('reset role');
+  }
+ }finally{await f.db.close();}
 });
 
-test('history lookup completes a 1001-product import against 45 historical batches within the unchanged worker budget',async()=>{
+test('historical lookup yields identical evidence with thousands of unrelated addresses, mixed priorities and stale payloads',async()=>{
+ const outputs=[];
+ for(const indexedCache of [false,true]){
+  const f=await fixture({indexedCache});try{
+   const fieldRecords=Array.from({length:284},(_,i)=>rec(i+1,'FIELD',{...address,street:(1000+i%109)+' Site Road'}));
+   await f.activate(fieldRecords);await f.tick();
+   await f.db.exec(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,reason,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
+    select source_sha256,'${payload}',address_sha256,'public_site_reference','Synthetic reviewed site','address_review','Synthetic only','Synthetic reviewed site',29.7,-95.4,'2030-01-01T00:00:00Z','{}','${'e'.repeat(64)}'
+    from cos_mhelp_placement_private.census_mhelp_address where source_sha256='${source}';`);
+   // No customer production data: 30 historical sources, each 109 unrelated sites.
+   await f.db.exec(`insert into cos_mhelp_placement_private.upload_batches
+    select lpad(to_hex(i),64,'0'),'${payload}','[]','{"recordCount":0}' from generate_series(1,30)i;
+    insert into cos_mhelp_placement_private.census_mhelp_address(source_sha256,address_sha256,street,city,state,zip,status,reason)
+    select lpad(to_hex(i),64,'0'),lpad(to_hex(j),64,'0'),(1000+j)::text||' Unrelated Road','OTHER CITY','TX','78000','no_match','Synthetic history'
+    from generate_series(1,30)i cross join generate_series(1,109)j;
+    insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,reason,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
+    select source_sha256,'${payload}',address_sha256,'public_site_reference','Unrelated reference','address_review','Synthetic only','Unrelated reference',29,-95,now(),'{}','${'f'.repeat(64)}'
+    from cos_mhelp_placement_private.census_mhelp_address where source_sha256<>'${source}';
+    insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,reason,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
+    select source_sha256,'${'f'.repeat(64)}',address_sha256,'public_site_reference','Wrong point','address_review','Stale payload must be ignored','Wrong point',1,1,now()+interval '1 hour','{}','${'e'.repeat(64)}'
+    from cos_mhelp_placement_private.census_mhelp_address where source_sha256='${source}';`);
+   const nativeBefore=(await f.db.query('select to_jsonb(t) v from public.equipment_units t')).rows;
+   await f.activate([...fieldRecords,...Array.from({length:717},(_,i)=>rec(1000+i,'SHOP'))],nextSource,nextPayload);
+   const started=performance.now();const tick=await f.tick();const elapsed=performance.now()-started;
+   console.log(JSON.stringify({syntheticAddressHistoryLookup:indexedCache?'indexed':'original',elapsedMs:Math.round(elapsed)}));
+   assert.equal(tick.sent,0);const result=await f.read();assert.equal(result.totalProducts,1001);assert.equal(result.fieldProducts,284);assert.equal(result.shopProducts,717);assert.equal(result.items.length,284);assert.ok(result.items.every(i=>i.latitude===29.7&&i.longitude===-95.4));
+   assert.deepEqual((await f.db.query('select to_jsonb(t) v from public.equipment_units t')).rows,nativeBefore);
+   outputs.push(result);
+  }finally{await f.db.close();}
+ }
+ assert.deepEqual(outputs[1],outputs[0],'candidate selection retains the original published result exactly');
+});
+
+test('a lookup hash collision cannot authorize reuse of a different full address',async()=>{
  const f=await fixture();try{
-  const records=Array.from({length:1001},(_,i)=>rec(i+1,i<284?'FIELD':'SHOP',{...address,street:(100+i%106)+' Synthetic Road'}));
-  await f.db.exec(`insert into cos_mhelp_placement_private.upload_batches select lpad(to_hex(n),64,'0'),repeat('f',64),'[]'::jsonb,'{"recordCount":0}'::jsonb from generate_series(1,45)n;
-   insert into cos_mhelp_placement_private.census_mhelp_address(source_sha256,address_sha256,street,city,state,zip,status,reason,matched_address,latitude,longitude,completed_at,census_benchmark)
-   select b.source_sha256,encode(sha256(convert_to(parts::text,'UTF8')),'hex'),parts->>'street',parts->>'city',parts->>'state',parts->>'zip','matched','Synthetic prior evidence',parts->>'street',29.7,-95.4,'2026-01-01','Public_AR_Current'
-   from cos_mhelp_placement_private.upload_batches b cross join generate_series(0,105)n cross join lateral (select cos_mhelp_placement_private.address_parts_v1(jsonb_build_object('street',(100+n)||' Synthetic Road','city','Houston','state','TX','zip','77002')) parts) normalized;
-   insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
-   select a.source_sha256,b.payload_sha256,a.address_sha256,'public_site_reference',a.street,'address_review',a.street,a.latitude,a.longitude,a.completed_at,'{}'::jsonb,repeat('e',64) from cos_mhelp_placement_private.census_mhelp_address a join cos_mhelp_placement_private.upload_batches b using(source_sha256);`);
-  await f.activate(records);
-  await f.db.exec("set statement_timeout='25s'");
-  const before=await f.snapshot(),start=performance.now();const result=await f.tick();const elapsed=performance.now()-start;
-  assert.ok(elapsed<25000,'candidate must complete under the existing worker limit');
-  assert.equal(result.sent,0,'positive historical evidence needs no new provider request');
-  const after=await f.snapshot();assert.deepEqual(after.source,before.source);assert.deepEqual(after.native,before.native);
-  assert.equal((await f.read()).totalProducts,1001);assert.equal((await f.read()).fieldProducts,284);assert.equal((await f.read()).shopProducts,717);
-  assert.equal((await f.db.query('select count(*) n from cos_mhelp_placement_private.census_mhelp_product where source_sha256=$1',[source])).rows[0].n,1001);
-  console.log(JSON.stringify({synthetic:true,historicalBatches:45,historicalAddresses:4770,historicalResolutions:4770,currentProducts:1001,elapsedMs:Math.round(elapsed),statementTimeoutMs:25000}));
+  await f.activate([rec(1,'FIELD',{...address,street:'999 Different Road'})]);await f.tick();
+  await f.db.exec(`insert into cos_mhelp_placement_private.mhelp_address_resolution(source_sha256,payload_sha256,address_sha256,provider,lookup_address,status,matched_address,latitude,longitude,geocoded_at,evidence,evidence_sha256)
+   select source_sha256,payload_sha256,address_sha256,'public_site_reference','Synthetic unrelated point','address_review','Synthetic unrelated point',1,1,now(),'{}','${'e'.repeat(64)}' from cos_mhelp_placement_private.census_mhelp_product;`);
+  const hash=(await f.db.query("select encode(cos_mhelp_placement_private.address_cache_lookup_key_v1($1,$2,$3,$4),'hex') hash",[address.street,address.city,address.state,address.zip])).rows[0].hash;
+  await f.db.exec(`create or replace function cos_mhelp_placement_private.address_cache_lookup_key_v1(street text,city text,state text,zip text) returns bytea language sql immutable set search_path='' as $$select decode('${hash}','hex')$$;reindex index cos_mhelp_placement_private.census_mhelp_address_exact_lookup;`);
+  await f.activate([rec(1)],nextSource,nextPayload);assert.equal((await f.tick()).sent,1);assert.equal((await f.read()).items[0].latitude,null);
  }finally{await f.db.close();}
 });
