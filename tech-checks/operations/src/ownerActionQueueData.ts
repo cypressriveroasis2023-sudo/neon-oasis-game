@@ -8,9 +8,23 @@ export type OwnerQueueItem = {
  route:'Owner Tasks'|'Jobs'|'Owner Review'|'Quotes'|'Invoices'|'Purchasing';
  jobId:string|null;evidenceUrl:string|null;photoUrl:string|null;
 };
-export type OwnerQueueCount={observed:number;complete:boolean};
+export type OwnerQueueCount={observed:number;complete:boolean;sourceComplete:boolean;coverageNote:string};
 export type OwnerActionQueue={items:OwnerQueueItem[];counts:Record<OwnerQueueArea,OwnerQueueCount>;sourceUnavailable:SourceKey[];rejectedIdentityCount:number};
 const areas:OwnerQueueArea[]=['approval','it','service','customers','overdue','paperwork'];
+/** Existing data sources do not yet cover every company action in any area. */
+const coverageGaps:Record<OwnerQueueArea,string>={
+ approval:'Signed handoff exceptions and other Owner-only decisions are not yet included.',
+ it:'Signed handoffs, truck inspections and IT equipment receipts are not yet included.',
+ service:'Signed receipts, Service daily reports and spare-stock discrepancies are not yet included.',
+ customers:'Camera outages need confirmed equipment and site identity; customer replies are not yet included.',
+ overdue:'Only explicit saved due dates are counted. Other schedules and missing deadlines are not certified.',
+ paperwork:'Signed reports, photographs and actual Google Drive archive receipts are not yet reconciled.'
+};
+export function ownerQueueSessionAllowed(session:unknown,mode:{fleetOnly:boolean;dailyOnly:boolean}):boolean{
+ if(!session||typeof session!=='object'||Array.isArray(session))return false;
+ const s=session as Record<string,unknown>;
+ return s.authorized===true&&s.legacyOwner===true&&s.role==='Owner'&&!mode.fleetOnly&&!mode.dailyOnly;
+}
 const sources:SourceKey[]=['jobs','tasks','quotes','invoices','pos'];
 const terminal=new Set(['complete','completed','closed','cancelled','canceled','deleted','paid']);
 const status=(v:unknown)=>typeof v==='string'?v.trim().toLowerCase().replaceAll('_',' '):'';
@@ -102,7 +116,7 @@ export function buildOwnerActionQueue(data:DashboardData,now=new Date()):OwnerAc
     'Approval or exception recorded in '+route,'Owner');
   }
  }
- const seen=new Set<string>(),items=gathered.filter(x=>{if(seen.has(x.key))return false;seen.add(x.key);return true;});
+ const seen=new Set<string>(),items=gathered.filter(x=>{if(seen.has(x.key)){rejectedIdentityCount++;return false;}seen.add(x.key);return true;});
  items.sort((a,b)=>Number(b.urgency==='high')-Number(a.urgency==='high')||
   Number(b.areas.includes('approval'))-Number(a.areas.includes('approval'))||a.title.localeCompare(b.title));
  const required:Record<OwnerQueueArea,SourceKey[]>={
@@ -110,7 +124,10 @@ export function buildOwnerActionQueue(data:DashboardData,now=new Date()):OwnerAc
   customers:['jobs'],overdue:['jobs','tasks'],paperwork:['jobs','tasks']
  };
  const counts={} as Record<OwnerQueueArea,OwnerQueueCount>;
- for(const area of areas)counts[area]={observed:items.filter(x=>x.areas.includes(area)).length,
-  complete:required[area].every(s=>data[s]!==null)&&rejectedIdentityCount===0};
+ for(const area of areas){
+  const sourceComplete=required[area].every(s=>data[s]!==null)&&rejectedIdentityCount===0;
+  counts[area]={observed:items.filter(x=>x.areas.includes(area)).length,
+   sourceComplete,complete:false,coverageNote:coverageGaps[area]};
+ }
  return {items,counts,sourceUnavailable,rejectedIdentityCount};
 }
