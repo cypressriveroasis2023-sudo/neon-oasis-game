@@ -8,6 +8,7 @@ test('Advanced diagnostics uses the complete Fleet Product-ID partition and hone
  await app.locator('body').evaluate(()=>{location.hash='#camera-health?diagnostics=1';});
  const totals=app.getByLabel('Shared field unit health totals');
  await expect(totals.locator('b')).toHaveText(['6','1','1','4']);
+ await expect(app.locator('.camera-field-equation')).toContainText('These are not camera-channel counts');
  await totals.getByRole('button',{name:'Camera units 6'}).click();
  const cards=app.getByLabel('Field Product-ID camera units');
  await expect(cards.locator('article')).toHaveCount(6);
