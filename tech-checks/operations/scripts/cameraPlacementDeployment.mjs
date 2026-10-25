@@ -10,6 +10,7 @@ export function prepareCameraPlacementDeployment(deployed,expected){
  if(deployed.files.length!==2||new Set(deployed.files.map(f=>f.name)).size!==2||!deployed.files.every(f=>['cos-operations-pages/serve.ts','cos-operations-pages/deno.json'].includes(f.name)&&typeof f.content==='string'))throw Error('Unexpected deployed source closure.');
  const file=deployed.files.find(f=>f.name==='cos-operations-pages/serve.ts');
  const config=deployed.files.find(f=>f.name==='cos-operations-pages/deno.json');
+ if(deployed.import_map!==true||typeof deployed.entrypoint_path!=='string'||!deployed.entrypoint_path.endsWith('/source/'+file.name)||deployed.import_map_path!==deployed.entrypoint_path.slice(0,-file.name.length)+config.name)throw Error('Deployed entrypoint or import-map routing changed.');
  if(digest(config.content)!==expected.configSha256)throw Error('Deployed dependency configuration changed.');
  if(digest(file.content)!==expected.serveSha256||file.content.split(beforeScope).length!==2)throw Error('Deployed source drift; review the complete closure again.');
  const code=file.content.replace(beforeScope,afterScope);
@@ -17,5 +18,5 @@ export function prepareCameraPlacementDeployment(deployed,expected){
  const files=deployed.files.map(f=>({name:f.name,content:f===file?code:f.content}));
  return {version:deployed.version,bundleSha256:deployed.ezbr_sha256,beforeSha256:digest(file.content),afterSha256:digest(code),changedFallbacks:1,
  manifest:files.map(f=>({name:f.name,sha256:digest(f.content)})),
- payload:{name:deployed.name,entrypoint_path:file.name,verify_jwt:deployed.verify_jwt,files}};
+ payload:{name:deployed.name,entrypoint_path:file.name,import_map_path:config.name,verify_jwt:deployed.verify_jwt,files}};
 }

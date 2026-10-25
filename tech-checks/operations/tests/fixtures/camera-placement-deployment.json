@@ -12,5 +12,8 @@
       "name": "cos-operations-pages/deno.json",
       "content": "{}"
     }
-  ]
+  ],
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_tughscoxralhofrckvxy_72adcfd9-7223-4e8c-ac39-2890de9adc22_121/source/cos-operations-pages/serve.ts",
+  "import_map_path": "/tmp/user_fn_tughscoxralhofrckvxy_72adcfd9-7223-4e8c-ac39-2890de9adc22_121/source/cos-operations-pages/deno.json"
 }

@@ -6,7 +6,9 @@ PR #225. Rebuilding Operations from main would lose those repairs.
 
 `prepareCameraPlacementDeployment` is a pure preparation helper. It accepts the
 complete freshly retrieved deployed function and independently reviewed version,
-archive hash, authentication mode, serve-file hash and dependency-config hash.
+archive hash, authentication mode, serve-file hash and dependency-config hash. The entrypoint and explicit import-map
+routing must match the same deployed source directory; the prepared payload keeps
+`cos-operations-pages/deno.json` as its import map.
 It rejects drift, changed closure, missing/duplicate/already-patched scope, and
 changes exactly one `cameraScope2` fallback from Field to Unknown. Every other
 deployed byte is retained, including the separate legacy summary routes.

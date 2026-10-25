@@ -12,6 +12,8 @@ test('preparation preserves complete closure and changes only unknown-until-proo
  assert.deepEqual(fixture,original);assert.equal(r.changedFallbacks,1);
  assert.equal(r.payload.files[1].content,fixture.files[1].content);
  assert.equal(r.payload.verify_jwt,fixture.verify_jwt);
+ assert.equal(r.payload.import_map_path,'cos-operations-pages/deno.json');
+ assert.equal(r.payload.entrypoint_path,'cos-operations-pages/serve.ts');
  assert.equal(r.payload.files[0].content.replace('?"unknown":"unknown"}', '?"unknown":"field"}'),fixture.files[0].content);
  const context=vm.createContext({});vm.runInContext(r.payload.files[0].content,context);
  const row={activation_state:'ACTIVE',organization:'Customer folder',unit_key:'Unit 1',source_status:'offline'};
@@ -24,7 +26,7 @@ test('preparation preserves complete closure and changes only unknown-until-proo
 });
 test('changed version, archive, file bytes or closure fail closed',()=>{
  const e=expected(fixture);
- for(const mutate of [d=>d.version++,d=>d.verify_jwt=!d.verify_jwt,d=>d.ezbr_sha256='0'.repeat(64),d=>d.files[0].content+='\n',d=>d.files[1].content+=' ',d=>d.files.pop(),d=>d.files.push({...d.files[0]}),d=>d.files[1].name='other.ts']){
+ for(const mutate of [d=>d.import_map=false,d=>d.import_map_path=null,d=>d.entrypoint_path='/other/serve.ts',d=>d.import_map_path='/other/deno.json',d=>d.version++,d=>d.verify_jwt=!d.verify_jwt,d=>d.ezbr_sha256='0'.repeat(64),d=>d.files[0].content+='\n',d=>d.files[1].content+=' ',d=>d.files.pop(),d=>d.files.push({...d.files[0]}),d=>d.files[1].name='other.ts']){
   const d=structuredClone(fixture);mutate(d);assert.throws(()=>prepareCameraPlacementDeployment(d,e));
  }
 });
