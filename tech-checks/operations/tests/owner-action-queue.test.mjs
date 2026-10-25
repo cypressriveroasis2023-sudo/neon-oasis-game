@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildOwnerActionQueue,explicitOverdue} from '../src/ownerActionQueueData.ts';
+import {buildOwnerActionQueue,explicitOverdue,ownerQueueSessionAllowed} from '../src/ownerActionQueueData.ts';
 const NOW=new Date('2026-10-24T21:00:00Z');
 const empty=()=>({jobs:[],tasks:[],quotes:[],invoices:[],pos:[],errors:{}});
 
@@ -16,7 +16,9 @@ test('Owner review, quote, invoice and PO approvals are deduplicated within one 
  assert.equal(r.counts.service.observed,1);
  assert.equal(r.items.filter(x=>x.sourceId==='j1').length,1);
  assert.deepEqual(r.items.find(x=>x.sourceId==='j1').areas,['approval','customers','service']);
- assert.equal(r.counts.approval.complete,true);
+ assert.equal(r.counts.approval.sourceComplete,true);
+ assert.equal(r.counts.approval.complete,false);
+ assert.match(r.counts.approval.coverageNote,/handoff/i);
 });
 
 test('IT, Service, overdue and explicitly incomplete paperwork use real records',()=>{
@@ -70,6 +72,31 @@ test('date-only deadlines honor Chicago calendar day and invalid dates never bec
  assert.equal(explicitOverdue('2026-02-31',NOW),false);
 });
 
+test('queue is allowed only with a verified existing COS Owner session',()=>{
+ const owner={authorized:true,legacyOwner:true,role:'Owner'};
+ assert.equal(ownerQueueSessionAllowed(owner,{fleetOnly:false,dailyOnly:false}),true);
+ for(const session of [null,{}, {authorized:false,legacyOwner:true,role:'Owner'},
+  {authorized:true,legacyOwner:false,role:'IT'},
+  {authorized:true,legacyOwner:true,role:'Service'}]){
+  assert.equal(ownerQueueSessionAllowed(session,{fleetOnly:false,dailyOnly:false}),false);
+ }
+ assert.equal(ownerQueueSessionAllowed(owner,{fleetOnly:true,dailyOnly:false}),false);
+ assert.equal(ownerQueueSessionAllowed(owner,{fleetOnly:false,dailyOnly:true}),false);
+});
+test('duplicate source identities cannot silently certify counts',()=>{
+ const d=empty();d.tasks=[{id:'x',assignedDepartment:'it'}, {id:'x',assignedDepartment:'it'}];
+ const result=buildOwnerActionQueue(d,NOW);
+ assert.equal(result.items.length,1);
+ assert.equal(result.rejectedIdentityCount,1);
+ assert.equal(result.counts.it.complete,false);
+});
+test('paperwork source remains incomplete when jobs and tasks successfully read',()=>{
+ const result=buildOwnerActionQueue(empty(),NOW);
+ assert.equal(result.counts.paperwork.observed,0);
+ assert.equal(result.counts.paperwork.sourceComplete,true);
+ assert.equal(result.counts.paperwork.complete,false);
+ assert.match(result.counts.paperwork.coverageNote,/signed reports/i);
+});
 test('provider folder or reported offline is never sufficient to invent a customer outage',()=>{
  const d=empty();d.jobs=[{id:'j1',customer:'Customer Folder',status:'dispatched',cameraStatus:'offline'}];
  const r=buildOwnerActionQueue(d,NOW);
