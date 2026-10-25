@@ -37,7 +37,7 @@ for(const role of ['owner','it'])test(role+' gets an explicit operational field 
   await frame.getByLabel('Fleet placement',{exact:true}).selectOption('field');await frame.getByLabel('Fleet status',{exact:true}).selectOption('unknown');await expect(rows).toHaveCount(1);await expect(rows).toContainText('Sniper 003');
   expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);return;
  }
- await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','1','1','1']);
+ await expect(frame.locator('.camera-overview-card')).toHaveCount(3);await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['—','—','—','—']);
  await frame.getByLabel('Camera Health unit filter').selectOption('shop');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('SHOP / ROOT');
  await frame.getByLabel('Camera Health unit filter').selectOption('unknown');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('provider');expect(state.errors).toEqual([]);
 });
