@@ -5,9 +5,9 @@ const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v)?v:null;
 const text=(v:unknown,max=600)=>v==null?'':typeof v==='number'&&Number.isSafeInteger(v)?String(v):typeof v==='string'&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/.test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v)?v.trim():(()=>{throw Error('Unsafe source field');})();
 const same=(a:Row,b:Row)=>['equipmentId','name','model','equipmentTypeId','customerId','serviceLocationId','active','updatedAt'].every(k=>a[k]===b[k]);
-export async function readInventorySource(options:{review:Row;baseline:Row;read:(path:string,refresh?:boolean)=>Promise<any>;observedAt?:(path:string)=>string|undefined;readStats?:()=>{cacheHits:number;resourceCacheMisses:number};verifyEquipment:()=>Promise<any>;now?:()=>string}){
+export async function readInventorySource(options:{review:Row;baseline:Row;refreshEquipmentIds?:string[];read:(path:string,refresh?:boolean)=>Promise<any>;observedAt?:(path:string)=>string|undefined;readStats?:()=>{cacheHits:number;resourceCacheMisses:number};verifyEquipment:()=>Promise<any>;now?:()=>string}){
  const {review,baseline}=options;
- const requested=baseline.publisherRefreshEquipmentIds??[];
+ const requested=options.refreshEquipmentIds??baseline.publisherRefreshEquipmentIds??[];
  if(!Array.isArray(requested)||requested.length>6||requested.some(v=>!id(v))||new Set(requested).size!==requested.length)throw Error('Invalid publisher refresh selection');
  const refreshCustomers=new Set<string>(review.items.filter((e:Row)=>requested.includes(e.equipmentId)).map((e:Row)=>e.customerId));
  const refreshPaths=new Map<string,Promise<any>>();
