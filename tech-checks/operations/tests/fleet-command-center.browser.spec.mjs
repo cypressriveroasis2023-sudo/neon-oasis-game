@@ -8,6 +8,8 @@ test('all mHelp Field Product IDs remain visible with searchable system and heal
  await app.getByRole('button',{name:'Data sources',exact:true}).click();
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await expect(board).toBeVisible();
+ await expect(board).toContainText("These totals count equipment connectivity, not camera channels.");
+ await expect(board).toContainText("A recorder offline observation does not confirm a camera-channel outage");
  await expect(board.locator('.cos-command-kpis>button')).toHaveCount(6);
  await expect(board.locator('.cos-command-provider')).toHaveCount(4);
  await expect(board.locator('.cos-command-attention-actions>button')).toHaveCount(4);

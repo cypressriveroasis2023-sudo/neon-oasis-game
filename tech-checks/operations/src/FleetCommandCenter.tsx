@@ -83,12 +83,13 @@ export default function FleetCommandCenter({
   {!data.healthVerified&&<p role="status" className="cos-command-source-warning">Camera Health is incomplete or its latest read failed. Camera-capable units are Unverified, not automatically Offline.</p>}
   <div className="cos-command-kpis" aria-label="Full equipment and camera summary">
    <button type="button" onClick={()=>filter('all')}><span>Field equipment</span><strong>{data.field}</strong><small>All recorded Field products</small></button>
-   <button type="button" className="cos-command-positive" onClick={()=>filter('all','online')}><span>Online linked equipment</span><strong>{data.counts.online}</strong><small>Saved camera / connection observations</small></button>
-   <button type="button" className="cos-command-negative" onClick={()=>filter('all','offline')}><span>Offline linked equipment</span><strong>{data.counts.offline}</strong><small>Only verified recent outage evidence</small></button>
+   <button type="button" className="cos-command-positive" onClick={()=>filter('all','online')}><span>Online linked equipment</span><strong>{data.counts.online}</strong><small>Saved camera, recorder or connection evidence</small></button>
+   <button type="button" className="cos-command-negative" onClick={()=>filter('all','offline')}><span>Offline linked equipment</span><strong>{data.counts.offline}</strong><small>Saved offline evidence; may describe a recorder</small></button>
    <button type="button" className="cos-command-muted" onClick={()=>filter('all','unverified')}><span>Camera status unverified</span><strong>{data.counts.unverified}</strong><small>Unknown, missing or stale observations</small></button>
    <button type="button" onClick={onShop}><span>Shop / ROOT</span><strong>{data.shop}</strong><small>Excluded from Field map</small></button>
    <button type="button" onClick={()=>filter('all')}><span>Total COS inventory</span><strong>{data.total}</strong><small>Field + Shop · unique Product IDs</small></button>
   </div>
+  <p className="cos-command-source-warning">These totals count equipment connectivity, not camera channels. A recorder offline observation does not confirm a camera-channel outage; video remains unverified.</p>
   <div className="cos-command-provider-grid" aria-label="Four independently reported monitoring systems">
    {data.panels.map(panel=><article key={panel.key} className={'cos-command-provider cos-command-provider-'+panel.key}>
     <div className="cos-command-provider-title">

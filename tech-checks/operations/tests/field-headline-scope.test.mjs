@@ -22,6 +22,7 @@ test('broader provider review records cannot inflate the Field unverified headli
  const html=render(f);
  assert.deepEqual(kpis(html),[String(count.online+count.offline+count.unverified),String(count.online),String(count.offline),String(count.unverified)]);
  assert.deepEqual(kpis(html),['6','1','1','4']);
+ assert.match(html,/These are not camera-channel counts; a recorder offline observation does not confirm a camera-channel outage/);
  assert.match(html,/1 online \+ 1 offline \+ 4 unverified = 6 Field camera units/);
  assert.match(html,/<details class="camera-record-breakdown"[^>]*><summary>Provider and camera record details/);
  assert.doesNotMatch(html,/<details class="camera-record-breakdown"[^>]*open/);
