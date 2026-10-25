@@ -1,11 +1,22 @@
 import {test,expect} from '@playwright/test';
 import {snapshot,resource,now} from './fixtures/camera-evidence-fixtures.mjs';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 const origin='http://127.0.0.1:4173';
 const stamp=new Date(now).toISOString();
 const units=Array.from({length:3},(_,index)=>({id:`00000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`,unitNumber:`Solar Spotter ${index+1}`,modelName:'Solar Spotter',status:'field',currentLocationType:'field',address:`${index+1} Fixture Street`,latitude:index<2?29.5+index: null,longitude:index<2?-95+index:null,hasUnitGps:false,coordinateSource:index<2?'site':null,locationVerification:index<2?'owner_verified':'address_only',gpsRecordedAt:index<2?stamp:null,locationVerifiedAt:index<2?stamp:null}));
 const field={items:units,summary:{fieldUnits:3,mappedUnits:2,unitGps:0,missingGps:1},generatedAt:stamp};
-async function mount(page,{workspace='field-map',healthFail=false}={}){
+function reviewedPair(){
+ const f=fieldProductFixture();
+ const records=units.map((unit,i)=>({...f.upload.records[i],unitNumber:unit.unitNumber,category:unit.modelName,binding:{state:'linked',unitIds:[unit.id],candidateUnitIds:[],placementHeld:false}}));
+ const items=units.map((unit,i)=>({...f.roster.items[i],unit,unitId:unit.id,unitNumber:unit.unitNumber,representedUnitIds:[unit.id]}));
+ const uploadInventory={...f.upload,records,summary:{totalRecords:3,fieldRecords:3,shopRecords:0,unflaggedFieldRecords:3,unflaggedShopRecords:0,doNotUseRecords:0,missingRecords:0}};
+ const fleetRoster={...f.roster,items,summary:{totalRecords:3,activeRecords:3,field:3,shop:0,review:0,excludedLifecycle:0,sourceOnlyRecords:0,linkedUnitRecords:3}};
+ const health={...snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]),identityVersion:1,unitIdentities:units.slice(0,2).map((unit,i)=>({...f.health.unitIdentities[i],unitId:unit.id,unitNumber:unit.unitNumber,unitKeys:[unit.unitNumber]})),identityWarnings:[]};
+ return {field:{...field,inventoryItems:units,uploadInventory,fleetRoster},health};
+}
+async function mount(page,{workspace='field-map',healthFail=false,canonical=false}={}){
+ const reviewed=canonical?reviewedPair():null;
  const state={calls:[],tiles:0,pending:[],hold:true,fail:false,errors:[]};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.clock.setFixedTime(new Date(now));
@@ -21,7 +32,7 @@ async function mount(page,{workspace='field-map',healthFail=false}={}){
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
   if(request.path==='/api/camera-health/summary-v3'&&healthFail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic camera read unavailable'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?(reviewed?.field||field):request.path==='/api/camera-health/summary-v3'?(reviewed?.health||snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')])):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/progressive-map-fixture');
@@ -79,9 +90,27 @@ test('initial field failure preserves the basemap and retry fills the same canva
 });
 
 test('Camera Health publishes only a complete paired snapshot and retries both sources together',async({page})=>{
- const {frame,state}=await mount(page,{workspace:'camera-health?diagnostics=1'}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
+ const {frame,state}=await mount(page,{workspace:'camera-health?diagnostics=1',canonical:true}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
  await expect(health.getByText('Loading Camera Health…')).toBeVisible();await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
  state.fail=true;state.release();await expect(health.getByRole('alert')).toContainText('Synthetic field read unavailable');await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
- state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();await expect(health.getByRole('button',{name:/^Online/})).toContainText('2');
- await expect(health.locator('.camera-overview-card')).toHaveCount(2);expect(state.errors).toEqual([]);
+ state.fail=false;state.hold=true;await health.getByRole('button',{name:'Reload saved results'}).click();
+ await expect.poll(()=>state.pending.length).toBe(1);
+ await expect.poll(()=>state.calls.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBe(2);
+ await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
+ state.release();
+ await expect(health.getByLabel('Shared field unit health totals').locator('b')).toHaveText(['3','2','0','1']);
+ await health.getByRole('button',{name:'Camera units 3',exact:true}).click();
+ const products=health.getByLabel('Field Product-ID camera units');
+ await expect(products.locator('article')).toHaveCount(3);
+ await expect(products.locator('article').filter({hasText:'Solar Spotter 3'})).toContainText('Health unverified');
+ expect(state.calls.filter(r=>r.path==='/api/field-map')).toHaveLength(2);
+ expect(state.calls.filter(r=>r.path==='/api/camera-health/summary-v3')).toHaveLength(2);
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
+
+test('paired legacy provider data without a reviewed Product-ID census keeps Field totals unavailable',async({page})=>{
+ const {frame,state}=await mount(page,{workspace:'camera-health?diagnostics=1'});state.release();
+ await expect(frame.getByLabel('Shared field unit health totals').locator('b')).toHaveText(['—','—','—','—']);
+ await expect(frame.getByLabel('Camera Health unit cards').locator('article')).toHaveCount(3);
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });

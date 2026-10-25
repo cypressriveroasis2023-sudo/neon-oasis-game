@@ -1,0 +1,29 @@
+import {test,expect} from '@playwright/test';
+import {mountFleet} from './fleet-dashboard-fixtures.mjs';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+
+test('Advanced diagnostics uses the complete Fleet Product-ID partition and honest filters',async({page})=>{
+ const f=fieldProductFixture();
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ await app.locator('body').evaluate(()=>{location.hash='#camera-health?diagnostics=1';});
+ const totals=app.getByLabel('Shared field unit health totals');
+ await expect(totals.locator('b')).toHaveText(['6','1','1','4']);
+ await totals.getByRole('button',{name:'Camera units 6'}).click();
+ const cards=app.getByLabel('Field Product-ID camera units');
+ await expect(cards.locator('article')).toHaveCount(6);
+ await expect(cards).not.toContainText('ST 001');
+ await expect(cards).not.toContainText('Product 1008');
+ await totals.getByRole('button',{name:'Unverified 4'}).click();
+ await expect(cards.locator('article')).toHaveCount(4);
+ await expect(cards).toContainText('Product 1006');
+ await expect(cards).toContainText('Protected identity hold');
+ await expect(cards).not.toContainText('Offline');
+ await totals.getByRole('button',{name:'Offline 1'}).click();
+ await expect(cards.locator('article')).toHaveCount(1);
+ await expect(cards).toContainText('Product 1002');
+ await expect(cards.getByRole('link',{name:'Fleet Dashboard'})).toHaveAttribute('href','#fleet-dashboard?unit='+f.units[1].id);
+ await app.getByLabel('Camera Health unit filter').selectOption('all');
+ await expect(app.getByLabel('Camera Health unit cards')).toBeVisible();
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ expect(state.errors).toEqual([]);
+});

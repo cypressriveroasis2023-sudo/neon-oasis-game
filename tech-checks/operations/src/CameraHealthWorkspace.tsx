@@ -41,7 +41,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
       </>}
     </section>}
     {!health&&!error?<p role='status'>Loading Camera Health…</p>:health&&<>
-      {!initialUnitId&&<CameraHealthOverview roster={(fleet?.fieldMap as any)?.fleetRoster} powerReadEnabled={powerReadEnabled} health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
+      {!initialUnitId&&<CameraHealthOverview fieldMap={fleet?.fieldMap} healthReadSucceeded={!error} roster={(fleet?.fieldMap as any)?.fleetRoster} powerReadEnabled={powerReadEnabled} health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
       {initialUnitId&&<>
       <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 4 minutes while visible</p>
       <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2} fieldRecorderObservation={detail?.classification?.fieldRecorderVerified?detail.observation:undefined}/>

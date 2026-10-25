@@ -50,6 +50,7 @@ async function mount(page,status){
 for(const status of ['online','offline'])test(`${status} camera and port observations retain separate exact times across Fleet and Camera Health`,async({page},info)=>{
   const {app,state,units}=await mount(page,status);
   expect(await app.locator('body').evaluate(()=>({now:new Date(Date.now()).toISOString(),zone:Intl.DateTimeFormat().resolvedOptions().timeZone}))).toEqual({now:'2026-10-14T16:00:00.000Z',zone:'UTC'});
+  // This legacy Fleet fixture still has two native units; only the new Product-ID diagnostics totals are unavailable.
   await expect(app.locator('.cos-fleet-stat-field strong,.cos-fleet-stat-online strong,.cos-fleet-stat-offline strong,.cos-fleet-stat-unknown strong')).toHaveText(status==='online'?['2','2','0','0']:['2','0','2','0']);
   const scenarios=[
     {unit:units[0],basis:'camera/detector',time:cameraTime,label:status==='online'?'Camera records online':'Camera outage observed',service:'ONLINE'},
@@ -73,7 +74,7 @@ for(const status of ['online','offline'])test(`${status} camera and port observa
   }
   await app.locator('body').evaluate(()=>{location.hash='#camera-health?diagnostics=1';});
   await expect(app.locator('.camera-overview-card')).toHaveCount(2);
-  await expect(app.locator('.camera-unit-kpis button b')).toHaveText(status==='online'?['2','2','0','0']:['2','0','2','0']);
+  await expect(app.locator('.camera-unit-kpis button b')).toHaveText(['—','—','—','—']);
   for(const scenario of scenarios){
     const overview=app.locator('.camera-overview-card').filter({hasText:scenario.unit.unitNumber});
     await expect(overview).toHaveCount(1);

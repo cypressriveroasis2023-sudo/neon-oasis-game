@@ -1,0 +1,19 @@
+{
+  "name": "cos-operations-pages",
+  "version": 121,
+  "ezbr_sha256": "8ce24b10e02de6155abe96a52e5bb156375cd0242af523162e9c1873113edba8",
+  "verify_jwt": false,
+  "files": [
+    {
+      "name": "cos-operations-pages/serve.ts",
+      "content": "const normalized3=v=>String(v??\" \").trim().toUpperCase();\nfunction cameraScope2(device,tracker=[]){let activation=normalized3(device.activation_state),org=normalized3(device.organization),unit=normalized3(device.unit_key);if(device.__ownerPlacement===\"FIELD\"||device.__ownerPlacement===\"SHOP\"||device.__ownerPlacement===\"UNKNOWN\")return device.__ownerPlacement.toLowerCase();if(/^STOLEN FROM RII?[-\\s]*\\d+ ON \\d{2}\\/\\d{2}\\/\\d{4}$/.test(unit)||/^STOLEN FROM RII?[-\\s]*\\d+ ON \\d{2}\\/\\d{2}\\/\\d{4}$/.test(org)||[\"RETIRED\",\"STOLEN\",\"NOT IN USE\"].includes(org)||/^RII?[-\\s]*\\d+\\s*-?\\s*(?:NOT IN USE|RETIRED|STOLEN)$/.test(unit))return\"inactive\";if([\"ROOT\",\"SHOP\",\"SHOP/ROOT\",\"ROOT/SHOP\",\"SHOP / ROOT\",\"ROOT / SHOP\",\"SHOP EQUIPMENT\"].includes(org)||unit===\"SHOP EQUIPMENT\"||/^RII?[-\\s]*\\d+\\s*-?\\s*SHOP$/.test(unit))return\"shop\";if(activation===\"DEACTIVATED\")return\"inactive\";if(activation!==\"ACTIVE\")return\"unknown\";let matches2=tracker.filter(row2=>normalized3(row2.source_label)===unit);return matches2.length>1||matches2.some(row2=>[\"shop\",\"retired\"].includes(row2.tracker_state))||device.__trackerOnly||!org||[\"TRACKER FIELD\",\"TRACKER \\xB7 SITE NOT LINKED\",\"UNKNOWN\",\"FIELD OR UNKNOWN\"].includes(org)?\"unknown\":\"field\"}\n// indexed lookup / preflight / authorization preservation sentinel\n"
+    },
+    {
+      "name": "cos-operations-pages/deno.json",
+      "content": "{}"
+    }
+  ],
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_tughscoxralhofrckvxy_72adcfd9-7223-4e8c-ac39-2890de9adc22_121/source/cos-operations-pages/serve.ts",
+  "import_map_path": "/tmp/user_fn_tughscoxralhofrckvxy_72adcfd9-7223-4e8c-ac39-2890de9adc22_121/source/cos-operations-pages/deno.json"
+}

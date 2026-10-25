@@ -121,7 +121,10 @@ export function cameraScope(device:SourceRecord,tracker:TrackerPlacement[]=[]):P
   const matches=tracker.filter(row=>normalized(row.source_label)===unit);
   if(matches.length>1||matches.some(row=>['shop','retired'].includes(row.tracker_state)))return 'unknown';
   if(device.__trackerOnly||!org||['TRACKER FIELD','TRACKER · SITE NOT LINKED','UNKNOWN','FIELD OR UNKNOWN'].includes(org))return 'unknown';
-  return 'field';
+  // Provider customer folders can outlive a return to Shop. Only the
+  // separately verified Owner/mHelpDesk identity placement above establishes
+  // an operational Field scope; raw online/offline source evidence is retained.
+  return 'unknown';
 }
 export function cameraEvidence(device:SourceRecord):CameraEvidence {
   const type=String(device.device_type||'').trim().toLowerCase();

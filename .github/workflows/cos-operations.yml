@@ -167,6 +167,16 @@ jobs:
         run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-address-geocodio/index.ts
       - run: npm run build
         id: build
+      - name: Verify reviewed frontend bytes and unchanged lockfile
+        run: node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Preserve exact hosted frontend artifact evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-reviewed-frontend
+          path: |
+            cos-build-evidence/manifest.json
+            tech-checks/operations/dist
+          if-no-files-found: error
       - name: Install pinned project browser
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
         timeout-minutes: 15
