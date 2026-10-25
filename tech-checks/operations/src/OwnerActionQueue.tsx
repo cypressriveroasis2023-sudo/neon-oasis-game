@@ -31,6 +31,7 @@ export default function OwnerActionQueue({ownerAuthorized,data,openWorkspace,ope
   <div className="cos-owner-queue-results" aria-live="polite">
    <div className="cos-owner-queue-results-head"><h3>{labels[category]}</h3>
     <span>{count.complete?count.observed+' saved action(s)':count.observed+' identified; verification incomplete'}</span></div>
+   <p className="cos-owner-queue-coverage">{count.coverageNote}</p>
    {selected.length===0?<p className="cos-owner-queue-empty">{count.complete?'No saved item currently meets this filter. This is not a live camera or paperwork audit.':'No action verified in the available records. Other sources still need checking.'}</p>:
     <div className="cos-owner-queue-list">{selected.slice(0,12).map(item=><article className="cos-owner-queue-item" key={item.key}>
      <div className="cos-owner-queue-item-main"><div className="cos-owner-queue-item-line"><strong>{item.title}</strong>{item.urgency==='high'&&<span className="cos-owner-queue-high">High priority / overdue</span>}</div>
