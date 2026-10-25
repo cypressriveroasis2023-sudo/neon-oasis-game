@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "scope": "Exact generic proof integration, current-main dependency identities and discovered local imports. No private source or runtime evidence. Runtime, locking, helper exposure and production gates remain HOLD.",
+  "accepted_main_commit": "6bf7f1b12dbdadd54624ec424ce59a6cba4e9ce6",
+  "accepted_main_tree": "6e71bd54065134720dabfcb1168654adf9e61f26",
+  "reviewed_source_packet_commit": "b79a0aac847773e74c8ccd67a377823566138072",
+  "reviewed_source_packet_tree": "13f0e96d9fcdfeb8cd6d8e1d7ff9d1a67d65353c",
+  "files": [
+    {
+      "path": ".github/workflows/recon-synthetic-proof.yml",
+      "sha256": "7b96d570bd1dc546a4b089d6e551c33ee2481d541bdc9094998bbbe15be6939f",
+      "bytes": 7868
+    },
+    {
+      "path": "recon-proof/.gitignore",
+      "sha256": "b3a8a664c0a06dc321f90c2354194baa6e6b95f84a012bff4d8a098f20702cf0",
+      "bytes": 23
+    },
+    {
+      "path": "recon-proof/README.md",
+      "sha256": "983efbabf9d0eb9d11d68d9f0dfad05785ab8caa9ff2e8ff308dc2e88d1fdf54",
+      "bytes": 8482
+    },
+    {
+      "path": "recon-proof/contention.test.mjs",
+      "sha256": "4bce064f7697ed802c84c38a2b5402bb3d66487bc27ef4755218d5d43982a0f5",
+      "bytes": 13188
+    },
+    {
+      "path": "recon-proof/http/README.md",
+      "sha256": "aa91c89fe86e4e49c533fcfc0d46b84d7f3b9a8f206ab7e07df818a6476a88a6",
+      "bytes": 3663
+    },
+    {
+      "path": "recon-proof/http/matrix.mjs",
+      "sha256": "78f1860d9f40816f59af0977b5b6b225edfea27f3a23464d099655ca9e4dd2d2",
+      "bytes": 22454
+    },
+    {
+      "path": "recon-proof/http/run-hosted-http.mjs",
+      "sha256": "e46a54cf22a03d1b55440384c75495e0cf6dafa0a09d3d436c1c72a243b5dd3e",
+      "bytes": 8402
+    },
+    {
+      "path": "recon-proof/http/runtime.mjs",
+      "sha256": "f365b8e8bdfa0ee71b1cb954840d90391bc171b0c1edbd21ddd5b1d293777c30",
+      "bytes": 12803
+    },
+    {
+      "path": "recon-proof/http/validate-offline.mjs",
+      "sha256": "8e34fa5f291d49a28b7121da85adbe40d4475ad57ab7d1b635fbdb244751a4ea",
+      "bytes": 5499
+    },
+    {
+      "path": "recon-proof/independent-traces.mjs",
+      "sha256": "c42072d0800e98c3353b774bdbf831939f2b10166b1d7342d245e2663c938c89",
+      "bytes": 5462
+    },
+    {
+      "path": "recon-proof/package-lock.json",
+      "sha256": "cb00ab307d8d9079d09148e0c0ff630454c36e8efeab764a7120ccd06bd242de",
+      "bytes": 5866
+    },
+    {
+      "path": "recon-proof/package.json",
+      "sha256": "6e581dcddae813ea9af6997127dd58d00bfa8eda524b8d4fb8f9423c04407be4",
+      "bytes": 121
+    },
+    {
+      "path": "recon-proof/postgres-engine.mjs",
+      "sha256": "ca5cd8a2af3bd3065bbd03613f54f930b93a8bde10b991e3cd4e4f6915ec4cac",
+      "bytes": 4297
+    },
+    {
+      "path": "recon-proof/postgres-fixture.mjs",
+      "sha256": "ec0649116d27469fcc4053e73c11693db8ea586098c018d54a371a0c1c5a0dc9",
+      "bytes": 422
+    },
+    {
+      "path": "recon-proof/postgrest-transport.test.mjs",
+      "sha256": "fdee70eb4891660cd9f4eac1518753dd1a6aacb6b2a769adc6669cdba77f29db",
+      "bytes": 7907
+    },
+    {
+      "path": "recon-proof/postgrest.mjs",
+      "sha256": "04d8e78e61c206a93964ea7a00dd0ad80f52b0329260be62735adc94e2fae4af",
+      "bytes": 2548
+    },
+    {
+      "path": "recon-proof/tooling-lock.json",
+      "sha256": "9cd76b650763996ff26260c55ae902b99723baf0eca9d380bc0e879e9ea773a0",
+      "bytes": 2023
+    },
+    {
+      "path": "recon-proof/validate-transport-sql.mjs",
+      "sha256": "24a5e620f8a588494cb5ccf95258f9c057c19667b7eab9da8e3301feed4cea99",
+      "bytes": 1214
+    },
+    {
+      "path": "recon-proof/verify-manifest.py",
+      "sha256": "2a3224567b6ad2c9a0d25b1e93dd5cdc338aa7426cfbca2640034ad769155063",
+      "bytes": 865
+    },
+    {
+      "path": "tech-checks/camera-detail.html",
+      "sha256": "42703b1c9219f7cab56efa8424e060b090b0cb14034c7b143674e83252a6250e",
+      "bytes": 50828
+    },
+    {
+      "path": "tech-checks/database-maintenance/archive-recon-event-payloads.sql",
+      "sha256": "ff4142961b13b05bd3b631d33d10d301eab65eb0e46869d67f8fa252d29146e1",
+      "bytes": 2151
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-event-ordering.sql",
+      "sha256": "4ebef426901e478c69031a4bbbd530644b970e265c8ec94d54c6a3212dbf8501",
+      "bytes": 12500
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-inventory-sync.sql",
+      "sha256": "72362562235f42abf3232fec2c1ef2c50f01c446edac485c2be2e60f6afc41d3",
+      "bytes": 20865
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2-acl.json",
+      "sha256": "713c5fb5677996833d15174bdd14c83d0e27fbf5e30a11b50ddf531f4ab05033",
+      "bytes": 56492
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+      "sha256": "2e5d6370c21c7cafed7cbb8872523abda95244ac4faf03891d4f71db0cf8f4d1",
+      "bytes": 73471
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-receipt-correction-v2.md",
+      "sha256": "585cee0da8d6d025d28a950e5771a47dd365e5ae7e672037dbe61d995cc569a0",
+      "bytes": 10775
+    },
+    {
+      "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+      "sha256": "020332ac7dc12e408c124fa2645d0299c12b013726578d5280f9fb3eccb39875",
+      "bytes": 24073
+    },
+    {
+      "path": "tech-checks/it-feature-availability.js",
+      "sha256": "beebe848b036e32803297490467e6f84212249f660bf67d99ea38c817fd350bc",
+      "bytes": 1335
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakeBackground.ts",
+      "sha256": "b1fd8a30004128cb4cf9ae977aeae27d8db29383e05d04c2bbf36d7bdea6d300",
+      "bytes": 2541
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakeHandlers.ts",
+      "sha256": "984c6f368ac124c375e440311c3aed1b909fda90657c061875eb3514701a5fad",
+      "bytes": 7868
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakePending.ts",
+      "sha256": "ee7e60e6c68b0bc59b693a2959e9266fe69d1a203f38d2d3f5ecdefded76e67e",
+      "bytes": 5592
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakeRetry.ts",
+      "sha256": "0df8fbdd5c8b8551acfd0e0a12acc34718a0691c333c9ed4486ef0511784d938",
+      "bytes": 2300
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakeRuntime.ts",
+      "sha256": "9b25c6908aaa427afcb2e042050aca6bc2a0928c35855c334bc7803b01d144ec",
+      "bytes": 15364
+    },
+    {
+      "path": "tech-checks/operations/intake/mhelpIntakeTransport.ts",
+      "sha256": "c1cd1d692a7b3e4ef518f9cfd34c59a1482c95fd5c857f4da0682e958f5830af",
+      "bytes": 6628
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/concurrency.mjs",
+      "sha256": "7db65667944f5e890968838483203bd742e34b0976f861c513ad12c08bb43631",
+      "bytes": 4953
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/edge-handler.test.mjs",
+      "sha256": "8be257ffebdb90b8730c7a37fa411ec5a267fd44ea77cc8f4f9cb3f94392d921",
+      "bytes": 60854
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/integration.sql",
+      "sha256": "dd70a3e815a14b88149dd2e51d11e38aa64b1e5319a2c677580b849e140ebfa9",
+      "bytes": 13621
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/inventory-concurrency.mjs",
+      "sha256": "2c66e6755e19bfa60d70b5b14834696ae96c4e32accfc0f0caab73f3b3712e51",
+      "bytes": 29449
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/inventory-http-contract.mjs",
+      "sha256": "e6dd5ead55a9831e427909419e0ea16d2b64c372136ba7c6df4b9898b1a9285f",
+      "bytes": 18742
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/migration-proposal.sql",
+      "sha256": "4ebef426901e478c69031a4bbbd530644b970e265c8ec94d54c6a3212dbf8501",
+      "bytes": 12500
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/package-lock.json",
+      "sha256": "ba626f21f72ab1ac84bac137b81db129853a8491cd1c6974491c6e85a78b86fe",
+      "bytes": 5878
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/package.json",
+      "sha256": "e7f572b98676822a5ec2e74405b47a338ce04c37a81c2174fbc133e0463ba134",
+      "bytes": 101
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/run-ci.mjs",
+      "sha256": "7be3fcdab297805371d27e0877c79128c7e99ed19d8e30d50db2c8915233f083",
+      "bytes": 2009
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/schema.sql",
+      "sha256": "cf02ed3236de7836bb5c884963d8345716569e3d9d4e36693e15e38c00db9fdf",
+      "bytes": 10050
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/top-level-rollback-fail.sql",
+      "sha256": "cf29dbd99b6a63a039592f9e9e8ace6b5b8706489bce9855eae6ff341a3be10b",
+      "bytes": 218
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/top-level-rollback-setup.sql",
+      "sha256": "58c65e619be4080313758a1d74a9eb6e2ce212fb0bc0ebac261df8e379c63f44",
+      "bytes": 525
+    },
+    {
+      "path": "tech-checks/operations/legacy/tests/recon-ordering/top-level-rollback-verify.sql",
+      "sha256": "882c8fc7aa381d2f56110f9b9908c075c9bb21cefe936a69dd6806246be59dc4",
+      "bytes": 1007
+    },
+    {
+      "path": "tech-checks/operations/package-lock.json",
+      "sha256": "d178cbc8f705d9d3fc79a9ce2af3f879df412731841cb502ccf37c7d8153a54e",
+      "bytes": 118525
+    },
+    {
+      "path": "tech-checks/operations/package.json",
+      "sha256": "e792c2b41925df1a8bf39388175da88840f1c45c9f4c778deed96a6fec5b46e0",
+      "bytes": 896
+    },
+    {
+      "path": "tech-checks/operations/shared/gpsValidation.ts",
+      "sha256": "e38539cb4368e23db7750f2b86939a52277dcf28e0e9cc1ac62b2cfd270add7e",
+      "bytes": 3790
+    },
+    {
+      "path": "tech-checks/operations/shared/mhelpUnitIdentity.ts",
+      "sha256": "e858002e035bd4bcaef307cb58b4d218a369445e2bba40f71f8e401a0caf0a04",
+      "bytes": 1047
+    },
+    {
+      "path": "tech-checks/operations/shared/reviewedAddressEstimates.ts",
+      "sha256": "fd8d880641859befec5ed3edfe30a6e490cff26dd842a837b60b1deb32064bb5",
+      "bytes": 16137
+    },
+    {
+      "path": "tech-checks/operations/src/CameraHealthOverview.tsx",
+      "sha256": "5da015e9dc6a59eba1804c12b405b80342c217f4d27b6f35c2801d72a54d49f6",
+      "bytes": 23926
+    },
+    {
+      "path": "tech-checks/operations/src/HeliosPowerDetails.tsx",
+      "sha256": "427d99e196f9aaf3022d0a0ca7b61f738e94a3f1ede084ca32966efcd954346f",
+      "bytes": 3722
+    },
+    {
+      "path": "tech-checks/operations/src/MhelpUnitRefresh.tsx",
+      "sha256": "564f6784cc5f93976c45e1b3dd6ed6f0a1d9ec540976514e348eb8ddd7e78230",
+      "bytes": 2724
+    },
+    {
+      "path": "tech-checks/operations/src/OwnerIdentityReview.tsx",
+      "sha256": "bd1bb8d1f9cf09ad10e081137334c110fc8ed98123dfe29bc8fd496a5d9ce365",
+      "bytes": 6637
+    },
+    {
+      "path": "tech-checks/operations/src/UnitDiagnosticReport.tsx",
+      "sha256": "3c600930a039c6097884ff0939a8861cd1678e7832e468fcab20ab9d3f88a252",
+      "bytes": 2066
+    },
+    {
+      "path": "tech-checks/operations/src/api.ts",
+      "sha256": "233867438def3d7e88caff61aa80e4bdb86ded42336076fa4ba4954c9214f268",
+      "bytes": 15690
+    },
+    {
+      "path": "tech-checks/operations/src/cameraCardActions.ts",
+      "sha256": "824d6984be33a41a88bbb3a302c5a87bdb7f814e255f79557d6587c838dbcb14",
+      "bytes": 2108
+    },
+    {
+      "path": "tech-checks/operations/src/cameraEvidence.ts",
+      "sha256": "8f60d323468b9622cc30cbfc00251549fa6c084495e0b5270eb0733e82e32cf3",
+      "bytes": 9789
+    },
+    {
+      "path": "tech-checks/operations/src/cameraHealthCounts.ts",
+      "sha256": "2b71c6b50f26b5c4afcc8f8f994c04ceeabac10d2e031c0e3352b154c36aed03",
+      "bytes": 15018
+    },
+    {
+      "path": "tech-checks/operations/src/fieldAddressEstimates.ts",
+      "sha256": "2bddb73c794db14b1e5b314b0fe45b4e8eb5721b009dca7528b2fb2c6b2b6961",
+      "bytes": 19213
+    },
+    {
+      "path": "tech-checks/operations/src/fieldCameraHealth.ts",
+      "sha256": "9b15159791e23d1a6a8c183eee8fa842bfc7e1b637d1aa543c100ab26f167569",
+      "bytes": 16391
+    },
+    {
+      "path": "tech-checks/operations/src/fieldLocations.ts",
+      "sha256": "66db6f0d777c5c24d25fcd2c7af986205bc22dee7bbcd7a2d3644de012402911",
+      "bytes": 10090
+    },
+    {
+      "path": "tech-checks/operations/src/fieldRecorderObservation.ts",
+      "sha256": "e867bc77668f17160af7bc3def4df71308458d2728de65f621a57bb2cded414e",
+      "bytes": 5165
+    },
+    {
+      "path": "tech-checks/operations/src/fleetSnapshot.ts",
+      "sha256": "4515e84314b31c1dd3a6f2b5eb67a748658e28110bb71d1ea1d647bca2eedb53",
+      "bytes": 4195
+    },
+    {
+      "path": "tech-checks/operations/src/gpsPersistence.ts",
+      "sha256": "e912d5872e37132bcc8d79388aa69a6db9c2f64c968d26645b9a2a6191392fa0",
+      "bytes": 7747
+    },
+    {
+      "path": "tech-checks/operations/src/healthObservationTime.ts",
+      "sha256": "cbe9a93f5f8f7a4cfc5cc7590915c787d940061b1201f6c5005299ccdd13925a",
+      "bytes": 2001
+    },
+    {
+      "path": "tech-checks/operations/src/refreshCadence.ts",
+      "sha256": "437ce3c183bf24339df7a695e7a43da66e8e3ba54ed0b74f21302f52274ea108",
+      "bytes": 570
+    },
+    {
+      "path": "tech-checks/operations/src/savedConnectionObservation.ts",
+      "sha256": "f0e4bf95332b14ff4506ab5e2278122a2bc09c8a45d9f43c11aa640c28bd0881",
+      "bytes": 840
+    },
+    {
+      "path": "tech-checks/operations/src/unitDiagnosticReport.ts",
+      "sha256": "fc33d6eee4f87965b641bf9b34b87a7bb7287fba87e3c207d4c910deddbe79ce",
+      "bytes": 7701
+    },
+    {
+      "path": "tech-checks/operations/src/verifiedUnitIdentity.ts",
+      "sha256": "aab14a0f2b93080717e6077d7d7add686731d8e6f8e1e8ce485e69eba1e43e1d",
+      "bytes": 12549
+    },
+    {
+      "path": "tech-checks/operations/tests/field-recorder-observation.test.mjs",
+      "sha256": "29a102b305606d4b9e767bdb189e2e1e5cf94be5336acc0e57b63d9dcebe1760",
+      "bytes": 15804
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/camera-evidence-fixtures.mjs",
+      "sha256": "b9c3762af84ff352b10eff34f501620c6a6aa769d2a5c321b45d9d5ef126f2b5",
+      "bytes": 1673
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recon-owned-metadata-v2.mjs",
+      "sha256": "ef86d50743b95f4935124dc713cfa1cdb24322c3e1dfb81847720a00c35f1d10",
+      "bytes": 8417
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recon-timestamp-micros.mjs",
+      "sha256": "2314e58044acec03d518f51df6c25aeb513ed818ddb5ed81ef80b75938c5c332",
+      "bytes": 1065
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recon-v2/V2_CONSTANTS.json",
+      "sha256": "20df29123a38c4b992cf4dbc61297c9c881648315b25a7708c2edf188ed0973f",
+      "bytes": 795
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recon-v2/V2_RESPONSE_SCHEMAS.min.json",
+      "sha256": "00e826c6048921f64a1817609bed4bd45e607f832902b93909e42a54118a1c7e",
+      "bytes": 41692
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recon-v2/synthetic-vault-integration.sql",
+      "sha256": "bacd7bc943cc65ac81dce1f1d1229ecbd726735e2de18bb53e68767e3b52f2ee",
+      "bytes": 2235
+    },
+    {
+      "path": "tech-checks/operations/tests/mhelp-intake-background.test.mjs",
+      "sha256": "6b4865fa64d1a61b2afa41fa8f6aa7fdc16c02010e86cb465cbb99203632d0e0",
+      "bytes": 10114
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-battery.test.mjs",
+      "sha256": "08a6e1ec7fb7010ca1e5fd5a4cda778991a43c80d2b49f8057f5a1db93a7f50b",
+      "bytes": 5714
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-event-archive.test.mjs",
+      "sha256": "eb7b9a35b6e4539eb6b95fde8d798916d18bf434c9e211dfc73518be2163b0e8",
+      "bytes": 7546
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-health-handler.test.mjs",
+      "sha256": "689ba2277d48b4c1597fef4113777e84951a8d9a86642a1028993771a3b55c7d",
+      "bytes": 4787
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-inventory-sync-sql.test.mjs",
+      "sha256": "1cda299bf722743a19d097d2f6232d2bff25d0361d70622d39951e779041a3d5",
+      "bytes": 24796
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-inventory-sync.test.mjs",
+      "sha256": "f9c96ada9eb5dd2dc96b2fd53af3a8c03fc74a3e6912eb1e66125108976a8381",
+      "bytes": 13504
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-owned-metadata-v2-sql.test.mjs",
+      "sha256": "e74683d17d5ed10fdb81d47aabb3a5b016c3af40b74aa7fe4552251b939e5305",
+      "bytes": 65546
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-owned-reconcile-v2.test.mjs",
+      "sha256": "f75c96d1eb05219bd514a801105feca4ef91279f2fbb44415ee8fdb0e692161d",
+      "bytes": 24852
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-owned-wire-v2.test.mjs",
+      "sha256": "fbefb62a0861ec11b8530b6cd6782f717e42ff4f25564b83fd5114f636f4c1d9",
+      "bytes": 10816
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-provider-identity.test.mjs",
+      "sha256": "ecd6cef3119236dc90314facd971de830d0840eee50851efa3f0bcbf2ea8ae48",
+      "bytes": 10323
+    },
+    {
+      "path": "tech-checks/operations/tests/recon-timestamp-micros.test.mjs",
+      "sha256": "8d88687dcc98ba56c799f1bc4b9d5aa1c1747eba6ac6613fe1e81be738a6cbdd",
+      "bytes": 1031
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/ownerInstallationAddress.ts",
+      "sha256": "2494c5d0557069d41025e26c19747d96961bec981492f4aa3285b262e0761ba6",
+      "bytes": 1656
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/reconEventArchive.ts",
+      "sha256": "246a2f2ad91cc1825edec96b15f9ee9634a4c53699e20f7c6f97c19fbd7fa37e",
+      "bytes": 4912
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/reconOwnedMetadataV2.ts",
+      "sha256": "56a991e70ba99ce5b3344ac57b3f3f9f2ff7d8e369b4a09153ec209bf51a12cc",
+      "bytes": 18664
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/reconProviderInventory.ts",
+      "sha256": "6bd2b82f0b6e63347db20f59d778cf1ada4c4cec5a1630965f725af9a6b60393",
+      "bytes": 3219
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/sourcePrecedence.ts",
+      "sha256": "bd3b0e2c3a49de7fe68505edbf8e0b243d238c86e26dcc1372dd447b70cbbb54",
+      "bytes": 3685
+    },
+    {
+      "path": "tech-checks/supabase/functions/_shared/trackerNativeSource.ts",
+      "sha256": "c7d31a84a8c4a90ce8122b2bb9183be340d2bf94d247cf46c692de61ea5270bc",
+      "bytes": 920
+    },
+    {
+      "path": "tech-checks/supabase/functions/camera-event-archive/index.ts",
+      "sha256": "9e040c099e63162f0b49ac778ec6c09607443b83b3c29a8489897f69999f2182",
+      "bytes": 2790
+    },
+    {
+      "path": "tech-checks/supabase/functions/camera-field-geocode/censusAddress.ts",
+      "sha256": "e8040941fe48a400f872c9026ef05eb9ff01f9445e7e5809e72c751ed60302da",
+      "bytes": 4582
+    },
+    {
+      "path": "tech-checks/supabase/functions/camera-provider-reconcile/index.ts",
+      "sha256": "0702992bb951dc1b67f63e0688c7c021da2daf00e118dd1dc79c28fe8a1496d2",
+      "bytes": 42828
+    },
+    {
+      "path": "tech-checks/supabase/functions/camera-provider-reconcile/star-resource-identity.js",
+      "sha256": "d1e17fe3cae349ec733a1876da54fbdd233c9b0e78dd62b2cde10311963262bc",
+      "bytes": 5899
+    },
+    {
+      "path": "tech-checks/supabase/functions/camera-provider-reconcile/unmapped-resource-diagnostics.js",
+      "sha256": "206b636bd6b72a151d8ca0689967d6e1cf8dc92ff3431a587784a5beebe67739",
+      "bytes": 2350
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/archivedRepresentationProjection.ts",
+      "sha256": "376d3adabb9b2254db816b45b043fb857745486d2ada6491694b0a4079c57e10",
+      "bytes": 11592
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/cameraEvidence.ts",
+      "sha256": "3456b0422e9a8ac47a3f48ea6e3110cf2d14ff8e4aa6282dfed1dbef06cf4bf3",
+      "bytes": 23183
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/cameraPlacementEvidence.ts",
+      "sha256": "1c5d8108cfffa0aead919079b34db3f49ea2357252a8ba01a96ccdfd63b14b7f",
+      "bytes": 20296
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/cameraTrackerShopScope.ts",
+      "sha256": "73d12be5a9069981020b572ff370f708ee04d9b59d0bfb51566737d9c0da6fc2",
+      "bytes": 16740
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/censusAddress.ts",
+      "sha256": "cd7497f2eed9384de54a452da29098d44f6aa1e46fab6a937ae00bad8923e112",
+      "bytes": 4583
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/combinedFleetRoster.ts",
+      "sha256": "f8ff0a3e0557b7ff39845f7934f48833d6f675e99bdf097e2f0bb93dbf0e99ca",
+      "bytes": 18469
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/deliveryGoBack.ts",
+      "sha256": "8f7e4e635cbfd9b038bacc6e5a9c480cf4cfd8e2e7b23cef03afde29e5d56fb1",
+      "bytes": 1599
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/effectiveFleetPlacement.ts",
+      "sha256": "3a8fa7b8b5e08fb43989734fa969004624076c194c929ad44f787d69336f49b9",
+      "bytes": 5488
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/fallbackGeocodeProjection.ts",
+      "sha256": "442c3218b4023d4da5c6484aeb89ae4a7e063908826a9b8fad7487ab64af8a0b",
+      "bytes": 3472
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/fieldGeocodeProjection.ts",
+      "sha256": "c53e0588d87933158c786dba4025f1ae90e64156fe893e92c388af79356d6b25",
+      "bytes": 3695
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/fieldRecorderObservation.ts",
+      "sha256": "8792d94e8d6a0bbd1d044be75ad76d13d0ee1fa24c912c78a5aa1db69424e4d7",
+      "bytes": 7843
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/fleetAccess.ts",
+      "sha256": "d4a82b13d5e9592a3998b56bd658240c629e82b77587a66a28a2fc10e4c6be79",
+      "bytes": 1514
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/googleSheets.ts",
+      "sha256": "9c03a33d5029e05e4f28993ed8a54af73fa8b03f31064ca523eec458ef01bb92",
+      "bytes": 13355
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/importedAddressContract.ts",
+      "sha256": "ef5e3b5430ce28f964ff1d4be2252f66e97ecd984cf309389a6c21a616717447",
+      "bytes": 3430
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/importedSourceProjection.ts",
+      "sha256": "3b6b102290cedf60c41e8b5f4469b52ebf5e21edecd892a16fb4be46249540cd",
+      "bytes": 40893
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/importedSourceProjectionV2.ts",
+      "sha256": "8c8575262b8aece3ae72caad6758058784deab6860c150be2713608a9dd0726e",
+      "bytes": 38576
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/index.ts",
+      "sha256": "dd74da696050bf27f5528337401f53a63f5b49105b5834865a137603584dd119",
+      "bytes": 109846
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/inhandPilot.ts",
+      "sha256": "d27e34dbed4306b992a915d2af3ea7a7110cd49dca850da49c17cac91681d526",
+      "bytes": 14422
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/legacyInstallEvidence.ts",
+      "sha256": "2002aaa8f5f411ed3dc9c24d141808a7d3f084d93ce599d2f79357f7e6d91964",
+      "bytes": 16249
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpAppointmentVariants.ts",
+      "sha256": "39795f6f432b5f642c57f14f72966f582b0a8b970b6aef6c2eef20a4736a98c7",
+      "bytes": 17540
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpAppointments.ts",
+      "sha256": "a31e139a12c41d19ca3e3c5c83733526e4e2703466c8574ad4e9fc27f0882e44",
+      "bytes": 14161
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpFleetLocationProjection.ts",
+      "sha256": "0ffb4f73767f3e8d850a8e2be172f9c27df706b959d7bfd1cf4dadb130f0f82c",
+      "bytes": 4208
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpImport.ts",
+      "sha256": "816bf4fe4d1132aa19d3b3303a9f84cc3141e845477bac12b3d39447d0545a67",
+      "bytes": 9335
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpIntakeReview.ts",
+      "sha256": "555d83656ae782936d0bf0bc20e74130964bf77e8bd859d103361652426c8669",
+      "bytes": 6665
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpIntakeReviewBridge.ts",
+      "sha256": "486dbceb7258231095cb852628611890353b5d0f7e1c37fe1117b01e108496e1",
+      "bytes": 3376
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpPartner.ts",
+      "sha256": "0633a15c74b662f429ab9c71c65688de846215d39ac03dc65d5cf4ef7c5140cb",
+      "bytes": 13957
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpPlacementProjection.ts",
+      "sha256": "c7a73be8026f011144a6a46fe19073b9dfd1851c2d443ab9d5f421af6c813ffe",
+      "bytes": 12709
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpReadBackoff.ts",
+      "sha256": "71d85b0526fc29f1c1fdc3d4f366a183465621108235a34d25b4e16842ec25c7",
+      "bytes": 4910
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpReconnect.ts",
+      "sha256": "57781f2a65125d94c8d444a7d924c146055f48f5ee7a598b0a7cb865be77e62d",
+      "bytes": 8476
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDay.ts",
+      "sha256": "9b08916c275f3ecf9a0a43e234ea6dc79fe8b5b3844ea38f2888fffd59ead747",
+      "bytes": 3716
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDetail.ts",
+      "sha256": "bc35fce95c683a2813c9e50b726bef189626a4e66da80337fb69b6f19aba12c4",
+      "bytes": 11524
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDiagnostics.ts",
+      "sha256": "d6782a54bbb4f6df6133dd93aef1783aef05abe99449e7979427e22a483c7c0f",
+      "bytes": 6082
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketPrivateSample.ts",
+      "sha256": "5edb12f07bebe16aa0a1f0c15a8bbfda3ca97a041f7c9d0ca2df6dd4259d452c",
+      "bytes": 28795
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketSchema.ts",
+      "sha256": "03f544a9c3dbaedb6ae553f4e030e4f484d21f197a75f5a5a3af96f09c0fa176",
+      "bytes": 12678
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTickets.ts",
+      "sha256": "8a6645f787eebd8fcc2b71a766fbe6b68053749c5ce6743876d648b33c00273d",
+      "bytes": 36656
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTokenRuntime.ts",
+      "sha256": "7d7b9d5df234094fb6bd93bfde7296349ef3a96ab0f34aebe87a0f3ee3ed3d38",
+      "bytes": 2383
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpTokenSession.ts",
+      "sha256": "e3755dc5173c81a0cb4b58944971cc3256eff7a0895ea3543a939f5238f2191e",
+      "bytes": 9685
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpUnitLocation.ts",
+      "sha256": "bc55f188c47edb04f18fce661dbc6ed326bd53abee58aec630a130b561b3da6b",
+      "bytes": 12232
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelpUploadPlacement.ts",
+      "sha256": "7a16a2cb0de17ac62ef8763d52aebebec75693ffff23ecc5a37efa1f349ff79e",
+      "bytes": 16920
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/ownerCensusProof.ts",
+      "sha256": "3a0a9de70e3e2ce2adec92a50250b6061897276be30bf91c437c8f0cf04e919c",
+      "bytes": 24150
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts",
+      "sha256": "b2f9e3919a4d5124c8d4c03dbe2006766ea52c08f45b7158f7ee0aff1754e39c",
+      "bytes": 10119
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/ownerIdentityReview.ts",
+      "sha256": "55ced417730c36b57e32d388201f2c2f0f5eaef6db1864c4316733b5c837cdb1",
+      "bytes": 5333
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/placementProjection.ts",
+      "sha256": "79d8598d5771feb23c6fb05405c5045589eb44cd79f3bf31009ae45b21654f8c",
+      "bytes": 19853
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/privateEvidence.ts",
+      "sha256": "ec2049a55f51038e94ba53b11e9f3b73e503cfc844dd07889718c7b987bab66e",
+      "bytes": 8225
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/reconProviderIdentity.ts",
+      "sha256": "44f4e95ada8d7f3e9e57db9d0f74c0c7f68e6a5f205c9acb626cc4641e9debb9",
+      "bytes": 7588
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/reconProviderIdentityScope.ts",
+      "sha256": "b50f2eade952e0a19b6bf94b447503c9cef84d3c4bf11af7fee8d4f9d1362c17",
+      "bytes": 6643
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/reviewedAddressEstimates.ts",
+      "sha256": "fd8d880641859befec5ed3edfe30a6e490cff26dd842a837b60b1deb32064bb5",
+      "bytes": 16137
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/routers.ts",
+      "sha256": "d2a5ffbe1387b52fd878a6db2adb77dde463cc2b294fde43136c18867c836d33",
+      "bytes": 6159
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/sourceRecordedCoordinates.ts",
+      "sha256": "b1695ad13288939754055553b60ece2f7879fd8d3db598cb80f7c7737e45598d",
+      "bytes": 13525
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/tv-board-settings/index.ts",
+      "sha256": "5e7cf18f03dc5f1a7b42bb97737d5057b18214e99e78e1c65c69482fb1f8d195",
+      "bytes": 2478
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/unitTracker.ts",
+      "sha256": "0edf6a317e3f995ae5cd276bbb8244d6a058b9b85d078d4909462bb60f61bd35",
+      "bytes": 12016
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/validatedLocationProofs.ts",
+      "sha256": "797d6b474ad2e84ea06c6ee1bd21441f1fc27066d3245ed2c6049c9f08178097",
+      "bytes": 4235
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/verifiedHealthIdentity.ts",
+      "sha256": "8136b905fff30d44ca09cb5bef3564cb5675b00f8a9a838110b0d93bf12e71de",
+      "bytes": 15479
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/verifiedHealthIdentityScope.ts",
+      "sha256": "045fa8b1051642eeaaa3e54d1dd86193c0a70a815f9ae25e32ca9edf1181e844",
+      "bytes": 35919
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/vrm.ts",
+      "sha256": "416783ab6efe3cf486f79cf5f44a1d17724cf7bf327aa544112e8dccd9df2df4",
+      "bytes": 5984
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/vrmDiscovery.ts",
+      "sha256": "eb8155730189281a1ff4ea1931c89ddf794aed5a025a4faeade412c74f663689",
+      "bytes": 8832
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/vrmPower.ts",
+      "sha256": "bb8db8a222f9889ee5a86337402bf4fe837295022350dec960a6b44c4ea2642d",
+      "bytes": 7015
+    },
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/vrmSafePower.ts",
+      "sha256": "1472cb85ece0db241156816e68d5b7d67d0efad5f06da59f49a2dcbce45d40a3",
+      "bytes": 2319
+    },
+    {
+      "path": "tech-checks/supabase/functions/reconeyez-connect/index.ts",
+      "sha256": "2565eb30c652c93a8adab299f46a9fce52439fbf9b08a50c167efe373d61e522",
+      "bytes": 16277
+    },
+    {
+      "path": "tech-checks/supabase/functions/reconeyez-connect/inventorySync.ts",
+      "sha256": "0fb83408c9aec03ef03b4dfbeae59f105605de056ed59040878f357f0a77e0a4",
+      "bytes": 4034
+    },
+    {
+      "path": "tech-checks/supabase/functions/reconeyez-connect/package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae",
+      "bytes": 18
+    },
+    {
+      "path": "tech-checks/supabase/functions/reconeyez-webhook/index.ts",
+      "sha256": "2aab65339495b246fd33404451327ef7d1abc7e512fd7b3e3609f6d647d3e736",
+      "bytes": 23572
+    },
+    {
+      "path": "tech-checks/supabase/migrations/20260923_reconeyez_camera_integration.sql",
+      "sha256": "708dfe42ec247732be0887464a2b73936295ea50e4386ebec82f7de444b8c0cb",
+      "bytes": 6370
+    }
+  ]
+}

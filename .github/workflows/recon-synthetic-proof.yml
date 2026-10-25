@@ -1,0 +1,139 @@
+# Isolated public synthetic proof. No production secrets, provider calls or deployment.
+name: Recon synthetic PostgreSQL and HTTP proof
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/recon-synthetic-proof.yml'
+      - 'recon-proof/**'
+      - 'tech-checks/database-maintenance/*recon*'
+      - 'tech-checks/supabase/functions/_shared/recon*.ts'
+      - 'tech-checks/supabase/functions/reconeyez-connect/**'
+      - 'tech-checks/supabase/functions/reconeyez-webhook/**'
+      - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/functions/camera-event-archive/**'
+      - 'tech-checks/supabase/migrations/*recon*'
+      - 'tech-checks/operations/legacy/tests/recon-ordering/**'
+      - 'tech-checks/operations/tests/recon-*.test.mjs'
+      - 'tech-checks/operations/tests/field-recorder-observation.test.mjs'
+      - 'tech-checks/operations/tests/mhelp-intake-background.test.mjs'
+      - 'tech-checks/operations/tests/fixtures/recon*'
+      - 'tech-checks/operations/tests/fixtures/recon*/**'
+      - 'tech-checks/operations/package*.json'
+  workflow_dispatch:
+    inputs:
+      acknowledgement:
+        description: Type SYNTHETIC_ONLY to run this isolated proof candidate
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: recon-synthetic-proof-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  proof:
+    if: github.event_name == 'pull_request' || inputs.acknowledgement == 'SYNTHETIC_ONLY'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, America/Chicago]
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_DB: recon_proof_control
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-isolated-job-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d recon_proof_control"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TZ: ${{ matrix.timezone }}
+      RECON_PROOF_BACKEND: hosted-postgres
+      RECON_SYNTHETIC_HOSTED_PROOF: 'yes'
+      RECON_ALLOW_HOSTED_HTTP: '1'
+      RECON_TEST_DATABASE_URL: postgresql://postgres:synthetic-isolated-job-only@127.0.0.1:5432/recon_proof_control
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Initialize evidence before dependency setup
+        run: |
+          mkdir -p recon-proof/evidence
+          {
+            printf 'Stage: started; hosted runtime results pending\n'
+            printf 'Commit: '; git rev-parse HEAD
+            printf 'Tree: '; git rev-parse HEAD^{tree}
+            printf 'UTC: '; date --utc --iso-8601=seconds
+            printf 'Timezone: %s\n' "$TZ"
+          } | tee recon-proof/evidence/source-identity.txt
+          cp recon-proof/source-manifest.json recon-proof/tooling-lock.json recon-proof/evidence/
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Verify exact reviewed source and candidate manifest
+        run: python3 recon-proof/verify-manifest.py 2>&1 | tee recon-proof/evidence/manifest.log
+      - name: Install locked public test dependencies only
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tech-checks/operations 2>&1 | tee recon-proof/evidence/install-operations.log
+          npm ci --ignore-scripts --no-audit --no-fund --prefix recon-proof 2>&1 | tee recon-proof/evidence/install-proof.log
+          python3 -m pip install 'jsonschema==4.23.0' 2>&1 | tee recon-proof/evidence/install-jsonschema.log
+          timeout 120s docker pull postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9 2>&1 | tee recon-proof/evidence/pull-postgrest.log
+      - name: Record hosted versions
+        run: |
+          node --version | tee recon-proof/evidence/node-version.txt
+          docker image inspect postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9 --format '{{json .}}' | tee recon-proof/evidence/postgrest-image.json
+          docker image inspect postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929 --format '{{json .}}' | tee recon-proof/evidence/postgres-image.json
+          # Official linux/amd64 Nix image has CMD ["/bin/postgrest"] and no ENTRYPOINT.
+          # Keep the default CMD for servers; a version probe must name the binary.
+          timeout 15s docker run --rm --network none --entrypoint /bin/postgrest postgrest/postgrest:v14.5@sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9 --version 2>&1 | tee recon-proof/evidence/postgrest-version.txt
+          grep -Eq '^PostgREST 14\.5([ .-]|$)' recon-proof/evidence/postgrest-version.txt
+      - name: Exact SQL regression and restrictive ACL catalog on PostgreSQL
+        working-directory: tech-checks/operations
+        run: |
+          set -o pipefail
+          node --import tsx tests/recon-owned-metadata-v2-sql.test.mjs 2>&1 | tee ../../recon-proof/evidence/postgres-regression.log
+      - name: Independent clients and observed contention
+        working-directory: tech-checks/operations
+        run: |
+          set -o pipefail
+          node --import tsx --test --test-concurrency=1 ../../recon-proof/contention.test.mjs 2>&1 | tee ../../recon-proof/evidence/contention.log
+      - name: Actual PostgREST transport and genuine native serialization error
+        working-directory: tech-checks/operations
+        run: |
+          set -o pipefail
+          node --import tsx --test --test-concurrency=1 ../../recon-proof/postgrest-transport.test.mjs 2>&1 | tee ../../recon-proof/evidence/postgrest.log
+      - name: Actual assembled handlers over HTTP to PostgREST and PostgreSQL
+        working-directory: tech-checks/operations
+        run: |
+          set -o pipefail
+          node --import tsx ../../recon-proof/http/run-hosted-http.mjs --source-root .. --public-only --fixture-module ../../recon-proof/postgres-fixture.mjs --postgrest-module ../../recon-proof/postgrest.mjs --output-dir ../../recon-proof/evidence/http 2>&1 | tee ../../recon-proof/evidence/http-handlers.log
+      - name: Retained handler and shared contract regressions
+        working-directory: tech-checks/operations
+        env:
+          RECON_PROOF_BACKEND: pglite
+        run: |
+          set -o pipefail
+          node legacy/tests/recon-ordering/edge-handler.test.mjs 2>&1 | tee ../../recon-proof/evidence/webhook-unit.log
+          node --import tsx --test --test-concurrency=1 tests/recon-provider-identity.test.mjs tests/recon-battery.test.mjs tests/recon-health-handler.test.mjs tests/recon-event-archive.test.mjs tests/recon-inventory-sync-sql.test.mjs tests/recon-inventory-sync.test.mjs tests/recon-owned-wire-v2.test.mjs tests/recon-owned-reconcile-v2.test.mjs tests/recon-timestamp-micros.test.mjs tests/field-recorder-observation.test.mjs tests/mhelp-intake-background.test.mjs 2>&1 | tee ../../recon-proof/evidence/related.log
+      - name: Retain proof evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: recon-synthetic-${{ strategy.job-index }}-${{ github.sha }}
+          path: recon-proof/evidence/
+          if-no-files-found: error
+          retention-days: 14
