@@ -4,14 +4,14 @@ import type {DashboardData} from './todayDashboardData';
 import './ownerActionQueue.css';
 const labels:Record<OwnerQueueArea,string>={approval:'My approvals',it:'IT',service:'Service',customers:'Customers',overdue:'Overdue',paperwork:'Paperwork'};
 const tabs:OwnerQueueArea[]=['approval','it','service','customers','overdue','paperwork'];
-type Props={data:DashboardData;openWorkspace:(workspace:string)=>void;
+type Props={ownerAuthorized:boolean;data:DashboardData;openWorkspace:(workspace:string)=>void;
  openJob?:(id:string,workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void};
 /** Read-only projection of existing Owner-authorized sources. Never writes inventory or task status. */
-export default function OwnerActionQueue({data,openWorkspace,openJob}:Props){
+export default function OwnerActionQueue({ownerAuthorized,data,openWorkspace,openJob}:Props){
  const[category,setCategory]=useState<OwnerQueueArea>('approval');
  const queue=useMemo(()=>buildOwnerActionQueue(data),[data]);
- // Hide Owner-only actions from sessions explicitly denied by the existing backend.
- if(data.tasks===null&&/Owner access|sign-in/i.test(data.errors.tasks||''))return null;
+ // Keep this defense-in-depth check even if a parent calls the panel incorrectly.
+ if(!ownerAuthorized||data.tasks===null&&/Owner access|sign-in/i.test(data.errors.tasks||''))return null;
  const selected=queue.items.filter(item=>item.areas.includes(category)),count=queue.counts[category];
  const open=(item:typeof queue.items[number])=>{
   if(item.jobId&&openJob&&(item.route==='Jobs'||item.route==='Owner Review'))openJob(item.jobId,item.route);
