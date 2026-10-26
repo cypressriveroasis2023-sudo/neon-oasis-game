@@ -29,7 +29,7 @@ export function validateOwnerIdentitySnapshot(value:unknown):asserts value is Ow
  for(const c of value.claims)if(!record(c)||!uuid(c.id)||c.organization_id!==OWNER_IDENTITY_ORG||!uuid(c.native_unit_id)||!text(c.native_unit_label)||!text(c.legacy_unit_key)||!Array.isArray(c.device_ids)||!c.device_ids.length||c.device_ids.length>1000||c.device_ids.some((v:unknown)=>id(v)!==v)||new Set(c.device_ids).size!==c.device_ids.length||!digest(c.resource_epoch)||!digest(c.physical_digest)||c.provenance!=='owner_confirmation'||!['active','revoked'].includes(c.status)||!revision(c.revision))fail('Owner identity commitments are malformed.');
  if(new Set(value.claims.map((c:Row)=>c.id)).size!==value.claims.length)fail('Owner identity history contains duplicate records.');
 }
-export async function currentOwnerIdentityEvidence(s:OwnerIdentitySources,unitId:string,unitKey:string){
+export async function currentOwnerIdentityEvidence(s:OwnerIdentitySources,unitId:string,unitKey:string,matchKey:typeof placementMatchKey=placementMatchKey){
  if(![s.units,s.devices,s.matches,s.providers,s.epochs].every(rows=>Array.isArray(rows)&&rows.length<=100000&&rows.every(record)))fail('Identity source records are unavailable.');
  if(!uuid(unitId)||!text(unitKey))fail('Choose the exact equipment and camera group.');
  const units=s.units.filter(u=>u.id===unitId),unit=units[0];
@@ -42,8 +42,8 @@ export async function currentOwnerIdentityEvidence(s:OwnerIdentitySources,unitId
  if(new Set(ids).size!==ids.length||group.some(d=>s.devices.filter(other=>id(other.id)===id(d.id)).length!==1))fail('Camera resource identities are duplicated.');
  if(group.some(d=>s.devices.some(other=>other!==d&&other.source===d.source&&((text(d.external_device_id,500)&&other.external_device_id===d.external_device_id)||(text(d.device_serial,500)&&other.device_serial===d.device_serial)))))fail('A physical camera identifier is claimed by multiple resources.');
  if(s.matches.some(m=>s.providers.some(p=>p.id===m.vigilant_device_id&&group.some(d=>p.external_device_id===d.external_device_id&&p.source===d.source))))fail('A native provider association already claims a resource in this camera group.');
- const concern=[placementMatchKey(unit.unit_number),placementMatchKey(unitKey)];
- if(s.units.some(u=>u.id!==unitId&&concern.includes(placementMatchKey(u.unit_number)))||s.devices.some(d=>d.unit_key!==unitKey&&concern.includes(placementMatchKey(d.unit_key))))fail('A competing full family, number or suffix identity requires review.');
+ const concern=[matchKey(unit.unit_number),matchKey(unitKey)];
+ if(s.units.some(u=>u.id!==unitId&&concern.includes(matchKey(u.unit_number)))||s.devices.some(d=>d.unit_key!==unitKey&&concern.includes(matchKey(d.unit_key))))fail('A competing full family, number or suffix identity requires review.');
  const epochs=s.epochs.filter(e=>e.unitKey===unitKey),epoch=epochs[0];
  if(epochs.length!==1||!digest(epoch.epoch)||!Array.isArray(epoch.deviceIds)||!exact(epoch.deviceIds,ids))fail('The current camera identity incarnation is unavailable or changed.');
  return {nativeEpoch:nativeEpochs[0].epoch,unitId,unitNumber:unit.unit_number as string,unitKey,deviceIds:ids,resourceEpoch:epoch.epoch,physicalDigest:await ownerIdentityDigest(ownerConfirmedPhysicalTuple(unitKey,group)),physicalResources:group.map(d=>({id:id(d.id)!,source:d.source,type:d.device_type,externalId:d.external_device_id??null,serial:d.device_serial??null})).sort((a,b)=>BigInt(a.id)<BigInt(b.id)?-1:1)};
@@ -53,12 +53,19 @@ export function ownerClaimRelated(c:OwnerIdentityClaim,unitId:string,key:string,
 export async function projectOwnerConfirmedIdentities(s:OwnerIdentitySources){
  validateOwnerIdentitySnapshot(s.crosswalk);
  const unitIdentities:Row[]=[],identityWarnings:Row[]=[];
+ // Only pure label normalization is reused; every claim still checks current sources.
+ const labelKeys=new Map<string,string>();
+ const matchKey=(value:unknown):string=>{
+  if(typeof value!=='string')return placementMatchKey(value);
+  if(!labelKeys.has(value))labelKeys.set(value,placementMatchKey(value));
+  return labelKeys.get(value)!;
+ };
  for(const claim of s.crosswalk.claims){
   const binding={unitId:claim.native_unit_id,deviceIds:[...claim.device_ids],unitKeys:[claim.legacy_unit_key]};
   let reason='';
   try{
    if(claim.status!=='active')fail('The Owner-confirmed identity was revoked. Its resource commitments remain reserved.');
-   const evidence=await currentOwnerIdentityEvidence(s,claim.native_unit_id,claim.legacy_unit_key);
+   const evidence=await currentOwnerIdentityEvidence(s,claim.native_unit_id,claim.legacy_unit_key,matchKey);
    if(claim.native_unit_label!==evidence.unitNumber||!exact(claim.device_ids,evidence.deviceIds)||claim.resource_epoch!==evidence.resourceEpoch||claim.physical_digest!==evidence.physicalDigest)fail('The Owner-confirmed source identity changed. A restored label cannot reactivate it.');
    if(s.crosswalk.claims.some(c=>c!==claim&&ownerClaimRelated(c,claim.native_unit_id,claim.legacy_unit_key,claim.device_ids)))fail('More than one identity commitment claims these resources.');
    // A new provider association cannot silently supersede Owner confirmation.
