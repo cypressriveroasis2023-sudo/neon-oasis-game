@@ -76,3 +76,70 @@ test('delayed automatic mHelp source shows its original successful time and fail
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');expect(state.field.uploadInventory.lastApiReadAt).toBe(f.field.uploadInventory.lastApiReadAt);
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
+
+for(const it of [false,true])test((it?'IT':'Owner')+' opens the complete Field Product-ID list before optional connection diagnostics',async({page})=>{
+ const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
+ await expect(primary.getByRole('heading',{name:'Field equipment 7',exact:true})).toBeVisible();
+ await expect(products).toHaveCount(7);
+ expect(await products.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-product-id')).sort())).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
+ await expect(app.locator('[data-product-id]')).toHaveCount(7);
+ for(const id of ['1001','1002','1003','1004','1005','1006','1007'])await expect(primary.locator('[data-product-id="'+id+'"]')).toBeVisible();
+ await expect(primary.locator('[data-product-id="1006"]')).toContainText('Identity / placement review');
+ await expect(primary.locator('[data-product-id="1007"]')).toContainText('Do Not Use');
+ const diagnostics=primary.locator('.cos-fleet-diagnostic-records');
+ await expect(diagnostics).not.toHaveAttribute('open','');
+ await expect(diagnostics.locator(':scope > summary')).toHaveText('Connection / map records (5)');
+ await expect(primary.locator('[data-product-id="1006"]').getByRole('button',{name:'Unit details and troubleshooting'})).toHaveCount(0);
+ // Field is an explicit return to the complete inventory, including after local list filters.
+ await primary.getByLabel('Search Field inventory',{exact:true}).fill('1002');
+ await primary.getByLabel('Field inventory status',{exact:true}).selectOption('offline');
+ await expect(products).toHaveCount(1);
+ await app.locator('.cos-fleet-stat-field').click();
+ await expect(primary.getByLabel('Search Field inventory',{exact:true})).toHaveValue('');
+ await expect(primary.getByLabel('Field inventory status',{exact:true})).toHaveValue('all');
+ await expect(products).toHaveCount(7);
+ await app.locator('.cos-fleet-stat-shop').click();
+ const shop=app.getByRole('region',{name:'Shop Product-ID inventory'});
+ await expect(shop).toBeVisible();await expect(shop).toContainText('Product 1008');await expect(shop).not.toContainText('Product 1001');
+ await app.getByText('Fleet totals & quick filters',{exact:true}).click();
+ await app.locator('.cos-fleet-stat-field').click();
+ await expect(primary.getByRole('heading',{name:'Field equipment 7',exact:true})).toBeVisible();await expect(products).toHaveCount(7);
+ expect(await app.locator('body').evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+ expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
+
+test('every accepted Field Product ID is reachable through bounded primary-list pagination',async({page})=>{
+ const f=fieldProductFixture();
+ for(let i=0;i<277;i++){
+  const productId=String(10000+i);
+  f.upload.records.push({...structuredClone(f.upload.records[4]),productId,recordId:'mhelp_product:'+productId,unitNumber:'ST '+productId,category:'STANDS'});
+ }
+ Object.assign(f.upload.summary,{totalRecords:285,fieldRecords:284,shopRecords:1,unflaggedFieldRecords:283,unflaggedShopRecords:1});
+ const before=structuredClone(f.field),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
+ await expect(primary.getByRole('heading',{name:'Field equipment 284',exact:true})).toBeVisible();
+ await expect(products).toHaveCount(40);
+ for(const count of [80,120,160,200,240,280,284]){
+  await primary.getByRole('button',{name:/^Show more Field products/}).click();await expect(products).toHaveCount(count);
+ }
+ const ids=await products.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-product-id')));
+ expect(new Set(ids).size).toBe(284);expect(ids.sort()).toEqual(f.upload.records.filter(p=>p.placement==='FIELD').map(p=>p.productId).sort());
+ await expect(primary.getByRole('button',{name:/^Show more Field products/})).toHaveCount(0);
+ expect(ids).not.toContain('1008');expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
+
+for(const it of [false,true])test((it?'IT':'Owner')+' health headline selections show exactly their Field Product IDs',async({page})=>{
+ const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
+ for(const [status,expected] of [['online',['1001']],['offline',['1002']],['unknown',['1003','1005','1006','1007']]]){
+  await app.locator('.cos-fleet-stat-'+status).click();await expect(products).toHaveCount(expected.length);
+  expect(await products.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-product-id')).sort())).toEqual(expected);
+  await expect(app.locator('.cos-fleet-stat-'+status+' strong')).toHaveText(String(expected.length));
+ }
+ await app.locator('.cos-fleet-stat-field').click();await expect(products).toHaveCount(7);
+ await primary.getByLabel('Field inventory status',{exact:true}).selectOption('support');
+ await expect(products).toHaveCount(1);await expect(primary.locator('[data-product-id="1004"]')).toBeVisible();
+ await app.locator('.cos-fleet-stat-field').click();await expect(products).toHaveCount(7);
+ expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});

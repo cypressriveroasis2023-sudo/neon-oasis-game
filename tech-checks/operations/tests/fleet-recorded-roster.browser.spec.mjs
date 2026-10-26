@@ -20,16 +20,20 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Product-ID inventory shows
  await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(1);
+ // This control searches diagnostic representations; the accepted Product-ID census remains separate.
+ const diagnostics=app.locator('.cos-fleet-diagnostic-records');
+ if(await diagnostics.count())await diagnostics.locator(':scope > summary').click();
  await app.getByLabel('Search units, customers, sites or addresses').fill('Ranger 901');
- await expect(app.locator('.cos-fleet-stat-field')).toContainText('FIELD EQUIPMENT');
- await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('287');
+ await expect(app.locator('.cos-fleet-stat-field')).toContainText('COMBINED FIELD');
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(inventory).toContainText('287 Field');
  await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('714');
  await expect(inventory).toContainText('1001 total equipment records');
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);
 });
 for(const it of [false,true])test(`${it?'IT':'Owner'} recorded field combines both sources while health and pins stay linked-only`,async({page},info)=>{
- const {app,state}=await mountFleet(page,it,{field:combined()});await expect(app.locator('.cos-fleet-stat-field')).toContainText('COMBINED FIELD');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('5');await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(app.locator('.cos-fleet-source-record')).toHaveCount(2);await expect(app.locator('.cos-fleet-unit-panel h2')).toHaveText('Equipment entries 5');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-dashboard-marker')).toHaveCount(1);await expect(app.locator('div.cos-fleet-count-note')).toContainText('1 tracker-only equipment record');
+ const {app,state}=await mountFleet(page,it,{field:combined()});await expect(app.locator('.cos-fleet-stat-field')).toContainText('COMBINED FIELD');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('5');await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(app.locator('.cos-fleet-source-record')).toHaveCount(2);await expect(app.locator('.cos-fleet-unit-panel h2')).toHaveText('Connection / map records 5');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-dashboard-marker')).toHaveCount(1);await expect(app.locator('div.cos-fleet-count-note')).toContainText('1 tracker-only equipment record');
  const source=app.locator('.cos-fleet-source-record').filter({hasText:'Ranger 901'});await expect(source).toContainText('Health unlinked');await source.getByText('Equipment record details',{exact:true}).click();await expect(source).toContainText('MHelp product record: 7001');await expect(source.locator('button,a,[data-unit-id]')).toHaveCount(0);await expect(app.getByRole('dialog')).toHaveCount(0);await expect(source).toContainText('MHelp address: 555 Synthetic customer address');await page.screenshot({path:info.outputPath(`combined-roster-${it?'it':'owner'}.png`),fullPage:true});
  await app.getByRole('button',{name:/Data sources/}).click();await expect(app.locator('.cos-fleet-review-grid article').filter({hasText:'Unlinked equipment'})).toContainText('5 source equipment records across all placements');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('5');await app.getByRole('button',{name:'Map',exact:true}).click();
  await app.getByLabel('Search units, customers, sites or addresses').fill('Ranger 901');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-source-record')).toHaveCount(1);await expect(app.locator('.cos-fleet-unit-row')).toHaveCount(0);await expect(app.locator('.cos-dashboard-marker')).toHaveCount(0);await expect(app.locator('.field-map-empty')).toHaveCount(0);await expect(app.locator('.cos-fleet-map-note')).toContainText('No linked unit pins match these filters. Recorded equipment can remain in the list');expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
