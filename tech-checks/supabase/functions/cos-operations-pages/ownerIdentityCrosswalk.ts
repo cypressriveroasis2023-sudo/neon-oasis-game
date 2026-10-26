@@ -41,7 +41,13 @@ export async function currentOwnerIdentityEvidence(s:OwnerIdentitySources,unitId
  const ids=sorted(group.map(d=>id(d.id)!));
  if(new Set(ids).size!==ids.length||group.some(d=>s.devices.filter(other=>id(other.id)===id(d.id)).length!==1))fail('Camera resource identities are duplicated.');
  if(group.some(d=>s.devices.some(other=>other!==d&&other.source===d.source&&((text(d.external_device_id,500)&&other.external_device_id===d.external_device_id)||(text(d.device_serial,500)&&other.device_serial===d.device_serial)))))fail('A physical camera identifier is claimed by multiple resources.');
- if(s.matches.some(m=>s.providers.some(p=>p.id===m.vigilant_device_id&&group.some(d=>p.external_device_id===d.external_device_id&&p.source===d.source))))fail('A native provider association already claims a resource in this camera group.');
+ // Index only exact string IDs within this evidence check. Malformed/non-string
+ // keys keep the original strict-equality scan, including undefined and NaN.
+ const matchedProviderIds=s.matches.every(m=>typeof m.vigilant_device_id==='string')&&s.providers.every(p=>typeof p.id==='string')?new Set(s.matches.map(m=>m.vigilant_device_id)):null;
+ const providerClaimsGroup=matchedProviderIds
+  ?s.providers.some(p=>matchedProviderIds.has(p.id)&&group.some(d=>p.external_device_id===d.external_device_id&&p.source===d.source))
+  :s.matches.some(m=>s.providers.some(p=>p.id===m.vigilant_device_id&&group.some(d=>p.external_device_id===d.external_device_id&&p.source===d.source)));
+ if(providerClaimsGroup)fail('A native provider association already claims a resource in this camera group.');
  const concern=[matchKey(unit.unit_number),matchKey(unitKey)];
  if(s.units.some(u=>u.id!==unitId&&concern.includes(matchKey(u.unit_number)))||s.devices.some(d=>d.unit_key!==unitKey&&concern.includes(matchKey(d.unit_key))))fail('A competing full family, number or suffix identity requires review.');
  const epochs=s.epochs.filter(e=>e.unitKey===unitKey),epoch=epochs[0];

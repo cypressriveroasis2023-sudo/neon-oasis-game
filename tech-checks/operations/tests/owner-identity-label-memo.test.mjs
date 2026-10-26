@@ -5,12 +5,17 @@ import {transform} from 'esbuild';
 import {OWNER_IDENTITY_ORG,ownerIdentityDigest,ownerConfirmedPhysicalTuple,projectOwnerConfirmedIdentities} from '../../supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts';
 
 // Exercise the same complete validation with its original uncached key reader.
-// Only the optional callback argument is removed; no validation is reimplemented.
+// Restore the original provider scan and uncached label reader; no admission
+// decision or physical/epoch/provenance validation is reimplemented.
 const moduleUrl=new URL('../../supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts',import.meta.url);
 const source=readFileSync(moduleUrl,'utf8');
 const call='currentOwnerIdentityEvidence(s,claim.native_unit_id,claim.legacy_unit_key,matchKey)';
 assert.equal(source.split(call).length,2);
-const uncachedSource=source.replace(call,'currentOwnerIdentityEvidence(s,claim.native_unit_id,claim.legacy_unit_key)')
+const providerStart=source.indexOf(' const matchedProviderIds=');
+const providerEnd=source.indexOf('\n const concern=',providerStart);
+assert.ok(providerStart>0&&providerEnd>providerStart);
+const originalProviderScan=" if(s.matches.some(m=>s.providers.some(p=>p.id===m.vigilant_device_id&&group.some(d=>p.external_device_id===d.external_device_id&&p.source===d.source))))fail('A native provider association already claims a resource in this camera group.');";
+const uncachedSource=(source.slice(0,providerStart)+originalProviderScan+source.slice(providerEnd)).replace(call,'currentOwnerIdentityEvidence(s,claim.native_unit_id,claim.legacy_unit_key)')
  .replace("'./placementProjection.ts'",JSON.stringify(new URL('./placementProjection.ts',moduleUrl).href));
 const compiled=await transform(uncachedSource,{loader:'ts',format:'esm'});
 const baseline=await import('data:text/javascript;base64,'+Buffer.from(compiled.code).toString('base64'));
@@ -62,4 +67,32 @@ test('successive invocations reread changed labels, serials, epochs and revocati
  s.devices[0].device_serial='replacement';assert.equal((await compare(s)).result.unitIdentities.length,19);
  s.devices[0].device_serial='serial-1';s.epochs[0].epoch='c'.repeat(64);assert.equal((await compare(s)).result.unitIdentities.length,19);
  s.epochs[0].epoch='a'.repeat(64);s.crosswalk.claims[0].status='revoked';assert.equal((await compare(s)).result.unitIdentities.length,19);
+});
+for(const [name,makeId,shouldBlock] of [
+ ['string',()=>['provider','provider'],true],
+ ['number',()=>[42,42],true],
+ ['null',()=>[null,null],true],
+ ['undefined',()=>[undefined,undefined],true],
+ ['NaN',()=>[NaN,NaN],false],
+ ['string versus number',()=>['42',42],false],
+ ['distinct objects',()=>[{},{}],false],
+ ['same object',()=>{const id={};return [id,id];},true],
+])test(`provider membership retains strict equality for ${name}`,async()=>{
+ const s=await fixture(),[matchId,providerId]=makeId();
+ s.matches.push({vigilant_device_id:matchId});s.providers.push({id:providerId,external_device_id:s.devices[0].external_device_id,source:s.devices[0].source});
+ const result=await compare(s);assert.equal(result.result.unitIdentities.length,shouldBlock?19:20);
+});
+test('duplicate provider IDs retain every provider and exact physical/source comparisons',async()=>{
+ const s=await fixture(),d=s.devices[0];s.matches.push({vigilant_device_id:'provider'},{vigilant_device_id:'provider'});
+ s.providers.push({id:'provider',source:d.source,external_device_id:'unrelated'},{id:'provider',source:d.source,external_device_id:d.external_device_id});
+ assert.equal((await compare(s)).result.unitIdentities.length,19);
+ s.providers[1].source='different-source';assert.equal((await compare(s)).result.unitIdentities.length,20);
+ s.providers[1].source=d.source;assert.equal((await compare(s)).result.unitIdentities.length,19);
+ s.matches.length=0;assert.equal((await compare(s)).result.unitIdentities.length,20);
+});
+test('physical serial and external-ID clashes remain quarantined',async()=>{
+ for(const field of ['device_serial','external_device_id']){
+  const s=await fixture();s.devices[1][field]=s.devices[0][field];
+  assert.equal((await compare(s)).result.unitIdentities.length,18);
+ }
 });
