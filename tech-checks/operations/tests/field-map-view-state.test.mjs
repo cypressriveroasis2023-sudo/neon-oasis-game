@@ -9,3 +9,5 @@ test('individual pin preference survives history and invalid modes keep the grou
 test('old auto-selected history is not treated as an explicit selection',()=>{assert.equal(readFieldMapView({cosFieldMapView:{selectedId:'old-first-unit'}}).selectionExplicit,false);assert.equal(readFieldMapView({cosFieldMapView:{selectedId:'chosen-unit',selectionExplicit:true}}).selectionExplicit,true);});
 
 test('an explicit saved operational health filter remains explicit after the all-states default changes',()=>{assert.equal(readFieldMapView({cosFieldMapView:{health:'operational'}}).health,'operational');assert.equal(readFieldMapView({cosFieldMapView:{health:'unknown'}}).health,'unknown');});
+
+test('explicit Field product review categories survive navigation without admitting arbitrary health values',()=>{for(const health of ['unverified','unlinked','review','inactive'])assert.equal(readFieldMapView({cosFieldMapView:{health}}).health,health);assert.equal(readFieldMapView({cosFieldMapView:{health:'healthy_by_name'}}).health,'all');});
