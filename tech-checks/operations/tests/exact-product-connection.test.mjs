@@ -113,7 +113,7 @@ test('browser-facing source receipt must cover every exact Product ID and retain
  assert.equal(map.get('1002').status,'offline');
  assert.equal(map.get('1002').checkedAt,current);
  assert.equal(readExactProductConnections(value,'b'.repeat(64),ids,now),null);
- assert.equal(readExactProductConnections(value,sha,['1001','1002'],now),null);
+ assert.deepEqual([...readExactProductConnections(value,sha,['1001','1002'],now).keys()],['1001','1002']);
  assert.equal(readExactProductConnections(value,sha,['1001','1001','1003'],now),null);
  const changed=structuredClone(value);changed.items[0].status='offline';changed.items[0].checkedAt='stale';
  assert.equal(readExactProductConnections(changed,sha,ids,now),null);
