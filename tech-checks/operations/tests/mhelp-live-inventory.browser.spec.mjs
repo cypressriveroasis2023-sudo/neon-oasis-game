@@ -13,6 +13,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} sees automatic API invento
  // This synthetic census has no Product-ID/provider associations. Native
  // camera evidence remains separate and must not be assigned to those IDs.
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
+ await app.locator('.cos-fleet-diagnostic-records > summary').click();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).locator('[aria-label="camera: Online"]')).toBeVisible();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Spotter 1'}).locator('[aria-label="camera: Offline"]')).toBeVisible();
  await app.getByRole('button',{name:/Data sources/}).click();const status=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(status).toContainText('mHelpDesk automatic inventory updates');await expect(status).toContainText('Last successful inventory update');
