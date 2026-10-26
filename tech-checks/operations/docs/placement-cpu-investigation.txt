@@ -1,0 +1,91 @@
+COS intermittent startup CPU investigation — 2026-10-26
+
+Status: tested optimization candidate, not a demonstrated resolution of the live incident.
+No deployment, migration, credential, permission, inventory, tracker, binding, provider,
+monitoring or frontend change. The pending default Fleet-list task and its branch are
+outside this change. Base: main 9c97c925ba62071f8d851c608037b6fdccee98ed (PR307).
+
+Reported live evidence supplied to this investigation:
+13:03:58.188 UTC HTTP546 WORKER_RESOURCE_LIMIT, CPU2068ms, wall22.918s;
+13:04:05.801 HTTP546, CPU2060ms, wall17.718s; 13:04:10.654 HTTP503 BOOT_ERROR,
+wall10.094s. Successful reads took18.629s and13.720s. A later retry recovered the
+1001/284/717 census. Recovery is intermittent and is not acceptance evidence.
+Supabase documents a 2-second CPU limit, excluding async I/O:
+https://supabase.com/docs/guides/functions/limits
+The skill-requested changelog fetch failed (web content type; direct HTTP403).
+No Supabase API, dependency or runtime feature is changed here.
+
+Fresh read-only verification:
+cos-operations-pages remains v123, archive SHA256
+8ce24b10e02de6155abe96a52e5bb156375cd0242af523162e9c1873113edba8.
+The complete capture contains serve.ts and deno.json. A bounded aggregate read of
+the existing legacy camera tables returned739 devices,54 audit rows and7 distinct
+marked Owner-placement groups. No row identities, IPs or other production data
+were copied into test fixtures.
+
+Finding and patch:
+currentOwnerPlacements repeatedly normalized every device label for each current
+Owner audit. It now builds invocation-local membership/alias indexes. Duplicate
+and malformed IDs are retained; exact key membership and alias denial remain.
+The indexes are lazy, preserve error order, and are discarded after each call.
+Malformed null device collections retain the original short-circuit fallback.
+No source read, identity digest, timestamp, freshness rule or guard was removed.
+No cross-request cache or camera classification fallback was introduced.
+
+Local measurement, Node v24.19.0, five alternating samples:
+100 Owner groups/400 devices: baseline mean CPU17.5992ms, candidate0.9678ms.
+1001 Owner groups/4004 devices: baseline1610.8016ms, candidate6.6062ms.
+The V8 profile concentrated baseline samples in placementMatchKey and its regexes.
+These are stress fixtures, NOT the observed production Owner population. It would
+be incorrect to infer a 99% reduction in actual startup CPU from that stress test.
+
+Whole deployed-artifact proof:
+An offline harness boots both full v123 and the single-function candidate with
+injected synthetic transport, fixed time,739 camera records,54 audits/7 marked
+groups,1001 native units and1001 mHelp source records. Across both versions it
+compares complete responses for /api/field-map and /api/camera-health/summary-v3:
+normal load,repeat,source failure,retry,stale health and partial health.
+All24 responses matched exactly. Successful maps retained1001 total/284 Field/
+717 Shop. Map failure remained503; health survived its optional map-source failure.
+Subsequent retry recovered the complete census. A failure never returned zero totals.
+This is backend parity, not a new frontend saved-data retention implementation.
+
+Observed whole-map CPU range, five successful reads: baseline364.876–529.433ms,
+candidate355.316–433.509ms. Successful health reads remained below230ms. These
+runs are not randomized, production-equivalent latency or a reliable percentage
+comparison. They do not reproduce the live2-second exhaustion. Production source
+shape, concurrent request pressure and the exact failing action remain unproven.
+Do not describe this patch as having fixed the incident or recommend deployment
+as the definitive repair solely from these measurements.
+
+Verification and reproduction (from tech-checks/operations):
+COS_CPU_DEPLOYED_CAPTURE=/tmp/cos-v123.json npm test
+npm run typecheck
+npm run build
+npm run test:browser -- tests/field-inventory-census.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs --workers=2
+node --cpu-prof --cpu-prof-dir=/tmp --import tsx tests/placement-cpu-benchmark.mjs
+COS_CPU_DEPLOYED_CAPTURE=/tmp/cos-v123.json node --cpu-prof --cpu-prof-dir=/tmp --import tsx tests/placement-startup-profile.mjs
+node scripts/prepare-placement-cpu.mjs /tmp/cos-v123.json /tmp/cos-cpu-release.json
+
+The full live capture/release packet stays outside git. The repository contains
+synthetic-only fixtures and measurement reports. The preparation script rejects
+archive/version/source/config/entrypoint drift, wrong closure and already-patched
+input. It preserves every byte before/after currentOwnerPlacements and every
+other file and deployment setting. The artifact proof boots the entire candidate
+and checks unauthenticated denial, projection parity and preparation rejections.
+
+Scoped future release proposal, held:
+Only the prepared replacement of currentOwnerPlacements in existing
+cos-operations-pages, with unchanged verify_jwt=false and existing custom auth.
+No other application, function, configuration or database object is in scope.
+Before proposing authorization, finish attributing the live CPU exhaustion using
+bounded existing evidence and representative local inputs. Recheck current main
+and a fresh complete deployed closure; if either drifts, stop and rebase/reverify.
+A later deployment needs separate explicit authorization. Preserve full v123 for
+rollback. After authorization, acceptance requires repeated ordinary authenticated
+loads plus Fleet/Shop/health navigation, no resource-limit or boot failures and
+no long waits; exact current census and identities; stale/missing evidence labeled
+honestly; recorder/camera separation and usable troubleshooting evidence.
+One recovered refresh is not acceptance. Do not restore v122's fallback or weaken
+the guarded camera_shop_scope_fallback path. No report has been sent to IT from
+this coding task; this file and the draft PR are handoff material for the parent.
