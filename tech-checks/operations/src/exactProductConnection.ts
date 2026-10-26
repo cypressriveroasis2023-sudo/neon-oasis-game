@@ -162,16 +162,20 @@ export function buildExactProductConnections(
  */
 export function readExactProductConnections(value:unknown,sourceSha256:string,expectedFieldIds:readonly string[],now=Date.now()):Map<string,ExactProductConnection>|null{
  if(!object(value)||value.contract!==EXACT_PRODUCT_CONNECTION_CONTRACT||value.sourceSha256!==sourceSha256||!HASH.test(sourceSha256)
-  ||!safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS)||!Array.isArray(value.items)||value.items.length!==expectedFieldIds.length)return null;
+  ||!safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS)||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
  const expected=new Set(expectedFieldIds);
  if(expected.size!==expectedFieldIds.length)return null;
- const result=new Map<string,ExactProductConnection>();
+ const result=new Map<string,ExactProductConnection>(),seen=new Set<string>();
  for(const raw of value.items){
-  if(!object(raw)||!ID.test(raw.productId)||!expected.has(raw.productId)||result.has(raw.productId)
+  if(!object(raw)||!ID.test(raw.productId)||seen.has(raw.productId)
    ||!['online','offline','unknown'].includes(raw.status)||raw.basis!=='tcp_service_port'||typeof raw.reason!=='string'||raw.reason.length>300
    ||!(raw.resourceId===null||deviceId(raw.resourceId)===raw.resourceId))return null;
   if(raw.status==='unknown'&&(raw.resourceId!==null||raw.checkedAt!==null)||raw.status!=='unknown'&&(!raw.resourceId||!cameraTimestamp(raw.checkedAt,now).fresh))return null;
-  result.set(raw.productId,raw as ExactProductConnection);
+  // A later authenticated Shop move can narrow the Field view without
+  // changing the upstream reviewed mHelp source digest. Never surface its
+  // saved Field connection under Shop; do not require an identical subset.
+  seen.add(raw.productId);
+  if(expected.has(raw.productId))result.set(raw.productId,raw as ExactProductConnection);
  }
  return result.size===expected.size?result:null;
 }
