@@ -35,17 +35,30 @@ export function currentOwnerPlacements(audits:unknown,devices:unknown):Row[] {
   if(!previous||BigInt(idString(a.id)!)>BigInt(idString(previous.id)!))latest.set(key,a);
   const previousMarked=marked.get(key);if(a.contract==='COS_CAMERA_PLACEMENT_V2'&&(!previousMarked||BigInt(idString(a.id)!)>BigInt(idString(previousMarked.id)!)))marked.set(key,a);
  }
+ // Request-local indexes retain every duplicate/invalid ID and every alias.
+ // Build lazily to retain validation order, including empty-history behavior.
+ let currentByKey:Map<string,(string|null)[]>|undefined;
+ let aliasesByMatch:Map<string,Set<string>>|undefined;
  const overrides:Row[]=[];
  for(const latestAudit of latest.values()){
   const a=latestAudit.contract==='COS_CAMERA_PLACEMENT_V2'?latestAudit:marked.get(auditKey(latestAudit.unit_key));if(!a)continue;
   let conflictReason=latestAudit!==a?'Camera inventory changed after the last Owner move. Review this unit’s identity.':null;
   const ids=Array.isArray(a.device_ids)?a.device_ids.map(idString):[];
-  const current=devices.filter(d=>object(d)&&auditKey(d.unit_key)===auditKey(a.unit_key)).map(d=>idString(d.id));
+  if(!currentByKey){
+   currentByKey=new Map();
+   devices.forEach(d=>{if(object(d)){const key=auditKey(d.unit_key),ids=currentByKey!.get(key)||[];ids.push(idString(d.id));currentByKey!.set(key,ids);}});
+  }
+  const current=currentByKey.get(auditKey(a.unit_key))||[];
   if(!ids.length||ids.some(id=>!id)||current.some(id=>!id)||new Set(ids).size!==ids.length||new Set(current).size!==current.length||ids.length!==current.length||ids.some(id=>!current.includes(id)))conflictReason='Camera identity changed after its placement move. Review this unit before using its field location.';
   if(!['SHOP','FIELD'].includes(a.placement)||a.action!==(a.placement==='SHOP'?'MOVE_TO_ROOT':'MOVE_TO_FIELD')||!Number.isFinite(stamp(a.created_at))||!uuid(a.request_id)||!uuid(a.control_id)
    ||a.placement==='FIELD'&&(!text(a.site_label,250)||!text(a.street_address,600)))fail('The saved Owner placement is incomplete.');
   const matchKey=placementMatchKey(a.unit_key);
-  if(devices.some(d=>placementMatchKey(d.unit_key)===matchKey&&auditKey(d.unit_key)!==auditKey(a.unit_key)))conflictReason='Camera aliases need review before this unit’s placement can be shown.';
+  if(!aliasesByMatch&&!devices.some(d=>d==null)){
+   aliasesByMatch=new Map();
+   devices.forEach(d=>{const key=placementMatchKey(d.unit_key),aliases=aliasesByMatch!.get(key)||new Set<string>();aliases.add(auditKey(d.unit_key));aliasesByMatch!.set(key,aliases);});
+  }
+  const aliases=aliasesByMatch?.get(matchKey);
+  if(aliasesByMatch?aliases&&(aliases.size>1||!aliases.has(auditKey(a.unit_key))):devices.some(d=>placementMatchKey(d.unit_key)===matchKey&&auditKey(d.unit_key)!==auditKey(a.unit_key)))conflictReason='Camera aliases need review before this unit’s placement can be shown.';
   overrides.push({...a,matchKey,conflictReason});
  }
  return overrides;

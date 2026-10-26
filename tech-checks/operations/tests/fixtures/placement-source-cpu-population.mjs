@@ -1,0 +1,8 @@
+export function sourceFixture(count=1001){
+ const now=Date.parse('2026-10-26T13:00:00Z'),hash='a'.repeat(64),observed='2026-10-26T00:00:00Z';
+ const inventoryItems=Array.from({length:count},(_,i)=>({id:'11111111-1111-4111-8111-'+String(i+1).padStart(12,'0'),unitNumber:'RECON '+(i+1),readOnly:false,placement:'SHOP',currentLocationType:'shop'}));
+ const records=inventoryItems.map((u,i)=>({productId:String(i+1),unitNumber:u.unitNumber,category:'Recon',customerId:'1',customer:'Fixture customer',sourceAddress:{street:'1 Fixture Street',city:'Houston',state:'TX',zip:'77001'},sourceRow:i+2,placement:i<284?'FIELD':'SHOP',lifecycle:'UNFLAGGED',binding:{productId:String(i+1),trackerId:null,trackerLabel:null,nativeUnitId:u.id,nativeLabel:u.unitNumber,fullLabel:u.unitNumber,matchMethod:'reviewed_product_id',evidenceSha256:hash,expectedGuard:hash,guardCurrent:true}}));
+ const upload={contract:'COS_MHELP_API_V1',origin:'mhelpdesk_api',portalId:'224643',complete:true,recordCount:count,apiMissingRecords:[],reviewed:true,sourceSha256:hash,payloadSha256:hash,receivedAt:observed,receivedAtPrecision:'second',exportAsOf:null,records};
+ const audits=Array.from({length:54},(_,i)=>({id:String(i+1),unit_key:'RECON '+(i%7+1),device_ids:[String(i%7+1)],contract:i>=47?'COS_CAMERA_PLACEMENT_V2':null,placement:'SHOP',action:'MOVE_TO_ROOT',created_at:'2026-10-25T00:00:00Z',request_id:'22222222-2222-4222-8222-222222222222',control_id:'99999999-9999-4999-8999-'+String(i%7+1).padStart(12,'0')}));
+ return {snapshot:{inventoryItems,items:[],summary:{fieldUnits:0}},upload,audits,identity:{unitIdentities:[],identityWarnings:[]},now};
+}

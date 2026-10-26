@@ -1,0 +1,111 @@
+{
+  "syntheticOnly": true,
+  "engine": "v24.19.0",
+  "productionRequests": 0,
+  "providerCalls": 0,
+  "scope": "currentOwnerPlacements only; not hosted request latency or demonstrated production trigger",
+  "populations": [
+    {
+      "units": 100,
+      "devices": 400,
+      "audits": 100,
+      "samples": {
+        "baseline": [
+          {
+            "cpuMs": 19.07,
+            "wallMs": 17.35493299999999
+          },
+          {
+            "cpuMs": 16.875,
+            "wallMs": 15.91314699999998
+          },
+          {
+            "cpuMs": 16.862,
+            "wallMs": 16.255081999999987
+          },
+          {
+            "cpuMs": 18.551,
+            "wallMs": 17.637118000000015
+          },
+          {
+            "cpuMs": 16.638,
+            "wallMs": 15.955419999999975
+          }
+        ],
+        "candidate": [
+          {
+            "cpuMs": 1.559,
+            "wallMs": 1.1968750000000057
+          },
+          {
+            "cpuMs": 1.572,
+            "wallMs": 0.7374430000000132
+          },
+          {
+            "cpuMs": 0.487,
+            "wallMs": 0.46437099999999987
+          },
+          {
+            "cpuMs": 0.8,
+            "wallMs": 0.7595660000000066
+          },
+          {
+            "cpuMs": 0.421,
+            "wallMs": 0.421165000000002
+          }
+        ]
+      }
+    },
+    {
+      "units": 1001,
+      "devices": 4004,
+      "audits": 1001,
+      "samples": {
+        "baseline": [
+          {
+            "cpuMs": 1634.36,
+            "wallMs": 1573.1356479999997
+          },
+          {
+            "cpuMs": 1641.958,
+            "wallMs": 1552.8816879999995
+          },
+          {
+            "cpuMs": 1593.336,
+            "wallMs": 1536.7845220000008
+          },
+          {
+            "cpuMs": 1590.637,
+            "wallMs": 1534.1063050000002
+          },
+          {
+            "cpuMs": 1593.717,
+            "wallMs": 1538.846442000001
+          }
+        ],
+        "candidate": [
+          {
+            "cpuMs": 7.518,
+            "wallMs": 5.218423000000257
+          },
+          {
+            "cpuMs": 10.422,
+            "wallMs": 4.832229999999981
+          },
+          {
+            "cpuMs": 5.177,
+            "wallMs": 4.125713999999789
+          },
+          {
+            "cpuMs": 5.497,
+            "wallMs": 4.290132000000085
+          },
+          {
+            "cpuMs": 4.417,
+            "wallMs": 4.176600999999209
+          }
+        ]
+      }
+    }
+  ]
+}
