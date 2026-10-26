@@ -42,13 +42,13 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
 test('Offline Fleet filter hides unrelated saved address pins without dropping the red unit',async({page})=>{
  const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health});
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(7);
- await app.getByLabel('Fleet status').selectOption('offline');
+ await app.getByLabel('Field inventory status').selectOption('offline');
  const markers=app.locator('.cos-mhelp-address-marker');
  await expect(markers).toHaveCount(1);
  await expect(markers.first()).toHaveAttribute('data-mhelp-product-id','1002');
  await expect(markers.first()).toHaveAttribute('data-health','offline');
  await expect(app.locator('.cos-compact-group-marker')).toHaveCount(0);
- await app.getByLabel('Fleet status').selectOption('all');
+ await app.getByLabel('Field inventory status').selectOption('all');
  await expect(markers).toHaveCount(7);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);

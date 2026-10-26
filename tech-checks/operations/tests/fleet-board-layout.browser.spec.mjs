@@ -14,8 +14,11 @@ for(const it of [false,true])test(`main Fleet board is map-first and source-labe
  await expect(board.locator('.cos-fleet-command')).toHaveCount(0);
  await expect(board.locator('.cos-fleet-map-panel')).toHaveAttribute('aria-busy','false');
  await board.getByRole('searchbox',{name:'Search units, customers, sites or addresses'}).fill('Helios');
- await expect(stats.locator('.cos-fleet-stat-field strong')).toHaveText('287');
- await expect(stats.locator('.cos-fleet-stat-unknown strong')).toHaveText('284');
+ // Search scopes the diagnostic representations; the accepted source census is unchanged.
+ await expect(stats.locator('.cos-fleet-stat-field')).toContainText('COMBINED FIELD');
+ await expect(stats.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(stats.locator('.cos-fleet-stat-unknown strong')).toHaveText('0');
+ await expect(board.getByRole('region',{name:'mHelpDesk equipment Product-ID inventory'})).toContainText('287 Field');
  await board.getByRole('searchbox',{name:'Search units, customers, sites or addresses'}).fill('');
  const map=await board.locator('.cos-fleet-map-panel').boundingBox();
  const units=await board.locator('.cos-fleet-unit-panel').boundingBox();
