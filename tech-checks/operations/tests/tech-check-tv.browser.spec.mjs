@@ -32,7 +32,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
   // Pause at a future instant while the page is still blank, before app timers exist.
   await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
   if(pausedClock)await page.clock.pauseAt(new Date(time));
-  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetFailures={};
+  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
   if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   state.fleetUnits=[unit];state.cameraRows=[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
@@ -69,6 +69,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
       }finally{state.pendingDaily--;}
       return;
     }
+    if(['/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(path)){state.fleetRequests.push({path,method,at:await page.evaluate(()=>Date.now())});if(path==='/api/field-map'&&state.fieldGate)await state.fieldGate.promise;}
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
@@ -403,4 +404,106 @@ test('TV never combines a newly arrived source with the preceding health read',a
  state.cameraGate.resolve();state.cameraGate=null;
  await expect(summary).toContainText('0 online');await expect(summary).toContainText('5 unverified');
  expect(state.writes).toEqual([]);
+});
+
+
+const savedReadCounts=state=>Object.fromEntries(['field-map','camera-health/summary-v3','routers'].map(path=>[path,state.fleetRequests.filter(r=>r.path==='/api/'+path).length]));
+async function coldFailure(page,status=546){
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.fleetFailures['/api/field-map']=status;state.settings={sections:['map'],revision:1,updatedAt:time};
+ await page.clock.runFor(60000);
+ await expect(frame.locator('.tv-fleet-loading')).toHaveText('Fleet information is unavailable.');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('Field equipment unavailable');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('— unverified');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('— mHelp address pins');
+ await expect(frame.locator('.tv-fleet-summary')).not.toContainText('0 COS diagnostic units');
+ return {state,frame};
+}
+
+test('initial field-map HTTP546 retries one shared saved pair after 30 seconds and recovers',async({page})=>{
+ const {state,frame}=await coldFailure(page);const before=savedReadCounts(state);
+ state.fleetFailures={};await page.clock.runFor(29999);expect(savedReadCounts(state)).toEqual(before);
+ await page.clock.runFor(1);
+ await expect(frame.locator('.tv-fleet-loading')).toHaveCount(0);
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 COS diagnostic units');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 online');
+ expect(savedReadCounts(state)).toEqual({'field-map':2,'camera-health/summary-v3':2,routers:2});
+ expect(state.fleetRequests.every(r=>r.method==='GET')).toBe(true);
+ expect(state.cameraRows[0].serviceEvidence.observedAt).toBe(time);
+ await page.clock.runFor(899999);expect(savedReadCounts(state)['field-map']).toBe(2);
+ await page.clock.runFor(30001);await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(3);
+ expect(state.writes).toEqual([]);
+});
+
+test('persistent initial HTTP546 has only one short retry and never displays zero inventory',async({page})=>{
+ const {state,frame}=await coldFailure(page);await page.clock.runFor(30000);
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(2);
+ await expect(frame.locator('.tv-fleet-loading')).toHaveText('Fleet information is unavailable.');
+ await page.clock.runFor(14*60000);expect(savedReadCounts(state)['field-map']).toBe(2);
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('Field equipment unavailable');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('— GPS-verified');
+ expect(state.writes).toEqual([]);
+});
+
+test('hidden initial-recovery deadline waits for visibility and never overlaps a slow retry',async({page})=>{
+ const {state,frame}=await coldFailure(page);
+ await frame.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);
+ state.fleetFailures={};state.fieldGate=deferred();
+ await frame.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));document.dispatchEvent(new Event('visibilitychange'));});
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(2);
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(2);
+ state.fieldGate.resolve();state.fieldGate=null;
+ await expect(frame.locator('.tv-fleet-loading')).toHaveCount(0);
+ expect(savedReadCounts(state)['camera-health/summary-v3']).toBe(2);expect(state.writes).toEqual([]);
+});
+
+test('disabling TV fleet cancels the pending cold-load retry',async({page})=>{
+ const {state,frame}=await coldFailure(page);
+ state.settings={sections:['shop'],revision:2,updatedAt:time};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','shop');
+ const count=savedReadCounts(state)['field-map'];await page.clock.runFor(60000);
+ expect(savedReadCounts(state)['field-map']).toBe(count);expect(state.writes).toEqual([]);
+});
+
+for(const status of [401,403,409])test('initial field-map HTTP'+status+' is not automatically replayed',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.fleetFailures['/api/field-map']=status;state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(1);
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);expect(state.writes).toEqual([]);
+});
+
+test('invalid initial field-map shape is not automatically replayed',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.fieldMapExtras={items:[state.fleetUnits[0],state.fleetUnits[0]]};state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
+ await expect(frame.locator('.tv-fleet-warning')).toContainText('Field locations');
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);expect(state.writes).toEqual([]);
+});
+
+test('the initial recovery delay starts after the failed field read settles',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.fieldGate=deferred();state.fleetFailures['/api/field-map']=546;state.settings={sections:['map'],revision:1,updatedAt:time};
+ await page.clock.runFor(60000);await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(1);
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);
+ state.fieldGate.resolve();state.fieldGate=null;
+ await expect(frame.locator('.tv-fleet-loading')).toHaveText('Fleet information is unavailable.');
+ state.fleetFailures={};await page.clock.runFor(29999);expect(savedReadCounts(state)['field-map']).toBe(1);
+ await page.clock.runFor(1);await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(2);
+ await expect(frame.locator('.tv-fleet-loading')).toHaveCount(0);expect(state.writes).toEqual([]);
+});
+
+test('session invalidation cancels an already scheduled initial retry',async({page})=>{
+ const {state,frame}=await coldFailure(page);
+ await frame.locator('body').evaluate(()=>window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}})));
+ await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);expect(state.writes).toEqual([]);
+});
+
+test('manual saved-data refresh stays immediate and cancels the pending initial retry',async({page})=>{
+ const {state,frame}=await coldFailure(page);state.fleetFailures={};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.tv-fleet-loading')).toHaveCount(0);
+ expect(savedReadCounts(state)['field-map']).toBe(2);
+ await page.clock.runFor(30000);expect(savedReadCounts(state)['field-map']).toBe(2);
+ expect(state.cameraRows[0].serviceEvidence.observedAt).toBe(time);expect(state.writes).toEqual([]);
 });
