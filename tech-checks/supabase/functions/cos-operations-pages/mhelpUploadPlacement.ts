@@ -41,12 +41,12 @@ const historicalOnly=(row:Row)=>({
  historicalHasUnitGps:row.hasUnitGps??row.historicalHasUnitGps??false,hasUnitGps:false,latitude:null,longitude:null,coordinateSource:null,locationVerification:'coordinates_unverified',locationVerifiedAt:null,locationHistoryId:null,
  importedInstallation:null,locationImportedGeocode:null,locationSourceRecorded:null,addressEstimateTrackerId:null,addressEstimateUnitNumber:null,
 });
-function blockingReason(row:Row,b:Row,audits:Row[],identity:Row|undefined,cutoff:number,groupRows:Row[]):string|null{
+function blockingReason(row:Row,b:Row,audits:Row[],identity:Row|undefined,cutoff:number,groupRows:Row[],concernKey=placementIdentityConcernKey):string|null{
  if(row.placementReviewReason||row.placementStatus==='needs_identity_review'||row.representationStatus==='conflict'||(identity?.identityWarnings||[]).some((w:Row)=>w.unitId===row.id))return 'identity_conflict';
  const proofs=[...(identity?.unitIdentities||[]),...(identity?.ownerConfirmedUnitIdentities||[])].filter(p=>p.unitId===row.id);
- const concerns=[row.unitNumber,b.trackerLabel,b.nativeLabel,...proofs.flatMap(p=>p.unitKeys||[])].filter(Boolean).map(placementIdentityConcernKey);
+ const concerns=[row.unitNumber,b.trackerLabel,b.nativeLabel,...proofs.flatMap(p=>p.unitKeys||[])].filter(Boolean).map(concernKey);
  const devices=proofs.flatMap(p=>p.deviceIds||[]);
- const related=audits.filter(a=>[row.id,b.trackerId,b.nativeUnitId].filter(Boolean).includes(a.control_id)||concerns.includes(placementIdentityConcernKey(a.unit_key))||Array.isArray(a.device_ids)&&a.device_ids.some((v:unknown)=>devices.includes(String(v))));
+ const related=audits.filter(a=>[row.id,b.trackerId,b.nativeUnitId].filter(Boolean).includes(a.control_id)||concerns.includes(concernKey(a.unit_key))||Array.isArray(a.device_ids)&&a.device_ids.some((v:unknown)=>devices.includes(String(v))));
  const confirmed=row.mhelpConfirmedAssignment,sourceTime=stamp(confirmed?.observedAt);
  const protectedTimes=[...related.map(a=>stamp(a.created_at)),...groupRows.flatMap(member=>[...(member.placementSource==='owner'?[stamp(member.placementUpdatedAt)]:[]),...(member.hasUnitGps===true?[stamp(member.gpsRecordedAt)]:[]),...(member.installedSiteId?[stamp(member.placementUpdatedAt)]:[])])];
  const protectedAfterSource=protectedTimes.some(t=>!Number.isFinite(t)||t>=cutoff&&(!Number.isFinite(sourceTime)||t>=sourceTime));
@@ -108,6 +108,9 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
  const byId=new Map<string,Row>();for(const row of snapshot.inventoryItems){if(!object(row)||!uuid(row.id)||byId.has(row.id))throw Error('Invalid upload target inventory');byId.set(row.id,row);}
+ // Memoize only pure label normalization within this projection; never source proof.
+ const concernKeys=new Map<unknown,string>();
+ const concernKey=(value:unknown)=>{let key=concernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);concernKeys.set(value,key);}return key;};
  const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
  for(const r of receipt.records){const key=r.customer.trim().replace(/\s+/g,' ').toLowerCase();customerIds.set(key,new Set([...(customerIds.get(key)||[]),r.customerId]));}
  const records=receipt.records.map((r:Row)=>{
@@ -123,7 +126,7 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
    else{
     state='linked';reason=null;unitIds.push(...targets.map(t=>t.id));
     const groupRows=targets.map(t=>byId.get(t.id)!);
-    const groupBlock=groupRows.map(row=>blockingReason(row,b,audits,identity,cutoff,groupRows)).find(Boolean);
+    const groupBlock=groupRows.map(row=>blockingReason(row,b,audits,identity,cutoff,groupRows,concernKey)).find(Boolean);
     if(groupBlock){reason=groupBlock;if(groupBlock==='identity_conflict')state='held';}
     for(const target of groupBlock?[]:targets){
      const row=byId.get(target.id)!,preserved=retainedLocation(row,r,b,options.validatedLocationProofs?.get(row.id),customerIds);
@@ -143,7 +146,7 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
   if(!object(removed)||!id(removed.productId)||receipt.records.some((r:Row)=>r.productId===removed.productId))throw Error('Invalid absent Product-ID receipt');
   const b=removed.binding;if(!b||b.guardCurrent!==true)continue;
   const targets=[{id:b.nativeUnitId,label:b.nativeLabel},{id:b.trackerId,label:b.trackerLabel}].filter(t=>t.id);
-  const rows=targets.map(t=>byId.get(t.id));if(rows.some((r,i)=>!r||r.unitNumber!==targets[i].label)||rows.some(r=>blockingReason(r!,b,audits,identity,stamp(receipt.receivedAt),rows as Row[])))continue;
+  const rows=targets.map(t=>byId.get(t.id));if(rows.some((r,i)=>!r||r.unitNumber!==targets[i].label)||rows.some(r=>blockingReason(r!,b,audits,identity,stamp(receipt.receivedAt),rows as Row[],concernKey)))continue;
   for(const row of rows as Row[])if(!changes.has(row.id))changes.set(row.id,{...row,uploadLifecycle:'MISSING',uploadActiveInventoryEligible:false,mhelpInventoryReview:'Not returned by the complete mHelpDesk inventory. Saved equipment and history are retained.'});
  }
  const inventoryItems=snapshot.inventoryItems.map((r:Row)=>changes.get(r.id)||r),priorField=new Set(snapshot.items.map((r:Row)=>r.id));

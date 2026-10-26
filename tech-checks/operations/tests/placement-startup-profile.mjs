@@ -63,17 +63,17 @@ const units=Array.from({length:1001},(_,i)=>({id:'11111111-1111-4111-8111-'+Stri
 const devices=Array.from({length:739},(_,i)=>({id:String(i+1),unit_key:'RECON '+(i+1),source:'vigilant_control_center',device_type:'IPC',device_serial:'synthetic'+i,external_device_id:'synthetic'+i,device_name:'Synthetic '+i,organization:'ROOT',activation_state:'active',source_status:'online'}));
 const upload={contract:'COS_MHELP_API_V1',origin:'mhelpdesk_api',portalId:'224643',complete:true,recordCount:1001,apiMissingRecords:[],reviewed:true,sourceSha256:'a'.repeat(64),payloadSha256:'b'.repeat(64),receivedAt:'2026-10-26T00:00:00Z',receivedAtPrecision:'second',exportAsOf:null,records:units.map((u,i)=>({productId:String(i+1),unitNumber:u.unitNumber,category:'Recon',customerId:'1',customer:'Fixture customer',sourceAddress:{street:'1 Fixture Street',city:'Houston',state:'TX',zip:'77001'},sourceRow:i+2,placement:i<284?'FIELD':'SHOP',lifecycle:'UNFLAGGED',binding:{productId:String(i+1),trackerId:null,trackerLabel:null,nativeUnitId:u.id,nativeLabel:u.unitNumber,fullLabel:u.unitNumber,matchMethod:'reviewed_product_id',evidenceSha256:'c'.repeat(64),expectedGuard:'d'.repeat(64),guardCurrent:true}}))};
 const audits=Array.from({length:54},(_,i)=>({id:String(i+1),unit_key:'RECON '+(i%7+1),device_ids:[String(i%7+1)],contract:i>=47?'COS_CAMERA_PLACEMENT_V2':null,placement:'SHOP',action:'MOVE_TO_ROOT',created_at:'2026-10-25T00:00:00Z',request_id:recordId,control_id:'99999999-9999-4999-8999-'+String(i%7+1).padStart(12,'0')}));
-const calls=[],base=transport({},calls);let outage=false;
+const calls=[],base=transport({},calls);let outage=false,scenario='load';
 
 const fetch=async(url,init)=>{
  if(outage&&url.endsWith('/rpc/appdeploy_field_map_snapshot'))return json({message:'Synthetic source unavailable'},503);
  if(url.includes('/camera_health_current?')||url.includes('/equipment_master?')||url.includes('/camera_integrations?'))return json([]);
- if(url.endsWith('/rpc/cos_fleet_placement_evidence_v1'))return json(audits.slice().reverse());
+ if(url.endsWith('/rpc/cos_fleet_placement_evidence_v1'))return json(audits.map(a=>scenario==='newer-history'?{...a,created_at:'2026-10-26T12:00:00Z'}:a).reverse());
  if(url.includes('/equipment_units?')){const offset=Number(new URL(url).searchParams.get('offset')||0);return json(units.slice(offset,offset+1000));}
  if(url.includes('/camera_devices?'))return json(devices);
  if(url.endsWith('/rpc/appdeploy_field_map_snapshot'))return json({items:[],inventoryItems:units,summary:{fieldUnits:0},generatedAt:'2026-10-26T00:00:00Z'});
  if(url.endsWith('/rpc/cos_geocode_sources_map_projection'))return json([]);
- if(url.endsWith('/rpc/cos_mhelp_placement_snapshot'))return json({contract:'COS_MHELP_PLACEMENT_V1',items:[],enabled:true,upload});
+ if(url.endsWith('/rpc/cos_mhelp_placement_snapshot')){const value=structuredClone(upload);if(scenario==='malformed-upload')value.complete=false;if(scenario==='guard-changed')value.records[0].binding.guardCurrent=false;return json({contract:'COS_MHELP_PLACEMENT_V1',items:[],enabled:true,upload:value});}
  if(url.endsWith('/rpc/cos_mhelp_location_snapshot'))return json(null);
  return base(url,init);
 };
@@ -82,14 +82,21 @@ const report={syntheticOnly:true,productionRequests:0,units:1001,devices:739,aud
 const outputs=new Map();
 for(const [variant,factory] of Object.entries(variants)){
  const handler=factory({platformUrl:'https://platform.example',serviceKey:'synthetic',fetch,mhelpPlacementEnabled:true});
- for(const mode of ['load','repeat','failure','retry','stale','partial']){
-  outage=mode==='failure';for(const d of devices){d.source_status=mode==='partial'?null:'online';d.source_last_seen_at=mode==='stale'?'2026-10-20T00:00:00Z':'2026-10-26T12:55:00Z';}
+ for(const mode of ['load','repeat','failure','retry','stale','partial','newer-history','guard-changed','malformed-upload']){
+  scenario=mode;outage=mode==='failure';for(const d of devices){d.source_status=mode==='partial'?null:'online';d.source_last_seen_at=mode==='stale'?'2026-10-20T00:00:00Z':'2026-10-26T12:55:00Z';}
   for(const path of ['/api/field-map','/api/camera-health/summary-v3']){
    const cpu=process.cpuUsage(),start=performance.now(),response=await handler(request(path)),body=await response.json(),usage=process.cpuUsage(cpu);
    const key=mode+path;if(variant==='baseline')outputs.set(key,{status:response.status,body});else assert.deepEqual({status:response.status,body},outputs.get(key));
-   if(mode!=='failure')assert.equal(response.status,200,JSON.stringify(body));
-   report.runs.push({variant,mode,path,status:response.status,cpuMs:(usage.user+usage.system)/1000,wallMs:performance.now()-start,inventory:body.inventoryItems?.length,census:body.fleetRoster?.summary});
+   if(!['failure','malformed-upload'].includes(mode))assert.equal(response.status,200,JSON.stringify(body));
+   report.runs.push({variant,mode,path,status:response.status,cpuMs:(usage.user+usage.system)/1000,wallMs:performance.now()-start,inventory:body.inventoryItems?.length,responseBytes:Buffer.byteLength(JSON.stringify(body)),census:body.fleetRoster?.summary});
   }
  }
 }
-fs.writeFileSync('/tmp/cos-startup-profile.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
+const handlers=Object.fromEntries(Object.entries(variants).map(([name,factory])=>[name,factory({platformUrl:'https://platform.example',serviceKey:'synthetic',fetch,mhelpPlacementEnabled:true})]));
+scenario='load';outage=false;report.alternating=[];
+for(let round=0;round<7;round++)for(const variant of round%2?['candidate','baseline']:['baseline','candidate']){
+ const start=performance.now(),cpu=process.cpuUsage();const response=await handlers[variant](request('/api/field-map'));const body=await response.json(),usage=process.cpuUsage(cpu);assert.equal(response.status,200);
+ if(round>0)report.alternating.push({round,variant,cpuMs:(usage.user+usage.system)/1000,wallMs:performance.now()-start});
+ assert.equal(body.fleetRoster.summary.totalRecords,1001);assert.equal(body.fleetRoster.summary.field,284);assert.equal(body.fleetRoster.summary.shop,717);
+}
+fs.writeFileSync('/tmp/cos-startup-profile.json' ,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));

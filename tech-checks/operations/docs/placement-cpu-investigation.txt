@@ -1,9 +1,9 @@
 COS intermittent startup CPU investigation — 2026-10-26
 
-Status: tested optimization candidate, not a demonstrated resolution of the live incident.
-No deployment, migration, credential, permission, inventory, tracker, binding, provider,
-monitoring or frontend change. The pending default Fleet-list task and its branch are
-outside this change. Base: main 9c97c925ba62071f8d851c608037b6fdccee98ed (PR307).
+Status: expanded, measured startup CPU reduction candidate; not deployed.
+No migration, credential, permission, inventory, tracker, binding, provider,
+monitoring or frontend change. The pending default Fleet-list task and its branch
+are outside this change. Base: main 9c97c925ba62071f8d851c608037b6fdccee98ed.
 
 Reported live evidence supplied to this investigation:
 13:03:58.188 UTC HTTP546 WORKER_RESOURCE_LIMIT, CPU2068ms, wall22.918s;
@@ -24,39 +24,55 @@ marked Owner-placement groups. No row identities, IPs or other production data
 were copied into test fixtures.
 
 Finding and patch:
-currentOwnerPlacements repeatedly normalized every device label for each current
-Owner audit. It now builds invocation-local membership/alias indexes. Duplicate
-and malformed IDs are retained; exact key membership and alias denial remain.
-The indexes are lazy, preserve error order, and are discarded after each call.
-Malformed null device collections retain the original short-circuit fallback.
-No source read, identity digest, timestamp, freshness rule or guard was removed.
-No cross-request cache or camera classification fallback was introduced.
+A V8 CPU profile of the complete deployed v123 startup path identified repeated
+placementMatchKey / placementIdentityConcernKey work in upload-history checks and
+the final effective Field/Shop projection, in addition to Owner placement checks.
+The complete synthetic fixture uses 1001 native units and mHelp records,739 camera
+records,54 audit rows and7 marked Owner groups. Source identity distribution and
+payloads remain synthetic; the counts alone do not reproduce production behavior.
 
-Local measurement, Node v24.19.0, five alternating samples:
-100 Owner groups/400 devices: baseline mean CPU17.5992ms, candidate0.9678ms.
-1001 Owner groups/4004 devices: baseline1610.8016ms, candidate6.6062ms.
-The V8 profile concentrated baseline samples in placementMatchKey and its regexes.
-These are stress fixtures, NOT the observed production Owner population. It would
-be incorrect to infer a 99% reduction in actual startup CPU from that stress test.
+currentOwnerPlacements now builds invocation-local membership/alias indexes.
+projectMhelpUploadPlacement and projectEffectiveFleetPlacement reuse pure label
+normalization within each projection invocation. Every audit/history comparison,
+source reread, duplicate check, UUID match, digest and freshness decision remains.
+No memoized value survives a projection call. This is not a source/permission cache.
+The full v123 artifact contains original and overlay implementations; the preparer
+patches both using guarded AST spans and preserves all unrelated bytes/settings.
 
-Whole deployed-artifact proof:
-An offline harness boots both full v123 and the single-function candidate with
-injected synthetic transport, fixed time,739 camera records,54 audits/7 marked
-groups,1001 native units and1001 mHelp source records. Across both versions it
-compares complete responses for /api/field-map and /api/camera-health/summary-v3:
-normal load,repeat,source failure,retry,stale health and partial health.
-All24 responses matched exactly. Successful maps retained1001 total/284 Field/
-717 Shop. Map failure remained503; health survived its optional map-source failure.
-Subsequent retry recovered the complete census. A failure never returned zero totals.
+Full-startup alternating measurement (Node v24.19.0, six measured rounds each,
+one warm-up round excluded): baseline mean CPU403.786ms, candidate295.365ms,
+a reduction of108.421ms /26.85%. Wall means358.819ms and253.532ms. Tests compare
+complete responses outside the timed interval. These are synthetic in-process
+measurements, not hosted latency or proof of the live2-second trigger. The earlier
+1001-Owner-group stress result (1611ms to6.6ms) overstates production benefit and
+is retained only as a scale test; production has seven marked Owner groups.
+
+Full-artifact parity covers36 responses: normal load,repeat,source failure,retry,
+stale health,partial health,newer Owner history,changed guard and malformed upload,
+on both field-map and camera-health/summary-v3, before and after. Successful maps
+retain1001 total/284 Field/717 Shop. A failed map read returns503, not zero totals.
+Health survives optional map-source failure; a subsequent retry restores the map.
 This is backend parity, not a new frontend saved-data retention implementation.
 
-Observed whole-map CPU range, five successful reads: baseline364.876–529.433ms,
-candidate355.316–433.509ms. Successful health reads remained below230ms. These
-runs are not randomized, production-equivalent latency or a reliable percentage
-comparison. They do not reproduce the live2-second exhaustion. Production source
-shape, concurrent request pressure and the exact failing action remain unproven.
-Do not describe this patch as having fixed the incident or recommend deployment
-as the definitive repair solely from these measurements.
+Tests and tooling:
+190 focused tests passed on the expanded candidate, including frozen baseline
+comparisons for malformed/duplicate/variant/decimal/history/source changes and
+cross-call freshness. Full artifact boot, closure reversal and denial tests pass.
+Build passed on the original identical frontend; expanded backend typecheck passes.
+Original PR head's full local suite had4833 passes,3 skips and one native V8 fatal
+JitPageReference::UnregisterAllocation crash while disposing WebAssembly/PGlite.
+The unchanged failing file passed all27 tests alone. Existing Node22 hosted CI
+subsequently passed the complete original-head npm test suite. This distinguishes
+the local Node24 engine crash from a reproducible assertion failure; the exact
+upstream V8 defect is not established. Expanded-head CI must be checked separately.
+
+Local Playwright hangs while registering its ESM loader through node:module.register.
+NODE_DEBUG=esm localized the stop before configuration/test execution. The existing
+PW_DISABLE_TS_ESM=1 opt-out plus --import tsx allows all13 selected browser tests to
+start without changing dependencies/config. They then fail at browser launch because
+the pinned Chromium shell is absent. Installation to /tmp was attempted once;
+the environment returned HTTP403 'Domain forbidden' for the official CDN hosts.
+No download-policy workaround was attempted. Use existing hosted Node22/browser CI.
 
 Verification and reproduction (from tech-checks/operations):
 COS_CPU_DEPLOYED_CAPTURE=/tmp/cos-v123.json npm test
@@ -70,12 +86,13 @@ node scripts/prepare-placement-cpu.mjs /tmp/cos-v123.json /tmp/cos-cpu-release.j
 The full live capture/release packet stays outside git. The repository contains
 synthetic-only fixtures and measurement reports. The preparation script rejects
 archive/version/source/config/entrypoint drift, wrong closure and already-patched
-input. It preserves every byte before/after currentOwnerPlacements and every
+input. It records reversible AST edits for the original/overlay concern functions and
+preserves every byte outside those edits and currentOwnerPlacements, plus every
 other file and deployment setting. The artifact proof boots the entire candidate
 and checks unauthenticated denial, projection parity and preparation rejections.
 
 Scoped future release proposal, held:
-Only the prepared replacement of currentOwnerPlacements in existing
+Only the prepared Owner-index and request-local concern-normalization edits in existing
 cos-operations-pages, with unchanged verify_jwt=false and existing custom auth.
 No other application, function, configuration or database object is in scope.
 Before proposing authorization, finish attributing the live CPU exhaustion using
@@ -89,3 +106,16 @@ honestly; recorder/camera separation and usable troubleshooting evidence.
 One recovered refresh is not acceptance. Do not restore v122's fallback or weaken
 the guarded camera_shop_scope_fallback path. No report has been sent to IT from
 this coding task; this file and the draft PR are handoff material for the parent.
+
+Further bounded live-log correlation (same historical45-second incident window):
+Both HTTP546 failures and the subsequent BOOT_ERROR have52-byte request envelopes.
+The current client serializes {path,method,body:null}; field-map and vrm-fleet both
+produce52 bytes, so length alone is not definitive action attribution. The67-byte
+camera summary requests succeeded with roughly50KB responses. A successful52-byte
+request produced1,067,879 bytes after18,629ms, consistent with the map-sized response.
+The7cc4aa3c execution served a small52-byte response and a67-byte health response
+before a later52-byte request failed at2060ms total recorded worker CPU. Therefore
+worker lifecycle records cannot simply be treated as isolated handler CPU traces.
+No request bodies, credentials, addresses or production rows were retrieved.
+The optimization targets the profiled map projection costs; it does not prove
+that every shared-worker resource limit will disappear after release.

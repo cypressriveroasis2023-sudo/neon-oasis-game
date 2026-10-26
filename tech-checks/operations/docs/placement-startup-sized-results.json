@@ -1,0 +1,563 @@
+{
+  "syntheticOnly": true,
+  "productionRequests": 0,
+  "units": 1001,
+  "devices": 739,
+  "audits": 54,
+  "markedGroups": 7,
+  "limitations": "Synthetic identity/binding distribution, no database/network latency; not production-trigger attribution",
+  "runs": [
+    {
+      "variant": "baseline",
+      "mode": "load",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 542.25,
+      "wallMs": 450.84283800000003,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "load",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 150.231,
+      "wallMs": 152.45529399999987,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "repeat",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 410.911,
+      "wallMs": 392.588667,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "repeat",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 140.523,
+      "wallMs": 138.09412799999996,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "failure",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 1.806,
+      "wallMs": 1.748796000000084,
+      "responseBytes": 62
+    },
+    {
+      "variant": "baseline",
+      "mode": "failure",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 182.879,
+      "wallMs": 158.78357100000017,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "retry",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 411.786,
+      "wallMs": 412.0861540000001,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "retry",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 164.163,
+      "wallMs": 175.39597099999992,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "stale",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 389.424,
+      "wallMs": 387.38710200000014,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "stale",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 133.224,
+      "wallMs": 147.72424199999978,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "partial",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 376.69,
+      "wallMs": 366.9385259999999,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "partial",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 124.41,
+      "wallMs": 128.84025100000008,
+      "responseBytes": 450807
+    },
+    {
+      "variant": "baseline",
+      "mode": "newer-history",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 367.643,
+      "wallMs": 359.94917099999975,
+      "inventory": 1001,
+      "responseBytes": 5623611,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 277,
+        "shop": 724,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "newer-history",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 194.669,
+      "wallMs": 143.1860889999998,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "guard-changed",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 409.157,
+      "wallMs": 377.931638,
+      "inventory": 1000,
+      "responseBytes": 5650491,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 283,
+        "shop": 717,
+        "review": 1,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 1,
+        "linkedUnitRecords": 1000
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "guard-changed",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 121.093,
+      "wallMs": 125.29443999999967,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "baseline",
+      "mode": "malformed-upload",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 208.992,
+      "wallMs": 202.72270800000024,
+      "responseBytes": 56
+    },
+    {
+      "variant": "baseline",
+      "mode": "malformed-upload",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 126.121,
+      "wallMs": 129.09687200000008,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "load",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 321.494,
+      "wallMs": 302.6320340000002,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "load",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 119.595,
+      "wallMs": 109.30088799999976,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "repeat",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 267.152,
+      "wallMs": 260.879825,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "repeat",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 117.964,
+      "wallMs": 113.44384400000035,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "failure",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 1.272,
+      "wallMs": 1.2834249999996246,
+      "responseBytes": 62
+    },
+    {
+      "variant": "candidate",
+      "mode": "failure",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 142.872,
+      "wallMs": 123.67989200000011,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "retry",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 290.649,
+      "wallMs": 302.59987400000045,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "retry",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 144.285,
+      "wallMs": 149.67110799999955,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "stale",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 290.049,
+      "wallMs": 303.62519900000007,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "stale",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 146.386,
+      "wallMs": 149.70037299999967,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "partial",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 286.908,
+      "wallMs": 302.27469100000053,
+      "inventory": 1001,
+      "responseBytes": 5656603,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 284,
+        "shop": 717,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "partial",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 143.924,
+      "wallMs": 152.40396500000043,
+      "responseBytes": 450807
+    },
+    {
+      "variant": "candidate",
+      "mode": "newer-history",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 292.045,
+      "wallMs": 298.0966699999999,
+      "inventory": 1001,
+      "responseBytes": 5623611,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 277,
+        "shop": 724,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "newer-history",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 145.748,
+      "wallMs": 156.6450849999992,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "guard-changed",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 284.011,
+      "wallMs": 296.7638219999999,
+      "inventory": 1000,
+      "responseBytes": 5650491,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 283,
+        "shop": 717,
+        "review": 1,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 1,
+        "linkedUnitRecords": 1000
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "guard-changed",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 155.649,
+      "wallMs": 163.62823600000047,
+      "responseBytes": 450068
+    },
+    {
+      "variant": "candidate",
+      "mode": "malformed-upload",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 213.617,
+      "wallMs": 252.9639160000006,
+      "responseBytes": 56
+    },
+    {
+      "variant": "candidate",
+      "mode": "malformed-upload",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 118.653,
+      "wallMs": 125.02197499999966,
+      "responseBytes": 450068
+    }
+  ],
+  "alternating": [
+    {
+      "round": 1,
+      "variant": "candidate",
+      "cpuMs": 276.485,
+      "wallMs": 257.7620500000012
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "cpuMs": 401.011,
+      "wallMs": 362.78001199999926
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "cpuMs": 366.481,
+      "wallMs": 353.6485870000015
+    },
+    {
+      "round": 2,
+      "variant": "candidate",
+      "cpuMs": 259.13,
+      "wallMs": 250.80904799999917
+    },
+    {
+      "round": 3,
+      "variant": "candidate",
+      "cpuMs": 269.038,
+      "wallMs": 260.9831559999984
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "cpuMs": 390.648,
+      "wallMs": 380.9190859999999
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "cpuMs": 371.384,
+      "wallMs": 364.9998489999998
+    },
+    {
+      "round": 4,
+      "variant": "candidate",
+      "cpuMs": 255.263,
+      "wallMs": 247.88238499999898
+    },
+    {
+      "round": 5,
+      "variant": "candidate",
+      "cpuMs": 351.471,
+      "wallMs": 271.31192700000065
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "cpuMs": 516.41,
+      "wallMs": 422.6289420000012
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "cpuMs": 380.933,
+      "wallMs": 360.21969199999876
+    },
+    {
+      "round": 6,
+      "variant": "candidate",
+      "cpuMs": 329.736,
+      "wallMs": 304.12562699999944
+    }
+  ]
+}

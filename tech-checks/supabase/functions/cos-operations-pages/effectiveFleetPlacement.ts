@@ -10,6 +10,9 @@ const instant=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.par
  * proof of a fresh address, GPS observation, health state, or provider identity. */
 export function projectEffectiveFleetPlacement(snapshot:Row,audits:Row[],options:{confirmedPrecedenceBindings?:Row[];authorizedUploadPlacements?:Row[]}={}):Row{
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Effective fleet placement is unavailable');
+ // Memoize only pure label normalization within this projection; never source proof.
+ const concernKeys=new Map<unknown,string>();
+ const concernKey=(value:unknown)=>{let key=concernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);concernKeys.set(value,key);}return key;};
  const inventory=snapshot.inventoryItems,byId=new Map<string,Row>();
  for(const row of inventory){if(!row||typeof row.id!=='string'||typeof row.unitNumber!=='string'||byId.has(row.id))throw Error('Effective fleet inventory has inconsistent identities');byId.set(row.id,row);}
  const fieldIds=new Set<string>();
@@ -30,8 +33,8 @@ export function projectEffectiveFleetPlacement(snapshot:Row,audits:Row[],options
    &&row.placementSource==='mhelpdesk_upload'&&row.placementEvidence?.source===a.source
    &&row.placementEvidence.productId===a.productId&&row.placementEvidence.sourceSha256===a.sourceSha256&&row.placementEvidence.observedAt===a.observedAt);
   const authorizedUpload=unitUploadClaims.length===1&&uploadClaims.length===1;
-  const concern=placementIdentityConcernKey(row.unitNumber);
-  const rootHistory=audits.some(a=>a.action==='MOVE_TO_ROOT'&&placementIdentityConcernKey(a.unit_key)===concern);
+  const concern=concernKey(row.unitNumber);
+  const rootHistory=audits.some(a=>a.action==='MOVE_TO_ROOT'&&concernKey(a.unit_key)===concern);
   if(conflict)placement='UNKNOWN';
   else if((placement==='FIELD'||placement===null&&fieldIds.has(row.id))&&rootHistory&&!owner&&!reviewedImport&&!authorizedUpload){placement='UNKNOWN';reason='A prior Owner ROOT move conflicts with this imported field record. Review placement precedence.';}
   else if(placement===null)placement=fieldIds.has(row.id)?'FIELD':'UNKNOWN';

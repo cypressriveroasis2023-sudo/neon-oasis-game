@@ -17,7 +17,11 @@ test('release builder rejects unreviewed deployment identity',()=>{for(const val
 test('complete freshly captured v123 artifact boots and preserves only-function delta, errors and projections',{skip:!file},async()=>{
  const deployed=JSON.parse(fs.readFileSync(file)),saved=structuredClone(deployed),packet=prepare(deployed);
  assert.deepEqual(deployed,saved);const before=deployed.files.find(f=>f.name.endsWith('serve.ts')).content,after=packet.payload.files.find(f=>f.name.endsWith('serve.ts')).content;
- const b=declaration(before),a=declaration(after);assert.equal(before.slice(0,b.start),after.slice(0,a.start));assert.equal(before.slice(b.end),after.slice(a.end));
+ // Undo only recorded concern edits, then verify the Owner function boundary.
+ let restored=after,offset=0;const located=packet.concernEdits.map(e=>{const entry={...e,position:e.start+offset};offset+=e.text.length-(e.end-e.start);return entry;});
+ for(const e of located.reverse()){assert.equal(restored.slice(e.position,e.position+e.text.length),e.text);restored=restored.slice(0,e.position)+e.before+restored.slice(e.position+e.text.length);}
+ assert.deepEqual(packet.concernImplementations,{blockingReason:2,projectMhelpUploadPlacement:2,projectEffectiveFleetPlacement:2});
+ const b=declaration(before),a=declaration(restored);assert.equal(before.slice(0,b.start),restored.slice(0,a.start));assert.equal(before.slice(b.end),restored.slice(a.end));
  assert.deepEqual(deployed.files.filter(f=>!f.name.endsWith('serve.ts')),packet.payload.files.filter(f=>!f.name.endsWith('serve.ts')));
  const old=boot(before),next=boot(after);
  for(const size of [0,2,1001]){

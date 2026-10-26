@@ -12,8 +12,8 @@
       "mode": "load",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 529.433,
-      "wallMs": 457.39249000000007,
+      "cpuMs": 582.889,
+      "wallMs": 477.6242870000001,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -31,16 +31,16 @@
       "mode": "load",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 119.084,
-      "wallMs": 119.77005499999996
+      "cpuMs": 140.735,
+      "wallMs": 129.62113499999987
     },
     {
       "variant": "baseline",
       "mode": "repeat",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 427.206,
-      "wallMs": 409.21575600000006,
+      "cpuMs": 380.131,
+      "wallMs": 352.072846,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -58,32 +58,32 @@
       "mode": "repeat",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 118.022,
-      "wallMs": 129.50146599999994
+      "cpuMs": 103.012,
+      "wallMs": 96.477979
     },
     {
       "variant": "baseline",
       "mode": "failure",
       "path": "/api/field-map",
       "status": 503,
-      "cpuMs": 1.829,
-      "wallMs": 1.7389610000000175
+      "cpuMs": 1.881,
+      "wallMs": 1.7528650000001562
     },
     {
       "variant": "baseline",
       "mode": "failure",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 141.213,
-      "wallMs": 123.34073599999988
+      "cpuMs": 122.944,
+      "wallMs": 107.25429699999995
     },
     {
       "variant": "baseline",
       "mode": "retry",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 402.958,
-      "wallMs": 391.8010840000002,
+      "cpuMs": 369.212,
+      "wallMs": 344.24889600000006,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -101,16 +101,16 @@
       "mode": "retry",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 126.793,
-      "wallMs": 139.65421199999992
+      "cpuMs": 139.243,
+      "wallMs": 139.71044900000015
     },
     {
       "variant": "baseline",
       "mode": "stale",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 364.876,
-      "wallMs": 368.48846900000035,
+      "cpuMs": 472.535,
+      "wallMs": 442.1532150000003,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -128,16 +128,16 @@
       "mode": "stale",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 118.688,
-      "wallMs": 112.45312100000001
+      "cpuMs": 126.84,
+      "wallMs": 123.13784699999997
     },
     {
       "variant": "baseline",
       "mode": "partial",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 380.653,
-      "wallMs": 383.41331200000013,
+      "cpuMs": 430.334,
+      "wallMs": 430.9009980000001,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -155,16 +155,86 @@
       "mode": "partial",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 101.652,
-      "wallMs": 118.4201149999999
+      "cpuMs": 123.089,
+      "wallMs": 118.99478299999964
+    },
+    {
+      "variant": "baseline",
+      "mode": "newer-history",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 388.849,
+      "wallMs": 392.1291120000001,
+      "inventory": 1001,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 277,
+        "shop": 724,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "newer-history",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 214.715,
+      "wallMs": 160.97369600000047
+    },
+    {
+      "variant": "baseline",
+      "mode": "guard-changed",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 452.726,
+      "wallMs": 387.4375799999998,
+      "inventory": 1000,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 283,
+        "shop": 717,
+        "review": 1,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 1,
+        "linkedUnitRecords": 1000
+      }
+    },
+    {
+      "variant": "baseline",
+      "mode": "guard-changed",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 121.122,
+      "wallMs": 115.7388719999999
+    },
+    {
+      "variant": "baseline",
+      "mode": "malformed-upload",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 231.085,
+      "wallMs": 219.58763499999986
+    },
+    {
+      "variant": "baseline",
+      "mode": "malformed-upload",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 139.089,
+      "wallMs": 135.82954700000028
     },
     {
       "variant": "candidate",
       "mode": "load",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 433.509,
-      "wallMs": 389.4065449999998,
+      "cpuMs": 374.39,
+      "wallMs": 378.06927300000007,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -182,16 +252,16 @@
       "mode": "load",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 229.742,
-      "wallMs": 165.0543819999998
+      "cpuMs": 141.026,
+      "wallMs": 133.1747719999994
     },
     {
       "variant": "candidate",
       "mode": "repeat",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 389.436,
-      "wallMs": 361.8018809999994,
+      "cpuMs": 290.261,
+      "wallMs": 296.8173510000006,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -209,32 +279,32 @@
       "mode": "repeat",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 95.761,
-      "wallMs": 87.55179099999987
+      "cpuMs": 126.625,
+      "wallMs": 123.16658800000005
     },
     {
       "variant": "candidate",
       "mode": "failure",
       "path": "/api/field-map",
       "status": 503,
-      "cpuMs": 1.516,
-      "wallMs": 1.5079130000003715
+      "cpuMs": 1.678,
+      "wallMs": 1.666377999999895
     },
     {
       "variant": "candidate",
       "mode": "failure",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 123.346,
-      "wallMs": 107.35524900000019
+      "cpuMs": 121.886,
+      "wallMs": 105.23548099999971
     },
     {
       "variant": "candidate",
       "mode": "retry",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 355.316,
-      "wallMs": 351.1239379999997,
+      "cpuMs": 268.28,
+      "wallMs": 281.29144199999973,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -252,16 +322,16 @@
       "mode": "retry",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 91.629,
-      "wallMs": 97.02568100000008
+      "cpuMs": 120.463,
+      "wallMs": 120.58883900000001
     },
     {
       "variant": "candidate",
       "mode": "stale",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 355.905,
-      "wallMs": 355.526844,
+      "cpuMs": 270.56,
+      "wallMs": 270.87304200000017,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -279,16 +349,16 @@
       "mode": "stale",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 95.003,
-      "wallMs": 98.14523699999972
+      "cpuMs": 121.593,
+      "wallMs": 118.65702200000032
     },
     {
       "variant": "candidate",
       "mode": "partial",
       "path": "/api/field-map",
       "status": 200,
-      "cpuMs": 356.81,
-      "wallMs": 362.18244500000037,
+      "cpuMs": 271.511,
+      "wallMs": 270.225727,
       "inventory": 1001,
       "census": {
         "totalRecords": 1001,
@@ -306,8 +376,152 @@
       "mode": "partial",
       "path": "/api/camera-health/summary-v3",
       "status": 200,
-      "cpuMs": 89.107,
-      "wallMs": 99.82578999999987
+      "cpuMs": 117.681,
+      "wallMs": 117.04230999999982
+    },
+    {
+      "variant": "candidate",
+      "mode": "newer-history",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 284.2,
+      "wallMs": 273.8491810000005,
+      "inventory": 1001,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 277,
+        "shop": 724,
+        "review": 0,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 0,
+        "linkedUnitRecords": 1001
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "newer-history",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 131.925,
+      "wallMs": 131.12748600000032
+    },
+    {
+      "variant": "candidate",
+      "mode": "guard-changed",
+      "path": "/api/field-map",
+      "status": 200,
+      "cpuMs": 287.895,
+      "wallMs": 290.2817359999999,
+      "inventory": 1000,
+      "census": {
+        "totalRecords": 1001,
+        "activeRecords": 1001,
+        "field": 283,
+        "shop": 717,
+        "review": 1,
+        "excludedLifecycle": 0,
+        "sourceOnlyRecords": 1,
+        "linkedUnitRecords": 1000
+      }
+    },
+    {
+      "variant": "candidate",
+      "mode": "guard-changed",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 138.596,
+      "wallMs": 136.69486300000062
+    },
+    {
+      "variant": "candidate",
+      "mode": "malformed-upload",
+      "path": "/api/field-map",
+      "status": 503,
+      "cpuMs": 212.294,
+      "wallMs": 206.35531599999922
+    },
+    {
+      "variant": "candidate",
+      "mode": "malformed-upload",
+      "path": "/api/camera-health/summary-v3",
+      "status": 200,
+      "cpuMs": 141.843,
+      "wallMs": 143.2585250000011
+    }
+  ],
+  "alternating": [
+    {
+      "round": 1,
+      "variant": "candidate",
+      "cpuMs": 332.087,
+      "wallMs": 296.26296
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "cpuMs": 443.524,
+      "wallMs": 385.3663489999999
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "cpuMs": 395.082,
+      "wallMs": 363.8816540000007
+    },
+    {
+      "round": 2,
+      "variant": "candidate",
+      "cpuMs": 265.68,
+      "wallMs": 246.3802080000005
+    },
+    {
+      "round": 3,
+      "variant": "candidate",
+      "cpuMs": 274.125,
+      "wallMs": 252.9138750000002
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "cpuMs": 380.457,
+      "wallMs": 353.79633900000044
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "cpuMs": 384.364,
+      "wallMs": 347.707593000001
+    },
+    {
+      "round": 4,
+      "variant": "candidate",
+      "cpuMs": 246.363,
+      "wallMs": 227.70874899999944
+    },
+    {
+      "round": 5,
+      "variant": "candidate",
+      "cpuMs": 379.033,
+      "wallMs": 261.3445840000004
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "cpuMs": 453.191,
+      "wallMs": 365.9517169999999
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "cpuMs": 366.098,
+      "wallMs": 336.21155400000134
+    },
+    {
+      "round": 6,
+      "variant": "candidate",
+      "cpuMs": 274.903,
+      "wallMs": 236.58289700000023
     }
   ]
 }
