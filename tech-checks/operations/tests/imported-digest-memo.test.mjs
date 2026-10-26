@@ -9,6 +9,7 @@ const sourceUrl=new URL('../../supabase/functions/cos-operations-pages/importedS
 const source=fs.readFileSync(sourceUrl,'utf8');
 const start=source.indexOf(' // Reuse only pure hashing'),end=source.indexOf(" if(!Array.isArray(records))",start);
 let uncached=source.slice(0,start)+source.slice(end);
+uncached=uncached.replace(" // Array.map supplies its numeric index as argument two; retain unary-call semantics.\n if(typeof digest!=='function')digest=addressDigest;\n",'');
 uncached=uncached.replace('v:unknown,digest:typeof addressDigest=addressDigest','v:unknown').replace('await digest(installationAddress(v.installation))','await addressDigest(installationAddress(v.installation))').replaceAll('checkedImportedBinding(row.importedInstallation,digest)','checkedImportedBinding(row.importedInstallation)').replaceAll('checkedImportedBinding(r.binding,digest)','checkedImportedBinding(r.binding)').replace('s.nativeUnitId===binding.nativeUnitId),digest)','s.nativeUnitId===binding.nativeUnitId))').replace('await digest(row.address)','await addressDigest(row.address)');
 const hash=s=>createHash('sha256').update(s).digest('hex');
 assert.equal(hash(uncached),'8c8575262b8aece3ae72caad6758058784deab6860c150be2713608a9dd0726e','Only the reviewed local digest changes may be reversed');
@@ -47,3 +48,5 @@ test('cross-call source mutations revalidate hashes and binding fields',async()=
  const next=await countDigests(()=>projectImportedGeocodes(f.snapshot,f.records,[],[]));assert.ok(next.calls>0);assert.equal(next.value.items[0].locationImportedGeocode,undefined);
  assert.equal(await checkedImportedBinding(f.row.importedInstallation),null);
 });
+
+test('binding validator ignores Array.map index arguments while preserving valid results',async()=>{const f=fixture(),bindings=[f.row.importedInstallation,structuredClone(f.row.importedInstallation)];assert.deepEqual(await Promise.all(bindings.map(checkedImportedBinding)),await Promise.all(bindings.map(value=>baseline.checkedImportedBinding(value))));});

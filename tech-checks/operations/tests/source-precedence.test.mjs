@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -5,7 +6,7 @@ import {randomUUID,webcrypto} from 'node:crypto';
 import {fixture as nativeFixture,reset as nativeReset,seed,ORG,hash,rpc as nativeRPC} from './fixtures/geocode-sources-database-fixture.mjs';
 import {fixture as legacyFixture,reset as legacyReset,OWNER,SERVICE} from './fixtures/geocodio-database-fixture.mjs';
 import {sourcePrecedenceAuditSha256} from '../../supabase/functions/_shared/sourcePrecedence.ts';
-import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
+import {createOperationsHandler as sourceOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 import {sourceDto,createGeocodeSourcesHandler} from '../../supabase/functions/cos-geocode-sources/index.ts';
 import {checkedImportedSource,sourceIdentity} from '../../supabase/functions/camera-field-geocode/importedSources.ts';
 import {processImportedGeocodes} from '../../supabase/functions/camera-field-geocode/importedGeocodeSweep.ts';
@@ -13,6 +14,16 @@ import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBi
 import {projectOwnerPlacement} from '../../supabase/functions/cos-operations-pages/placementProjection.ts';
 import {checkedAddressEstimate} from '../src/fieldAddressEstimates.ts';
 globalThis.crypto??=webcrypto;
+// Optional complete deployed-artifact proof; all transports below stay synthetic.
+const artifactFile=process.env.COS_PRECEDENCE_ARTIFACT;
+const createOperationsHandler=artifactFile?(()=>{
+ const packet=JSON.parse(readFileSync(artifactFile,'utf8')),payload=packet.payload||packet;
+ const code=payload.files.find(f=>f.name==='cos-operations-pages/serve.ts').content;
+ const context=vm.createContext({console,crypto:webcrypto,structuredClone,TextEncoder,TextDecoder,URL,URLSearchParams,Request,Response,Headers,AbortController,AbortSignal,setTimeout,clearTimeout,Date,fetch:()=>{throw Error('Unmocked transport forbidden');},Deno:{env:{get:()=>undefined},serve:()=>{}}});
+ const external='import{importPKCS8,SignJWT}from"jose";';assert.equal(code.split(external).length,2);
+ vm.runInContext(code.replace(external,'const importPKCS8=()=>{throw Error("Signing forbidden")};const SignJWT=class {};'),context);return context.createOperationsHandler;
+})():sourceOperationsHandler;
+
 let native,legacy;
 const replacedFunctions=['app_private.cos_imported_lock_binding(uuid,jsonb)','public.cos_imported_geocode_sync(uuid,uuid,text,jsonb,text)','public.cos_imported_geocode_list_due(uuid,integer)','public.cos_imported_geocode_read_many(uuid,jsonb)','app_private.cos_postal_retry_current(app_private.cos_imported_postal_retry_jobs)','public.cos_imported_geocode_postal_ordinary_list_due(uuid,integer)'];
 let existingFunctionProperties,existingBodies;

@@ -61,7 +61,8 @@ function prepareOwnerMemo(v) {
 }
 function prepareImportedMemo(v) { prepareOwnerMemo(v); const source = v.files.find(f => f.name.endsWith('/serve.ts')), code = source.content, tree = ts.createSourceFile('serve.ts', code, ts.ScriptTarget.Latest, true), found = []; function walk(n) { if (ts.isFunctionDeclaration(n) && ['checkedImportedBinding2', 'projectImportedGeocodes'].includes(n.name?.text))
     found.push(n); ts.forEachChild(n, walk); } walk(tree); if (found.length !== 2)
-    throw Error('Unexpected functions'); const binding = found.find(n => n.name.text === 'checkedImportedBinding2'), project = found.find(n => n.name.text === 'projectImportedGeocodes'); const edits = [], add = (start, end, text) => edits.push({ start, end, text, before: code.slice(start, end) }); add(binding.parameters.end, binding.parameters.end, ',cosImportedDigest=addressDigest'); let digestCalls = 0, bindingCalls = 0; function inner(n, kind) { if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
+    throw Error('Unexpected functions'); const binding = found.find(n => n.name.text === 'checkedImportedBinding2'), project = found.find(n => n.name.text === 'projectImportedGeocodes'); const edits = [], add = (start, end, text) => edits.push({ start, end, text, before: code.slice(start, end) }); add(binding.parameters.end, binding.parameters.end, ',cosImportedDigest=addressDigest');
+    add(binding.body.getStart(tree) + 1, binding.body.getStart(tree) + 1, 'if(typeof cosImportedDigest!=="function")cosImportedDigest=addressDigest;'); let digestCalls = 0, bindingCalls = 0; function inner(n, kind) { if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
     if (n.expression.text === 'addressDigest') {
         add(n.expression.getStart(tree), n.expression.end, 'cosImportedDigest');
         digestCalls++;

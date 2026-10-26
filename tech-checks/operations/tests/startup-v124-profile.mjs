@@ -1,3 +1,4 @@
+import {prepareBindingCompatibility} from '../scripts/prepare-binding-map-compat-v125.mjs';
 import {prepare} from '../scripts/prepare-startup-cpu-v124.mjs';
 // Isolated contract/auth tests. All remote services use injected in-memory transports.
 // Uses the unchanged bridge's configured auth-map constants, but all transport records are synthetic and in memory.
@@ -95,7 +96,8 @@ const fetch=async(url,init)=>{
  if(url.endsWith('/rpc/cos_mhelp_location_snapshot'))return json(null);
  return base(url,init);
 };
-const variants={baseline:boot(v.files.find(f=>f.name.endsWith('serve.ts')).content),candidate:boot(prepare(v).payload.files.find(f=>f.name.endsWith('serve.ts')).content)};
+const v125=process.env.COS_CPU_V125_PACKET?JSON.parse(fs.readFileSync(process.env.COS_CPU_V125_PACKET)):null;
+const variants=v125?{baseline:boot(v125.payload.files.find(f=>f.name.endsWith('serve.ts')).content),candidate:boot(prepareBindingCompatibility(v125).payload.files.find(f=>f.name.endsWith('serve.ts')).content)}:{baseline:boot(v.files.find(f=>f.name.endsWith('serve.ts')).content),candidate:boot(prepare(v).payload.files.find(f=>f.name.endsWith('serve.ts')).content)};
 const report={syntheticOnly:true,productionRequests:0,units:378,inventory:476,uploadRecords:1001,devices:739,providers:468,matches:241,ownerClaims:20,importedSources:476,audits:54,markedGroups:7,limitations:'Synthetic identity/binding distribution, no database/network latency; not production-trigger attribution',runs:[]};
 const outputs=new Map();
 for(const [variant,factory] of Object.entries(variants)){

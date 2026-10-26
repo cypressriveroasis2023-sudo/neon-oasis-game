@@ -27,3 +27,14 @@ fresh validation across calls. Synthetic timings are not production guarantees.
 This code does not deploy a function or modify source data, permissions, provider
 schedules or credentials. Release verification requires fresh drift checks and
 preservation of the prior artifact for rollback.
+
+## Callback compatibility correction
+
+The initial deployed CPU repair made the binding validator's second parameter a
+digest callback. Existing direct Array.map calls supplied their numeric index
+instead, causing valid precedence paths to return503. A typeof guard now restores
+the original unary-callback behavior while retaining projection-local hashing.
+The reproduced401-row handler passes with available, unavailable and freshly
+missing precedence evidence against both source and the complete amended v125
+artifact. The v125 preparer records one reversible insertion and preserves every
+other deployed byte and setting;64 complete response comparisons also pass.
