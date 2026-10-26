@@ -45,6 +45,16 @@ for(const unavailable of [false,true])test('successive accepted Shop Field Shop 
   await expect(app.locator('.cos-fleet-stat-total strong')).toHaveText('8');
   const list=app.getByRole('region',{name:'Field inventory health breakdown'}),products=list.locator('details > ul > li');
   await expect(products).toHaveCount(field);await expect(products.filter({hasText:'Product 1002'})).toHaveCount(placement==='FIELD'?1:0);
+  if(placement==='FIELD'){
+   await expect(products.filter({hasText:'Product 1002'})).toContainText('Current customer: Current site');
+   await expect(products.filter({hasText:'Product 1002'})).toContainText('123 Current Service St');
+  }else{
+   await app.locator('.cos-fleet-stat-shop').click();
+   const shop=app.getByRole('region',{name:'Shop Product-ID inventory'});
+   await expect(shop).toBeVisible();await expect(shop.locator('ul > li').filter({hasText:'Product 1002'})).toContainText('Cameras Onsite LLC');
+   await expect(shop.locator('ul > li').filter({hasText:'Product 1002'})).toContainText('SHOP / ROOT');
+   await app.locator('.cos-fleet-stat-field').click();
+  }
   expect(state.field.inventoryItems).toEqual(nativeBefore);
  }
  expect(history.map(h=>h.records.find(p=>p.productId==='1002').placement)).toEqual(['SHOP','FIELD','SHOP']);
