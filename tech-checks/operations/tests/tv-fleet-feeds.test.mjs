@@ -45,3 +45,18 @@ test('a failed health refresh clears cached health while retaining verified fiel
  const errors=await loadTvFleetFeeds({get:async path=>{if(path==='/api/camera-health/summary-v3')throw Error('Saved source unavailable');return {data:values[path]};}}, {...callbacks(accepted),healthUnavailable:()=>{accepted.health=null;}});
  assert.equal(accepted.field,field);assert.equal(accepted.health,null);assert.ok(accepted.routers);assert.deepEqual(errors,['Camera Health: Saved source unavailable']);
 });
+
+test('source failures preserve their HTTP status separately from display text',async()=>{
+ for(const status of [546,503,401,403,409]){
+  const accepted={},failures=[],requests=[];
+  const errors=await loadTvFleetFeeds({get:async path=>{requests.push(path);if(path==='/api/field-map')throw Object.assign(new Error('Synthetic failed read'),{response:{status}});return {data:values[path]};}}, {...callbacks(accepted),readFailure:(source,status)=>failures.push({source,status})});
+  assert.deepEqual(failures,[{source:'fieldMap',status}]);assert.equal(requests.length,3);
+  assert.deepEqual(errors,['Field locations: Synthetic failed read']);assert.equal(accepted.field,undefined);
+ }
+});
+
+test('schema rejection reports no retryable HTTP status',async()=>{
+ const failures=[];
+ await loadTvFleetFeeds({get:async path=>({data:path==='/api/field-map'?{...field,items:[...field.items,...field.items]}:values[path]})},{...callbacks({}),readFailure:(source,status)=>failures.push({source,status})});
+ assert.deepEqual(failures,[{source:'fieldMap',status:null}]);
+});
