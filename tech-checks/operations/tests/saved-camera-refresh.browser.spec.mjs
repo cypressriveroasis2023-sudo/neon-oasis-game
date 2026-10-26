@@ -11,7 +11,7 @@ const summaryPath='/api/camera-health/summary-v3',mapPath='/api/field-map';
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
 async function mount(page){
  const unit={id:unitId,unitNumber:'Solar Spotter 22HDC1',modelName:'Solar Spotter',status:'field',currentLocationType:'field',address:'100 Synthetic Road',site:'Synthetic refresh test',customer:'Synthetic customer',latitude:null,longitude:null,locationVerification:'address_only'};
- const state={calls:[],errors:[],failed:false,gate:deferred()};
+ const state={calls:[],errors:[],failed:false,mapCustomer:'Synthetic customer',gate:deferred()};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.addInitScript(()=>{window.savedRefreshInvalidations=[];window.addEventListener('cos-private-data-invalidated',()=>window.savedRefreshInvalidations.push(Date.now()));});
  await page.clock.install({time:new Date(start)});await page.clock.pauseAt(new Date(start));
@@ -31,7 +31,7 @@ async function mount(page){
   const row=resource('92001','SOLARSPOTTER022',{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:'online',observedAt,lastOnlineAt:observedAt}});
   const data=body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{vrmRead:true}}
    :body.path===summaryPath?{...snapshot([row]),refreshedAt:new Date(at).toISOString(),identityVersion:1,unitIdentities:[{unitId,unitNumber:unit.unitNumber,kind:'native_provider',deviceIds:['92001'],unitKeys:['SOLARSPOTTER022'],proof:'a'.repeat(64)}],identityWarnings:[]}
-   :body.path===mapPath?{items:[unit],inventoryItems:[unit],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:new Date(at).toISOString()}
+   :body.path===mapPath?{items:[{...unit,customer:state.mapCustomer,site:state.mapCustomer}],inventoryItems:[{...unit,customer:state.mapCustomer,site:state.mapCustomer}],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:new Date(at).toISOString()}
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:new Date(at).toISOString()}
    :body.path==='/api/vrm-fleet'?{items:[],power:[]}
    :{items:[]};
@@ -49,21 +49,18 @@ function counts(state){const count=path=>state.calls.filter(call=>call.path===pa
 async function visible(app,value){await app.locator('body').evaluate((_,isVisible)=>{Object.defineProperty(document,'hidden',{configurable:true,value:!isVisible});document.dispatchEvent(new Event('visibilitychange'));},value);}
 function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
 
-test('four-minute saved reads see the next producer result before old evidence expires; other feeds stay fifteen minutes',async({page})=>{
+test('fifteen-minute saved reads preserve source expiry without vendor polling',async({page})=>{
  const {app,state}=await mount(page);
- await page.clock.runFor(237000);await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:1,power:1});
- expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000]);
+ await page.clock.runFor(537000);
+ expect(counts(state)).toEqual({health:1,map:1,routers:1,power:1});
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ await page.clock.runFor(360000);
+ await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:2,power:2});
+ expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+900000]);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- await page.clock.runFor(240000);await expect.poll(()=>counts(state)).toEqual({health:3,map:3,routers:1,power:1});
- await page.clock.runFor(60000);await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- // At 22:39, the old 22:18 observation would have expired. The saved 22:33
- // producer result is still recent without changing the 20-minute truth rule.
- await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:1,power:1});
- await page.clock.runFor(180000);await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:2});
- for(let minute=16;minute<=24;minute++){
-  await page.clock.runFor(60000);
-  if(minute%4===0)await expect.poll(()=>counts(state).health).toBe(minute/4+1);
- }
+ await page.clock.runFor(9*60000);
+ expect(counts(state)).toEqual({health:2,map:2,routers:2,power:2});
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
  assertReadOnly(state);
@@ -86,10 +83,10 @@ test('returning to Fleet keeps the cached pair original refresh deadline',async(
  await openWorkspace(app,'Operations');
  await expect(app.getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
- await page.clock.runFor(177000); // Three minutes from the original saved pair.
- expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+180000);
+ await page.clock.runFor(837000); // Fourteen minutes from the original saved pair.
+ expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+840000);
  await openWorkspace(app,'Field Map');
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(counts(state).health).toBe(1);expect(counts(state).map).toBe(1);
  expect(await app.locator('body').evaluate(()=>window.savedRefreshInvalidations)).toEqual([]);
@@ -98,32 +95,32 @@ test('returning to Fleet keeps the cached pair original refresh deadline',async(
  await page.clock.runFor(60000);
  await expect.poll(()=>counts(state).health).toBe(2);await expect.poll(()=>counts(state).map).toBe(2);
  await (await healthResponse).finished();
- expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000]);
+ expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+900000]);
  // A fresh health response cannot replace the complete shared pair on its own.
  await expect(app.getByRole('button',{name:'↻ Reading data…',exact:true})).toBeDisabled();
  await expect(savedHealth).toHaveText(originalRead);
  await page.clock.runFor(45000);state.gate.resolve();state.gate=null;
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  await expect(savedHealth).not.toHaveText(originalRead);
- await page.clock.runFor(195000);
+ await page.clock.runFor(855000);
  await expect.poll(()=>counts(state).health).toBe(3);await expect.poll(()=>counts(state).map).toBe(3);
- expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+240000,start+480000]);
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');assertReadOnly(state);
- expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+480000);
+ expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+900000,start+1800000]);
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');assertReadOnly(state);
+ expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+1800000);
  expect(await app.locator('body').evaluate(()=>window.savedRefreshInvalidations)).toEqual([]);
 });
 
-test('a failed saved read waits four minutes to retry and manual reload remains immediate',async({page})=>{
+test('a failed saved read waits fifteen minutes to retry and manual reload remains immediate',async({page})=>{
  const {app,state}=await mount(page);state.failed=true;
- await page.clock.runFor(237000);await expect.poll(()=>counts(state).health).toBe(2);
+ await page.clock.runFor(897000);await expect.poll(()=>counts(state).health).toBe(2);
  await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
- await page.clock.runFor(180000);await visible(app,true);expect(counts(state).health).toBe(2);
+ await page.clock.runFor(840000);await visible(app,true);expect(counts(state).health).toBe(2);
  await page.clock.runFor(60000);await expect.poll(()=>counts(state).health).toBe(3);
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
- await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:2,power:2});
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');assertReadOnly(state);
+ await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:4,power:4});
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');assertReadOnly(state);
 });
 
 test('failed health keeps its slow map shared through manual refresh and Fleet reentry',async({page})=>{
@@ -155,4 +152,32 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  await expect.poll(()=>counts(state).health).toBe(3);await expect.poll(()=>counts(state).map).toBe(3);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  expect(await app.locator('body').evaluate(()=>window.savedRefreshInvalidations)).toEqual([]);assertReadOnly(state);
+});
+
+
+test('automatic partial failure adopts newer placement without asserting successful health',async({page})=>{
+ const {app,state}=await mount(page);state.failed=true;state.mapCustomer='Updated authoritative customer';
+ await page.clock.runFor(897000);
+ await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-unit-list')).toContainText('Updated authoritative customer');
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('—');
+ expect(counts(state)).toEqual({health:2,map:2,routers:2,power:2});assertReadOnly(state);
+});
+
+test('expired-cache remount renders dated inventory while the fresh pair waits',async({page})=>{
+ const {app,state}=await mount(page);await openWorkspace(app,'Operations');
+ await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
+ await page.clock.runFor(957000);state.gate=deferred();
+ await openWorkspace(app,'Field Map');
+ await expect.poll(()=>counts(state).health).toBe(2);
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ await expect(app.getByRole('button',{name:'↻ Reading data…',exact:true})).toBeDisabled();
+ state.gate.resolve();state.gate=null;
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ assertReadOnly(state);
 });

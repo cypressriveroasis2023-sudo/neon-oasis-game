@@ -37,9 +37,9 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} all Field products, shared
  await expect(app.locator('.cos-fleet-stat-verify')).toContainText('MHELP ADDRESS QUEUE');await expect(app.locator('.cos-fleet-stat-verify strong')).toHaveText('126');
  const queue=app.locator('.cos-mhelp-address-followups');await queue.locator(':scope > summary').click();await expect(queue.locator('li')).toHaveCount(126);
  await queue.locator('li').filter({hasText:'Product 287 ·'}).getByRole('button',{name:'Open unit record'}).click();await expect(app.getByRole('dialog')).toContainText('Product 287');await expect(app.getByRole('dialog')).toContainText('invalid address');await app.getByRole('button',{name:'Close MHelp address details'}).click();
- await app.getByLabel('Fleet status').selectOption('offline');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);
+ await revealMapFilters(app);await app.getByLabel('Fleet status').selectOption('offline');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);
  await revealMapFilters(app);await app.getByLabel('Fleet placement').selectOption('shop');await expect(groups).toHaveCount(0);await expect(marker).toHaveCount(0);await expect(queue).toHaveCount(0);
- await app.getByLabel('Fleet placement').selectOption('field');await app.getByLabel('Fleet status').selectOption('all');await expect(groups).toHaveCount(1);
+ await app.getByLabel('Fleet placement').selectOption('field');await revealMapFilters(app);await app.getByLabel('Fleet status').selectOption('all');await expect(groups).toHaveCount(1);
  expect(await app.locator('html').evaluate(e=>e.scrollWidth<=e.clientWidth+1)).toBe(true);
  await app.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('mhelp-address-layer.png')});
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);

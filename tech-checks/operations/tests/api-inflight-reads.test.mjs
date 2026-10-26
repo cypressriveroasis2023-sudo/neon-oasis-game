@@ -483,14 +483,14 @@ test('source-only fleet completions cannot cross an account change or a save inv
   await flush();f.answer(2,{saved:true});await other;f.answer(1,fleetMap);f.answer(0,fleetHealth);await denied;
  }
 });
-test('fleet consumers share a complete paired snapshot and re-authorize before using its four-minute cache',async()=>{
+test('fleet consumers share a complete paired snapshot and re-authorize before using its fifteen-minute cache',async()=>{
  const f=fixture(),a=f.api.fleet(),b=f.api.fleet();await flush();assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
  f.answer(0,fleetHealth);f.answer(1,fleetMap);const values=await Promise.all([a,b]);assert.equal(values[0],values[1]);
  const cached=await f.api.fleet();assert.equal(cached,values[0]);assert.equal(f.requests.length,2);assert.equal(f.handshakes.length,2);
  const forced=f.api.fleet(true);await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await forced;
  f.state.role='service';await assert.rejects(f.api.fleet(),status(401));
 });
-test('paired cache expires four minutes from attempt start, including delayed auth and responses',async()=>{
+test('paired cache expires fifteen minutes from attempt start, including delayed auth and responses',async()=>{
  const f=fixture({autoReply:false}),first=f.api.fleet();
  f.advance(2000);f.reply();await flush();assert.equal(f.requests.length,2);
  f.advance(6000);f.answer(0,fleetHealth);f.answer(1,fleetMap);const initial=await first;
@@ -498,7 +498,7 @@ test('paired cache expires four minutes from attempt start, including delayed au
  f.state.autoReply=true;f.advance(CAMERA_AUTO_REFRESH_MS-8001);
  assert.equal(await f.api.fleet(),initial);assert.equal(f.requests.length,2,'the pair stays cached until the exact deadline');
  f.advance(1);const next=f.api.fleet(),peer=f.api.fleetSource('fieldMap');await flush();
- assert.equal(f.requests.length,4,'completion latency cannot defer the four-minute read');
+ assert.equal(f.requests.length,4,'completion latency cannot defer the fifteen-minute read');
  f.answer(2,fleetHealth);f.answer(3,fleetMap);const refreshed=await next;assert.equal(await peer,refreshed.fieldMap);assert.notEqual(refreshed,initial);
  assert.equal(refreshed.readStartedAt,CAMERA_AUTO_REFRESH_MS);
 });

@@ -30,7 +30,10 @@ for(const kind of ['owner','verified-it','daily-it'])test(kind+' troubleshooting
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/diagnostics-host');if(kind==='verified-it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
- const app=page.frameLocator('iframe');await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+ const app=page.frameLocator('iframe');
+ const primary=app.getByRole('region',{name:'Fleet units in view',exact:true});
+ await expect(primary.locator('[data-product-id="1001"]')).toContainText('Helios 1');
+ await primary.locator('[data-product-id="1001"]').getByRole('button',{name:'Unit details and troubleshooting',exact:true}).click();
  await app.locator('.cos-fleet-troubleshooting > summary').click();
  await app.getByRole('button',{name:'Open Camera Health diagnostics',exact:true}).click();
  await expect(page).toHaveURL(/camera-health\.html\?(?:itDaily=1&)?diagnostics=1$/);

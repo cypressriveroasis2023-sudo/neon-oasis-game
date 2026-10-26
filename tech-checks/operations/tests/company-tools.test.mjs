@@ -45,7 +45,14 @@ const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.u
 for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
     const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
+    // User-requested 15-minute saved-camera cadence; preserve all other bytes.
+    // Real scheduler/hidden-tab/freshness behavior is tested separately.
     let navigationPreserved=original;
+    if(name==='camera-health'){
+      assert.equal(original.split('const CAMERA_AUTO_REFRESH_MS=15*60*1000;').length-1,1);
+      assert.equal(original.split('Saved status refreshes every 15 minutes;').length-1,1);
+      navigationPreserved=original.replace('const CAMERA_AUTO_REFRESH_MS=15*60*1000;','const CAMERA_AUTO_REFRESH_MS=4*60*1000;').replace('Saved status refreshes every 15 minutes;','Saved status refreshes every 4 minutes;');
+    }
     if(name==='onsite-vision'&&original.includes('onsite-vision-fleet-data.js')){
       // Reviewed main be5ebf13 additions: preserve the exact prior baseline after
       // asserting each new asset entry once. Vision behavior has its own tests.
@@ -62,7 +69,7 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
         +'  if(window.self!==window.top)return false;\n';
       assert.equal(original.split(reviewedGuard).length-1,1);
       assert.equal(original.split(entry+reviewedGuard).length-1,1);
-      navigationPreserved=original.replace(entry+reviewedGuard,entry);
+      navigationPreserved=navigationPreserved.replace(entry+reviewedGuard,entry);
     }
     const html=navigationPreserved.replace('<script type="module" src="./it-daily-camera-host.js?v=it-owner-controls-20261021"></script>\n','');
     if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);

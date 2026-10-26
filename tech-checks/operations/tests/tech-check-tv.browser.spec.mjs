@@ -1,3 +1,4 @@
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -71,7 +72,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
-    if(path==='/api/camera-health/summary-v3'){state.fleetReads++;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows}});}
+    if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
@@ -84,6 +85,8 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
 test('TV link fills the host and sees a saved update without a remote desktop connection', async ({page}, testInfo) => {
   const {state,frame}=await setup(page);
   await expect(page.locator('#hostToolbar')).toBeHidden();
+  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Jobs/tasks updated');
+  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Work board refresh 60s · Saved camera reads 15 min · Page rotation');
   await expect(frame.getByRole('button',{name:'Save Schedule & Assignment'})).toHaveCount(0);
   state.tasks[0].instructions='The return rack is ready';
   await page.clock.fastForward(60000);
@@ -315,6 +318,8 @@ test('Field Map visits overview and geographic close-ups with the red area first
  await expect(wrap).toHaveAttribute('data-area-kind','closeup');
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+red.unitNumber);
  await expect(frame.locator('.tv-map-area')).toContainText('1 down');
+ // The map fits bounds in requestAnimationFrame; advance that frame under the paused test clock.
+ await page.clock.runFor(32);
  await expect.poll(async()=>Number(await map.getAttribute('data-zoom'))).toBe(13);
  await page.clock.fastForward(15000);
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+green.unitNumber);
@@ -338,13 +343,64 @@ test('Owner saves rotation time and a remote timing update changes the TV interv
  await frame.getByRole('button',{name:'TV View',exact:true}).click();
  const board=frame.getByRole('region',{name:'Tech Check TV Board'});
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
- await expect(board).toContainText('Rotate 30s');
+ await expect(board).toContainText('Page rotation 30s');
  await page.clock.fastForward(25000);await expect(board).toHaveAttribute('data-page','1');
  await page.clock.fastForward(6000);await expect(board).toHaveAttribute('data-page','2');
  state.settings={...state.settings,revision:state.settings.revision+1,rotationSeconds:5};
- await page.clock.fastForward(30000);await expect(board).toContainText('Rotate 5s');
+ await page.clock.fastForward(30000);await expect(board).toContainText('Page rotation 5s');
  await expect(board).toHaveAttribute('data-page','1');
  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','1');
  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','2');
  expect(state.fleetReads).toBe(3);
+});
+
+
+test('TV headline and outage cards use the same complete Field Product IDs through failure and retry',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ const initial=fieldProductFixture();
+ const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
+ state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};
+ state.cameraRows=f.health.rows;
+ state.cameraExtras={identityVersion:f.health.identityVersion,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
+ state.settings={sections:['map'],revision:1,updatedAt:time,rotationSeconds:15};
+ await page.clock.runFor(60000);
+ const summary=frame.locator('.tv-fleet-summary');
+ await expect(summary).toContainText('7 Field equipment');
+ await expect(summary).toContainText('6 camera-capable equipment');
+ await expect(summary).toContainText('1 support · no cameras');
+ await expect(summary).toContainText('1 online');await expect(summary).toContainText('1 offline');await expect(summary).toContainText('4 unverified');
+ state.settings={sections:['camera'],revision:2,updatedAt:time,rotationSeconds:15};
+ await page.clock.runFor(60000);
+ await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
+ await expect(frame.locator('.tv-fleet-record')).toHaveCount(1);
+ state.fleetFailures['/api/camera-health/summary-v3']=503;
+ await page.clock.runFor(15*60000);
+ await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health');
+ await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
+ // The accepted equipment census survives a failed refresh; it is not zero inventory.
+ state.settings={sections:['map'],revision:3,updatedAt:time};
+ await page.clock.runFor(60000);
+ await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('— offline');await expect(summary).toContainText('6 unverified');
+ state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));
+ await page.clock.runFor(15*60000);
+ await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');
+ expect(state.writes).toEqual([]);
+});
+
+
+test('TV never combines a newly arrived source with the preceding health read',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true}),initial=fieldProductFixture();
+ const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
+ state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
+ state.cameraExtras={identityVersion:1,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
+ state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
+ const summary=frame.locator('.tv-fleet-summary');await expect(summary).toContainText('1 online');
+ state.fieldMapExtras.uploadInventory={...state.fieldMapExtras.uploadInventory,sourceSha256:'d'.repeat(64),records:state.fieldMapExtras.uploadInventory.records.map((p,i)=>i? p:{...p,binding:{...p.binding,placementHeld:true}})};
+ state.cameraGate=deferred();
+ const mapResponse=page.waitForResponse(response=>response.request().method()==='POST'&&response.request().postDataJSON()?.path==='/api/field-map');
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await (await mapResponse).finished();
+ await expect(summary).toContainText('1 online');await expect(summary).toContainText('7 Field equipment');
+ state.cameraGate.resolve();state.cameraGate=null;
+ await expect(summary).toContainText('0 online');await expect(summary).toContainText('5 unverified');
+ expect(state.writes).toEqual([]);
 });
