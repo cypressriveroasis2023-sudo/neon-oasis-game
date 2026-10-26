@@ -25,3 +25,16 @@ test('individual Fleet pin drops retain state, numeric labels and HTML safety',(
  const group=fleetGroupPinMarkup({online:1,offline:1,unknown:0,support:0});assert.match(group,/data-health="mixed"/);assert.match(group,/class="[^"]*cos-unit-pin-drop/);
  assert.match(fleetGroupPinMarkup({online:0,offline:0,unknown:0,support:0},0,0,0,2),/--pin:#94a3b8/);
 });
+
+test('verified exact Product-ID TCP observations color Field pins even without a native or provider link',()=>{
+ const observation=(state)=>({gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',
+  observedAt:'2026-10-26T21:00:00.000Z',video:'not_verified',
+  observations:[{resourceId:'42',source:'Saved TCP/service-port check',kind:'connection',observedAt:'2026-10-26T21:00:00.000Z',fresh:true,reportedStatus:state,currentState:state}]});
+ const products=[{...product('1','online',null),evidence:observation('online')},
+  {...product('2','offline',null),evidence:observation('offline')}];
+ assert.deepEqual([...fleetAddressHealth(products,[],'camera').values()],['online','offline']);
+ assert.deepEqual([...fleetAddressHealth(products,[],'router').values()],['unknown','unknown']);
+ const forged=structuredClone(products);forged[0].evidence.observations[0].fresh=false;
+ assert.equal(fleetAddressHealth(forged,[],'camera').get('1'),'unknown');
+ assert.equal(fleetAddressHealth([...products,products[0]],[],'camera').get('1'),'unknown');
+});
