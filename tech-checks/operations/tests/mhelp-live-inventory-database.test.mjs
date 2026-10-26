@@ -29,3 +29,21 @@ test('renamed products cannot inherit camera identities',async()=>{const f=await
 test('changed equipment categories cannot inherit camera identities even with an unchanged label',async()=>{const f=await fixture();try{const r=await f.call('stage',[{...record(),category:'Solar Stand'}]);const s=(await f.db.query('select records from cos_mhelp_placement_private.live_inventory_candidates where source_sha256=$1',[r.sourceSha256])).rows[0];assert.equal(s.records[0].binding,null);assert(s.records[0].possibleAliasUnitIds.includes(native));}finally{await f.db.close();}});
 test('empty, partial, duplicate, stale, cross-portal and moved-source reads reject atomically',async()=>{const f=await fixture();try{const before=await f.state();for(const [rows,extra] of [[[],{}],[[record()],{complete:false}],[[record(),record()],{}],[[record()],{portalId:'9'}],[[record()],{baselineSourceSha256:'c'.repeat(64)}],[[record()],{readAt:'2020-01-01T00:00:00Z'}]])await assert.rejects(f.call('run',rows,extra));assert.deepEqual(await f.state(),before);}finally{await f.db.close();}});
 test('client roles cannot use the server-only source writer or private ledgers',async()=>{const f=await fixture();try{for(const role of ['anon','authenticated']){await f.db.exec('set role '+role);await assert.rejects(f.call('status'),/permission denied/);await assert.rejects(f.db.query('select * from cos_mhelp_placement_private.live_inventory_candidates'),/permission denied/);await f.db.exec('reset role');}}finally{await f.db.close();}});
+
+test('successive Shop Field Shop sources retain dated immutable snapshots and protected native data',async()=>{
+ const f=await fixture();try{
+  const before=await f.state();await f.db.exec('update cos_mhelp_placement_private.live_inventory_control set enabled=true');
+  // The production snapshot revalidates the saved binding guard on every read.
+  await f.db.exec(`create or replace function cos_mhelp_placement_private.upload_snapshot() returns jsonb language sql as $$select receipt||jsonb_build_object('sourceSha256',b.source_sha256,'payloadSha256',b.payload_sha256,'records',(select jsonb_agg(case when r->'binding'<>'null'::jsonb then jsonb_set(r,'{binding,guardCurrent}',to_jsonb(r->'binding'->>'expectedGuard'='${guard}')) else r end) from jsonb_array_elements(b.records)r)) from cos_mhelp_placement_private.upload_control c join cos_mhelp_placement_private.upload_batches b on c.active_sha256=b.source_sha256 where c.singleton$$;`);
+  let baselineSourceSha256=original;const snapshots=[];
+  for(const placement of ['SHOP','FIELD','SHOP']){
+   const r=await f.call('run',[record('1',placement)],{baselineSourceSha256});assert.equal(r.state,'current');
+   baselineSourceSha256=r.sourceSha256;
+   const saved=(await f.db.query('select source_sha256,receipt,records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[r.sourceSha256])).rows[0];
+   assert.equal(saved.records[0].placement,placement);assert.equal(saved.records[0].binding.nativeUnitId,native);assert(saved.receipt.receivedAt);snapshots.push(saved);
+  }
+  for(const saved of snapshots)assert.deepEqual((await f.db.query('select source_sha256,receipt,records from cos_mhelp_placement_private.upload_batches where source_sha256=$1',[saved.source_sha256])).rows[0],saved);
+  const after=await f.state();assert.deepEqual(after.native,before.native);assert.deepEqual(after.original,before.original);
+  assert.equal((await f.db.query('select count(*)::int n from cos_mhelp_placement_private.live_inventory_runs')).rows[0].n,3);
+ }finally{await f.db.close();}
+});
