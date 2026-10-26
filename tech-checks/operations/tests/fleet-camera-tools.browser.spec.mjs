@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {mountFleet,fresh} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet,fresh,now} from './fleet-dashboard-fixtures.mjs';
 import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 const health=snapshot([resource(12,'Helios 1',{connection:{publicIp:'8.8.8.8',ports:[80,443,8443]}})]);
 for(const it of [false,true])test(`inline camera checks keep ${it?'IT':'Owner'} in the unit card`,async({page},info)=>{
@@ -40,4 +40,27 @@ test('pending checks disable repeat taps and closing the card discards a late re
  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();const card=app.getByRole('dialog',{name:'Helios 1 unit intelligence'}),tools=card.getByRole('region',{name:'Camera connection tools'});await tools.getByRole('button',{name:'Ping',exact:true}).click();await started;
  await expect(tools.getByRole('button',{name:'Ping',exact:true})).toBeDisabled();await expect(tools.getByRole('button',{name:'Scan ports',exact:true})).toBeDisabled();expect(checks).toBe(1);
  await page.keyboard.press('Escape');release();await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();await expect(app.getByText('Connection responded',{exact:true})).toHaveCount(0);await expect(app.getByRole('button',{name:'Ping',exact:true})).toBeEnabled();
+});
+
+
+test('connection results require the exact target and distinguish incomplete, offline and stale checks',async({page})=>{
+ const {app,state}=await mountFleet(page,false,{health});let variant='wrong-target',checks=0;
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()!=='POST')return route.fallback();const call=route.request().postDataJSON();
+  if(!call.path?.endsWith('/check'))return route.fallback();checks++;
+  const ports=(variant==='partial'?[80]:[80,443,8443]).map(port=>({port,reachable:variant==='positive'&&port===80,latencyMs:variant==='positive'&&port===80?10:null}));
+  return route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{deviceId:variant==='wrong-target'?13:12,unitKey:'Helios 1',publicIp:'8.8.8.8',mode:call.body.mode,checkedAt:new Date(now).toISOString(),ports}});
+ });
+ await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+ const tools=app.getByRole('region',{name:'Camera connection tools'}),result=tools.locator('.cos-camera-test-result');
+ await expect(tools).toContainText('No completed check · Unknown');expect(checks).toBe(0);
+ await tools.getByRole('button',{name:'Ping',exact:true}).click();await expect(tools.getByRole('alert')).toContainText('Unknown');await expect(result).toHaveCount(0);
+ variant='partial';await tools.getByRole('button',{name:'Ping',exact:true}).click();await expect(result).toContainText('Unknown · No tested port responded; saved port coverage is incomplete.');
+ variant='negative';await tools.getByRole('button',{name:'Scan ports',exact:true}).click();await expect(result).toContainText('Offline · No tested port responded');
+ await expect(result).toContainText('Saved TCP / service-port check · Device 12');await expect(result).toContainText('Video unverified');
+ variant='positive';await tools.getByRole('button',{name:'Ping',exact:true}).click();await expect(result).toContainText('Online · Connection responded');
+ await page.clock.setFixedTime(new Date(now+21*60000));
+ await tools.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await expect(result).toContainText('Unknown · Saved connection check is stale. Run a new check.');
+ expect(checks).toBe(4);expect(state.errors).toEqual([]);
 });

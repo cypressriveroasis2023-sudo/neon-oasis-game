@@ -57,28 +57,28 @@ function fixture({autoReply=true}={}){
 async function prewarm(f){const pending=f.api.fleet();await flush();f.answerPair();return pending;}
 async function boot(){const f=fixture(),hook=f.mount();await flush();f.answerPair();await flush();assert.equal(hook.loading,false);return {f,hook};}
 
-test('a view mounting on a three-minute-old cache rereads at the original four-minute deadline',async()=>{
- const f=fixture(),saved=await prewarm(f);await f.advance(3*60000);const hook=f.mount();await flush();
+test('a view mounting on a fourteen-minute-old cache rereads at the original fifteen-minute deadline',async()=>{
+ const f=fixture(),saved=await prewarm(f);await f.advance(14*60000);const hook=f.mount();await flush();
  assert.equal(hook.fleet,saved);assert.equal(hook.loading,false);assert.equal(f.requests.length,2);
- await f.advance(60000);assert.equal(f.requests.length,4,'cache adoption must not postpone the saved-data read to minute seven');assert.equal(hook.loading,true);assert.equal(hook.fleet,saved,'a pending pair retains the last complete saved snapshot');
- f.answerPair(2);await flush();assert.equal(hook.loading,false);assert.equal(hook.fleet.readStartedAt,start+4*60000);assert.notEqual(hook.fleet,saved);
+ await f.advance(60000);assert.equal(f.requests.length,4,'cache adoption must not postpone the saved-data read to minute twenty-nine');assert.equal(hook.loading,true);assert.equal(hook.fleet,saved,'a pending pair retains the last complete saved snapshot');
+ f.answerPair(2);await flush();assert.equal(hook.loading,false);assert.equal(hook.fleet.readStartedAt,start+15*60000);assert.notEqual(hook.fleet,saved);
 });
 
 test('snapshot update adoption cannot reset the actual pair deadline',async()=>{
  const {f,hook}=await boot();const saved=hook.fleet;await f.advance(60000);f.window.dispatchEvent(new Event('cos-fleet-snapshot-updated'));await flush();
- assert.equal(hook.fleet,saved);assert.equal(f.requests.length,2);await f.advance(3*60000);assert.equal(f.requests.length,4,'reaccepting a cached snapshot does not restart its age');f.answerPair(2);await flush();
+ assert.equal(hook.fleet,saved);assert.equal(f.requests.length,2);await f.advance(14*60000);assert.equal(f.requests.length,4,'reaccepting a cached snapshot does not restart its age');f.answerPair(2);await flush();
 });
 
 test('delayed authentication and a late peer preserve the original paired request start',async()=>{
  const f=fixture({autoReply:false}),first=f.mount();await f.advance(2000);f.reply();f.state.autoReply=true;await flush();assert.equal(f.requests.length,2);
  await f.advance(6000);f.answer(0,health);await f.advance(52000);const peer=f.mount();await flush();assert.equal(f.requests.length,2);assert.equal(first.loading,true);assert.equal(peer.loading,true);
  await f.advance(20000);f.answer(1,fieldMap);await flush();assert.equal(first.fleet,peer.fleet);assert.equal(first.fleet.readStartedAt,start);assert.equal(first.lastAttemptAt,start);assert.equal(peer.lastAttemptAt,start);
- await f.advance(160000);assert.equal(f.requests.length,4,'both consumers share one new pair four minutes from its actual start');f.answerPair(2);await flush();
+ await f.advance(820000);assert.equal(f.requests.length,4,'both consumers share one new pair fifteen minutes from its actual start');f.answerPair(2);await flush();
 });
 
-test('a failed read retains its four-minute attempt backoff',async()=>{
+test('a failed read retains its fifteen-minute attempt backoff',async()=>{
  const {f,hook}=await boot();await f.advance(CAMERA_AUTO_REFRESH_MS);assert.equal(f.requests.length,4);f.answer(2,{error:'Synthetic saved camera read unavailable'},503);f.answer(3,fieldMap);await flush();assert.match(hook.error,/Synthetic saved camera read unavailable/);assert.equal(hook.loading,false);assert.equal(hook.lastAttemptAt,start+CAMERA_AUTO_REFRESH_MS);
- await f.advance(3*60000);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);await f.advance(60000);assert.equal(f.requests.length,6);f.answerPair(4);await flush();assert.equal(hook.error,'');assert.equal(hook.loading,false);
+ await f.advance(14*60000);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);await f.advance(60000);assert.equal(f.requests.length,6);f.answerPair(4);await flush();assert.equal(hook.error,'');assert.equal(hook.loading,false);
 });
 
 test('hidden tabs pause reads and repeated visibility events resume only one shared pair',async()=>{
@@ -187,4 +187,22 @@ test('a queued history updater cannot repopulate evidence after healthy hide',as
  assert.equal(hook.cameraHistory.size,1);const saved=hook.fleet;f.hide();assert.equal(hook.cameraHistory.size,0);
  hook.flushHistory();assert.equal(hook.cameraHistory.size,0,'the updater rechecks its history generation when React applies it');assert.equal(hook.fleet,saved);assert.equal(hook.error,'');
  const current=hook.refresh(true);await flush();f.answer(4,historyHealth);f.answer(5,historyMap);await current;assert.equal(hook.cameraHistory.size,1);
+});
+
+
+test('expired-cache remount shows the authorized dated pair while one fresh pair is pending',async()=>{
+ const f=fixture(),saved=await prewarm(f);await f.advance(CAMERA_AUTO_REFRESH_MS+60000);
+ const hook=f.mount();await flush();
+ assert.equal(hook.fleet,saved);assert.equal(hook.loading,true);assert.equal(f.requests.length,4);
+ assert.equal(hook.fleet.readStartedAt,start);assert.equal(hook.fleet.health.refreshedAt,new Date(start).toISOString());
+ const peer=f.mount();await flush();assert.equal(peer.fleet,saved);assert.equal(f.requests.length,4);
+ f.answer(2,{error:'Synthetic refresh unavailable'},503);f.answer(3,fieldMap);await flush();
+ assert.equal(hook.fleet,saved);assert.match(hook.error,/unavailable/);assert.equal(hook.loading,false);
+ hook.unmount();peer.unmount();
+});
+
+test('expired saved pair is never exposed to a changed actor on remount',async()=>{
+ const f=fixture();await prewarm(f);await f.advance(CAMERA_AUTO_REFRESH_MS+60000);
+ f.state.token='synthetic-other-owner';const hook=f.mount();await flush();
+ assert.equal(hook.fleet,null);f.answerPair(2);await flush();assert.ok(hook.fleet);hook.unmount();
 });

@@ -30,3 +30,20 @@ test('invalid inventory cannot invent a census even when old health exists',()=>
  const f=fieldProductFixture(),health=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
  assert.equal(fieldInventoryCensus({...f.upload,records:f.upload.records.slice(1)},health,true,f.now),null);
 });
+
+
+test('failed health retains current guarded navigation without retaining health claims',()=>{
+ const f=fieldProductFixture(),navigation=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
+ const result=fieldInventoryCensus(f.upload,null,false,f.now,navigation);
+ assert.equal(result.counts.online,0);assert.equal(result.counts.offline,0);
+ for(const item of result.items){
+  const current=navigation.items.find(p=>p.productId===item.productId);
+  if(['review','inactive'].includes(item.state)){assert.equal(item.unitId,null);assert.equal(item.recordId,null);}
+  else{assert.equal(item.unitId,current.unitId);assert.equal(item.recordId,current.recordId);}
+  assert.equal(item.evidence,undefined);
+ }
+ assert.ok(result.items.some(p=>p.unitId));
+ for(const changed of [{...navigation,sourceSha256:'b'.repeat(64)},{...navigation,items:navigation.items.slice(1)}]){
+  assert.ok(fieldInventoryCensus(f.upload,null,false,f.now,changed).items.every(p=>!p.unitId&&!p.recordId));
+ }
+});

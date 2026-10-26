@@ -41,11 +41,11 @@ for(const role of ['owner','it'])test(role+' camera diagnostics keeps management
  await expect(page.getByLabel('Search units',{exact:true})).toBeVisible();
 });
 
-test('automatic reloads wait four minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
+test('automatic reloads wait fifteen minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
  await mount(page);await page.waitForFunction(()=>liveRefreshStarted);const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length);const calls=await page.evaluate(()=>functionCalls);
- await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:33:59Z');await liveRefresh(true)});
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:44:59Z');await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
- await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:34:00Z');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});await liveRefresh(true)});
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:45:00Z');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
  await page.evaluate(async()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});await liveRefresh(true)});
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
@@ -57,29 +57,29 @@ test('automatic reloads wait four minutes, skip hidden tabs and share in-flight 
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+4);
  expect(await page.evaluate(()=>functionCalls)).toEqual(calls);
 });
-test('actual timers reread saved status at the rephased four-minute deadline without probing or freshening observations',async({page})=>{
+test('actual timers reread saved status at the rephased fifteen-minute deadline without probing or freshening observations',async({page})=>{
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.clock.install({time:new Date('2026-10-06T12:29:59Z')});await page.clock.pauseAt(new Date('2026-10-06T12:30:00Z'));
  await mount(page);await page.waitForFunction(()=>liveRefreshStarted);
  await page.evaluate(()=>{Date.now=()=>new Date().getTime()});
  const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length),calls=await page.evaluate(()=>functionCalls);
  await page.getByLabel('Search units',{exact:true}).fill('RANGER 022');
- await page.clock.runFor(3*60000);
- await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'online',source_last_seen_at:'2026-10-06T12:33:00Z'}:d)});
+ await page.clock.runFor(14*60000);
+ await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'online',source_last_seen_at:'2026-10-06T12:44:00Z'}:d)});
  await page.clock.runFor(59999);expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
  await page.clock.runFor(1);await expect.poll(()=>page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
  await expect(page.locator('.compact-unit[data-unit="RANGER 022"] .statuspill')).toHaveText('ONLINE');
  await expect(page.getByLabel('Search units',{exact:true})).toHaveValue('RANGER 022');
- expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:33:00Z');
+ expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:44:00Z');
  expect(await page.evaluate(()=>functionCalls)).toEqual(calls);
- // An explicit saved reread at minute six must schedule minute ten, not twelve.
+ // An explicit saved reread at minute seventeen must schedule minute thirty-two.
  await page.clock.runFor(2*60000);await page.evaluate(()=>loadAfterWrite({background:true}));
  expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
- await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'offline',source_last_seen_at:'2026-10-06T12:35:00Z'}:d)});
+ await page.evaluate(()=>{fixtureDevices=fixtureDevices.map(d=>d.id===11?{...d,source_status:'offline',source_last_seen_at:'2026-10-06T12:46:00Z'}:d)});
  await page.clock.runFor(2*60000);expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
- await page.clock.runFor(2*60000);await expect.poll(()=>page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+3);
+ await page.clock.runFor(13*60000);await expect.poll(()=>page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+3);
  await expect(page.locator('.compact-unit[data-unit="RANGER 022"] .statuspill')).toHaveText('OFFLINE');
- expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:35:00Z');
+ expect(await page.evaluate(()=>devices.find(d=>d.id===11).source_last_seen_at)).toBe('2026-10-06T12:46:00Z');
  expect(await page.evaluate(()=>functionCalls)).toEqual(calls);expect(errors).toEqual([]);
 });
 test('overview is quiet; unit cards open scoped history and preserve Back and keyboard navigation',async({page},info)=>{

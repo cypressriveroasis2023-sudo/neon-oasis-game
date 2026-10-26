@@ -183,7 +183,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
 }
 /** Dashboard sources can settle separately; complete views still require the pair.
  * Every source completion carries the same actor and invalidation checks. */
-async function readFleet(force=false):Promise<FleetReads>{
+async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetReads>{
     // Match the camera hook's attempt clock, including parent-auth and response
     // latency. Dating the cache at completion can skip the next scheduled read.
     const requestedAt=Date.now();
@@ -195,6 +195,9 @@ async function readFleet(force=false):Promise<FleetReads>{
     const key=JSON.stringify([session.token,session.role,mode]);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
     const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    // Only the newly authorized actor may see the dated complete saved pair.
+    // This callback does not renew the cache or any observation timestamps.
+    if(saved)onSaved?.(saved.value);
     const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
     const revision=fleetRevision;
     const current=()=>{
@@ -217,7 +220,7 @@ export const api = {
   captureSession: () => { const revision=privateSessionRevision; return () => revision===privateSessionRevision; },
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
-  fleet: async(force=false):Promise<FleetSnapshot>=>(await readFleet(force)).paired,
+  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,
   fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);

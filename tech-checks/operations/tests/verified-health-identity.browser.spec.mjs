@@ -80,7 +80,7 @@ async function settlePollingMinute(page,frame,state,baseline,minute){
  // posted token response gets an event-loop turn. That creates a synthetic
  // expired session even though the parent responds immediately.
  await page.clock.runFor(60000);
- await expect.poll(()=>pollingReads(state)).toEqual({health:baseline.health+Math.floor(minute/4),map:baseline.map+Math.floor(minute/4),routers:baseline.routers+Math.floor(minute/15),power:baseline.power+Math.floor(minute/15)});
+ await expect.poll(()=>pollingReads(state)).toEqual({health:baseline.health+Math.floor(minute/15),map:baseline.map+Math.floor(minute/15),routers:baseline.routers+Math.floor(minute/15),power:baseline.power+Math.floor(minute/15)});
  await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(await frame.locator('body').evaluate(()=>Date.now())).toBe(Date.parse(now)+minute*60000);
  expect(await frame.locator('body').evaluate(()=>window.fixtureSessionDiagnostics.invalidations)).toEqual([]);
@@ -179,7 +179,7 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  noWrites(state);
 });
 
-test('four-minute saved-data polling preserves the 20-minute source expiry',async({page},info)=>{
+test('fifteen-minute saved-data polling preserves the 20-minute source expiry',async({page},info)=>{
  const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
  const samples=[];
  const sample=async label=>{
@@ -198,9 +198,9 @@ test('four-minute saved-data polling preserves the 20-minute source expiry',asyn
    if(minute===3)await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
   }
   // Saved observations begin five minutes old and remain unchanged by reads:
-  // after sixteen elapsed minutes they must be gray despite four reloads.
+  // after sixteen elapsed minutes they must be gray despite a saved-data reload.
   await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
-  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 4 minutes');
+  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 15 minutes');
   noWrites(state);
  }finally{
   await sample('final').catch(error=>samples.push({label:'diagnostic capture unavailable',error:String(error)}));
@@ -210,7 +210,7 @@ test('four-minute saved-data polling preserves the 20-minute source expiry',asyn
  }
 });
 
-test('scheduled supporting-source refresh rejects a revoked parent before the next camera poll',async({page})=>{
+test('scheduled saved-data refresh rejects a revoked parent before transport',async({page})=>{
  const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
  await expand(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  const baseline=pollingReads(state);
@@ -220,7 +220,7 @@ test('scheduled supporting-source refresh rejects a revoked parent before the ne
  await expect(frame.getByRole('alert')).toContainText('Your session changed. Reload COS Operations to verify your account and permissions.');
  expect(await frame.locator('body').evaluate(()=>window.fixtureSessionDiagnostics.invalidations.map(event=>event.reason))).toEqual(['authentication-denied']);
  await page.clock.runFor(60000);
- expect(pollingReads(state)).toEqual({health:baseline.health+3,map:baseline.map+3,routers:baseline.routers,power:baseline.power});
+ expect(pollingReads(state)).toEqual({health:baseline.health,map:baseline.map,routers:baseline.routers,power:baseline.power});
  await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);
  noWrites(state);
 });
