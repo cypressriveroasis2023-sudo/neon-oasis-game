@@ -91,8 +91,9 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  const proof=device.portStatus._connection;
  if(!object(proof)||proof.ip!==ip||revision(proof.revision)!==rev||!['online','offline','verifying'].includes(proof.status)||typeof proof.reachable!=='boolean'
   ||proof.error||proof.errorCode||proof.error_code)return null;
- const checkedAt=cameraTimestamp(proof.checkedAt,now).at;
- if(!checkedAt)return null;
+ const observed=cameraTimestamp(proof.checkedAt,now);
+ if(!observed.fresh||!observed.at)return null;
+ const checkedAt=observed.at;
  const observedPorts=Object.keys(device.portStatus).filter(k=>/^[1-9][0-9]{0,4}$/.test(k)&&Number(k)<=65535);
  if(observedPorts.length!==ports.length||ports.some(p=>!observedPorts.includes(String(p))))return null;
  const states=ports.map(port=>device.portStatus![String(port)]);

@@ -56,10 +56,12 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./exactProductConnection'?{readExactProductConnections:()=>null}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
+      // Optional Product-ID receipt is unavailable in this legacy saved-pair fixture.
+      if(JSON.parse(init.body).path==='/api/product-connections')return Promise.resolve({ok:false,status:503,json:async()=>({error:'Synthetic connection receipt unavailable'})});
       const result = deferred();
       init.signal.addEventListener('abort', () => { const error = new Error('Synthetic aborted request'); error.name = 'AbortError'; result.reject(error); }, { once: true });
       requests.push({ url, init, envelope: JSON.parse(init.body), result });

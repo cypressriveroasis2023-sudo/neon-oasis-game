@@ -4,6 +4,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductEvidence,fieldProductEvidenceCsv} from '../src/fieldProductEvidence.ts';
 import {fleetAddressHealth} from '../src/fleetStatusPins.ts';
+import {buildExactProductConnections,VERIFIED_TRACKER_IP_CONTRACT,TRACKER_IP_WORKBOOK} from '../src/exactProductConnection.ts';
 
 test('a legacy name match cannot give a Product ID positive health or a green address pin',()=>{
  const f=fieldProductFixture();delete f.rows[0].camera.association;
