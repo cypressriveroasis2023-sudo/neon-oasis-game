@@ -54,6 +54,7 @@ for(const unavailable of [false,true])test('successive accepted Shop Field Shop 
    const shop=app.getByRole('region',{name:'Shop Product-ID inventory'});
    await expect(shop).toBeVisible();await expect(shop.locator('ul > li').filter({hasText:'Product 1002'})).toContainText('Cameras Onsite LLC');
    await expect(shop.locator('ul > li').filter({hasText:'Product 1002'})).toContainText('SHOP / ROOT');
+   await app.getByText('Fleet totals & quick filters',{exact:true}).click();
    await app.locator('.cos-fleet-stat-field').click();
   }
   expect(state.field.inventoryItems).toEqual(nativeBefore);
