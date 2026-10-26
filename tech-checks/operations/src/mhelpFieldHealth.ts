@@ -31,7 +31,9 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   // Connection does not depend on provider/channel acceptance, but still
   // respects current Product-ID ownership, placement, support and holds.
   const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length<=1
-   &&(!record||record.kind!=='identity_review'&&record.placement==='field'&&record.active&&record.lifecycle==='active')
+   &&(!record?binding?.state!=='linked':record.kind!=='identity_review'&&record.placement==='field'
+     &&record.active&&record.lifecycle==='active'
+     &&record.productIds.length===1&&record.productIds[0]===product.productId)
    &&(record?.kind!=='unit'||Boolean(row&&row.placement==='field'&&!row.retired&&record.productIds.length===1
      &&record.productIds[0]===product.productId&&binding?.state==='linked'&&binding.unitIds?.includes(record.unitId))));
   let state:FieldProductHealth,reason:string;
