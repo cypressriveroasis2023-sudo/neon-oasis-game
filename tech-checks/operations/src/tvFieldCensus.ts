@@ -21,7 +21,10 @@ export function tvFieldCensus(source:Record<string,any>|null,inventory:Dashboard
 export function tvCensusOutages<T extends {unit:{id:string};health:{state:string}}>(board:FleetCommandCenterData|null,rows:T[]):Array<T&{productId?:string}>{
  if(!board)return rows.filter(row=>row.health.state==='offline');
  return board.items.filter(product=>product.status==='offline').flatMap(product=>{
-  const matches=rows.filter(row=>row.unit.id===product.linked?.unitId&&row.health.state==='offline');
-  return matches.length===1?[{...matches[0],productId:product.productId}]:[];
+  const matches=rows.filter(row=>product.linked?.unitId&&row.unit.id===product.linked.unitId);
+  const exact=product.linked?.evidence?.association==='exact_product_id_tracker_endpoint'&&product.linked?.evidence?.basis==='connection';
+  if(matches.length!==1||matches[0].health.state!=='offline'&&!exact)return [];
+  const row=matches[0];
+  return [{...row,health:exact?{...row.health,state:'offline',basis:'connection',checkedAt:product.linked?.evidence?.observedAt}:row.health,productId:product.productId} as T&{productId?:string}];
  });
 }
