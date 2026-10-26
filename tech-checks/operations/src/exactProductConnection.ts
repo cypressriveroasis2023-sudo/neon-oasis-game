@@ -135,7 +135,7 @@ export function buildExactProductConnections(
   if(!object(device)||!deviceId(device.deviceId)||!Array.isArray(device.expectedPorts))return null;
   const ip=publicIp(device.publicIp);
   if(!ip)continue;
-  const list=endpoints.get(ip)||[];list.push(device);endpoints.set(ip,list);
+  const list=endpoints.get(ip)||[];list.push(device as SavedTcpEndpoint);endpoints.set(ip,list);
  }
  const items=products.filter(p=>p.placement==='FIELD').map(product=>{
   const pid=product.productId,row=byProduct.get(pid)!;
