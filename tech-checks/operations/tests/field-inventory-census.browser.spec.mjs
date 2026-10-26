@@ -24,6 +24,7 @@ test('accepted Product-ID census remains visible without a COS identity roster',
  const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,skipInitialFieldCount:true});
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  const list=app.getByRole('region',{name:'Field inventory health breakdown'});await expect(list).toBeVisible();await expect(list.locator('details > ul > li')).toHaveCount(7);
+ await expect(app.locator('.cos-fleet-source-age')).toBeVisible();
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 
@@ -59,4 +60,18 @@ for(const unavailable of [false,true])test('successive accepted Shop Field Shop 
  }
  expect(history.map(h=>h.records.find(p=>p.productId==='1002').placement)).toEqual(['SHOP','FIELD','SHOP']);
  expect(history.every(h=>h.records.length===8)).toBe(true);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
+
+test('delayed automatic mHelp source shows its original successful time and failure independently of identity roster',async({page})=>{
+ const f=fieldProductFixture();delete f.field.fleetRoster;
+ f.field.items=[];f.field.inventoryItems=[];
+ Object.assign(f.field.uploadInventory,{source:'mhelpdesk_api',lastApiReadAt:new Date(f.now-46*60000).toISOString()});
+ f.field.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:f.field.uploadInventory.lastApiReadAt,errorCode:'inventory_source_unavailable'};
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,skipInitialFieldCount:true});
+ const inventory=app.getByRole('region',{name:'mHelpDesk equipment Product-ID inventory'});
+ await expect(inventory).toBeVisible();await expect(inventory).toContainText('Automatic inventory updates are delayed.');
+ await expect(inventory.locator('.cos-fleet-source-age')).toBeVisible();await expect(inventory).toContainText('Last complete mHelpDesk API read');await expect(inventory).toContainText('scheduled every 30 minutes');
+ await expect(inventory.getByText('Inventory refresh unavailable; the last successful source remains shown.')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');expect(state.field.uploadInventory.lastApiReadAt).toBe(f.field.uploadInventory.lastApiReadAt);
+ expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
