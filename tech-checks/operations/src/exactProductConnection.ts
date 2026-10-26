@@ -65,6 +65,13 @@ const publicIp=(value:unknown):string|null=>{
 };
 const revision=(value:unknown):string|null=>typeof value==='number'&&Number.isSafeInteger(value)&&value>=0?String(value):
  typeof value==='string'&&/^(0|[1-9][0-9]*)$/.test(value)?value:null;
+/** A completed TCP timeout or explicit refusal is a valid nonresponse.
+ * Routing, DNS, permission, authentication and arbitrary transport errors are
+ * not a completed reachability result. Do not collapse all socket errors.
+ */
+const validPortNonresponseError=(v:unknown)=>v===undefined||v===null
+ ||v==='timeout'||v==='Connection refused (os error 111)'
+ ||v==='Connection timed out (os error 110)';
 const deviceId=(v:unknown):string|null=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):
  typeof v==='string'&&ID.test(v)?v:null;
 
@@ -82,20 +89,22 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  const ports=device.expectedPorts;
  if(new Set(ports).size!==ports.length||ports.some(v=>!Number.isInteger(v)||v<1||v>65535))return null;
  const proof=device.portStatus._connection;
- if(!object(proof)||proof.ip!==ip||revision(proof.revision)!==rev||proof.status!=='online'&&proof.status!=='offline'||typeof proof.reachable!=='boolean'
+ if(!object(proof)||proof.ip!==ip||revision(proof.revision)!==rev||!['online','offline','verifying'].includes(proof.status)||typeof proof.reachable!=='boolean'
   ||proof.error||proof.errorCode||proof.error_code)return null;
  const checkedAt=cameraTimestamp(proof.checkedAt,now).at;
  if(!checkedAt)return null;
  const observedPorts=Object.keys(device.portStatus).filter(k=>/^[1-9][0-9]{0,4}$/.test(k)&&Number(k)<=65535);
  if(observedPorts.length!==ports.length||ports.some(p=>!observedPorts.includes(String(p))))return null;
  const states=ports.map(port=>device.portStatus![String(port)]);
- if(states.some(v=>!object(v)||typeof v.online!=='boolean'||v.attempted===false||v.error||v.errorCode||v.error_code||v.technicalError))return null;
+ if(states.some(v=>!object(v)||typeof v.online!=='boolean'||v.attempted===false
+   ||v.errorCode||v.error_code||v.technicalError||(v.online===true&&v.error!=null)
+   ||v.online===false&&!validPortNonresponseError(v.error)))return null;
  const responded=states.some(v=>(v as Record<string,any>).online===true);
  if(responded&&proof.status==='online'&&proof.reachable===true)return {
   status:'online',basis:'tcp_service_port',checkedAt,resourceId:deviceId(device.deviceId),
   reason:'Completed saved TCP/service-port check responded. Camera video is not verified.'
  };
- if(!responded&&proof.status==='offline'&&proof.reachable===false)return {
+ if(!responded&&['offline','verifying'].includes(proof.status)&&proof.reachable===false)return {
   status:'offline',basis:'tcp_service_port',checkedAt,resourceId:deviceId(device.deviceId),
   reason:'Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.'
  };
