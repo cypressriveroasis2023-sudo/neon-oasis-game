@@ -120,3 +120,16 @@ test('browser-facing source receipt must cover every exact Product ID and retain
  const future=structuredClone(value);future.trackerVerifiedAt=new Date(now+60000).toISOString();
  assert.equal(readExactProductConnections(future,sha,ids,now),null);
 });
+
+test('a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not',()=>{
+ const d=endpoint(42,'9.9.9.9',false);
+ d.portStatus[80].error='timeout';
+ d.portStatus[443].error='Connection refused (os error 111)';
+ d.portStatus._connection.status='verifying';
+ assert.equal(completedSavedTcpCheck(d,now)?.status,'offline');
+ assert.equal(run(accepted(),tracker(),[endpoint(41,'8.8.8.8'),d]).items[1].status,'offline');
+ const route=structuredClone(d);route.portStatus[443].error='No route to host (os error 113)';
+ assert.equal(completedSavedTcpCheck(route,now),null);
+ const unknown=structuredClone(d);unknown.portStatus[443].error='unknown transport exception';
+ assert.equal(completedSavedTcpCheck(unknown,now),null);
+});
