@@ -78,7 +78,7 @@ export async function read2027ProductIpsFromGoogle(options:{
   const ips=verifiedRows(result.valueRanges[6],names[6]);
   const products=verifiedRows(result.valueRanges[1],names[1]);
   const info=verifiedRows(result.valueRanges[0],names[0]);
-  if(ips[0]?.[0]!=='IP'||products[0]?.[0]!=='MHELP EQUIPMENT ID')return failure();
+  if(ips[0]?.[0]!=='IP'||products[0]?.[0]!=='MHELP EQUIPMENT ID'||ips.length>products.length)return failure();
   const recordIds=new Set<string>(),records:VerifiedTrackerIpCensus['records'] extends Array<infer T>?T[]:never=[];
   for(let i=1;i<Math.max(products.length,info.length,ips.length);i++){
    const pid=products[i]?.[0]||'',family=info[i]?.[0]||'',label=info[i]?.[1]||'',placement=info[i]?.[2]||'';
