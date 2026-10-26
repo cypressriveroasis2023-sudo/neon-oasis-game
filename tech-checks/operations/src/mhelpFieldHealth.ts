@@ -30,7 +30,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   const support=Boolean(row?.support)||isSupportEquipment({id:product.recordId,unitNumber:label,modelName:typeof product.category==='string'?product.category:undefined});
   // Connection does not depend on provider/channel acceptance, but still
   // respects current Product-ID ownership, placement, support and holds.
-  const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support
+  const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length<=1
    &&(!record||record.kind!=='identity_review'&&record.placement==='field'&&record.active&&record.lifecycle==='active')
    &&(record?.kind!=='unit'||Boolean(row&&row.placement==='field'&&!row.retired&&record.productIds.length===1
      &&record.productIds[0]===product.productId&&binding?.state==='linked'&&binding.unitIds?.includes(record.unitId))));
