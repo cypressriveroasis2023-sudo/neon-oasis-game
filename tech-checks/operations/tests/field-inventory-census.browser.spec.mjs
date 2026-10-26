@@ -65,7 +65,7 @@ for(const unavailable of [false,true])test('successive accepted Shop Field Shop 
 
 test('delayed automatic mHelp source shows its original successful time and failure independently of identity roster',async({page})=>{
  const f=fieldProductFixture();delete f.field.fleetRoster;
- f.field.items=[];f.field.inventoryItems=[];
+ f.field.items=[];f.field.inventoryItems=[];f.field.summary={fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0};
  Object.assign(f.field.uploadInventory,{source:'mhelpdesk_api',lastApiReadAt:new Date(f.now-46*60000).toISOString()});
  f.field.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:f.field.uploadInventory.lastApiReadAt,errorCode:'inventory_source_unavailable'};
  const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,skipInitialFieldCount:true});
