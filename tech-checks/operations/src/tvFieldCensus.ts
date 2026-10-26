@@ -13,7 +13,7 @@ export function tvFieldCensus(source:Record<string,any>|null,inventory:Dashboard
  const rows=fleetDashboardRows(inventory,health,routers?.items||null,null,now);
  const upload=source?manualShopInventory(source.uploadInventory,source.manualPlacementOverrides):null;
  const roster=source?readRecordedRoster(source.fleetRoster,inventory).roster:null;
- const products=mhelpFieldHealth(upload,roster,rows,now);
+ const products=mhelpFieldHealth(upload,roster,rows,now,source?.productConnections);
  return {rows,products,board:buildFleetCommandCenter(upload,products,Boolean(health),rows,addressMap,null,now,health?.refreshedAt||null)};
 }
 
