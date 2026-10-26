@@ -42,6 +42,7 @@ import { cameraSummary } from './cameraEvidence.ts';
 import { cameraSummary as placementCameraSummary } from './cameraPlacementEvidence.ts';
 import {currentTrackerShopScope} from './cameraTrackerShopScope.ts';
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
+import {createMappedIdentityReview} from './mappedIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
 import {projectCameraSweepCoverage} from '../../../operations/shared/cameraSweepCoverage.ts';
@@ -761,6 +762,9 @@ export function createOperationsHandler(options) {
         // Deliberately outside the verified IT allowlist. No identity-approval expansion.
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
         if(method==='POST'&&body===null)body=await requestBody(request);
+        if(path==='/api/owner-identity/mapped-preview')return json(await createMappedIdentityReview({now:()=>Date.now(),
+          read:async key=>{const [result,receipt]=await Promise.all([readIdentitySources(context,key),readMhelpPlacements(actorPayload)]);return {sources:result.sources,upload:receipt?.upload};},
+        })(method,body));
         return json(await createOwnerIdentityReview({actorId:context.actorId,organizationId:ORGANIZATION_ID,rpc,
           read:async key=>{const result=await readIdentitySources(context,key);return {sources:result.reviewSources,identity:result.identity};},
         })(path,method,body));
