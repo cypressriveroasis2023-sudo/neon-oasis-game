@@ -318,6 +318,8 @@ test('Field Map visits overview and geographic close-ups with the red area first
  await expect(wrap).toHaveAttribute('data-area-kind','closeup');
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+red.unitNumber);
  await expect(frame.locator('.tv-map-area')).toContainText('1 down');
+ // The map fits bounds in requestAnimationFrame; advance that frame under the paused test clock.
+ await page.clock.runFor(32);
  await expect.poll(async()=>Number(await map.getAttribute('data-zoom'))).toBe(13);
  await page.clock.fastForward(15000);
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+green.unitNumber);

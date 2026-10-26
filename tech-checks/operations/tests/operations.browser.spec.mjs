@@ -256,7 +256,10 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Field Map');
   const units = frame.getByRole('region', { name: 'Fleet units in view' });
-  await expect(units.getByRole('button')).toHaveCount(2);
+  // Advanced map filters include Reset filters; count only equipment entries.
+  const equipment=units.locator('.cos-fleet-unit-row');
+  await expect(equipment).toHaveCount(2);
+  expect(await equipment.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-unit-id')).sort())).toEqual([unitId,missingUnitId].sort());
   await expect(frame.locator('.cos-fleet-map-canvas .leaflet-container, .cos-fleet-map-canvas.leaflet-container')).toBeVisible();
   await noOverflow(page);
   await selectLocation(frame,'FIX-RG-002');
