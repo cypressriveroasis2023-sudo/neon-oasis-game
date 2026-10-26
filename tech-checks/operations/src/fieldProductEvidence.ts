@@ -2,6 +2,7 @@ import {cameraTimestamp,providerState,cameraState} from './cameraEvidence';
 import {savedConnectionObservation} from './savedConnectionObservation';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {FieldProduct} from './mhelpFieldHealth';
+import type {ExactProductConnection} from './exactProductConnection';
 
 export type FieldEvidenceGap='device_link_needed'|'no_current_reading'|'incomplete_check'|'inactive'|'not_applicable'|null;
 export const fieldEvidenceGapLabels={device_link_needed:'Device link needed',no_current_reading:'No current reading',incomplete_check:'Incomplete check',inactive:'Inactive source record',not_applicable:'No camera / support'};
@@ -16,7 +17,14 @@ export type FieldProductEvidence={
 /** Only the classifier's complete reviewed resource set supplies product health.
  * Never infer a device link from a product label, IP, address or provider family.
  * Source times remain source times; a successful saved read cannot renew them. */
-export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now=Date.now()):FieldProductEvidence{
+export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now=Date.now(),exact:ExactProductConnection|null=null):FieldProductEvidence{
+ // This attribution is independently keyed by the accepted Product ID,
+ // verified 2027 tracker IP and saved endpoint configuration revision.
+ // It is never inferred from the provider/channel name or device label.
+ if(exact&&exact.status!=='unknown'&&exact.status===state&&exact.resourceId&&cameraTimestamp(exact.checkedAt,now).fresh){
+  return {gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:exact.checkedAt,video:'not_verified',
+   observations:[{resourceId:exact.resourceId,source:'Saved TCP/service-port check',kind:'connection',observedAt:exact.checkedAt,fresh:true,reportedStatus:exact.status,currentState:exact.status}]};
+ }
  const camera=row?.camera,linked=Boolean(camera?.association);
  const observations:FieldProductEvidence['observations']=[];
  if(linked)for(const resource of camera!.rows){
