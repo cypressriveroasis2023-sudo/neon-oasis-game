@@ -3,6 +3,7 @@ import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
 import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
+import {readExactProductConnections} from './exactProductConnection';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -204,7 +205,24 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
     };
     const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
-    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
+    // Optional protected Product-ID proof has its own bounded time budget.
+    // Never block a valid saved map/health pair on a missing Sheets read.
+    const productConnections=async()=>{
+      let timer=0;
+      const limited=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),6500);});
+      try{return await Promise.race([sendRequest('GET','/api/product-connections',session.token).then(r=>r.data).catch(()=>null),limited]);}
+      finally{window.clearTimeout(timer);}
+    };
+    const fieldMap=Promise.all([
+      sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);}),
+      productConnections()
+    ]).then(([map,receipt])=>{
+      current();
+      const upload=(map as any).uploadInventory;
+      const fieldIds=Array.isArray(upload?.records)?upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId):[];
+      const accepted=receipt&&typeof upload?.sourceSha256==='string'&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
+      return accepted?{...map,productConnections:receipt}:map;
+    });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
