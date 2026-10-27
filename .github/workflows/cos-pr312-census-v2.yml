@@ -1,0 +1,181 @@
+name: Prepare COS per-product connection holds
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-census-v2.yml]
+permissions:
+  contents: write
+concurrency:
+  group: cos-pr312-census-v2-61fb7e9
+  cancel-in-progress: false
+jobs:
+  verify-candidate:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: 61fb7e9e676df817981d6b0d125e880dc7bd8457
+    steps:
+      - name: Retrieve inert source patch from this helper revision
+        uses: actions/checkout@v4
+        with:
+          path: input
+          persist-credentials: false
+          sparse-checkout: .github/cos-verification
+      - name: Check out exact existing repair source
+        uses: actions/checkout@v4
+        with:
+          ref: 61fb7e9e676df817981d6b0d125e880dc7bd8457
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: source/tech-checks/operations/package-lock.json
+      - name: Decode and verify immutable source edits
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {brotliDecompressSync} from 'node:zlib';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          let text=readFileSync('../input/.github/cos-verification/pr312-connection-census-v2.br.b64','utf8').trim();
+          // Correct one known text-transfer omission; the complete decoded
+          // payload hash below remains mandatory and cannot be bypassed.
+          const omitted='Qs/9ruuke/DYodgNEL';
+          if(text.includes(omitted)){
+            assert.equal(text.split(omitted).length,2);
+            text=text.replace(omitted,'Qs/9ruADKxiW0Gjbgj5zNFAfrec+8jvuke/DYodgNEL');
+          }
+          assert.equal(text.length,15692);
+          const bytes=brotliDecompressSync(Buffer.from(text,'base64'));
+          assert.equal(createHash('sha256').update(bytes).digest('hex'),'daa37adb16fd5ec3839fd510234ba256a4370e78cc3fae0872355d37152fef8a');
+          writeFileSync('../candidate-edits.json',bytes);
+          NODE
+          python3 <<'PY'
+          import json,hashlib,pathlib,subprocess
+          data=json.loads(pathlib.Path('../candidate-edits.json').read_text())
+          assert data['sourceCommit']=='61fb7e9e676df817981d6b0d125e880dc7bd8457'
+          assert len(data['files'])==25
+          seen=set()
+          for f in data['files']:
+              name=f['path']; p=pathlib.Path(name)
+              assert name not in seen and not p.is_absolute() and '..' not in p.parts
+              assert name.startswith(('tech-checks/operations/src/','tech-checks/operations/tests/','tech-checks/supabase/functions/cos-operations-pages/'))
+              assert not p.is_symlink()
+              seen.add(name)
+              if f['before'] is None:
+                  assert not p.exists(); old=''
+              else:
+                  original=p.read_bytes(); assert hashlib.sha256(original).hexdigest()==f['before']; old=original.decode('utf-8')
+              edits=f['edits']; last=0
+              for e in edits:
+                  assert last<=e['start']<=e['end']<=len(old)
+                  last=e['end']
+              result=old
+              for e in reversed(edits): result=result[:e['start']]+e['text']+result[e['end']:]
+              new=result.encode('utf-8'); assert hashlib.sha256(new).hexdigest()==f['after']
+              p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(new)
+          pathlib.Path('../candidate-paths.json').write_text(json.dumps(sorted(seen)))
+          print('Applied exact checksummed source files:',len(seen))
+          PY
+      - name: Install unchanged locked dependencies
+        working-directory: source/tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Focused identity, source, connection and unavailable-read regressions
+        working-directory: source/tech-checks/operations
+        run: |
+          node --import tsx --test --test-concurrency=1 tests/exact-product-connection.test.mjs tests/mhelp-2027-product-ip-reader.test.mjs tests/mhelp-2027-connection-census.test.mjs tests/mhelp-2027-product-census.test.mjs tests/field-product-evidence.test.mjs tests/product-connection-fleet-rows.test.mjs tests/tv-field-census.test.mjs tests/api-inflight-reads.test.mjs tests/saved-camera-refresh-scheduling.test.mjs tests/fleet-status-pins.test.mjs tests/imported-digest-memo.test.mjs tests/owner-identity-label-memo.test.mjs | tee ../../../focused-results.log
+      - name: Typecheck and build exact candidate
+        working-directory: source/tech-checks/operations
+        run: |
+          npm run typecheck
+          npm run build
+      - name: Install pinned project browser for synthetic fixtures only
+        working-directory: source/tech-checks/operations
+        run: npx playwright install --with-deps chromium
+      - name: Verify changed source-proof screens with synthetic Owner and IT data
+        working-directory: source/tech-checks/operations
+        run: |
+          npm run test:browser -- --workers=3 --retries=0 tests/camera-diagnostics-access.browser.spec.mjs tests/camera-field-product-scope.browser.spec.mjs tests/field-inventory-census.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs tests/field-product-evidence.browser.spec.mjs tests/fleet-command-center.browser.spec.mjs tests/it-desktop-layout.browser.spec.mjs tests/mhelp-field-health.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs | tee ../../../browser-results.log
+      - name: Stage allowlisted candidate locally without advancing any remote reference
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- tech-checks/operations/package.json tech-checks/operations/package-lock.json
+          git add -A -- tech-checks/operations/src tech-checks/operations/tests tech-checks/supabase/functions/cos-operations-pages tech-checks/operations/dist
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync} from 'node:fs';
+          const allowed=new Set(JSON.parse(readFileSync('../candidate-paths.json','utf8')));
+          const files=execFileSync('git',['diff','--cached','--name-only','-z'],{encoding:'utf8'}).split('\0').filter(Boolean);
+          assert(files.length>=25&&files.length<150);
+          assert(files.every(p=>allowed.has(p)||p.startsWith('tech-checks/operations/dist/')));
+          assert.equal(execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim(),'');
+          NODE
+          git -c user.name='COS candidate verification' -c user.email='cos-candidate-verification@users.noreply.github.com' commit -m 'Verify isolated Product-ID connection holds candidate'
+      - name: Rebuild and verify all committed runtime files
+        working-directory: source/tech-checks/operations
+        run: |
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Store immutable verified Git objects, not branches or deployments
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync,writeFileSync,lstatSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const repo='cypressriveroasis2023-sudo/neon-oasis-game',source=process.env.SOURCE_SHA;
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:32*1024*1024}).trim();
+          assert.equal(git('rev-parse','HEAD^'),source);
+          const manifest=JSON.parse(readFileSync('cos-build-evidence/manifest.json','utf8'));
+          assert.equal(manifest.commit,git('rev-parse','HEAD'));assert.equal(manifest.lockfileUnchanged,true);
+          const allowed=new Set(JSON.parse(readFileSync('../candidate-paths.json','utf8')));
+          const paths=execFileSync('git',['diff','--name-only','--no-renames','-z',source,'HEAD'],{encoding:'utf8'}).split('\0').filter(Boolean);
+          assert(paths.length>=25&&paths.length<150&&paths.every(p=>allowed.has(p)||p.startsWith('tech-checks/operations/dist/')));
+          const api=async(path,payload)=>{
+            assert(['git/blobs','git/trees'].includes(path));
+            const r=await fetch('https://api.github.com/repos/'+repo+'/'+path,{method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(45000)});
+            if(!r.ok)throw Error('Immutable Git object write failed '+r.status);
+            return r.json();
+          };
+          const entries=[];
+          for(const path of paths){
+            let stat;try{stat=lstatSync(path);}catch(e){if(e.code!=='ENOENT')throw e;entries.push({path,mode:'100644',type:'blob',sha:null});continue;}
+            assert(stat.isFile()&&!stat.isSymbolicLink());const bytes=readFileSync(path);assert(bytes.length<8*1024*1024);
+            const expected=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+            const b=await api('git/blobs',{encoding:'base64',content:bytes.toString('base64')});assert.equal(b.sha,expected);
+            entries.push({path,mode:'100644',type:'blob',sha:b.sha});
+          }
+          const tree=await api('git/trees',{base_tree:git('rev-parse',source+'^{tree}'),tree:entries});
+          assert.equal(tree.sha,git('rev-parse','HEAD^{tree}'));
+          const proof={sourceCommit:source,preparedTree:tree.sha,localVerificationCommit:manifest.commit,changedFiles:paths,lockfileUnchanged:true,verifiedFileCount:manifest.files.length,branchesChanged:false,productionChanged:false};
+          writeFileSync('cos-build-evidence/pr312-census-v2-tree.json',JSON.stringify(proof,null,2));
+          console.log('COS_PR312_CENSUS_V2_TREE='+JSON.stringify(proof));
+          NODE
+      - name: Preserve test evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-pr312-census-v2-evidence
+          path: |
+            focused-results.log
+            browser-results.log
+            source/cos-build-evidence
+            source/tech-checks/operations/test-results
+            source/tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+          retention-days: 5
