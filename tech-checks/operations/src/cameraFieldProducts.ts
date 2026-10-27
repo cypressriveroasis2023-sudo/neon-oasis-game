@@ -16,6 +16,6 @@ export function cameraFieldProducts(map:any,health:Health,now:number,readSucceed
   const item=roster?.items.find(item=>item.unitId===row.id);
   return {...row,retired:item?!item.active:row.retired};
  });
- const field=mhelpFieldHealth(upload,roster,rows,now);
+ const field=mhelpFieldHealth(upload,roster,rows,now,map.productConnections);
  return buildFleetCommandCenter(upload,field,readSucceeded,rows,null,null,now,health.refreshedAt||null);
 }

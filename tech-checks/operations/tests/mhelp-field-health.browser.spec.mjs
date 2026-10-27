@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Field product and inspect held or linked records',async({page})=>{
- const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field,health:fixture.health});
+ const fixture=fieldProductFixture(),{app,state}=await mountFleet(page,it,{hash:'#camera-health',field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  const disclosure=app.locator('.cos-fleet-accounting');
  await expect(disclosure).not.toHaveAttribute('open','');
  await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
@@ -10,8 +10,8 @@ for(const it of [false,true])test((it?'IT':'Owner')+' can account for every Fiel
  await expect(disclosure).toHaveAttribute('open','');
  const counts=app.getByRole('region',{name:'Field inventory health breakdown'});
  await expect(counts).toContainText('All 7 Field equipment records accounted for');
- await expect(counts).toContainText('1 online + 1 offline + 1 health unverified + 1 solar / support');
- await expect(counts).toContainText('1 health not linked + 1 identity / placement review + 1 do not use / missing / inactive = 7 Field records');
+ await expect(counts).toContainText('1 online + 1 offline + 2 health unverified + 1 solar / support');
+ await expect(counts).toContainText('1 identity / placement review + 1 do not use / missing / inactive = 7 Field records');
  await counts.locator('summary').click();await counts.getByLabel('Field inventory status').selectOption('review');
  await expect(counts.locator('li')).toHaveCount(1);await expect(counts.locator('li')).toContainText('Ranger 902');
  await counts.getByRole('button',{name:'Review source record'}).click();await expect(app.getByRole('dialog',{name:'Ranger 902 source equipment details'})).toBeVisible();

@@ -26,7 +26,7 @@ for(const kind of ['owner','verified-it','daily-it'])test(kind+' troubleshooting
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization,content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();calls.push(request);
-  const data=request.path==='/api/session'?{authorized:true,legacyOwner:kind==='owner',role:kind==='owner'?'Owner':'IT',name:'Synthetic operator',features:{fleetAccess:true}}:request.path==='/api/field-map'?fixture.field:request.path==='/api/camera-health/summary-v3'?fixture.health:request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fixture.fresh}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,legacyOwner:kind==='owner',role:kind==='owner'?'Owner':'IT',name:'Synthetic operator',features:{fleetAccess:true}}:request.path==='/api/product-connections'?fixture.connections:request.path==='/api/field-map'?fixture.field:request.path==='/api/camera-health/summary-v3'?fixture.health:request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fixture.fresh}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/diagnostics-host');if(kind==='verified-it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();

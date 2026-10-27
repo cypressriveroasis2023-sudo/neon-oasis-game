@@ -18,6 +18,9 @@ import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPla
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
+import {read2027ProductIpsFromGoogle} from './mhelp2027ProductIpReader.ts';
+import {currentMhelpProductConnectionCensus} from './mhelpProductConnectionSource.ts';
+import {buildExactProductConnections} from '../../../operations/src/exactProductConnection.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
@@ -615,6 +618,35 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if (path === '/api/product-connections') {
+        // Independent Owner/IT read: no browser-supplied IP, Product ID,
+        // resource ID, sheet range or credential. No live device probes.
+        if (method !== 'GET') fail('Use GET for saved connection evidence.',405);
+        const receipt=await rpc('cos_mhelp_placement_snapshot',actorPayload,request.signal);
+        if(!receipt?.upload)fail('Reviewed mHelp Product-ID census is unavailable.',503);
+        let source;
+        try{source=currentMhelpProductConnectionCensus(receipt.upload);}catch{fail('Reviewed mHelp Product-ID census could not be verified.',503);}
+        const [tracker,deviceRows,checks]=await Promise.all([
+          read2027ProductIpsFromGoogle({
+            getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),
+            signAssertion:options.googleSheets?.signAssertion,fetch:requestFetch,
+            candidate:source.candidate,expectedMhelpSourceSha256:source.sourceSha256,
+          }),
+          legacyAll('camera_devices?select=id,public_ip,expected_ports,connection_revision,monitoring_enabled&order=id.asc',context.headers,request.signal),
+          legacyAll('camera_health_current?select=camera_device_id,port_status&order=camera_device_id.asc',context.headers,request.signal),
+        ]);
+        const byId=new Map(checks.map(row=>[String(row.camera_device_id),row]));
+        if(byId.size!==checks.length)fail('Saved endpoint checks have conflicting identities.',503);
+        const endpoints=deviceRows.map(device=>({
+          deviceId:device.id,publicIp:device.public_ip,expectedPorts:device.expected_ports,
+          connectionRevision:device.connection_revision,monitoringEnabled:device.monitoring_enabled,
+          portStatus:byId.get(String(device.id))?.port_status||null,
+        }));
+        const evaluated=buildExactProductConnections(source.census,tracker,endpoints);
+        if(!evaluated)fail('Current exact Product-ID/endpoint evidence could not be verified.',503);
+        return json(evaluated);
+      }
+
       const censusOnce=/^\/api\/field-map\/([^/]+)\/(owner-census-once|owner-census-proof|owner-census-prepare)$/.exec(path);
       if(censusOnce){
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);

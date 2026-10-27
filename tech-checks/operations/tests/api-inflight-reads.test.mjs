@@ -25,7 +25,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true } = {}) {
-  const invalidations=[], listeners = new Set(), otherListeners=new Map(), timers = new Map(), requests = [], handshakes = [];
+  const invalidations=[], listeners = new Set(), otherListeners=new Map(), timers = new Map(), requests = [], handshakes = [], optionalProductReads=[];
   const location = { origin: 'https://synthetic.example', search: mode ? '?mode=' + mode : '' };
   let timerId = 0, requestId = 0, clock = 0;
   const state = { role, token, autoReply };
@@ -56,10 +56,15 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./exactProductConnection'?{readExactProductConnections:()=>null}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
+      // Optional Product-ID receipt is unavailable in this legacy saved-pair fixture.
+      if(JSON.parse(init.body).path==='/api/product-connections'){
+        optionalProductReads.push({init,envelope:JSON.parse(init.body)});
+        return Promise.resolve({ok:false,status:503,json:async()=>({error:'Synthetic connection receipt unavailable'})});
+      }
       const result = deferred();
       init.signal.addEventListener('abort', () => { const error = new Error('Synthetic aborted request'); error.name = 'AbortError'; result.reject(error); }, { once: true });
       requests.push({ url, init, envelope: JSON.parse(init.body), result });
@@ -67,7 +72,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
     },
   }, { filename: 'api.ts' });
   return {
-    api: exports.api, invalidations, requests, handshakes, state, location, window, timers, listeners, reply,
+    api: exports.api, invalidations, requests, optionalProductReads, handshakes, state, location, window, timers, listeners, reply,
     answer(index, data = { items: [] }, responseStatus = 200) {
       requests[index].result.resolve(new Response(JSON.stringify(data), { status: responseStatus }));
     },
@@ -401,6 +406,36 @@ test('verified parent credential changes and malformed auth responses still inva
 
 const fleetHealth={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:'2026-10-12T18:00:00Z',rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
 const fleetMap={items:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-12T18:00:00Z'};
+
+test('read-only Product-ID evidence is requested only after a complete reviewed Field census',async()=>{
+ const native=fixture(),first=native.api.fleet();await flush();
+ assert.deepEqual(native.requests.map(x=>x.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
+ native.answer(0,fleetHealth);native.answer(1,fleetMap);await first;
+ assert.equal(native.optionalProductReads.length,0,'native-only Fleet must not request an absent Product-ID source');
+
+ const f=fixture(),pending=f.api.fleet();await flush();
+ assert.equal(f.optionalProductReads.length,0,'wait for the authenticated Field source');
+ f.answer(0,fleetHealth);
+ const reviewed={...fleetMap,uploadInventory:{
+  contract:'COS_MHELP_UPLOAD_INVENTORY_V1',
+  countBasis:'mhelp_product_records_not_unique_physical_units',
+  sourceSha256:'a'.repeat(64),summary:{totalRecords:2,fieldRecords:1},
+  records:[{productId:'1001',placement:'FIELD'},{productId:'1002',placement:'SHOP'}]
+ }};
+ f.answer(1,reviewed);const complete=await pending;
+ assert.equal(f.optionalProductReads.length,1);
+ assert.deepEqual(f.optionalProductReads[0].envelope,{path:'/api/product-connections',method:'GET',body:null});
+ assert.equal(f.optionalProductReads[0].init.headers.Authorization,'Bearer synthetic-session-a');
+ assert.equal(complete.fieldMap.productConnections,null,'failed Product-ID read must stay explicit, never fall back to provider status');
+ assert.equal(f.requests.length,2,'the original health/map reads remain unchanged');
+
+ const held=fixture(),other=held.api.fleet();await flush();
+ held.answer(0,fleetHealth);
+ held.answer(1,{...reviewed,uploadInventory:{...reviewed.uploadInventory,summary:{totalRecords:1,fieldRecords:1}}});
+ await other;
+ assert.equal(held.optionalProductReads.length,0,'incomplete source census cannot trigger a Product-ID read');
+});
+
 for(const failedSource of ['health','fieldMap'])for(const peerFails of [false,true])test(`${failedSource} failure is prompt but retains the shared fleet barrier until its peer ${peerFails?'fails':'succeeds'}`,async()=>{
  const f=fixture(),first=f.api.fleet();let pairedError;
  const failed=first.catch(error=>{pairedError=error;});

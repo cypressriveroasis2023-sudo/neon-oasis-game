@@ -14,6 +14,14 @@ export function fleetAddressHealth(products:FieldProduct[],rows:FleetDashboardRo
   const row=matches.length===1?matches[0]:null;
   if(!duplicates.has(p.productId)){
    if(p.state==='support')state='support';
+   // A verified source Product-ID TCP observation can color a Field pin
+   // without a camera-provider/native-unit association. Router and battery
+   // layers retain their separately verified native linkage requirements.
+   else if(layer==='camera'&&['online','offline'].includes(p.state)
+     &&p.evidence?.association==='exact_product_id_tracker_endpoint'
+     &&p.evidence.basis==='connection'&&p.evidence.observations.length===1
+     &&p.evidence.observations[0].fresh===true
+     &&p.evidence.observations[0].currentState===p.state)state=p.state as ReticleState;
    else if(['online','offline','unverified'].includes(p.state)&&row&&row.placement==='field'&&!row.retired
     &&products.filter(x=>x.unitId===p.unitId).length===1
     &&(p.state==='unverified'?'unknown':p.state)===row.cameraState){

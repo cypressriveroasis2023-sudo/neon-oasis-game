@@ -11,7 +11,7 @@ export function fleetRouteAllowed(method: string, path: string): boolean {
     || method === 'POST' && (path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
     || method === 'GET' && new Set([
     '/api/session', '/api/field-map', '/api/camera-health/summary',
-    '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/routers',
+    '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/product-connections', '/api/routers',
     // Saved, read-only installations only. /refresh and all discovery/sharing writes stay Owner-only.
     '/api/vrm-fleet',
   ]).has(path);

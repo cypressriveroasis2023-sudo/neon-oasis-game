@@ -3,6 +3,7 @@ import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
 import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
+import {readExactProductConnections} from './exactProductConnection';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -204,7 +205,39 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
     };
     const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
-    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);});
+    // Optional protected Product-ID proof has its own bounded time budget.
+    // Never block a valid saved map/health pair on a missing Sheets read.
+    const productConnections=async()=>{
+      let timer=0;
+      const limited=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),6500);});
+      try{return await Promise.race([sendRequest('GET','/api/product-connections',session.token).then(r=>r.data).catch(()=>null),limited]);}
+      finally{window.clearTimeout(timer);}
+    };
+    // Native-only Fleet pages cannot attribute any Product-ID TCP results.
+    // Avoid an unnecessary protected source read until this authenticated map
+    // supplies a reviewed, complete Field Product-ID census.
+    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(async result=>{
+      current();
+      const map=checkedFieldMap(result.data),upload=(map as any).uploadInventory;
+      const records=Array.isArray(upload?.records)?upload.records:[];
+      const fieldIds=records.filter((r:any)=>r?.placement==='FIELD').map((r:any)=>r.productId);
+      const sourceReady=upload?.contract==='COS_MHELP_UPLOAD_INVENTORY_V1'
+        &&upload.countBasis==='mhelp_product_records_not_unique_physical_units'
+        &&typeof upload.sourceSha256==='string'&&/^[a-f0-9]{64}$/.test(upload.sourceSha256)
+        &&records.length>0&&records.length<=10000
+        &&upload.summary?.totalRecords===records.length
+        &&upload.summary?.fieldRecords===fieldIds.length
+        &&fieldIds.length>0&&new Set(fieldIds).size===fieldIds.length
+        &&fieldIds.every((id:unknown)=>typeof id==='string'&&/^[1-9][0-9]{0,14}$/.test(id));
+      if(!sourceReady)return map;
+      const receipt=await productConnections();
+      current();
+      const accepted=receipt&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
+      // Explicit null means the required exact-product read failed or was
+      // rejected. Keep the inventory, but never silently substitute provider
+      // health for a missing TCP observation. Native-only maps omit the field.
+      return {...map,productConnections:accepted?receipt:null};
+    });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};

@@ -1,4 +1,4 @@
-import {fieldProductFixture} from './mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './mhelp-field-health-fixtures.mjs';
 export function statusPinsFixture(){
  const f=fieldProductFixture();
  for(let i=0;i<993;i++){
@@ -12,5 +12,7 @@ export function statusPinsFixture(){
  f.field.mhelpAddressMap={contract:'COS_MHELP_CENSUS_ADDRESS_MAP_V1',sourceSha256:f.upload.sourceSha256,payloadSha256:f.upload.payloadSha256,totalProducts:1001,fieldProducts:287,shopProducts:714,verifiedGps:false,liveGps:false,confidence:'mhelpdesk_customer_address_reference_only',items:f.upload.records.filter(r=>r.placement==='FIELD').map((r,i)=>({productId:r.productId,sourceRowSha256:'c'.repeat(64),unitNumber:r.unitNumber,customer:'Synthetic service customer',category:r.category,placement:'FIELD',lifecycle:r.uploadLifecycle,placementHeld:r.binding.placementHeld,sourceAddress:{street:'123 Example Rd',city:'Houston',state:'TX',zip:'77064'},status:i<7?(i===0?'address_review':'matched'):'no_match',reason:i<7?null:'Synthetic unresolved address',matchedAddress:i<7?'123 EXAMPLE RD, HOUSTON, TX, 77064':null,latitude:i<7?30+Math.sin(i*2*Math.PI/7)*.4:null,longitude:i<7?-96+Math.cos(i*2*Math.PI/7)*.65:null,geocodedAt:f.fresh,geocodeSource:'us_census_address_range',verified:false,liveGps:false,confidence:'mhelpdesk_address_census_range_unverified'}))};
  Object.assign(f.units[0],{latitude:f.field.mhelpAddressMap.items[0].latitude,longitude:f.field.mhelpAddressMap.items[0].longitude,coordinateSource:'site',locationVerification:'owner_verified',locationVerifiedAt:f.fresh,gpsRecordedAt:f.fresh});
  Object.assign(f.field.summary,{mappedUnits:1,missingGps:3});
+ // Reconcile the independently mocked TCP receipt with the enlarged Product-ID census.
+ f.connections=fieldProductConnectionFixture(f.upload,f.fresh);
  return f;
 }

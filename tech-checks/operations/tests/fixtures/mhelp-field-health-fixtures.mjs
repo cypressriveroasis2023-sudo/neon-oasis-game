@@ -10,5 +10,17 @@ export function fieldProductFixture(){
  const items=records.map((product,i)=>({id:i<4?'cos_unit:'+units[i].id:product.recordId,kind:i<4?'unit':i===5?'identity_review':'source_equipment',unitId:i<4?units[i].id:null,unit:i<4?units[i]:null,unitNumber:product.unitNumber,placement:i===5?'unknown':product.placement.toLowerCase(),lifecycle:i===6?'do_not_use':'active',active:i!==6,source:'owner_supplied_mhelp_export',observedAt:fresh,productIds:[product.productId],sourceRecordIds:[product.recordId],representedUnitIds:i<4?[units[i].id]:[],customer:'Synthetic customer',sourceAddress:null,reviewReason:i===5?'Protected identity hold.':null,...(i===5?{recordedSourcePlacement:'field'}:{})}));
  const roster={contract:'COS_COMBINED_FLEET_ROSTER_V1',countBasis:'equipment_records_with_reviewed_cross_source_links',physicalDeduplication:'incomplete',items,summary:{totalRecords:8,activeRecords:7,field:5,shop:1,review:1,excludedLifecycle:1,sourceOnlyRecords:4,linkedUnitRecords:4}};
  const field={items:units,inventoryItems:units,summary:{fieldUnits:4,mappedUnits:0,unitGps:0,missingGps:4},generatedAt:fresh,uploadInventory:upload,fleetRoster:roster};
- return {units,health,upload,roster,field,rows:fleetDashboardRows(units,health,[],null,now),now,fresh};
+ return {units,health,upload,roster,field,connections:fieldProductConnectionFixture(upload,fresh),rows:fleetDashboardRows(units,health,[],null,now),now,fresh};
+}
+
+/** Explicit synthetic saved TCP observations, not a projection from provider
+ * labels, health or names. Tests opt into this independently mocked endpoint. */
+export function fieldProductConnectionFixture(upload,observedAt=fresh,states={'1001':'online','1002':'offline'}){
+ return {contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:upload.sourceSha256,trackerVerifiedAt:observedAt,
+  items:upload.records.filter(r=>r.placement==='FIELD').map(p=>{
+   const status=states[p.productId]||'unknown';
+   return {productId:p.productId,status,basis:'tcp_service_port',
+    checkedAt:status==='unknown'?null:observedAt,resourceId:status==='unknown'?null:String(9000+Number(p.productId)),
+    reason:status==='unknown'?'No fresh completed synthetic TCP check.':'Completed synthetic saved TCP/service-port check; video not verified.'};
+  })};
 }

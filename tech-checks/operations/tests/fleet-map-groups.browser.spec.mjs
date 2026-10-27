@@ -4,7 +4,7 @@ import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
 for(const it of [false,true])test(`dense Fleet switches between grouped and individually selectable pins ${it?'IT':'Owner'}`,async({page},info)=>{
  const f=statusPinsFixture();
  f.field.mhelpAddressMap.items.forEach((pin,i)=>{if(i<21)Object.assign(pin,{status:'matched',reason:null,matchedAddress:'123 EXAMPLE RD, HOUSTON, TX, 77064',latitude:30,longitude:-96});});
- const original=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const original=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
  const groups=app.locator('.cos-compact-group-marker'),individual=app.getByRole('button',{name:'Individual pins',exact:true}),grouped=app.getByRole('button',{name:'Grouped',exact:true});
  await expect(groups).toHaveCount(1);await expect(groups).toHaveAttribute('data-group-count','21');
  await expect(grouped).toHaveAttribute('aria-pressed','true');
@@ -35,7 +35,7 @@ for(const it of [false,true])test(`dense Fleet switches between grouped and indi
 });
 for(const dense of [false,true])for(const it of [false,true])test(`${dense?'shared-address':'nearby'} individual pin drops ${it?'IT':'Owner'}`,async({page},info)=>{
  const f=statusPinsFixture();f.field.mhelpAddressMap.items.forEach((p,i)=>{if(i<7){p.latitude=30;p.longitude=-96+(dense?0:i*.04);}});
- const original=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health}),markers=app.locator('.cos-mhelp-address-marker');
+ const original=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections}),markers=app.locator('.cos-mhelp-address-marker');
  await expect(markers).toHaveCount(7);await expect(app.locator('.cos-dashboard-cluster,.cos-map-group,.cos-status-group-ring,.cos-address-review-flag')).toHaveCount(0);
  expect((await app.locator('.cos-fleet-map-toolbar').boundingBox()).height).toBeLessThanOrEqual(76);
  const ids=await markers.evaluateAll(nodes=>nodes.flatMap(n=>JSON.parse(n.dataset.mhelpProductIds)).sort());expect(ids).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
@@ -59,7 +59,7 @@ for(const it of [false,true])test(`a slow power read does not block camera refre
 });
 for(const size of [{width:844,height:390},{width:932,height:430}])test(`touch landscape ${size.width} keeps groups clear and selectable`,async({browser},info)=>{
  const context=await browser.newContext({viewport:size,hasTouch:true});
- try{const page=await context.newPage(),f=statusPinsFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ try{const page=await context.newPage(),f=statusPinsFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
  await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await expect.poll(()=>app.locator('.cos-mhelp-address-marker').first().evaluate(n=>n.getBoundingClientRect().width)).toBe(44);
  const boxes=await app.locator('.cos-mhelp-address-marker,.cos-dashboard-marker').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().toJSON()).filter(b=>b.width));

@@ -4,6 +4,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductEvidence,fieldProductEvidenceCsv} from '../src/fieldProductEvidence.ts';
 import {fleetAddressHealth} from '../src/fleetStatusPins.ts';
+import {buildExactProductConnections,VERIFIED_TRACKER_IP_CONTRACT,TRACKER_IP_WORKBOOK} from '../src/exactProductConnection.ts';
 
 test('a legacy name match cannot give a Product ID positive health or a green address pin',()=>{
  const f=fieldProductFixture();delete f.rows[0].camera.association;
@@ -54,4 +55,70 @@ test('the audit exports each Field Product ID once, preserves suffixes and sourc
  assert.equal(csv.split('\r\n').length,8);assert.match(csv,/Spotter 022HDC1/);assert.match(csv,/"'=not-a-formula"/);
  assert.match(csv,new RegExp(new Date(f.fresh).toISOString()));
  assert.throws(()=>fieldProductEvidenceCsv([...view.items,view.items[0]],view.sourceSha256,view.receivedAt),/invalid/);
+});
+
+test('exact Product-ID TCP response works for an unlinked Field product and a provider-unassociated native row',()=>{
+ const f=fieldProductFixture();
+ delete f.rows[0].camera.association;
+ const tracker={contract:VERIFIED_TRACKER_IP_CONTRACT,workbookId:TRACKER_IP_WORKBOOK,
+  expectedMhelpSourceSha256:f.upload.sourceSha256,verifiedAt:f.fresh,
+  records:f.upload.records.map(product=>({productId:product.productId,recordId:product.recordId,placement:product.placement,
+   publicIp:product.productId==='1001'?'8.8.8.8':product.productId==='1005'?'9.9.9.9':product.productId==='1004'?'4.2.2.2':null}))};
+ const device=(id,ip,online)=>({deviceId:id,publicIp:ip,expectedPorts:[80,443],connectionRevision:2,monitoringEnabled:true,
+  portStatus:{80:{online,attempted:true},443:{online:false,attempted:true},
+   _connection:{ip,revision:2,checkedAt:f.fresh,status:online?'online':'offline',reachable:online,consecutiveFailures:1,confirmedOutage:false}}});
+ const exact=buildExactProductConnections(f.upload,tracker,[device(881,'8.8.8.8',true),device(882,'9.9.9.9',false),device(883,'4.2.2.2',true)],f.now);
+ assert.ok(exact);
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,exact);
+ assert.equal(view.items[0].state,'online');assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
+ assert.equal(view.items[0].evidence.observations[0].kind,'connection');
+ assert.equal(view.items[0].evidence.video,'not_verified');
+ assert.equal(view.items[3].state,'support');
+ assert.equal(view.items[4].state,'offline');assert.equal(view.items[4].evidence.basis,'connection');
+ assert.equal(view.items[4].evidence.observations[0].resourceId,'882');
+ assert.equal(view.items[5].state,'review');assert.equal(view.items[6].state,'inactive');
+ assert.equal(view.total,7);assert.equal(Object.values(view.counts).reduce((sum,v)=>sum+v,0),7);
+ assert.equal(fleetAddressHealth(view.items,f.rows,'camera').get('1005'),'offline');
+});
+test('unverified or wrong-source TCP receipts never bypass a missing provider association',()=>{
+ const f=fieldProductFixture();delete f.rows[0].camera.association;
+ const fake={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:'b'.repeat(64),trackerVerifiedAt:f.fresh,
+  items:f.upload.records.filter(p=>p.placement==='FIELD').map(p=>({productId:p.productId,status:'online',basis:'tcp_service_port',resourceId:'881',checkedAt:f.fresh,reason:'fake'}))};
+ assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unverified');
+});
+
+test('authoritatively Unknown Product-ID TCP checks do not inherit older provider Online or Offline',()=>{
+ const f=fieldProductFixture();
+ const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',
+  sourceSha256:f.upload.sourceSha256,trackerVerifiedAt:f.fresh,
+  items:f.upload.records.filter(r=>r.placement==='FIELD').map(r=>({
+   productId:r.productId,basis:'tcp_service_port',status:'unknown',checkedAt:null,
+   resourceId:null,reason:'No complete current tracker-IP check.'
+  }))};
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.equal(f.rows[0].cameraState,'online');
+ assert.equal(f.rows[1].cameraState,'offline');
+ assert.equal(view.items[0].state,'unverified');
+ assert.equal(view.items[1].state,'unverified');
+ assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
+ assert.equal(view.items[0].evidence.basis,'connection');
+ assert.equal(view.items[0].evidence.observations.length,0);
+ assert.match(view.items[0].reason,/No complete current tracker-IP check/);
+ assert.equal(view.counts.online,0);
+ assert.equal(view.counts.offline,0);
+ assert.equal(view.items[3].state,'support');
+ assert.equal(view.items[5].state,'review');
+ assert.equal(view.items[6].state,'inactive');
+});
+
+test('explicit unavailable TCP source cannot fall back to provider Online or Offline',()=>{
+ const f=fieldProductFixture();
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
+ assert.equal(view.counts.online,0);assert.equal(view.counts.offline,0);
+ assert.equal(view.items[0].state,'unverified');assert.equal(view.items[1].state,'unverified');
+ assert.equal(view.items[0].evidence.association,'product_id_connection_unavailable');
+ assert.equal(view.items[0].evidence.observedAt,null);assert.deepEqual(view.items[0].evidence.observations,[]);
+ assert.equal(view.items[3].state,'support');assert.equal(view.items[5].state,'review');assert.equal(view.items[6].state,'inactive');
+ // An older/native-only source never requesting Product-ID proof retains its existing diagnostics.
+ assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0].state,'online');
 });
