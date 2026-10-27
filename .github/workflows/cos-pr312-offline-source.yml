@@ -1,0 +1,48 @@
+name: Prepare COS PR312 offline verification
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-offline-source.yml]
+permissions:
+  contents: read
+concurrency:
+  group: cos-pr312-offline-source-61fb7e9
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 61fb7e9e676df817981d6b0d125e880dc7bd8457
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install exact locked verification tools
+        working-directory: tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Package only reviewed source and installed tools, never production data
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 61fb7e9e676df817981d6b0d125e880dc7bd8457
+          git diff --exit-code -- tech-checks/operations/package-lock.json
+          mkdir -p /tmp/cos-offline
+          git archive HEAD tech-checks/operations tech-checks/supabase .github/scripts | tar -xf - -C /tmp/cos-offline
+          cp -a tech-checks/operations/node_modules /tmp/cos-offline/tech-checks/operations/
+          printf '%s\n' 61fb7e9e676df817981d6b0d125e880dc7bd8457 > /tmp/cos-offline/SOURCE_COMMIT
+          tar -czf cos-pr312-offline-61fb7e9.tar.gz -C /tmp/cos-offline .
+          sha256sum cos-pr312-offline-61fb7e9.tar.gz > cos-pr312-offline-61fb7e9.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cos-pr312-offline-source-61fb7e9
+          path: |
+            cos-pr312-offline-61fb7e9.tar.gz
+            cos-pr312-offline-61fb7e9.sha256
+          retention-days: 2
+          if-no-files-found: error
