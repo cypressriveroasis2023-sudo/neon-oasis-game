@@ -1,0 +1,62 @@
+name: Verify COS exact TCP TV recovery
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-tv-recovery-proof.yml]
+permissions:
+  contents: read
+concurrency:
+  group: cos-pr312-tv-recovery-6192d22
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6192d22bb8b2c7f9554c101bbf960ba538d0a143
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install locked tools and pinned browser
+        working-directory: tech-checks/operations
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx playwright install chromium
+      - name: Stage only paused-clock scheduling correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6192d22bb8b2c7f9554c101bbf960ba538d0a143
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('tech-checks/operations/tests/tech-check-tv.browser.spec.mjs')
+          s=p.read_text()
+          before=" state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));\n await page.clock.runFor(15*60000);\n await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');"
+          after=" state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));\n // Stop virtual time on the next scheduled read boundary. Let its real\n // asynchronous transport settle before advancing beyond the 6.5s budget.\n const lastFleetRead=Math.max(...state.fleetRequests.filter(r=>r.path==='/api/field-map').map(r=>r.at));\n const untilNext=lastFleetRead+15*60000-await page.evaluate(()=>Date.now());\n expect(untilNext).toBeGreaterThan(0);\n await page.clock.runFor(untilNext);\n await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');\n await page.clock.runFor(2*60000);\n await expect(summary).toContainText('1 offline');"
+          assert s.count(before)==1
+          p.write_text(s.replace(before,after))
+          PY
+          test "$(git diff --name-only)" = tech-checks/operations/tests/tech-check-tv.browser.spec.mjs
+      - name: Verify complete recovery on all three viewport profiles
+        working-directory: tech-checks/operations
+        run: |
+          set -euo pipefail
+          npm run test:browser -- --workers=1 --retries=0 tests/tech-check-tv.browser.spec.mjs --grep 'TV headline and outage cards use the same complete Field Product IDs through failure and retry' | tee ../../../tv-recovery-result.log
+      - name: Preserve exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-pr312-tv-recovery-6192d22
+          path: |
+            tv-recovery-result.log
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          retention-days: 3
+          if-no-files-found: error
