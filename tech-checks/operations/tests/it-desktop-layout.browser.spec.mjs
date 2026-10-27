@@ -70,7 +70,7 @@ for(const view of views)test(view.name+' shows complete source evidence with CSV
  const fixture=fieldProductFixture();
  const {app,state}=await mountFleet(page,view.it,{
   hash:view.daily?'?mode=it-daily#fleet-dashboard':'#fleet-dashboard',
-  field:fixture.field,health:fixture.health,
+  field:fixture.field,health:fixture.health,productConnections:fixture.connections,
  });
  const originalField=structuredClone(state.field);
  await app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Data sources/}).click();

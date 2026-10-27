@@ -84,7 +84,7 @@ test('unverified or wrong-source TCP receipts never bypass a missing provider as
  const f=fieldProductFixture();delete f.rows[0].camera.association;
  const fake={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:'b'.repeat(64),trackerVerifiedAt:f.fresh,
   items:f.upload.records.filter(p=>p.placement==='FIELD').map(p=>({productId:p.productId,status:'online',basis:'tcp_service_port',resourceId:'881',checkedAt:f.fresh,reason:'fake'}))};
- assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unlinked');
+ assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unverified');
 });
 
 test('authoritatively Unknown Product-ID TCP checks do not inherit older provider Online or Offline',()=>{
@@ -109,4 +109,16 @@ test('authoritatively Unknown Product-ID TCP checks do not inherit older provide
  assert.equal(view.items[3].state,'support');
  assert.equal(view.items[5].state,'review');
  assert.equal(view.items[6].state,'inactive');
+});
+
+test('explicit unavailable TCP source cannot fall back to provider Online or Offline',()=>{
+ const f=fieldProductFixture();
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
+ assert.equal(view.counts.online,0);assert.equal(view.counts.offline,0);
+ assert.equal(view.items[0].state,'unverified');assert.equal(view.items[1].state,'unverified');
+ assert.equal(view.items[0].evidence.association,'product_id_connection_unavailable');
+ assert.equal(view.items[0].evidence.observedAt,null);assert.deepEqual(view.items[0].evidence.observations,[]);
+ assert.equal(view.items[3].state,'support');assert.equal(view.items[5].state,'review');assert.equal(view.items[6].state,'inactive');
+ // An older/native-only source never requesting Product-ID proof retains its existing diagnostics.
+ assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0].state,'online');
 });

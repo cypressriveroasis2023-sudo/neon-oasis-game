@@ -426,7 +426,7 @@ test('read-only Product-ID evidence is requested only after a complete reviewed 
  assert.equal(f.optionalProductReads.length,1);
  assert.deepEqual(f.optionalProductReads[0].envelope,{path:'/api/product-connections',method:'GET',body:null});
  assert.equal(f.optionalProductReads[0].init.headers.Authorization,'Bearer synthetic-session-a');
- assert.equal(complete.fieldMap.productConnections,undefined,'failed optional read cannot recolor camera health');
+ assert.equal(complete.fieldMap.productConnections,null,'failed Product-ID read must stay explicit, never fall back to provider status');
  assert.equal(f.requests.length,2,'the original health/map reads remain unchanged');
 
  const held=fixture(),other=held.api.fleet();await flush();

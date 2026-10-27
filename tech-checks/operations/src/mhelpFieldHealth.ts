@@ -12,7 +12,7 @@ export type FieldProduct={productId:string;unitNumber:string;state:FieldProductH
 /** One result per reviewed Field Product ID. Reuse the existing health result
  * only through the server-reviewed product/registry association, never a name,
  * IP, candidate identity or historical tracker join. This is a read-only view. */
-export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:FleetDashboardRow[],now=Date.now(),exactConnectionReceipt:unknown=null){
+export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:FleetDashboardRow[],now=Date.now(),exactConnectionReceipt:unknown=undefined){
  const authority=readMhelpInventoryAuthority(value,now);
  if(!authority||!roster||!readRecordedRoster(roster).roster)return null;
  const products=(value as {records:Record<string,any>[]}).records.filter(item=>item.placement==='FIELD');
@@ -47,6 +47,8 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
    state='support';reason='Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.';
+  }else if(exactConnectionReceipt!==undefined&&!connections){
+   state='unverified';reason='The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.';
   }else if(exact?.status==='unknown'&&connections){
    // A current, authenticated Product-ID check that cannot establish a TCP
    // outcome always overrides legacy provider/status guesses for connectivity.
@@ -68,7 +70,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   counts[state]++;
   const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
     ||state==='unverified'&&exact.status==='unknown'));
-  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null)};
+  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,exactConnectionReceipt!==undefined&&!connections)};
  });
  return {total:authority.field,counts,items,receivedAt:authority.receivedAt,sourceSha256:authority.sourceSha256};
 }

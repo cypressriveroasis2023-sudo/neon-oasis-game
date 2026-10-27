@@ -107,3 +107,12 @@ test('TV native rows use exact Unknown instead of older provider colors',()=>{
  assert.equal(tv.rows.find(row=>row.id===f.units[0].id).camera.basis,'connection');
  assert.deepEqual(tvCensusOutages(tv.board,tv.rows.map(row=>({unit:row.unit,health:row.camera}))),[]);
 });
+
+test('TV reports Unknown for an unavailable required Product-ID read without hiding inventory',()=>{
+ const f=fieldProductFixture();
+ const tv=tvFieldCensus({...f.field,productConnections:null},f.units,f.health,null,null,f.now);
+ assert.equal(tv.board.counts.online,0);assert.equal(tv.board.counts.offline,0);
+ assert.equal(tv.board.field,7);assert.equal(tv.board.total,8);
+ assert.equal(tv.rows.find(r=>r.id===f.units[0].id).cameraState,'unknown');
+ assert.equal(tv.rows.find(r=>r.id===f.units[1].id).cameraState,'unknown');
+});

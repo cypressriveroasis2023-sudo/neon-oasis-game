@@ -4,30 +4,19 @@
  */
 import {UNIT_TRACKER_WORKBOOK} from './unitTracker.ts';
 import {parseSheetsAccount,readSheetsJson,type SheetsAssertionSigner} from './googleSheets.ts';
-import {verify2027CensusRanges} from './mhelp2027ProductCensus.ts';
+import {verify2027ConnectionCensus} from './mhelp2027ConnectionCensus.ts';
 import type {EquipmentCsvRow} from './mhelpEquipmentCsvPreview.ts';
-import {VERIFIED_TRACKER_IP_CONTRACT,TRACKER_IP_WORKBOOK,type VerifiedTrackerIpCensus} from '../../../operations/src/exactProductConnection.ts';
+import type {VerifiedTrackerIpCensusV2} from '../../../operations/src/exactProductConnection.ts';
 
 const TOKEN_URL='https://oauth2.googleapis.com/token';
 const SCOPE='https://www.googleapis.com/auth/spreadsheets.readonly';
 const OVERVIEW={id:1132540236,title:'UNIT OVERVIEW'};
 const INDEX={id:1900169011,title:'MHELP MATCH INDEX'};
-const ID=/^[1-9][0-9]{0,14}$/;
-const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const failure=():never=>{throw Error('Protected 2027 Product-ID/IP evidence is unavailable or changed.');};
-const verifiedRows=(raw:unknown,range:string):string[][]=>{
- if(!object(raw)||raw.range!==range||raw.majorDimension!=='ROWS'||!Array.isArray(raw.values))return failure();
- const data:string[][]=[];
- for(const item of raw.values){
-  if(!Array.isArray(item)||item.length>6||item.some(value=>typeof value!=='string'||value.length>600))return failure();
-  data.push(item);
- }
- return data;
-};
 export async function read2027ProductIpsFromGoogle(options:{
  getServiceAccountJson:()=>unknown;signAssertion?:SheetsAssertionSigner;fetch?:typeof fetch;
  candidate:readonly EquipmentCsvRow[];expectedMhelpSourceSha256:string;now?:()=>number;
-}):Promise<VerifiedTrackerIpCensus>{
+}):Promise<VerifiedTrackerIpCensusV2>{
  if(!/^[a-f0-9]{64}$/.test(options.expectedMhelpSourceSha256)||!Array.isArray(options.candidate)||!options.candidate.length||options.candidate.length>10000)return failure();
  const at=options.now??Date.now,requestFetch=options.fetch??fetch;
  let account:ReturnType<typeof parseSheetsAccount>;
@@ -63,35 +52,15 @@ export async function read2027ProductIpsFromGoogle(options:{
    count.set(expected.title,p.gridProperties.rowCount);
   }
   const n=count.get(OVERVIEW.title)!,m=count.get(INDEX.title)!;
-  // The first six ranges are the existing strict Product-ID census. H is
-  // the *operational tracker IP*, not a mHelpDesk IP note or router URL.
+  // The first six ranges preserve the full grounded Product-ID census;
+  // current assignment conflicts are explicit per-ID holds. H is the actual
+  // operational tracker IP, never a mHelpDesk IP note or router URL.
   const names=[`'UNIT OVERVIEW'!A1:E${n}`,`'UNIT OVERVIEW'!O1:O${n}`,`'UNIT OVERVIEW'!Q1:R${n}`,
    `'MHELP MATCH INDEX'!A1:B${m}`,`'MHELP MATCH INDEX'!D1:E${m}`,`'MHELP MATCH INDEX'!H1:H${m}`,`'UNIT OVERVIEW'!H1:H${n}`];
   const query=new URLSearchParams();for(const name of names)query.append('ranges',name);query.set('valueRenderOption','FORMATTED_VALUE');
   const result=await read(base+'/values:batchGet?'+query,2200000,signed.access_token);
   if(!Array.isArray(result.valueRanges)||result.valueRanges.length!==7)return failure();
-  const exports=verifiedRows(result.valueRanges[5],names[5]);
-  const sourceFilename=exports.slice(1).find(row=>row[0]?.trim())?.[0]||'';
-  if(!/^ServiceItem_List_[0-9]{14}\.csv$/.test(sourceFilename))return failure();
-  const verified=await verify2027CensusRanges(result.valueRanges.slice(0,6),names.slice(0,6),options.candidate,sourceFilename,new Date(at()).toISOString());
-  if(verified.total!==options.candidate.length||verified.productIds.length!==verified.total)return failure();
-  const ips=verifiedRows(result.valueRanges[6],names[6]);
-  const products=verifiedRows(result.valueRanges[1],names[1]);
-  const info=verifiedRows(result.valueRanges[0],names[0]);
-  if(ips[0]?.[0]!=='IP'||products[0]?.[0]!=='MHELP EQUIPMENT ID'||ips.length>products.length)return failure();
-  const recordIds=new Set<string>(),records:VerifiedTrackerIpCensus['records'] extends Array<infer T>?T[]:never=[];
-  for(let i=1;i<Math.max(products.length,info.length,ips.length);i++){
-   const pid=products[i]?.[0]||'',family=info[i]?.[0]||'',label=info[i]?.[1]||'',placement=info[i]?.[2]||'';
-   const rawIp=ips[i]?.[0]||'';
-   if(!pid&&!family&&!label&&!placement&&!rawIp)continue;
-   if(!ID.test(pid)||recordIds.has(pid)||!['FIELD','SHOP'].includes(placement)||rawIp.length>80)return failure();
-   recordIds.add(pid);
-   records.push({productId:pid,recordId:'mhelp_product:'+pid,placement:placement as 'FIELD'|'SHOP',publicIp:rawIp.trim()||null});
-  }
-  if(records.length!==verified.total||records.some((record,i)=>record.productId!==verified.productRows[i].productId
-   ||record.placement!==verified.productRows[i].placement))return failure();
-  return {contract:VERIFIED_TRACKER_IP_CONTRACT,workbookId:TRACKER_IP_WORKBOOK,
-   expectedMhelpSourceSha256:options.expectedMhelpSourceSha256,verifiedAt:new Date(at()).toISOString(),records};
+  return verify2027ConnectionCensus(result.valueRanges,names,options.candidate,options.expectedMhelpSourceSha256,new Date(at()).toISOString());
  }catch{return failure();}
  finally{clearTimeout(timer);controller.abort();}
 }

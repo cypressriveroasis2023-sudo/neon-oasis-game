@@ -85,7 +85,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     const byNative=new Map(census.rows.map(row=>[row.id,row]));
     const productClaims=new Map<string,NonNullable<typeof census.products>['items']>();
     for(const item of census.products?.items||[]){
-      if(!item.unitId||item.evidence?.association!=='exact_product_id_tracker_endpoint'||item.evidence.basis!=='connection')continue;
+      if(!item.unitId||!item.evidence||!['exact_product_id_tracker_endpoint','product_id_connection_unavailable'].includes(item.evidence?.association||'')||item.evidence.basis!=='connection')continue;
       productClaims.set(item.unitId,[...(productClaims.get(item.unitId)||[]),item]);
     }
     return data.units.map(unit=>{

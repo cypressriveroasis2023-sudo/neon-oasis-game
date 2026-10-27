@@ -12,6 +12,9 @@ import {savedCameraConnection} from '../../supabase/functions/cos-operations-pag
  */
 export const EXACT_PRODUCT_CONNECTION_CONTRACT='COS_EXACT_PRODUCT_CONNECTIONS_V1' as const;
 export const VERIFIED_TRACKER_IP_CONTRACT='COS_VERIFIED_2027_PRODUCT_IPS_V1' as const;
+export const TRACKER_CONNECTION_CENSUS_V2='COS_VERIFIED_2027_PRODUCT_IPS_V2' as const;
+export const TRACKER_CONNECTION_HOLDS=['placement_mismatch','customer_mismatch','identity_mismatch','tracker_restriction'] as const;
+export type TrackerConnectionHold=typeof TRACKER_CONNECTION_HOLDS[number];
 export const TRACKER_IP_WORKBOOK='1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA';
 const ID=/^[1-9][0-9]{0,14}$/;
 const HASH=/^[a-f0-9]{64}$/;
@@ -24,6 +27,7 @@ const safeTime=(v:unknown,now:number,windowMs:number):string|null=>{
 };
 export type VerifiedTrackerIpRow={
  productId:string;recordId:string;placement:'FIELD'|'SHOP';publicIp:string|null;
+ reviewReasons?:TrackerConnectionHold[];sourceRow?:number;
 };
 export type VerifiedTrackerIpCensus={
  contract:typeof VERIFIED_TRACKER_IP_CONTRACT;
@@ -31,6 +35,11 @@ export type VerifiedTrackerIpCensus={
  expectedMhelpSourceSha256:string;
  verifiedAt:string;
  records:VerifiedTrackerIpRow[];
+};
+export type VerifiedTrackerIpCensusV2=Omit<VerifiedTrackerIpCensus,'contract'> & {
+ contract:typeof TRACKER_CONNECTION_CENSUS_V2;
+ trackerSourceSha256:string;sourceExport:string;
+ records:Array<VerifiedTrackerIpRow & {reviewReasons:TrackerConnectionHold[];sourceRow:number}>;
 };
 export type SavedTcpEndpoint={
  deviceId:number|string;
@@ -126,31 +135,44 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  return null;
 }
 
-/** Fail the WHOLE source envelope closed if one Product ID, placement, source
- * hash, or workbook identity is missing or different. The resulting statuses
- * are for existing products only, and never carry public IPs or credentials.
+/** Missing/duplicate IDs, changed source hashes or workbook identity fail
+ * the whole census closed. V1 still requires every placement to agree. V2
+ * keeps explicit per-Product-ID source holds as Unknown, never relocates
+ * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
 export function buildExactProductConnections(
  acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
- if(!authority||authority.stale||!object(tracker)||tracker.contract!==VERIFIED_TRACKER_IP_CONTRACT
+ if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
   ||tracker.workbookId!==TRACKER_IP_WORKBOOK
   ||tracker.expectedMhelpSourceSha256!==authority.sourceSha256
   ||!HASH.test(tracker.expectedMhelpSourceSha256)
   ||!safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)
   ||!Array.isArray(tracker.records)||tracker.records.length!==authority.total
   ||!Array.isArray(devices)||devices.length>10000)return null;
+ const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
+ if(isolated&&(!HASH.test(tracker.trackerSourceSha256)||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(tracker.sourceExport)))return null;
  const products=(acceptedMhelp as {records:Record<string,any>[]}).records;
  const expected=new Map(products.map(p=>[p.productId,p]));
  const byProduct=new Map<string,VerifiedTrackerIpRow>();
- const ipClaims=new Map<string,number>();
+ const ipClaims=new Map<string,number>(),sourceRows=new Set<number>();
  for(const raw of tracker.records){
   if(!object(raw)||typeof raw.productId!=='string'||!ID.test(raw.productId)||byProduct.has(raw.productId)
    ||raw.recordId!=='mhelp_product:'+raw.productId||!['FIELD','SHOP'].includes(raw.placement)
-   ||!expected.has(raw.productId)||expected.get(raw.productId)?.placement!==raw.placement
+   ||!expected.has(raw.productId)
    ||!(raw.publicIp===null||typeof raw.publicIp==='string'&&raw.publicIp.length<=80))return null;
+  const mismatch=expected.get(raw.productId)?.placement!==raw.placement;
+  if(isolated){
+   if(!Number.isSafeInteger(raw.sourceRow)||raw.sourceRow<2||raw.sourceRow>12000||sourceRows.has(raw.sourceRow)
+    ||!Array.isArray(raw.reviewReasons)||new Set(raw.reviewReasons).size!==raw.reviewReasons.length
+    ||raw.reviewReasons.some((reason:unknown)=>!TRACKER_CONNECTION_HOLDS.includes(reason as TrackerConnectionHold))
+    ||mismatch!==raw.reviewReasons.includes('placement_mismatch'))return null;
+   sourceRows.add(raw.sourceRow);
+  }else if(mismatch||raw.reviewReasons!==undefined)return null;
   const row=raw as VerifiedTrackerIpRow;byProduct.set(raw.productId,row);
+  // Held/Shop records still reserve their IP: ignoring them could give a
+  // different Product ID false ownership of a shared endpoint.
   if(publicIp(row.publicIp))ipClaims.set(row.publicIp!,(ipClaims.get(row.publicIp!)||0)+1);
  }
  if(byProduct.size!==expected.size||[...expected.keys()].some(id=>!byProduct.has(id)))return null;
@@ -163,6 +185,7 @@ export function buildExactProductConnections(
  }
  const items=products.filter(p=>p.placement==='FIELD').map(product=>{
   const pid=product.productId,row=byProduct.get(pid)!;
+  if(row.reviewReasons?.length)return unknown(pid,'Current tracker and mHelp source disagree for this Product ID. Placement or identity review is required; no connection status is assigned.');
   if(product.uploadLifecycle!=='UNFLAGGED')return unknown(pid,'Inactive, Missing or Do Not Use source; no operational connection is claimed.');
   const binding=object(product.binding)?product.binding:null;
   if(binding?.state==='held'||binding?.placementHeld===true||Array.isArray(binding?.candidateUnitIds)&&binding.candidateUnitIds.length>0)

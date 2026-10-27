@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {snapshot,resource,now} from './fixtures/camera-evidence-fixtures.mjs';
-import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 const origin='http://127.0.0.1:4173';
 const stamp=new Date(now).toISOString();
@@ -13,7 +13,7 @@ function reviewedPair(){
  const uploadInventory={...f.upload,records,summary:{totalRecords:3,fieldRecords:3,shopRecords:0,unflaggedFieldRecords:3,unflaggedShopRecords:0,doNotUseRecords:0,missingRecords:0}};
  const fleetRoster={...f.roster,items,summary:{totalRecords:3,activeRecords:3,field:3,shop:0,review:0,excludedLifecycle:0,sourceOnlyRecords:0,linkedUnitRecords:3}};
  const health={...snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]),identityVersion:1,unitIdentities:units.slice(0,2).map((unit,i)=>({...f.health.unitIdentities[i],unitId:unit.id,unitNumber:unit.unitNumber,unitKeys:[unit.unitNumber]})),identityWarnings:[]};
- return {field:{...field,inventoryItems:units,uploadInventory,fleetRoster},health};
+ return {field:{...field,inventoryItems:units,uploadInventory,fleetRoster},health,connections:fieldProductConnectionFixture(uploadInventory,f.fresh,{'1001':'online','1002':'online'})};
 }
 async function mount(page,{workspace='field-map',healthFail=false,canonical=false}={}){
  const reviewed=canonical?reviewedPair():null;
@@ -32,7 +32,7 @@ async function mount(page,{workspace='field-map',healthFail=false,canonical=fals
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
   if(request.path==='/api/camera-health/summary-v3'&&healthFail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic camera read unavailable'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?(reviewed?.field||field):request.path==='/api/camera-health/summary-v3'?(reviewed?.health||snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')])):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/product-connections'?reviewed?.connections:request.path==='/api/field-map'?(reviewed?.field||field):request.path==='/api/camera-health/summary-v3'?(reviewed?.health||snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')])):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/progressive-map-fixture');

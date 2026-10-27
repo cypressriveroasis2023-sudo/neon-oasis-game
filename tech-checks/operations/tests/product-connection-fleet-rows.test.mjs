@@ -47,3 +47,14 @@ test('selected Camera Health unit detail uses Product-ID TCP status instead of p
  assert.equal(productConnectionUnitDetail(base,'unit-1',[{...unknown,unitId:null}]),base);
  assert.equal(base.state,'online');
 });
+
+test('unavailable required Product-ID source propagates Unknown without claiming endpoint identity',()=>{
+ const unavailable={...product,state:'unverified',reason:'Exact TCP source unavailable',evidence:{
+  association:'product_id_connection_unavailable',basis:'connection',gap:'no_current_reading',observedAt:null,observations:[]}};
+ const value=productConnectionFleetRows([row],{items:[unavailable]})[0];
+ assert.equal(value.cameraState,'unknown');assert.equal(value.camera.reason,unavailable.reason);
+ assert.equal(productConnectionUnitDetail(row.camera,'unit-1',[unavailable]).state,'unknown');
+ const forged={...unavailable,state:'online'};
+ assert.equal(productConnectionFleetRows([row],{items:[forged]})[0],row);
+ assert.equal(productConnectionUnitDetail(row.camera,'unit-1',[forged]),row.camera);
+});

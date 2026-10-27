@@ -3,7 +3,7 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 for(const it of [false,true])test((it?'IT':'Owner')+' retains every recorded Field product when saved camera health fails',async({page})=>{
- const f=fieldProductFixture(),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
  const list=app.getByRole('region',{name:'Field inventory health breakdown'});
  await expect(list).toBeVisible();await expect(list.locator('details > ul > li')).toHaveCount(7);await expect(list).not.toContainText('Product 1008');
  await expect(list.locator('details > ul > li').filter({hasText:'Product 1006'})).toContainText('FIELD');
@@ -21,7 +21,7 @@ test('accepted Product-ID census remains visible without a COS identity roster',
  const f=fieldProductFixture();delete f.field.fleetRoster;
  // Keep a valid but empty legacy representation layer. It is not the census.
  f.field.items=[];f.field.inventoryItems=[];f.field.summary={fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0};
- const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,skipInitialFieldCount:true});
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  const list=app.getByRole('region',{name:'Field inventory health breakdown'});await expect(list).toBeVisible();await expect(list.locator('details > ul > li')).toHaveCount(7);
  await expect(app.locator('.cos-fleet-source-age')).toBeVisible();
@@ -29,7 +29,7 @@ test('accepted Product-ID census remains visible without a COS identity roster',
 });
 
 for(const unavailable of [false,true])test('successive accepted Shop Field Shop snapshots update the census with '+(unavailable?'no health':'offline recorder evidence')+' and no GPS',async({page})=>{
- const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
  const nativeBefore=structuredClone(state.field.inventoryItems),history=[];
  state.fail=unavailable;
  for(const [i,placement] of ['SHOP','FIELD','SHOP'].entries()){
@@ -68,7 +68,7 @@ test('delayed automatic mHelp source shows its original successful time and fail
  f.field.items=[];f.field.inventoryItems=[];f.field.summary={fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0};
  Object.assign(f.field.uploadInventory,{source:'mhelpdesk_api',lastApiReadAt:new Date(f.now-46*60000).toISOString()});
  f.field.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:f.field.uploadInventory.lastApiReadAt,errorCode:'inventory_source_unavailable'};
- const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,skipInitialFieldCount:true});
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
  const inventory=app.getByRole('region',{name:'mHelpDesk equipment Product-ID inventory'});
  await expect(inventory).toBeVisible();await expect(inventory).toContainText('Automatic inventory updates are delayed.');
  await expect(inventory.locator('.cos-fleet-source-age')).toBeVisible();await expect(inventory).toContainText('Last complete mHelpDesk API read');await expect(inventory).toContainText('scheduled every 30 minutes');
@@ -78,7 +78,7 @@ test('delayed automatic mHelp source shows its original successful time and fail
 });
 
 for(const it of [false,true])test((it?'IT':'Owner')+' opens the complete Field Product-ID list before optional connection diagnostics',async({page})=>{
- const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
  const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
  await expect(primary.getByRole('heading',{name:'Field equipment 7',exact:true})).toBeVisible();
  await expect(products).toHaveCount(7);
@@ -116,7 +116,7 @@ test('every accepted Field Product ID is reachable through bounded primary-list 
   f.upload.records.push({...structuredClone(f.upload.records[4]),productId,recordId:'mhelp_product:'+productId,unitNumber:'ST '+productId,category:'STANDS'});
  }
  Object.assign(f.upload.summary,{totalRecords:285,fieldRecords:284,shopRecords:1,unflaggedFieldRecords:283,unflaggedShopRecords:1});
- const before=structuredClone(f.field),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ const before=structuredClone(f.field),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
  const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
  await expect(primary.getByRole('heading',{name:'Field equipment 284',exact:true})).toBeVisible();
  await expect(products).toHaveCount(40);
@@ -130,7 +130,7 @@ test('every accepted Field Product ID is reachable through bounded primary-list 
 });
 
 for(const it of [false,true])test((it?'IT':'Owner')+' health headline selections show exactly their Field Product IDs',async({page})=>{
- const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health});
+ const f=fieldProductFixture(),before=structuredClone(f.field),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
  const primary=app.getByRole('region',{name:'Fleet units in view'}),products=primary.locator('[data-product-id]');
  for(const [status,expected] of [['online',['1001']],['offline',['1002']],['unknown',['1003','1005','1006','1007']]]){
   await app.locator('.cos-fleet-stat-'+status).click();await expect(products).toHaveCount(expected.length);
@@ -142,4 +142,21 @@ for(const it of [false,true])test((it?'IT':'Owner')+' health headline selections
  await expect(products).toHaveCount(1);await expect(primary.locator('[data-product-id="1004"]')).toBeVisible();
  await app.locator('.cos-fleet-stat-field').click();await expect(products).toHaveCount(7);
  expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
+
+test('required TCP source failure makes connectivity Unknown without losing or moving any Product IDs',async({page})=>{
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
+ const before=structuredClone(state.field);
+ state.productConnections=null;
+ await app.locator('.cos-fleet-refresh').click();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('6');
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
+ await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('1');
+ expect(state.field).toEqual(before);
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ expect(state.errors).toEqual([]);
 });

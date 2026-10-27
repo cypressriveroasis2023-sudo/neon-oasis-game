@@ -17,7 +17,7 @@ export type FieldProductEvidence={
 /** Only the classifier's complete reviewed resource set supplies product health.
  * Never infer a device link from a product label, IP, address or provider family.
  * Source times remain source times; a successful saved read cannot renew them. */
-export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now=Date.now(),exact:ExactProductConnection|null=null):FieldProductEvidence{
+export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now=Date.now(),exact:ExactProductConnection|null=null,requiredConnectionUnavailable=false):FieldProductEvidence{
  // This attribution is independently keyed by the accepted Product ID,
  // verified 2027 tracker IP and saved endpoint configuration revision.
  // It is never inferred from the provider/channel name or device label.
@@ -27,6 +27,10 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
  }
  if(exact?.status==='unknown'&&state==='unverified'){
   return {gap:'no_current_reading',association:'exact_product_id_tracker_endpoint',
+   basis:'connection',observedAt:null,video:'not_verified',observations:[]};
+ }
+ if(requiredConnectionUnavailable&&state==='unverified'){
+  return {gap:'no_current_reading',association:'product_id_connection_unavailable',
    basis:'connection',observedAt:null,video:'not_verified',observations:[]};
  }
  const camera=row?.camera,linked=Boolean(camera?.association);

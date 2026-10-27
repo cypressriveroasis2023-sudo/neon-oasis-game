@@ -4,7 +4,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 test('Advanced diagnostics uses the complete Fleet Product-ID partition and honest filters',async({page})=>{
  const f=fieldProductFixture();
- const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health});
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
  await app.locator('body').evaluate(()=>{location.hash='#camera-health?diagnostics=1';});
  const totals=app.getByLabel('Shared field unit health totals');
  await expect(totals.locator('b')).toHaveText(['6','1','1','4']);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {parseEquipmentCsv} from '../../supabase/functions/cos-operations-pages/mhelpEquipmentCsvPreview.ts';
 import {read2027ProductIpsFromGoogle} from '../../supabase/functions/cos-operations-pages/mhelp2027ProductIpReader.ts';
-import {buildExactProductConnections,TRACKER_IP_WORKBOOK,VERIFIED_TRACKER_IP_CONTRACT} from '../src/exactProductConnection.ts';
+import {buildExactProductConnections,TRACKER_IP_WORKBOOK,TRACKER_CONNECTION_CENSUS_V2} from '../src/exactProductConnection.ts';
 globalThis.crypto??=webcrypto;
 
 const records=()=>parseEquipmentCsv([
@@ -54,10 +54,10 @@ const read=(override={})=>read2027ProductIpsFromGoogle({
 });
 test('protected Google viewer loads exact 2027 Product IDs with IP and Field/Shop, never interpreting a provider name',async()=>{
  const result=await read();
- assert.equal(result.contract,VERIFIED_TRACKER_IP_CONTRACT);
+ assert.equal(result.contract,TRACKER_CONNECTION_CENSUS_V2);
  assert.equal(result.records.length,2);
- assert.deepEqual(result.records[0],{productId:'11',recordId:'mhelp_product:11',placement:'FIELD',publicIp:'8.8.8.8'});
- assert.deepEqual(result.records[1],{productId:'12',recordId:'mhelp_product:12',placement:'SHOP',publicIp:null});
+ assert.deepEqual(result.records[0],{productId:'11',recordId:'mhelp_product:11',placement:'FIELD',publicIp:'8.8.8.8',reviewReasons:[],sourceRow:2});
+ assert.deepEqual(result.records[1],{productId:'12',recordId:'mhelp_product:12',placement:'SHOP',publicIp:null,reviewReasons:[],sourceRow:3});
  assert.equal(result.expectedMhelpSourceSha256,sourceHash);
 });
 test('a missing secret, inconsistent indexed Product ID, workbook, source placement or IP heading fail closed',async()=>{

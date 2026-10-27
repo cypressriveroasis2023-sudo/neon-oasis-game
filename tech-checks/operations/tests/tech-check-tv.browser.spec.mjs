@@ -1,4 +1,4 @@
-import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -74,6 +74,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
+    if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
@@ -360,7 +361,7 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  const {state,frame}=await setup(page,{pausedClock:true});
  const initial=fieldProductFixture();
  const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
- state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};
+ state.productConnections=f.connections;state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};
  state.cameraRows=f.health.rows;
  state.cameraExtras={identityVersion:f.health.identityVersion,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
  state.settings={sections:['map'],revision:1,updatedAt:time,rotationSeconds:15};
@@ -382,6 +383,7 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  state.settings={sections:['map'],revision:3,updatedAt:time};
  await page.clock.runFor(60000);
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('— offline');await expect(summary).toContainText('6 unverified');
+ state.productConnections=fieldProductConnectionFixture(state.fieldMapExtras.uploadInventory,new Date(Date.parse(time)+18*60000).toISOString());
  state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));
  await page.clock.runFor(15*60000);
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');
@@ -392,11 +394,12 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
 test('TV never combines a newly arrived source with the preceding health read',async({page})=>{
  const {state,frame}=await setup(page,{pausedClock:true}),initial=fieldProductFixture();
  const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
- state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
+ state.productConnections=f.connections;state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
  state.cameraExtras={identityVersion:1,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
  state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
  const summary=frame.locator('.tv-fleet-summary');await expect(summary).toContainText('1 online');
  state.fieldMapExtras.uploadInventory={...state.fieldMapExtras.uploadInventory,sourceSha256:'d'.repeat(64),records:state.fieldMapExtras.uploadInventory.records.map((p,i)=>i? p:{...p,binding:{...p.binding,placementHeld:true}})};
+ state.productConnections={...f.connections,sourceSha256:state.fieldMapExtras.uploadInventory.sourceSha256};
  state.cameraGate=deferred();
  const mapResponse=page.waitForResponse(response=>response.request().method()==='POST'&&response.request().postDataJSON()?.path==='/api/field-map');
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();await (await mapResponse).finished();

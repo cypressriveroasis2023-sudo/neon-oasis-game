@@ -233,7 +233,10 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const receipt=await productConnections();
       current();
       const accepted=receipt&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
-      return accepted?{...map,productConnections:receipt}:map;
+      // Explicit null means the required exact-product read failed or was
+      // rejected. Keep the inventory, but never silently substitute provider
+      // health for a missing TCP observation. Native-only maps omit the field.
+      return {...map,productConnections:accepted?receipt:null};
     });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;

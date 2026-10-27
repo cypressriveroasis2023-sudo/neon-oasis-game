@@ -4,7 +4,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 test('all mHelp Field Product IDs remain visible with searchable system and health lists',async({page},testInfo)=>{
  const fixture=fieldProductFixture();
- const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health});
+ const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  await app.getByRole('button',{name:'Data sources',exact:true}).click();
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await expect(board).toBeVisible();
