@@ -1,0 +1,98 @@
+name: Package verified COS connection-holds candidate
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-census-v2-package.yml]
+permissions:
+  contents: write
+concurrency:
+  group: cos-pr312-census-v2-package-61fb7e9
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: 61fb7e9e676df817981d6b0d125e880dc7bd8457
+    steps:
+      - name: Retrieve exact already-verified candidate recipe
+        uses: actions/checkout@v4
+        with:
+          ref: fa84227950469b3451a37150a1febfa3e869984e
+          path: input
+          persist-credentials: false
+          sparse-checkout: |
+            .github/cos-verification
+            .github/workflows/cos-pr312-census-v2.yml
+      - name: Check out existing repair source
+        uses: actions/checkout@v4
+        with:
+          ref: 61fb7e9e676df817981d6b0d125e880dc7bd8457
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: source/tech-checks/operations/package-lock.json
+      - name: Reuse exact source and artifact guards from the verified recipe
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C input rev-parse HEAD)" = fa84227950469b3451a37150a1febfa3e869984e
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 <<'PY'
+          from pathlib import Path
+          lines=Path('input/.github/workflows/cos-pr312-census-v2.yml').read_text().splitlines()
+          phases={
+           'Decode and verify immutable source edits':'apply-candidate.sh',
+           'Stage allowlisted candidate locally without advancing any remote reference':'stage-candidate.sh',
+           'Store immutable verified Git objects, not branches or deployments':'store-candidate.sh'
+          }
+          for name,target in phases.items():
+              marker='      - name: '+name
+              assert lines.count(marker)==1
+              start=lines.index(marker)
+              end=next((i for i in range(start+1,len(lines)) if lines[i].startswith('      - ')),len(lines))
+              block=lines[start:end]
+              assert block.count('        run: |')==1
+              body=block[block.index('        run: |')+1:]
+              assert body and all(not s or s.startswith('          ') for s in body)
+              Path(target).write_text('\n'.join(s[10:] if s else '' for s in body)+'\n')
+          PY
+      - name: Apply only checksummed source edits
+        working-directory: source
+        run: bash ../apply-candidate.sh
+      - name: Install exact locked tools
+        working-directory: source/tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Verify focused candidate and TypeScript
+        working-directory: source/tech-checks/operations
+        run: |
+          node --import tsx --test --test-concurrency=1 tests/exact-product-connection.test.mjs tests/mhelp-2027-product-ip-reader.test.mjs tests/mhelp-2027-connection-census.test.mjs tests/mhelp-2027-product-census.test.mjs tests/field-product-evidence.test.mjs tests/product-connection-fleet-rows.test.mjs tests/tv-field-census.test.mjs tests/api-inflight-reads.test.mjs tests/saved-camera-refresh-scheduling.test.mjs tests/fleet-status-pins.test.mjs tests/imported-digest-memo.test.mjs tests/owner-identity-label-memo.test.mjs | tee ../../../focused-results.log
+          npm run typecheck
+          npm run build
+      - name: Stage exact source and runtime locally
+        working-directory: source
+        run: bash ../stage-candidate.sh
+      - name: Second build and unchanged committed-artifact verifier
+        working-directory: source/tech-checks/operations
+        run: |
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Store only immutable candidate objects
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ../store-candidate.sh
+      - name: Preserve candidate verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-pr312-census-v2-package-evidence
+          path: |
+            focused-results.log
+            source/cos-build-evidence
+          retention-days: 5
+          if-no-files-found: error
