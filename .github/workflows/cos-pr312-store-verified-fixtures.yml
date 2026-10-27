@@ -1,0 +1,82 @@
+name: Store verified COS TCP fixture corrections
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-store-verified-fixtures.yml]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  store:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6192d22bb8b2c7f9554c101bbf960ba538d0a143
+          persist-credentials: false
+      - name: Retrieve the already-passed immutable fixture artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const base='https://api.github.com/repos/cypressriveroasis2023-sudo/neon-oasis-game';
+          const headers={Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'};
+          const run=await fetch(base+'/actions/runs/40516415785',{headers});assert(run.ok);const r=await run.json();
+          assert.equal(r.head_sha,'a0aab95c44492d9d7f320ae87b80d124d2dd201c');assert.equal(r.conclusion,'success');
+          const meta=await fetch(base+'/actions/artifacts/12739247927',{headers});assert(meta.ok);const m=await meta.json();
+          assert.equal(m.workflow_run.id,40516415785);assert.equal(m.expired,false);
+          assert.equal(m.digest,'sha256:1c85557026a9c6058f77adb30bee48fb2e89e70fc67131e5968e90c03415208a');
+          const link=await fetch(base+'/actions/artifacts/12739247927/zip',{headers,redirect:'manual'});
+          assert([301,302,303,307,308].includes(link.status));const url=link.headers.get('location');assert.equal(new URL(url).protocol,'https:');
+          const archive=await fetch(url);assert(archive.ok);const bytes=Buffer.from(await archive.arrayBuffer());
+          assert.equal(createHash('sha256').update(bytes).digest('hex'),'1c85557026a9c6058f77adb30bee48fb2e89e70fc67131e5968e90c03415208a');
+          writeFileSync('/tmp/cos-passed-fixtures.zip',bytes);
+          NODE
+      - name: Validate passing report and restore only its four test files
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6192d22bb8b2c7f9554c101bbf960ba538d0a143
+          python3 <<'PY'
+          import zipfile,hashlib,re,base64,json,io,pathlib
+          z=zipfile.ZipFile('/tmp/cos-passed-fixtures.zip')
+          html=z.read('operations/playwright-report/index.html').decode()
+          value=re.search(r'window\.playwrightReportBase64\s*=\s*["\']([^"\']+)',html).group(1).split('base64,')[-1]
+          report=zipfile.ZipFile(io.BytesIO(base64.b64decode(value)))
+          stats=json.loads(report.read('report.json'))['stats']
+          assert stats=={'total':18,'expected':18,'unexpected':0,'flaky':0,'skipped':0,'ok':True}
+          files={
+           'fixtures/fleet-status-pins-fixture.mjs':'0b2f5317a9a38a82e44d13811c0d048c3b7100cdfd9e86e5f6a3309303e92e5a',
+           'fleet-map-groups.browser.spec.mjs':'eaea7292f9b69ae8467860c02c856f4e5ee70e92286ea97bea3662e9abb6212a',
+           'fleet-status-pins.browser.spec.mjs':'35ec7ef10bf5c6ae42300d9d3c07eb1eaf2a50b01026857be5dfef5f0045e4ca',
+           'tech-check-tv.browser.spec.mjs':'1d0c2e2966ab3648a44f4f50b1cb327b9e0cbc0f0bb2b9740c019df702a13e4a'
+          }
+          for name,digest in files.items():
+              content=z.read('operations/tests/'+name);assert hashlib.sha256(content).hexdigest()==digest
+              p=pathlib.Path('tech-checks/operations/tests')/name
+              assert p.is_file() and not p.is_symlink();p.write_bytes(content)
+          pathlib.Path('/tmp/cos-verified-fixture-files.json').write_text(json.dumps(['tech-checks/operations/tests/'+n for n in files]))
+          print('Reused 18 passed screen checks; no retries, failures, flaky results or skips.')
+          PY
+      - name: Store immutable Git objects without commits, branches or deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';import {createHash} from 'node:crypto';
+          const repo='cypressriveroasis2023-sudo/neon-oasis-game',source='6192d22bb8b2c7f9554c101bbf960ba538d0a143';
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();assert.equal(git('rev-parse','HEAD'),source);
+          const files=JSON.parse(readFileSync('/tmp/cos-verified-fixture-files.json','utf8'));
+          assert.deepEqual(git('diff','--name-only').split('\n').sort(),[...files].sort());
+          const api=async(path,body)=>{assert(['git/blobs','git/trees'].includes(path));const r=await fetch('https://api.github.com/repos/'+repo+'/'+path,{method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});assert(r.ok);return r.json();};
+          const tree=[];for(const path of files){const bytes=readFileSync(path);const hash=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');const b=await api('git/blobs',{content:bytes.toString('base64'),encoding:'base64'});assert.equal(b.sha,hash);tree.push({path,mode:'100644',type:'blob',sha:b.sha});}
+          execFileSync('git',['add','--',...files]);
+          const saved=await api('git/trees',{base_tree:git('rev-parse','HEAD^{tree}'),tree});assert.equal(saved.sha,git('write-tree'));
+          console.log('COS_PASSED_FIXTURE_TREE='+JSON.stringify({sourceCommit:source,preparedTree:saved.sha,passedRun:40516415785,passed:18,failed:0,skipped:0,files,productionChanged:false,branchesChanged:false}));
+          NODE
