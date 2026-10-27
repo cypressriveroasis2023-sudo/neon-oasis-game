@@ -1,0 +1,157 @@
+name: Prepare COS camera backend reconciliation
+on:
+  push:
+    branches: [build/cos-pr312-runtime-20261026]
+    paths: [.github/workflows/cos-pr312-backend-reconcile.yml]
+permissions:
+  contents: write
+concurrency:
+  group: cos-pr312-backend-reconcile-34f6d32
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COS_SOURCE_SHA: 34f6d32aae56b14b6cc0442e950206a42fe26a98
+      COS_RELIABILITY_SHA: 6cbfcc1e3a1f1f965a18e9a9ced9445191dc2f60
+      COS_BASELINE_SHA: 283cfafdd8903602adc9b6df61bd1cf03a6ab050
+    steps:
+      - name: Read the exact already-passing camera repair
+        uses: actions/checkout@v4
+        with:
+          ref: 34f6d32aae56b14b6cc0442e950206a42fe26a98
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Reconcile only reviewed pure-computation source and synthetic tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COS_SOURCE_SHA"
+          test "$(git rev-parse HEAD:tech-checks/operations/package-lock.json)" = 11a25561eb56277882935478aa91ec819c788529
+          git fetch --no-tags --depth=1 origin "$COS_RELIABILITY_SHA" "$COS_BASELINE_SHA"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {mkdirSync,writeFileSync} from 'node:fs';
+          const source=process.env.COS_SOURCE_SHA,prior=process.env.COS_RELIABILITY_SHA,base=process.env.COS_BASELINE_SHA;
+          const existing=[
+            'tech-checks/supabase/functions/cos-operations-pages/importedSourceProjectionV2.ts',
+            'tech-checks/supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts',
+            'tech-checks/operations/tests/source-precedence.test.mjs'
+          ];
+          const added=[
+            'tech-checks/operations/tests/fixtures/imported-digest-fixture.mjs',
+            'tech-checks/operations/tests/imported-digest-memo.test.mjs',
+            'tech-checks/operations/tests/owner-identity-label-memo.test.mjs'
+          ];
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:8*1024*1024}).trim();
+          for(const path of existing)assert.equal(git('rev-parse',source+':'+path),git('rev-parse',base+':'+path),'Camera branch changed this baseline; manual reconciliation required: '+path);
+          for(const path of added)assert.equal(git('ls-tree',source,'--',path),'','Existing test must not be overwritten: '+path);
+          const selected=[...existing,...added];
+          for(const path of selected){
+            const content=execFileSync('git',['show',prior+':'+path],{maxBuffer:8*1024*1024});
+            assert(content.length>0&&content.length<250000);
+            writeFileSync(path,content);
+          }
+          mkdirSync('cos-build-evidence',{recursive:true});
+          writeFileSync('cos-build-evidence/reconciled-paths.json',JSON.stringify(selected));
+          console.log('Selected reviewed source/test files:',selected.length);
+          NODE
+      - name: Install unchanged pinned dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Focused identity parity, callback compatibility and TCP status regression checks
+        working-directory: tech-checks/operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import tsx --test --test-concurrency=1 tests/imported-digest-memo.test.mjs tests/owner-identity-label-memo.test.mjs tests/owner-identity-crosswalk.test.mjs tests/source-precedence.test.mjs tests/exact-product-connection.test.mjs tests/mhelp-2027-product-ip-reader.test.mjs tests/field-product-evidence.test.mjs tests/product-connection-fleet-rows.test.mjs tests/tv-field-census.test.mjs | tee ../../cos-build-evidence/reconciled-tests.tap
+          npm run typecheck
+          npm run build
+      - name: Commit candidate only in the isolated runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync} from 'node:fs';
+          const selected=JSON.parse(readFileSync('cos-build-evidence/reconciled-paths.json','utf8'));
+          execFileSync('git',['diff','--exit-code','--','tech-checks/operations/package.json','tech-checks/operations/package-lock.json'],{stdio:'inherit'});
+          execFileSync('git',['add','-A','--',...selected,'tech-checks/operations/dist']);
+          const paths=execFileSync('git',['diff','--cached','--name-only','-z'],{encoding:'utf8'}).split('\0').filter(Boolean);
+          assert(paths.length>=selected.length&&paths.length<250);
+          assert(paths.every(path=>selected.includes(path)||path.startsWith('tech-checks/operations/dist/')),'Change outside approved reconciliation scope');
+          assert.equal(execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim(),'','Unstaged source drift');
+          NODE
+          git -c user.name='COS reconciliation verification' -c user.email='cos-reconciliation@users.noreply.github.com' commit -m 'Preserve reviewed backend reliability fixes in camera repair candidate'
+      - name: Rebuild and run the unchanged committed artifact verifier
+        working-directory: tech-checks/operations
+        run: |
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Store verified inert Git objects without merging or advancing references
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync,writeFileSync,lstatSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const repo='cypressriveroasis2023-sudo/neon-oasis-game';
+          const source='34f6d32aae56b14b6cc0442e950206a42fe26a98';
+          assert.equal(process.env.GITHUB_REPOSITORY,repo);
+          assert.equal(process.env.COS_SOURCE_SHA,source);
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:32*1024*1024}).trim();
+          assert.equal(git('rev-parse','HEAD^'),source);
+          const selected=JSON.parse(readFileSync('cos-build-evidence/reconciled-paths.json','utf8'));
+          const manifest=JSON.parse(readFileSync('cos-build-evidence/manifest.json','utf8'));
+          assert.equal(manifest.commit,git('rev-parse','HEAD'));
+          assert.equal(manifest.lockfileUnchanged,true);
+          const tap=readFileSync('cos-build-evidence/reconciled-tests.tap','utf8');
+          assert.match(tap,/# fail 0(?:\r?\n|$)/);assert.match(tap,/# skipped 0(?:\r?\n|$)/);
+          const paths=execFileSync('git',['diff','--name-only','--no-renames','-z',source,'HEAD'],{encoding:'utf8'}).split('\0').filter(Boolean);
+          assert(paths.length>=selected.length&&paths.length<250&&paths.every(path=>selected.includes(path)||path.startsWith('tech-checks/operations/dist/')));
+          const api=async(path,payload)=>{
+            assert(['git/blobs','git/trees'].includes(path));
+            const response=await fetch('https://api.github.com/repos/'+repo+'/'+path,{
+              method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
+              body:JSON.stringify(payload),signal:AbortSignal.timeout(45000)
+            });
+            if(!response.ok)throw Error('Git object storage failed: '+response.status);
+            return response.json();
+          };
+          const entries=[];
+          for(const path of paths){
+            const stat=lstatSync(path);assert(stat.isFile()&&!stat.isSymbolicLink());
+            const bytes=readFileSync(path);assert(bytes.length<=8*1024*1024);
+            const expected=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+            const saved=await api('git/blobs',{encoding:'base64',content:bytes.toString('base64')});
+            assert.equal(saved.sha,expected);entries.push({path,mode:'100644',type:'blob',sha:saved.sha});
+          }
+          const stored=await api('git/trees',{base_tree:git('rev-parse',source+'^{tree}'),tree:entries});
+          assert.equal(stored.sha,git('rev-parse','HEAD^{tree}'));
+          const proof={sourceCommit:source,reliabilityCommit:process.env.COS_RELIABILITY_SHA,preparedTree:stored.sha,
+            changedFiles:paths,passedTests:Number(tap.match(/# pass (\d+)/)?.[1]),skippedTests:0,
+            lockfileSha256:manifest.lockfileSha256,verifiedRuntimeFiles:manifest.files.length,
+            applicationReferencesChanged:false,productionChanged:false};
+          writeFileSync('cos-build-evidence/pr312-reconciliation.json',JSON.stringify(proof,null,2)+'\n');
+          console.log('COS_PR312_RECONCILIATION='+JSON.stringify(proof));
+          NODE
+      - name: Preserve synthetic verification and build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-pr312-reconciliation-34f6d32
+          path: cos-build-evidence
+          if-no-files-found: error
+          retention-days: 14
