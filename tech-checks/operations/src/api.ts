@@ -213,14 +213,26 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       try{return await Promise.race([sendRequest('GET','/api/product-connections',session.token).then(r=>r.data).catch(()=>null),limited]);}
       finally{window.clearTimeout(timer);}
     };
-    const fieldMap=Promise.all([
-      sendRequest('GET','/api/field-map',session.token).then(result=>{current();return checkedFieldMap(result.data);}),
-      productConnections()
-    ]).then(([map,receipt])=>{
+    // Native-only Fleet pages cannot attribute any Product-ID TCP results.
+    // Avoid an unnecessary protected source read until this authenticated map
+    // supplies a reviewed, complete Field Product-ID census.
+    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(async result=>{
       current();
-      const upload=(map as any).uploadInventory;
-      const fieldIds=Array.isArray(upload?.records)?upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId):[];
-      const accepted=receipt&&typeof upload?.sourceSha256==='string'&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
+      const map=checkedFieldMap(result.data),upload=(map as any).uploadInventory;
+      const records=Array.isArray(upload?.records)?upload.records:[];
+      const fieldIds=records.filter((r:any)=>r?.placement==='FIELD').map((r:any)=>r.productId);
+      const sourceReady=upload?.contract==='COS_MHELP_UPLOAD_INVENTORY_V1'
+        &&upload.countBasis==='mhelp_product_records_not_unique_physical_units'
+        &&typeof upload.sourceSha256==='string'&&/^[a-f0-9]{64}$/.test(upload.sourceSha256)
+        &&records.length>0&&records.length<=10000
+        &&upload.summary?.totalRecords===records.length
+        &&upload.summary?.fieldRecords===fieldIds.length
+        &&fieldIds.length>0&&new Set(fieldIds).size===fieldIds.length
+        &&fieldIds.every((id:unknown)=>typeof id==='string'&&/^[1-9][0-9]{0,14}$/.test(id));
+      if(!sourceReady)return map;
+      const receipt=await productConnections();
+      current();
+      const accepted=receipt&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
       return accepted?{...map,productConnections:receipt}:map;
     });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
