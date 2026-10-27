@@ -4,6 +4,7 @@ import {isSupportEquipment,unitHealthLabel} from './fieldCameraHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import {fieldProductEvidence,type FieldProductEvidence} from './fieldProductEvidence';
 import {readExactProductConnections} from './exactProductConnection';
+import {fieldProductFollowUp} from './fieldProductFollowUp';
 
 export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
@@ -70,7 +71,10 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   counts[state]++;
   const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
     ||state==='unverified'&&exact.status==='unknown'));
-  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,exactConnectionReceipt!==undefined&&!connections)};
+  const evidence=fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,exactConnectionReceipt!==undefined&&!connections);
+  const followUp=fieldProductFollowUp(state,reason,exact?.status==='unknown'?exact.reason:undefined);
+  if(followUp)evidence.followUp=followUp;
+  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence};
  });
  return {total:authority.field,counts,items,receivedAt:authority.receivedAt,sourceSha256:authority.sourceSha256};
 }
