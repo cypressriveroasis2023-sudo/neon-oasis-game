@@ -133,3 +133,43 @@ test('a first complete TCP timeout or refusal remains a valid OFFLINE result, bu
  const unknown=structuredClone(d);unknown.portStatus[443].error='unknown transport exception';
  assert.equal(completedSavedTcpCheck(unknown,now),null);
 });
+
+test('live saved port schema requires measured attempt evidence, not invented Boolean port state',()=>{
+ // Real saved sweep records omit "attempted", but contain latency_ms and
+ // a concrete TCP outcome. All configured ports must be complete.
+ const negative=endpoint(42,'9.9.9.9',false);
+ for(const port of [80,443]){delete negative.portStatus[port].attempted;negative.portStatus[port].latency_ms=null;}
+ negative.portStatus[80].error='timeout';
+ negative.portStatus[443].error='Connection refused (os error 111)';
+ assert.equal(completedSavedTcpCheck(negative,now)?.status,'offline');
+ const forged=structuredClone(negative);
+ delete forged.portStatus[443].error; // false without a socket outcome is not a probe
+ assert.equal(completedSavedTcpCheck(forged,now),null);
+ const unexplained=structuredClone(negative);
+ delete unexplained.portStatus[80].latency_ms;
+ assert.equal(completedSavedTcpCheck(unexplained,now),null);
+ const technical=structuredClone(negative);
+ technical.portStatus[443].error='No route to host (os error 113)';
+ assert.equal(completedSavedTcpCheck(technical,now),null);
+
+ const positive=endpoint(41,'8.8.8.8',true);
+ delete positive.portStatus[80].attempted;
+ delete positive.portStatus[443].attempted;
+ positive.portStatus[80].latency_ms=8.4;
+ positive.portStatus[443].latency_ms=null;
+ positive.portStatus[443].error='timeout';
+ assert.equal(completedSavedTcpCheck(positive,now)?.status,'online');
+ const unmeasured=structuredClone(positive);
+ delete unmeasured.portStatus[80].latency_ms;
+ assert.equal(completedSavedTcpCheck(unmeasured,now),null);
+});
+
+test('a stale reviewed mHelp source cannot authorize currently online camera product claims',()=>{
+ const old=accepted();
+ old.receivedAt=new Date(now-25*60*60*1000).toISOString();
+ assert.equal(run(old,tracker()),null);
+ const live=accepted();
+ live.source='mhelpdesk_api';
+ live.lastApiReadAt=new Date(now-46*60*1000).toISOString();
+ assert.equal(run(live,tracker()),null);
+});

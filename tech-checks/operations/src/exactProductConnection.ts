@@ -72,6 +72,22 @@ const revision=(value:unknown):string|null=>typeof value==='number'&&Number.isSa
 const validPortNonresponseError=(v:unknown)=>v===undefined||v===null
  ||v==='timeout'||v==='Connection refused (os error 111)'
  ||v==='Connection timed out (os error 110)';
+/** The saved sweep schema does not include "attempted" on historic port
+ * records. Those records prove a real attempt with a measured positive
+ * response, or with an explicit bounded TCP nonresponse and a latency field.
+ * A bare online:false (or online:true) must never be interpreted as a
+ * completed service-port probe.
+ */
+const completedPortOutcome=(v:unknown):v is Record<string,any>=>{
+ if(!object(v)||typeof v.online!=='boolean'||v.attempted===false
+   ||v.attempted!==undefined&&v.attempted!==true
+   ||v.errorCode||v.error_code||v.technicalError)return false;
+ const hasLatency=typeof v.latency_ms==='number'&&Number.isFinite(v.latency_ms)&&v.latency_ms>=0;
+ const measured=Object.hasOwn(v,'latency_ms')&&(v.latency_ms===null||hasLatency);
+ if(v.online)return (v.error===undefined||v.error===null)&&(v.attempted===true||hasLatency);
+ return validPortNonresponseError(v.error)
+  &&(v.attempted===true||typeof v.error==='string'&&measured);
+};
 const deviceId=(v:unknown):string|null=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):
  typeof v==='string'&&ID.test(v)?v:null;
 
@@ -97,9 +113,7 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  const observedPorts=Object.keys(device.portStatus).filter(k=>/^[1-9][0-9]{0,4}$/.test(k)&&Number(k)<=65535);
  if(observedPorts.length!==ports.length||ports.some(p=>!observedPorts.includes(String(p))))return null;
  const states=ports.map(port=>device.portStatus![String(port)]);
- if(states.some(v=>!object(v)||typeof v.online!=='boolean'||v.attempted===false
-   ||v.errorCode||v.error_code||v.technicalError||(v.online===true&&v.error!=null)
-   ||v.online===false&&!validPortNonresponseError(v.error)))return null;
+ if(states.some(v=>!completedPortOutcome(v)))return null;
  const responded=states.some(v=>(v as Record<string,any>).online===true);
  if(responded&&proof.status==='online'&&proof.reachable===true)return {
   status:'online',basis:'tcp_service_port',checkedAt,resourceId:deviceId(device.deviceId),
@@ -120,7 +134,7 @@ export function buildExactProductConnections(
  acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
- if(!authority||!object(tracker)||tracker.contract!==VERIFIED_TRACKER_IP_CONTRACT
+ if(!authority||authority.stale||!object(tracker)||tracker.contract!==VERIFIED_TRACKER_IP_CONTRACT
   ||tracker.workbookId!==TRACKER_IP_WORKBOOK
   ||tracker.expectedMhelpSourceSha256!==authority.sourceSha256
   ||!HASH.test(tracker.expectedMhelpSourceSha256)
