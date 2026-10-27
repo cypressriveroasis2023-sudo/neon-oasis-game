@@ -86,3 +86,24 @@ test('unverified or wrong-source TCP receipts never bypass a missing provider as
   items:f.upload.records.filter(p=>p.placement==='FIELD').map(p=>({productId:p.productId,status:'online',basis:'tcp_service_port',resourceId:'881',checkedAt:f.fresh,reason:'fake'}))};
  assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unlinked');
 });
+
+test('authoritatively Unknown Product-ID TCP checks do not inherit older provider Online or Offline',()=>{
+ const f=fieldProductFixture();
+ const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',
+  sourceSha256:f.upload.sourceSha256,trackerVerifiedAt:f.fresh,
+  items:f.upload.records.filter(r=>r.placement==='FIELD').map(r=>({
+   productId:r.productId,basis:'tcp_service_port',status:'unknown',checkedAt:null,
+   resourceId:null,reason:'No complete current tracker-IP check.'
+  }))};
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.equal(f.rows[0].cameraState,'online');
+ assert.equal(f.rows[1].cameraState,'offline');
+ assert.equal(view.items[0].state,'unverified');
+ assert.equal(view.items[1].state,'unverified');
+ assert.match(view.items[0].reason,/No complete current tracker-IP check/);
+ assert.equal(view.counts.online,0);
+ assert.equal(view.counts.offline,0);
+ assert.equal(view.items[3].state,'support');
+ assert.equal(view.items[5].state,'review');
+ assert.equal(view.items[6].state,'inactive');
+});

@@ -47,6 +47,11 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
    state='support';reason='Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.';
+  }else if(exact?.status==='unknown'&&connections){
+   // A current, authenticated Product-ID check that cannot establish a TCP
+   // outcome always overrides legacy provider/status guesses for connectivity.
+   // Diagnostics may still show their independent provider observations.
+   state='unverified';reason=exact.reason;
   }else if(exactAllowed&&exact){
    state=exact.status==='online'?'online':'offline';
    reason=exact.reason;
