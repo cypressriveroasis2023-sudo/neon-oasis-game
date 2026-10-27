@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .github/cos-verification
-            .github/workflows/cos-pr312-census-v2.yml
+            .github/workflows
       - name: Check out existing repair source
         uses: actions/checkout@v4
         with:
