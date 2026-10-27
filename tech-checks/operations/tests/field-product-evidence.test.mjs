@@ -100,6 +100,9 @@ test('authoritatively Unknown Product-ID TCP checks do not inherit older provide
  assert.equal(f.rows[1].cameraState,'offline');
  assert.equal(view.items[0].state,'unverified');
  assert.equal(view.items[1].state,'unverified');
+ assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
+ assert.equal(view.items[0].evidence.basis,'connection');
+ assert.equal(view.items[0].evidence.observations.length,0);
  assert.match(view.items[0].reason,/No complete current tracker-IP check/);
  assert.equal(view.counts.online,0);
  assert.equal(view.counts.offline,0);

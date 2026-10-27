@@ -25,6 +25,10 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
   return {gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:exact.checkedAt,video:'not_verified',
    observations:[{resourceId:exact.resourceId,source:'Saved TCP/service-port check',kind:'connection',observedAt:exact.checkedAt,fresh:true,reportedStatus:exact.status,currentState:exact.status}]};
  }
+ if(exact?.status==='unknown'&&state==='unverified'){
+  return {gap:'no_current_reading',association:'exact_product_id_tracker_endpoint',
+   basis:'connection',observedAt:null,video:'not_verified',observations:[]};
+ }
  const camera=row?.camera,linked=Boolean(camera?.association);
  const observations:FieldProductEvidence['observations']=[];
  if(linked)for(const resource of camera!.rows){

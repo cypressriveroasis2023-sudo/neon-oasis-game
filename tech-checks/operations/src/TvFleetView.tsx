@@ -80,8 +80,27 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     return()=>{alive.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);};
   },[enabled,refresh]);
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
-  const rows=useMemo(()=>data.units.map(unit=>({unit,health:fieldCameraHealth(unit,data.inventory,data.health,clock),router:fieldReachability(unit,data.routers?.items,clock),point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),estimate:data.estimates.get(unit.id)})).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]-{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber)),[data,clock]);
   const census=useMemo(()=>tvFieldCensus(data.fieldSource,data.inventory,data.health,data.routers,data.addressMap,clock),[data,clock]);
+  const rows=useMemo(()=>{
+    const byNative=new Map(census.rows.map(row=>[row.id,row]));
+    const productClaims=new Map<string,NonNullable<typeof census.products>['items']>();
+    for(const item of census.products?.items||[]){
+      if(!item.unitId||item.evidence?.association!=='exact_product_id_tracker_endpoint'||item.evidence.basis!=='connection')continue;
+      productClaims.set(item.unitId,[...(productClaims.get(item.unitId)||[]),item]);
+    }
+    return data.units.map(unit=>{
+      const raw=fieldCameraHealth(unit,data.inventory,data.health,clock);
+      const claim=productClaims.get(unit.id)||[],reviewed=byNative.get(unit.id);
+      const accepted=claim.length===1&&reviewed?.camera.basis==='connection'
+        &&['online','offline','unknown'].includes(reviewed.cameraState);
+      const health=accepted?{...raw,state:reviewed!.cameraState as 'online'|'offline'|'unknown',
+        basis:'connection' as const,checkedAt:reviewed!.camera.checkedAt,reason:reviewed!.camera.reason}:raw;
+      return {unit,health,router:fieldReachability(unit,data.routers?.items,clock),
+        point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),
+        estimate:data.estimates.get(unit.id)};
+    }).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]
+      -{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber));
+  },[data,clock,census]);
   const outages=useMemo(()=>tvCensusOutages(census.board,rows),[census,rows]);
   // Fleet and TV use the same strict mHelp Product-ID/address proof; never
   // convert a customer address into GPS verification or guess video health.

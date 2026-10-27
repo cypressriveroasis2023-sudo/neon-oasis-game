@@ -21,3 +21,17 @@ test('duplicate ownership, Shop, support, inactive, malformed or stale observati
  ];
  for(const v of invalid){const result=productConnectionFleetRows(v.rows||[row],{items:v.products||[product]});assert.equal(result[0].cameraState,'unknown');}
 });
+ 
+test('verified Unknown TCP result supersedes a native provider Online label',()=>{
+ const unknown={...product,state:'unverified',reason:'No current completed TCP check',
+  evidence:{association:'exact_product_id_tracker_endpoint',basis:'connection',gap:'no_current_reading',
+   observedAt:null,observations:[]}};
+ const oldOnline={...row,cameraState:'online',camera:{...row.camera,state:'online',reason:'Old provider online'}};
+ const result=productConnectionFleetRows([oldOnline],{items:[unknown]})[0];
+ assert.equal(result.cameraState,'unknown');
+ assert.equal(result.camera.state,'unknown');
+ assert.equal(result.camera.basis,'connection');
+ assert.equal(result.camera.checkedAt,null);
+ assert.equal(result.camera.reason,'No current completed TCP check');
+ assert.equal(oldOnline.cameraState,'online');
+});

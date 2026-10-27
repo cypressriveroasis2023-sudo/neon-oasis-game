@@ -66,7 +66,9 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    reason=unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
   }
   counts[state]++;
-  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,exactAllowed&&exact&&state===exact.status?exact:null)};
+  const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
+    ||state==='unverified'&&exact.status==='unknown'));
+  return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence:fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null)};
  });
  return {total:authority.field,counts,items,receivedAt:authority.receivedAt,sourceSha256:authority.sourceSha256};
 }

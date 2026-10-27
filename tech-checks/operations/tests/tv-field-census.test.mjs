@@ -88,3 +88,19 @@ test('TV outage population honors current Product-ID TCP proof even when native 
  assert.deepEqual(sourceOnly.map(p=>p.productId),['1005']);
  assert.equal(sourceOnly[0].linked.evidence.association,'exact_product_id_tracker_endpoint');
 });
+ 
+test('TV native rows use exact Unknown instead of older provider colors',()=>{
+ const f=fieldProductFixture();
+ const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:f.upload.sourceSha256,
+  trackerVerifiedAt:f.fresh,
+  items:f.upload.records.filter(r=>r.placement==='FIELD').map(r=>({
+   productId:r.productId,status:'unknown',basis:'tcp_service_port',
+   checkedAt:null,resourceId:null,reason:'Exact saved TCP check unavailable.'
+  }))};
+ const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
+ assert.equal(tv.board.counts.online,0);assert.equal(tv.board.counts.offline,0);
+ assert.equal(tv.rows.find(row=>row.id===f.units[0].id).cameraState,'unknown');
+ assert.equal(tv.rows.find(row=>row.id===f.units[1].id).cameraState,'unknown');
+ assert.equal(tv.rows.find(row=>row.id===f.units[0].id).camera.basis,'connection');
+ assert.deepEqual(tvCensusOutages(tv.board,tv.rows.map(row=>({unit:row.unit,health:row.camera}))),[]);
+});

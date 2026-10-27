@@ -1,30 +1,33 @@
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {FieldProduct} from './mhelpFieldHealth';
 
-/** Read-only presentation overlay. Use only status already accepted for the
- * exact Product ID, not a legacy family/name or provider channel result.
- * Do not mutate native inventory, identity proofs, raw source rows or history.
- */
+/** Presentation-only overlay of a verified Product-ID TCP result. Never
+ * infer unit identity from names, and do not mutate provider or inventory. */
 export function productConnectionFleetRows(
  rows:FleetDashboardRow[],products:{items:FieldProduct[]}|null
 ):FleetDashboardRow[]{
  if(!products)return rows;
  const byUnitId=new Map<string,FieldProduct[]>();
  for(const product of products.items){
-  if(!product.unitId||!['online','offline'].includes(product.state)
-   ||product.evidence?.association!=='exact_product_id_tracker_endpoint'
-   ||product.evidence.basis!=='connection'||product.evidence.observations.length!==1
-   ||product.evidence.observations[0].fresh!==true||product.evidence.observations[0].currentState!==product.state)continue;
+  const evidence=product.evidence;
+  if(!product.unitId||evidence?.association!=='exact_product_id_tracker_endpoint'||evidence.basis!=='connection')continue;
+  const known=['online','offline'].includes(product.state)
+   &&evidence.observations.length===1&&evidence.observations[0].fresh===true
+   &&evidence.observations[0].currentState===product.state;
+  const unresolved=product.state==='unverified'&&evidence.gap==='no_current_reading'
+   &&evidence.observedAt===null&&evidence.observations.length===0;
+  if(!known&&!unresolved)continue;
   byUnitId.set(product.unitId,[...(byUnitId.get(product.unitId)||[]),product]);
  }
  return rows.map(row=>{
   const claimed=byUnitId.get(row.id)||[];
   if(claimed.length!==1||row.support||row.retired||row.placement!=='field')return row;
-  const proof=claimed[0];
-  if(proof.state!=='online'&&proof.state!=='offline')return row;
-  return {...row,cameraState:proof.state,camera:{
-   ...row.camera,state:proof.state,basis:'connection',checkedAt:proof.evidence!.observedAt,
-   reason:proof.reason,observation:undefined,
-  },review:row.review.filter(reason=>reason!==row.camera.reason)};
+  const product=claimed[0];
+  const status=product.state==='unverified'?'unknown':product.state as 'online'|'offline';
+  return {...row,cameraState:status,camera:{
+   ...row.camera,state:status,basis:'connection',checkedAt:product.evidence!.observedAt,
+   reason:product.reason,observation:undefined,
+  },review:[...row.review.filter(reason=>reason!==row.camera.reason),
+    ...(status==='unknown'?[product.reason]:[])]};
  });
 }

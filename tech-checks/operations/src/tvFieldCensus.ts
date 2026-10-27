@@ -1,6 +1,7 @@
 import {manualShopInventory} from '../../supabase/functions/cos-operations-pages/fleetShopProjection';
 import {readRecordedRoster} from './fleetRecordedRoster';
 import {mhelpFieldHealth} from './mhelpFieldHealth';
+import {productConnectionFleetRows} from './productConnectionFleetRows';
 import {fleetDashboardRows,type DashboardUnit} from './fleetDashboardModel';
 import {buildFleetCommandCenter,type FleetCommandCenterData} from './fleetCommandCenterModel';
 import type {Health} from './fieldCameraHealth';
@@ -10,10 +11,11 @@ import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
 /** TV uses the same accepted Product-ID accounting as the Fleet headline.
  * Native rows remain diagnostic resources, never additional census members. */
 export function tvFieldCensus(source:Record<string,any>|null,inventory:DashboardUnit[],health:Health|null,routers:RouterSnapshot|null,addressMap:MhelpAddressMapResult|null,now:number){
- const rows=fleetDashboardRows(inventory,health,routers?.items||null,null,now);
+ const baseRows=fleetDashboardRows(inventory,health,routers?.items||null,null,now);
  const upload=source?manualShopInventory(source.uploadInventory,source.manualPlacementOverrides):null;
  const roster=source?readRecordedRoster(source.fleetRoster,inventory).roster:null;
- const products=mhelpFieldHealth(upload,roster,rows,now,source?.productConnections);
+ const products=mhelpFieldHealth(upload,roster,baseRows,now,source?.productConnections);
+ const rows=productConnectionFleetRows(baseRows,products);
  return {rows,products,board:buildFleetCommandCenter(upload,products,Boolean(health),rows,addressMap,null,now,health?.refreshedAt||null)};
 }
 
