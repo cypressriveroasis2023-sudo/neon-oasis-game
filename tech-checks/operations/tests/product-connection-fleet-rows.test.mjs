@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {productConnectionFleetRows} from '../src/productConnectionFleetRows.ts';
+import {productConnectionFleetRows,productConnectionUnitDetail} from '../src/productConnectionFleetRows.ts';
 const evidence={association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:'2026-10-26T21:00:00Z',observations:[{resourceId:'99',source:'Saved TCP/service-port check',kind:'connection',reportedStatus:'offline',currentState:'offline',fresh:true,observedAt:'2026-10-26T21:00:00Z'}]};
 const product={productId:'11',unitId:'unit-1',state:'offline',evidence,reason:'Completed exact TCP nonresponse'};
 const row={id:'unit-1',placement:'field',retired:false,support:false,cameraState:'unknown',camera:{state:'unknown',basis:'camera',reason:'Provider unknown',checkedAt:null,identity:'missing',rows:[],classification:null},review:['Provider unknown','Location review']};
@@ -37,7 +37,6 @@ test('verified Unknown TCP result supersedes a native provider Online label',()=
 });
 
 test('selected Camera Health unit detail uses Product-ID TCP status instead of provider Online',()=>{
- const {productConnectionUnitDetail}=await import('../src/productConnectionFleetRows.ts');
  const base={state:'online',reason:'Provider online',basis:'provider',checkedAt:'2026-10-26T20:55:00Z',identity:'missing',rows:[],classification:null,unitKey:null};
  const unknown={...product,state:'unverified',reason:'No current saved TCP check',
   evidence:{association:'exact_product_id_tracker_endpoint',basis:'connection',gap:'no_current_reading',observedAt:null,observations:[]}};

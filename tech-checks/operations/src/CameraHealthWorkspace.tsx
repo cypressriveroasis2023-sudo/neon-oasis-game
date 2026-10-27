@@ -22,7 +22,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
   const [ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
   const selected=units?.find(unit=>unit.id===initialUnitId);
   const source=health&&fleet?cameraFieldProducts(fleet.fieldMap,health,now,!error):null;
-  const accepted=source?.items.map(item=>item.linked).filter((item):item is NonNullable<typeof item>=>Boolean(item))||[];
+  const accepted=(source?.items||[]).flatMap(item=>item.linked?[item.linked]:[]);
   const rawDetail=selected?fieldCameraHealth(selected,units||[],health,now):null;
   const detail=selected?productConnectionUnitDetail(rawDetail,selected.id,accepted):null;
   const rows=initialUnitId?detail?.rows||[]:health?.rows||[];
