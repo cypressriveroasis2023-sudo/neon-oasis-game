@@ -11,6 +11,8 @@ import {lastKnownCamera} from './cameraLastKnown';
 import CameraHealthOverview,{CameraCardActions,CameraResourceObservations,UnitEvidenceDetails,ReconProviderAreaDetails} from './CameraHealthOverview';
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 import {cameraOverview} from './cameraHealthCounts';
+import {cameraFieldProducts} from './cameraFieldProducts';
+import {productConnectionUnitDetail} from './productConnectionFleetRows';
 export { validateCameraHealth } from './fieldCameraHealth';
 type Props={powerReadEnabled?:boolean;embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
 export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
@@ -19,7 +21,10 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
   const unitError=error;const loadUnits=()=>refresh();
   const [ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
   const selected=units?.find(unit=>unit.id===initialUnitId);
-  const detail=selected?fieldCameraHealth(selected,units||[],health,now):null;
+  const source=health&&fleet?cameraFieldProducts(fleet.fieldMap,health,now,!error):null;
+  const accepted=source?.items.map(item=>item.linked).filter((item):item is NonNullable<typeof item>=>Boolean(item))||[];
+  const rawDetail=selected?fieldCameraHealth(selected,units||[],health,now):null;
+  const detail=selected?productConnectionUnitDetail(rawDetail,selected.id,accepted):null;
   const rows=initialUnitId?detail?.rows||[]:health?.rows||[];
   const group=selected&&health?cameraOverview(health,now,units||[]).groups.find(group=>group.unitIdentity?.unitId===selected.id):undefined;
   return <section className={'panel module camera-health-native'+(embedded?' cos-fleet-camera-troubleshooting':'')} aria-label='Camera Health'>

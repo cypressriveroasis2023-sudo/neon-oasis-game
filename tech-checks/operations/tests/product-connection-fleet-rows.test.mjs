@@ -35,3 +35,16 @@ test('verified Unknown TCP result supersedes a native provider Online label',()=
  assert.equal(result.camera.reason,'No current completed TCP check');
  assert.equal(oldOnline.cameraState,'online');
 });
+
+test('selected Camera Health unit detail uses Product-ID TCP status instead of provider Online',()=>{
+ const {productConnectionUnitDetail}=await import('../src/productConnectionFleetRows.ts');
+ const base={state:'online',reason:'Provider online',basis:'provider',checkedAt:'2026-10-26T20:55:00Z',identity:'missing',rows:[],classification:null,unitKey:null};
+ const unknown={...product,state:'unverified',reason:'No current saved TCP check',
+  evidence:{association:'exact_product_id_tracker_endpoint',basis:'connection',gap:'no_current_reading',observedAt:null,observations:[]}};
+ const result=productConnectionUnitDetail(base,'unit-1',[unknown]);
+ assert.equal(result.state,'unknown');assert.equal(result.basis,'connection');assert.equal(result.checkedAt,null);
+ assert.equal(result.reason,'No current saved TCP check');assert.equal(result.identity,'missing');
+ assert.equal(productConnectionUnitDetail(base,'unit-1',[unknown,unknown]),base);
+ assert.equal(productConnectionUnitDetail(base,'unit-1',[{...unknown,unitId:null}]),base);
+ assert.equal(base.state,'online');
+});

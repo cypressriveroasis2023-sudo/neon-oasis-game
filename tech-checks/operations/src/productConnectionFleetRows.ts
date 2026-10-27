@@ -1,4 +1,5 @@
 import type {FleetDashboardRow} from './fleetDashboardModel';
+import type {UnitCameraHealth} from './fieldCameraHealth';
 import type {FieldProduct} from './mhelpFieldHealth';
 
 /** Presentation-only overlay of a verified Product-ID TCP result. Never
@@ -30,4 +31,21 @@ export function productConnectionFleetRows(
   },review:[...row.review.filter(reason=>reason!==row.camera.reason),
     ...(status==='unknown'?[product.reason]:[])]};
  });
+}
+
+/** One native unit detail badge uses the exact same accepted Product-ID
+ * connection result as Fleet's headline. Raw provider/channel diagnostics
+ * remain untouched in the unit's rows and classification. */
+export function productConnectionUnitDetail(
+ original:UnitCameraHealth|null,unitId:string,products:readonly FieldProduct[]
+):UnitCameraHealth|null{
+ if(!original||!unitId||original.state==='support')return original;
+ const claims=products.filter(product=>product.unitId===unitId
+   &&product.evidence?.association==='exact_product_id_tracker_endpoint'
+   &&product.evidence.basis==='connection'
+   &&(product.state==='online'||product.state==='offline'
+     ||product.state==='unverified'&&product.evidence.gap==='no_current_reading'));
+ if(claims.length!==1)return original;
+ const product=claims[0],status=product.state==='unverified'?'unknown':product.state as 'online'|'offline';
+ return {...original,state:status,basis:'connection',checkedAt:product.evidence!.observedAt,reason:product.reason};
 }
