@@ -78,10 +78,13 @@ test('TV outage population honors current Product-ID TCP proof even when native 
  const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(55,'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now);
  assert.ok(receipt);
  const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
- assert.equal(tv.board.counts.offline,3);
+ // Product 1002 has a legacy provider Offline observation but no valid
+ // Product-ID TCP check: the strict receipt records UNKNOWN, not an outage.
+ assert.equal(tv.board.counts.offline,2);
+ assert.equal(tv.board.items.find(p=>p.productId==='1002').status,'unverified');
  const physical=tv.rows.map(row=>({unit:row.unit,health:row.camera}));
  const outages=tvCensusOutages(tv.board,physical);
- assert.deepEqual(outages.map(v=>v.productId),['1001','1002']);
+ assert.deepEqual(outages.map(v=>v.productId),['1001']);
  assert.equal(outages[0].health.state,'offline');
  assert.equal(outages[0].health.basis,'connection');
  const sourceOnly=tv.board.items.filter(p=>p.status==='offline'&&!outages.some(o=>o.productId===p.productId));
