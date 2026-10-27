@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: cos-pr312-runtime-only-0444525
+  group: cos-pr312-runtime-only-61fb7e9
   cancel-in-progress: false
 jobs:
   prepare-runtime:
@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      COS_SOURCE_SHA: 0444525008291054665b35ffd359a78d4fd37325
+      COS_SOURCE_SHA: 61fb7e9e676df817981d6b0d125e880dc7bd8457
     steps:
       - name: Check out only the already-tested repair source
         uses: actions/checkout@v4
         with:
-          ref: 0444525008291054665b35ffd359a78d4fd37325
+          ref: 61fb7e9e676df817981d6b0d125e880dc7bd8457
           fetch-depth: 1
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -76,7 +76,7 @@ jobs:
           import {readFileSync,writeFileSync,lstatSync} from 'node:fs';
           import {createHash} from 'node:crypto';
           const repo='cypressriveroasis2023-sudo/neon-oasis-game';
-          const source='0444525008291054665b35ffd359a78d4fd37325';
+          const source='61fb7e9e676df817981d6b0d125e880dc7bd8457';
           assert.equal(process.env.GITHUB_REPOSITORY,repo);
           assert.equal(process.env.COS_SOURCE_SHA,source);
           const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:32*1024*1024}).trim();
@@ -116,7 +116,7 @@ jobs:
       - name: Preserve reproducible build and source evidence
         uses: actions/upload-artifact@v4
         with:
-          name: cos-pr312-runtime-0444525
+          name: cos-pr312-runtime-61fb7e9
           path: |
             cos-build-evidence/manifest.json
             cos-build-evidence/pr312-runtime-tree.json
