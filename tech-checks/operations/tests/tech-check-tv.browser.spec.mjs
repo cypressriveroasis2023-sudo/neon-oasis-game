@@ -385,8 +385,20 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('— offline');await expect(summary).toContainText('6 unverified');
  state.productConnections=fieldProductConnectionFixture(state.fieldMapExtras.uploadInventory,new Date(Date.parse(time)+18*60000).toISOString());
  state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));
- await page.clock.runFor(15*60000);
+ // Keep the real network's bounded timeout on real time at the scheduled
+ // recovery boundary; a 15-minute virtual jump can otherwise outrun I/O.
+ const firstFleetRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
+ const scheduledRecovery=firstFleetRead+2*15*60000;
+ const untilRecovery=scheduledRecovery-await page.evaluate(()=>Date.now());
+ expect(untilRecovery).toBeGreaterThan(1000);
+ await page.clock.runFor(untilRecovery-1000);
+ await page.clock.resume();
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');
+ const recoveredAt=await page.evaluate(()=>Date.now());
+ expect(recoveredAt).toBeGreaterThanOrEqual(scheduledRecovery-1000);
+ await page.clock.pauseAt(new Date(recoveredAt+1000));
+ await page.clock.runFor(2*60000);
+ await expect(summary).toContainText('1 offline');
  expect(state.writes).toEqual([]);
 });
 

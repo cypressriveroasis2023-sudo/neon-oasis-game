@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
 for(const it of [false,true])test(`Fleet status pin colors, mixed selection and failed reads ${it?'IT':'Owner'}`,async({page},testInfo)=>{
- const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,it,{field:fixture.field,health:fixture.health});
+ const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,it,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  await expect(app.locator('.cos-fleet-map-panel')).toHaveAttribute('aria-busy','false');
  await expect.poll(()=>app.locator('.cos-mhelp-address-marker').first().evaluate(n=>n.getBoundingClientRect().width)).toBe(44);
  await expect(app.locator('.cos-fleet-map-canvas')).not.toHaveClass(/leaflet-zoom-anim/);
@@ -40,7 +40,7 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
 
 
 test('Offline Fleet filter hides unrelated saved address pins without dropping the red unit',async({page})=>{
- const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health});
+ const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(7);
  await app.getByLabel('Field inventory status').selectOption('offline');
  const markers=app.locator('.cos-mhelp-address-marker');
