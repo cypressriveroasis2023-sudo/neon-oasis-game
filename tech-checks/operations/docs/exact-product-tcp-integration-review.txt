@@ -1,0 +1,86 @@
+EXACT PRODUCT TCP — COMPLETE LOCAL INTEGRATION, DISABLED
+
+Continues checkpoint 438b160a and preserves ed193928. No live operation occurred.
+
+Mounted native context
+cos-operations-pages/index.ts now mounts POST /api/product-tcp-proof after the
+existing authenticate() same-person native resolution. The exact existing Owner
+with actorId or verifiedItFleet predicate is required. The protected source adapter
+receives existing actor-bound RPC/read closures, the existing user-bound legacy
+reader/epoch RPC, placement audit reader and Google Viewer context. There are no
+client-supplied actor IDs, roles, proofs, service keys or endpoint targets.
+Both ordinary and existing envelope transport are handled. Native serve.ts sets
+scopedProductTcpEnabled:false explicitly; the disabled route does no source IO.
+
+Mounted legacy context
+cos-exact-product-tcp/host.ts mounts the writer/read handler using the SAME
+createFleetVerifier already used by camera-field-geocode. It verifies auth user,
+exact active unarchived profile and existing approved IT/Owner policy. Its own
+legacy service context performs receipt RPCs; the user's bearer is forwarded
+unchanged to the pinned native proof route for independent native authorization.
+serve.ts has an explicit ENABLED=false source switch. In its disabled branch it
+reads no credentials and performs no authentication/source/RPC/socket calls.
+The enabled branch wires the existing own-project environment configuration,
+reviewed native route/origin settings and Deno.connect. No settings were applied.
+The original sweep, schedules and authentication rules are untouched.
+
+Current status reader integration
+The existing GET /api/product-connections route now calls integrateScopedConnections
+only when the native switch is explicitly enabled. It keeps its complete existing
+baseline envelope and only considers the missing-completed-proof or multiple-saved-
+endpoint Unknown reasons. Existing conclusive results and all other source,
+Product-IP, lifecycle, identity and ownership holds are never overridden.
+
+Full protected native source/group proof brackets the legacy scoped receipt read.
+Each returned status must match Product ID, source SHA, tracker SHA, authority
+(including identity/configuration/epochs), actual reviewed representative device
+ID, fresh original timestamp and TCP-only basis. Duplicate/missing/foreign rows,
+changed source/configuration/epochs, incomplete/technical/stale receipts and
+source/transport failure retain the baseline Unknown. Raw physical identifiers,
+IPs and opaque guards are stripped from the existing frontend envelope.
+
+The resourceId is an actual member of the reviewed group (the stable first sorted
+member), not an invented group/device identity. Wording explicitly states that
+this is shared service connectivity and does not verify video. The existing
+readExactProductConnections browser validator accepts the result without changes
+to frontend or TV files. No production collision is relaxed without full proof.
+
+Additional source work and scoped reads share a 48-second route deadline. Reads
+are batched at eight Product IDs. If the full fresh validation cannot finish,
+scoped fallback fails closed to the existing baseline. No hosted coverage or
+latency guarantee is claimed; assess full-fleet source-read cost before activation.
+
+TS2345 resolved
+mhelp2027ConnectionCensus.ts retains a typed EquipmentCsvRow alias before the
+existing runtime object check and inserts that same checked object into its Map.
+No cast, any widening, guard removal or runtime acceptance change was added.
+Both the application npm run typecheck and strict complete producer/handler
+closure now pass. This supersedes the inherited TS limitation in the V2 review.
+
+Validation
+106 focused tests passed, zero failures/skips. Includes real migration execution
+in local PGlite; existing consumer, 2027 source/Google reader, direct producer and
+reviewed identity regressions; mounted native Owner/IT-disabled and service denial;
+legacy default-disabled, inactive/archived/foreign/unapproved-user denial; exact
+positive and complete-negative scoped consumption accepted by the existing browser
+validator; stale/foreign/forged guards; post-read source/config/epoch/lifecycle
+races; conclusive-row and source/conflict-hold preservation. HTTP and socket probes
+are mocked. Positive synthetic identity tests use an explicit test review scope;
+no synthetic scope is exposed through a production handler option or request.
+
+Remaining activation review
+The programming mounts and status integration are complete but disabled. Still
+required: exact deployed-source preservation review, legacy receipt migration
+approval, pinned native proof URL/origin configuration, existing role verification,
+hosted transport cancellation/lock-contention/capacity checks and a bounded exact-ID
+activation approval. Existing V2 migration/rollback and cross-project snapshot
+semantics are unchanged. No distributed atomicity claim is made. Unknown/held
+products may remain Unknown; current UI counts and all 47 are not claimed fixed.
+
+Rollback
+Restore the native scopedProductTcpEnabled:false and legacy ENABLED=false switches
+first (already their state here). Revert this integration commit for exact local
+rollback. Preserve historical receipt rows; the V2 SQL rollback revokes the new
+receipt RPC/mutation privileges without touching health/history. No frontend,
+TV, placement publisher, deployment, schedule, credential or live database/Sheets
+mutation was made.

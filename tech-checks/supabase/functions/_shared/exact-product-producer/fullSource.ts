@@ -91,6 +91,6 @@ export function consumeProductReceipt(current:GroupProof,receipt:Row,now=Date.no
  const results=current.devices.map(d=>completedSavedTcpCheck({deviceId:d.id,publicIp:d.ip,expectedPorts:d.ports,connectionRevision:d.revision,monitoringEnabled:d.enabled,
   portStatus:{...ports,_connection:{ip:d.ip,revision:d.revision,checkedAt,status:Object.values(ports||{}).some((p:any)=>p?.online===true)?'online':'offline',reachable:Object.values(ports||{}).some((p:any)=>p?.online===true)}}},now));
  if(!results.length||results.some(r=>!r)||new Set(results.map(r=>r!.status)).size!==1)return null;
- return {productId:current.productId,status:results[0]!.status,basis:'tcp_service_port',checkedAt:results[0]!.checkedAt,
+ return {productId:current.productId,resourceId:current.devices[0].id,authorityGuard:current.authorityGuard,sourceSha256:current.sourceSha256,trackerSha256:current.trackerSha256,status:results[0]!.status,basis:'tcp_service_port',checkedAt:results[0]!.checkedAt,
   deviceCount:results.length,reason:'Completed saved service-port check for the current reviewed equipment group. Camera video is not verified.'};
 }

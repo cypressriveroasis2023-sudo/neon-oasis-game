@@ -1,3 +1,8 @@
+INTEGRATION UPDATE: mounts and current status consumption are now implemented
+locally, disabled. TS2345 is resolved. See exact-product-tcp-integration-review.txt
+for current validation and remaining activation requirements. This V2 document
+retains the earlier checkpoint and receipt protocol design.
+
 EXACT PRODUCT-ID TCP RECEIPTS V2 — RUNNABLE LOCAL CANDIDATE, DISABLED
 
 This supersedes the proposed V1 activation contract in ed193928. That checkpoint

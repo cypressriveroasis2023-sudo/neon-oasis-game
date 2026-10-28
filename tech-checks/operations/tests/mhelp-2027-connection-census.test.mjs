@@ -188,3 +188,11 @@ test('full 1,001-ID membership stays intact while only three assignment conflict
  assert.equal(proof.records.filter(r=>r.placement==='FIELD').length,284);
  assert.equal(current.filter(r=>r.placement==='FIELD').length,287,'current mHelp assignment is never rewritten');
 });
+
+test('mounted native proof route remains disabled after existing Owner/IT authentication and denies service accounts',async()=>{
+ for(const role of ['owner','it','service']){
+  const f=routeFixture(role);const response=await f.handler(new Request('https://platform.example/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-user','Content-Type':'application/json'},body:JSON.stringify({method:'POST',path:'/api/product-tcp-proof',body:{productIds:['11']}})}));
+  assert.equal(response.status,role==='service'?403:503);
+  assert.equal(f.calls.some(c=>c.url.endsWith('/rpc/cos_mhelp_placement_snapshot')||c.url.includes('sheets.googleapis.com')),false);
+ }
+});

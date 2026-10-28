@@ -4,6 +4,7 @@ import {signSheetsAssertion} from './googleSheetsRuntime.ts';
 const mhelpTokens=nativeMhelpTokens(name=>Deno.env.get(name));
 Deno.serve(createOperationsHandler({
   fetch:mhelpTokens.fetch,
+  scopedProductTcpEnabled:false, // Local candidate: requires separately reviewed activation.
   platformUrl:Deno.env.get('SUPABASE_URL'),
   serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
   vrmEmbeds:Deno.env.get('COS_VRM_EMBEDS'),
