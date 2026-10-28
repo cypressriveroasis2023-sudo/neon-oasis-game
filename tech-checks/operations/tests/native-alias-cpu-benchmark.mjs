@@ -1,0 +1,7 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+import {projectOwnerPlacement as baseline} from './fixtures/native-alias-cpu-baseline.ts';
+import {projectOwnerPlacement as candidate} from '../../supabase/functions/cos-operations-pages/placementProjection.ts';
+import {aliasPopulation,run} from './fixtures/native-alias-cpu-population.mjs';
+const report={syntheticOnly:true,engine:process.version,productionRequests:0,sourceBase:'c5346bec1a625c64b97444a492e993eef2737459',scope:'complete projectOwnerPlacement with verified-proof-shaped synthetic inputs; not an attribution of the production 546 envelopes or an end-to-end hosted latency guarantee',populations:[]};
+for(const count of [203,434,1001]){const f=aliasPopulation(count),expected=await run(baseline,f),samples={baseline:[],candidate:[]};for(let i=0;i<3;i++)for(const [name,fn] of i%2?[['candidate',candidate],['baseline',baseline]]:[['baseline',baseline],['candidate',candidate]]){const cpu=process.cpuUsage(),start=performance.now(),before=process.memoryUsage().heapUsed;const out=await run(fn,f),usage=process.cpuUsage(cpu);samples[name].push({cpuMs:(usage.user+usage.system)/1000,wallMs:performance.now()-start,heapDeltaBytes:process.memoryUsage().heapUsed-before});assert.deepEqual(out,expected);}report.populations.push({nativeProofs:count,cameras:f.devices.length,samples});}
+fs.writeFileSync(process.env.COS_NATIVE_ALIAS_REPORT||'/tmp/cos-native-alias-benchmark.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
