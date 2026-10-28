@@ -1,3 +1,4 @@
+import {planFields,assertFieldRequest} from './fields.ts';
 import {UNIT_TRACKER_WORKBOOK} from '../cos-operations-pages/unitTracker.ts';
 import {TRACKER_TABS} from '../cos-operations-pages/googleSheets.ts';
 export {UNIT_TRACKER_WORKBOOK};
@@ -64,7 +65,10 @@ export function planPublishing(bindings:Row[],rows:Row[]){
   const matches=rows.filter(r=>r.sheetId===b.sheetId&&r.row===b.row),r=matches[0],o=b.observation;
   const hold=(reason:string)=>results.push({equipmentId:b.equipmentId,state:'held',reason});
   if(matches.length!==1||!r.unique||r.label!==b.label||!Array.isArray(b.baseline)||b.baseline.length!==4){hold('sheet_identity_changed');continue;}
-  if(b.pending&&equal(r.cells,b.pending)){results.push({equipmentId:b.equipmentId,state:'recovered',cells:r.cells});continue;}
+  const extension=planFields(b,r);
+  if(extension.reason){hold(extension.reason);continue;}
+  const fieldResult=b.fields?{fields:extension.cells}:{};
+  if(b.pending&&equal(r.cells,b.pending)&&(!b.fields||b.fields.pending&&equal(r.fields,b.fields.pending))){results.push({equipmentId:b.equipmentId,state:'recovered',cells:r.cells,...fieldResult});continue;}
   if(!equal(r.cells,b.baseline)){hold('manual_sheet_change');continue;}
   if(!b.sourceCurrent||o?.state!=='confirmed'){hold('source_unverified');continue;}
   if(!['SHOP','FIELD'].includes(o.placement)||typeof o.customerLabel!=='string'||typeof o.siteLabel!=='string'||!o.customerLabel.trim()||!o.siteLabel.trim()||(o.placement==='SHOP')!==shop(o.customerLabel)){hold('source_unverified');continue;}
@@ -76,20 +80,22 @@ export function planPublishing(bindings:Row[],rows:Row[]){
   const changed=[1,2,3].filter(i=>old[i]!==desired[i]);
   const cells=b.baseline.map((c:Row,i:number)=>changed.includes(i)?{...c,entered:{stringValue:desired[i]}}:c);
   if(b.pending&&!equal(cells,b.pending)){hold('pending_write_changed');continue;}
-  if(!changed.length){results.push({equipmentId:b.equipmentId,state:'unchanged',cells:r.cells});continue;}
+  if(!changed.length&&!extension.requests?.length){results.push({equipmentId:b.equipmentId,state:'unchanged',cells:r.cells,...fieldResult});continue;}
   if(changed.some(i=>typeof desired[i]!=='string'||desired[i]!.length>250||/[\x00-\x1f\x7f]/.test(desired[i]!)||!allowed(r.cells[i],desired[i]!))){hold('sheet_validation');continue;}
   if(intents.length>=60){hold('batch_limit');continue;}
-  intents.push({equipmentId:b.equipmentId,observation:o,cells});
+  intents.push({equipmentId:b.equipmentId,observation:o,cells,...(b.fields?{fields:{source:b.fields.source,cells:extension.cells}}:{})});
+  requests.push(...(extension.requests||[]));
   const layout=tabLayout(b.sheetId);
   for(const i of changed){const col=layout.columns[i];requests.push({updateCells:{range:{sheetId:b.sheetId,startRowIndex:b.row-1,endRowIndex:b.row,startColumnIndex:col,endColumnIndex:col+1},rows:[{values:[{userEnteredValue:{stringValue:desired[i]}}]}],fields:'userEnteredValue'}});}
-  results.push({equipmentId:b.equipmentId,state:'published',cells});
+  results.push({equipmentId:b.equipmentId,state:'published',cells,...fieldResult});
  }
  return {results,intents,requests};
 }
-export function assertPublishRequests(requests:Row[]){
- if(!Array.isArray(requests)||!requests.length||requests.length>180)throw Error('Invalid publisher batch');
+export function assertPublishRequests(requests:Row[],extended=false){
+ if(!Array.isArray(requests)||!requests.length||requests.length>(extended?420:180))throw Error('Invalid publisher batch');
  const seen=new Set<string>();
  for(const r of requests){const u=r?.updateCells,g=u?.range;
+  if(extended&&assertFieldRequest(r)){const key=[g.sheetId,g.startRowIndex,g.startColumnIndex].join(':');if(seen.has(key))throw Error('Duplicate publisher cell');seen.add(key);continue;}
   if(!object(r)||Object.keys(r).length!==1||!object(u)||Object.keys(u).some(k=>!['range','rows','fields'].includes(k))||!object(g)
    ||Object.keys(g).some(k=>!['sheetId','startRowIndex','endRowIndex','startColumnIndex','endColumnIndex'].includes(k))
    ||!Number.isSafeInteger(g.startRowIndex)||g.startRowIndex<1||g.startRowIndex>=10000||g.endRowIndex!==g.startRowIndex+1
