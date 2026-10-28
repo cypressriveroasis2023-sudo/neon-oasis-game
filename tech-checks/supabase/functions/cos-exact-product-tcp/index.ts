@@ -28,7 +28,7 @@ export function createProductTcpHandler(options:{enabled?:boolean;bindExistingCo
   const now=options.now??Date.now;
   if(!context.readGroups)return reply({error:'Protected source context unavailable.'},503);
   const runtime={readGroups:context.readGroups,rpc:context.receiptRpc,probe:createSavedTcpProbe(context.connect)};
-  try{return reply(body.action==='run'?await collectProductGroups(runtime,body.productIds,body.runId,now):{items:await readProductGroupStatuses(runtime,body.productIds,now)});}
+  try{return reply(body.action==='run'?await collectProductGroups(runtime,body.productIds,body.runId,now):{items:await readProductGroupStatuses(runtime,body.productIds,now,undefined,request.signal)});}
   catch{return reply({error:'Current complete source or receipt unavailable.'},409);}
  };
 }

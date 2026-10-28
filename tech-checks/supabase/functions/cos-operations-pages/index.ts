@@ -2,7 +2,6 @@ import {createProductProofHandler} from '../_shared/exact-product-producer/attes
 import {existingNativeProductSourceContext} from '../_shared/exact-product-producer/nativeContextAdapter.ts';
 import {createProtectedSourceReader} from '../_shared/exact-product-producer/sourceReader.ts';
 import {integrateScopedConnections} from '../_shared/exact-product-producer/statusIntegration.ts';
-import {boundedRequest} from '../_shared/scheduledDirectService.ts';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -452,7 +451,8 @@ export function createOperationsHandler(options) {
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
   return async function handle(request) {
-    const ownerProofDeadlineMs=Date.now()+75000;
+    const requestStartedAt=Date.now();
+    const ownerProofDeadlineMs=requestStartedAt+75000;
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
     const releaseLargeBody = () => {
@@ -666,13 +666,13 @@ export function createOperationsHandler(options) {
         const evaluated=buildExactProductConnections(source.census,tracker,endpoints);
         if(!evaluated)fail('Current exact Product-ID/endpoint evidence could not be verified.',503);
         if(options.scopedProductTcpEnabled===true){
-          const deadline=Date.now()+48_000,reader=createProtectedSourceReader(productSourceContext(context));
+          const reader=createProtectedSourceReader(productSourceContext(context));
           const scoped=await integrateScopedConnections(evaluated,{
-            readSource:()=>boundedRequest(signal=>reader(signal),deadline,Date.now,20_000),
-            readStatuses:ids=>boundedRequest(async signal=>{
+            requestStartedAt,signal:request.signal,readSource:signal=>reader(signal),
+            readStatuses:async(ids,signal)=>{
               const value=await readJson(LEGACY_URL+'/functions/v1/cos-exact-product-tcp',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({action:'read',productIds:ids}),signal},'Scoped receipts unavailable.');
               return value.items;
-            },deadline,Date.now,20_000),
+            },
           });
           return json(scoped);
         }

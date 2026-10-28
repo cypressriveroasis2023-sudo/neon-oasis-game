@@ -45,10 +45,39 @@ this is shared service connectivity and does not verify video. The existing
 readExactProductConnections browser validator accepts the result without changes
 to frontend or TV files. No production collision is relaxed without full proof.
 
-Additional source work and scoped reads share a 48-second route deadline. Reads
-are batched at eight Product IDs. If the full fresh validation cannot finish,
-scoped fallback fails closed to the existing baseline. No hosted coverage or
-latency guarantee is claimed; assess full-fleet source-read cost before activation.
+Timing contract (supersedes the former 48-second optional route deadline)
+Inspected PR314 head 35af49bdd6aaf05ddd58e141422cc0624f812b92: its 6.5-second
+presentation budget permits late proof, but both the request transport and late
+proof discard expire at 30 seconds. Frontend/TV files are not changed here.
+Optional enrichment now receives min(6.5 seconds from baseline completion,
+23.5 seconds from native handler entry). The 23.5-second cutoff reserves one
+existing presentation window (6.5 seconds) for delivery before frontend discard;
+it is a conservative server policy, not a measured network guarantee. The
+baseline source read is unchanged and itself may exceed the client deadline;
+this change prevents OPTIONAL enrichment from adding delay beyond its cutoff.
+
+One timer races the entire optional operation, not each batch. Deadline or client
+cancellation aborts protected source/HTTP IO and immediately returns the original
+validated baseline, including existing positive and negative rows. Ignored or
+late cancellation cannot publish partial overlays, renew timestamps or start the
+next authority/batch read. Identity, configuration and source checks before and
+after receipts remain mandatory. There is no background continuation or cache.
+The legacy read-only receipt consumer separately caps its whole read at 6.5
+seconds and forwards request cancellation; the explicit probe writer retains its
+separate 48-second contract. Hosted propagation of HTTP abort remains unverified.
+
+The 100-eligible-candidate regression constructs 100 distinct reviewed native
+identities, runs the real grouped planner and receipt consumer, and verifies 13
+sequential batches (8 maximum), 2 outer complete authority reads plus 26 inner
+complete authority reads and exactly 100 receipt RPCs on the fast path. This
+cost is NOT optimized away or represented as two total source reads. Slow batches
+stop subsequent work at the shared budget and retain the entire baseline.
+The fast deterministic clock accounts for 1.5 seconds; this is synthetic, not a
+production latency measurement. Slow census ignoring abort, final census timeout,
+cancellation, already-exhausted budget and valid late proof at 9 seconds are
+covered. Real network/event-loop latency and PostgreSQL lock contention remain
+activation checks. A large fleet may conservatively retain Unknown when full
+validation cannot complete; no coverage guarantee is made.
 
 TS2345 resolved
 mhelp2027ConnectionCensus.ts retains a typed EquipmentCsvRow alias before the
@@ -58,7 +87,7 @@ Both the application npm run typecheck and strict complete producer/handler
 closure now pass. This supersedes the inherited TS limitation in the V2 review.
 
 Validation
-106 focused tests passed, zero failures/skips. Includes real migration execution
+113 focused tests passed, zero failures/skips. Includes real migration execution
 in local PGlite; existing consumer, 2027 source/Google reader, direct producer and
 reviewed identity regressions; mounted native Owner/IT-disabled and service denial;
 legacy default-disabled, inactive/archived/foreign/unapproved-user denial; exact

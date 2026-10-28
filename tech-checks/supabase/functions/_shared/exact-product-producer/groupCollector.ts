@@ -47,9 +47,19 @@ export async function collectProductGroups(runtime:GroupRuntime,ids:string[],run
 }
 /** Backend consumption rereads complete authority after reading the receipt.
  * No global health fallback and no raw IP/config/serial leaves this function. */
-export async function readProductGroupStatuses(runtime:Pick<GroupRuntime,'read'|'readGroups'|'rpc'>,ids:string[],now=Date.now,review?:IdentityReview){
+export async function readProductGroupStatuses(runtime:Pick<GroupRuntime,'read'|'readGroups'|'rpc'>,ids:string[],now=Date.now,review?:IdentityReview,parentSignal?:AbortSignal){
  if(!targetsValid(ids)||ids.length>8)throw Error('Bounded exact IDs required');
- const deadline=now()+48_000,request=<T>(fn:(s:AbortSignal)=>PromiseLike<T>)=>boundedRequest(fn,deadline,now,20_000),store=createReceiptStore(runtime.rpc);
+ const deadline=now()+6500,store=createReceiptStore(runtime.rpc);
+ const request=async<T>(fn:(s:AbortSignal)=>PromiseLike<T>):Promise<T>=>{
+  if(parentSignal?.aborted)throw Error('Receipt read canceled');
+  return boundedRequest(async timeoutSignal=>{
+   const controller=new AbortController();let cancel!:()=>void;
+   const aborted=new Promise<T>((_,reject)=>{cancel=()=>{controller.abort();reject(Error('Receipt read canceled'));};});
+   parentSignal?.addEventListener('abort',cancel,{once:true});timeoutSignal.addEventListener('abort',cancel,{once:true});
+   try{const value=await Promise.race([Promise.resolve(fn(controller.signal)),aborted]);if(parentSignal?.aborted||now()>=deadline)throw Error('Receipt read expired');return value;}
+   finally{parentSignal?.removeEventListener('abort',cancel);timeoutSignal.removeEventListener('abort',cancel);controller.abort();}
+  },deadline,now,6500);
+ };
  const readPlan=async()=>runtime.readGroups?await request(s=>runtime.readGroups!(ids,s)):await buildProductGroups(await request(runtime.read!),ids,now(),review);
  const initial=await readPlan();
  const receipts=await Promise.all(initial.groups.map(g=>request(s=>store.read(g,s))));
