@@ -194,31 +194,39 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     const session=await requestParentToken();
     if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
     const key=JSON.stringify([session.token,session.role,mode]);
+    const saved=fleetSnapshots.get(key);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
-    const saved=fleetSnapshots.get(key);if(saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     // Only the newly authorized actor may see the dated complete saved pair.
     // This callback does not renew the cache or any observation timestamps.
     if(saved)onSaved?.(saved.value);
     const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
-    const revision=fleetRevision;
+    const revision=++fleetRevision;
     const current=()=>{
-      if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
+      if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||lastVerifiedSession?.role!==session.role||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
     };
     const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
-    // Optional protected Product-ID proof has its own bounded time budget.
-    // Never block a valid saved map/health pair on a missing Sheets read.
-    const productConnections=async()=>{
-      let timer=0;
-      const limited=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),6500);});
-      try{return await Promise.race([sendRequest('GET','/api/product-connections',session.token).then(r=>r.data).catch(()=>null),limited]);}
-      finally{window.clearTimeout(timer);}
+    type ProofResult={receipt:any;state:'ready'|'error'|'timeout'|'rejected'};
+    let proofCompletion:Promise<ProofResult>|undefined;
+    // The presentation budget is not a discard deadline. Independently bound
+    // the entire proof (including body parsing) and cancel its transport at 30s.
+    const productConnections=(hash:string,ids:string[])=>{
+      const controller=new AbortController();let timer=0;
+      const deadline=new Promise<ProofResult>(resolve=>{timer=window.setTimeout(()=>{
+        resolve({receipt:null,state:'timeout'});controller.abort();
+      },30000);});
+      const response=sendRequest('GET','/api/product-connections',session.token,undefined,controller.signal)
+        .then(({data})=>readExactProductConnections(data,hash,ids,Date.now())
+          ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const})
+        .catch(()=>({receipt:null,state:'error' as const}));
+      return Promise.race([response,deadline]).finally(()=>window.clearTimeout(timer));
     };
     // Native-only Fleet pages cannot attribute any Product-ID TCP results.
     // Avoid an unnecessary protected source read until this authenticated map
     // supplies a reviewed, complete Field Product-ID census.
-    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(async result=>{
+    const fieldMap=sendRequest('GET','/api/field-map',session.token).then(async response=>{
       current();
-      const map=checkedFieldMap(result.data),upload=(map as any).uploadInventory;
+      const map=checkedFieldMap(response.data),upload=(map as any).uploadInventory;
       const records=Array.isArray(upload?.records)?upload.records:[];
       const fieldIds=records.filter((r:any)=>r?.placement==='FIELD').map((r:any)=>r.productId);
       const sourceReady=upload?.contract==='COS_MHELP_UPLOAD_INVENTORY_V1'
@@ -230,17 +238,36 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
         &&fieldIds.length>0&&new Set(fieldIds).size===fieldIds.length
         &&fieldIds.every((id:unknown)=>typeof id==='string'&&/^[1-9][0-9]{0,14}$/.test(id));
       if(!sourceReady)return map;
-      const receipt=await productConnections();
+      proofCompletion=productConnections(upload.sourceSha256,fieldIds);
+      let timer=0;
+      const budget=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),6500);});
+      const result=await Promise.race([proofCompletion,budget]).finally(()=>window.clearTimeout(timer));
       current();
-      const accepted=receipt&&readExactProductConnections(receipt,upload.sourceSha256,fieldIds);
-      // Explicit null means the required exact-product read failed or was
-      // rejected. Keep the inventory, but never silently substitute provider
-      // health for a missing TCP observation. Native-only maps omit the field.
-      return {...map,productConnections:accepted?receipt:null};
+      // Only still-valid exact proof for this census may bridge a pending read.
+      // Never renew its observation/source times or carry it across a failure.
+      const previous=(saved?.value.fieldMap as any)?.productConnections;
+      const retained=!result&&readExactProductConnections(previous,upload.sourceSha256,fieldIds,Date.now())?previous:null;
+      return {...map,productConnections:result?result.receipt:retained,productConnectionsState:result?.state||'pending'};
     });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
+    // Publish only into this generation's successful pair. A failed pair,
+    // refresh, write, hide, account/role/mode change cannot be revived by proof.
+    void read.paired.then(async initial=>{
+      if(!proofCompletion||(initial.fieldMap as any).productConnectionsState!=='pending')return;
+      const result=await proofCompletion;
+      current();
+      if(fleetSnapshots.get(key)?.value!==initial)return;
+      const map=initial.fieldMap as any,upload=map.uploadInventory;
+      const ids=upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId);
+      const accepted=result.state==='ready'&&readExactProductConnections(result.receipt,upload.sourceSha256,ids,Date.now());
+      const value={...initial,fieldMap:{...map,productConnections:accepted?result.receipt:null,
+        productConnectionsState:result.state==='ready'&&!accepted?'rejected':result.state}};
+      fleetSnapshots.set(key,{value,at:requestedAt});
+      window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));
+      window.dispatchEvent?.(new Event('cos-fleet-proof-updated'));
+    }).catch(()=>{});
     // A source-only caller must not leave the optional pair's rejection unhandled.
     void read.paired.catch(()=>{});
     // Deliver pair errors immediately, but keep sharing a still-running source.

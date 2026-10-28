@@ -8,6 +8,7 @@ import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
 import {createOperationsSessionRecovery} from '../src/operationsSessionRecovery.ts';
+import {readExactProductConnections} from '../src/exactProductConnection.ts';
 import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
 import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
@@ -24,7 +25,7 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true } = {}) {
+function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true, proof = false } = {}) {
   const invalidations=[], listeners = new Set(), otherListeners=new Map(), timers = new Map(), requests = [], handshakes = [], optionalProductReads=[];
   const location = { origin: 'https://synthetic.example', search: mode ? '?mode=' + mode : '' };
   let timerId = 0, requestId = 0, clock = 0;
@@ -56,12 +57,12 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./exactProductConnection'?{readExactProductConnections:()=>null}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
       // Optional Product-ID receipt is unavailable in this legacy saved-pair fixture.
-      if(JSON.parse(init.body).path==='/api/product-connections'){
+      if(!proof&&JSON.parse(init.body).path==='/api/product-connections'){
         optionalProductReads.push({init,envelope:JSON.parse(init.body)});
         return Promise.resolve({ok:false,status:503,json:async()=>({error:'Synthetic connection receipt unavailable'})});
       }
@@ -727,4 +728,70 @@ for(const code of [200,401,403])test('submitted old write HTTP '+code+' stays un
  const f=await recoveryFixture(),write=assert.rejects(f.api.post('/api/owner-tasks',{title:'Synthetic intent'}),/save could not be confirmed/);await flush();
  f.state.token='synthetic-session-b';const read=f.api.get('/api/routers');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();f.answer(1,{saved:true},code);await write;
  assert.equal(f.requests.filter(r=>r.envelope.method==='POST').length,1);assert.equal(f.requests.length,4);assert.ok(f.sessionState.session);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
+});
+
+// Actual validator + synthetic transport/clock: no production payloads or tokens.
+const proofMap=(hash='a'.repeat(64))=>({...fleetMap,uploadInventory:{contract:'COS_MHELP_UPLOAD_INVENTORY_V1',countBasis:'mhelp_product_records_not_unique_physical_units',sourceSha256:hash,summary:{totalRecords:2,fieldRecords:1},records:[{productId:'1001',placement:'FIELD'},{productId:'1002',placement:'SHOP'}]}});
+const exactReceipt=(f,hash='a'.repeat(64))=>({contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:hash,trackerVerifiedAt:new Date(f.elapsed).toISOString(),items:[{productId:'1001',status:'online',basis:'tcp_service_port',checkedAt:new Date(f.elapsed).toISOString(),resourceId:'1',reason:'Synthetic completed check'}]});
+async function startProof(f,force=false,map=proofMap()){
+ const index=f.requests.length,pending=f.api.fleet(force);await flush();
+ f.answer(index,fleetHealth);f.answer(index+1,map);await flush();
+ return {pending,index:index+2};
+}
+const proofFixture=()=>{const f=fixture({proof:true});f.advance(Date.parse('2026-10-28T16:00:00Z'));return f;};
+test('valid proof after6.5s updates only the current saved pair and remount reads it without transport',async()=>{
+ const f=proofFixture(),{pending,index}=await startProof(f);f.advance(6500);
+ const initial=await pending;assert.equal(initial.fieldMap.productConnectionsState,'pending');assert.equal(initial.fieldMap.productConnections,null);
+ f.advance(5900);const receipt=exactReceipt(f);f.answer(index,receipt);await flush();
+ const next=await f.api.fleet();assert.deepEqual(next.fieldMap.productConnections,receipt);assert.equal(next.fieldMap.productConnectionsState,'ready');assert.equal(next.readStartedAt,initial.readStartedAt);assert.equal(next.readAt,initial.readAt);
+ assert.equal(f.requests.length,3);assert.equal(f.timers.size,0);assert.equal(f.invalidations.filter(v=>v==='cos-fleet-snapshot-updated').length,2);
+ assert.equal((await f.api.fleetSource('fieldMap')).productConnectionsState,'ready');assert.equal(f.requests.length,3);
+});
+test('pending refresh retains only validated saved exact proof, then late error clears it',async()=>{
+ const f=proofFixture(),first=await startProof(f),receipt=exactReceipt(f);f.answer(first.index,receipt);await first.pending;
+ const second=await startProof(f,true);f.advance(6500);const interim=await second.pending;
+ assert.equal(interim.fieldMap.productConnectionsState,'pending');assert.deepEqual(interim.fieldMap.productConnections,receipt);
+ f.answer(second.index,{error:'synthetic-private-error'},503);await flush();const failed=await f.api.fleet();
+ assert.equal(failed.fieldMap.productConnectionsState,'error');assert.equal(failed.fieldMap.productConnections,null);assert.equal(JSON.stringify(failed).includes('synthetic-private-error'),false);
+});
+for(const bodyStall of [false,true])test('never-resolving '+(bodyStall?'body':'fetch')+' has a30s terminal timeout and cannot later adopt',async()=>{
+ const f=proofFixture(),{pending,index}=await startProof(f),body=deferred();
+ if(bodyStall){f.requests[index].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();}
+ f.advance(6500);await pending;f.advance(23500);await flush();
+ const timedOut=await f.api.fleet();assert.equal(timedOut.fieldMap.productConnectionsState,'timeout');assert.equal(timedOut.fieldMap.productConnections,null);assert.equal(f.requests[index].init.signal.aborted,true);
+ if(bodyStall)body.resolve(exactReceipt(f));else f.answer(index,exactReceipt(f));await flush();assert.equal((await f.api.fleet()).fieldMap.productConnectionsState,'timeout');assert.equal(f.timers.size,0);
+});
+for(const [name,mutate] of [
+ ['malformed',r=>({...r,items:null})],['source mismatch',r=>({...r,sourceSha256:'b'.repeat(64)})],
+ ['census mismatch',r=>({...r,items:[{...r.items[0],productId:'9999'}]})],['duplicate identity',r=>({...r,items:[r.items[0],r.items[0]]})],
+ ['stale tracker',r=>({...r,trackerVerifiedAt:'2026-10-28T14:00:00Z'})],['stale check',r=>({...r,items:[{...r.items[0],checkedAt:'2026-10-28T14:00:00Z'}]})],
+])test('late '+name+' proof is rejected without a provider fallback',async()=>{
+ const f=proofFixture(),{pending,index}=await startProof(f);f.advance(6500);await pending;
+ f.answer(index,mutate(exactReceipt(f)));await flush();const next=await f.api.fleet();assert.equal(next.fieldMap.productConnectionsState,'rejected');assert.equal(next.fieldMap.productConnections,null);
+});
+for(const changed of [false,true])test((changed?'changed':'same')+' source refresh race cannot adopt the old generation',async()=>{
+ const f=proofFixture(),old=await startProof(f);f.advance(6500);await old.pending;
+ const hash=(changed?'b':'a').repeat(64),fresh=await startProof(f,true,proofMap(hash));f.advance(6500);await fresh.pending;
+ f.answer(old.index,exactReceipt(f));await flush();assert.equal((await f.api.fleet()).fieldMap.productConnectionsState,'pending');
+ const receipt=exactReceipt(f,hash);f.answer(fresh.index,receipt);await flush();assert.deepEqual((await f.api.fleet()).fieldMap.productConnections,receipt);
+});
+for(const boundary of ['logout','pagehide','hide','actor','role','mode'])test('late proof cannot publish across '+boundary,async()=>{
+ const f=proofFixture(),old=await startProof(f);f.advance(6500);await old.pending;
+ const before=f.invalidations.filter(v=>v==='cos-fleet-snapshot-updated').length;
+ if(boundary==='logout')f.window.dispatchEvent(new Event('cos-private-data-invalidated'));
+ if(boundary==='pagehide')f.window.dispatchEvent(new Event('pagehide'));
+ if(boundary==='hide')f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
+ if(boundary==='mode')f.location.search='?mode=fleet';
+ if(boundary==='actor'){f.state.token='synthetic-actor-b';const read=f.api.get('/api/jobs');await flush();f.answer(f.requests.length-1);await read;}
+ if(boundary==='role'){f.state.role='it';await assert.rejects(f.api.get('/api/jobs'),status(401));}
+ f.answer(old.index,exactReceipt(f));await flush();assert.equal(f.invalidations.filter(v=>v==='cos-fleet-snapshot-updated').length,before);
+});
+test('failed paired health cannot be revived by later successful proof',async()=>{
+ const f=proofFixture(),pending=f.api.fleet(),failed=assert.rejects(pending,status(503));await flush();f.answer(0,{},503);f.answer(1,proofMap());await flush();f.advance(6500);await failed;
+ f.answer(2,exactReceipt(f));await flush();assert.equal(f.invalidations.includes('cos-fleet-snapshot-updated'),false);
+ const next=await startProof(f);f.answer(next.index,exactReceipt(f));assert.equal((await next.pending).fieldMap.productConnectionsState,'ready');
+});
+test('changed census cannot borrow saved proof during the presentation window',async()=>{
+ const f=proofFixture(),first=await startProof(f);f.answer(first.index,exactReceipt(f));await first.pending;
+ const fresh=await startProof(f,true,proofMap('b'.repeat(64)));f.advance(6500);assert.equal((await fresh.pending).fieldMap.productConnections,null);f.advance(23500);await flush();
 });
