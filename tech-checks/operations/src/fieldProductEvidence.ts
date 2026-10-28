@@ -3,6 +3,7 @@ import {savedConnectionObservation} from './savedConnectionObservation';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {ExactProductConnection} from './exactProductConnection';
+import type {FieldProductFollowUp} from './fieldProductFollowUp';
 
 export type FieldEvidenceGap='device_link_needed'|'no_current_reading'|'incomplete_check'|'inactive'|'not_applicable'|null;
 export const fieldEvidenceGapLabels={device_link_needed:'Device link needed',no_current_reading:'No current reading',incomplete_check:'Incomplete check',inactive:'Inactive source record',not_applicable:'No camera / support'};
@@ -13,6 +14,7 @@ export type FieldProductEvidence={
  observedAt:string|null;
  video:'not_verified';
  observations:{resourceId:string;source:string;kind:string;observedAt:string|null;fresh:boolean;reportedStatus:string;currentState:string}[];
+ followUp?:FieldProductFollowUp;
 };
 /** Only the classifier's complete reviewed resource set supplies product health.
  * Never infer a device link from a product label, IP, address or provider family.
@@ -56,5 +58,5 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
 export function fieldProductEvidenceCsv(items:FieldProduct[],sourceSha256:string,sourceAt:string){
  if(!/^[a-f0-9]{64}$/.test(sourceSha256)||new Set(items.map(p=>p.productId)).size!==items.length)throw Error('Field audit Product IDs or source checksum are invalid.');
  const cell=(v:unknown)=>{const s=String(v??'');return '"'+(/^[\s]*[=+@-]/.test(s)?"'":'')+s.replaceAll('"','""')+'"';};
- return ['Product ID,Unit,Placement,Inventory source SHA256,Inventory observed,Health state,Evidence gap,Association,Observation basis,Health observed,Resource observations,Reason,Video and recording,Power telemetry',...items.map(p=>[p.productId,p.unitNumber,'FIELD',sourceSha256,sourceAt,p.state,p.evidence?.gap?fieldEvidenceGapLabels[p.evidence.gap]:'',p.evidence?.association,p.evidence?.basis,p.evidence?.observedAt,JSON.stringify(p.evidence?.observations||[]),p.reason,'Not verified by connection observations','Separate telemetry'].map(cell).join(','))].join('\r\n');
+ return ['Product ID,Unit,Placement,Inventory source SHA256,Inventory observed,Health state,Evidence gap,Association,Observation basis,Health observed,Resource observations,Reason,Video and recording,Power telemetry,Follow-up category,Responsible role,Next step',...items.map(p=>[p.productId,p.unitNumber,'FIELD',sourceSha256,sourceAt,p.state,p.evidence?.gap?fieldEvidenceGapLabels[p.evidence.gap]:'',p.evidence?.association,p.evidence?.basis,p.evidence?.observedAt,JSON.stringify(p.evidence?.observations||[]),p.reason,'Not verified by connection observations','Separate telemetry',p.evidence?.followUp?.label,p.evidence?.followUp?.responsibleRole,p.evidence?.followUp?.nextStep].map(cell).join(','))].join('\r\n');
 }

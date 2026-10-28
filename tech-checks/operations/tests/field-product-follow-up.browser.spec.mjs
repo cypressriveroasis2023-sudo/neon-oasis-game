@@ -1,0 +1,41 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import {mountFleet} from './fleet-dashboard-fixtures.mjs';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+
+for(const it of [false,true])test(`${it?'IT':'Owner'} sees read-only next steps, independent support review and the same evidence export`,async({page})=>{
+ const f=fieldProductFixture();
+ f.connections.items.find(row=>row.productId==='1003').reason='No verified public tracker IP is available for this Product ID.';
+ f.connections.items.find(row=>row.productId==='1004').reason='Current tracker and mHelp source disagree for this Product ID. Placement or identity review is required; no connection status is assigned.';
+ const {app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
+ await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
+ const row=id=>board.locator('.cos-command-row').filter({hasText:'Product '+id});
+ await row('1003').click();
+ const detail=board.getByRole('region',{name:'Selected Field equipment details'});
+ const next=detail.getByRole('note',{name:'Next step for this product'});
+ await expect(next).toContainText('Tracker IP not verified');await expect(next).toContainText('Who: IT');
+ await expect(next).toContainText('Confirm the current network assignment for this exact Product ID.');
+ await expect(detail).toContainText('A verified connection result is not available for this Product ID.');
+ await expect(detail).not.toContainText('Reviewed device association: exact product id tracker endpoint');
+ const detailWidth=await detail.evaluate(element=>({width:element.clientWidth,scroll:element.scrollWidth}));
+ expect(detailWidth.scroll).toBeLessThanOrEqual(detailWidth.width+2);
+ await row('1004').click();
+ await expect(row('1004')).toContainText('No camera');
+ await expect(next).toContainText('Source records need review');await expect(next).toContainText('Who: Owner');
+ await row('1001').click();await expect(next).toHaveCount(0);
+ if(it){await expect(app.getByRole('button',{name:/Needs setup/})).toHaveCount(0);await expect(board.getByRole('button',{name:'mHelpDesk CSV / sync →'})).toHaveCount(0);}
+ const accounting=app.locator('.cos-fleet-accounting');await accounting.locator(':scope > summary').click();
+ await accounting.getByText('Review every Field product and its status',{exact:true}).click();
+ const product=accounting.locator('li[data-product-id="1003"]');
+ await expect(product.getByRole('note',{name:'Next step for this product'})).toContainText('Tracker IP not verified');
+ const productWidth=await product.evaluate(element=>({width:element.clientWidth,scroll:element.scrollWidth}));
+ expect(productWidth.scroll).toBeLessThanOrEqual(productWidth.width+2);
+ const downloadPromise=page.waitForEvent('download');
+ await app.getByRole('button',{name:'Export every Field Product ID and health evidence'}).click();
+ const download=await downloadPromise,csv=await readFile(await download.path(),'utf8');
+ expect(csv.split('\r\n')).toHaveLength(8);
+ expect(csv).toContain('Follow-up category,Responsible role,Next step');
+ expect(csv).toContain('Tracker IP not verified');expect(csv).toContain('Source records need review');
+ expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
