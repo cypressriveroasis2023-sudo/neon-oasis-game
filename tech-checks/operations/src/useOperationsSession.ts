@@ -2,7 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {api} from './api';
 import {createOperationsSessionRecovery, guardSessionCallback, type SessionRecoveryState} from './operationsSessionRecovery';
 
-export function useOperationsSession(onInvalidated: () => void) {
+export function useOperationsSession(onInvalidated: (reason?: unknown) => void) {
   const [state, setState] = useState<SessionRecoveryState>({session:null, checking:true, error:'', reloadRequired:false, generation:0});
   const controller = useRef<ReturnType<typeof createOperationsSessionRecovery> | null>(null);
   const clearView = useRef(onInvalidated);
@@ -15,15 +15,16 @@ export function useOperationsSession(onInvalidated: () => void) {
     });
     controller.current = current;
     const invalidate = (event: Event) => {
-      current.invalidate((event as CustomEvent<{reason?: unknown}>).detail?.reason);
-      clearView.current();
+      const reason=(event as CustomEvent<{reason?: unknown}>).detail?.reason;
+      current.invalidate(reason);
+      clearView.current(reason);
     };
-    const leave = () => { current.invalidate('security-hide'); clearView.current(); };
+    const leave = () => { current.invalidate('security-hide'); clearView.current('security-hide'); };
     // A bfcache restore retains the terminal security-hide controller. Start a
     // fresh document and normal parent/server verification; never revive it.
     const restore = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };
     const hidden = (event: MessageEvent) => {
-      if (event.origin === location.origin && event.source === window.parent && event.data?.type === 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' && current.hide()) clearView.current();
+      if (event.origin === location.origin && event.source === window.parent && event.data?.type === 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' && current.hide()) clearView.current('security-hide');
     };
     window.addEventListener('cos-private-data-invalidated', invalidate);
     window.addEventListener('pagehide', leave);

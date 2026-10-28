@@ -74,6 +74,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
+    if(path==='/api/product-connections'){state.proofReads=(state.proofReads||0)+1;if(state.proofGate)await state.proofGate.promise;}
     if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
@@ -521,4 +522,26 @@ test('manual saved-data refresh stays immediate and cancels the pending initial 
  expect(savedReadCounts(state)['field-map']).toBe(2);
  await page.clock.runFor(30000);expect(savedReadCounts(state)['field-map']).toBe(2);
  expect(state.cameraRows[0].serviceEvidence.observedAt).toBe(time);expect(state.writes).toEqual([]);
+});
+
+for(const mode of ['map','camera'])test('TV '+mode+' adopts late validated proof without delaying its saved refresh deadline',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true}),initial=fieldProductFixture();
+ const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
+ state.productConnections=f.connections;state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
+ state.cameraExtras={identityVersion:f.health.identityVersion,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
+ state.settings={sections:[mode],revision:1,updatedAt:time,rotationSeconds:15};state.proofGate=deferred();
+ await page.clock.runFor(60000);await expect.poll(()=>state.proofReads).toBe(1);
+ const initialRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
+ await page.clock.runFor(6600);
+ if(mode==='map')await expect(frame.locator('.tv-fleet-summary')).toContainText('0 online');
+ else await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
+ state.proofGate.resolve();state.proofGate=null;
+ if(mode==='map')await expect(frame.locator('.tv-fleet-summary')).toContainText('1 online');
+ else await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
+ expect(state.proofReads).toBe(1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
+ // Adopting a cached proof must not restart the15-minute cadence.
+ const untilNext=initialRead+15*60000-await page.evaluate(()=>Date.now());
+ await page.clock.runFor(untilNext-1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
+ await page.clock.runFor(1);await expect.poll(()=>state.fleetRequests.filter(r=>r.path==='/api/field-map').length).toBe(2);
+ expect(state.writes).toEqual([]);
 });

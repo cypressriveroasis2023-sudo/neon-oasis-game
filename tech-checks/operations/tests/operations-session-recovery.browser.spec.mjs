@@ -10,7 +10,7 @@ const unit={id:unitId,unitNumber:'Helios 1',modelName:'Helios',status:'field',cu
 const health=snapshot([resource('9001','Helios 1')]);
 const field={items:[unit],inventoryItems:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:0,missingGps:0},generatedAt:fresh};
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
-async function mount(page,{it=false,locationWrites=false}={}){
+async function mount(page,{it=false,locationWrites=false,tv=false}={}){
  const session={...structuredClone(owner),features:{...owner.features,fieldLocationVerification:locationWrites}};
  const state={session:it?{...session,legacyOwner:false,role:'IT',productionOwnerUserId:null}:session,calls:[],errors:[],sessionGate:null,healthGate:null,routerStatus:200,sessionStatus:200,sessionReads:0};
  page.on('pageerror',error=>state.errors.push(error.message));
@@ -18,7 +18,7 @@ async function mount(page,{it=false,locationWrites=false}={}){
  await page.clock.install({time:new Date(now-60000)});await page.clock.pauseAt(new Date(now));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
-  if(url.origin===origin&&url.pathname==='/session-recovery-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/${it?'?mode=fleet':''}#fleet-dashboard"></iframe><script>window.syntheticSession='synthetic-session-a';window.dropNextHandshake=false;addEventListener('message',e=>{const frame=document.querySelector('iframe');if(e.origin!==location.origin||e.source!==frame.contentWindow||e.data?.type!=='COS_OPERATIONS_TOKEN_REQUEST')return;if(window.dropNextHandshake){window.dropNextHandshake=false;return;}e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${it?'it':'owner'}',accessToken:window.syntheticSession},location.origin)})</script>`});
+  if(url.origin===origin&&url.pathname==='/session-recovery-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/${it?'?mode=fleet':''}#${tv?'daily-board':'fleet-dashboard'}"></iframe><script>window.syntheticSession='synthetic-session-a';window.dropNextHandshake=false;addEventListener('message',e=>{const frame=document.querySelector('iframe');if(e.origin!==location.origin||e.source!==frame.contentWindow||e.data?.type!=='COS_OPERATIONS_TOKEN_REQUEST')return;if(window.dropNextHandshake){window.dropNextHandshake=false;return;}e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${it?'it':'owner'}',accessToken:window.syntheticSession},location.origin)})</script>`});
   if(url.origin===origin)return route.continue();
   if(/(?:^|\.)tile\.openstreetmap\.org$/.test(url.hostname))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>'});
   if(!url.pathname.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
@@ -34,11 +34,12 @@ async function mount(page,{it=false,locationWrites=false}={}){
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
   if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
-  const data=body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
+  const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
- await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+ if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();}
+ else {await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
  return {app,state,initialSessions:state.sessionReads};
 }
 const refresh=app=>app.getByRole('button',{name:'↻ Refresh data',exact:true});
@@ -184,4 +185,51 @@ test('logout boundary while offline cancels scheduled session recovery',async({p
  const {app,state,initialSessions}=await mount(page);state.sessionStatus=503;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  await app.locator('body').evaluate(()=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason:'authentication-denied'}})));
  await blocked(app);state.sessionStatus=200;await page.clock.runFor(120000);expect(state.sessionReads).toBe(initialSessions+1);readOnly(state);
+});
+
+const tvBoard=app=>app.getByRole('region',{name:'Tech Check TV Board'});
+async function renewTv(page,app,token){
+ await page.evaluate(value=>window.syntheticSession=value,token);
+ await tvBoard(app).getByRole('button',{name:'Refresh',exact:true}).click();
+ await page.clock.runFor(1);
+}
+test('button-launched TV survives repeated verified renewal and continues automatic saved work refresh',async({page})=>{
+ const {app,state,initialSessions}=await mount(page,{tv:true});
+ expect(await app.locator('body').evaluate(()=>location.search)).toBe('');
+ for(let i=0;i<3;i++){
+  const gate=deferred();state.sessionGate=gate;await renewTv(page,app,'synthetic-tv-'+i);
+  await expect.poll(()=>state.sessionReads).toBe(initialSessions+i+1);await expect(tvBoard(app)).toHaveCount(0);
+  gate.resolve();await expect(tvBoard(app)).toBeVisible();
+  const reads=state.calls.filter(c=>c.path==='/api/daily-board').length;
+  await page.clock.runFor(60000);await expect.poll(()=>state.calls.filter(c=>c.path==='/api/daily-board').length).toBeGreaterThan(reads);
+ }
+ readOnly(state);
+});
+test('manual TV exit remains exited after renewal and browser Back and Forward',async({page})=>{
+ const {app,state}=await mount(page,{tv:true});
+ await tvBoard(app).getByRole('button',{name:'Exit TV'}).click();await expect(tvBoard(app)).toHaveCount(0);
+ await page.evaluate(()=>window.syntheticSession='synthetic-exited-tv');
+ await page.clock.runFor(60000);await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);
+ await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await expect(tvBoard(app)).toHaveCount(0);
+ await app.locator('body').evaluate(()=>{location.hash='#fleet-dashboard';});await expect(refresh(app)).toBeEnabled();
+ await app.locator('body').evaluate(()=>history.back());await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await expect(tvBoard(app)).toHaveCount(0);
+ await app.locator('body').evaluate(()=>history.forward());await expect(refresh(app)).toBeEnabled();await expect(tvBoard(app)).toHaveCount(0);readOnly(state);
+});
+for(const boundary of ['actor','permissions','role','mode','logout','security-hide','verification-denied','malformed-verification'])test('button-launched TV stays blocked after '+boundary,async({page})=>{
+ const {app,state}=await mount(page,{tv:true});
+ if(boundary==='actor')state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';
+ if(boundary==='permissions')state.session.features.vrmRead=false;
+ if(boundary==='role')state.session.role='IT';
+ if(boundary==='verification-denied')state.sessionStatus=401;
+ if(boundary==='malformed-verification')state.session.authorized=null;
+ if(boundary==='mode')await app.locator('body').evaluate(()=>history.replaceState(null,'','?mode=fleet#daily-board'));
+ if(['logout','security-hide'].includes(boundary))await app.locator('body').evaluate((_,reason)=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason}})),boundary==='logout'?'authentication-denied':'security-hide');
+ else await renewTv(page,app,'synthetic-blocked-tv');
+ await expect(tvBoard(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');
+ await page.clock.runFor(60000);await expect(tvBoard(app)).toHaveCount(0);readOnly(state);
+});
+test('TV remains quarantined during temporary verification failure then restores only after same-Owner proof',async({page})=>{
+ const {app,state}=await mount(page,{tv:true});state.sessionStatus=503;await renewTv(page,app,'synthetic-retrying-tv');
+ await expect(app.getByRole('status').filter({hasText:'Connection interrupted.'})).toContainText('reconnect automatically');await expect(tvBoard(app)).toHaveCount(0);
+ state.sessionStatus=200;await page.clock.runFor(30000);await expect(tvBoard(app)).toBeVisible();readOnly(state);
 });
