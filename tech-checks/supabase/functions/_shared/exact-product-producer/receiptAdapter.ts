@@ -1,3 +1,4 @@
+import {fleetReadTargets} from './fleetReadPlan.ts';
 import {RECEIPT_CONTRACT,type GroupProof} from './fullSource.ts';
 export type ReceiptPayload={contract:typeof RECEIPT_CONTRACT;runId:string;proof:GroupProof;ports:Record<string,unknown>;checkedAt:string};
 export type ReceiptAck={ok:boolean;receiptKey?:string;payloadSha256?:string;state?:string;reason?:string};
@@ -25,13 +26,20 @@ export function createReceiptStore(rpc:ReceiptRpc){
    if(result.receiptKey!==ack.receiptKey||result.payloadSha256!==ack.payloadSha256||result.state!=='accepted')throw Error('Acceptance receipt uncertain');
    return result;
   },
+  async readMany(proofs:GroupProof[],signal:AbortSignal){
+   if(!fleetReadTargets(proofs.map(p=>p.productId)))throw Error('Bounded unique receipt targets required');
+   const rows=await rpc('cos_product_tcp_read_batch_v2',{p_targets:proofs.map(p=>({productId:p.productId,authorityGuard:p.authorityGuard}))},signal);
+   if(!Array.isArray(rows)||rows.length!==proofs.length||new Set(rows.map(r=>r?.productId)).size!==proofs.length
+    ||rows.some(r=>!proofs.some(p=>p.productId===r?.productId)||!Object.hasOwn(r,'receipt')))throw Error('Incomplete receipt batch');
+   return new Map(rows.map(r=>[r.productId,r.receipt]));
+  },
   async read(proof:GroupProof,signal:AbortSignal){return await rpc('cos_product_tcp_read_v2',{p_product_id:proof.productId,p_authority_guard:proof.authorityGuard},signal) as Record<string,any>|null;}
  };
 }
 
 export function createSupabaseReceiptRpc(client:{rpc:(name:string,args:Record<string,unknown>)=>{abortSignal:(signal:AbortSignal)=>PromiseLike<{data:unknown;error:unknown}>}}):ReceiptRpc{
  return async(name,args,signal)=>{
-  if(!['cos_product_tcp_stage_v2','cos_product_tcp_accept_v2','cos_product_tcp_read_v2','cos_product_tcp_receipt_v2'].includes(name))throw Error('Unsupported receipt operation');
+  if(!['cos_product_tcp_stage_v2','cos_product_tcp_accept_v2','cos_product_tcp_read_v2','cos_product_tcp_receipt_v2','cos_product_tcp_read_batch_v2'].includes(name))throw Error('Unsupported receipt operation');
   const result=await client.rpc(name,args).abortSignal(signal);if(result.error)throw Error('Receipt operation unverified');return result.data;
  };
 }

@@ -1,3 +1,4 @@
+import {FLEET_RECEIPT_LIMIT} from './fleetReadPlan.ts';
 import {buildProductGroups,type FullSource,type GroupProof} from './fullSource.ts';
 import type {IdentityReview} from '../../cos-operations-pages/verifiedHealthIdentity.ts';
 import type {ExactProductConnectionEnvelope} from '../../../../operations/src/exactProductConnection.ts';
@@ -32,8 +33,8 @@ export async function integrateScopedConnections(base:ExactProductConnectionEnve
    return new Map(groups.map(g=>[g.productId,g]));
   };
   const first=await plans(before),statuses=new Map<string,Record<string,any>>();
-  for(let i=0,selected=[...first.keys()];i<selected.length;i+=8){
-   const batch=selected.slice(i,i+8),rows=await read(signal=>options.readStatuses(batch,signal));
+  for(let i=0,selected=[...first.keys()];i<selected.length;i+=FLEET_RECEIPT_LIMIT){
+   const batch=selected.slice(i,i+FLEET_RECEIPT_LIMIT),rows=await read(signal=>options.readStatuses(batch,signal));
    if(!Array.isArray(rows)||rows.length!==batch.length||new Set(rows.map(r=>r.productId)).size!==batch.length||rows.some(r=>!batch.includes(r.productId)))return base;
    for(const row of rows)statuses.set(row.productId,row);
   }

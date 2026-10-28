@@ -1,3 +1,4 @@
+import {fleetReadTargets,buildFleetReadPlan} from './fleetReadPlan.ts';
 import type {IdentityReview} from '../../cos-operations-pages/verifiedHealthIdentity.ts';
 import {boundedRequest} from '../scheduledDirectService.ts';
 import {buildProductGroups,consumeProductReceipt,RECEIPT_CONTRACT,type FullSource,type GroupProof} from './fullSource.ts';
@@ -48,7 +49,7 @@ export async function collectProductGroups(runtime:GroupRuntime,ids:string[],run
 /** Backend consumption rereads complete authority after reading the receipt.
  * No global health fallback and no raw IP/config/serial leaves this function. */
 export async function readProductGroupStatuses(runtime:Pick<GroupRuntime,'read'|'readGroups'|'rpc'>,ids:string[],now=Date.now,review?:IdentityReview,parentSignal?:AbortSignal){
- if(!targetsValid(ids)||ids.length>8)throw Error('Bounded exact IDs required');
+ if(!fleetReadTargets(ids))throw Error('Bounded exact IDs required');
  const deadline=now()+6500,store=createReceiptStore(runtime.rpc);
  const request=async<T>(fn:(s:AbortSignal)=>PromiseLike<T>):Promise<T>=>{
   if(parentSignal?.aborted)throw Error('Receipt read canceled');
@@ -60,13 +61,14 @@ export async function readProductGroupStatuses(runtime:Pick<GroupRuntime,'read'|
    finally{parentSignal?.removeEventListener('abort',cancel);timeoutSignal.removeEventListener('abort',cancel);controller.abort();}
   },deadline,now,6500);
  };
- const readPlan=async()=>runtime.readGroups?await request(s=>runtime.readGroups!(ids,s)):await buildProductGroups(await request(runtime.read!),ids,now(),review);
+ const readPlan=async()=>runtime.readGroups?await request(s=>runtime.readGroups!(ids,s)):await buildFleetReadPlan(await request(runtime.read!),ids,now(),review);
  const initial=await readPlan();
- const receipts=await Promise.all(initial.groups.map(g=>request(s=>store.read(g,s))));
+ const receipts=initial.groups.length?await request(s=>store.readMany(initial.groups,s)):new Map();
  const fresh=await readPlan();
+ if(parentSignal?.aborted||now()>=deadline)throw Error('Receipt read expired');
  return ids.map(productId=>{
   const first=initial.groups.find(g=>g.productId===productId),current=fresh.groups.find(g=>g.productId===productId);
-  const receipt=first?receipts[initial.groups.indexOf(first)]:null;
+  const receipt=first?receipts.get(first.productId):null;
   const status=first&&current&&first.authorityGuard===current.authorityGuard&&receipt?consumeProductReceipt(current,receipt,now()):null;
   return status??{productId,status:'unknown',basis:'tcp_service_port',checkedAt:null,reason:'Current complete Product-ID/group/receipt proof is unavailable.'};
  });

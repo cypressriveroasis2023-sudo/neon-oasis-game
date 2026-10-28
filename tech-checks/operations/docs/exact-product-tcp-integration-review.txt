@@ -66,18 +66,59 @@ The legacy read-only receipt consumer separately caps its whole read at 6.5
 seconds and forwards request cancellation; the explicit probe writer retains its
 separate 48-second contract. Hosted propagation of HTTP abort remains unverified.
 
+Fleet batch read integration (supersedes per-eight receipt reads)
+The read-only attestation/consumer accepts up to 100 exact Product IDs; explicit
+probe/publication calls remain capped at eight. A cloned, recursively frozen
+complete source snapshot feeds planner chunks of 64 without rereading authority.
+The next complete snapshot is independently fetched after the receipt RPC. No
+cross-request/actor cache or caller-provided authority proof is introduced.
+
 The 100-eligible-candidate regression constructs 100 distinct reviewed native
-identities, runs the real grouped planner and receipt consumer, and verifies 13
-sequential batches (8 maximum), 2 outer complete authority reads plus 26 inner
-complete authority reads and exactly 100 receipt RPCs on the fast path. This
-cost is NOT optimized away or represented as two total source reads. Slow batches
-stop subsequent work at the shared budget and retain the entire baseline.
-The fast deterministic clock accounts for 1.5 seconds; this is synthetic, not a
-production latency measurement. Slow census ignoring abort, final census timeout,
-cancellation, already-exhausted budget and valid late proof at 9 seconds are
-covered. Real network/event-loop latency and PostgreSQL lock contention remain
-activation checks. A large fleet may conservatively retain Unknown when full
-validation cannot complete; no coverage guarantee is made.
+identities and exercises the real planner, batch adapter and receipt consumer:
+- One native-to-legacy read request, two outer complete authority reads.
+- Two inner complete authority reads, one network receipt RPC for all 100.
+- Four TOTAL complete authority reads; each protected source read still performs
+  its own existing source/identity/epoch bracketing and pagination.
+The remaining outer/inner brackets intentionally preserve independent validation
+in the native response integrator and the directly callable authenticated legacy
+status endpoint. Eliminating either requires changing that trust contract; this
+candidate does not share untrusted caller snapshots or source credentials.
+
+receipt_batch_read_v2.sql is a separate REVIEW-ONLY migration after the existing
+receipt_protocol_v2.sql. Its invoker function accepts only 1–100 unique exact
+Product-ID/guard pairs, within 16KB, using the same service principal. It calls the
+existing cos_product_tcp_read_v2 for each target in one transaction, preserving
+accepted-state, 20-minute receipt freshness, exact guard and whole-group local
+configuration checks. The existing SHARE lock persists until transaction end.
+This is one network RPC, NOT one constant-cost DB lookup: up to 100 indexed
+receipt/local-configuration checks remain. Foreign, missing, disabled, stale or
+changed targets return null; no global rows or receipts are modified. The only
+proposed execution grant is the existing service_role boundary; no live grant,
+public/client access, security-definer function or permission change was applied.
+
+The actual protocol supports equivalent validation: receipts are immutable and
+already keyed by product and exact authority guard. Batch transport changes
+neither their meaning nor eligibility. Current full native source validation
+still brackets consumption; SQL still rechecks current legacy configurations.
+No distributed atomicity is claimed across projects or Google Sheets.
+
+The fast deterministic 100-candidate clock accounts for 0.5 seconds (synthetic,
+not a production latency measurement). A slow path exhausts the same 6.5-second
+budget and does not perform the outer final read or expose partial results.
+Additional tests cover 100-member pinned remote transport, malformed/duplicate/
+foreign responses, real local SQL 100-target selection and 100 accepted distinct four-device groups
+(400 devices), invalid bounds/private
+roles, missing/foreign guards, disabled configuration, rollback, final source
+drift, and cancellation while the batch RPC is pending. The complete test suite
+continues covering lifecycle/source/identity collisions and non-target writes.
+
+Activation additionally requires approval/application of the batch-read migration
+and its service-only execution grant, paired legacy/native code versions, and
+hosted timing/lock/cancellation verification for the bounded fleet. If the batch
+RPC is absent or an old source endpoint rejects >8 targets, fallback retains the
+baseline; it does not silently restore the expensive per-target network path.
+Use receipt_batch_read_v2_rollback.sql after disabling runtime to revoke the new
+RPC while preserving all receipts and original functions. Runtime remains OFF.
 
 TS2345 resolved
 mhelp2027ConnectionCensus.ts retains a typed EquipmentCsvRow alias before the
@@ -87,7 +128,7 @@ Both the application npm run typecheck and strict complete producer/handler
 closure now pass. This supersedes the inherited TS limitation in the V2 review.
 
 Validation
-113 focused tests passed, zero failures/skips. Includes real migration execution
+118 focused tests passed, zero failures/skips. Includes real migration execution
 in local PGlite; existing consumer, 2027 source/Google reader, direct producer and
 reviewed identity regressions; mounted native Owner/IT-disabled and service denial;
 legacy default-disabled, inactive/archived/foreign/unapproved-user denial; exact

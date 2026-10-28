@@ -4,7 +4,7 @@ import {buildProductGroups,consumeProductReceipt,RECEIPT_CONTRACT} from '../../s
 import {integrateScopedConnections} from '../../supabase/functions/_shared/exact-product-producer/statusIntegration.ts';
 import {currentMhelpProductConnectionCensus} from '../../supabase/functions/cos-operations-pages/mhelpProductConnectionSource.ts';
 import {buildExactProductConnections,readExactProductConnections} from '../src/exactProductConnection.ts';
-import {readProductGroupStatuses} from '../../supabase/functions/_shared/exact-product-producer/groupCollector.ts';
+import {readProductGroupStatuses,collectProductGroups} from '../../supabase/functions/_shared/exact-product-producer/groupCollector.ts';
 import {createLegacyProductTcpHost} from '../../supabase/functions/cos-exact-product-tcp/host.ts';
 async function fixture(online=true){
  const f=await productSource(),proof=(await buildProductGroups(f.source,['101'],f.now,f.review)).groups[0];
@@ -90,15 +90,15 @@ async function fleetFixture(count){
  const base=buildExactProductConnections(currentMhelpProductConnectionCensus(source.upload,f.now).census,source.tracker,source.identitySources.devices.map(d=>({deviceId:d.id,publicIp:d.public_ip,expectedPorts:d.expected_ports,connectionRevision:0,monitoringEnabled:true,portStatus:null})),f.now);
  return {...f,source,review,base};
 }
-test('100 eligible fleet candidates: 13 bounded receipt batches, 2 outer authority reads; budget stops further calls',async()=>{
+test('100 eligible fleet candidates: one RPC and four complete authority reads; budget preserved',async()=>{
  const f=await fleetFixture(100),ids=f.base.items.map(i=>i.productId),groups=[];
  for(let i=0;i<ids.length;i+=64)groups.push(...(await buildProductGroups(f.source,ids.slice(i,i+64),f.now,f.review)).groups);
  assert.equal(groups.length,100);
  for(const slow of [false,true]){
   let time=f.now,reads=0,batches=0,innerAuthority=0,receiptCalls=0;
-  const out=await integrateScopedConnections(f.base,{now:()=>time,readSource:async()=>{reads++;time+=100;return f.source;},readStatuses:async selected=>{assert.ok(selected.length<=8);batches++;time+=slow?2000:100;return readProductGroupStatuses({read:async()=>{innerAuthority++;return f.source;},rpc:async(name,args)=>{receiptCalls++;assert.equal(name,'cos_product_tcp_read_v2');const proof=groups.find(g=>g.productId===args.p_product_id);return {state:'accepted',payload:{contract:RECEIPT_CONTRACT,proof,ports:{80:positive,443:negative},checkedAt:new Date(f.now).toISOString()}};}},selected,()=>time,f.review);}},f.review);
-  if(slow){assert.equal(out,f.base);assert.equal(batches,4);assert.equal(reads,1);assert.equal(innerAuthority,8);}
-  else{assert.equal(out.items.filter(i=>i.status==='online').length,100);assert.equal(batches,13);assert.equal(reads,2);assert.equal(innerAuthority,26);assert.equal(receiptCalls,100);assert.equal(time-f.now,1500);}
+  const out=await integrateScopedConnections(f.base,{now:()=>time,readSource:async()=>{reads++;time+=100;return f.source;},readStatuses:async selected=>{assert.ok(selected.length<=100);batches++;time+=slow?2000:100;return readProductGroupStatuses({read:async()=>{innerAuthority++;time+=slow?2500:100;return f.source;},rpc:async(name,args)=>{receiptCalls++;assert.equal(name,'cos_product_tcp_read_batch_v2');return args.p_targets.map(target=>{const proof=groups.find(g=>g.productId===target.productId);return {productId:target.productId,receipt:{state:'accepted',payload:{contract:RECEIPT_CONTRACT,proof,ports:{80:positive,443:negative},checkedAt:new Date(f.now).toISOString()}}};});}},selected,()=>time,f.review);}},f.review);
+  if(slow){assert.equal(out,f.base);assert.equal(batches,1);assert.equal(reads,1);assert.equal(innerAuthority,2);}
+  else{assert.equal(out.items.filter(i=>i.status==='online').length,100);assert.equal(batches,1);assert.equal(reads,2);assert.equal(innerAuthority,2);assert.equal(receiptCalls,1);assert.equal(time-f.now,500);}
  }
 });
 test('final census timeout retains mixed baseline including valid existing positive proof',async t=>{
@@ -110,4 +110,27 @@ test('legacy receipt consumer cancels a hung authority read and never starts RPC
  const f=await fixture(),controller=new AbortController();let calls=0,signal;
  const pending=readProductGroupStatuses({read:s=>{calls++;signal=s;return new Promise(()=>{});},rpc:async()=>{throw Error('must not read receipts');}},['101'],()=>f.now,f.review,controller.signal);
  controller.abort();await assert.rejects(pending,/canceled/);assert.equal(calls,1);assert.equal(signal.aborted,true);
+});
+import {createReceiptStore} from '../../supabase/functions/_shared/exact-product-producer/receiptAdapter.ts';
+import {createRemoteGroupReader} from '../../supabase/functions/_shared/exact-product-producer/attestationTransport.ts';
+import {buildFleetReadPlan,fleetReadTargets} from '../../supabase/functions/_shared/exact-product-producer/fleetReadPlan.ts';
+test('100-member remote snapshot transport is bounded, complete and matches the real planner',async()=>{
+ const f=await fleetFixture(100),ids=f.base.items.map(r=>r.productId),plan=await buildFleetReadPlan(f.source,ids,f.now,f.review);let calls=0;
+ const read=createRemoteGroupReader({proofUrl:'https://native.test/proof',expectedOrigin:'https://native.test',authorization:'Bearer synthetic',now:()=>f.now,fetch:async(url,init)=>{calls++;assert.deepEqual(JSON.parse(init.body).productIds,ids);return Response.json({contract:'COS_PRODUCT_TCP_SOURCE_V2',productIds:ids,...plan});}});
+ assert.deepEqual(await read(ids,new AbortController().signal),plan);assert.equal(calls,1);assert.equal(fleetReadTargets([...ids,'9999']),false);assert.equal(fleetReadTargets([ids[0],ids[0]]),false);
+ await assert.rejects(()=>read([...ids,'9999'],new AbortController().signal));assert.equal(calls,1);
+ await assert.rejects(()=>collectProductGroups({read:async()=>{throw Error('must not read');},rpc:async()=>{throw Error('must not write');},probe:async()=>{throw Error('must not probe');}},ids.slice(0,9),'00000000-0000-4000-8000-000000000001',()=>f.now,f.review),/Bounded/);
+});
+test('batch response rejects missing, duplicate, foreign and malformed entries before consumption',async()=>{
+ const f=await fixture(),g=(await buildProductGroups(f.source,['101'],f.now,f.review)).groups[0];
+ for(const rows of [[],[{productId:'102',receipt:null}],[{productId:'101'}],[{productId:'101',receipt:null},{productId:'101',receipt:null}]])await assert.rejects(()=>createReceiptStore(async()=>rows).readMany([g],new AbortController().signal),/Incomplete/);
+});
+test('batch source drift holds statuses and cancellation during RPC stops final authority read',async()=>{
+ const f=await fixture(),g=(await buildProductGroups(f.source,['101'],f.now,f.review)).groups[0];let reads=0;
+ const receipt={state:'accepted',payload:{contract:RECEIPT_CONTRACT,proof:g,ports:{80:positive,443:negative},checkedAt:new Date(f.now).toISOString()}};
+ const out=await readProductGroupStatuses({read:async()=>{const s=structuredClone(f.source);if(++reads===2)s.identitySources.devices[0].connection_revision++;return s;},rpc:async()=>[{productId:'101',receipt}]},['101'],()=>f.now,f.review);
+ assert.equal(out[0].status,'unknown');assert.equal(reads,2);
+ const controller=new AbortController();let reached,signal;const entered=new Promise(r=>reached=r);reads=0;
+ const pending=readProductGroupStatuses({read:async()=>{reads++;return f.source;},rpc:async(_n,_a,s)=>{signal=s;reached();return new Promise(()=>{});}},['101'],()=>f.now,f.review,controller.signal);
+ await entered;controller.abort();await assert.rejects(pending,/canceled/);assert.equal(signal.aborted,true);assert.equal(reads,1);
 });

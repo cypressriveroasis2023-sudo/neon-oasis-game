@@ -14,9 +14,9 @@ async function fixture(){
  grant select,update on public.camera_devices to service_role;`);
  const fields=Object.keys(f.source.identitySources.devices[0]);
  for(const d of f.source.identitySources.devices)await db.query(`insert into camera_devices(${fields.join(',')}) values(${fields.map((_,i)=>'$'+(i+1)).join(',')})`,fields.map(k=>d[k]));
- try{await db.exec(migration);}catch(e){await db.close();throw Error(e.message+' at '+e.position);}
+ try{await db.exec(migration);await db.exec(await readFile(new URL('../db/exact-product-producer/receipt_batch_read_v2.sql',import.meta.url),'utf8'));}catch(e){await db.close();throw Error(e.message+' at '+e.position);}
  const rpc=async(name,args)=>{
-  assert.ok(['cos_product_tcp_stage_v2','cos_product_tcp_accept_v2','cos_product_tcp_read_v2','cos_product_tcp_receipt_v2'].includes(name));
+  assert.ok(['cos_product_tcp_stage_v2','cos_product_tcp_accept_v2','cos_product_tcp_read_v2','cos_product_tcp_receipt_v2','cos_product_tcp_read_batch_v2'].includes(name));
   await db.exec('begin;set local role service_role;');
   try{const result=(await db.query(`select public.${name}(${Object.values(args).map((_,i)=>'$'+(i+1)).join(',')}) value`,Object.values(args))).rows[0].value;await db.exec('commit');return result;}
   catch(error){await db.exec('rollback');throw error;}
@@ -35,7 +35,7 @@ test('real SQL migration: private invoker-only functions, no public grants; stag
  assert.equal((await f.db.query('select count(*)::int n from cos_product_tcp_private.receipts')).rows[0].n,1);
  assert.equal((await f.store.stage({...f.payload,ports:{80:negative,443:negative}},f.signal)).reason,'receipt_payload_conflict');
  for(const role of ['anon','authenticated']){await f.db.exec('begin;set local role '+role);await assert.rejects(()=>f.db.query('select public.cos_product_tcp_read_v2($1,$2)',['101',f.g.authorityGuard]),/permission denied/);await f.db.exec('rollback');}
- const meta=(await f.db.query("select prosecdef,proacl::text acl from pg_proc where proname like 'cos_product_tcp_%_v2'")).rows;assert.equal(meta.length,4);assert.ok(meta.every(r=>r.prosecdef===false&&!r.acl.includes('anon')&&!r.acl.includes('authenticated')));
+ const meta=(await f.db.query("select prosecdef,proacl::text acl from pg_proc where proname like 'cos_product_tcp_%_v2'")).rows;assert.equal(meta.length,5);assert.ok(meta.every(r=>r.prosecdef===false&&!r.acl.includes('anon')&&!r.acl.includes('authenticated')));
  }finally{await f.db.close();}
 });
 test('SQL rejects stale revision/ports, disabled/retired/foreign members and added IP collisions atomically',async()=>{
@@ -97,5 +97,41 @@ test('lost stage acknowledgement yields a reconcilable receipt key and never ret
  let stages=0;const runtime={read:async()=>structuredClone(f.source),probe:async()=>positive,rpc:async(name,args,signal)=>{const r=await f.rpc(name,args,signal);if(name==='cos_product_tcp_stage_v2'){stages++;throw Error('lost acknowledgement');}return r;}};
  const result=await collectProductGroups(runtime,['101'],uuid(905),()=>f.now,f.review);assert.equal(result.outcomes[0].state,'publication_uncertain');assert.equal(stages,1);
  assert.equal((await f.store.inspect(result.outcomes[0].receiptKey,f.signal)).state,'pending');assert.equal(await f.store.read(f.g,f.signal),null);
+ }finally{await f.db.close();}
+});
+test('batch SQL preserves exact per-target semantics, 100-target bound, configuration CAS and private rollback',async()=>{
+ const f=await fixture();try{
+ const before=await f.preserved(),ack=await f.store.stage(f.payload,f.signal);await f.store.accept(ack,f.g.authorityGuard,f.signal);
+ const targets=Array.from({length:100},(_,i)=>({productId:i===0?'101':String(1000+i),authorityGuard:f.g.authorityGuard}));
+ const rows=await f.rpc('cos_product_tcp_read_batch_v2',{p_targets:targets});assert.equal(rows.length,100);assert.equal(rows[0].receipt.state,'accepted');assert.ok(rows.slice(1).every(r=>r.receipt===null));assert.deepEqual(rows.map(r=>r.productId),targets.map(t=>t.productId));
+ for(const bad of [[],[targets[0],targets[0]],[...targets,{productId:'9999',authorityGuard:f.g.authorityGuard}],[{...targets[0],authorityGuard:null}],[{...targets[0],productId:101}],[{...targets[0],extra:true}]])await assert.rejects(()=>f.rpc('cos_product_tcp_read_batch_v2',{p_targets:bad}));
+ assert.equal((await f.rpc('cos_product_tcp_read_batch_v2',{p_targets:[{productId:'101',authorityGuard:'0'.repeat(64)}]}))[0].receipt,null);
+ for(const role of ['anon','authenticated']){await f.db.exec('begin;set local role '+role);await assert.rejects(()=>f.db.query('select cos_product_tcp_read_batch_v2($1)',[[targets[0]]]),/permission denied/);await f.db.exec('rollback');}
+ await f.db.exec('update camera_devices set monitoring_enabled=false where id=4');assert.equal((await f.rpc('cos_product_tcp_read_batch_v2',{p_targets:[targets[0]]}))[0].receipt,null);await f.db.exec('update camera_devices set monitoring_enabled=true where id=4');assert.deepEqual(await f.preserved(),before);
+ await f.db.exec(await readFile(new URL('../db/exact-product-producer/receipt_batch_read_v2_rollback.sql',import.meta.url),'utf8'));await assert.rejects(()=>f.rpc('cos_product_tcp_read_batch_v2',{p_targets:[targets[0]]}),/permission denied/);
+ assert.equal((await f.store.read(f.g,f.signal)).state,'accepted');assert.equal((await f.db.query('select count(*)::int n from cos_product_tcp_private.receipts')).rows[0].n,1);
+ }finally{await f.db.close();}
+});
+test('real SQL full fleet: 100 accepted distinct saved groups in one network-equivalent batch, no non-target writes',async()=>{
+ const f=await fixture();try{
+ const groups=[];
+ for(let i=0;i<100;i++){
+  const group=structuredClone(f.g);group.productId=String(1000+i);group.nativeUnitId=uuid(2000+i);group.authorityGuard=(1000+i).toString(16).padStart(64,'0');
+  for(let j=0;j<group.devices.length;j++){
+   const d=group.devices[j];d.id=String(1000+i*4+j);d.ip=`11.23.0.${i+1}`;d.unitKey='sql-batch-'+i;d.serial='sql-serial-'+d.id;d.externalId='sql-external-'+d.id;
+   const row={...f.source.identitySources.devices[j],id:Number(d.id),public_ip:d.ip,unit_key:d.unitKey,device_serial:d.serial,external_device_id:d.externalId},fields=Object.keys(row);
+   await f.db.query(`insert into camera_devices(${fields.join(',')}) values(${fields.map((_,n)=>'$'+(n+1)).join(',')})`,fields.map(k=>row[k]));
+  }
+  // SQL fixtures exercise receipt storage/current-config semantics. Native
+  // admission is independently exercised by the 100-reviewed-identity test.
+  const ack=await f.store.stage({...f.payload,runId:uuid(3000+i),proof:group},f.signal);assert.equal(ack.ok,true);assert.equal((await f.store.accept(ack,group.authorityGuard,f.signal)).ok,true);groups.push(group);
+ }
+ const before=await f.preserved();let calls=0;
+ const store=createReceiptStore(async(name,args,signal)=>{calls++;return f.rpc(name,args,signal);});
+ const receipts=await store.readMany(groups,f.signal);assert.equal(calls,1);assert.equal(receipts.size,100);for(const group of groups)assert.equal(consumeProductReceipt(group,receipts.get(group.productId),f.now).status,'online');
+ assert.deepEqual(await f.preserved(),before);
+ await f.db.exec('update camera_devices set connection_revision=1 where id=1000');
+ const changed=await store.readMany(groups,f.signal);assert.equal(changed.get('1000'),null);assert.equal([...changed.values()].filter(Boolean).length,99);
+ assert.equal((await f.db.query('select count(*)::int n from cos_product_tcp_private.receipts')).rows[0].n,100);
  }finally{await f.db.close();}
 });

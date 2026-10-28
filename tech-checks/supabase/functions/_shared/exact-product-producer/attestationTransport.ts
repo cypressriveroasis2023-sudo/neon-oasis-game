@@ -1,6 +1,6 @@
-import {buildProductGroups,PROFILES,RECEIPT_CONTRACT,type GroupProof} from './fullSource.ts';
+import {fleetReadTargets,buildFleetReadPlan} from './fleetReadPlan.ts';
+import {PROFILES,RECEIPT_CONTRACT,type GroupProof} from './fullSource.ts';
 import {createProtectedSourceReader,type ProtectedSourceIO} from './sourceReader.ts';
-import {targetsValid} from './model.ts';
 import {directPublicHost,boundedRequest} from '../scheduledDirectService.ts';
 import type {GroupPlan} from './groupCollector.ts';
 const SHA=/^[a-f0-9]{64}$/;
@@ -16,10 +16,10 @@ export function createProductProofHandler(options:{enabled?:boolean;bindExisting
    const io=await boundedRequest(()=>options.bindExistingContext!(request),Date.now()+4000);
    if(!io)return reply({error:'Unauthorized.'},403);
    const reader=request.body?.getReader();if(!reader)throw Error();let text='',size=0;const decoder=new TextDecoder(),deadline=Date.now()+4000;
-   try{for(;;){const part=await boundedRequest(()=>reader.read(),deadline);if(part.done)break;size+=part.value.length;if(size>2048)throw Error();text+=decoder.decode(part.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
-   const body=JSON.parse(text);if(!body||Object.keys(body).length!==1||!targetsValid(body.productIds)||body.productIds.length>8)throw Error();
+   try{for(;;){const part=await boundedRequest(()=>reader.read(),deadline);if(part.done)break;size+=part.value.length;if(size>4096)throw Error();text+=decoder.decode(part.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
+   const body=JSON.parse(text);if(!body||Object.keys(body).length!==1||!fleetReadTargets(body.productIds))throw Error();
    const now=options.now??Date.now,source=await createProtectedSourceReader(io,now)(request.signal);
-   const plan=await buildProductGroups(source,body.productIds,now());
+   const plan=await buildFleetReadPlan(source,body.productIds,now());
    return reply({contract:'COS_PRODUCT_TCP_SOURCE_V2',productIds:body.productIds,...plan});
   }catch{return reply({error:'Current complete source unavailable.'},409);}
  };
@@ -54,11 +54,11 @@ export function createRemoteGroupReader(options:{proofUrl:string;expectedOrigin:
  if(url.protocol!=='https:'||url.origin!==options.expectedOrigin||url.username||url.password||url.search||url.hash
   ||!/^Bearer [^\s]+$/.test(options.authorization)||options.authorization.length>8192)throw Error('Reviewed source route and existing user authorization required');
  return async(ids:string[],signal:AbortSignal)=>{
-  if(!targetsValid(ids)||ids.length>8)throw Error('Invalid source selection');
+  if(!fleetReadTargets(ids))throw Error('Invalid source selection');
   const response=await options.fetch(url,{method:'POST',headers:{Authorization:options.authorization,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({productIds:ids}),redirect:'error',cache:'no-store',signal});
   if(!response.ok||!response.body)throw Error('Protected source unavailable');
   const reader=response.body.getReader(),decoder=new TextDecoder();let size=0,text='';
-  try{for(;;){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>131072)throw Error('Oversized proof');text+=decoder.decode(part.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
+  try{for(;;){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>2097152)throw Error('Oversized proof');text+=decoder.decode(part.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
   return validateRemoteGroups(JSON.parse(text),ids,(options.now??Date.now)());
  };
 }

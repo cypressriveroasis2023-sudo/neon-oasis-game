@@ -19,7 +19,7 @@ export function createProductTcpHandler(options:{enabled?:boolean;bindExistingCo
   try{
    if(!request.headers.get('Content-Type')?.startsWith('application/json'))throw Error();
    const reader=request.body?.getReader();if(!reader)throw Error();let bytes=0,text='';const decoder=new TextDecoder(),bodyDeadline=Date.now()+4000;
-   try{for(;;){const next=await boundedRequest(()=>reader.read(),bodyDeadline);if(next.done)break;bytes+=next.value.length;if(bytes>2048)throw Error();text+=decoder.decode(next.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
+   try{for(;;){const next=await boundedRequest(()=>reader.read(),bodyDeadline);if(next.done)break;bytes+=next.value.length;if(bytes>4096)throw Error();text+=decoder.decode(next.value,{stream:true});}text+=decoder.decode();}finally{void reader.cancel().catch(()=>{});}
    body=JSON.parse(text);
    const keys=body.action==='run'?['action','productIds','runId']:['action','productIds'];
    if(!body||typeof body!=='object'||Array.isArray(body)||!['run','read'].includes(body.action)||Object.keys(body).length!==keys.length||Object.keys(body).some(k=>!keys.includes(k)))throw Error();
