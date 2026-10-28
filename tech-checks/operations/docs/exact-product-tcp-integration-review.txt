@@ -1,0 +1,156 @@
+EXACT PRODUCT TCP — COMPLETE LOCAL INTEGRATION, DISABLED
+
+Continues checkpoint 438b160a and preserves ed193928. No live operation occurred.
+
+Mounted native context
+cos-operations-pages/index.ts now mounts POST /api/product-tcp-proof after the
+existing authenticate() same-person native resolution. The exact existing Owner
+with actorId or verifiedItFleet predicate is required. The protected source adapter
+receives existing actor-bound RPC/read closures, the existing user-bound legacy
+reader/epoch RPC, placement audit reader and Google Viewer context. There are no
+client-supplied actor IDs, roles, proofs, service keys or endpoint targets.
+Both ordinary and existing envelope transport are handled. Native serve.ts sets
+scopedProductTcpEnabled:false explicitly; the disabled route does no source IO.
+
+Mounted legacy context
+cos-exact-product-tcp/host.ts mounts the writer/read handler using the SAME
+createFleetVerifier already used by camera-field-geocode. It verifies auth user,
+exact active unarchived profile and existing approved IT/Owner policy. Its own
+legacy service context performs receipt RPCs; the user's bearer is forwarded
+unchanged to the pinned native proof route for independent native authorization.
+serve.ts has an explicit ENABLED=false source switch. In its disabled branch it
+reads no credentials and performs no authentication/source/RPC/socket calls.
+The enabled branch wires the existing own-project environment configuration,
+reviewed native route/origin settings and Deno.connect. No settings were applied.
+The original sweep, schedules and authentication rules are untouched.
+
+Current status reader integration
+The existing GET /api/product-connections route now calls integrateScopedConnections
+only when the native switch is explicitly enabled. It keeps its complete existing
+baseline envelope and only considers the missing-completed-proof or multiple-saved-
+endpoint Unknown reasons. Existing conclusive results and all other source,
+Product-IP, lifecycle, identity and ownership holds are never overridden.
+
+Full protected native source/group proof brackets the legacy scoped receipt read.
+Each returned status must match Product ID, source SHA, tracker SHA, authority
+(including identity/configuration/epochs), actual reviewed representative device
+ID, fresh original timestamp and TCP-only basis. Duplicate/missing/foreign rows,
+changed source/configuration/epochs, incomplete/technical/stale receipts and
+source/transport failure retain the baseline Unknown. Raw physical identifiers,
+IPs and opaque guards are stripped from the existing frontend envelope.
+
+The resourceId is an actual member of the reviewed group (the stable first sorted
+member), not an invented group/device identity. Wording explicitly states that
+this is shared service connectivity and does not verify video. The existing
+readExactProductConnections browser validator accepts the result without changes
+to frontend or TV files. No production collision is relaxed without full proof.
+
+Timing contract (supersedes the former 48-second optional route deadline)
+Inspected PR314 head 35af49bdd6aaf05ddd58e141422cc0624f812b92: its 6.5-second
+presentation budget permits late proof, but both the request transport and late
+proof discard expire at 30 seconds. Frontend/TV files are not changed here.
+Optional enrichment now receives min(6.5 seconds from baseline completion,
+23.5 seconds from native handler entry). The 23.5-second cutoff reserves one
+existing presentation window (6.5 seconds) for delivery before frontend discard;
+it is a conservative server policy, not a measured network guarantee. The
+baseline source read is unchanged and itself may exceed the client deadline;
+this change prevents OPTIONAL enrichment from adding delay beyond its cutoff.
+
+One timer races the entire optional operation, not each batch. Deadline or client
+cancellation aborts protected source/HTTP IO and immediately returns the original
+validated baseline, including existing positive and negative rows. Ignored or
+late cancellation cannot publish partial overlays, renew timestamps or start the
+next authority/batch read. Identity, configuration and source checks before and
+after receipts remain mandatory. There is no background continuation or cache.
+The legacy read-only receipt consumer separately caps its whole read at 6.5
+seconds and forwards request cancellation; the explicit probe writer retains its
+separate 48-second contract. Hosted propagation of HTTP abort remains unverified.
+
+Fleet batch read integration (supersedes per-eight receipt reads)
+The read-only attestation/consumer accepts up to 100 exact Product IDs; explicit
+probe/publication calls remain capped at eight. A cloned, recursively frozen
+complete source snapshot feeds planner chunks of 64 without rereading authority.
+The next complete snapshot is independently fetched after the receipt RPC. No
+cross-request/actor cache or caller-provided authority proof is introduced.
+
+The 100-eligible-candidate regression constructs 100 distinct reviewed native
+identities and exercises the real planner, batch adapter and receipt consumer:
+- One native-to-legacy read request, two outer complete authority reads.
+- Two inner complete authority reads, one network receipt RPC for all 100.
+- Four TOTAL complete authority reads; each protected source read still performs
+  its own existing source/identity/epoch bracketing and pagination.
+The remaining outer/inner brackets intentionally preserve independent validation
+in the native response integrator and the directly callable authenticated legacy
+status endpoint. Eliminating either requires changing that trust contract; this
+candidate does not share untrusted caller snapshots or source credentials.
+
+receipt_batch_read_v2.sql is a separate REVIEW-ONLY migration after the existing
+receipt_protocol_v2.sql. Its invoker function accepts only 1–100 unique exact
+Product-ID/guard pairs, within 16KB, using the same service principal. It calls the
+existing cos_product_tcp_read_v2 for each target in one transaction, preserving
+accepted-state, 20-minute receipt freshness, exact guard and whole-group local
+configuration checks. The existing SHARE lock persists until transaction end.
+This is one network RPC, NOT one constant-cost DB lookup: up to 100 indexed
+receipt/local-configuration checks remain. Foreign, missing, disabled, stale or
+changed targets return null; no global rows or receipts are modified. The only
+proposed execution grant is the existing service_role boundary; no live grant,
+public/client access, security-definer function or permission change was applied.
+
+The actual protocol supports equivalent validation: receipts are immutable and
+already keyed by product and exact authority guard. Batch transport changes
+neither their meaning nor eligibility. Current full native source validation
+still brackets consumption; SQL still rechecks current legacy configurations.
+No distributed atomicity is claimed across projects or Google Sheets.
+
+The fast deterministic 100-candidate clock accounts for 0.5 seconds (synthetic,
+not a production latency measurement). A slow path exhausts the same 6.5-second
+budget and does not perform the outer final read or expose partial results.
+Additional tests cover 100-member pinned remote transport, malformed/duplicate/
+foreign responses, real local SQL 100-target selection and 100 accepted distinct four-device groups
+(400 devices), invalid bounds/private
+roles, missing/foreign guards, disabled configuration, rollback, final source
+drift, and cancellation while the batch RPC is pending. The complete test suite
+continues covering lifecycle/source/identity collisions and non-target writes.
+
+Activation additionally requires approval/application of the batch-read migration
+and its service-only execution grant, paired legacy/native code versions, and
+hosted timing/lock/cancellation verification for the bounded fleet. If the batch
+RPC is absent or an old source endpoint rejects >8 targets, fallback retains the
+baseline; it does not silently restore the expensive per-target network path.
+Use receipt_batch_read_v2_rollback.sql after disabling runtime to revoke the new
+RPC while preserving all receipts and original functions. Runtime remains OFF.
+
+TS2345 resolved
+mhelp2027ConnectionCensus.ts retains a typed EquipmentCsvRow alias before the
+existing runtime object check and inserts that same checked object into its Map.
+No cast, any widening, guard removal or runtime acceptance change was added.
+Both the application npm run typecheck and strict complete producer/handler
+closure now pass. This supersedes the inherited TS limitation in the V2 review.
+
+Validation
+118 focused tests passed, zero failures/skips. Includes real migration execution
+in local PGlite; existing consumer, 2027 source/Google reader, direct producer and
+reviewed identity regressions; mounted native Owner/IT-disabled and service denial;
+legacy default-disabled, inactive/archived/foreign/unapproved-user denial; exact
+positive and complete-negative scoped consumption accepted by the existing browser
+validator; stale/foreign/forged guards; post-read source/config/epoch/lifecycle
+races; conclusive-row and source/conflict-hold preservation. HTTP and socket probes
+are mocked. Positive synthetic identity tests use an explicit test review scope;
+no synthetic scope is exposed through a production handler option or request.
+
+Remaining activation review
+The programming mounts and status integration are complete but disabled. Still
+required: exact deployed-source preservation review, legacy receipt migration
+approval, pinned native proof URL/origin configuration, existing role verification,
+hosted transport cancellation/lock-contention/capacity checks and a bounded exact-ID
+activation approval. Existing V2 migration/rollback and cross-project snapshot
+semantics are unchanged. No distributed atomicity claim is made. Unknown/held
+products may remain Unknown; current UI counts and all 47 are not claimed fixed.
+
+Rollback
+Restore the native scopedProductTcpEnabled:false and legacy ENABLED=false switches
+first (already their state here). Revert this integration commit for exact local
+rollback. Preserve historical receipt rows; the V2 SQL rollback revokes the new
+receipt RPC/mutation privileges without touching health/history. No frontend,
+TV, placement publisher, deployment, schedule, credential or live database/Sheets
+mutation was made.

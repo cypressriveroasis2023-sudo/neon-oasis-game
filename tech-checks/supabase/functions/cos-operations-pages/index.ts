@@ -1,3 +1,7 @@
+import {createProductProofHandler} from '../_shared/exact-product-producer/attestationTransport.ts';
+import {existingNativeProductSourceContext} from '../_shared/exact-product-producer/nativeContextAdapter.ts';
+import {createProtectedSourceReader} from '../_shared/exact-product-producer/sourceReader.ts';
+import {integrateScopedConnections} from '../_shared/exact-product-producer/statusIntegration.ts';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -331,6 +335,17 @@ export function createOperationsHandler(options) {
     const sources={units,matches,providers,devices,audits,ownerCrosswalk:crosswalk,ownerEpochs:epochs};
     return {sources,identity:await verifiedHealthIdentities(sources),reviewSources:{units,matches,providers,devices,epochs,crosswalk}};
   };
+  // Bound only after authenticate resolves the existing same-person native actor.
+  const productSourceContext = context => existingNativeProductSourceContext({
+    source:{
+      platformRpc:(name,signal)=>rpc(name,{p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID},signal),
+      platformRead:(path,signal)=>platformRead(path,signal),
+      legacyRead:(path,signal)=>readJson(LEGACY_URL+'/rest/v1/'+path,{headers:context.headers,signal},'Camera source unavailable.'),
+      legacyEpochs:(keys,signal)=>readJson(LEGACY_URL+'/rest/v1/rpc/cos_camera_identity_epochs_v1',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_unit_keys:keys}),signal},'Camera identity epochs unavailable.'),
+      placementAudits:signal=>fleetPlacementAudits(context,signal),
+    },
+    googleSheets:{getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion,fetch:requestFetch},
+  });
   // The same exact read and actor predicate serve execution and shared admission.
   const readOwnerCensusTarget=async(context,key,id,signal=undefined)=>{
     const bounded=async(url,init)=>readOwnerCensusJson(await requestFetch(url,{...init,redirect:'error',cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)}));
@@ -436,7 +451,8 @@ export function createOperationsHandler(options) {
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
   return async function handle(request) {
-    const ownerProofDeadlineMs=Date.now()+75000;
+    const requestStartedAt=Date.now();
+    const ownerProofDeadlineMs=requestStartedAt+75000;
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
     const releaseLargeBody = () => {
@@ -590,6 +606,11 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
+      if(path==='/api/product-tcp-proof'){
+        if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail('An active COS Owner or verified IT account is required.',403);
+        const proofRequest=body===null?request:new Request(request.url,{method,headers:request.headers,body:JSON.stringify(body),signal:request.signal});
+        return await createProductProofHandler({enabled:options.scopedProductTcpEnabled===true,bindExistingContext:async()=>productSourceContext(context)})(proofRequest);
+      }
       const shopPlacement=/^\/api\/fleet\/units\/([a-f0-9-]+)\/shop-placement$/i.exec(path);
       if(shopPlacement){
         if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail('An active COS Owner or verified IT account is required.',403);
@@ -644,6 +665,17 @@ export function createOperationsHandler(options) {
         }));
         const evaluated=buildExactProductConnections(source.census,tracker,endpoints);
         if(!evaluated)fail('Current exact Product-ID/endpoint evidence could not be verified.',503);
+        if(options.scopedProductTcpEnabled===true){
+          const reader=createProtectedSourceReader(productSourceContext(context));
+          const scoped=await integrateScopedConnections(evaluated,{
+            requestStartedAt,signal:request.signal,readSource:signal=>reader(signal),
+            readStatuses:async(ids,signal)=>{
+              const value=await readJson(LEGACY_URL+'/functions/v1/cos-exact-product-tcp',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({action:'read',productIds:ids}),signal},'Scoped receipts unavailable.');
+              return value.items;
+            },
+          });
+          return json(scoped);
+        }
         return json(evaluated);
       }
 

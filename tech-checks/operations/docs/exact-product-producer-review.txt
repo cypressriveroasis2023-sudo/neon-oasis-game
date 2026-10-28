@@ -1,0 +1,178 @@
+CHECKPOINT NOTE: superseded for activation by exact-product-producer-v2-review.txt.
+This file records the preserved ed193928 V1 checkpoint.
+
+EXACT PRODUCT SAVED TCP PRODUCER — LOCAL CONTRACT CANDIDATE, NOT ACTIVATED
+
+Base: main checkout 33e4ff20. No .agents/skills or AGENTS.md files were present
+in the checkout or /workspace/.agents. Existing npm test/TypeScript conventions
+were used. PR303, PR306 and PR311 metadata/diffs were read through the connected
+GitHub tool after gh's GraphQL request returned Forbidden. PR303 refresh does not
+grant publishing eligibility; PR306 is explicitly review-only; PR311 reuses pure
+calculations without creating identity admissions. No files from those changes
+are modified here. No frontend, API route, TV or cos-sheets-placement-publish file
+is edited. The existing scheduledDirectService and schedule remain unchanged.
+
+Decision and scope
+The current exact Product-ID consumer intentionally accepts an observation by an
+exclusive current tracker IP. It does not supply a writable equipment identity.
+The 47 missing-proof products (37 Spotters, one Solar Spotter, nine Rangers) are
+review candidates, not 47 authorized endpoints. Every one still needs enabled
+monitoring, valid saved public IPv4/ports/revision, nonterminal lifecycle, current
+source agreement, and a validated committed Product-ID -> native -> complete
+resource identity. No source/profile ownership was inferred from those counts.
+
+The local collector is inert dependency-injected code, with NO runtime import,
+HTTP handler, credential reader, network implementation, DB adapter or schedule.
+Its synthetic admission envelope is an explicit FUTURE CONTRACT. A hash, flag,
+family name or caller-supplied envelope is not authorization. Nothing in this
+patch creates that admission or claims a live record satisfies it.
+
+All three supported families use TCP connect on the configured saved public IPv4
+and exact saved service ports. No family-specific default port, protocol guessing,
+DNS, ranges, ping, provider configuration, authentication, video or camera-channel
+health. The current CAMV/Sniper producer remains the sole existing path for those
+families. Unknown ownership/profile is held, not assigned a guessed profile.
+
+Reusable existing proof and remaining prerequisite
+A production adapter MUST use the protected current mHelp upload receipt and the
+full projectMhelpUploadPlacement result, not just the stripped connection census.
+That existing function validates the receipt and current binding guard and exposes
+binding.unitIds plus placement/identity holds. currentMhelpProductConnectionCensus
+omits those unit IDs and cannot establish the Product-to-native half of this join.
+Require exactly one current native target for this narrow first version; reject
+unlinked, held, candidate aliases, stale guards and conflicting reservations.
+
+For the native-to-device half, reproduce the existing readIdentitySources path:
+cos_owner_identity_snapshot, complete devices/units/provider matches/providers/
+audits, bracketing identity epoch reads and a second crosswalk revision read,
+then verifiedHealthIdentities. That validator checks reviewed tuple digests,
+complete group membership, serial/provider ownership, revoked reservations and
+warnings. Do not accept normalized_device_name/confidence=exact alone. Do not
+accept PR306's mapped-preview digest as an admission. No protected-table shortcut
+or new service-role access is implemented by this patch.
+
+COS_COMMITTED_PRODUCT_DEVICE_V1 must be derived ONLY from that validated chain
+and current approved ownership/profile/configuration, never synthesized by a
+browser or name/IP lookup. Its native/resource epochs and admission revision must
+come from persisted authority. The trusted adapter and the publication verifier
+must independently validate that chain. Where no valid chain exists, retain
+committed_identity_required. The model does not implement a replacement identity
+registry or automatically approve anyone's mapping.
+
+Multichannel follow-up remains held
+Read-only evidence supplied by the parent suggests some of the 53 endpoint
+collision cases are complete same-unit channel groups. It is not an admission.
+The reviewed native tuple for Solar Spotter 003 can prove four channels while
+still lacking the accepted Product-ID binding half in the minimal census.
+This candidate explicitly rejects groups with more than one saved endpoint and
+more than one admitted device ID. A regression proves four matching same-name,
+same-profile channel rows remain held. No consumer collision gate is relaxed.
+
+A later grouped contract must carry the full validated Product-ID binding and
+verifiedHealthIdentities group, exactly match the complete device set, include
+all disabled/foreign/held reservations in collision checks, and require consistent
+public target/port configuration. Reject missing/extra/foreign/disabled members
+and any other Product-ID IP claimant. A shared TCP observation may be reused only
+for an identical saved target and port set. Every member needs its own current
+revision CAS; group receipt/publication must be all-or-none. Connectivity for the
+shared service must never become a claim about any channel's video. Consumer
+changes and grouped atomic publication need their own review; neither is here.
+
+Local model and collector guarantees
+- Explicit 1–64 exact Product IDs; the planner never selects by family/name/IP.
+- Uses buildExactProductConnections with null portStatus to preserve all its
+  complete-census, source, tracker, lifecycle, identity and collision gates.
+  Only its exact final missing-proof reason permits further review. This text
+  dependency is deliberate fail-closed coupling; a future refactor should expose
+  a shared machine-readable admission result. No fake successful proof is made.
+- Additional exact committed identity, source/profile, lifecycle, enabled flag,
+  unique device ID, public literal, revision and 1–32 unique saved-port checks.
+- One target at a time, four concurrent ports maximum, 2.2s probe budget, 4s IO
+  budget and 48s run deadline. Bounded wrapper aborts on timeout. Real adapter
+  must cancel sockets and close late sockets; a JS timeout cannot enforce that
+  on an adapter that ignores AbortSignal. No real socket adapter is included.
+- Whole source/identity/endpoint snapshot reread after probes, before publishing.
+  A guard binds mHelp, complete tracker records, identity reservations and every
+  saved endpoint configuration. Only the reread tracker observation time and
+  old health proofs are omitted. Current source verification still checks time.
+- Complete probe outcomes are validated with completedSavedTcpCheck. A complete
+  refusal/timeout is Offline; routing/DNS/auth/permission/partial/technical failures
+  are Unknown and make no publication call. No counters increment on a hold.
+- Run/product/guard-derived receipt key plus immutable payload digest. A failed
+  publication response is not retried. Missing/malformed/lost receipts produce
+  publication_uncertain, never a successful write claim or another failed check.
+
+REQUIRED PUBLICATION CONTRACT / MINIMAL MIGRATION DESIGN (NOT APPLIED)
+The existing publish_camera_connection_v1 performs config CAS, but does not
+atomically validate the accepted mHelp/2027/identity authority. Binding the new
+publishAtomic adapter directly to that RPC is prohibited. Its behavior, grants,
+signature and source allowlist must remain intact.
+
+Before creating SQL, resolve the cross-project permission boundary explicitly.
+The current Owner/IT reader is not a schedule principal. No authorized scheduled
+reader or cross-source atomic commit token was established in this work.
+
+Minimal reviewed schema design in the publication database:
+1. A private authority epoch/attestation store, with authority epoch primary key,
+   complete canonical guard, source SHA, tracker SHA, identity revision/epochs,
+   verified-at and expires-at, and explicit superseded/revoked state. A protected
+   verifier alone may register it after the existing safe readers validate the
+   complete source. Registration is not an identity admission. External Sheets
+   cannot participate in a Postgres transaction: define freshness as the latest
+   verified complete snapshot, disclose the post-read external-change window,
+   and reject this design if stronger distributed atomicity is required.
+2. A private immutable receipt store keyed by receipt_key, with payload SHA,
+   Product ID, device ID, authority epoch/guard, configuration revision, original
+   observation time and outcome. Same key/same payload returns the original
+   receipt without another health/history write. Same key/different payload
+   rejects. Do not extend the observation time on replay.
+3. A narrowly scoped new publication wrapper. In one transaction, lock the active
+   authority epoch and exact endpoint, check epoch/guard/expiry/revocation and the
+   committed Product/native/resource identity and reservations, then compare
+   enabled state, lifecycle, ownership/source/profile, IP, complete ports and
+   revision. Recheck actual complete probe schema and newest-observation ordering.
+   Only then delegate to the unchanged saved-endpoint publication primitive under
+   a separately reviewed source policy and insert the immutable receipt. Both
+   writes commit together or neither does. No non-target inventory/placement/
+   identity/configuration/Sheet rows may be written. Reject a stale epoch or
+   changed/ABA revision even if the public IP returns to its prior value.
+4. No PUBLIC/anon/authenticated execute or table access, no new grants in this
+   patch. Exact execution role and safe-reader permissions require separate
+   review. Do not solve the boundary with an unrestricted SECURITY DEFINER.
+
+These are schema/transaction acceptance criteria, not runnable migration SQL or
+an assertion that a distributed atomic publisher already exists. Generate the
+actual migration only after authority store ownership, principal, role and source
+publication policy are reviewed. Test SQL locally against the real publisher:
+concurrent source/config/revocation drift, rollback after inner RPC, receipt replay,
+conflicting replay, latest-result CAS and denied-role tests are activation gates.
+Mocked adapters here do not establish database atomicity or authorization.
+
+Activation and rollback
+No activation is included or authorized. Before any proposal: establish the
+safe reader and atomic publication contracts above; inspect all 47 candidates
+through those readers without granting identity; produce held-reason counts;
+verify source closure/role/permissions and real socket cancellation in the target
+runtime; test the atomic wrapper and receipts in local Postgres; review a bounded
+exact-ID activation manifest. Do not promise all 47 become conclusive. Keep
+source, duplicate-product and duplicate-endpoint buckets held.
+
+Current rollback is simply remove/revert these additive files: no caller exists
+and no DB/schedule/credential/permission changed. A future runtime rollback must
+first stop only the new activation path, revoke its authority epochs, retain
+immutable receipts for reconciliation, and restore the captured old runtime.
+Keep existing health history as evidence; do not bulk-delete or restore old health
+rows. Retire a future wrapper only after uncertain receipts are reconciled; the
+historical scheduled direct producer and its schedule must remain unchanged.
+
+Local validation (2026-10-28)
+From tech-checks/operations:
+./node_modules/.bin/tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution Bundler --allowImportingTsExtensions --skipLibCheck ../supabase/functions/_shared/exact-product-producer/model.ts ../supabase/functions/_shared/exact-product-producer/collector.ts
+PASS.
+node --import tsx --test tests/exact-product-producer.test.mjs tests/exact-product-connection.test.mjs tests/scheduled-direct-service.test.mjs tests/mhelp-2027-connection-census.test.mjs tests/verified-health-identity-backend.test.mjs
+81 tests passed, zero failures/skips. Includes 11 new tests with table-driven
+source drift, duplicate IP/endpoints, disabled/retired/DNU, changed revision/ports,
+source ownership, technical failures versus completed negatives, hung deadline,
+bounded concurrency, receipt replay/rejection/uncertainty, non-target preservation
+and multichannel holds. All probes and writes are mocks. No production completion,
+47-record eligibility, SQL atomicity or real socket behavior is claimed.

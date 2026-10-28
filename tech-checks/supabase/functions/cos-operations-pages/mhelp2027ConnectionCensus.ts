@@ -53,9 +53,11 @@ export async function verify2027ConnectionCensus(
   ||exports[0]?.[0]!=='MHELP SOURCE EXPORT'||ips[0]?.[0]!=='IP'||ips.length>ids.length)return fail();
  const expected=new Map<string,EquipmentCsvRow>();
  for(const r of candidate){
+  // Keep the declared complete row type while checking the same object at runtime.
+  const sourceRow:EquipmentCsvRow=r;
   if(!object(r)||!ID.test(r.productId)||expected.has(r.productId)||!['FIELD','SHOP'].includes(r.placement)
    ||typeof r.customer!=='string'||!r.customer.trim()||typeof r.unitNumber!=='string'||!r.unitNumber.trim())return fail();
-  expected.set(r.productId,r);
+  expected.set(r.productId,sourceRow);
  }
  const indexed=new Map<string,{key:string;model:string;customer:string}>();let sourceExport:string|null=null;
  for(let i=1;i<Math.max(indexIds.length,indexDetails.length,exports.length);i++){
