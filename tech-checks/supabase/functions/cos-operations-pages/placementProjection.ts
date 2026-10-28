@@ -95,28 +95,45 @@ function nativePlacementAliases(inventory:Row[],audits:Row[],devices:Row[],overr
  const proofs=[...identity.unitIdentities,...(identity.ownerConfirmedUnitIdentities||[])],warnings=identity.identityWarnings;
  if(proofs.some(p=>!object(p)||!uuid(p.unitId)||!text(p.unitNumber,250)||!['native_provider','owner_placement','owner_confirmed_native'].includes(p.kind)||!Array.isArray(p.deviceIds)||!p.deviceIds.length||p.deviceIds.some((id:unknown)=>typeof id!=='string'||idString(id)!==id)||!Array.isArray(p.unitKeys)||!p.unitKeys.length||p.unitKeys.some((key:unknown)=>!text(key,250))||!/^[a-f0-9]{64}$/.test(p.proof))
   ||warnings.some(w=>!object(w)||(!uuid(w.unitId)&&!/^unavailable:[a-f0-9]{64}$/.test(w.unitId))||!text(w.reason,1000)||!Array.isArray(w.deviceIds)||w.deviceIds.some((id:unknown)=>typeof id!=='string'||idString(id)!==id)||new Set(w.deviceIds).size!==w.deviceIds.length||!Array.isArray(w.unitKeys)||w.unitKeys.some((key:unknown)=>!text(key,250))||new Set(w.unitKeys).size!==w.unitKeys.length))fail('Reviewed placement identities are malformed.');
- const related=(claim:Row,key:string,ids:string[])=>claim.unitKeys.some((k:string)=>auditKey(k)===auditKey(key))||claim.deviceIds.some((id:string)=>ids.includes(id));
+ // Pure string normalization only, scoped to this invocation. Every proof,
+ // membership, warning and audit is still evaluated against the current inputs.
+ // Non-string values keep the original malformed-input behavior.
+ const normalizedKeys=new Map<string,string>(),matchedKeys=new Map<string,string>();
+ const keyOf=(value:unknown):string=>{if(typeof value!=='string')return auditKey(value);let key=normalizedKeys.get(value);if(key===undefined){key=auditKey(value);normalizedKeys.set(value,key);}return key;};
+ const match=(value:unknown):string=>{if(typeof value!=='string')return placementMatchKey(value);let key=matchedKeys.get(value);if(key===undefined){key=placementMatchKey(value);matchedKeys.set(value,key);}return key;};
+ const related=(claim:Row,key:string,ids:string[])=>claim.unitKeys.some((k:string)=>keyOf(k)===keyOf(key))||claim.deviceIds.some((id:string)=>ids.includes(id));
+ // Index candidates, not decisions. Arrays preserve duplicate records and
+ // ordinal unions preserve inventory order and repeated proof entries.
+ const index=(rows:Row[],keys:(r:Row)=>unknown[])=>{const map=new Map<unknown,number[]>();rows.forEach((r,i)=>{for(const key of new Set(keys(r))){const group=map.get(key)||[];group.push(i);map.set(key,group);}});return map;};
+ const union=(lookups:[Map<unknown,number[]>,unknown[]][])=>{const found=new Set<number>();for(const [map,keys] of lookups)for(const key of keys)for(const i of map.get(key)||[])found.add(i);return [...found].sort((a,b)=>a-b);};
+ const proofUnits=index(proofs,p=>[p.unitId]),proofKeys=index(proofs,p=>p.unitKeys.map(keyOf)),proofDevices=index(proofs,p=>p.deviceIds);
+ const warningUnits=index(warnings,p=>[p.unitId]),warningKeys=index(warnings,p=>p.unitKeys.map(keyOf)),warningDevices=index(warnings,p=>p.deviceIds);
+ const inventoryIds=index(inventory,r=>[r.id]),inventoryMatches=index(inventory,r=>[match(r.unitNumber)]);
+ const auditKeys=index(audits,a=>[keyOf(a.unit_key)]),auditMatches=index(audits,a=>[match(a.unit_key)]),auditDevices=index(audits,a=>Array.isArray(a.device_ids)?a.device_ids.map(idString).filter(v=>v!==null):[]),auditControls=index(audits,a=>[a.control_id]);
+ const overrideKeys=index(overrides,a=>[keyOf(a.unit_key)]);
+ // Retain empty-history/no-native-proof malformed-device behavior.
+ let deviceKeys:Map<unknown,number[]>|undefined,deviceMatches:Map<unknown,number[]>|undefined;
+ const ensureDevices=()=>{if(!deviceKeys){deviceKeys=index(devices,d=>[keyOf(d.unit_key)]);deviceMatches=index(devices,d=>[match(d.unit_key)]);}};
  const targets:Row[]=[],blocked=new Map<string,Set<string>>();
- const block=(key:string,ids:string[])=>blocked.set(auditKey(key),new Set([...(blocked.get(auditKey(key))||[]),...ids]));
+ const block=(key:string,ids:string[])=>blocked.set(keyOf(key),new Set([...(blocked.get(keyOf(key))||[]),...ids]));
  // A warning never becomes a fallback name match or a camera-only generated row.
  for(const warning of warnings){
   for(const key of warning.unitKeys)block(key,[warning.unitId]);
   for(const a of overrides)if(related(warning,a.unit_key,a.device_ids.map(idString)))block(a.unit_key,[warning.unitId]);
  }
  for(const proof of proofs.filter(p=>['native_provider','owner_confirmed_native'].includes(p.kind))){
-  const keys=proof.unitKeys,rawKey=keys[0],rawMatch=placementMatchKey(rawKey),nativeMatch=placementMatchKey(proof.unitNumber);
-  const rows=inventory.filter(row=>row.id===proof.unitId),group=devices.filter(d=>auditKey(d.unit_key)===auditKey(rawKey));
-  const ids=group.map(d=>idString(d.id)),latest=audits.filter(a=>auditKey(a.unit_key)===auditKey(rawKey)).sort((a,b)=>BigInt(idString(a.id)!)>BigInt(idString(b.id)!)?-1:1)[0];
-  const current=overrides.find(a=>auditKey(a.unit_key)===auditKey(rawKey));
-  const relatedProofs=proofs.filter(p=>p.unitId===proof.unitId||keys.some((key:string)=>related(p,key,proof.deviceIds)));
-  const competingRows=inventory.filter(row=>row.id!==proof.unitId&&[rawMatch,nativeMatch].includes(placementMatchKey(row.unitNumber)));
-  const auditConflict=audits.some(a=>auditKey(a.unit_key)!==auditKey(rawKey)&&(
-   [rawMatch,nativeMatch].includes(placementMatchKey(a.unit_key))||Array.isArray(a.device_ids)&&a.device_ids.map(idString).some((id:string|null)=>id!==null&&proof.deviceIds.includes(id))
-   ||current&&a.control_id===current.control_id));
+  const keys=proof.unitKeys,rawKey=keys[0],rawMatch=match(rawKey),nativeMatch=match(proof.unitNumber);
+  ensureDevices();
+  const rows=(inventoryIds.get(proof.unitId)||[]).map(i=>inventory[i]),group=(deviceKeys!.get(keyOf(rawKey))||[]).map(i=>devices[i]);
+  const ids=group.map(d=>idString(d.id)),latest=(auditKeys.get(keyOf(rawKey))||[]).map(i=>audits[i]).sort((a,b)=>BigInt(idString(a.id)!)>BigInt(idString(b.id)!)?-1:1)[0];
+  const current=overrides[(overrideKeys.get(keyOf(rawKey))||[])[0]];
+  const relatedProofs=union([[proofUnits,[proof.unitId]],[proofKeys,keys.map(keyOf)],[proofDevices,proof.deviceIds]]);
+  const competingRows=union([[inventoryMatches,[rawMatch,nativeMatch]]]).map(i=>inventory[i]).filter(row=>row.id!==proof.unitId);
+  const auditConflict=union([[auditMatches,[rawMatch,nativeMatch]],[auditDevices,proof.deviceIds],[auditControls,current?[current.control_id]:[]]]).some(i=>keyOf(audits[i].unit_key)!==keyOf(rawKey));
   const valid=keys.length===1&&rawKey===rawKey.trim()&&rows.length===1&&rows[0].readOnly===false&&rows[0].unitNumber===proof.unitNumber
    &&group.length>0&&group.every(d=>d.unit_key===rawKey)&&sameIds(proof.deviceIds,ids)&&relatedProofs.length===1&&!competingRows.length
-   &&!warnings.some(w=>w.unitId===proof.unitId||related(w,rawKey,proof.deviceIds))
-   &&!devices.some(d=>[rawMatch,nativeMatch].includes(placementMatchKey(d.unit_key))&&d.unit_key!==rawKey)
+   &&!union([[warningUnits,[proof.unitId]],[warningKeys,[keyOf(rawKey)]],[warningDevices,proof.deviceIds]]).length
+   &&!union([[deviceMatches!,[rawMatch,nativeMatch]]]).some(i=>devices[i].unit_key!==rawKey)
    &&!auditConflict&&(!current||!current.conflictReason&&current.unit_key===rawKey&&sameIds(current.device_ids.map(idString),proof.deviceIds)
     &&latest&&idString(latest.id)===idString(current.id)&&(!inventory.some(row=>row.id===current.control_id)))
    &&(!latest||latest.unit_key===rawKey);
@@ -128,10 +145,10 @@ function nativePlacementAliases(inventory:Row[],audits:Row[],devices:Row[],overr
  for(const a of overrides)if(overrides.some(other=>other!==a&&other.control_id===a.control_id))block(a.unit_key,proofs.filter(p=>related(p,a.unit_key,a.device_ids.map(idString))).map(p=>p.unitId));
  // Protected native identities cannot be claimed by an unrelated name-only move.
  for(const a of overrides){
-  const rows=inventory.filter(row=>placementMatchKey(row.unitNumber)===a.matchKey);
+  const rows=inventory.filter(row=>match(row.unitNumber)===a.matchKey);
   for(const row of rows)if(proofs.some(p=>['native_provider','owner_confirmed_native'].includes(p.kind)&&p.unitId===row.id&&!related(p,a.unit_key,a.device_ids.map(idString)))||warnings.some(w=>w.unitId===row.id))block(a.unit_key,[row.id]);
  }
- return {targets:targets.filter(t=>!blocked.has(auditKey(t.unitKey))),blocked};
+ return {targets:targets.filter(t=>!blocked.has(keyOf(t.unitKey))),blocked};
 }
 
 /** Healthy unmarked rows and pins are unchanged. Explicit identity warnings are deny-only quarantines. */
