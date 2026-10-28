@@ -195,6 +195,10 @@ function OwnerApp() {
   const [fleetEntryRevision,setFleetEntryRevision]=useState(0);
   const [trackerConnectionOpen,setTrackerConnectionOpen]=useState(false);
   const [tvDisplay,setTvDisplay]=useState(()=>new URLSearchParams(location.search).get('tvBoard')==='1');
+  // Only this display Boolean survives a recoverable private-view teardown.
+  // The existing session controller must verify identical actor/mode/features
+  // before DailyBoard can mount again; no records or callbacks are retained.
+  const tvIntent=useRef(tvDisplay);
   const lastRouteHash=useRef(location.hash);
   // Current role-scoped routes; a direct hash edit must never mount a paused workspace.
   const allowedFleetRoutes=useRef<string[]|null>(null);
@@ -223,7 +227,8 @@ function OwnerApp() {
     window.addEventListener('message',returnToChecks);
     return()=>window.removeEventListener('message',returnToChecks);
   },[setRouteLocation]);
-  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(()=>{
+  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{
+    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;
     setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);
     setRouteLocation({workspace:active,jobId:'',detail:false},true);
     // Discard selection/history payloads as well as the mounted private views.
@@ -231,7 +236,8 @@ function OwnerApp() {
   });
   // DailyBoard owns the host display lifecycle. Keep its guarded notification
   // stable within this session so an ordinary shell render cannot simulate exit.
-  const onTvChange=useCallback(guardCurrent(setTvDisplay),[guardCurrent]);
+  const onTvChange=useCallback(guardCurrent((enabled:boolean)=>{tvIntent.current=enabled;setTvDisplay(enabled);}),[guardCurrent]);
+  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
   const fleetWorkspaces = useMemo(()=>(dailyOnly?[...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
@@ -373,7 +379,7 @@ function OwnerApp() {
         :<Fragment key={sessionGeneration}>{fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Fleet Dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<FleetInventoryOverview navigate={navigate}/><nav className='cos-daily-shortcuts' aria-label='Daily work shortcuts'><button onClick={()=>navigate('Daily Board')}>Today’s work</button><button onClick={()=>navigate('Units On Hand')}>Shop / ROOT</button><button onClick={()=>openLegacy('it')}>IT check out / check in</button><button onClick={()=>openLegacy('service')}>Service work & returns</button>{trackerAccess(session)&&<button onClick={()=>navigate('Unit Tracker')}>2027 Unit Tracker</button>}</nav><TicketActions createTicket={createTicket}/>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={guardCurrent(unit=>{setHeliosUnit(unit);navigate('Victron VRM');})} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate} openUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>
-        :active==='Daily Board'?<>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate} onTvChange={onTvChange} createTicket={createTicket}/>} {!tvDisplay&&(route.createType?<OwnerBoardControls key={'create-ticket-'+(route.unitId||'')} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>:<details className='cos-workspace-settings'><summary>Owner tools · import, create and manage jobs</summary>{session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key='board-controls' show={show} unitId={route.unitId} cancelCreateLabel='Back to dashboard' cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/></details>)}</>
+        :active==='Daily Board'?<>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate} initialTv={tvIntent.current} onTvChange={onTvChange} createTicket={createTicket}/>} {!tvDisplay&&(route.createType?<OwnerBoardControls key={'create-ticket-'+(route.unitId||'')} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>:<details className='cos-workspace-settings'><summary>Owner tools · import, create and manage jobs</summary>{session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key='board-controls' show={show} unitId={route.unitId} cancelCreateLabel='Back to dashboard' cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/></details>)}</>
         :(active==='Fleet Dashboard'||active==='Camera Health'&&(!route.diagnostics||dailyOnly))?<FleetDashboard session={session!} navigate={navigate} openMhelpConnection={guardCurrent(()=>{navigate('Unit Tracker');setTrackerConnectionOpen(true);})} initialView={active==='Camera Health'?'fleet':'map'} entryRevision={fleetEntryRevision} openAdvancedDiagnostics={!fleetOnly&&!dailyOnly?guardCurrent(()=>setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,...(route.unitId?{unitId:route.unitId}:{})})):undefined} createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId} initialUnitLabel={route.unitLabel} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:active==='Camera Health'?'Camera Health':'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true,history.state))} show={show} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={!fleetOnly&&!dailyOnly&&session?.features?.fieldLocationVerification===true} ownerManagementEnabled={!fleetOnly&&!dailyOnly} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} registerEquipment={guardCurrent(name=>{setRegisterUnitName(name);navigate('Equipment');})}/>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialConnectionOpen={trackerConnectionOpen} initialUnitId={route.unitId} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true))} openMap={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>

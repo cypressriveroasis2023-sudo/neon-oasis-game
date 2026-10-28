@@ -30,11 +30,12 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),alive=useRef(false);
   const retryAt=useRef(0),retryTimer=useRef<number|null>(null),retryUsed=useRef(false),sessionBlocked=useRef(false),retryRead=useRef(()=>{});
   const cancelRetry=()=>{if(retryTimer.current!==null)window.clearTimeout(retryTimer.current);retryTimer.current=null;};
-  const refresh=useCallback(async(force=false)=>{
+  const proofUpdatePending=useRef(false);
+  const refresh=useCallback(async(force=false,proofUpdate=false)=>{
     if(running.current||!alive.current||sessionBlocked.current)return;
     if(force){cancelRetry();retryAt.current=0;}
     const initialAttempt=lastAttempt.current===0;
-    running.current=true;lastAttempt.current=Date.now();const request=generation.current;
+    running.current=true;if(!proofUpdate)lastAttempt.current=Date.now();const request=generation.current;
     try{
       const current=()=>alive.current&&request===generation.current;
       // Stage each response until this read settles. A new placement response
@@ -63,7 +64,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){setData(previous=>({...previous,health:null,routers:null}));setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
-    finally{if(request===generation.current)running.current=false;}
+    finally{if(request===generation.current){running.current=false;if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true);}}}
   },[api]);
   useEffect(()=>{
     if(!enabled){setData(empty);return;}
@@ -76,8 +77,11 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh(true);};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;setData(empty);setError('Sign in again to load fleet information.');};
-    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);
-    return()=>{alive.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);};
+    // The API has already fenced and validated the late proof. Reauthorize
+    // and adopt its cached pair without moving the automatic refresh clock.
+    const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true);};
+    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
+    return()=>{alive.current=false;proofUpdatePending.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
   },[enabled,refresh]);
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const census=useMemo(()=>tvFieldCensus(data.fieldSource,data.inventory,data.health,data.routers,data.addressMap,clock),[data,clock]);

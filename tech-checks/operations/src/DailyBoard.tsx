@@ -13,7 +13,7 @@ import TicketActions from './TicketActions';
 import type {TicketType} from './ticketTypes';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
 
-type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;createTicket?:(type:TicketType)=>void };
+type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:(type:TicketType)=>void };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
 const statusKey=(value:unknown)=>String(value||'').trim().toLowerCase().replaceAll('_',' ');
 const plusTwoHours=(value:string)=>{
@@ -27,7 +27,7 @@ const jobNotes=(card:BoardCard)=>{
   return String(notes.at(-1)?.text||card.record.instructions||card.record.siteAddress||'');
 };
 
-export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:Props) {
+export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,createTicket}:Props) {
   const launch = useMemo(() => tvBoardOptions(location.search), []);
   const tvSettings=useTvBoardSettings(api);
   const [snapshot,setSnapshot]=useState<BoardSnapshot>({jobs:[],tasks:[],readiness:[]});
@@ -43,7 +43,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
   const [department,setDepartment]=useState(launch.department);
   const [scope,setScope]=useState<BoardScope>(launch.scope);
   const [showTest,setShowTest]=useState(false);
-  const [tv,setTv]=useState(launch.enabled);
+  const [tv,setTv]=useState(initialTv??launch.enabled);
   const [rotation,setRotation]=useState(0);
   useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(','),tvSettings.settings.rotationSeconds]);
   const [selected,setSelected]=useState<BoardCard|null>(null);
