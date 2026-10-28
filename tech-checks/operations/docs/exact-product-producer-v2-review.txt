@@ -1,0 +1,177 @@
+EXACT PRODUCT-ID TCP RECEIPTS V2 — RUNNABLE LOCAL CANDIDATE, DISABLED
+
+This supersedes the proposed V1 activation contract in ed193928. That checkpoint
+is preserved. V1 remains test/reference code; V2 entrypoints use fullSource,
+sourceReader, attestationTransport, groupCollector, receiptAdapter and tcpProbe.
+No existing producer, consumer, frontend/API/TV, placement publisher, source
+permission, live data, credentials, schedule or deployment has been changed.
+
+WHAT IS IMPLEMENTED
+1. Full protected source adapter: current accepted complete API upload, current
+2027 census, native map, full devices/units/provider matches/providers/audits,
+Owner crosswalk before/after, and resource epochs before/after. A preliminary
+unfiltered device census establishes ALL exact source keys; the source pass
+rereads devices inside the epoch bracket. Key-set changes and any upload,
+crosswalk or epoch drift fail closed. Pagination is capped and truncation denied.
+
+It calls the existing currentMhelpProductConnectionCensus,
+projectMhelpUploadPlacement and verifiedHealthIdentities validators. No new
+identity admission is invented. The full upload binding must remain current,
+project to exactly one native target and have no identity/placement/alias hold.
+Native status, complete reviewed physical tuple, resource membership, current
+resource epochs, source/profile, enabled flag, activation and saved configuration
+must all agree. Binding/native IDs, exact endpoint revisions, resource epochs,
+Owner crosswalk revision and source/identity/configuration guards are retained.
+For existing static reviewed native mappings that have no native epoch in the
+crosswalk, nativeEpoch is explicitly null; the reviewed complete tuple remains
+mandatory. It is never replaced by a fabricated epoch.
+
+2. Exact grouped support: 1–16 reviewed resources for one Product/native identity.
+The complete group must exactly equal all saved endpoint claimants of the current
+tracker IP. Another Product's IP claim (including Shop/held records), an extra
+foreign/disabled endpoint, incomplete mapping, duplicated serial/provider owner,
+revoked admission, mismatched port set or lifecycle restriction holds the group.
+One shared TCP attempt set is reused only across the same complete configured
+IP/port set. Every member's saved configuration and physical tuple participates
+in the local database CAS. No production IDs, IPs or new review hashes were
+hardcoded. The supplied Solar Spotter 003 evidence is guidance, not admission.
+
+Protocol policy is explicit, without name inference:
+- Spotter: existing vigilant_control_center source, saved spotter profile.
+- Solar Spotter: same source, saved solar_spotter profile.
+- Ranger: same source, saved ranger profile.
+All use configured public IPv4 and saved TCP ports only. Other profiles remain
+held pending review. This does not assert that all 47 candidates meet the policy.
+No DNS/default ports/range scans, provider edits, credentials, ping or video test.
+
+3. Actual socket adapter, injected Deno.connect-compatible connector. A bounded
+TCP timeout/refusal is a completed negative; routing/DNS/permission and technical
+failures are incomplete. Abort and late socket cleanup are tested with mock
+sockets. There have been no live network probes. Maximum four sockets per target,
+32 configured ports, eight exact Product IDs per manual request, 2.2-second socket
+budget, 4-second ordinary IO, 20-second complete-source read and 48-second run.
+Sequential group processing may defer work; it does not guarantee all eight finish.
+
+4. Executable legacy-project SQL migration and rollback under operations/db/
+exact-product-producer. The functions are SECURITY INVOKER; only the existing
+service_role receives execute and private-table access. No PUBLIC, anon or
+authenticated grants, role spoofing, new principal, security-definer bypass,
+protected source-table access or live migration operation is introduced.
+RLS is enabled. Receipt payloads/identity are immutable. Keys derive from exact
+contract/run UUID/Product ID and are checked again in SQL. Same-key/same-payload
+replay returns the existing receipt; altered replay is rejected. Receipt inspection
+reconciles uncertain acknowledgements without another probe or write.
+
+The transaction checks every local physical/configuration tuple and the entire IP
+claim set under a short SHARE table lock (prevents phantom competing endpoints).
+It makes a single all-or-none group receipt write. A two-second lock timeout
+bounds contention; the runtime also aborts bounded IO. This is deliberately more
+conservative than row locks. Assess production contention before activation.
+Queries use an indexed product/authority/observation-time prefix.
+
+WHY THERE IS NO CLAIM OF A DISTRIBUTED ATOMIC HEALTH UPDATE
+Source code proves three authority boundaries: native platform service client,
+legacy camera database, and current Google Sheets. The existing epoch reader also
+requires the verified user's auth.uid; its backing event table is explicitly
+revoked from service_role. A legacy invoker transaction cannot read native private
+source data, lock Google Sheets, or bypass that epoch boundary. The existing
+publish_camera_connection_v1 compares saved local endpoint configuration, not
+the cross-project source/identity authority. Reusing it as though it had those
+checks would be unsafe. No permissions or auth claims are invented to bridge it.
+
+Instead V2 implements this safe receipt protocol:
+- Fully verify the source and reviewed identity, then probe only saved targets.
+- Fully reread source/identity/configuration after all sockets finish.
+- Stage an immutable, source-bound pending receipt with atomic local group CAS.
+- Fully reread remote authority again AFTER staging; accept only the same guard
+  and the same receipt payload with another atomic local physical/config CAS.
+- When consuming any accepted receipt, read current complete source, read the
+  matching receipt with local CAS, then reread complete source again. Require the
+  same exact authority guard and a fresh completed observation. Otherwise Unknown.
+
+A remote change in the gap between the last producer read and acceptance can
+persist a historical scoped receipt. It cannot change global camera-health rows
+and cannot be consumed against changed current authority. A regression injects
+exactly that race: acceptance succeeds, fresh consumption returns Unknown, and
+all global device/health/history rows remain byte-equivalent. This is explicit
+snapshot-bound validation, not a distributed transaction or a zero-time race claim.
+No update is made to camera_health_current/history, source, inventory or placement.
+The unchanged existing publisher and schedule continue normally.
+
+TWO EXISTING CONTEXTS, NO COPIED SERVICE KEYS
+The native proof handler uses existing native actor resolution/Owner or verified
+IT authorization and existing Google Viewer reader. The legacy writer uses its
+own existing service client and the same verified incoming user bearer. It sends
+that bearer unchanged to one pinned HTTPS native proof route, which independently
+reauthenticates the same existing actor. It does not share either service key,
+create a user/role, accept a caller URL, follow redirects, or trust proof supplied
+in the body. Only requested exact group proofs leave the native route, not the
+whole mHelp census or credentials. Protected group tuples contain saved IPs and
+physical identifiers and remain backend/read-authorized data, not UI diagnostics.
+
+nativeContextAdapter and legacyContextAdapter implement these bridges.
+runtimeWiring.createExistingContextProductRoutes composes the concrete handlers
+with the EXISTING host authentication/context closures. Both serve.ts entrypoints
+return 503 with zero IO by default. Enabling an environment flag alone cannot
+activate them; approved host integration must supply those existing closures.
+No schedule-only principal was created or assumed.
+
+MANUAL REQUEST SHAPES (only after separate runtime/DB approval)
+Writer POST {"action":"run","productIds":["<exact Product ID>"],"runId":"<new UUID>"}
+Writer POST {"action":"read","productIds":["<exact Product ID>"]}
+Native protected proof route POST {"productIds":["<exact Product ID>"]}
+No IP, port, source proof, actor, role or credential fields are accepted.
+Run responses mean scoped receipts accepted, not an unqualified Online claim.
+Read responses contain only Product ID, service connectivity, original check time,
+member count and wording that video is not verified. Pending/technical evidence
+never becomes Offline. Uncertain responses include the deterministic receipt key;
+cos_product_tcp_receipt_v2 inspects its historical state without probing again.
+
+ACTIVATION DEPENDENCIES / RISKS
+- Review exact current source closures and mount the new handlers inside the two
+  existing authorization contexts. Do not deploy a standalone handler with a
+  homemade actor or copied service key. Verify the pinned native origin/path.
+- Review/apply the tested receipt SQL to the legacy project only. All new grants
+  are narrow grants to its existing service_role; none were applied here.
+- Connect the existing Product-ID status reader to the scoped V2 reader in a
+  separately reviewed backend integration. The current consumer deliberately
+  continues holding multichannel collisions; this task did not edit its API or
+  frontend. Deploying only a producer will NOT change today's UI counts.
+- Freshly classify the 47 and possible same-unit collision groups through the
+  actual adapter. No live eligibility or configuration/profile assertion was
+  made here. Missing identity, current epochs or ownership remains held.
+- Local PostgreSQL tests use PGlite, not hosted Supabase or a concurrent external
+  Postgres server. Socket cancellation tests use mocks, not hosted Deno sockets.
+  Verify host cancellation, authenticated route integration and lock contention
+  before approving a bounded exact-ID runtime activation.
+- The full imported Google reader closure has an existing strict TS2345 at
+  cos-operations-pages/mhelp2027ConnectionCensus.ts:58. Compiling that unchanged
+  reader alone reproduces it. No overlapping API file was edited to hide it.
+  Strict typechecking of all new core/handler modules succeeds. Both disabled
+  entrypoint bundles build. The native adapter imports the existing reader and
+  shares that inherited typecheck limitation.
+- Supabase CLI could not initialize in the immutable host home; the pinned CLI
+  fallback installation also failed. SQL is supplied as a tested review migration
+  script in the repository's operations/db convention, without invented migration
+  history or any CLI/live schema application.
+
+ROLLBACK
+Disable/remove only the new source/writer route mounts. Apply the included rollback
+script to revoke V2 RPC execute and receipt mutation privileges from service_role.
+Preserve private receipt rows to reconcile uncertain outcomes. Do not delete or
+restore global health rows: V2 never writes them. Existing producer, schedules and
+permissions remain untouched. Local rollback is reverting the V2 commit; ed193928
+remains available. No production activation or rollback was performed.
+
+FINAL LOCAL VALIDATION
+100 focused tests passed, zero failures/skips (10.68 seconds), covering V1 and V2,
+existing exact Product-ID consumer, current 2027 census/Google reader, unchanged
+scheduled direct producer, and reviewed health identity regressions. Eight V2 SQL
+cases execute the actual migration in PGlite, including privileges, immutable
+receipts, replay/conflict, configuration CAS, pending/accepted separation,
+post-reread remote drift, lost acknowledgement reconciliation and rollback.
+Eight V2 source/transport cases exercise the existing identity proof model,
+complete source brackets, grouped membership, TCP cleanup, authenticated/pinned
+transport and disabled entrypoints. All sockets and HTTP provider calls are mocks.
+Strict new-core/handler typecheck passes. Full native-adapter import closure has
+only the independently reproduced pre-existing TS2345 described above.

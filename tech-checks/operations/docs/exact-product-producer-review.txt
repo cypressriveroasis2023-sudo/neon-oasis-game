@@ -1,3 +1,6 @@
+CHECKPOINT NOTE: superseded for activation by exact-product-producer-v2-review.txt.
+This file records the preserved ed193928 V1 checkpoint.
+
 EXACT PRODUCT SAVED TCP PRODUCER — LOCAL CONTRACT CANDIDATE, NOT ACTIVATED
 
 Base: main checkout 33e4ff20. No .agents/skills or AGENTS.md files were present
