@@ -42,7 +42,7 @@ test('complete exact-ID census isolates one conflicting placement without reloca
  assert.equal(proof.records.length,4);assert.equal(proof.records[1].placement,'SHOP');
  assert.deepEqual(proof.records[1].reviewReasons,['placement_mismatch','customer_mismatch']);
  assert.deepEqual(proof.records[0].reviewReasons,[]);
- const result=buildExactProductConnections(f.accepted,proof,devices,now);
+ const result=buildExactProductConnections(f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
  assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','offline']]);
  assert.match(result.items[1].reason,/review is required/);
  assert.equal(result.items[1].resourceId,null);
@@ -56,7 +56,7 @@ test('the equipment import verifier remains all-or-nothing for a changed physica
 });
 test('held records still reserve IP ownership across Field and Shop',async()=>{
  const f=fixture();f.values[6].values[2]=['8.8.8.8'];
- const result=buildExactProductConnections(f.accepted,await verify(f),devices,now);
+ const result=buildExactProductConnections(f.accepted,await verify(f),devices,now,new Map([['11',['101']],['13',['103']]]));
  assert.equal(result.items[0].status,'unknown');assert.equal(result.items[1].status,'unknown');
  assert.equal(result.items[2].status,'offline');
 });
@@ -86,7 +86,7 @@ test('source identity/customer/restriction changes hold that exact Product ID',a
  ]){
   const f=fixture();mutate(f);const proof=await verify(f);
   assert.ok(proof.records[0].reviewReasons.includes(reason));
-  const result=buildExactProductConnections(f.accepted,proof,devices,now);
+  const result=buildExactProductConnections(f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
   assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'offline');
  }
 });
@@ -101,13 +101,13 @@ test('safe A1 quoting and trailing empty cells are allowed, row indices remain s
 test('a malformed V2 hold cannot permit status under an unmatched placement or checksum',async()=>{
  const f=fixture(),proof=await verify(f);
  const unheld=structuredClone(proof);unheld.records[1].reviewReasons=[];
- assert.equal(buildExactProductConnections(f.accepted,unheld,devices,now),null);
+ assert.equal(buildExactProductConnections(f.accepted,unheld,devices,now,new Map([['11',['101']],['13',['103']]])),null);
  const repeated=structuredClone(proof);repeated.records[1].sourceRow=repeated.records[0].sourceRow;
- assert.equal(buildExactProductConnections(f.accepted,repeated,devices,now),null);
+ assert.equal(buildExactProductConnections(f.accepted,repeated,devices,now,new Map([['11',['101']],['13',['103']]])),null);
  const forged=structuredClone(proof);forged.records[0].reviewReasons=['made_up'];
- assert.equal(buildExactProductConnections(f.accepted,forged,devices,now),null);
+ assert.equal(buildExactProductConnections(f.accepted,forged,devices,now,new Map([['11',['101']],['13',['103']]])),null);
  const stale=structuredClone(proof);stale.expectedMhelpSourceSha256='b'.repeat(64);
- assert.equal(buildExactProductConnections(f.accepted,stale,devices,now),null);
+ assert.equal(buildExactProductConnections(f.accepted,stale,devices,now,new Map([['11',['101']],['13',['103']]])),null);
 });
 
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
@@ -150,7 +150,7 @@ for(const role of ['owner','it'])test(`protected ${role} route returns current e
  const f=routeFixture(role),response=await f.handler(f.request()),text=await response.text();
  assert.equal(response.status,200,text);
  const result=JSON.parse(text);
- assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','offline']]);
+ assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','unknown'],['12','unknown'],['13','unknown']]);
  assert.doesNotMatch(text,/8\.8\.8\.8|1\.1\.1\.1|private_key|Bearer|Different Synthetic/);
  assert.equal(f.calls.some(c=>c.url.includes('/camera-health-check')||c.url.includes('/camera-health-sweep')),false,'saved checks only, no live probes');
  assert.equal(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>!c.init.method||c.init.method==='GET'||c.url.endsWith('/cos_mhelp_placement_snapshot')),true);

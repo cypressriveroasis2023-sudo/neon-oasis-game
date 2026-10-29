@@ -10,7 +10,7 @@ import {savedCameraConnection} from '../../supabase/functions/cos-operations-pag
  * Viewer read and independently validate the complete Product-ID census.
  * This model does NOT fetch endpoints, trigger checks or write inventory.
  */
-export const EXACT_PRODUCT_CONNECTION_CONTRACT='COS_EXACT_PRODUCT_CONNECTIONS_V1' as const;
+export const EXACT_PRODUCT_CONNECTION_CONTRACT='COS_EXACT_PRODUCT_CONNECTIONS_V2' as const;
 export const VERIFIED_TRACKER_IP_CONTRACT='COS_VERIFIED_2027_PRODUCT_IPS_V1' as const;
 export const TRACKER_CONNECTION_CENSUS_V2='COS_VERIFIED_2027_PRODUCT_IPS_V2' as const;
 export const TRACKER_CONNECTION_HOLDS=['placement_mismatch','customer_mismatch','identity_mismatch','tracker_restriction'] as const;
@@ -141,7 +141,7 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
 export function buildExactProductConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()
+ acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
  if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
@@ -197,6 +197,7 @@ export function buildExactProductConnections(
   if(devicesForIp.length!==1)return unknown(pid,devicesForIp.length?'More than one saved endpoint claims this tracker IP; verify exact device ownership.':'No saved camera endpoint matches the current tracker IP.');
   const result=completedSavedTcpCheck(devicesForIp[0],now);
   if(!result)return unknown(pid,'No fresh, completed, exact-target TCP/service-port check is available.');
+  if(!resourceMembership?.get(pid)?.includes(String(devicesForIp[0].deviceId)))return unknown(pid,'No current verified Product-to-resource membership is available for this saved endpoint.');
   return {productId:pid,...result};
  });
  if(items.length!==authority.field)return null;

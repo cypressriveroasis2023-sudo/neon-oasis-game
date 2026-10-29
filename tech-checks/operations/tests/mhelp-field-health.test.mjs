@@ -39,3 +39,12 @@ test('all 287 Field Product IDs reconcile without importing the 714 Shop records
  Object.assign(f.roster.summary,{totalRecords:1001,activeRecords:1000,field:285,shop:714,sourceOnlyRecords:997});
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.total,287);assert.equal(view.items.length,287);assert.equal(view.counts.unlinked,281);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),287);
 });
+
+test('obsolete IP-only contract and failed source keep inventory/support but cannot certify connectivity',()=>{
+ const f=fieldProductFixture();
+ for(const receipt of [null,{...f.connections,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'}]){
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.equal(view.total,7);assert.equal(view.items.filter(i=>i.state==='support').length,1);
+ assert.equal(view.items.filter(i=>i.state==='online'||i.state==='offline').length,0);
+ }
+});

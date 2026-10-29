@@ -34,9 +34,9 @@ const endpoint=(deviceId,ip,online=true)=>({
   _connection:{ip,revision:4,checkedAt:current,status:online?'online':'offline',reachable:online,confirmedOutage:false,consecutiveFailures:1}
  }
 });
-const run=(a=accepted(),t=tracker(),devices=[endpoint(41,'8.8.8.8'),endpoint(42,'9.9.9.9',false)],time=now)=>buildExactProductConnections(a,t,devices,time);
+const run=(a=accepted(),t=tracker(),devices=[endpoint(41,'8.8.8.8'),endpoint(42,'9.9.9.9',false)],time=now)=>buildExactProductConnections(a,t,devices,time,new Map([['1001',['41']],['1002',['42']]]));
 
-test('a verified exact Product-ID endpoint response is ONLINE without provider/channel association',()=>{
+test('a verified exact Product-ID endpoint with separately admitted membership is ONLINE',()=>{
  const results=run();assert.equal(results.contract,EXACT_PRODUCT_CONNECTION_CONTRACT);
  assert.deepEqual(results.items.map(x=>x.status),['online','offline','unknown']);
  assert.equal(results.items[0].productId,'1001');assert.equal(results.items[0].resourceId,'41');
@@ -172,4 +172,12 @@ test('a stale reviewed mHelp source cannot authorize currently online camera pro
  live.source='mhelpdesk_api';
  live.lastApiReadAt=new Date(now-46*60*1000).toISOString();
  assert.equal(run(live,tracker()),null);
+});
+test('cached pre-attribution V1 positives and negatives are rejected without renewing proof time',()=>{
+ const current=run();const old={...current,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'};
+ assert.equal(readExactProductConnections(old,sha,['1001','1002','1003'],now),null);
+ const accepted=readExactProductConnections(current,sha,['1001','1002','1003'],now);
+ assert.equal(accepted.get('1001').checkedAt,current.items[0].checkedAt);
+ assert.equal(accepted.get('1002').checkedAt,current.items[1].checkedAt);
+ assert.equal(readExactProductConnections(current,sha,['1001','1002','1003'],now+20*60_000),null);
 });

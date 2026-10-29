@@ -16,7 +16,7 @@ export function fieldProductFixture(){
 /** Explicit synthetic saved TCP observations, not a projection from provider
  * labels, health or names. Tests opt into this independently mocked endpoint. */
 export function fieldProductConnectionFixture(upload,observedAt=fresh,states={'1001':'online','1002':'offline'}){
- return {contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:upload.sourceSha256,trackerVerifiedAt:observedAt,
+ return {contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:upload.sourceSha256,trackerVerifiedAt:observedAt,
   items:upload.records.filter(r=>r.placement==='FIELD').map(p=>{
    const status=states[p.productId]||'unknown';
    return {productId:p.productId,status,basis:'tcp_service_port',
