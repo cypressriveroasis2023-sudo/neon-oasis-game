@@ -32,9 +32,77 @@ test('current field row has optional preview control without changing existing d
  assert.doesNotMatch(render(false),/Preview saved connection scope/);const html=render(true);assert.match(html,/Preview saved connection scope/);assert.match(html,/Saved connection scope for Product 123/);assert.match(html,/Unit details and troubleshooting/);assert.doesNotMatch(html,/11\.22\.33\.44/);
 });
 
-test('display parser accepts the actual validated backend projection, including decimal-string revisions',async()=>{
- const {productSource}=await import('./fixtures/product-tcp-source.mjs');const {buildProductGroups}=await import('../../supabase/functions/_shared/exact-product-producer/fullSource.ts');
- const f=await productSource(),plan=await buildProductGroups(f.source,['101'],f.now,f.review),g=plan.groups[0];
- const response={contract:'COS_PRODUCT_TCP_PREVIEW_V1',productIds:['101'],held:[],groups:[{...g,devices:g.devices.map(d=>({id:d.id,ip:d.ip,ports:d.ports,revision:d.revision,profile:d.profile}))}]};
- const parsed=readScopePreview(response,'101');assert.equal(parsed.kind,'eligible');assert.equal(parsed.group.devices.length,4);assert.equal(typeof parsed.group.devices[0].revision,'string');assert.equal('serial' in parsed.group.devices[0],false);
+// Immutable synthetic response captured from the validated four-channel fixture and
+// COS_PRODUCT_TCP_PREVIEW_V1 projection in attestationTransport.ts at reviewed
+// backend commit 54a09b67588eeb7360e0d30985d9e3252807a8c1. All identities, IPs
+// and source data are synthetic. This is a display-contract specimen, not live
+// admission evidence; no unpublished backend import is needed to run this test.
+const freeze=v=>{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;};
+const projectedResponse=freeze({
+  "contract": "COS_PRODUCT_TCP_PREVIEW_V1",
+  "productIds": [
+    "101"
+  ],
+  "held": [],
+  "groups": [
+    {
+      "productId": "101",
+      "nativeUnitId": "00000000-0000-4000-8000-000000000001",
+      "family": "Solar Spotter",
+      "authorityGuard": "722687034df75c46709896cd4164bc3cc98d574d741b61e80272d1e3ae7e9a15",
+      "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "trackerSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "identityGuard": "11c57acfc0cfb3a7be19cc7604124601f7024d46b140b54c616b396c9907760d",
+      "bindingGuard": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "epochGuard": "ce405dd98b51adf2aca47a8caebd5366910cd0a58a4193c8b64a6470ae8ecd19",
+      "crosswalkRevision": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "verifiedAt": "2026-10-29T01:00:00.000Z",
+      "devices": [
+        {
+          "id": "1",
+          "ip": "11.22.33.44",
+          "ports": [
+            80,
+            443
+          ],
+          "revision": "0",
+          "profile": "solar_spotter"
+        },
+        {
+          "id": "2",
+          "ip": "11.22.33.44",
+          "ports": [
+            80,
+            443
+          ],
+          "revision": "0",
+          "profile": "solar_spotter"
+        },
+        {
+          "id": "3",
+          "ip": "11.22.33.44",
+          "ports": [
+            80,
+            443
+          ],
+          "revision": "0",
+          "profile": "solar_spotter"
+        },
+        {
+          "id": "4",
+          "ip": "11.22.33.44",
+          "ports": [
+            80,
+            443
+          ],
+          "revision": "0",
+          "profile": "solar_spotter"
+        }
+      ]
+    }
+  ]
+});
+test('display parser accepts captured exact backend projection and preserves four decimal-string revisions',()=>{
+ const parsed=readScopePreview(projectedResponse,'101');assert.equal(parsed.kind,'eligible');assert.equal(parsed.group.devices.length,4);assert.ok(parsed.group.devices.every(d=>typeof d.revision==='string'));assert.deepEqual(parsed.group.devices,projectedResponse.groups[0].devices);assert.equal('serial' in parsed.group.devices[0],false);
+ assert.ok(Object.isFrozen(projectedResponse.groups[0].devices[0].ports));assert.notEqual(parsed.group.devices[0].ports,projectedResponse.groups[0].devices[0].ports);
 });

@@ -1,13 +1,12 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';import {chromium} from '@playwright/test';
+import {test} from '@playwright/test';import assert from 'node:assert/strict';import {build} from 'esbuild';
 // Offline real React/DOM checks. The only API implementation is this synthetic
 // fixture; all browser network requests are denied.
-test('visible preview control cancels, clears private/source state, and renders held/eligible scope',async()=>{
+test('visible preview control cancels, clears private/source state, and renders held/eligible scope',async({page})=>{
  const entry=`import React from 'react';import {createRoot} from 'react-dom/client';import FleetFieldHealthCounts from './src/FleetFieldHealthCounts';
  window.calls=[];window.previewApi={captureSession:()=>()=>true,post:(path,body,options)=>new Promise((resolve,reject)=>window.calls.push({path,body,options,resolve,reject}))};
  const root=createRoot(document.getElementById('root'));window.draw=(sha='a')=>root.render(<React.StrictMode><FleetFieldHealthCounts previewSavedScope expanded value={{total:1,sourceSha256:sha.repeat(64),receivedAt:'2026-10-29T01:00:00Z',counts:{unverified:1},items:[{productId:'123',unitNumber:'Fixture unit',state:'unverified',reason:'No reading',unitId:'unit',recordId:'record'}]}} onOpen={()=>{}}/></React.StrictMode>);window.draw();`;
  const bundle=(await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'tsx'},resolveExtensions:['.ts','.tsx','.js','.jsx'],jsx:'automatic',bundle:true,format:'iife',platform:'browser',write:false,plugins:[{name:'synthetic-preview-api',setup(b){b.onResolve({filter:/^\.\/[Ff]ieldProductEvidence$/},args=>({path:process.cwd()+'/src/'+args.path.slice(2)+(args.path==='./FieldProductEvidence'?'.tsx':'.ts')}));b.onResolve({filter:/^\.\/api$/},()=>({path:'api',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const api={captureSession:()=>window.previewApi.captureSession(),post:(...args)=>window.previewApi.post(...args)};'}));}}]})).outputFiles[0].text;
- const browser=await chromium.launch({executablePath:process.env.COS_TEST_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
- try{const page=await browser.newPage();page.setDefaultTimeout(5000);page.on('pageerror',error=>console.error(error.message));await page.route('**/*',route=>route.abort());await page.setContent('<div id="root"></div>');await page.addScriptTag({content:bundle});
+ page.setDefaultTimeout(5000);page.on('pageerror',error=>console.error(error.message));await page.route('**/*',route=>route.abort());await page.setContent('<div id="root"></div>');await page.addScriptTag({content:bundle});
  const button=page.getByRole('button',{name:'Preview saved connection scope'});await button.waitFor();assert.equal(await page.evaluate(()=>calls.length),0);
  await button.click();await page.getByRole('button',{name:'Cancel preview'}).click();assert.equal(await page.evaluate(()=>calls[0].options.signal.aborted),true);
  await page.evaluate(()=>calls[0].resolve({data:{contract:'COS_PRODUCT_TCP_PREVIEW_V1',productIds:['123'],groups:[],held:[{productId:'123',reason:'late hold'}]}}));assert.equal(await page.getByText('late hold',{exact:true}).count(),0);
@@ -18,5 +17,4 @@ test('visible preview control cancels, clears private/source state, and renders 
  await page.evaluate(()=>draw('b'));await page.getByText('Eligible saved scope at source review',{exact:true}).waitFor({state:'detached'});
  await button.click();await page.evaluate(()=>draw('c'));await button.waitFor();await page.waitForFunction(()=>calls[3].options.signal.aborted);await page.evaluate(()=>calls[3].resolve({data:{contract:'COS_PRODUCT_TCP_PREVIEW_V1',productIds:['123'],groups:[],held:[{productId:'123',reason:'obsolete row'}]}}));assert.equal(await page.getByText('obsolete row',{exact:true}).count(),0);
  assert.deepEqual(await page.evaluate(()=>calls.map(c=>[c.path,c.body])),Array.from({length:4},()=>['/api/product-tcp-preview',{productIds:['123']}]));
- }finally{await browser.close();}
 });
