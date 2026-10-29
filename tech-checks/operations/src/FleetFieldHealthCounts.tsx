@@ -1,10 +1,11 @@
 import {useState} from 'react';
 import {fieldHealthLabels,type FieldProduct,type mhelpFieldHealth} from './mhelpFieldHealth';
 import FieldProductEvidence from './FieldProductEvidence';
+import ProductScopePreview from './ProductScopePreview';
 import {fieldProductEvidenceCsv} from './fieldProductEvidence';
 
-type Props={value:NonNullable<ReturnType<typeof mhelpFieldHealth>>;onOpen:(item:FieldProduct)=>void;expanded?:boolean;sourceRecords?:Record<string,any>[];status?:string;onStatusChange?:(status:string)=>void;healthStates?:Record<string,string>};
-export default function FleetFieldHealthCounts({value,onOpen,expanded=false,sourceRecords=[],status,onStatusChange,healthStates={}}:Props){
+type Props={previewSavedScope?:boolean;value:NonNullable<ReturnType<typeof mhelpFieldHealth>>;onOpen:(item:FieldProduct)=>void;expanded?:boolean;sourceRecords?:Record<string,any>[];status?:string;onStatusChange?:(status:string)=>void;healthStates?:Record<string,string>};
+export default function FleetFieldHealthCounts({value,onOpen,expanded=false,sourceRecords=[],status,onStatusChange,healthStates={},previewSavedScope=false}:Props){
  const [filter,setFilter]=useState('all'),[query,setQuery]=useState(''),[limit,setLimit]=useState(40);
  const sourceById=new Map(sourceRecords.map(r=>[r.productId,r]));
  const entries=Object.entries(value.counts) as [keyof typeof fieldHealthLabels,number][];
@@ -31,7 +32,7 @@ export default function FleetFieldHealthCounts({value,onOpen,expanded=false,sour
    <label>Field record status <select aria-label='Field inventory status' value={selectedStatus} onChange={event=>{if(onStatusChange)onStatusChange(event.target.value);else setFilter(event.target.value);setLimit(40);}}><option value='all'>All Field products ({value.total})</option>{onStatusChange&&<><option value='unknown'>Unknown / unverified ({unknownCount})</option><option value='operational'>Online / offline / support</option></>}{entries.map(([state,count])=><option key={state} value={state}>{fieldHealthLabels[state]} ({onStatusChange&&['online','offline','support'].includes(state)?value.items.filter(item=>matchesStatus(item,state)).length:count})</option>)}</select></label>
    <label>Find a Field product <input aria-label='Search Field inventory' value={query} placeholder='Unit number or Product ID' onChange={event=>{setQuery(event.target.value);setLimit(40);}}/></label>
    <p>{items.length} Field product records in this list.</p>
-   <ul>{items.slice(0,limit).map(item=><li key={item.productId} data-product-id={item.productId}><strong>{item.unitNumber}</strong> · Product {item.productId} · <b>FIELD</b> · <b>{fieldHealthLabels[item.state]}</b><p>{item.reason}</p>{sourceById.has(item.productId)&&<p>mHelp customer / site: {sourceById.get(item.productId)?.customer||'Not supplied'} · Source service address: {['street','city','state','zip'].map(k=>sourceById.get(item.productId)?.sourceAddress?.[k]).filter(v=>typeof v==='string'&&v.trim()).join(', ')||'Not supplied'}</p>}<FieldProductEvidence value={item.evidence} now={Date.now()}/>{(item.unitId||item.recordId)&&<button onClick={()=>onOpen(item)}>{item.unitId?'Unit details and troubleshooting':'Review source record'}</button>}</li>)}</ul>
+   <ul>{items.slice(0,limit).map(item=><li key={item.productId} data-product-id={item.productId}><strong>{item.unitNumber}</strong> · Product {item.productId} · <b>FIELD</b> · <b>{fieldHealthLabels[item.state]}</b><p>{item.reason}</p>{sourceById.has(item.productId)&&<p>mHelp customer / site: {sourceById.get(item.productId)?.customer||'Not supplied'} · Source service address: {['street','city','state','zip'].map(k=>sourceById.get(item.productId)?.sourceAddress?.[k]).filter(v=>typeof v==='string'&&v.trim()).join(', ')||'Not supplied'}</p>}<FieldProductEvidence value={item.evidence} now={Date.now()}/>{previewSavedScope&&<ProductScopePreview key={JSON.stringify([value.sourceSha256,value.receivedAt,item,sourceById.get(item.productId)])} productId={item.productId}/>}{(item.unitId||item.recordId)&&<button onClick={()=>onOpen(item)}>{item.unitId?'Unit details and troubleshooting':'Review source record'}</button>}</li>)}</ul>
    {items.length>limit&&<button onClick={()=>setLimit(previous=>previous+40)}>Show more Field products ({items.length-limit})</button>}
   </details>
  </section>;
