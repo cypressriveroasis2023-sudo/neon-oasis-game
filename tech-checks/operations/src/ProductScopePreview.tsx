@@ -1,3 +1,4 @@
+import {connectionDiagnosticText} from './connectionDiagnostics';
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {createScopePreview,type PreviewState} from './productScopePreviewModel';
@@ -16,10 +17,10 @@ export default function ProductScopePreview({productId}:{productId:string}){
   <button type='button' disabled={state.status==='loading'} onClick={()=>void actions.current?.load()}>{state.status==='loading'?'Reading saved scope…':'Preview saved connection scope'}</button>
   {state.status!=='idle'&&<button type='button' onClick={()=>actions.current?.clear()}>{state.status==='loading'?'Cancel preview':'Close preview'}</button>}
   <div aria-live='polite'>
-   {state.status==='error'&&<p role='alert'>{state.message}</p>}
+   {state.status==='error'&&<p role='alert'>{state.message} {connectionDiagnosticText(state.diagnostic)}</p>}
    {state.status==='ready'&&result&&<>
     <p>Read-only source review for Product {productId}. No camera test was run. This preview does not change connection status or authorize a check.</p>
-    {result.kind==='held'?<><strong>Held — scope not eligible</strong><p>{result.reason}</p></>:<>
+    {result.kind==='held'?<><strong>Held — scope not eligible</strong><p>{result.reason}</p><p>{connectionDiagnosticText(result.diagnostic)}</p></>:<>
      <strong>Eligible saved scope at source review</strong>
      <p>Reviewed {result.group.verifiedAt} · {result.group.family} · Native unit {result.group.nativeUnitId}. This is a snapshot; eligibility can change.</p>
      <ul>{result.group.devices.map(d=><li key={d.id}>Saved endpoint {d.id} · {d.ip} · TCP ports {d.ports.join(', ')} · configuration revision {d.revision} · {d.profile}</li>)}</ul>

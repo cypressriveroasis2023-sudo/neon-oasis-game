@@ -32,3 +32,17 @@ test('late connection read failure is visible and removes retained exact checks'
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
+test('Fleet warning renders only bounded source diagnostics and clears them on recovery or invalidation',async({page})=>{
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true});
+ let mode='safe';
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()!=='POST'||route.request().postDataJSON().path!=='/api/product-connections'||mode==='success')return route.fallback();
+  return route.fulfill({status:503,headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{error:'SECRET_RAW_ERROR',diagnostic:mode==='safe'?{stage:'saved_checks',code:'source_unavailable'}:{stage:'saved_checks',code:'SECRET_RAW_ERROR'}}});
+ });
+ await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ const warning=app.getByRole('status').filter({hasText:'Connection source could not be read'});
+ await expect(warning).toContainText('Diagnostic: saved_checks / source_unavailable.');await expect(app.locator('body')).not.toContainText('SECRET_RAW_ERROR');
+ mode='malicious';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(warning).not.toContainText('Diagnostic:');await expect(app.locator('body')).not.toContainText('SECRET_RAW_ERROR');
+ mode='success';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(warning).toHaveCount(0);await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ mode='safe';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(warning).toContainText('Diagnostic:');await app.locator('.cos-fleet-dashboard').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));await expect(app.locator('body')).not.toContainText('Diagnostic:');expect(state.errors).toEqual([]);
+});

@@ -1,3 +1,4 @@
+import {readConnectionDiagnostic,type ConnectionDiagnostic} from './connectionDiagnostics';
 import {IT_DAILY_ONLY} from '../../it-feature-availability';
 import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 import {validateCameraHealth} from './fieldCameraHealth';
@@ -118,6 +119,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   finally { if (pendingReads.get(key) === pending) pendingReads.delete(key); }
 }
 async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<ApiResponse<T>> {
+  const scopedRead=path==='/api/product-connections'||path==='/api/product-tcp-preview';
   const sessionRevision = privateSessionRevision;
   const sessionMode = location.search;
   const obsolete = () => sessionRevision !== privateSessionRevision || token !== lastVerifiedSession?.token || sessionMode !== location.search;
@@ -154,6 +156,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
       });
     } catch (cause) {
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
+      if(scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',503),{diagnostic:{stage:'connection_transport',code:abortKind==='timeout'?'timeout':abortKind==='cancelled'?'cancelled':'request_failed'}});
       throw new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
@@ -171,13 +174,16 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     let data: any;
     try { data = await response.json(); } catch {
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
+      if(scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',response.status||503),{diagnostic:{stage:'connection_transport',code:'incomplete_response'}});
       throw new OperationsApiError('Operations returned an incomplete response. Please refresh.', response.status || 503);
     }
     if (!authenticationDenied) requireCurrent();
+    if(scopedRead&&abortKind)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',503),{diagnostic:{stage:'connection_transport',code:abortKind}});
     if (ownerAction && abortKind) {
       if (preparation) throw preparationFailure(abortKind);
       throw new OperationsApiError('The save could not be confirmed. Refresh this workspace before trying again.', 503);
     }
+    if(!response.ok&&scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',response.status),{diagnostic:readConnectionDiagnostic(data?.diagnostic)});
     if (!response.ok) throw new OperationsApiError(typeof data?.error === 'string' ? data.error : 'Operations request failed.', response.status);
     return { data };
   } finally { window.clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
@@ -206,19 +212,19 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||lastVerifiedSession?.role!==session.role||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
     };
     const health=sendRequest('GET','/api/camera-health/summary-v3',session.token).then(result=>{current();return validateCameraHealth(result.data);});
-    type ProofResult={receipt:any;state:'ready'|'error'|'timeout'|'rejected'};
+    type ProofResult={receipt:any;state:'ready'|'error'|'timeout'|'rejected';diagnostic?:ConnectionDiagnostic};
     let proofCompletion:Promise<ProofResult>|undefined;
     // The presentation budget is not a discard deadline. Independently bound
     // the entire proof (including body parsing) and cancel its transport at 30s.
     const productConnections=(hash:string,ids:string[])=>{
       const controller=new AbortController();let timer=0;
       const deadline=new Promise<ProofResult>(resolve=>{timer=window.setTimeout(()=>{
-        resolve({receipt:null,state:'timeout'});controller.abort();
+        resolve({receipt:null,state:'timeout',diagnostic:{stage:'connection_transport',code:'timeout'}});controller.abort();
       },30000);});
       const response=sendRequest('GET','/api/product-connections',session.token,undefined,controller.signal)
         .then(({data})=>readExactProductConnections(data,hash,ids,Date.now())
-          ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const})
-        .catch(()=>({receipt:null,state:'error' as const}));
+          ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const,diagnostic:{stage:'connection_envelope' as const,code:'validation_rejected'}})
+        .catch(cause=>({receipt:null,state:'error' as const,diagnostic:readConnectionDiagnostic(cause?.diagnostic)}));
       return Promise.race([response,deadline]).finally(()=>window.clearTimeout(timer));
     };
     // Native-only Fleet pages cannot attribute any Product-ID TCP results.
@@ -247,7 +253,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       // Never renew its observation/source times or carry it across a failure.
       const previous=(saved?.value.fieldMap as any)?.productConnections;
       const retained=!result&&readExactProductConnections(previous,upload.sourceSha256,fieldIds,Date.now())?previous:null;
-      return {...map,productConnections:result?result.receipt:retained,productConnectionsState:result?.state||'pending'};
+      return {...map,productConnections:result?result.receipt:retained,productConnectionsState:result?.state||'pending',productConnectionsDiagnostic:result?.diagnostic};
     });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
@@ -263,7 +269,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const ids=upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId);
       const accepted=result.state==='ready'&&readExactProductConnections(result.receipt,upload.sourceSha256,ids,Date.now());
       const value={...initial,fieldMap:{...map,productConnections:accepted?result.receipt:null,
-        productConnectionsState:result.state==='ready'&&!accepted?'rejected':result.state}};
+        productConnectionsState:result.state==='ready'&&!accepted?'rejected':result.state,productConnectionsDiagnostic:result.state==='ready'&&!accepted?{stage:'connection_envelope',code:'validation_rejected'}:result.diagnostic}};
       fleetSnapshots.set(key,{value,at:requestedAt});
       window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));
       window.dispatchEvent?.(new Event('cos-fleet-proof-updated'));
