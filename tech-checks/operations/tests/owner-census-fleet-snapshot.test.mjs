@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readConnectionDiagnostic} from '../src/connectionDiagnostics.ts';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -18,7 +19,7 @@ const source=ts.transpileModule(readFileSync(root+'/src/api.ts','utf8'),{compile
 const fixtureSource=readFileSync(root+'/tests/api-inflight-reads.test.mjs','utf8');
 const fixtureBody=fixtureSource.slice(fixtureSource.indexOf('function fixture('),fixtureSource.indexOf("\ntest('identical safe reads"));
 let observationClock=now;class ClockDate extends Date{static now(){return observationClock;}}
-const apiFixture=new Function('assert','vm','source','reconcileFleetSnapshot','validateCameraHealth','checkedFieldMap','deferred','clockDate','CAMERA_AUTO_REFRESH_MS',fixtureBody.replace('Date: class extends Date { static now() { return clock; } },','Date:clockDate,')+'; return fixture;')(assert,vm,source,reconcileFleetSnapshot,validateCameraHealth,checkedFieldMap,deferred,ClockDate,CAMERA_AUTO_REFRESH_MS);
+const apiFixture=new Function('readConnectionDiagnostic','assert','vm','source','reconcileFleetSnapshot','validateCameraHealth','checkedFieldMap','deferred','clockDate','CAMERA_AUTO_REFRESH_MS',fixtureBody.replace('Date: class extends Date { static now() { return clock; } },','Date:clockDate,')+'; return fixture;')(readConnectionDiagnostic,assert,vm,source,reconcileFleetSnapshot,validateCameraHealth,checkedFieldMap,deferred,ClockDate,CAMERA_AUTO_REFRESH_MS);
 const flush=()=>setImmediate();function deferred(){let resolve,reject;const promise=new Promise((y,n)=>{resolve=y;reject=n;});return {promise,resolve,reject};}
 function expression(file,name){const text=readFileSync(root+'/src/'+file,'utf8'),tree=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let found;function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(tree)===name)found=node.initializer;ts.forEachChild(node,visit);}visit(tree);assert(found,name);const node=name==='refresh'?found.arguments[0]:found;return ts.transpileModule('const extractedFunction='+node.getText(tree)+';', {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText+'; return extractedFunction;';}
 const {sameFieldMapSourceSnapshot}=await import(root+'/src/fieldMapSnapshot.ts');

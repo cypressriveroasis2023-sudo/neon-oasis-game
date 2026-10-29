@@ -1,7 +1,8 @@
+import {readConnectionDiagnostic,type ConnectionDiagnostic} from './connectionDiagnostics';
 export type ScopeDevice={id:string;ip:string;ports:number[];revision:string;profile:string};
 export type ScopeGroup={productId:string;nativeUnitId:string;family:string;verifiedAt:string;devices:ScopeDevice[];authorityGuard:string;sourceSha256:string;trackerSha256:string;identityGuard:string;bindingGuard:string;epochGuard:string;crosswalkRevision:string};
-export type ScopePreview={kind:'eligible';group:ScopeGroup}|{kind:'held';reason:string};
-export type PreviewState={status:'idle'|'loading'|'error'|'ready';result?:ScopePreview;message?:string};
+export type ScopePreview={kind:'eligible';group:ScopeGroup}|{kind:'held';reason:string;diagnostic?:ConnectionDiagnostic};
+export type PreviewState={status:'idle'|'loading'|'error'|'ready';result?:ScopePreview;message?:string;diagnostic?:ConnectionDiagnostic};
 export type PreviewApi={captureSession:()=>()=>boolean;post:(path:string,body:unknown,options:{signal:AbortSignal})=>Promise<{data:unknown}>};
 const productIdValid=(id:string)=>/^[1-9][0-9]{0,14}$/.test(id);
 const guards=['authorityGuard','sourceSha256','trackerSha256','identityGuard','bindingGuard','epochGuard','crosswalkRevision'] as const;
@@ -9,7 +10,7 @@ const guards=['authorityGuard','sourceSha256','trackerSha256','identityGuard','b
 export function readScopePreview(value:unknown,productId:string):ScopePreview{
  const v=value as any;
  if(!productIdValid(productId)||v?.contract!=='COS_PRODUCT_TCP_PREVIEW_V1'||!Array.isArray(v.productIds)||v.productIds.length!==1||v.productIds[0]!==productId||!Array.isArray(v.groups)||!Array.isArray(v.held)||v.groups.length+v.held.length!==1)throw Error('Incomplete exact-product preview.');
- if(v.held.length){const h=v.held[0];if(h?.productId!==productId||typeof h.reason!=='string'||!h.reason.trim()||h.reason.length>2000)throw Error('Invalid hold evidence.');return {kind:'held',reason:h.reason};}
+ if(v.held.length){const h=v.held[0];if(h?.productId!==productId||typeof h.reason!=='string'||!h.reason.trim()||h.reason.length>2000)throw Error('Invalid hold evidence.');const diagnostic=readConnectionDiagnostic(h.diagnostic);return {kind:'held',reason:h.reason,...(diagnostic?.stage==='product_native_binding'?{diagnostic}:{})};}
  const g=v.groups[0];
  if(g?.productId!==productId||typeof g.nativeUnitId!=='string'||!/^[a-f0-9-]{36}$/i.test(g.nativeUnitId)||typeof g.family!=='string'||!g.family||typeof g.verifiedAt!=='string'||!Number.isFinite(Date.parse(g.verifiedAt))||guards.some(k=>typeof g[k]!=='string'||!/^[a-f0-9]{64}$/.test(g[k]))||!Array.isArray(g.devices)||!g.devices.length||g.devices.length>64)throw Error('Incomplete source scope.');
  const devices:ScopeDevice[]=g.devices.map((d:any)=>{
@@ -27,7 +28,7 @@ export function createScopePreview(api:PreviewApi,productId:string,notify:(state
   const ticket=++revision,currentSession=api.captureSession(),request=new AbortController();controller=request;notify({status:'loading'});
   const current=()=>!disposed&&ticket===revision&&!request.signal.aborted&&currentSession();
   try{const response=await api.post('/api/product-tcp-preview',{productIds:[productId]},{signal:request.signal});if(current())notify({status:'ready',result:readScopePreview(response.data,productId)});}
-  catch{if(current())notify({status:'error',message:'Saved scope could not be verified. No camera test was run.'});}
+  catch(cause){if(current())notify({status:'error',message:'Saved scope could not be verified. No camera test was run.',...(readConnectionDiagnostic((cause as any)?.diagnostic)?{diagnostic:readConnectionDiagnostic((cause as any).diagnostic)}:{})});}
   finally{if(ticket===revision){controller=null;if(!disposed&&!currentSession())notify({status:'idle'});}}
  }};
 }

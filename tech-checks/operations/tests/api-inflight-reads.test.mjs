@@ -1,3 +1,4 @@
+import {readConnectionDiagnostic} from '../src/connectionDiagnostics.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -57,7 +58,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -739,6 +740,31 @@ async function startProof(f,force=false,map=proofMap()){
  return {pending,index:index+2};
 }
 const proofFixture=()=>{const f=fixture({proof:true});f.advance(Date.parse('2026-10-28T16:00:00Z'));return f;};
+test('existing proof failure carries only allowlisted diagnostics, including late completion; success clears them',async()=>{
+ for(const late of [false,true])for(const malicious of [false,true]){
+  const f=proofFixture(),{pending,index}=await startProof(f);if(late){f.advance(6500);await pending;}
+  f.answer(index,{error:'SECRET_RAW_ERROR',diagnostic:malicious?{stage:'saved_checks',code:'SECRET_RAW_ERROR'}:{stage:'saved_checks',code:'source_unavailable'}},503);
+  const value=late?(await flush(),await f.api.fleet()):await pending;
+  assert.equal(value.fieldMap.productConnectionsState,'error');assert.equal(value.fieldMap.productConnections,null);assert.doesNotMatch(JSON.stringify(value),/SECRET_RAW_ERROR/);
+  assert.equal(JSON.stringify(value.fieldMap.productConnectionsDiagnostic),malicious?undefined:JSON.stringify({stage:'saved_checks',code:'source_unavailable'}));
+  const next=await startProof(f,true);f.answer(next.index,exactReceipt(f));const ready=await next.pending;assert.equal(ready.fieldMap.productConnectionsState,'ready');assert.equal(ready.fieldMap.productConnectionsDiagnostic,undefined);
+ }
+});
+test('preview API strips malicious error messages and rejects obsolete diagnostic responses',async()=>{
+ const f=fixture(),pending=f.api.post('/api/product-tcp-preview',{productIds:['101']});await flush();
+ f.answer(0,{error:'SECRET_RAW_ERROR',diagnostic:{stage:'preview_source',code:'source_unavailable'}},409);
+ await assert.rejects(pending,e=>{assert.doesNotMatch(JSON.stringify(e),/SECRET/);assert.equal(JSON.stringify(e.diagnostic),JSON.stringify({stage:'preview_source',code:'source_unavailable'}));return e.response.status===409;});
+ const old=f.api.post('/api/product-tcp-preview',{productIds:['101']});await flush();f.window.dispatchEvent(new Event('cos-private-data-invalidated'));f.answer(1,{error:'SECRET',diagnostic:{stage:'preview_source',code:'source_unavailable'}},409);await assert.rejects(old,e=>e.diagnostic===undefined);
+});
+test('preview timeout or cancellation during ignored body parsing cannot publish late diagnostics or success',async()=>{
+ for(const cancel of [false,true]){
+  const f=fixture(),controller=new AbortController(),pending=f.api.post('/api/product-tcp-preview',{productIds:['101']},{signal:controller.signal});await flush();
+  const body=deferred();f.requests[0].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
+  if(cancel)controller.abort();else f.advance(30000);
+  body.resolve({contract:'COS_PRODUCT_TCP_PREVIEW_V1',diagnostic:{stage:'preview_source',code:'source_unavailable'}});
+  await assert.rejects(pending,e=>e.diagnostic?.stage==='connection_transport'&&e.diagnostic.code===(cancel?'cancelled':'timeout'));
+ }
+});
 test('valid proof after6.5s updates only the current saved pair and remount reads it without transport',async()=>{
  const f=proofFixture(),{pending,index}=await startProof(f);f.advance(6500);
  const initial=await pending;assert.equal(initial.fieldMap.productConnectionsState,'pending');assert.equal(initial.fieldMap.productConnections,null);
