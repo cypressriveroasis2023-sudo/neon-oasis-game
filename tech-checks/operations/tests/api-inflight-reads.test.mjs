@@ -795,3 +795,11 @@ test('changed census cannot borrow saved proof during the presentation window',a
  const f=proofFixture(),first=await startProof(f);f.answer(first.index,exactReceipt(f));await first.pending;
  const fresh=await startProof(f,true,proofMap('b'.repeat(64)));f.advance(6500);assert.equal((await fresh.pending).fieldMap.productConnections,null);f.advance(23500);await flush();
 });
+
+test('scope preview uses existing authenticated wrapper, exact body, cancellation and denial gates',async()=>{
+ const f=fixture(),c=new AbortController(),p=f.api.post('/api/product-tcp-preview',{productIds:['123']},{signal:c.signal});await flush();
+ assert.equal(f.handshakes.length,1);assert.equal(f.requests.length,1);assert.equal(f.requests[0].init.headers.Authorization,'Bearer synthetic-session-a');assert.deepEqual(JSON.parse(f.requests[0].init.body),{path:'/api/product-tcp-preview',method:'POST',body:{productIds:['123']}});
+ c.abort();await assert.rejects(p);assert.equal(f.requests[0].init.signal.aborted,true);assert.equal(f.requests.length,1);
+ const denied=fixture({role:'service'});await assert.rejects(denied.api.post('/api/product-tcp-preview',{productIds:['123']}),status(401));assert.equal(denied.requests.length,0);
+ const late=fixture(),pending=late.api.post('/api/product-tcp-preview',{productIds:['123']});await flush();late.window.dispatchEvent(new Event('cos-private-data-invalidated'));late.answer(0,{contract:'COS_PRODUCT_TCP_PREVIEW_V1'});await assert.rejects(pending);assert.equal(late.requests.length,1);
+});
