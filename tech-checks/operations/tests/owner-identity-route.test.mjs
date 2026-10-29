@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 import {fixture,key} from './owner-identity-fixtures.mjs';
 import {unitId} from './native-placement-alias-fixtures.mjs';
+import {mappedFixture,unitKey as mappedKey} from './mapped-identity-fixture.mjs';
 const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const users={owner:{id:owner,actor,role:'owner',name:'Owner',code:'owner'},it:{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc',actor:'d0757b64-9623-4adc-afff-21cc7853e88a',role:'it',name:'Teddy Hopper',code:'it_technician'},service:{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285',actor:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',role:'service',name:'Abel Cervantes',code:'service_technician'}};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status});
 const req=(path,method='GET',body=null)=>new Request('https://platform.example/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-owner','Content-Type':'application/json'},body:JSON.stringify({path,method,body})});
-async function setup(role='owner'){
+async function setup(role='owner',mapped=false){
  const f=await fixture(),user=users[role],calls=[];f.sources.ownerCrosswalk.claims=[];
- const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'synthetic-service-key',fetch:async(url,init={})=>{
+ const mappedData=mappedFixture();if(mapped){f.sources=mappedData.sources;for(const d of f.sources.devices)d.source_last_seen_at=new Date(Date.now()-1000).toISOString();}
+ const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'synthetic-service-key',mhelpPlacementEnabled:mapped,fetch:async(url,init={})=>{
   const body=init.body?JSON.parse(init.body):null;calls.push({url,body});
   if(url.includes('/auth/v1/user'))return json({id:user.id});
   if(url.includes('/profiles?'))return json([{user_id:user.id,full_name:user.name,role:user.role,active:true,archived_at:null}]);
@@ -19,8 +21,10 @@ async function setup(role='owner'){
   if(url.endsWith('/cos_camera_identity_epochs_v1'))return json(f.sources.ownerEpochs.filter(e=>body.p_unit_keys.includes(e.unitKey)));
   if(url.includes('/camera_devices?'))return json(f.sources.devices);
   if(url.includes('/equipment_units?'))return json(f.sources.units);
-  if(url.includes('/vision_vigilant_unit_matches?'))return json([]);
-  if(url.includes('/vision_vigilant_devices?'))return json([]);
+  if(url.includes('/vision_vigilant_unit_matches?'))return json(mapped?f.sources.matches:[]);
+  if(url.includes('/vision_vigilant_devices?'))return json(mapped?f.sources.providers:[]);
+  if(url.endsWith('/cos_mhelp_placement_snapshot'))return json({upload:mappedData.upload});
+  if(url.endsWith('/cos_mhelp_location_snapshot'))return json({});
   if(url.endsWith('/cos_fleet_placement_evidence_v1'))return json([]);
   if(url.endsWith('/cos_owner_identity_confirm')){
    assert.equal(body.p_actor_user_id,actor);assert.equal(body.p_organization_id,org);assert.equal(body.p_claim.provenance,'owner_confirmation');assert.equal(body.p_claim.physicalResources[0].serial,'synthetic-serial-9101');
@@ -45,4 +49,17 @@ test('Owner cannot submit a fabricated provider proof or browser-selected actor'
 });
 test('unknown suffix-compatible route cannot reach identity mutations',async()=>{
  const {handler,calls}=await setup();const response=await handler(req('/api/owner-identity/anything/confirm','POST',{unitId,unitKey:key}));assert.equal(response.status,404);assert.equal(calls.some(c=>c.url.endsWith('/cos_owner_identity_confirm')),false);
+});
+
+for(const role of ['it','service'])test(role+' cannot access mapped identity preview',async()=>{
+ const {handler,calls}=await setup(role,true);const response=await handler(req('/api/owner-identity/mapped-preview','POST',{productId:'101',unitKey:mappedKey}));assert.equal(response.status,403);assert.equal(calls.some(c=>/cos_owner_identity|camera_devices|equipment_units|cos_mhelp_placement_snapshot/.test(c.url)),false);
+});
+test('Owner mapped preview reads current sources twice without any identity mutation',async()=>{
+ const {handler,calls}=await setup('owner',true);const response=await handler(req('/api/owner-identity/mapped-preview','POST',{productId:'101',unitKey:mappedKey}));const result=await response.json();assert.equal(response.status,200,JSON.stringify(result));assert.equal(result.reviewOnly,true);assert.equal(result.commitSupported,false);assert.equal(calls.filter(c=>c.url.endsWith('/cos_mhelp_placement_snapshot')).length,2);assert.equal(calls.some(c=>/cos_owner_identity_confirm|cos_owner_identity_revoke/.test(c.url)),false);
+});
+test('mapped preview digest cannot be used as an Owner identity confirmation',async()=>{
+ const {handler,calls}=await setup('owner',true);
+ const preview=await (await handler(req('/api/owner-identity/mapped-preview','POST',{productId:'101',unitKey:mappedKey}))).json();
+ const response=await handler(req('/api/owner-identity/confirm','POST',{unitId:preview.unitId,unitKey:mappedKey,reviewToken:preview.reviewDigest,requestId:'99999999-9999-4999-8999-999999999999',confirmationText:'Synthetic attempted confirmation.'}));
+ assert.equal(response.status,409);assert.equal(calls.some(c=>c.url.endsWith('/cos_owner_identity_confirm')),false);
 });
