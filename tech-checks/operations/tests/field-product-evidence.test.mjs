@@ -82,14 +82,14 @@ test('exact Product-ID TCP response works for an unlinked Field product and a pr
 });
 test('unverified or wrong-source TCP receipts never bypass a missing provider association',()=>{
  const f=fieldProductFixture();delete f.rows[0].camera.association;
- const fake={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:'b'.repeat(64),trackerVerifiedAt:f.fresh,
+ const fake={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:'b'.repeat(64),trackerVerifiedAt:f.fresh,
   items:f.upload.records.filter(p=>p.placement==='FIELD').map(p=>({productId:p.productId,status:'online',basis:'tcp_service_port',resourceId:'881',checkedAt:f.fresh,reason:'fake'}))};
  assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unverified');
 });
 
 test('authoritatively Unknown Product-ID TCP checks do not inherit older provider Online or Offline',()=>{
  const f=fieldProductFixture();
- const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',
+ const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',
   sourceSha256:f.upload.sourceSha256,trackerVerifiedAt:f.fresh,
   items:f.upload.records.filter(r=>r.placement==='FIELD').map(r=>({
    productId:r.productId,basis:'tcp_service_port',status:'unknown',checkedAt:null,

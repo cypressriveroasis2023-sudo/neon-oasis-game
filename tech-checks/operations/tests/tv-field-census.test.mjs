@@ -94,7 +94,7 @@ test('TV outage population honors current Product-ID TCP proof even when native 
  
 test('TV native rows use exact Unknown instead of older provider colors',()=>{
  const f=fieldProductFixture();
- const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:f.upload.sourceSha256,
+ const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:f.upload.sourceSha256,
   trackerVerifiedAt:f.fresh,
   items:f.upload.records.filter(r=>r.placement==='FIELD').map(r=>({
    productId:r.productId,status:'unknown',basis:'tcp_service_port',

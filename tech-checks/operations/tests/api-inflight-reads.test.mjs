@@ -733,7 +733,7 @@ for(const code of [200,401,403])test('submitted old write HTTP '+code+' stays un
 
 // Actual validator + synthetic transport/clock: no production payloads or tokens.
 const proofMap=(hash='a'.repeat(64))=>({...fleetMap,uploadInventory:{contract:'COS_MHELP_UPLOAD_INVENTORY_V1',countBasis:'mhelp_product_records_not_unique_physical_units',sourceSha256:hash,summary:{totalRecords:2,fieldRecords:1},records:[{productId:'1001',placement:'FIELD'},{productId:'1002',placement:'SHOP'}]}});
-const exactReceipt=(f,hash='a'.repeat(64))=>({contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1',sourceSha256:hash,trackerVerifiedAt:new Date(f.elapsed).toISOString(),items:[{productId:'1001',status:'online',basis:'tcp_service_port',checkedAt:new Date(f.elapsed).toISOString(),resourceId:'1',reason:'Synthetic completed check'}]});
+const exactReceipt=(f,hash='a'.repeat(64))=>({contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:hash,trackerVerifiedAt:new Date(f.elapsed).toISOString(),items:[{productId:'1001',status:'online',basis:'tcp_service_port',checkedAt:new Date(f.elapsed).toISOString(),resourceId:'1',reason:'Synthetic completed check'}]});
 async function startProof(f,force=false,map=proofMap()){
  const index=f.requests.length,pending=f.api.fleet(force);await flush();
  f.answer(index,fleetHealth);f.answer(index+1,map);await flush();
@@ -828,4 +828,17 @@ test('scope preview uses existing authenticated wrapper, exact body, cancellatio
  c.abort();await assert.rejects(p);assert.equal(f.requests[0].init.signal.aborted,true);assert.equal(f.requests.length,1);
  const denied=fixture({role:'service'});await assert.rejects(denied.api.post('/api/product-tcp-preview',{productIds:['123']}),status(401));assert.equal(denied.requests.length,0);
  const late=fixture(),pending=late.api.post('/api/product-tcp-preview',{productIds:['123']});await flush();late.window.dispatchEvent(new Event('cos-private-data-invalidated'));late.answer(0,{contract:'COS_PRODUCT_TCP_PREVIEW_V1'});await assert.rejects(pending);assert.equal(late.requests.length,1);
+});
+test('pre-attribution cached V1 proof cannot bridge a pending read or return late',async()=>{
+ const f=proofFixture(),first=await startProof(f);f.answer(first.index,exactReceipt(f));const saved=await first.pending;
+ saved.fieldMap.productConnections.contract='COS_EXACT_PRODUCT_CONNECTIONS_V1';
+ const fresh=await startProof(f,true);f.advance(6500);const pending=await fresh.pending;
+ assert.equal(pending.fieldMap.productConnections,null);assert.equal(pending.fieldMap.uploadInventory.records.length,saved.fieldMap.uploadInventory.records.length);
+ const obsolete={...exactReceipt(f),contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'};f.answer(fresh.index,obsolete);await flush();
+ const value=await f.api.fleet();assert.equal(value.fieldMap.productConnections,null);assert.equal(value.fieldMap.productConnectionsState,'rejected');
+});
+test('identity-source 403 preserves the existing private-session invalidation rather than retaining inventory',async()=>{
+ const f=proofFixture(),read=await startProof(f),rejected=assert.rejects(read.pending);
+ f.answer(read.index,{error:'Saved connection source could not be verified.',diagnostic:{stage:'endpoint_evaluation',code:'source_unavailable'}},403);
+ await rejected;assert.ok(f.invalidations.includes('cos-private-data-invalidated'));
 });

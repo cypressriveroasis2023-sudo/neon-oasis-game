@@ -10,7 +10,7 @@ import {savedCameraConnection} from '../../supabase/functions/cos-operations-pag
  * Viewer read and independently validate the complete Product-ID census.
  * This model does NOT fetch endpoints, trigger checks or write inventory.
  */
-export const EXACT_PRODUCT_CONNECTION_CONTRACT='COS_EXACT_PRODUCT_CONNECTIONS_V1' as const;
+export const EXACT_PRODUCT_CONNECTION_CONTRACT='COS_EXACT_PRODUCT_CONNECTIONS_V2' as const;
 export const VERIFIED_TRACKER_IP_CONTRACT='COS_VERIFIED_2027_PRODUCT_IPS_V1' as const;
 export const TRACKER_CONNECTION_CENSUS_V2='COS_VERIFIED_2027_PRODUCT_IPS_V2' as const;
 export const TRACKER_CONNECTION_HOLDS=['placement_mismatch','customer_mismatch','identity_mismatch','tracker_restriction'] as const;

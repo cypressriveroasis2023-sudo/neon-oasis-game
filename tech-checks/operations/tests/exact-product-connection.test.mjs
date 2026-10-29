@@ -173,3 +173,12 @@ test('a stale reviewed mHelp source cannot authorize currently online camera pro
  live.lastApiReadAt=new Date(now-46*60*1000).toISOString();
  assert.equal(run(live,tracker()),null);
 });
+
+test('cached pre-attribution V1 positives and negatives are rejected without renewing proof time',()=>{
+ const current=run();const old={...current,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'};
+ assert.equal(readExactProductConnections(old,sha,['1001','1002','1003'],now),null);
+ const accepted=readExactProductConnections(current,sha,['1001','1002','1003'],now);
+ assert.equal(accepted.get('1001').checkedAt,current.items[0].checkedAt);
+ assert.equal(accepted.get('1002').checkedAt,current.items[1].checkedAt);
+ assert.equal(readExactProductConnections(current,sha,['1001','1002','1003'],now+20*60_000),null);
+});
