@@ -57,7 +57,7 @@ test('the audit exports each Field Product ID once, preserves suffixes and sourc
  assert.throws(()=>fieldProductEvidenceCsv([...view.items,view.items[0]],view.sourceSha256,view.receivedAt),/invalid/);
 });
 
-test('exact Product-ID TCP response works for an unlinked Field product and a provider-unassociated native row',()=>{
+test('IP-only TCP response cannot certify an unlinked product or unassociated native row',()=>{
  const f=fieldProductFixture();
  delete f.rows[0].camera.association;
  const tracker={contract:VERIFIED_TRACKER_IP_CONTRACT,workbookId:TRACKER_IP_WORKBOOK,
@@ -70,15 +70,16 @@ test('exact Product-ID TCP response works for an unlinked Field product and a pr
  const exact=buildExactProductConnections(f.upload,tracker,[device(881,'8.8.8.8',true),device(882,'9.9.9.9',false),device(883,'4.2.2.2',true)],f.now);
  assert.ok(exact);
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,exact);
- assert.equal(view.items[0].state,'online');assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
- assert.equal(view.items[0].evidence.observations[0].kind,'connection');
+ assert.equal(view.items[0].state,'unverified');assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
+ assert.equal(view.items[0].evidence.observations.length,0);
+ assert.match(view.items[0].reason,/Product-to-resource membership/);
  assert.equal(view.items[0].evidence.video,'not_verified');
  assert.equal(view.items[3].state,'support');
- assert.equal(view.items[4].state,'offline');assert.equal(view.items[4].evidence.basis,'connection');
- assert.equal(view.items[4].evidence.observations[0].resourceId,'882');
+ assert.equal(view.items[4].state,'unverified');assert.equal(view.items[4].evidence.basis,'connection');
+ assert.equal(view.items[4].evidence.observations.length,0);
  assert.equal(view.items[5].state,'review');assert.equal(view.items[6].state,'inactive');
  assert.equal(view.total,7);assert.equal(Object.values(view.counts).reduce((sum,v)=>sum+v,0),7);
- assert.equal(fleetAddressHealth(view.items,f.rows,'camera').get('1005'),'offline');
+ assert.equal(fleetAddressHealth(view.items,f.rows,'camera').get('1005'),'unknown');
 });
 test('unverified or wrong-source TCP receipts never bypass a missing provider association',()=>{
  const f=fieldProductFixture();delete f.rows[0].camera.association;

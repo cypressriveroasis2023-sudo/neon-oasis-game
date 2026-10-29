@@ -75,12 +75,12 @@ test('TV outage population honors current Product-ID TCP proof even when native 
     publicIp:p.productId==='1001'?'8.8.8.8':p.productId==='1005'?'9.9.9.9':null}))};
  const endpoint=(deviceId,ip)=>({deviceId,publicIp:ip,expectedPorts:[80],monitoringEnabled:true,connectionRevision:3,
   portStatus:{80:{online:false,attempted:true},_connection:{ip,revision:3,status:'offline',reachable:false,checkedAt:f.fresh,consecutiveFailures:1,confirmedOutage:false}}});
- const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(55,'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now);
+ const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(55,'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now,new Map([['1001',['55']]]));
  assert.ok(receipt);
  const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
  // Product 1002 has a legacy provider Offline observation but no valid
  // Product-ID TCP check: the strict receipt records UNKNOWN, not an outage.
- assert.equal(tv.board.counts.offline,2);
+ assert.equal(tv.board.counts.offline,1);
  assert.equal(tv.board.items.find(p=>p.productId==='1002').status,'unverified');
  const physical=tv.rows.map(row=>({unit:row.unit,health:row.camera}));
  const outages=tvCensusOutages(tv.board,physical);
@@ -88,8 +88,8 @@ test('TV outage population honors current Product-ID TCP proof even when native 
  assert.equal(outages[0].health.state,'offline');
  assert.equal(outages[0].health.basis,'connection');
  const sourceOnly=tv.board.items.filter(p=>p.status==='offline'&&!outages.some(o=>o.productId===p.productId));
- assert.deepEqual(sourceOnly.map(p=>p.productId),['1005']);
- assert.equal(sourceOnly[0].linked.evidence.association,'exact_product_id_tracker_endpoint');
+ assert.deepEqual(sourceOnly,[]);
+ assert.equal(tv.board.items.find(p=>p.productId==='1005').status,'unverified');
 });
  
 test('TV native rows use exact Unknown instead of older provider colors',()=>{

@@ -141,7 +141,7 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
 export function buildExactProductConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()
+ acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
  if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
@@ -197,6 +197,7 @@ export function buildExactProductConnections(
   if(devicesForIp.length!==1)return unknown(pid,devicesForIp.length?'More than one saved endpoint claims this tracker IP; verify exact device ownership.':'No saved camera endpoint matches the current tracker IP.');
   const result=completedSavedTcpCheck(devicesForIp[0],now);
   if(!result)return unknown(pid,'No fresh, completed, exact-target TCP/service-port check is available.');
+  if(!resourceMembership?.get(pid)?.includes(String(devicesForIp[0].deviceId)))return unknown(pid,'No current verified Product-to-resource membership is available for this saved endpoint.');
   return {productId:pid,...result};
  });
  if(items.length!==authority.field)return null;
