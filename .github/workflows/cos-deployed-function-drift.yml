@@ -1,0 +1,22 @@
+# Detects hand-deployments of edge functions that were not recorded in version control.
+# Deliberately NOT triggered on push or pull_request: it must never block unrelated
+# work, and it reads live platform state rather than the commit under test.
+name: Deployed function drift
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare deployed function against the reviewed record
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node .github/scripts/verify-deployed-function-digest.mjs
