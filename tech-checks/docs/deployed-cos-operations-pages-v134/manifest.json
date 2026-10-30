@@ -1,0 +1,133 @@
+{
+ "record": "Verbatim deployed source of the ACTIVE edge function, retrieved read-only from the platform.",
+ "why": "The deployed function was published by hand (no workflow in .github/workflows deploys Supabase functions). Its source was never committed, so production was unreproducible and a deploy from any branch would have silently replaced it. This directory is a record only: nothing here is imported, built, or deployed.",
+ "slug": "cos-operations-pages",
+ "version": 134,
+ "deployedAtUtc": "2026-10-29T21:40:46.737Z",
+ "retrievedAtUtc": "2026-10-30T23:49:02Z",
+ "ezbr_sha256": "fc3e40da7d5dffc53e8a66e8c7551026440ea63ad3d8d91f4b826474cb1c20e9",
+ "files": [
+  {
+   "name": "serve.ts",
+   "bytes": 1027995,
+   "sha256": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12"
+  },
+  {
+   "name": "productTcpRuntime.ts",
+   "bytes": 148548,
+   "sha256": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db"
+  },
+  {
+   "name": "deno.json",
+   "bytes": 63,
+   "sha256": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  }
+ ],
+ "bundledSourcesOfProductTcpRuntime": [
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/attestationTransport.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/cancellableIo.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/fleetReadPlan.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/fullSource.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/model.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/nativeContextAdapter.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/sourceReader.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/exact-product-producer/statusIntegration.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/_shared/scheduledDirectService.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/cameraEvidence.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/googleSheets.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/mhelp2027ConnectionCensus.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/mhelp2027ProductIpReader.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/mhelpEquipmentCsvPreview.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/mhelpProductConnectionSource.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/mhelpUploadPlacement.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/ownerIdentityCrosswalk.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/placementProjection.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/productResourceMembership.ts",
+   "onMain": false
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/unitTracker.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/verifiedHealthIdentity.ts",
+   "onMain": true
+  },
+  {
+   "bundledSource": "supabase/functions/cos-operations-pages/verifiedHealthIdentityScope.ts",
+   "onMain": true
+  }
+ ],
+ "missingFromMain": {
+  "recoverableFrom_origin/draft/cos-exact-product-tcp-20261028": [
+   "supabase/functions/_shared/exact-product-producer/attestationTransport.ts",
+   "supabase/functions/_shared/exact-product-producer/cancellableIo.ts",
+   "supabase/functions/_shared/exact-product-producer/fleetReadPlan.ts",
+   "supabase/functions/_shared/exact-product-producer/fullSource.ts",
+   "supabase/functions/_shared/exact-product-producer/model.ts",
+   "supabase/functions/_shared/exact-product-producer/nativeContextAdapter.ts",
+   "supabase/functions/_shared/exact-product-producer/sourceReader.ts",
+   "supabase/functions/_shared/exact-product-producer/statusIntegration.ts"
+  ],
+  "inNoCommitOnAnyBranch": [
+   "supabase/functions/cos-operations-pages/productResourceMembership.ts"
+  ]
+ },
+ "doNotDeployWarning": "Deploying cos-operations-pages from main or from the draft branch replaces the running implementation and removes productTcpRuntime.ts. Reconcile the drift under review before any deploy of this function.",
+ "latentHazard": "The deployed scopedProductTcpEnabled===true branch POSTs to /functions/v1/cos-exact-product-tcp, which is NOT a deployed function. The flag reads false in the bundle. Do not enable it."
+}
