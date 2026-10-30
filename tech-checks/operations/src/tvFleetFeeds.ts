@@ -14,7 +14,14 @@ type Callbacks={
 };
 
 /** Accept each verified feed as it arrives; an optional outage cannot hide locations. */
-export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false):Promise<string[]> {
+/** `includeRouters` keeps the router saved read on its own cadence. The
+ * camera saved reads (field map + camera health) run more often than the
+ * default interval so evidence cannot expire between reads; routers have no
+ * such freshness constraint and are not cached by api.fleetSource, so reading
+ * them on the camera cadence would simply increase /api/routers traffic for
+ * no benefit. Omitting it preserves the previous behaviour of reading all
+ * three together, which is what a manual refresh and the initial load want. */
+export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false,includeRouters=true):Promise<string[]> {
   const errors:string[]=[];
   let field:ReturnType<typeof checkedFieldMap>|null=null,health:Health|null=null;
   const read=async<T>(label:string,path:string,check:(value:any)=>T,accept:(value:T)=>void|Promise<void>)=>{
@@ -24,7 +31,7 @@ export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false):
   await Promise.all([
     read('Field locations','/api/field-map',checkedFieldMap,async snapshot=>{field=snapshot;await callbacks.field(snapshot);if(health)await callbacks.health(reconcileFleetSnapshot(health,snapshot).health);}),
     read('Camera Health','/api/camera-health/summary-v3',validateCameraHealth,async snapshot=>{health=snapshot;await callbacks.health(field?reconcileFleetSnapshot(snapshot,field).health:snapshot);}),
-    read('Routers','/api/routers',readRouterSnapshot,callbacks.routers)
+    ...(includeRouters?[read('Routers','/api/routers',readRouterSnapshot,callbacks.routers)]:[])
   ]);
   return errors;
 }

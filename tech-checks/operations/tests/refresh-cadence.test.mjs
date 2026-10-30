@@ -10,6 +10,11 @@ test('returning to a recent tab and backwards clock movement do not force reads'
 // shortened to keep evidence inside its freshness window.
 test('camera saved-data reads have their own visible-tab interval, shorter than the default',()=>{
  const start=1_000_000;
+ // James set this figure explicitly at 10 minutes on 2026-10-30, so the exact
+ // value is asserted as well as the relationships it has to satisfy. The
+ // relational checks alone would let the requirement drift silently.
+ assert.equal(CAMERA_AUTO_REFRESH_MS,600_000,'approved camera saved-read cadence is 10 minutes');
+ assert.equal(AUTO_REFRESH_MS,900_000,'the default interval for routers, power and other consumers is unchanged');
  assert.ok(CAMERA_AUTO_REFRESH_MS<AUTO_REFRESH_MS,'camera evidence is read more often than default consumers');
  for(const age of [0,60_000,CAMERA_AUTO_REFRESH_MS-1])assert.equal(automaticRefreshDue(start,start+age,false,CAMERA_AUTO_REFRESH_MS),false);
  assert.equal(automaticRefreshDue(start,start+CAMERA_AUTO_REFRESH_MS,false,CAMERA_AUTO_REFRESH_MS),true);
