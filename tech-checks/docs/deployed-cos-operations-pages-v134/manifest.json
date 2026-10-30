@@ -129,5 +129,39 @@
   ]
  },
  "doNotDeployWarning": "Deploying cos-operations-pages from main or from the draft branch replaces the running implementation and removes productTcpRuntime.ts. Reconcile the drift under review before any deploy of this function.",
- "latentHazard": "The deployed scopedProductTcpEnabled===true branch POSTs to /functions/v1/cos-exact-product-tcp, which is NOT a deployed function. The flag reads false in the bundle. Do not enable it."
+ "latentHazard": "The deployed scopedProductTcpEnabled===true branch POSTs to /functions/v1/cos-exact-product-tcp, which is NOT a deployed function. The flag reads false in the bundle. Do not enable it.",
+ "draftBranchComparison": {
+  "branch": "origin/draft/cos-exact-product-tcp-20261028",
+  "finding": "The draft branch is NOT the deployed tree either. Production runs a third state that is neither main nor this branch.",
+  "producerFilesOnDraft": 13,
+  "producerFilesUsedByDeployedBundle": 8,
+  "onDraftButUnusedByProduction": [
+   "collector.ts",
+   "groupCollector.ts",
+   "legacyContextAdapter.ts",
+   "receiptAdapter.ts",
+   "runtimeWiring.ts",
+   "tcpProbe.ts"
+  ],
+  "literalOverlapDeployedVsDraft": {
+   "sourceReader.ts": "100%",
+   "statusIntegration.ts": "100%",
+   "fleetReadPlan.ts": "100%",
+   "nativeContextAdapter.ts": "100%",
+   "fullSource.ts": "83%",
+   "attestationTransport.ts": "56%",
+   "model.ts": "50%"
+  },
+  "literalOverlapCaveat": "Quoted-literal overlap is a weak heuristic and weakest on the smallest files; esbuild inlining can depress it. Treat 100% as strong evidence of sameness and the lower figures as unresolved, not as proven divergence."
+ },
+ "orphanedSources": {
+  "files": [
+   "supabase/functions/_shared/exact-product-producer/cancellableIo.ts",
+   "supabase/functions/cos-operations-pages/productResourceMembership.ts"
+  ],
+  "status": "Present in NO commit on ANY branch, and absent from the draft branch. The deployed bundle was their only copy.",
+  "recoveredTo": "recovered-orphans/ (post-esbuild output, types stripped, some identifiers renamed; evidence, not drop-in source)",
+  "consequence": "Had cos-operations-pages been redeployed from any branch before this record, both files would have been permanently lost."
+ },
+ "reconciliationIsNotAMerge": "Because production is a third tree, reconciliation requires deciding which tree is authoritative. That is an author decision, not a mechanical merge."
 }
