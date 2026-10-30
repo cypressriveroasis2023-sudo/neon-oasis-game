@@ -126,7 +126,10 @@ test('a failed saved read waits ten minutes to retry and manual reload remains i
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect.poll(()=>counts(state)).toEqual({health:4,map:4,routers:3,power:3});
- await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');assertReadOnly(state);
+ // At minute 20, the saved minute-3 observation is still within the unchanged 20-minute freshness window.
+ expect(await page.evaluate(()=>Date.now())).toBe(start+2*CAMERA_AUTO_REFRESH_MS);
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('0');assertReadOnly(state);
 });
 
 test('failed health keeps its slow map shared through manual refresh and Fleet reentry',async({page})=>{
