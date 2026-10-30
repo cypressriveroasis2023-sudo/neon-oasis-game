@@ -128,7 +128,7 @@
    "supabase/functions/cos-operations-pages/productResourceMembership.ts"
   ]
  },
- "doNotDeployWarning": "Deploying cos-operations-pages from main or from the draft branch replaces the running implementation and removes productTcpRuntime.ts. Reconcile the drift under review before any deploy of this function.",
+ "doNotDeployWarning": "Do not deploy bare main or the older draft. Reconcile from released native source 3bb41252 under review.",
  "latentHazard": "The deployed scopedProductTcpEnabled===true branch POSTs to /functions/v1/cos-exact-product-tcp, which is NOT a deployed function. The flag reads false in the bundle. Do not enable it.",
  "draftBranchComparison": {
   "branch": "origin/draft/cos-exact-product-tcp-20261028",
@@ -154,14 +154,45 @@
   },
   "literalOverlapCaveat": "Quoted-literal overlap is a weak heuristic and weakest on the smallest files; esbuild inlining can depress it. Treat 100% as strong evidence of sameness and the lower figures as unresolved, not as proven divergence."
  },
- "orphanedSources": {
-  "files": [
-   "supabase/functions/_shared/exact-product-producer/cancellableIo.ts",
-   "supabase/functions/cos-operations-pages/productResourceMembership.ts"
-  ],
-  "status": "Present in NO commit on ANY branch, and absent from the draft branch. The deployed bundle was their only copy.",
-  "recoveredTo": "recovered-orphans/ (post-esbuild output, types stripped, some identifiers renamed; evidence, not drop-in source)",
-  "consequence": "Had cos-operations-pages been redeployed from any branch before this record, both files would have been permanently lost."
+ "CORRECTION": {
+  "retracted": "An earlier revision of this manifest and of commit 83426ed0 stated that productResourceMembership.ts and cancellableIo.ts appear in no commit on any branch and that the deployed bundle was their only copy. The first half was accurate only of the remote branches visible here; the claim of \"never committed\" was wrong and is retracted.",
+  "authority": "Corrected by the author (Vision) from the original working tree and deployment records.",
+  "productResourceMembership.ts": {
+   "introducedIn": "75e717698e7c1f0a695a3257eca5a42f7d734071",
+   "revisedIn": [
+    "410bb816",
+    "475e3b2d"
+   ],
+   "originalSurvivesAt": "/workspace/cos-connection-membership (author machine)",
+   "status": "Committed locally and extant. Not published to the remote branches. Does NOT need reconstructing from the bundle."
+  },
+  "releasedNativeSource": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7 - use THIS as the reconciliation starting point, not the older draft."
  },
- "reconciliationIsNotAMerge": "Because production is a third tree, reconciliation requires deciding which tree is authoritative. That is an author decision, not a mechanical merge."
+ "authorVerifiedDraftComparison": {
+  "draftHead": "76dd8b76",
+  "identical": [
+   "fleetReadPlan",
+   "model",
+   "nativeContextAdapter",
+   "sourceReader",
+   "statusIntegration"
+  ],
+  "different": [
+   "attestationTransport",
+   "fullSource"
+  ],
+  "missingAtDraftHead": [
+   "cancellableIo.ts"
+  ],
+  "myHeuristicWasWrongOn": "model.ts - my quoted-literal overlap scored it 50% and flagged it DIFFERENT; the author confirms it is IDENTICAL. The heuristic produced a false positive for divergence, as its recorded caveat warned it might. It was correct on attestationTransport and fullSource."
+ },
+ "deploymentProvenance": {
+  "method": "Deployed by the author through the approved identity-repair task, as an OVERLAY preserving verified v133 plus released native source 3bb41252 - not a deployment of the whole main tree.",
+  "deployedAtUtc": "2026-10-29T21:40:46.737Z",
+  "runtimeFileSha256": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+  "archiveSha256": "fc3e40da7d5dffc53e8a66e8c7551026440ea63ad3d8d91f4b826474cb1c20e9",
+  "independentCrossCheck": "The productTcpRuntime.ts retrieved read-only here hashes to the runtime-file SHA256 above, matching the deployment records byte-for-byte from the other direction.",
+  "retained": "Original manifest, preparation script, preservation checks and rollback record all still exist on the author machine."
+ },
+ "deploymentCiStatus": "Separate reviewed backend delivery was intentional for this release. Permanently omitting deployment CI was NOT a documented decision, and the source-publication gap needs fixing. Agreed order: (1) preserve the exact native source and a reproducible build in reviewed version control, (2) add CI that VERIFIES the artifact without deploying it, (3) automated deployment is a separate decision requiring approval."
 }

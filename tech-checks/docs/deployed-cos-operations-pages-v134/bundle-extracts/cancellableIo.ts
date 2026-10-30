@@ -1,7 +1,7 @@
-// RECOVERED ORPHAN - not original source.
+// BUNDLE EXTRACT - evidence only, NOT the authoritative source.
 // Extracted verbatim from the deployed cos-operations-pages v134 bundle
-// (productTcpRuntime.ts), which is the ONLY known copy of this file. It exists
-// in no commit on any branch of this repository.
+// (productTcpRuntime.ts) as a cross-check of what production runs.
+// The authoritative original is held by the author; see README.md Correction.
 // Original path: tech-checks/supabase/functions/_shared/exact-product-producer/cancellableIo.ts
 // This is post-esbuild output: types are stripped and some identifiers are
 // renamed (value2, rows2). Treat it as evidence of what production runs, not as
