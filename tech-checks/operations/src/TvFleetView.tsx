@@ -10,7 +10,7 @@ import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds} from './tvFleetFeeds';
-import {automaticRefreshDue} from './refreshCadence';
+import {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -27,20 +27,24 @@ const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546]
 const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
-  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),alive=useRef(false);
+  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false);
   const retryAt=useRef(0),retryTimer=useRef<number|null>(null),retryUsed=useRef(false),sessionBlocked=useRef(false),retryRead=useRef(()=>{});
   const cancelRetry=()=>{if(retryTimer.current!==null)window.clearTimeout(retryTimer.current);retryTimer.current=null;};
   const proofUpdatePending=useRef(false);
-  const refresh=useCallback(async(force=false,proofUpdate=false)=>{
+  // `include` selects which saved reads this pass performs. Each side advances
+  // only its own attempt clock, so a camera-only pass cannot postpone the router
+  // deadline and a router-only pass cannot postpone the camera deadline.
+  const refresh=useCallback(async(force=false,proofUpdate=false,include:{camera?:boolean;routers?:boolean}={})=>{
+    const readCamera=include.camera!==false,readRouters=include.routers!==false;
     if(running.current||!alive.current||sessionBlocked.current)return;
     if(force){cancelRetry();retryAt.current=0;}
     const initialAttempt=lastAttempt.current===0;
-    running.current=true;if(!proofUpdate)lastAttempt.current=Date.now();const request=generation.current;
+    running.current=true;if(!proofUpdate&&readCamera)lastAttempt.current=Date.now();if(!proofUpdate&&readRouters)lastRouterAttempt.current=Date.now();const request=generation.current;
     try{
       const current=()=>alive.current&&request===generation.current;
       // Stage each response until this read settles. A new placement response
       // must never be displayed with the preceding read's health claims.
-      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null=null,transientFieldFailure=false,recoveryBlocked=false;
+      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,transientFieldFailure=false,recoveryBlocked=false;
       const errors=await loadTvFleetFeeds(api,{
         readFailure:(source,status)=>{if(source==='fieldMap')transientFieldFailure=transientReadStatus(status);if(!transientReadStatus(status))recoveryBlocked=true;},
         healthUnavailable:()=>{nextHealth=null;},
@@ -52,9 +56,9 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         },
         health:health=>{nextHealth=health;},
         routers:routers=>{nextRouters=routers;}
-      },force);
+      },force,{camera:readCamera,routers:readRouters});
       if(current()){
-        setData(previous=>({...previous,...nextField,health:nextField?nextHealth:null,routers:nextRouters}));
+        setData(previous=>({...previous,...(readCamera?nextField:null),health:readCamera?(nextField?nextHealth:null):previous.health,routers:nextRouters===undefined?previous.routers:nextRouters}));
         setClock(Date.now());setError(errors.join(' '));
         // One cold-load recovery only, after the complete initial read settles.
         // This reads saved records and never schedules a provider probe.
@@ -64,22 +68,22 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){setData(previous=>({...previous,health:null,routers:null}));setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
-    finally{if(request===generation.current){running.current=false;if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true);}}}
+    finally{if(request===generation.current){running.current=false;if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true,{routers:false});}}}
   },[api]);
   useEffect(()=>{
     if(!enabled){setData(empty);return;}
-    alive.current=true;sessionBlocked.current=false;lastAttempt.current=0;retryUsed.current=false;retryAt.current=0;
+    alive.current=true;sessionBlocked.current=false;lastAttempt.current=0;lastRouterAttempt.current=0;retryUsed.current=false;retryAt.current=0;
     retryRead.current=()=>{
       if(!alive.current||sessionBlocked.current||document.hidden||running.current||retryUsed.current||!retryAt.current||Date.now()<retryAt.current)return;
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
     };
     void refresh();
-    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh(true);};
+    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;setData(empty);setError('Sign in again to load fleet information.');};
     // The API has already fenced and validated the late proof. Reauthorize
     // and adopt its cached pair without moving the automatic refresh clock.
-    const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true);};
+    const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true,{routers:false});};
     document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
     return()=>{alive.current=false;proofUpdatePending.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
   },[enabled,refresh]);

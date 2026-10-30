@@ -57,7 +57,18 @@ export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilte
    &&(view!=='verify'||r.locationNeedsReview);
  });
 }
-export function fleetDashboardSummary(rows:FleetDashboardRow[]){return {field:rows.filter(r=>r.placement==='field').length,online:rows.filter(r=>!r.support&&r.cameraState==='online').length,offline:rows.filter(r=>!r.support&&r.cameraState==='offline').length,unknown:rows.filter(r=>!r.support&&r.cameraState==='unknown').length,verify:rows.filter(r=>r.locationNeedsReview).length};}
+/** Health headline counts cover operational placement only. Shop/root and
+ * inactive equipment keeps its own accurate unit-level state - a bench Sniper
+ * whose ports do not answer still reads IP / PORT OFFLINE on its record - but
+ * it is not a Field outage and must not be counted as one. Without this,
+ * deactivated direct-connection families (SNIPER/SNIPER2/SNIPER4/CAMV, whose
+ * state in fieldCameraHealth is assigned from the connection result without
+ * the `operational` check the camera families get) landed in the OFFLINE tile:
+ * observed 2026-10-30 as 106 offline against 2 genuinely down. Field-or-unknown
+ * matches `operational` in fieldCameraHealth and `evidenceCoverage` in
+ * cameraEvidence, so unresolved placement is still counted rather than hidden. */
+const operationalPlacement=(row:FleetDashboardRow)=>['field','unknown'].includes(row.placement);
+export function fleetDashboardSummary(rows:FleetDashboardRow[]){const health=rows.filter(r=>!r.support&&operationalPlacement(r));return {field:rows.filter(r=>r.placement==='field').length,online:health.filter(r=>r.cameraState==='online').length,offline:health.filter(r=>r.cameraState==='offline').length,unknown:health.filter(r=>r.cameraState==='unknown').length,verify:rows.filter(r=>r.locationNeedsReview).length};}
 export function discoveryNeedsSetup(items:any[],rows:FleetDashboardRow[]){
  return items.filter(item=>{const key=typeof item.name==='string'?canonicalCameraUnit(item.name):null;return key?.startsWith('HELIOS|')&&Number.isSafeInteger(item.installationId)&&rows.filter(r=>canonicalCameraUnit(r.name)===key).length!==1;});
 }

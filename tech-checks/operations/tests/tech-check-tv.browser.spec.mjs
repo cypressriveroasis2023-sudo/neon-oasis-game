@@ -1,4 +1,5 @@
 import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -89,7 +90,7 @@ test('TV link fills the host and sees a saved update without a remote desktop co
   const {state,frame}=await setup(page);
   await expect(page.locator('#hostToolbar')).toBeHidden();
   await expect(frame.locator('.tech-check-tv-footer')).toContainText('Jobs/tasks updated');
-  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Work board refresh 60s · Saved camera reads 15 min · Page rotation');
+  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Work board refresh 60s · Saved camera reads 10 min · Page rotation');
   await expect(frame.getByRole('button',{name:'Save Schedule & Assignment'})).toHaveCount(0);
   state.tasks[0].instructions='The return rack is ready';
   await page.clock.fastForward(60000);
@@ -377,7 +378,7 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
  await expect(frame.locator('.tv-fleet-record')).toHaveCount(1);
  state.fleetFailures['/api/camera-health/summary-v3']=503;
- await page.clock.runFor(15*60000);
+ await page.clock.runFor(CAMERA_AUTO_REFRESH_MS);
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health');
  await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
  // The accepted equipment census survives a failed refresh; it is not zero inventory.
@@ -389,7 +390,7 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  // Keep the real network's bounded timeout on real time at the scheduled
  // recovery boundary; a 15-minute virtual jump can otherwise outrun I/O.
  const firstFleetRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
- const scheduledRecovery=firstFleetRead+2*15*60000;
+ const scheduledRecovery=firstFleetRead+2*CAMERA_AUTO_REFRESH_MS;
  const untilRecovery=scheduledRecovery-await page.evaluate(()=>Date.now());
  expect(untilRecovery).toBeGreaterThan(1000);
  await page.clock.runFor(untilRecovery-1000);
@@ -446,7 +447,7 @@ test('initial field-map HTTP546 retries one shared saved pair after 30 seconds a
  expect(savedReadCounts(state)).toEqual({'field-map':2,'camera-health/summary-v3':2,routers:2});
  expect(state.fleetRequests.every(r=>r.method==='GET')).toBe(true);
  expect(state.cameraRows[0].serviceEvidence.observedAt).toBe(time);
- await page.clock.runFor(899999);expect(savedReadCounts(state)['field-map']).toBe(2);
+ await page.clock.runFor(CAMERA_AUTO_REFRESH_MS-1);expect(savedReadCounts(state)['field-map']).toBe(2);
  await page.clock.runFor(30001);await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(3);
  expect(state.writes).toEqual([]);
 });
@@ -455,7 +456,7 @@ test('persistent initial HTTP546 has only one short retry and never displays zer
  const {state,frame}=await coldFailure(page);await page.clock.runFor(30000);
  await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(2);
  await expect(frame.locator('.tv-fleet-loading')).toHaveText('Fleet information is unavailable.');
- await page.clock.runFor(14*60000);expect(savedReadCounts(state)['field-map']).toBe(2);
+ await page.clock.runFor(CAMERA_AUTO_REFRESH_MS-60000);expect(savedReadCounts(state)['field-map']).toBe(2);
  await expect(frame.locator('.tv-fleet-summary')).toContainText('Field equipment unavailable');
  await expect(frame.locator('.tv-fleet-summary')).toContainText('— GPS-verified');
  expect(state.writes).toEqual([]);
@@ -549,8 +550,8 @@ for(const mode of ['map','camera'])test('TV '+mode+' adopts late validated proof
   await expect(frame.locator('.tv-fleet-summary')).toContainText('0 offline');
  }else await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
  expect(state.proofReads).toBe(1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
- // Adopting a cached proof must not restart the15-minute cadence.
- const untilNext=initialRead+15*60000-await page.evaluate(()=>Date.now());
+ // Adopting a cached proof must not restart the camera saved-read cadence.
+ const untilNext=initialRead+CAMERA_AUTO_REFRESH_MS-await page.evaluate(()=>Date.now());
  await page.clock.runFor(untilNext-1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
  await page.clock.runFor(1);await expect.poll(()=>state.fleetRequests.filter(r=>r.path==='/api/field-map').length).toBe(2);
  expect(state.writes).toEqual([]);

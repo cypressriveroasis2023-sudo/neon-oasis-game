@@ -58,11 +58,15 @@ function fixture({autoReply=true}={}){
 async function prewarm(f){const pending=f.api.fleet();await flush();f.answerPair();return pending;}
 async function boot(){const f=fixture(),hook=f.mount();await flush();f.answerPair();await flush();assert.equal(hook.loading,false);return {f,hook};}
 
-test('a view mounting on a fourteen-minute-old cache rereads at the original fifteen-minute deadline',async()=>{
- const f=fixture(),saved=await prewarm(f);await f.advance(14*60000);const hook=f.mount();await flush();
+// The rule is that the reread deadline stays anchored to the ORIGINAL read,
+// so adopting a cache on mount cannot postpone it by a further full interval.
+// Expressed against CAMERA_AUTO_REFRESH_MS so the cadence can change without
+// the assertions silently encoding an old constant.
+test('a view mounting on a nearly-due cache rereads at the original deadline, not a full interval later',async()=>{
+ const f=fixture(),saved=await prewarm(f);await f.advance(CAMERA_AUTO_REFRESH_MS-60000);const hook=f.mount();await flush();
  assert.equal(hook.fleet,saved);assert.equal(hook.loading,false);assert.equal(f.requests.length,2);
- await f.advance(60000);assert.equal(f.requests.length,4,'cache adoption must not postpone the saved-data read to minute twenty-nine');assert.equal(hook.loading,true);assert.equal(hook.fleet,saved,'a pending pair retains the last complete saved snapshot');
- f.answerPair(2);await flush();assert.equal(hook.loading,false);assert.equal(hook.fleet.readStartedAt,start+15*60000);assert.notEqual(hook.fleet,saved);
+ await f.advance(60000);assert.equal(f.requests.length,4,'cache adoption must not postpone the saved-data read by another full interval');assert.equal(hook.loading,true);assert.equal(hook.fleet,saved,'a pending pair retains the last complete saved snapshot');
+ f.answerPair(2);await flush();assert.equal(hook.loading,false);assert.equal(hook.fleet.readStartedAt,start+CAMERA_AUTO_REFRESH_MS);assert.notEqual(hook.fleet,saved);
 });
 
 test('snapshot update adoption cannot reset the actual pair deadline',async()=>{
@@ -77,9 +81,11 @@ test('delayed authentication and a late peer preserve the original paired reques
  await f.advance(820000);assert.equal(f.requests.length,4,'both consumers share one new pair fifteen minutes from its actual start');f.answerPair(2);await flush();
 });
 
-test('a failed read retains its fifteen-minute attempt backoff',async()=>{
+// A failed read must still wait a full interval before the next attempt;
+// visibility changes in between must not force an early retry.
+test('a failed read retains its full attempt backoff',async()=>{
  const {f,hook}=await boot();await f.advance(CAMERA_AUTO_REFRESH_MS);assert.equal(f.requests.length,4);f.answer(2,{error:'Synthetic saved camera read unavailable'},503);f.answer(3,fieldMap);await flush();assert.match(hook.error,/Synthetic saved camera read unavailable/);assert.equal(hook.loading,false);assert.equal(hook.lastAttemptAt,start+CAMERA_AUTO_REFRESH_MS);
- await f.advance(14*60000);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);await f.advance(60000);assert.equal(f.requests.length,6);f.answerPair(4);await flush();assert.equal(hook.error,'');assert.equal(hook.loading,false);
+ await f.advance(CAMERA_AUTO_REFRESH_MS-60000);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);await f.advance(60000);assert.equal(f.requests.length,6);f.answerPair(4);await flush();assert.equal(hook.error,'');assert.equal(hook.loading,false);
 });
 
 test('hidden tabs pause reads and repeated visibility events resume only one shared pair',async()=>{

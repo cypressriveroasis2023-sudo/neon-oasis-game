@@ -60,3 +60,44 @@ test('schema rejection reports no retryable HTTP status',async()=>{
  await loadTvFleetFeeds({get:async path=>({data:path==='/api/field-map'?{...field,items:[...field.items,...field.items]}:values[path]})},{...callbacks({}),readFailure:(source,status)=>failures.push({source,status})});
  assert.deepEqual(failures,[{source:'fieldMap',status:null}]);
 });
+
+// Camera saved reads and the router saved read run on separate cadences, so the
+// loader must be able to perform either side alone. Reading routers on the
+// camera cadence raises /api/routers traffic for no freshness benefit, and
+// tying routers to the next camera deadline stretches them to that interval's
+// next multiple instead of their own.
+test('camera and router saved reads can each be performed alone',async()=>{
+ const requested=[],api={get:async path=>{requested.push(path);return {data:values[path]};}};
+
+ const cameraOnly={};
+ assert.deepEqual(await loadTvFleetFeeds(api,callbacks(cameraOnly),false,{routers:false}),[]);
+ assert.deepEqual(requested.sort(),['/api/camera-health/summary-v3','/api/field-map']);
+ assert.equal(cameraOnly.routers,undefined,'a camera-only pass must not read routers');
+ assert.ok(cameraOnly.field&&cameraOnly.health);
+
+ requested.length=0;
+ const routersOnly={};
+ assert.deepEqual(await loadTvFleetFeeds(api,callbacks(routersOnly),false,{camera:false}),[]);
+ assert.deepEqual(requested,['/api/routers'],'a router-only pass must not re-read camera evidence');
+ assert.equal(routersOnly.field,undefined);assert.equal(routersOnly.health,undefined);
+ assert.equal(routersOnly.routers,routers);
+
+ requested.length=0;
+ const both={};
+ assert.deepEqual(await loadTvFleetFeeds(api,callbacks(both),false),[]);
+ assert.deepEqual(requested.sort(),['/api/camera-health/summary-v3','/api/field-map','/api/routers'],'the default still reads all three, as manual refresh and initial load require');
+});
+
+// A skipped router read is not a failed one. The caller distinguishes them by
+// whether the routers callback fired at all, so a camera-only pass must leave
+// no router signal behind rather than reporting an absent or failed snapshot.
+test('skipping the router read reports neither a router snapshot nor a router failure',async()=>{
+ const accepted={};let unavailable=false;
+ const errors=await loadTvFleetFeeds(
+  {get:async path=>{if(path==='/api/routers')throw new Error('Routers should not have been read');return {data:values[path]};}},
+  {...callbacks(accepted),routersUnavailable:()=>{unavailable=true;}},
+  false,{routers:false});
+ assert.deepEqual(errors,[]);
+ assert.equal(accepted.routers,undefined);
+ assert.equal(unavailable,false,'a deliberate skip must not look like unavailable router evidence');
+});

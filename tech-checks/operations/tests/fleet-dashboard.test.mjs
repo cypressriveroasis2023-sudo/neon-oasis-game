@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fleetVrmReadAllowed,fleetDashboardRows,filterFleetDashboard,fleetDashboardSummary,initialFleetFilters,discoveryNeedsSetup,fleetDashboardCsv} from '../src/fleetDashboardModel.ts';
 import {fieldCameraHealth} from '../src/fieldCameraHealth.ts';
-import {resource,snapshot,now,fresh,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
+import {resource,snapshot,now,fresh,withStatus,port} from './fixtures/camera-evidence-fixtures.mjs';
 const unit=(n,name,model,placement='FIELD')=>({id:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,unitNumber:name,modelName:model,placement,currentLocationType:placement.toLowerCase(),status:placement==='FIELD'?'field':'available',address:'123 Synthetic Road, Houston, TX 77001',customer:'Fixture Customer',site:'Fixture Site'});
 const units=[unit(1,'Helios 1','Helios'),unit(2,'Spotter 1','Spotter'),unit(3,'Spotter 2','Spotter'),unit(4,'Sniper 44','Snipers','SHOP'),unit(5,'Recon II 2','Recon II')];
 const raw=snapshot([resource(1,'Helios 1'),withStatus(resource(2,'Spotter 1'),'offline'),resource(3,'Spotter 2',{evidence:{...resource(3).evidence,observedAt:'2026-10-01T00:00:00Z'}}),resource(4,'Sniper 44',{scope:'shop'}),resource(5,'Recon II 2',{type:'detector',batteryEvidence:{source:'Reconeyez',percent:75,percentObservedAt:fresh,status:'normal',statusObservedAt:fresh}})]);
@@ -54,3 +54,30 @@ test('approved display alias never changes immutable health identity or source m
 });
 
 test('Fleet requests saved Victron data only for an explicit capability or normal Owner',()=>{for(const role of ['IT','Service',undefined]){assert.equal(fleetVrmReadAllowed({role}),false);assert.equal(fleetVrmReadAllowed({role,features:{vrmRead:false}}),false);assert.equal(fleetVrmReadAllowed({role,features:{vrmRead:true}}),true);}assert.equal(fleetVrmReadAllowed({role:'Owner'}),true);assert.equal(fleetVrmReadAllowed({role:'Owner',legacyOwner:false}),false);assert.equal(fleetVrmReadAllowed({role:'Owner',features:{vrmRead:false}}),false);});
+
+// Shop/root and inactive equipment keeps its own accurate connection state but
+// is not a Field outage. The direct-connection families (SNIPER/SNIPER2/
+// SNIPER4/CAMV) assign state in fieldCameraHealth straight from the connection
+// result, without the `operational` scope check the camera families get, so a
+// deactivated bench unit with dead ports reads OFFLINE on its own record. That
+// is correct for the record and wrong for the headline: on 2026-10-30 the live
+// OFFLINE tile read 106 against 2 units genuinely down, the rest being
+// deactivated Snipers. The unit detail must keep the truth; the tile must not
+// count it.
+test('a shop Sniper with a confirmed port outage keeps its own OFFLINE record but is not a Field outage',()=>{
+ const bench=unit(40,'Sniper 440','Snipers','SHOP'),installed=unit(41,'Sniper 441','Snipers');
+ const down=port({status:'offline',reachable:false,confirmedOutage:true,consecutiveFailures:3});
+ const scoped=snapshot([
+  {...resource(40,'Sniper 440',{scope:'shop',type:'camera'}),serviceEvidence:down},
+  {...resource(41,'Sniper 441',{scope:'field',type:'camera'}),serviceEvidence:down}
+ ]);
+ const rows=fleetDashboardRows([bench,installed],scoped,[],null,now);
+ const shopRow=rows.find(r=>r.name==='Sniper 440'),fieldRow=rows.find(r=>r.name==='Sniper 441');
+ assert.equal(shopRow.placement,'shop');
+ assert.equal(shopRow.cameraState,'offline','the bench unit keeps its true connection state on its own record');
+ assert.match(shopRow.camera.reason,/saved IP \/ port checks confirmed no response/);
+ assert.equal(fieldRow.cameraState,'offline');
+ const summary=fleetDashboardSummary(rows);
+ assert.equal(summary.offline,1,'only the installed unit is a Field outage; the bench unit must not be counted');
+ assert.equal(summary.online+summary.offline+summary.unknown,1,'health counts cover operational placement only');
+});
