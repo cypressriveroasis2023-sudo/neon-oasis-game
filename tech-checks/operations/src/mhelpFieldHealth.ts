@@ -39,16 +39,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
      &&record.productIds.length===1&&record.productIds[0]===product.productId)
    &&(record?.kind!=='unit'||Boolean(row&&row.placement==='field'&&!row.retired&&record.productIds.length===1
      &&record.productIds[0]===product.productId&&binding?.state==='linked'&&binding.unitIds?.includes(record.unitId))));
-   // A receipt that arrived and failed validation is not the same event as a
-  // read that failed. undefined means the source was never attempted; null
-  // means the read itself failed, which is a broken verification path rather
-  // than evidence of absence - retained exact checks must be dropped and no
-  // provider fallback may silently take their place, or the tile reads the same
-  // whether verification is healthy or broken. An object that did not validate
-  // means the source is present but stale or mismatched against the current
-  // inventory, and a labelled reviewed-provider fallback is the honest reading.
-  const directReadFailed=exactConnectionReceipt===null;
-  const directSourceUnavailable=exactConnectionReceipt!==undefined&&!directReadFailed&&!connections;
+  const directSourceUnavailable=exactConnectionReceipt!==undefined&&!connections;
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
@@ -69,12 +60,12 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    // one exists, and the provider's own reported status otherwise, labelled as
    // such. Provider status is admitted ONLY on a reviewed device association,
    // never from a name match, and never over a completed direct check.
-   const reviewedProvider=!directReadFailed&&record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState);
+   const reviewedProvider=record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState);
    if(reviewedProvider){
     state=row!.cameraState==='online'?'online':'offline';
     reason=PROVIDER_REPORTED+(directSourceUnavailable?DIRECT_SOURCE_GAP:'No direct connection result: '+exact!.reason+' ')+unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
    }else{
-    state='unverified';reason=directReadFailed?'The exact Product-ID connection source could not be read. Retained exact checks are dropped and no provider status is certified in their place. Connection status is Unknown.':directSourceUnavailable?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.':exact!.reason;
+    state='unverified';reason=directSourceUnavailable?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.':exact!.reason;
    }
   }else if(exactAllowed&&exact){
    state=exact.status==='online'?'online':'offline';
@@ -92,7 +83,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   counts[state]++;
   const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
     ||state==='unverified'&&exact.status==='unknown'));
-  const evidence=fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,directSourceUnavailable);
+  const evidence=fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,exactConnectionReceipt!==undefined&&!connections);
   const followUp=fieldProductFollowUp(state,reason,exact?.status==='unknown'?exact.reason:undefined,directSourceUnavailable);
   if(followUp)evidence.followUp=followUp;
   return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence};
