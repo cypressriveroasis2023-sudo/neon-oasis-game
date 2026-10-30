@@ -527,17 +527,27 @@ test('manual saved-data refresh stays immediate and cancels the pending initial 
 for(const mode of ['map','camera'])test('TV '+mode+' adopts late validated proof without delaying its saved refresh deadline',async({page})=>{
  const {state,frame}=await setup(page,{pausedClock:true}),initial=fieldProductFixture();
  const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
- state.productConnections=f.connections;state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
+ // Deliberately disagree with provider Product1002 Offline: late exact TCP
+ // must take precedence, not merely preserve the same visible totals.
+ state.productConnections=fieldProductConnectionFixture(f.upload,time,{'1001':'online','1002':'online'});state.fleetUnits=f.units;state.fieldMapExtras={...f.field,generatedAt:time};state.cameraRows=f.health.rows;
  state.cameraExtras={identityVersion:f.health.identityVersion,unitIdentities:f.health.unitIdentities,identityWarnings:[]};
  state.settings={sections:[mode],revision:1,updatedAt:time,rotationSeconds:15};state.proofGate=deferred();
  await page.clock.runFor(60000);await expect.poll(()=>state.proofReads).toBe(1);
  const initialRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
  await page.clock.runFor(6600);
- if(mode==='map')await expect(frame.locator('.tv-fleet-summary')).toContainText('0 online');
- else await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
+ // The reviewed provider association remains visible while TCP is pending.
+ if(mode==='map'){
+  await expect(frame.locator('.tv-fleet-summary')).toContainText('1 online');
+  await expect(frame.locator('.tv-fleet-summary')).toContainText('1 offline');
+ }else{
+  await expect(frame.locator('.tv-fleet-record')).toHaveCount(1);
+  await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
+ }
  state.proofGate.resolve();state.proofGate=null;
- if(mode==='map')await expect(frame.locator('.tv-fleet-summary')).toContainText('1 online');
- else await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
+ if(mode==='map'){
+  await expect(frame.locator('.tv-fleet-summary')).toContainText('2 online');
+  await expect(frame.locator('.tv-fleet-summary')).toContainText('0 offline');
+ }else await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
  expect(state.proofReads).toBe(1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
  // Adopting a cached proof must not restart the15-minute cadence.
  const untilNext=initialRead+15*60000-await page.evaluate(()=>Date.now());
