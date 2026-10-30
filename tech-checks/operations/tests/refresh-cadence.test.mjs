@@ -35,3 +35,44 @@ test('camera reads are scheduled well inside the evidence freshness window',()=>
  assert.ok(CAMERA_AUTO_REFRESH_MS<CAMERA_FRESH_MS,'a read must land before the previous evidence expires');
  assert.ok(CAMERA_FRESH_MS-CAMERA_AUTO_REFRESH_MS>=9*60_000,'leave room for observations that are already minutes old on arrival');
 });
+
+// Vision's counterexample against commit 63928d5a, encoded. Evaluating the
+// router predicate only inside the camera-due branch produced cameras at 10 and
+// 20 minutes and routers at 20 - the router read waited for the next camera
+// deadline instead of keeping its own 15-minute cadence. Each side must be due
+// on its own clock, and each clock must advance only when its own read runs.
+// This covers the scheduling rule, not the React wiring in TvFleetView; the
+// browser specs cover that and cannot be executed in this environment.
+test('camera and router saved reads keep independent cadences on a one-minute tick',()=>{
+ const start=1_000_000;
+ let lastCamera=start,lastRouter=start;
+ const cameraReads=[],routerReads=[];
+ for(let minute=1;minute<=30;minute++){
+  const now=start+minute*60_000;
+  const cameraDue=automaticRefreshDue(lastCamera,now,false,CAMERA_AUTO_REFRESH_MS);
+  const routerDue=automaticRefreshDue(lastRouter,now,false);
+  if(cameraDue){cameraReads.push(minute);lastCamera=now;}
+  if(routerDue){routerReads.push(minute);lastRouter=now;}
+ }
+ assert.deepEqual(cameraReads,[10,20,30],'camera evidence is re-read before it can expire');
+ assert.deepEqual(routerReads,[15,30],'routers keep the default interval and are never stretched to a camera deadline');
+});
+
+// A camera-only pass must not postpone the router deadline, and a router-only
+// pass must not postpone the camera deadline. Advancing the wrong clock is what
+// turns two independent cadences back into one.
+test('a saved read advances only the clock belonging to the source it read',()=>{
+ const start=1_000_000,tenMinutes=start+CAMERA_AUTO_REFRESH_MS;
+ let lastCamera=start,lastRouter=start;
+ // Camera-only pass at ten minutes.
+ assert.equal(automaticRefreshDue(lastCamera,tenMinutes,false,CAMERA_AUTO_REFRESH_MS),true);
+ assert.equal(automaticRefreshDue(lastRouter,tenMinutes,false),false,'routers are not yet due');
+ lastCamera=tenMinutes;
+ // The router deadline must still fall at fifteen minutes from the original read.
+ const fifteenMinutes=start+AUTO_REFRESH_MS;
+ assert.equal(automaticRefreshDue(lastRouter,fifteenMinutes,false),true,'the camera pass must not have moved the router deadline');
+ lastRouter=fifteenMinutes;
+ // And that router pass must not have moved the camera deadline, which is due at twenty.
+ assert.equal(automaticRefreshDue(lastCamera,fifteenMinutes,false,CAMERA_AUTO_REFRESH_MS),false);
+ assert.equal(automaticRefreshDue(lastCamera,tenMinutes+CAMERA_AUTO_REFRESH_MS,false,CAMERA_AUTO_REFRESH_MS),true);
+});
