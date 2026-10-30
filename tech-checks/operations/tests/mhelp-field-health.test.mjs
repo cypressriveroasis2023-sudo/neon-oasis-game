@@ -40,11 +40,21 @@ test('all 287 Field Product IDs reconcile without importing the 714 Shop records
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.total,287);assert.equal(view.items.length,287);assert.equal(view.counts.unlinked,281);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),287);
 });
 
-test('obsolete IP-only contract and failed source keep inventory/support but cannot certify connectivity',()=>{
+test('obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health',()=>{
  const f=fieldProductFixture();
  for(const receipt of [null,{...f.connections,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'}]){
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
  assert.equal(view.total,7);assert.equal(view.items.filter(i=>i.state==='support').length,1);
- assert.equal(view.items.filter(i=>i.state==='online'||i.state==='offline').length,0);
+ // A rejected or obsolete connection source cannot certify connectivity itself.
+ // It does not erase the provider's own reported health on a reviewed
+ // association, which is shown labelled, with the source failure still raised.
+ assert.equal(view.items[0].state,'online');
+ assert.equal(view.items[1].state,'offline');
+ assert.match(view.items[0].reason,/Provider-reported, not direct-connection verified/);
+ assert.equal(view.items[0].evidence.followUp.category,'source_unavailable');
+ // Everything without a reviewed association stays Unknown.
+ assert.equal(view.items[2].state,'unverified');
+ assert.equal(view.items[4].state,'unverified');
+ assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
  }
 });

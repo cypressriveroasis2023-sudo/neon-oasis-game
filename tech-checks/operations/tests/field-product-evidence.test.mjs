@@ -88,7 +88,11 @@ test('unverified or wrong-source TCP receipts never bypass a missing provider as
  assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,fake).items[0].state,'unverified');
 });
 
-test('authoritatively Unknown Product-ID TCP checks do not inherit older provider Online or Offline',()=>{
+test('an Unknown Product-ID TCP check falls back to labelled provider health only on a reviewed association',()=>{
+ // Owner intent: a direct check and the provider's own report are two separate
+ // signals. Where no direct result exists, a REVIEWED device association may
+ // show the provider's status, always labelled and never silently. Equipment
+ // without a reviewed association, and stale provider data, stay Unknown.
  const f=fieldProductFixture();
  const receipt={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',
   sourceSha256:f.upload.sourceSha256,trackerVerifiedAt:f.fresh,
@@ -99,26 +103,37 @@ test('authoritatively Unknown Product-ID TCP checks do not inherit older provide
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
  assert.equal(f.rows[0].cameraState,'online');
  assert.equal(f.rows[1].cameraState,'offline');
- assert.equal(view.items[0].state,'unverified');
- assert.equal(view.items[1].state,'unverified');
- assert.equal(view.items[0].evidence.association,'exact_product_id_tracker_endpoint');
- assert.equal(view.items[0].evidence.basis,'connection');
- assert.equal(view.items[0].evidence.observations.length,0);
+ assert.equal(view.items[0].state,'online');
+ assert.equal(view.items[1].state,'offline');
+ // The label and the missing direct result both stay on the record.
+ assert.match(view.items[0].reason,/Provider-reported, not direct-connection verified/);
  assert.match(view.items[0].reason,/No complete current tracker-IP check/);
- assert.equal(view.counts.online,0);
- assert.equal(view.counts.offline,0);
+ assert.equal(view.items[0].evidence.association,'native_provider');
+ assert.equal(view.counts.online,1);
+ assert.equal(view.counts.offline,1);
+ // Stale provider observations are still not a status.
+ assert.equal(view.items[2].state,'unverified');
+ // No COS unit record at all: unchanged, never promoted.
+ assert.equal(view.items[4].state,'unverified');
  assert.equal(view.items[3].state,'support');
  assert.equal(view.items[5].state,'review');
  assert.equal(view.items[6].state,'inactive');
+ assert.equal(Object.values(view.counts).reduce((sum,v)=>sum+v,0),7);
 });
 
-test('explicit unavailable TCP source cannot fall back to provider Online or Offline',()=>{
+test('an unavailable TCP source still reports provider health, labelled, and never hides the source failure',()=>{
  const f=fieldProductFixture();
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
- assert.equal(view.counts.online,0);assert.equal(view.counts.offline,0);
- assert.equal(view.items[0].state,'unverified');assert.equal(view.items[1].state,'unverified');
- assert.equal(view.items[0].evidence.association,'product_id_connection_unavailable');
- assert.equal(view.items[0].evidence.observedAt,null);assert.deepEqual(view.items[0].evidence.observations,[]);
+ assert.equal(view.counts.online,1);assert.equal(view.counts.offline,1);
+ assert.equal(view.items[0].state,'online');assert.equal(view.items[1].state,'offline');
+ assert.match(view.items[0].reason,/Provider-reported, not direct-connection verified/);
+ // The unreadable connection source is still raised for IT, not swallowed.
+ assert.equal(view.items[0].evidence.followUp.category,'source_unavailable');
+ // Equipment with no reviewed unit association stays Unknown with its own diagnostics.
+ assert.equal(view.items[2].state,'unverified');
+ assert.equal(view.items[4].state,'unverified');
+ assert.equal(view.items[4].evidence.association,'product_id_connection_unavailable');
+ assert.equal(view.items[4].evidence.observedAt,null);assert.deepEqual(view.items[4].evidence.observations,[]);
  assert.equal(view.items[3].state,'support');assert.equal(view.items[5].state,'review');assert.equal(view.items[6].state,'inactive');
  // An older/native-only source never requesting Product-ID proof retains its existing diagnostics.
  assert.equal(mhelpFieldHealth(f.upload,f.roster,f.rows,f.now).items[0].state,'online');

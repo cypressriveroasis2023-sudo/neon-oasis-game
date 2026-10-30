@@ -40,8 +40,11 @@ const knownReason=(reason?:string):FieldProductFollowUp|undefined=>typeof reason
 /** Read-only guidance from known reasons and existing classified states.
  * It never diagnoses a more specific failure than the source supplies, and
  * never changes health, placement, permissions or observation timestamps. */
-export function fieldProductFollowUp(state:string,reason:string,exactUnknownReason?:string):FieldProductFollowUp|null{
- if(state==='online'||state==='offline')return null;
+const SOURCE_UNAVAILABLE_REASON='The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.';
+export function fieldProductFollowUp(state:string,reason:string,exactUnknownReason?:string,directSourceUnavailable=false):FieldProductFollowUp|null{
+ // A provider-reported Online/Offline is usable, but the direct-source failure
+ // behind it must stay visible: IT still has to fix the connection source.
+ if(state==='online'||state==='offline')return directSourceUnavailable?{...knownReasons[SOURCE_UNAVAILABLE_REASON]}:null;
  const exact=knownReason(exactUnknownReason);
  // Support has no camera outage. A separate, explicit source/ownership hold
  // can still need review; a missing IP alone does not create support work.

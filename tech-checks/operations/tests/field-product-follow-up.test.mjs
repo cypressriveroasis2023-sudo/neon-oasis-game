@@ -67,16 +67,22 @@ test('an explicit source hold remains visible on support without adding a camera
  assert.equal(item(build(f),'1004').evidence.followUp,undefined);
 });
 
-test('unverified source receipts cannot supply a support review notice or hide source-read failure',()=>{
+test('a failed source receipt never creates support work and never hides the source-read failure',()=>{
  const f=fieldProductFixture();setReason(f,'1004',sourceHold);
  f.connections.sourceSha256='b'.repeat(64);
  const view=build(f);
  assert.equal(item(view,'1004').state,'support');
  assert.equal(item(view,'1004').evidence.followUp,undefined);
- assert.equal(item(view,'1001').state,'unverified');
+ // The reviewed association now reports the provider's own status, labelled,
+ // but the unreadable connection source is still raised for IT.
+ assert.equal(item(view,'1001').state,'online');
+ assert.match(item(view,'1001').reason,/Provider-reported, not direct-connection verified/);
  assert.equal(item(view,'1001').evidence.followUp.category,'source_unavailable');
- assert.equal(item(view,'1001').evidence.observedAt,null);
- assert.deepEqual(item(view,'1001').evidence.observations,[]);
+ // Equipment with no reviewed unit association stays Unknown and keeps its guidance.
+ assert.equal(item(view,'1005').state,'unverified');
+ assert.equal(item(view,'1005').evidence.followUp.category,'source_unavailable');
+ assert.equal(item(view,'1005').evidence.observedAt,null);
+ assert.deepEqual(item(view,'1005').evidence.observations,[]);
 });
 
 test('unknown text and object-property names get neutral guidance rather than an invented diagnosis',()=>{
