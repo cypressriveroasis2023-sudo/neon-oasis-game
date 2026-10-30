@@ -6,6 +6,9 @@ import {fieldProductEvidence,type FieldProductEvidence} from './fieldProductEvid
 import {readExactProductConnections} from './exactProductConnection';
 import {fieldProductFollowUp} from './fieldProductFollowUp';
 
+export const DIRECT_VERIFIED='Direct connection verified. ';
+export const PROVIDER_REPORTED='Provider-reported, not direct-connection verified. ';
+export const PROVIDER_UNLINKED='Provider-reported by name match only, with no verified device association. ';
 export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
 export type FieldProduct={productId:string;unitNumber:string;state:FieldProductHealth;reason:string;unitId:string|null;recordId:string|null;evidence?:FieldProductEvidence};
@@ -37,6 +40,11 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
      &&record.productIds.length===1&&record.productIds[0]===product.productId)
    &&(record?.kind!=='unit'||Boolean(row&&row.placement==='field'&&!row.retired&&record.productIds.length===1
      &&record.productIds[0]===product.productId&&binding?.state==='linked'&&binding.unitIds?.includes(record.unitId))));
+  // Why no direct check was available, carried into the reason text so the
+  // provider-reported fallback always says what it is standing in for.
+  const directGap=exactConnectionReceipt!==undefined&&!connections
+   ?'No direct connection check available (the Product-ID connection source is unavailable, stale or does not match the current inventory). '
+   :exact?.status==='unknown'?'No direct connection check available ('+exact.reason+') ':'';
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
@@ -48,25 +56,27 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
    state='support';reason='Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.';
-  }else if(exactConnectionReceipt!==undefined&&!connections){
-   state='unverified';reason='The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.';
-  }else if(exact?.status==='unknown'&&connections){
-   // A current, authenticated Product-ID check that cannot establish a TCP
-   // outcome always overrides legacy provider/status guesses for connectivity.
-   // Diagnostics may still show their independent provider observations.
-   state='unverified';reason=exact.reason;
   }else if(exactAllowed&&exact){
+   // Strongest result: a completed direct TCP/service-port check against this
+   // Product ID's own verified endpoint.
    state=exact.status==='online'?'online':'offline';
-   reason=exact.reason;
+   reason=DIRECT_VERIFIED+exact.reason;
   }else if(!record){
    state='review';reason=related.length?'Multiple COS representations claim this Product ID.':'No current COS roster representation is available for this Product ID.';
   }else if(record.kind!=='unit'){
    state='unlinked';reason='The Field assignment is recorded, but it has no verified COS health link. It is not counted as an outage.';
   }else if(!row!.camera.association){
+   // A name match is never identity. Without a reviewed device association
+   // nothing here can say whose camera a provider record describes.
    state='unlinked';reason='Device link needed. The Product ID has a COS inventory association, but its complete provider-resource association is not verified. A matching device name cannot supply current product health. '+row!.camera.reason;
   }else{
+   // Owner decision 2026-10-30: on a REVIEWED device association, where no
+   // direct check is available, the provider's own reported status is shown
+   // rather than withheld, and is always labelled as provider-reported. It
+   // never claims direct verification, never overrides a completed direct
+   // check above, and is never taken from a name match.
    state=row!.cameraState==='online'?'online':row!.cameraState==='offline'?'offline':'unverified';
-   reason=unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
+   reason=(['online','offline'].includes(row!.cameraState)?PROVIDER_REPORTED:'')+directGap+unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
   }
   counts[state]++;
   const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
