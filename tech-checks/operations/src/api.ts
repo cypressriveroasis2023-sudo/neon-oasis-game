@@ -221,10 +221,21 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const deadline=new Promise<ProofResult>(resolve=>{timer=window.setTimeout(()=>{
         resolve({receipt:null,state:'timeout',diagnostic:{stage:'connection_transport',code:'timeout'}});controller.abort();
       },30000);});
-      const response=sendRequest('GET','/api/product-connections',session.token,undefined,controller.signal)
+      const attempt=()=>sendRequest('GET','/api/product-connections',session.token,undefined,controller.signal)
         .then(({data})=>readExactProductConnections(data,hash,ids,Date.now())
           ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const,diagnostic:{stage:'connection_envelope' as const,code:'validation_rejected'}})
         .catch(cause=>({receipt:null,state:'error' as const,diagnostic:readConnectionDiagnostic(cause?.diagnostic)}));
+      // A cold app open can lose the first request before it reaches the
+      // network: the diagnostic is request_failed, not timeout, and the same
+      // read succeeds immediately afterwards. That is why closing and
+      // reopening the app works. Make that second attempt here, once, inside
+      // the same 30s budget and the same abort controller, rather than showing
+      // the person a failure they have to clear by hand. A timeout, a
+      // cancellation, an auth refusal or a rejected envelope is a real answer
+      // and is never retried.
+      const response=attempt().then(first=>first.state==='error'
+        &&first.diagnostic?.stage==='connection_transport'&&first.diagnostic?.code==='request_failed'
+        &&!controller.signal.aborted?attempt():first);
       return Promise.race([response,deadline]).finally(()=>window.clearTimeout(timer));
     };
     // Native-only Fleet pages cannot attribute any Product-ID TCP results.
