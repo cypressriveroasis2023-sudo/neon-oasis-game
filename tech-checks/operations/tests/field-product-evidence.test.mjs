@@ -123,7 +123,11 @@ test('an Unknown Product-ID TCP check falls back to labelled provider health onl
 
 test('an unavailable TCP source still reports provider health, labelled, and never hides the source failure',()=>{
  const f=fieldProductFixture();
- const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
+ // A receipt that arrived and failed validation - stale against the current
+ // inventory. This is the fallback case. A null receipt is a failed READ and is
+ // covered in mhelp-field-health.test.mjs, where no fallback is permitted.
+ const stale={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:'0'.repeat(64),trackerVerifiedAt:f.fresh,items:[]};
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,stale);
  assert.equal(view.counts.online,1);assert.equal(view.counts.offline,1);
  assert.equal(view.items[0].state,'online');assert.equal(view.items[1].state,'offline');
  assert.match(view.items[0].reason,/Provider-reported, not direct-connection verified/);

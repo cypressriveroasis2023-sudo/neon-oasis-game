@@ -128,11 +128,13 @@ test('TV native rows fall back to labelled provider colors when the exact receip
  assert.deepEqual(tv.board.items.filter(p=>p.status==='offline'&&!down.some(o=>o.productId===p.productId)),[]);
 });
 
-test('TV reports labelled provider health for an unavailable Product-ID read without hiding inventory',()=>{
+test('TV reports labelled provider health for a stale Product-ID receipt without hiding inventory',()=>{
  const f=fieldProductFixture();
- const tv=tvFieldCensus({...f.field,productConnections:null},f.units,f.health,null,null,f.now);
- // No connection source at all. Inventory is still never hidden, and reviewed
- // associations report the provider's status naming the missing direct check.
+ // Present but stale against the current inventory, which is the fallback case.
+ const stale={contract:'COS_EXACT_PRODUCT_CONNECTIONS_V2',sourceSha256:'0'.repeat(64),trackerVerifiedAt:f.fresh,items:[]};
+ const tv=tvFieldCensus({...f.field,productConnections:stale},f.units,f.health,null,null,f.now);
+ // Inventory is never hidden, and reviewed associations report the provider's
+ // status naming the missing direct check.
  assert.equal(tv.board.counts.online,1);assert.equal(tv.board.counts.offline,1);
  assert.equal(tv.board.field,7);assert.equal(tv.board.total,8);
  assert.equal(tv.rows.find(r=>r.id===f.units[0].id).cameraState,'online');
@@ -140,4 +142,17 @@ test('TV reports labelled provider health for an unavailable Product-ID read wit
  for(const id of ['1001','1002'])
   assert.match(tv.board.items.find(p=>p.productId===id).reason,/No direct connection check is available/);
  assert.equal(tv.board.items.find(p=>p.productId==='1003').status,'unverified');
+});
+
+// The TV board follows the same rule as the dashboard: a failed connection read
+// drops retained exact checks rather than falling back to provider status, so
+// the wall cannot read the same whether verification is healthy or broken.
+// Inventory stays visible either way.
+test('TV drops retained exact checks when the connection read fails, without hiding inventory',()=>{
+ const f=fieldProductFixture();
+ const tv=tvFieldCensus({...f.field,productConnections:null},f.units,f.health,null,null,f.now);
+ assert.equal(tv.board.counts.online,0);assert.equal(tv.board.counts.offline,0);
+ assert.equal(tv.board.field,7);assert.equal(tv.board.total,8);
+ for(const id of ['1001','1002'])assert.equal(tv.board.items.find(p=>p.productId===id).status,'unverified');
+ assert.deepEqual(tvCensusOutages(tv.board,tv.rows.map(r=>({unit:r.unit,health:r.camera}))),[]);
 });

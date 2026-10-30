@@ -42,7 +42,12 @@ test('all 287 Field Product IDs reconcile without importing the 714 Shop records
 
 test('obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health',()=>{
  const f=fieldProductFixture();
- for(const receipt of [null,{...f.connections,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'}]){
+ // Only the obsolete-contract receipt belongs here. A null receipt is a FAILED
+ // READ, not a rejected one, and is asserted separately below: the browser
+ // specs require a failed read to drop retained exact checks, and a labelled
+ // provider fallback in their place would leave the tile reading the same
+ // whether verification is healthy or broken.
+ for(const receipt of [{...f.connections,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'}]){
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
  assert.equal(view.total,7);assert.equal(view.items.filter(i=>i.state==='support').length,1);
  // A rejected or obsolete connection source cannot certify connectivity itself.
@@ -57,4 +62,21 @@ test('obsolete IP-only contract and failed source keep inventory and support, an
  assert.equal(view.items[4].state,'unverified');
  assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
  }
+});
+
+// The counterpart to the test above. A connection read that FAILED is a broken
+// verification path, not evidence of absence, so retained exact checks are
+// dropped and no provider status is certified in their place. Inventory and
+// support classification are never hidden by the failure.
+test('a failed connection read drops retained exact checks without certifying provider health',()=>{
+ const f=fieldProductFixture();
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
+ assert.equal(view.total,7);
+ assert.equal(view.items.filter(i=>i.state==='support').length,1);
+ assert.equal(view.counts.online,0);assert.equal(view.counts.offline,0);
+ assert.equal(view.items[0].state,'unverified');
+ assert.equal(view.items[1].state,'unverified');
+ for(const item of view.items.slice(0,2))assert.doesNotMatch(item.reason,/Provider-reported/);
+ assert.match(view.items[0].reason,/connection source could not be read/);
+ assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
 });
