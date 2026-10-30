@@ -310,7 +310,7 @@ test('Camera Health rotates every red outage and never lists green or unknown un
 });
 
 test('Field Map visits overview and geographic close-ups with the red area first',async({page})=>{
- const {state,frame}=await setup(page);
+ const {state,frame}=await setup(page,{pausedClock:true});
  const red=fieldUnit(0),green=fieldUnit(1,32.77,-96.79);
  state.fleetUnits=[red,green];state.cameraRows=[cameraRow(red,'offline'),cameraRow(green,'online')];
  state.settings={sections:['map'],revision:1,updatedAt:time,rotationSeconds:15};
@@ -322,10 +322,17 @@ test('Field Map visits overview and geographic close-ups with the red area first
  await expect(wrap).toHaveAttribute('data-area-kind','closeup');
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+red.unitNumber);
  await expect(frame.locator('.tv-map-area')).toContainText('1 down');
- // The map fits bounds in requestAnimationFrame; advance that frame under the paused test clock.
- await page.clock.runFor(32);
- await expect.poll(async()=>Number(await map.getAttribute('data-zoom'))).toBe(13);
- await page.clock.fastForward(15000);
+ // React may schedule its fit-bounds effect after the label commits. Drive
+ // animation frames while waiting, rather than advancing once then freezing
+ // the clock while a newly scheduled frame is still pending.
+ let animationMs=0;
+ await expect.poll(async()=>{
+  expect(animationMs).toBeLessThan(1000);
+  await page.clock.runFor(16);animationMs+=16;
+  return Number(await map.getAttribute('data-zoom'));
+ }).toBe(13);
+ // Keep the next rotation anchored to its original 15-second boundary.
+ await page.clock.fastForward(15000-animationMs);
  await expect(frame.locator('.tv-map-area')).toContainText('Area near '+green.unitNumber);
  await expect(frame.locator('.tv-map-area')).toContainText('1 online');
  expect(state.fleetReads).toBe(3);expect(state.writes).toEqual([]);
