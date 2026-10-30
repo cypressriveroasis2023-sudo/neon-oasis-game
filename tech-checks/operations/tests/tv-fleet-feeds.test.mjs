@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {loadTvFleetFeeds} from '../src/tvFleetFeeds.ts';
+import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from '../src/tvFleetFeeds.ts';
 
 const time='2026-10-12T18:45:00Z';
 const field={items:[{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',status:'installed'}],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:time};
@@ -100,4 +100,53 @@ test('skipping the router read reports neither a router snapshot nor a router fa
  assert.deepEqual(errors,[]);
  assert.equal(accepted.routers,undefined);
  assert.equal(unavailable,false,'a deliberate skip must not look like unavailable router evidence');
+});
+
+// Vision's finding against 9eb1eb3e: once camera and router reads run on
+// separate cadences, a successful router-only pass produces no camera errors,
+// and reporting that pass's errors wholesale cleared an unresolved camera
+// warning. The warning vanished while the condition causing it persisted.
+// Errors are retained per source group so a pass only speaks for what it read.
+const none={camera:[],routers:[]};
+const CAMERA_FAIL='Camera Health: Connection unavailable';
+const ROUTER_FAIL='Routers: Connection unavailable';
+
+test('a successful router-only pass cannot clear an unresolved camera warning',()=>{
+ const afterCameraFailure=retainSourceErrors(none,[CAMERA_FAIL],{camera:true,routers:true});
+ assert.deepEqual(afterCameraFailure.camera,[CAMERA_FAIL]);
+ assert.equal(sourceErrorText(afterCameraFailure),CAMERA_FAIL);
+ // Routers alone, and they succeed. The camera warning must survive.
+ const afterRouterOnly=retainSourceErrors(afterCameraFailure,[],{camera:false,routers:true});
+ assert.deepEqual(afterRouterOnly.camera,[CAMERA_FAIL],'the camera warning is not this pass to clear');
+ assert.deepEqual(afterRouterOnly.routers,[]);
+ assert.equal(sourceErrorText(afterRouterOnly),CAMERA_FAIL);
+ // Only a camera read that succeeds may clear it.
+ const afterCameraRecovers=retainSourceErrors(afterRouterOnly,[],{camera:true,routers:false});
+ assert.deepEqual(afterCameraRecovers.camera,[]);
+ assert.equal(sourceErrorText(afterCameraRecovers),'');
+});
+
+test('a successful camera-only pass cannot clear an unresolved router warning',()=>{
+ const afterRouterFailure=retainSourceErrors(none,[ROUTER_FAIL],{camera:true,routers:true});
+ assert.deepEqual(afterRouterFailure.routers,[ROUTER_FAIL]);
+ const afterCameraOnly=retainSourceErrors(afterRouterFailure,[],{camera:true,routers:false});
+ assert.deepEqual(afterCameraOnly.routers,[ROUTER_FAIL],'the router warning is not this pass to clear');
+ assert.equal(sourceErrorText(afterCameraOnly),ROUTER_FAIL);
+});
+
+test('both warnings are retained and reported together, each cleared only by its own source',()=>{
+ const both=retainSourceErrors(none,[CAMERA_FAIL,ROUTER_FAIL],{camera:true,routers:true});
+ assert.equal(sourceErrorText(both),CAMERA_FAIL+' '+ROUTER_FAIL);
+ const routersRecover=retainSourceErrors(both,[],{camera:false,routers:true});
+ assert.equal(sourceErrorText(routersRecover),CAMERA_FAIL);
+ const camerasRecover=retainSourceErrors(routersRecover,[],{camera:true,routers:false});
+ assert.equal(sourceErrorText(camerasRecover),'');
+});
+
+test('a field-locations failure is retained with the camera group, not the router group',()=>{
+ const fieldFail='Field locations: Connection unavailable';
+ const afterField=retainSourceErrors(none,[fieldFail],{camera:true,routers:true});
+ assert.deepEqual(afterField.camera,[fieldFail],'field map is read with the camera pair');
+ assert.deepEqual(afterField.routers,[]);
+ assert.equal(sourceErrorText(retainSourceErrors(afterField,[],{camera:false,routers:true})),fieldFail);
 });

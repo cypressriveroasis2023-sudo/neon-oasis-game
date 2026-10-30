@@ -41,3 +41,25 @@ export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false,i
   ]);
   return errors;
 }
+
+/** Errors belong to the source that produced them. A pass that did not read a
+ * source cannot speak for it, so its previous errors are retained rather than
+ * cleared. Without this a successful router-only read reports no errors and
+ * wipes an unresolved camera warning that no camera read has resolved - the
+ * warning disappears while the condition causing it persists. Labels come from
+ * the read() calls below: 'Field locations: ', 'Camera Health: ' and
+ * 'Routers: '. Field and camera share a group because they are always read
+ * together as the camera saved pair. */
+export type RetainedSourceErrors = {camera:string[];routers:string[]};
+export const ROUTER_ERROR_PREFIX='Routers:';
+export function retainSourceErrors(
+ previous:RetainedSourceErrors,
+ errors:readonly string[],
+ read:{camera:boolean;routers:boolean}
+):RetainedSourceErrors {
+ return {
+  camera:read.camera?errors.filter(message=>!message.startsWith(ROUTER_ERROR_PREFIX)):previous.camera,
+  routers:read.routers?errors.filter(message=>message.startsWith(ROUTER_ERROR_PREFIX)):previous.routers
+ };
+}
+export const sourceErrorText=(retained:RetainedSourceErrors)=>[...retained.camera,...retained.routers].join(' ');
