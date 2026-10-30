@@ -10,7 +10,7 @@ import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds} from './tvFleetFeeds';
-import {automaticRefreshDue} from './refreshCadence';
+import {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -74,7 +74,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
     };
     void refresh();
-    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh(true);};
+    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void refresh(true);};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;setData(empty);setError('Sign in again to load fleet information.');};
     // The API has already fenced and validated the late proof. Reauthorize
