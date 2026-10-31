@@ -1,0 +1,45 @@
+{
+  "description": "Add ONLY the Cloudflare preview origin https://a711192b.cos-vision-integration-preview.pages.dev to the deployed v134 allowlist. One literal insertion in serve.ts; the other two files are byte-identical. No wildcard, no branch alias, no other origin, no change to authentication, roles or verify_jwt.",
+  "authorization": "James Martin approved this exact-origin-only repair on 2026-10-31 at 12:41:21 UTC (07:41:21 CDT); the one-insertion recipe and expected hashes are Vision's appendix 'COS exact-origin CORS patch - safe reconstruction appendix' (2026-10-31, byte provenance corrected 14:04 UTC).",
+  "slug": "cos-operations-pages",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceRecord": "tech-checks/docs/deployed-cos-operations-pages-v134/manifest.json",
+  "sourceDir": "tech-checks/docs/deployed-cos-operations-pages-v134/source",
+  "deployedFileNames": {
+    "serve.ts": "cos-operations-pages/serve.ts",
+    "productTcpRuntime.ts": "cos-operations-pages/productTcpRuntime.ts",
+    "deno.json": "cos-operations-pages/deno.json"
+  },
+  "entrypointPath": "cos-operations-pages/serve.ts",
+  "importMapPath": "cos-operations-pages/deno.json",
+  "verifyJwt": false,
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 134,
+    "ezbr_sha256": "fc3e40da7d5dffc53e8a66e8c7551026440ea63ad3d8d91f4b826474cb1c20e9"
+  },
+  "edits": [
+    {
+      "file": "serve.ts",
+      "needle": "ALLOWED_ORIGINS=new Set([\"https://cypressriveroasis2023-sudo.github.io\",\"https://cos-vision-integration-preview.pages.dev\"])",
+      "replacement": "ALLOWED_ORIGINS=new Set([\"https://cypressriveroasis2023-sudo.github.io\",\"https://cos-vision-integration-preview.pages.dev\",\"https://a711192b.cos-vision-integration-preview.pages.dev\"])",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "serve.ts": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12",
+    "productTcpRuntime.ts": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "serve.ts": "b3e625b5358c06ddf272f6e38ddc5b5d9e57cfc781c91d58c0351abb73bb906c",
+    "productTcpRuntime.ts": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "liveChecks": {
+    "requestPath": "/api/session",
+    "approvedOrigin": "https://a711192b.cos-vision-integration-preview.pages.dev",
+    "productionOrigin": "https://cypressriveroasis2023-sudo.github.io",
+    "unapprovedOrigin": "https://unapproved.example"
+  }
+}

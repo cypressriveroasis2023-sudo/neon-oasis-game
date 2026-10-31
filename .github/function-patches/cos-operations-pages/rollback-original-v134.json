@@ -1,0 +1,36 @@
+{
+  "description": "Roll back to the byte-exact original v134 record: the three recorded files, unchanged. Use only to undo a patch deployed by this workflow. This never deploys main's function directory.",
+  "authorization": "Rollback material is the recorded v134 source (record-only commit 6bbaa488). Running it still requires an explicit instruction from James for that specific run.",
+  "slug": "cos-operations-pages",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceRecord": "tech-checks/docs/deployed-cos-operations-pages-v134/manifest.json",
+  "sourceDir": "tech-checks/docs/deployed-cos-operations-pages-v134/source",
+  "deployedFileNames": {
+    "serve.ts": "cos-operations-pages/serve.ts",
+    "productTcpRuntime.ts": "cos-operations-pages/productTcpRuntime.ts",
+    "deno.json": "cos-operations-pages/deno.json"
+  },
+  "entrypointPath": "cos-operations-pages/serve.ts",
+  "importMapPath": "cos-operations-pages/deno.json",
+  "verifyJwt": false,
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE"
+  },
+  "edits": [],
+  "expectedBefore": {
+    "serve.ts": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12",
+    "productTcpRuntime.ts": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "serve.ts": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12",
+    "productTcpRuntime.ts": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "liveChecks": {
+    "requestPath": "/api/session",
+    "approvedOrigin": "https://cos-vision-integration-preview.pages.dev",
+    "productionOrigin": "https://cypressriveroasis2023-sudo.github.io",
+    "unapprovedOrigin": "https://unapproved.example"
+  }
+}
