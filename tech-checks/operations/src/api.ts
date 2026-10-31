@@ -3,7 +3,7 @@ import {IT_DAILY_ONLY} from '../../it-feature-availability';
 import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
-import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
+import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS} from './refreshCadence';
 import {readExactProductConnections} from './exactProductConnection';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
@@ -257,7 +257,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       if(!sourceReady)return map;
       proofCompletion=productConnections(upload.sourceSha256,fieldIds);
       let timer=0;
-      const budget=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),6500);});
+      const budget=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),PROOF_PRESENTATION_BUDGET_MS);});
       const result=await Promise.race([proofCompletion,budget]).finally(()=>window.clearTimeout(timer));
       current();
       // Only still-valid exact proof for this census may bridge a pending read.

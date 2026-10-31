@@ -15,3 +15,15 @@ export const CAMERA_AUTO_REFRESH_MS=10*60*1000;
 export function automaticRefreshDue(lastAttemptAt:number,now:number,hidden:boolean,intervalMs=AUTO_REFRESH_MS) {
   return !hidden && Number.isFinite(now) && (lastAttemptAt===0 || now-lastAttemptAt>=intervalMs);
 }
+// How long the paired health/map read waits for the optional exact-Product
+// proof before presenting the map with proof "pending". This is a
+// PRESENTATION budget, not a cadence or a freshness rule: proof keeps running
+// after it elapses and is adopted when it lands (the separate 30-second
+// cancellation in api.ts is unchanged). The original 6500 ms value (318ab091)
+// had no recorded benchmark. Measured 2026-10-31 (edge logs, 31 Oct): proof p50
+// is ~7.5 s, so the old budget almost always expired anyway, after holding the
+// first paint for 6.5 s. A controlled fake-clock run of the real api.ts
+// (budget-harness-record, main 559f14d2) showed 1500 settles 2.9 s sooner on
+// typical inputs and 5 s sooner on bad-day inputs, with cache retention, saved
+// receipt bridging, overlap sharing and late-failure clearing all unchanged.
+export const PROOF_PRESENTATION_BUDGET_MS=1500;

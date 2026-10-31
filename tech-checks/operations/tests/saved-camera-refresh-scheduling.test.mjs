@@ -9,7 +9,7 @@ import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {rememberCameraHistory} from '../src/cameraLastKnown.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
-import {CAMERA_AUTO_REFRESH_MS,automaticRefreshDue} from '../src/refreshCadence.ts';
+import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS,automaticRefreshDue} from '../src/refreshCadence.ts';
 
 // Execute the exact production hook and API in a small hook/timer host. This
 // does not render React, launch a browser, bind a socket, or contact a service.
@@ -35,7 +35,7 @@ function fixture({autoReply=true}={}){
  const document={hidden:false,addEventListener:(type,fn)=>add(documentListeners,type,fn),removeEventListener:(type,fn)=>documentListeners.get(type)?.delete(fn)};
  const ClockDate=class extends Date{static now(){return clock;}};
  const exports={};
- const modules={'./connectionDiagnostics':{readConnectionDiagnostic},'./exactProductConnection':{readExactProductConnections:()=>null},'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./cameraLastKnown':{rememberCameraHistory},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
+ const modules={'./connectionDiagnostics':{readConnectionDiagnostic},'./exactProductConnection':{readExactProductConnections:()=>null},'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./cameraLastKnown':{rememberCameraHistory},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
  vm.runInNewContext(apiSource,{exports,window,location,URLSearchParams,AbortController,Event,Error,Date:ClockDate,require:name=>{assert.ok(modules[name],'Unexpected import '+name);return modules[name];},crypto:{randomUUID:()=>`synthetic-request-${++requestId}`},fetch(url,init){assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');if(JSON.parse(init.body).path==='/api/product-connections')return Promise.resolve({ok:false,status:503,json:async()=>({error:'Synthetic connection receipt unavailable'})});const result=deferred();init.signal.addEventListener('abort',()=>result.reject(new Error('Synthetic aborted request')),{once:true});requests.push({url,init,envelope:JSON.parse(init.body),result});return result.promise;}},{filename:'api.ts'});
  const api=exports.api;
  function mount(){
