@@ -1,0 +1,114 @@
+/* Presentation only, scoped to Fleet. Standalone FieldMap and service flows
+   keep their existing styles and behavior. No map geometry or status overrides. */
+#root#root .cos-fleet-board.cos-vision-preview{--fleet-line:#284353;--fleet-muted:#a9bfcc;background:radial-gradient(ellipse at 100% 0,#12334b 0,transparent 48%),#07131f;color:#eef5fa;border:1px solid #284353;border-radius:16px;padding:0 24px 24px;box-shadow:0 12px 40px #0002}
+#root#root .cos-vision-preview :is(h1,h2,h3){letter-spacing:-.035em;color:#eef5fa}
+#root#root .cos-vision-preview :is(button,a,input,select,summary):focus-visible{outline:3px solid #7acaff!important;outline-offset:3px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-tabs{background:#0a1926;border-color:#284353;margin:0 -24px;padding:9px 24px;gap:8px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-tabs button{background:transparent!important;border:1px solid transparent!important;color:#adc3d1!important;border-radius:8px!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-tabs button[aria-current=page]{background:#123951!important;border-color:#338cbd!important;color:#e9f7ff!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-content{padding-top:26px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-bottom:24px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading>div:last-child{display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:340px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading h1{font-size:clamp(27px,3vw,38px);font-weight:800;line-height:1.15}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading>div:first-child>p{display:block;color:#a9bfcc;font-size:13px;line-height:1.6;margin-top:10px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-eyebrow,#root#root .cos-vision-preview .cos-vision-eyebrow{display:block;color:#5ec1ff;font-size:10px;letter-spacing:.18em;font-weight:800;margin-bottom:9px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-clock{display:none}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-refresh,#root#root .cos-vision-preview button.cos-vision-primary{background:#259bf1!important;color:#041628!important;border:1px solid #65c4ff!important;border-radius:8px!important;min-height:44px;padding:11px 17px;font-weight:800;font-size:13px;box-shadow:0 5px 25px #0588eb18}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading>div:last-child>small{color:#a9bfcc;max-width:340px;text-align:right;font-size:11px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stats{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stats .cos-fleet-stat{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:7px;min-height:142px;padding:18px 16px;background:linear-gradient(110deg,#102b3c,#0d1c29)!important;border:1px solid #2e5267!important;border-radius:12px!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>strong{font-size:34px;line-height:1.15;order:2;margin:0}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>span{font-size:10px;letter-spacing:.09em;order:1;color:#d8e8f2}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>small{display:block;font-size:10px;line-height:1.5;order:3;color:#abc1cf}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>.cos-card-icon,#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>.cos-board-status-dot{display:none}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat:hover{border-color:#61b9ed!important;background:#12364a!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-provider-grid{gap:12px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-provider-grid>button{background:#0e2231!important;border-color:#284353!important;border-radius:11px;padding:16px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-provider-title{font-size:14px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-provider-values b{font-size:22px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-search{border-radius:9px;border-color:#385a6d;background:#0b202f;margin:18px 0}
+#root#root .cos-fleet-board.cos-vision-preview .cos-board-search input{border-radius:9px;font-size:14px;height:48px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-workspace{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(310px,1fr);gap:20px;align-items:start}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-panel{grid-column:2;grid-row:1;background:linear-gradient(140deg,#102231,#0c1a27);border:1px solid #284353;border-radius:13px;min-width:0}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-map-panel{grid-column:1;grid-row:1;background:#0b202d;border:1px solid #284353;border-radius:13px;min-width:0}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){min-height:610px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded) .cos-fleet-map-canvas{height:520px;min-height:440px}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-panel>div:first-child{padding:20px;border-bottom:1px solid #284353}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-panel h2{font-size:20px;line-height:1.4}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-list{height:500px;max-height:70dvh;overflow:auto;padding:10px;scrollbar-color:#3b647e #0e2231}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row{background:#102737!important;border-color:#284353!important;border-radius:9px!important;padding:14px!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row:hover{background:#173b50!important;border-color:#438bb8!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row.selected{background:var(--cos-selected)!important;border-color:var(--cos-blue)!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-panel .cos-fleet-filters{display:block;padding:14px;background:#0e2231}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-filter-row>label{font-size:10px}
+#root#root .cos-vision-preview .cos-fleet-drawer{background:linear-gradient(145deg,#102b3c,#0b1b29);border-color:#39596e;border-radius:16px;color:#eef5fa}
+#root#root .cos-vision-preview .cos-fleet-drawer h2{font-size:30px;line-height:1.25}
+#root#root .cos-vision-preview .cos-fleet-drawer :is(.cos-fleet-recorded-address,.cos-fleet-unit-health-section){background:#0b1c29;border:1px solid #284353;border-radius:11px}
+#root#root .cos-vision-preview .cos-fleet-drawer .cos-card-quick-actions .cos-card-pill{background:#12476b;border-color:#337fab}
+#root#root .cos-vision-preview .cos-fleet-drawer-backdrop{background:#020910bf;backdrop-filter:blur(3px)}
+#root#root .cos-vision-preview .cos-vision-focus{margin:24px 0;border:1px solid #284353;border-radius:13px;background:linear-gradient(140deg,#102231,#0c1a27);padding:24px}
+#root#root .cos-vision-preview .cos-vision-focus>header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}
+#root#root .cos-vision-preview .cos-vision-focus h2{font-size:24px;margin:0;line-height:1.3}
+#root#root .cos-vision-preview .cos-vision-focus header p{color:#a9bfcc;font-size:13px;margin:8px 0 0}
+#root#root .cos-vision-preview .cos-vision-decisions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+#root#root .cos-vision-preview .cos-vision-decisions>button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;white-space:normal;padding:22px!important;border:1px solid #284353!important;border-radius:10px!important;background:#0b1c28!important;color:#eef5fa!important;min-width:0}
+#root#root .cos-vision-preview .cos-vision-decisions>button:hover{border-color:#438bb8!important;background:#102b3c!important}
+#root#root .cos-vision-preview .cos-vision-decision-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:#174e7c66;color:#7cc5ff;font-size:22px;margin-bottom:18px}
+#root#root .cos-vision-preview .cos-vision-decisions small{font-size:9px;letter-spacing:.15em;color:#abc1cf}
+#root#root .cos-vision-preview .cos-vision-decisions h3{font-size:17px;line-height:1.5;margin:8px 0 0}
+#root#root .cos-vision-preview .cos-vision-decisions p{font-size:12px;line-height:1.7;color:#abc1cf;margin:8px 0 20px}
+#root#root .cos-vision-preview .cos-vision-decisions b{font-size:12px;color:#82c9f7;margin-top:auto}
+#root#root .cos-vision-preview dialog.cos-vision-briefing{width:min(650px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:30px;border:1px solid #39596e;border-radius:16px;background:#102332;color:#eef5fa;box-shadow:0 25px 100px #0009}
+#root#root .cos-vision-preview dialog.cos-vision-briefing::backdrop{background:#020910d9;backdrop-filter:blur(6px)}
+#root#root .cos-vision-preview .cos-vision-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+#root#root .cos-vision-preview .cos-vision-modal-head button{min-width:44px;min-height:44px;font-size:27px;background:transparent!important;border:1px solid #39596e!important;border-radius:8px;color:#d4e7f3}
+#root#root .cos-vision-preview .cos-vision-briefing p{font-size:13px;line-height:1.7;color:#b7cddc}
+#root#root .cos-vision-preview .cos-vision-briefing ol{padding-left:22px}
+#root#root .cos-vision-preview .cos-vision-briefing li{padding-left:6px;margin:20px 0}
+#root#root .cos-vision-preview .cos-vision-briefing li::marker{color:#6bc1ff}
+#root#root .cos-vision-preview .cos-vision-briefing-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:24px 0}
+#root#root .cos-vision-preview .cos-vision-briefing-counts>div{border:1px solid #39596e;border-radius:9px;padding:14px;min-width:0}
+#root#root .cos-vision-preview .cos-vision-briefing dt{font-size:11px;color:#b7cddc}
+#root#root .cos-vision-preview .cos-vision-briefing dd{font-size:22px;color:#eef5fa;margin:8px 0 0;overflow-wrap:anywhere}
+#root#root .cos-vision-preview .cos-vision-boundary{padding:14px;background:#091925;border-left:3px solid #438ebc;margin:24px 0}
+#root#root .cos-vision-preview .cos-fleet-content>footer{padding:24px 0 0;font-size:10px;letter-spacing:.08em;color:#a9bfcc}
+@media(max-width:1150px){
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-workspace{grid-template-columns:minmax(0,1.1fr) minmax(280px,1fr);gap:14px}
+}
+@media(max-width:900px){
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-workspace{display:flex;flex-direction:column-reverse}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-workspace>section{width:100%}
+ #root#root .cos-vision-preview .cos-vision-decisions{grid-template-columns:1fr}
+ #root#root .cos-vision-preview .cos-vision-decisions>button{padding:18px!important}
+}
+@media(max-width:600px){
+ #root#root .cos-fleet-board.cos-vision-preview{padding:0 12px 16px;border-radius:12px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-tabs{margin:0 -12px;padding:8px 12px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading{align-items:flex-start;flex-direction:column;gap:14px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading>div:last-child{align-items:flex-start;max-width:100%}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-heading>div:last-child>small{text-align:left}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stats .cos-fleet-stat{padding:15px 12px;min-height:130px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-stat>strong{font-size:30px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){min-height:0}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded) .cos-fleet-map-canvas{height:390px;min-height:300px}
+ #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-list{height:auto;max-height:65dvh}
+ #root#root .cos-vision-preview .cos-vision-focus{padding:18px 14px}
+ #root#root .cos-vision-preview .cos-vision-focus>header{flex-direction:column;align-items:flex-start}
+ #root#root .cos-vision-preview .cos-vision-focus h2{font-size:22px}
+ #root#root .cos-vision-preview dialog.cos-vision-briefing{padding:20px}
+ #root#root .cos-vision-preview .cos-vision-briefing-counts{gap:7px}
+ #root#root .cos-vision-preview .cos-vision-briefing-counts>div{padding:10px}
+ #root#root .cos-vision-preview .cos-vision-briefing dd{font-size:18px}
+}
+/* Put the searchable source inventory before its accounting explanation in the
+   narrow map column. Every evidence field remains available in the same view. */
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note{display:flex;flex-direction:column;gap:8px;margin:0}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details{order:-1}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details>label{display:block;margin:10px 0;color:#b7cddc;font-size:12px}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details>label :is(input,select){display:block;width:100%;min-height:44px;margin-top:5px}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details>ul{list-style:none;margin:12px 0;padding:0}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details>ul>li{padding:16px;margin:0 0 12px;border:1px solid #355467;border-radius:9px;background:#102737;overflow-wrap:anywhere}
+#root#root .cos-vision-preview .cos-fleet-unit-list>.cos-fleet-count-note>details>ul>li>strong{display:block;color:#eef5fa;font-size:17px;margin-bottom:8px}
