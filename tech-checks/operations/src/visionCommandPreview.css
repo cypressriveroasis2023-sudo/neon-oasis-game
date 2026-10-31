@@ -38,6 +38,7 @@
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-list{height:500px;max-height:70dvh;overflow:auto;padding:10px;scrollbar-color:#3b647e #0e2231}
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row{background:#102737!important;border-color:#284353!important;border-radius:9px!important;padding:14px!important}
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row:hover{background:#173b50!important;border-color:#438bb8!important}
+#root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-row.selected{background:var(--cos-selected)!important;border-color:var(--cos-blue)!important}
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-unit-panel .cos-fleet-filters{display:block;padding:14px;background:#0e2231}
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 #root#root .cos-fleet-board.cos-vision-preview .cos-fleet-filter-row>label{font-size:10px}

@@ -1,0 +1,882 @@
+{
+  "repository": "cypressriveroasis2023-sudo/neon-oasis-game",
+  "base": "559f14d28b2ac9792626cd7c0c909bbca7c19a3a",
+  "original_head": "4035edcabcf5bbf293b071b82e4626cb326c00be",
+  "operations_run": 41166605735,
+  "operations_terminal": "failure",
+  "failed_steps": [
+    27,
+    31,
+    33,
+    35,
+    38,
+    42
+  ],
+  "full_browser_step": "skipped after earlier failures",
+  "local_node": "22.23.4",
+  "local_browser": "Chromium 154.0.8037.57",
+  "ci_browser": "Chromium 134.0.6998.35 / Playwright build 1161",
+  "local_overrides": [
+    "installed Chromium executable",
+    "local report and output paths",
+    "reuse existing local static server",
+    "two workers"
+  ],
+  "shared_settings": [
+    "original checked-in test bodies and fixtures for all targeted cases",
+    "45-second test timeout",
+    "10-second assertions",
+    "one retry",
+    "390x844, 1024x900, 1440x900"
+  ],
+  "source_change": "Restore existing selected-row background and border tokens without changing assertions or runtime semantics",
+  "evidence": {
+    "operations-terminal-browser.log": "73047051d54554c46052e252d28155763ddc9b33646ca9aa57f9b3db29e2f30b",
+    "operations-terminal-jobs.json": "ad0d02f3633f63cb7d578e34128186a9376433aec499d87ce1d75e884fa7a796",
+    "input-comparison.json": "43823393ad2e44bf20e85d60d640e68717453d85aedf282a66840f638e8418a3",
+    "cli-head.json": "35236bead7cf9803c51268d0ba0d930b383991f72abac305193c91e602221938",
+    "ci-failures.json": "92a6423facd8de6ffad795242ed182f8d604acc9a5eecfec79cd0081b1a314d8",
+    "cli.config.mjs": "374b5a6af51b684f2a5036533164a624a8cb74d8624305344dcdfd9b39314335"
+  },
+  "comparison": [
+    {
+      "file": "field-health-flow.browser.spec.mjs",
+      "line": 237,
+      "title": "closing a shared-site popup restores its auto-pan but preserves a subsequent user pan",
+      "project": "mobile-390",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "field-health-flow.browser.spec.mjs",
+      "line": 237,
+      "title": "closing a shared-site popup restores its auto-pan but preserves a subsequent user pan",
+      "project": "desktop-1024",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "field-health-flow.browser.spec.mjs",
+      "line": 237,
+      "title": "closing a shared-site popup restores its auto-pan but preserves a subsequent user pan",
+      "project": "desktop-1440",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "field-map-deep-link.browser.spec.mjs",
+      "line": 266,
+      "title": "hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces",
+      "project": "mobile-390",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "field-map-deep-link.browser.spec.mjs",
+      "line": 266,
+      "title": "hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces",
+      "project": "desktop-1024",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "field-map-deep-link.browser.spec.mjs",
+      "line": 266,
+      "title": "hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces",
+      "project": "desktop-1440",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "operations-session-recovery.browser.spec.mjs",
+      "line": 100,
+      "title": "identity changed while hidden cannot reuse the healthy prior Owner fingerprint",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 1\n+ Received  + 3\n\n- Array []\n+ Array [\n+   \"token-renewed\",\n+ ]",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "operations-session-recovery.browser.spec.mjs",
+      "line": 100,
+      "title": "identity changed while hidden cannot reuse the healthy prior Owner fingerprint",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 1\n+ Received  + 3\n\n- Array []\n+ Array [\n+   \"token-renewed\",\n+ ]",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "operations-session-recovery.browser.spec.mjs",
+      "line": 100,
+      "title": "identity changed while hidden cannot reuse the healthy prior Owner fingerprint",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 1\n+ Received  + 3\n\n- Array []\n+ Array [\n+   \"token-renewed\",\n+ ]",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 52,
+      "title": "fifteen-minute saved reads preserve source expiry without vendor polling",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-online strong')\nExpected string: \"1\"\nReceived string: \"\u2014\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 78,
+      "title": "returning to Fleet keeps the cached pair original refresh deadline",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-unknown strong')\nExpected string: \"1\"\nReceived string: \"0\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 113,
+      "title": "a failed saved read waits fifteen minutes to retry and manual reload remains immediate",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 158,
+      "title": "automatic partial failure adopts newer placement without asserting successful health",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 52,
+      "title": "fifteen-minute saved reads preserve source expiry without vendor polling",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-online strong')\nExpected string: \"1\"\nReceived string: \"\u2014\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 78,
+      "title": "returning to Fleet keeps the cached pair original refresh deadline",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-unknown strong')\nExpected string: \"1\"\nReceived string: \"0\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 113,
+      "title": "a failed saved read waits fifteen minutes to retry and manual reload remains immediate",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 158,
+      "title": "automatic partial failure adopts newer placement without asserting successful health",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 52,
+      "title": "fifteen-minute saved reads preserve source expiry without vendor polling",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-online strong')\nExpected string: \"1\"\nReceived string: \"\u2014\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 78,
+      "title": "returning to Fleet keeps the cached pair original refresh deadline",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-stat-unknown strong')\nExpected string: \"1\"\nReceived string: \"0\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 113,
+      "title": "a failed saved read waits fifteen minutes to retry and manual reload remains immediate",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "saved-camera-refresh.browser.spec.mjs",
+      "line": 158,
+      "title": "automatic partial failure adopts newer placement without asserting successful health",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('iframe').contentFrame().locator('.cos-fleet-message')\nExpected string: \"Synthetic saved camera read unavailable\"\nReceived string: \"Health refresh unavailable \u00b7 saved equipment remains visibleOnline and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.Refresh detailsOperations could not connect. Retry to verify the current records.\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 89,
+      "title": "TV link fills the host and sees a saved update without a remote desktop connection",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tech-check-tv-footer')\nExpected string: \"Work board refresh 60s \u00b7 Saved camera reads 15 min \u00b7 Page rotation\"\nReceived string: \"LIVE BOARDJobs/tasks updated 10:00 AM CT \u00b7 Work board refresh 60s \u00b7 Saved camera reads 10 min \u00b7 Page rotation 15sRefreshFull screenExit TV\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 312,
+      "title": "Field Map visits overview and geographic close-ups with the red area first",
+      "project": "mobile-390",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 440,
+      "title": "initial field-map HTTP546 retries one shared saved pair after 30 seconds and recovers",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 455,
+      "title": "persistent initial HTTP546 has only one short retry and never displays zero inventory",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV map adopts late validated proof without delaying its saved refresh deadline",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-summary')\nExpected string: \"0 online\"\nReceived string: \"1 online1 offline4 unverified7 Field equipment6 camera-capable equipment1 support \u00b7 no cameras0 mHelp address pins0 GPS-verifiedSaved camera / placement read every 10 min \u00b7 Oct 12, 2026, 3:00:00 PM UTC\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV camera adopts late validated proof without delaying its saved refresh deadline",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveCount(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-record')\nExpected: 0\nReceived: 1",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 89,
+      "title": "TV link fills the host and sees a saved update without a remote desktop connection",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tech-check-tv-footer')\nExpected string: \"Work board refresh 60s \u00b7 Saved camera reads 15 min \u00b7 Page rotation\"\nReceived string: \"LIVE BOARDJobs/tasks updated 10:00 AM CT \u00b7 Work board refresh 60s \u00b7 Saved camera reads 10 min \u00b7 Page rotation 15sRefreshFull screenExit TV\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 312,
+      "title": "Field Map visits overview and geographic close-ups with the red area first",
+      "project": "desktop-1024",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 440,
+      "title": "initial field-map HTTP546 retries one shared saved pair after 30 seconds and recovers",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 455,
+      "title": "persistent initial HTTP546 has only one short retry and never displays zero inventory",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV map adopts late validated proof without delaying its saved refresh deadline",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-summary')\nExpected string: \"0 online\"\nReceived string: \"1 online1 offline4 unverified7 Field equipment6 camera-capable equipment1 support \u00b7 no cameras0 mHelp address pins0 GPS-verifiedSaved camera / placement read every 10 min \u00b7 Oct 12, 2026, 3:00:00 PM UTC\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV camera adopts late validated proof without delaying its saved refresh deadline",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveCount(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-record')\nExpected: 0\nReceived: 1",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 89,
+      "title": "TV link fills the host and sees a saved update without a remote desktop connection",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tech-check-tv-footer')\nExpected string: \"Work board refresh 60s \u00b7 Saved camera reads 15 min \u00b7 Page rotation\"\nReceived string: \"LIVE BOARDJobs/tasks updated 10:00 AM CT \u00b7 Work board refresh 60s \u00b7 Saved camera reads 10 min \u00b7 Page rotation 15sRefreshFull screenExit TV\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 312,
+      "title": "Field Map visits overview and geographic close-ups with the red area first",
+      "project": "desktop-1440",
+      "status": "expected",
+      "error": "",
+      "ci_error_prefix_matches": null
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 440,
+      "title": "initial field-map HTTP546 retries one shared saved pair after 30 seconds and recovers",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 455,
+      "title": "persistent initial HTTP546 has only one short retry and never displays zero inventory",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 3",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV map adopts late validated proof without delaying its saved refresh deadline",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toContainText(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-summary')\nExpected string: \"0 online\"\nReceived string: \"1 online1 offline4 unverified7 Field equipment6 camera-capable equipment1 support \u00b7 no cameras0 mHelp address pins0 GPS-verifiedSaved camera / placement read every 10 min \u00b7 Oct 12, 2026, 3:00:00 PM UTC\"",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "tech-check-tv.browser.spec.mjs",
+      "line": 528,
+      "title": "TV camera adopts late validated proof without delaying its saved refresh deadline",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: Timed out 10000ms waiting for expect(locator).toHaveCount(expected)\n\nLocator: locator('#cosOperationsFrame').contentFrame().locator('.tv-fleet-record')\nExpected: 0\nReceived: 1",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 182,
+      "title": "fifteen-minute saved-data polling preserves the 20-minute source expiry",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 213,
+      "title": "scheduled saved-data refresh rejects a revoked parent before transport",
+      "project": "mobile-390",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 182,
+      "title": "fifteen-minute saved-data polling preserves the 20-minute source expiry",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 213,
+      "title": "scheduled saved-data refresh rejects a revoked parent before transport",
+      "project": "desktop-1024",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 182,
+      "title": "fifteen-minute saved-data polling preserves the 20-minute source expiry",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    },
+    {
+      "file": "verified-health-identity.browser.spec.mjs",
+      "line": 213,
+      "title": "scheduled saved-data refresh rejects a revoked parent before transport",
+      "project": "desktop-1440",
+      "status": "unexpected",
+      "error": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"health\": 1,\n-   \"map\": 1,\n+   \"health\": 2,\n+   \"map\": 2,\n    \"power\": 1,\n    \"routers\": 1,\n  }",
+      "ci_error_prefix_matches": true
+    }
+  ],
+  "bundle_verification": [
+    {
+      "variant": "base",
+      "commit": "559f14d28b2ac9792626cd7c0c909bbca7c19a3a",
+      "path": "tech-checks/operations/dist/assets/index-ByPD4ZlZ.js",
+      "sha256": "22e8303298d3fbf73b2ea5701da2fe1306ab326a8525eaf907cdae0bff418d3e",
+      "matches_committed_bytes": true
+    },
+    {
+      "variant": "base",
+      "commit": "559f14d28b2ac9792626cd7c0c909bbca7c19a3a",
+      "path": "tech-checks/operations/dist/assets/index-L3ge90LI.css",
+      "sha256": "4e7da33281202c0c26a9ada11fce0bdab6e3c602d5d563118802cd2b76614ac1",
+      "matches_committed_bytes": true
+    },
+    {
+      "variant": "head",
+      "commit": "4035edcabcf5bbf293b071b82e4626cb326c00be",
+      "path": "tech-checks/operations/dist/assets/index-BNmCcYtE.js",
+      "sha256": "8f3814c3ecca9db0509ff9f829c9251b1683522285f22c1a069d1c141af0dc35",
+      "matches_committed_bytes": true
+    },
+    {
+      "variant": "head",
+      "commit": "4035edcabcf5bbf293b071b82e4626cb326c00be",
+      "path": "tech-checks/operations/dist/assets/index-C-AkFOP_.css",
+      "sha256": "4189629571ce232020d82435892aed8154359b98e74910ae7a0328c20cf720bd",
+      "matches_committed_bytes": true
+    }
+  ],
+  "relevant_input_hashes": [
+    {
+      "path": ".github/workflows/cos-operations.yml",
+      "base_sha256": "d02ec42ce264a96d0925cecc92357985fd49b137a8e3b4dad95e8a36b83b4ef6",
+      "head_sha256": "d02ec42ce264a96d0925cecc92357985fd49b137a8e3b4dad95e8a36b83b4ef6",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/package-lock.json",
+      "base_sha256": "d178cbc8f705d9d3fc79a9ce2af3f879df412731841cb502ccf37c7d8153a54e",
+      "head_sha256": "d178cbc8f705d9d3fc79a9ce2af3f879df412731841cb502ccf37c7d8153a54e",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/package.json",
+      "base_sha256": "e792c2b41925df1a8bf39388175da88840f1c45c9f4c778deed96a6fec5b46e0",
+      "head_sha256": "e792c2b41925df1a8bf39388175da88840f1c45c9f4c778deed96a6fec5b46e0",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/field-health-flow.browser.spec.mjs",
+      "base_sha256": "c155e6d173fcd71ffee7f069bd06742f233cf842887402ecaac2faca5dbd108e",
+      "head_sha256": "c155e6d173fcd71ffee7f069bd06742f233cf842887402ecaac2faca5dbd108e",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/field-map-controls.mjs",
+      "base_sha256": "a0141257050ddd63a3ecf8b3063ef415c44a311b2427e679f42a2a3f5c34f692",
+      "head_sha256": "a0141257050ddd63a3ecf8b3063ef415c44a311b2427e679f42a2a3f5c34f692",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/field-map-deep-link.browser.spec.mjs",
+      "base_sha256": "8c6604499b0c454b8db5c258cecdbc90f3093f9f3dbee024afb1dfd606f1e74b",
+      "head_sha256": "8c6604499b0c454b8db5c258cecdbc90f3093f9f3dbee024afb1dfd606f1e74b",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/assignment-continuity-ui.mjs",
+      "base_sha256": "ef2c5679a457adb2b465aa06dff25c0fd4849cef9bc1c91df7502a29b3c1fc05",
+      "head_sha256": "ef2c5679a457adb2b465aa06dff25c0fd4849cef9bc1c91df7502a29b3c1fc05",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/assignment-postgres.mjs",
+      "base_sha256": "42fa4052c3e238b0f335bb573b1f15766e1ac75d41d2456a871b4135202b1c9f",
+      "head_sha256": "42fa4052c3e238b0f335bb573b1f15766e1ac75d41d2456a871b4135202b1c9f",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/assignment-review-indexed.mjs",
+      "base_sha256": "b03f1a8e8a7a157480098f4d773aabf26f1d5d5014e6aaa4538b7a4349ca25b5",
+      "head_sha256": "b03f1a8e8a7a157480098f4d773aabf26f1d5d5014e6aaa4538b7a4349ca25b5",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/assignment-timestamps.mjs",
+      "base_sha256": "451a8b81dd690d35b5c0a64d76c91e21655cfe6baae266affeac787f588bcf39",
+      "head_sha256": "451a8b81dd690d35b5c0a64d76c91e21655cfe6baae266affeac787f588bcf39",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/camera-evidence-fixtures.mjs",
+      "base_sha256": "b9c3762af84ff352b10eff34f501620c6a6aa769d2a5c321b45d9d5ef126f2b5",
+      "head_sha256": "b9c3762af84ff352b10eff34f501620c6a6aa769d2a5c321b45d9d5ef126f2b5",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/camera-placement-deployment.json",
+      "base_sha256": "57762802d1cd5ebc9e4eaa6ba69af205698369c1e68b00aa3dac23d2373c38bf",
+      "head_sha256": "57762802d1cd5ebc9e4eaa6ba69af205698369c1e68b00aa3dac23d2373c38bf",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/effectiveFleetPlacement-cpu-baseline.mjs",
+      "base_sha256": "51fc434ece5fd3359524c9008f940b917b816352ca38898676cc34a9f30e57f4",
+      "head_sha256": "51fc434ece5fd3359524c9008f940b917b816352ca38898676cc34a9f30e57f4",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/existing-tracker-source-v3-fixture.mjs",
+      "base_sha256": "7c78541178d3bcf9a1c1d8a2613cc8f2c02a4f8f6ad6fecd9a4427afe449ea7f",
+      "head_sha256": "7c78541178d3bcf9a1c1d8a2613cc8f2c02a4f8f6ad6fecd9a4427afe449ea7f",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/fleet-location-fixtures.mjs",
+      "base_sha256": "407572a1191302e0946860dd8046a3bf2ffd4eb2fc1df213cc7d82d5b301a37b",
+      "head_sha256": "407572a1191302e0946860dd8046a3bf2ffd4eb2fc1df213cc7d82d5b301a37b",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/fleet-status-pins-fixture.mjs",
+      "base_sha256": "0b2f5317a9a38a82e44d13811c0d048c3b7100cdfd9e86e5f6a3309303e92e5a",
+      "head_sha256": "0b2f5317a9a38a82e44d13811c0d048c3b7100cdfd9e86e5f6a3309303e92e5a",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/geocode-sources-database-fixture.mjs",
+      "base_sha256": "7763a5b7ea23d0362afd98ed797d931839f8958ebc321ba68c4f37e6a3dc2815",
+      "head_sha256": "7763a5b7ea23d0362afd98ed797d931839f8958ebc321ba68c4f37e6a3dc2815",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/geocodio-database-fixture.mjs",
+      "base_sha256": "2196f815b91967a3d3ea66e93cbbd07fd2f727cf1f37e13a8589db4fea32e80c",
+      "head_sha256": "2196f815b91967a3d3ea66e93cbbd07fd2f727cf1f37e13a8589db4fea32e80c",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/imported-digest-fixture.mjs",
+      "base_sha256": "bc17e4b6260a2375376348abde9edfd4a2ec70c2851e0bf5d4ad4299da25d27c",
+      "head_sha256": "bc17e4b6260a2375376348abde9edfd4a2ec70c2851e0bf5d4ad4299da25d27c",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/imported-family-policy.mjs",
+      "base_sha256": "0258808418855606374aa6e22dce97a6060a48f12ee53fb0179702fa09ad1079",
+      "head_sha256": "0258808418855606374aa6e22dce97a6060a48f12ee53fb0179702fa09ad1079",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelp-address-cache-lookup.json",
+      "base_sha256": "ee6f0409551f6d2772e937036cd154dd269e18cb50f5bf513749e54c7dd7fe1f",
+      "head_sha256": "ee6f0409551f6d2772e937036cd154dd269e18cb50f5bf513749e54c7dd7fe1f",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelp-field-health-fixtures.mjs",
+      "base_sha256": "c1c8c7bbc2f474af42ea1099a67a15a7db29e306e1e19025fc5d06fe62019a88",
+      "head_sha256": "c1c8c7bbc2f474af42ea1099a67a15a7db29e306e1e19025fc5d06fe62019a88",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelp-placement-schema.mjs",
+      "base_sha256": "9ccef3afb22b84aa1a08e8d4673f5aeb079d8440178f381fbac84a9ae647ad33",
+      "head_sha256": "9ccef3afb22b84aa1a08e8d4673f5aeb079d8440178f381fbac84a9ae647ad33",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpAppointmentPreview.mjs",
+      "base_sha256": "f8e78f3e640be3460be3ddc546ea48e8e7827b9a53e47015e659e53ab01212b3",
+      "head_sha256": "f8e78f3e640be3460be3ddc546ea48e8e7827b9a53e47015e659e53ab01212b3",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpAppointmentTicketPreview.mjs",
+      "base_sha256": "25ce02a85ce1e464f64e07d63258d2ac5e19244e20a93f7e4eb868e8e5ca9f90",
+      "head_sha256": "25ce02a85ce1e464f64e07d63258d2ac5e19244e20a93f7e4eb868e8e5ca9f90",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpAppointmentVariantPreview.mjs",
+      "base_sha256": "30a1ce4721272dc25e812d4db085947a5d949423bdcb036c058f2be6deecec90",
+      "head_sha256": "30a1ce4721272dc25e812d4db085947a5d949423bdcb036c058f2be6deecec90",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpSyntheticPdf.mjs",
+      "base_sha256": "6fd3e31f2130e1d3574830096b543de3705150999c190f11bf01e03fb5c161b0",
+      "head_sha256": "6fd3e31f2130e1d3574830096b543de3705150999c190f11bf01e03fb5c161b0",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpTicketPreview.mjs",
+      "base_sha256": "1da99f85cdd8586135af216e544488d09f91770a492d8c9b10eef8060078745e",
+      "head_sha256": "1da99f85cdd8586135af216e544488d09f91770a492d8c9b10eef8060078745e",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpTicketPrivateSample.mjs",
+      "base_sha256": "577e8da2890a2dd420b865f5b486277c5342a77bfce1bd22418c471f0d5f1fbe",
+      "head_sha256": "577e8da2890a2dd420b865f5b486277c5342a77bfce1bd22418c471f0d5f1fbe",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/mhelpUploadPlacement-cpu-baseline.mjs",
+      "base_sha256": "19f194a2706e90d34ba477457eed160add16dbea041ac28995468194cb1c0479",
+      "head_sha256": "19f194a2706e90d34ba477457eed160add16dbea041ac28995468194cb1c0479",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/native-alias-cpu-population.mjs",
+      "base_sha256": "be02e072aaa7bc6197f5f6b39ba3e116c7f2d64ceaf07975269ee040e1e5193b",
+      "head_sha256": "be02e072aaa7bc6197f5f6b39ba3e116c7f2d64ceaf07975269ee040e1e5193b",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/owner-identity-upload-fixture.mjs",
+      "base_sha256": "f75d5baafdbcef02b96cf51ed4ba0c235c27b5d2daef43c9e85b23827874f8b3",
+      "head_sha256": "f75d5baafdbcef02b96cf51ed4ba0c235c27b5d2daef43c9e85b23827874f8b3",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-cpu-baseline.mjs",
+      "base_sha256": "dae3c9153fee68b8da36d7ebbffc3531c0ad4819428fd504c2b4bd12f3aa44d7",
+      "head_sha256": "dae3c9153fee68b8da36d7ebbffc3531c0ad4819428fd504c2b4bd12f3aa44d7",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-cpu-population.mjs",
+      "base_sha256": "7988503d10508dc71a2740239de7ffe9bebe919a17dc49a47ecd505e74217ef6",
+      "head_sha256": "7988503d10508dc71a2740239de7ffe9bebe919a17dc49a47ecd505e74217ef6",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-label-index-catalog.json",
+      "base_sha256": "3709903decd7f078502ab847e6ed012ed692f71e96f71a36e11a40ca1d33a58d",
+      "head_sha256": "3709903decd7f078502ab847e6ed012ed692f71e96f71a36e11a40ca1d33a58d",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-label-index.mjs",
+      "base_sha256": "9512cc744f7e7f32938c8e511908e8871d7dee632b4dffe69b37a369389bae27",
+      "head_sha256": "9512cc744f7e7f32938c8e511908e8871d7dee632b4dffe69b37a369389bae27",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-snapshot-dedup-catalog.json",
+      "base_sha256": "d364a4f15478d9208fae67f9b7a896eba609ad3425b4e4efc73af132c5c58671",
+      "head_sha256": "d364a4f15478d9208fae67f9b7a896eba609ad3425b4e4efc73af132c5c58671",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-snapshot-dedup.mjs",
+      "base_sha256": "0381f8e1c0cf0f5da496e5a08cbf7c65969f267e3ce19c087dccf2cd224cbe86",
+      "head_sha256": "0381f8e1c0cf0f5da496e5a08cbf7c65969f267e3ce19c087dccf2cd224cbe86",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-snapshot-live-catalog.json",
+      "base_sha256": "f810bdaaecf5114f1f18f55e0f1937c6b777db4fbbe312fbe855facc18f32160",
+      "head_sha256": "f810bdaaecf5114f1f18f55e0f1937c6b777db4fbbe312fbe855facc18f32160",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/placement-source-cpu-population.mjs",
+      "base_sha256": "2ba116ca716c4070f68862bf4cf570e6b0d775a3d512ec9877caed514b771f77",
+      "head_sha256": "2ba116ca716c4070f68862bf4cf570e6b0d775a3d512ec9877caed514b771f77",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/publisher-review-fixture.mjs",
+      "base_sha256": "8ef8177f960a2082026a5f6a8c8b732f1e938a757e7c11632ebe740bdc8efe48",
+      "head_sha256": "8ef8177f960a2082026a5f6a8c8b732f1e938a757e7c11632ebe740bdc8efe48",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/recorded-roster-fixtures.mjs",
+      "base_sha256": "a20e544be11c6eea324546191631768acab183b09d8b8d6a9b501497bcbedc0c",
+      "head_sha256": "a20e544be11c6eea324546191631768acab183b09d8b8d6a9b501497bcbedc0c",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/routers.mjs",
+      "base_sha256": "202b61fccc1dd9b228866bb270cd6d6bac163a6462afb4cbdbd944aa556c51cd",
+      "head_sha256": "202b61fccc1dd9b228866bb270cd6d6bac163a6462afb4cbdbd944aa556c51cd",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/scoped-inventory-fixture.mjs",
+      "base_sha256": "812d6c51abf2c06e3cebdea51b54d74e30cfb8cf273ee58ebe83e6b2a8c614b9",
+      "head_sha256": "812d6c51abf2c06e3cebdea51b54d74e30cfb8cf273ee58ebe83e6b2a8c614b9",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-admission-continuity.mjs",
+      "base_sha256": "272c3253751df03deee29d23c6b892f931147990e001e1b89c6ba3f88c6c4cee",
+      "head_sha256": "272c3253751df03deee29d23c6b892f931147990e001e1b89c6ba3f88c6c4cee",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-equipment-cache-fixture.mjs",
+      "base_sha256": "79aa5ab5424479b4efb78933ff8af158f66eefd3e278f3b10631a07b25b2595e",
+      "head_sha256": "79aa5ab5424479b4efb78933ff8af158f66eefd3e278f3b10631a07b25b2595e",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-equipment-pin-fixtures.mjs",
+      "base_sha256": "4e3e2f21af13ba380d1222638838ef2f330899affde8286e8f6347e390e1ebc8",
+      "head_sha256": "4e3e2f21af13ba380d1222638838ef2f330899affde8286e8f6347e390e1ebc8",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-equipment-receipts-postgres.mjs",
+      "base_sha256": "0333dcddd38a6861dcab9e82155b2f32b7bc9507a5251ea9d4c9e4f7bd897922",
+      "head_sha256": "0333dcddd38a6861dcab9e82155b2f32b7bc9507a5251ea9d4c9e4f7bd897922",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-equipment-receipts-proof.mjs",
+      "base_sha256": "37270e3d9a1af72e74461d4053f7d94150f506ea07aa91584861864dc981b71b",
+      "head_sha256": "37270e3d9a1af72e74461d4053f7d94150f506ea07aa91584861864dc981b71b",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/source-recorded-coordinates-fixture.mjs",
+      "base_sha256": "b3aefe6acf2e1362014eaba271552692c9a96d3eb55df65043b76c6066f5edbf",
+      "head_sha256": "b3aefe6acf2e1362014eaba271552692c9a96d3eb55df65043b76c6066f5edbf",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/support-admission-fixture.mjs",
+      "base_sha256": "4caa170a25be5dbc8c2cba341350761cc6e67a41abfcc2b6e84d810e94ec5087",
+      "head_sha256": "4caa170a25be5dbc8c2cba341350761cc6e67a41abfcc2b6e84d810e94ec5087",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fixtures/vrm-fleet-database-fixture.mjs",
+      "base_sha256": "4fb4bc74d737cfb10e958a54df9eaedab46be4aaa5c8d39e7b7a255c729aa1b7",
+      "head_sha256": "4fb4bc74d737cfb10e958a54df9eaedab46be4aaa5c8d39e7b7a255c729aa1b7",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/fleet-dashboard-fixtures.mjs",
+      "base_sha256": "51992d19b9456e1cc2d14c886d3be37e8d687b29dd71cdddd64207f2328955e1",
+      "head_sha256": "51992d19b9456e1cc2d14c886d3be37e8d687b29dd71cdddd64207f2328955e1",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/iframeHistory.mjs",
+      "base_sha256": "d2a79e716f43f5345fed2b76ec9ff020ff78b1ac02cd7e99872247f423f708a5",
+      "head_sha256": "d2a79e716f43f5345fed2b76ec9ff020ff78b1ac02cd7e99872247f423f708a5",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/operationsAccess.mjs",
+      "base_sha256": "633af93cacd455625a15beaa6c83d89ba82c509797a75c4929b6641015427502",
+      "head_sha256": "633af93cacd455625a15beaa6c83d89ba82c509797a75c4929b6641015427502",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/service-basics-fixture.mjs",
+      "base_sha256": "b78a7253cdbc5bf9e4ce531f88900ca56ca0c3dba9ba2ec609ede48d647d31a8",
+      "head_sha256": "b78a7253cdbc5bf9e4ce531f88900ca56ca0c3dba9ba2ec609ede48d647d31a8",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/service-ticket-fixture.mjs",
+      "base_sha256": "b6801d2b41012fa05f5e021b77bb6dc358c58c4734bd19c06f1fa7dde0933f6c",
+      "head_sha256": "b6801d2b41012fa05f5e021b77bb6dc358c58c4734bd19c06f1fa7dde0933f6c",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/ticket-instructions-host-harness.mjs",
+      "base_sha256": "40a654108a811ae51ee8bcf3964b87f9f5301fccd9274dc6982dd856b9e16fdb",
+      "head_sha256": "40a654108a811ae51ee8bcf3964b87f9f5301fccd9274dc6982dd856b9e16fdb",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/helpers/transfer-fixture.mjs",
+      "base_sha256": "493afa4fe1bdeb0d8deaea817ce7ab1f537dd5c4c4fe71b5cb1265311f49e03f",
+      "head_sha256": "493afa4fe1bdeb0d8deaea817ce7ab1f537dd5c4c4fe71b5cb1265311f49e03f",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/navigation-helper.mjs",
+      "base_sha256": "d20ca692713ae88a1dc2cdba1bd4b0ae7bc80bd236210be666ad04efdca8f91a",
+      "head_sha256": "d20ca692713ae88a1dc2cdba1bd4b0ae7bc80bd236210be666ad04efdca8f91a",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/operations-session-recovery.browser.spec.mjs",
+      "base_sha256": "866ec75a8e01c78d57e6bec71a59b6c0cafb5ff3f8290a8458952473d8249b76",
+      "head_sha256": "866ec75a8e01c78d57e6bec71a59b6c0cafb5ff3f8290a8458952473d8249b76",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/playwright.config.mjs",
+      "base_sha256": "ed14244b62ef34f9a2bca58d793b59f408a0ddffb33f66cfb41e30b082321c90",
+      "head_sha256": "ed14244b62ef34f9a2bca58d793b59f408a0ddffb33f66cfb41e30b082321c90",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/saved-camera-refresh.browser.spec.mjs",
+      "base_sha256": "a3ebee939fa1d0e001dbeeb2a89159b889d518dbb06ff738ff5a23ab519aee5d",
+      "head_sha256": "a3ebee939fa1d0e001dbeeb2a89159b889d518dbb06ff738ff5a23ab519aee5d",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/tech-check-tv.browser.spec.mjs",
+      "base_sha256": "3128c203a3aa8fb4440f1c2c13158657e5c408952d03b6539f44a005090877ad",
+      "head_sha256": "3128c203a3aa8fb4440f1c2c13158657e5c408952d03b6539f44a005090877ad",
+      "identical": true
+    },
+    {
+      "path": "tech-checks/operations/tests/verified-health-identity.browser.spec.mjs",
+      "base_sha256": "61e1da923c5fb3bd8b19d2f31282a3fd54a2ebd99ba1a3de5df8224ceb17f9b5",
+      "head_sha256": "61e1da923c5fb3bd8b19d2f31282a3fd54a2ebd99ba1a3de5df8224ceb17f9b5",
+      "identical": true
+    }
+  ],
+  "ci_checkout": "8021ae740b69a864091a5015f1b3a3b7d7a2a487",
+  "ci_tree_equals_original_head": "47ca6df53cceccd20b6c3285e72cf7e4dfd3fb33",
+  "fixed_browser_checks": {
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+  },
+  "extra_head_checks": {
+    "passed": 6,
+    "failed": 6,
+    "all_six_failure_prefixes_match_base": true
+  }
+}

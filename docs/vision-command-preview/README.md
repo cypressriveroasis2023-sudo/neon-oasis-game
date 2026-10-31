@@ -45,3 +45,7 @@ Review the visual layout, density, map/list balance and briefing wording. The sc
 - [Mobile Owner briefing](owner-briefing-390.png)
 
 63 distinct browser scenario/viewport checks passed after updating the intentional gradient assertion. The three delayed-connection failure cases above remain reproducible on main. The final CSS-only inventory ordering adjustment passed six additional briefing/layout checks. Library screenshot upload could not start because the supported upload helper could not reach its tool-discovery service; the screenshots are retained here instead.
+
+## Follow-up
+
+See [normal-runner comparison and UI correction](VALIDATION.md) for the terminal Operations workflow result, exact base comparisons and the selected-row highlight correction. The follow-up resolved the local Playwright CLI stall by using isolated Node 22.
