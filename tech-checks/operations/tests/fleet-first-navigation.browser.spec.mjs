@@ -21,7 +21,7 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} opens Fleet first
  }
  if(mobile)await app.getByRole('button',{name:/Close menu/}).click();
  const design=await app.locator('.cos-fleet-dashboard').evaluate(el=>({font:getComputedStyle(el).fontFamily,border:getComputedStyle(el).borderTopWidth,panel:getComputedStyle(el.querySelector('.cos-fleet-stats button')).backgroundImage,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
- expect(design.font).toContain('Open Sans');expect(design.border).toBe('1px');expect(design.panel).toBe('linear-gradient(145deg, rgb(23, 41, 59), rgb(17, 30, 45))');expect(design.scroll).toBeLessThanOrEqual(design.viewport+1);
+ expect(design.font).toContain('Open Sans');expect(design.border).toBe('1px');expect(design.panel).toBe('linear-gradient(110deg, rgb(16, 43, 60), rgb(13, 28, 41))');expect(design.scroll).toBeLessThanOrEqual(design.viewport+1);
  await page.screenshot({path:info.outputPath((it?'it':'owner')+'-fleet-first-native.png'),fullPage:true});
  expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });
