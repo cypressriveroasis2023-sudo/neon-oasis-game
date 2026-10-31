@@ -194,5 +194,11 @@
   "independentCrossCheck": "The productTcpRuntime.ts retrieved read-only here hashes to the runtime-file SHA256 above, matching the deployment records byte-for-byte from the other direction.",
   "retained": "Original manifest, preparation script, preservation checks and rollback record all still exist on the author machine."
  },
- "deploymentCiStatus": "Separate reviewed backend delivery was intentional for this release. Permanently omitting deployment CI was NOT a documented decision, and the source-publication gap needs fixing. Agreed order: (1) preserve the exact native source and a reproducible build in reviewed version control, (2) add CI that VERIFIES the artifact without deploying it, (3) automated deployment is a separate decision requiring approval."
+ "deploymentCiStatus": "Separate reviewed backend delivery was intentional for this release. Permanently omitting deployment CI was NOT a documented decision, and the source-publication gap needs fixing. Agreed order: (1) preserve the exact native source and a reproducible build in reviewed version control, (2) add CI that VERIFIES the artifact without deploying it, (3) automated deployment is a separate decision requiring approval.",
+ "reproducibilityCheck": {
+  "status": "NOT IMPLEMENTED - blocked on publication of the exact native source and build records",
+  "requirements": "See REPRODUCIBILITY-CHECK-REQUIREMENTS.md in this directory.",
+  "mustNeverAutoUpdateTheseDigests": true,
+  "note": "The digests in this file are comparison targets. Any check that rewrites them on mismatch verifies nothing."
+ }
 }
