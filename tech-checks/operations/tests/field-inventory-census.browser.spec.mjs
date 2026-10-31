@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
-import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 for(const it of [false,true])test((it?'IT':'Owner')+' retains every recorded Field product when saved camera health fails',async({page})=>{
  const f=fieldProductFixture(),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
@@ -144,16 +144,37 @@ for(const it of [false,true])test((it?'IT':'Owner')+' health headline selections
  expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 
-test('required TCP source failure makes connectivity Unknown without losing or moving any Product IDs',async({page})=>{
- const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
+test('TCP source failure removes direct proof and retains only labelled reviewed provider results without moving Product IDs',async({page})=>{
+ const f=fieldProductFixture();
+ // Product1002 deliberately disagrees: exact TCP Online, reviewed provider Offline.
+ const connections=fieldProductConnectionFixture(f.upload,f.fresh,{'1001':'online','1002':'online'});
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:connections});
+ const products=app.getByRole('region',{name:'Fleet units in view'});
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('2');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ await expect(products.locator('[data-product-id="1002"]')).toContainText('Completed synthetic saved TCP/service-port check');
  const before=structuredClone(state.field);
  state.productConnections=null;
  await app.locator('.cos-fleet-refresh').click();
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
- await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
- await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('6');
+ await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('4');
+ for(const id of ['1001','1002']){
+  const product=products.locator('[data-product-id="'+id+'"]');
+  await expect(product).toContainText('Provider-reported, not direct-connection verified.');
+  await expect(product).toContainText('No direct connection check is available');
+  await expect(product).not.toContainText('Completed synthetic saved TCP/service-port check');
+  await expect(product).not.toContainText('exact product id tracker endpoint');
+  await expect(product).not.toContainText('resource '+String(9000+Number(id)));
+  await expect(product).toContainText('Reviewed device association: native provider.');
+  await expect(product).toContainText('resource '+String(Number(id)-1000)+' · Current · reported '+(id==='1001'?'online':'offline'));
+  await expect(product).toContainText('Live video and recording are not verified');
+ }
+ for(const id of ['1003','1005','1006','1007'])await expect(products.locator('[data-product-id="'+id+'"]')).not.toContainText('Provider-reported, not direct-connection verified.');
+ await expect(products.locator('[data-product-id="1006"]')).toContainText('Identity / placement review');
+ await expect(products.locator('[data-product-id="1007"]')).toContainText('Do Not Use');
+ expect(await products.locator('[data-product-id]').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-product-id')).sort())).toEqual(['1001','1002','1003','1004','1005','1006','1007']);
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('1');
  expect(state.field).toEqual(before);

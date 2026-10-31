@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
-import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact checks while pending and adopts late proof`,async({page})=>{
  const f=fieldProductFixture();
@@ -20,16 +20,32 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact 
  expect(state.calls.filter(r=>r.path==='/api/product-connections')).toHaveLength(2);
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
-test('late connection read failure is visible and removes retained exact checks',async({page})=>{
- const f=fieldProductFixture();const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true});
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+test('late connection read failure removes retained exact checks before labelled reviewed-provider fallback',async({page})=>{
+ const f=fieldProductFixture();
+ const connections=fieldProductConnectionFixture(f.upload,f.fresh,{'1001':'offline','1002':'offline'});
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:connections,advancingClock:true});
+ const product=app.getByRole('region',{name:'Fleet units in view'}).locator('[data-product-id="1001"]');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(product).toContainText('Completed synthetic saved TCP/service-port check');
  let release;state.proofGate=new Promise(resolve=>{release=resolve;});
  await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect.poll(()=>state.calls.filter(r=>r.path==='/api/product-connections').length).toBe(2);
  await page.clock.runFor(6600);await expect(app.getByRole('status').filter({hasText:'Connection source is still loading'})).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(product).toContainText('Completed synthetic saved TCP/service-port check');
  state.productConnections=null;release();state.proofGate=null;
  await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(product).toContainText('Provider-reported, not direct-connection verified.');
+ await expect(product).toContainText('No direct connection check is available');
+ await expect(product).not.toContainText('Completed synthetic saved TCP/service-port check');
+ await expect(product).not.toContainText('exact product id tracker endpoint');
+ await expect(product).not.toContainText('resource 10001');
+ await expect(product).toContainText('Reviewed device association: native provider.');
+ await expect(product).toContainText('resource 1 · Current · reported online');
+ await expect(product).toContainText('Live video and recording are not verified');
+ await expect(app.getByRole('status').filter({hasText:'Connection source is still loading'})).toHaveCount(0);
+ expect(state.calls.filter(r=>r.path==='/api/product-connections')).toHaveLength(2);
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 test('Fleet warning renders only bounded source diagnostics and clears them on recovery or invalidation',async({page})=>{

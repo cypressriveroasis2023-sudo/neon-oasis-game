@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import {fleetDashboardRows} from '../src/fleetDashboardModel.ts';
 import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
-import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('every Field Product ID appears once in a complete partition; Shop never enters it',()=>{
  const f=fieldProductFixture(),before=structuredClone(f),view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
  assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,unverified:1,support:1,unlinked:1,review:1,inactive:1});
@@ -56,5 +57,39 @@ test('obsolete IP-only contract and failed source keep inventory and support, an
  assert.equal(view.items[2].state,'unverified');
  assert.equal(view.items[4].state,'unverified');
  assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
+ }
+});
+
+// Synthetic provider evidence only; no equipment/provider requests.
+for(const [name,change] of [
+ ['unreviewed',f=>{f.rows[0].camera.association=null;}],
+ ['mismatched native membership',f=>{f.upload.records[0].binding.unitIds=[f.units[1].id];}],
+ ['stale provider observation',f=>{f.health.rows[0].evidence.observedAt=new Date(f.now-21*60000).toISOString();f.rows=fleetDashboardRows(f.units,f.health,[],null,f.now);}],
+ ['ambiguous native row',f=>{f.rows.push(structuredClone(f.rows[0]));}],
+])test('pending or Unknown TCP cannot admit '+name+' provider evidence',()=>{
+ for(const source of ['pending','unknown']){
+  const f=fieldProductFixture();change(f);
+  const receipt=source==='pending'?null:fieldProductConnectionFixture(f.upload,f.fresh,{});
+  const item=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt).items.find(p=>p.productId==='1001');
+  assert.ok(['review','unverified'].includes(item.state),item.state);
+  assert.doesNotMatch(item.reason,/Provider-reported, not direct-connection verified/);
+ }
+});
+test('reviewed provider fallback is labelled and completed exact TCP takes precedence in both directions',()=>{
+ const f=fieldProductFixture(),fallback=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,null);
+ assert.deepEqual(fallback.items.slice(0,2).map(p=>p.state),['online','offline']);
+ for(const p of fallback.items.slice(0,2))assert.match(p.reason,/^Provider-reported, not direct-connection verified/);
+ const receipt=fieldProductConnectionFixture(f.upload,f.fresh,{'1001':'offline','1002':'online'});
+ const exact=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.deepEqual(exact.items.slice(0,2).map(p=>[p.productId,p.state]),[['1001','offline'],['1002','online']]);
+ for(const p of exact.items.slice(0,2)){
+  assert.doesNotMatch(p.reason,/Provider-reported/);assert.equal(p.evidence.association,'exact_product_id_tracker_endpoint');
+  assert.equal(p.evidence.observedAt,f.fresh);assert.equal(p.evidence.video,'not_verified');
+ }
+ // Rejected source and expired proof do not masquerade as current direct TCP.
+ for(const invalid of [{...receipt,sourceSha256:'f'.repeat(64)},fieldProductConnectionFixture(f.upload,new Date(f.now-21*60000).toISOString(),{'1001':'offline','1002':'online'})]){
+  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,invalid);
+  assert.deepEqual(view.items.slice(0,2).map(p=>p.state),['online','offline']);
+  for(const p of view.items.slice(0,2))assert.match(p.reason,/^Provider-reported, not direct-connection verified/);
  }
 });
