@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: v133 preservation, rollback and exact original-runtime rebuild
+ok 1 - v133 preservation, rollback and exact original-runtime rebuild
+  ---
+  duration_ms: 337.988733
+  type: 'test'
+  ...
+# Subtest: complete artifact removes IP-only outcomes for Owner/IT; preserves denial and CORS
+ok 2 - complete artifact removes IP-only outcomes for Owner/IT; preserves denial and CORS
+  ---
+  duration_ms: 152.567385
+  type: 'test'
+  ...
+# Subtest: complete artifact source failures retain recognized status and bounded diagnostics
+ok 3 - complete artifact source failures retain recognized status and bounded diagnostics
+  ---
+  duration_ms: 93.428949
+  type: 'test'
+  ...
+# Subtest: preparation rejects version, file, configuration or entrypoint drift
+ok 4 - preparation rejects version, file, configuration or entrypoint drift
+  ---
+  duration_ms: 13.92784
+  type: 'test'
+  ...
+# Subtest: compiled runtime requires reviewed exact resource membership for conclusive TCP
+ok 5 - compiled runtime requires reviewed exact resource membership for conclusive TCP
+  ---
+  duration_ms: 30.080479
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2148.694217
