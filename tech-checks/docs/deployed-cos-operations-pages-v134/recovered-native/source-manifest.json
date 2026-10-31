@@ -3,7 +3,7 @@
   "reproductionPerformed": false,
   "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
   "publicationBase": "559f14d28b2ac9792626cd7c0c909bbca7c19a3a",
-  "sourceFileCount": 41,
+  "sourceFileCount": 59,
   "retainedRecordCount": 5,
   "manifestSelfHashExcluded": true,
   "files": [
@@ -368,8 +368,175 @@
     {
       "path": "README.md",
       "provenance": "new explanatory documentation",
-      "bytes": 3444,
-      "sha256": "fb32c25fd3d9ce5ddae0b4ceddaf51682c888b065656340e4073f9020f473fdf"
+      "bytes": 7640,
+      "sha256": "3f8449fadf3cd743ff3138514e2971ea590cf49369c6b25d3f8c8813dcfe0c2c"
+    },
+    {
+      "path": "archive-adapter.mjs",
+      "provenance": "NEW documentation-only adapter or adapter test; not historical source",
+      "bytes": 3106,
+      "sha256": "fa8027376f959cc4ba73262e3c1cdd044863920bcd4e70faea15dc77fa1d22c1"
+    },
+    {
+      "path": "archive-adapter.test.mjs",
+      "provenance": "NEW documentation-only adapter or adapter test; not historical source",
+      "bytes": 2846,
+      "sha256": "acb924b3b66d63088a5286f744d1c2d18473803cef02037b8c77fa879947fa43"
+    },
+    {
+      "path": "baseline-24e2dc78/tech-checks/operations/src/exactProductConnection.ts",
+      "sourceCommit": "24e2dc78a8b8d08f72daf3fcd5aaa3861519482c",
+      "sourcePath": "tech-checks/operations/src/exactProductConnection.ts",
+      "gitBlob": "4488955e31d301c6979df0d13121f0ad7ae5fffb",
+      "bytes": 14172,
+      "sha256": "1e435cdfa5c01c09d4414b85102d34029e869a1c3bb40445cc876693a98126d0"
+    },
+    {
+      "path": "tree/tech-checks/operations/scripts/attribution-v133-proof.mjs",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/operations/scripts/attribution-v133-proof.mjs",
+      "gitBlob": "994c9827ede06adc461b3d9f2a307dac36062d37",
+      "bytes": 7491,
+      "sha256": "bdd1fd74ded96c486362765611ae856cbebd5804dfbacbbf89a7afaa76c3d81d"
+    },
+    {
+      "path": "tree/tech-checks/operations/src/productScopePreviewModel.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/operations/src/productScopePreviewModel.ts",
+      "gitBlob": "8ddb8087e488bd1e96b220823ed808bd3c276cf5",
+      "bytes": 4407,
+      "sha256": "64dedea29b1d629ddbb0272bfa366526c455bde3d29470e723072813bab18e5e"
+    },
+    {
+      "path": "tree/tech-checks/operations/tests/fixtures/product-tcp-source.mjs",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/operations/tests/fixtures/product-tcp-source.mjs",
+      "gitBlob": "7cdc6620aa774fff684ee3a20819dd8a8b3fe067",
+      "bytes": 4290,
+      "sha256": "301e8906ef090788c413975aab062c4d0f4ac7983e3024ad07b5f131c366f730"
+    },
+    {
+      "path": "tree/tech-checks/operations/tests/mhelp-2027-connection-census.test.mjs",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/operations/tests/mhelp-2027-connection-census.test.mjs",
+      "gitBlob": "cc3c43d28e9d80364c13683819dee452afdc5347",
+      "bytes": 22032,
+      "sha256": "dccad05407af0043cc3349efdfdac84e79146a2f86d01efcac958b4ca9f9290a"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/inhandPilot.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/inhandPilot.ts",
+      "gitBlob": "ecdb34f9991222191e46f9a4a0c311b5a44659bd",
+      "bytes": 14422,
+      "sha256": "d27e34dbed4306b992a915d2af3ea7a7110cd49dca850da49c17cac91681d526"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelp2027ProductCensus.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelp2027ProductCensus.ts",
+      "gitBlob": "32a4aa8da6a0883efa1d931bc2eb2e0d8acdffbb",
+      "bytes": 15011,
+      "sha256": "45d0b090060ad0c2e30d87681eed5ee5ce0abfc1b1bd710b41683420b196f64c"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpAccessRetry.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpAccessRetry.ts",
+      "gitBlob": "cffe32af0215056cffdfba756f891cbc90b74c19",
+      "bytes": 1057,
+      "sha256": "d85ba7d817cd4c667ff16cfa2b2638b606d903ad647da8986ceee72c75e0f069"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpAppointmentVariants.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpAppointmentVariants.ts",
+      "gitBlob": "400d03854329507c7b91c3c7b6791fb8e12ddae1",
+      "bytes": 17540,
+      "sha256": "39795f6f432b5f642c57f14f72966f582b0a8b970b6aef6c2eef20a4736a98c7"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpAppointments.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpAppointments.ts",
+      "gitBlob": "d21d245d51fd021a9cf8f3de6fb1d8c39832d9dc",
+      "bytes": 14161,
+      "sha256": "a31e139a12c41d19ca3e3c5c83733526e4e2703466c8574ad4e9fc27f0882e44"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpImport.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpImport.ts",
+      "gitBlob": "776fd23258347f4f92142c273507e79bf59080f3",
+      "bytes": 9335,
+      "sha256": "816bf4fe4d1132aa19d3b3303a9f84cc3141e845477bac12b3d39447d0545a67"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpPartner.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpPartner.ts",
+      "gitBlob": "4d601b28e358ac07d0218881f99788ca8b099470",
+      "bytes": 15321,
+      "sha256": "6515ea42a3a18c10956f23d4ffe4272276f3a010a88b3c507fe8515869eb3abf"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDay.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDay.ts",
+      "gitBlob": "b65a1888b46c210f350ec8ea22d1bc6660efde63",
+      "bytes": 3716,
+      "sha256": "9b08916c275f3ecf9a0a43e234ea6dc79fe8b5b3844ea38f2888fffd59ead747"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDetail.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketDetail.ts",
+      "gitBlob": "fc3e6215f79536a86304526e91fbcf35cbc96847",
+      "bytes": 11524,
+      "sha256": "bc35fce95c683a2813c9e50b726bef189626a4e66da80337fb69b6f19aba12c4"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTicketPrivateSample.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketPrivateSample.ts",
+      "gitBlob": "3f02647cca421a7ece6d077ce2531217c3220f2e",
+      "bytes": 28795,
+      "sha256": "5edb12f07bebe16aa0a1f0c15a8bbfda3ca97a041f7c9d0ca2df6dd4259d452c"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTicketSchema.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTicketSchema.ts",
+      "gitBlob": "02e6363d62d31162f1e09062ead26e4124397ffb",
+      "bytes": 12678,
+      "sha256": "03f544a9c3dbaedb6ae553f4e030e4f484d21f197a75f5a5a3af96f09c0fa176"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTickets.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTickets.ts",
+      "gitBlob": "ebc832d577f15752236dbb66a6eb40b24762fdb2",
+      "bytes": 36923,
+      "sha256": "f9c30430f0e5db4bd1b836a6d252b44b732d786585ef472f7ba122375701bc7e"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/mhelpTokenSession.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/mhelpTokenSession.ts",
+      "gitBlob": "af924c39aa748f541885cc23f52b1ca1c2d45ebd",
+      "bytes": 13796,
+      "sha256": "4ebdaaaf50ef4ff215dd40f1c92c9652f2b7b654f9b5ab9bd79c96d25503811e"
+    },
+    {
+      "path": "tree/tech-checks/supabase/functions/cos-operations-pages/privateEvidence.ts",
+      "sourceCommit": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "sourcePath": "tech-checks/supabase/functions/cos-operations-pages/privateEvidence.ts",
+      "gitBlob": "a8d126f99c4dc10e3dd51a47f26ea8f2d0afb8da",
+      "bytes": 8225,
+      "sha256": "ec2049a55f51038e94ba53b11e9f3b73e503cfc844dd07889718c7b987bab66e"
     }
-  ]
+  ],
+  "archivedBaselineFileCount": 1,
+  "newAdapterFileCount": 2,
+  "supplementReproductionPerformed": false
 }
