@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {checkedReconnectStatus,type ReconnectStatus,type ReconnectAttempt} from './mhelpReconnectModel';
 const ROOT='/api/mhelpdesk/partner/reconnect';
@@ -6,14 +6,22 @@ const valid=(v:string)=>v.length>0&&v.length<=16384&&!/[\s\x00-\x1f\x7f]/.test(v
 export default function MhelpReconnect(){
  const [open,setOpen]=useState(false),[status,setStatus]=useState<ReconnectStatus|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const access=useRef<HTMLInputElement>(null),refresh=useRef<HTMLInputElement>(null),attempt=useRef<ReconnectAttempt|null>(null),pending=useRef(false),generation=useRef(0),request=useRef<AbortController|null>(null);
- const clear=()=>{if(access.current)access.current.value='';if(refresh.current)refresh.current.value='';};
+ // Clear detached inputs too; passive unmount cleanup can run after refs detach.
+ const accessRef=useCallback((node:HTMLInputElement|null)=>{if(access.current&&access.current!==node)access.current.value='';access.current=node;},[]);
+ const refreshRef=useCallback((node:HTMLInputElement|null)=>{if(refresh.current&&refresh.current!==node)refresh.current.value='';refresh.current=node;},[]);
+ const expiry=useRef<{wall:number;monotonic:number}|null>(null),expiryTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const clear=()=>{if(expiryTimer.current!==null)clearTimeout(expiryTimer.current);expiryTimer.current=null;expiry.current=null;if(access.current)access.current.value='';if(refresh.current)refresh.current.value='';};
+ const expire=()=>{const end=expiry.current;if(end&&(Date.now()>=end.wall||performance.now()>=end.monotonic)){clear();setMessage('The five-minute limit ended. Paste a fresh matching pair.');return true;}return false;};
+ const input=()=>{if(expire())return;if(!expiry.current&&(access.current?.value||refresh.current?.value)){expiry.current={wall:Date.now()+300000,monotonic:performance.now()+300000};expiryTimer.current=setTimeout(expire,300000);}};
  const close=()=>{request.current?.abort();clear();generation.current++;setOpen(false);setStatus(null);setMessage('');};
  useEffect(()=>{
   const invalidate=()=>{request.current?.abort();clear();generation.current++;setOpen(false);setStatus(null);setMessage('');};
-  const hidden=()=>{if(document.hidden)invalidate();};
+  // App switching retains only unsubmitted DOM values. Actual navigation still clears.
+  const hidden=()=>{if(document.hidden&&pending.current)invalidate();else expire();};
+  const resume=()=>{expire();};
   const parentHidden=(event:MessageEvent)=>{if(window.parent!==window&&event.source===window.parent&&event.origin===location.origin&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')invalidate();};
-  window.addEventListener('cos-private-data-invalidated',invalidate);window.addEventListener('cos-workspace-navigation',invalidate);window.addEventListener('hashchange',invalidate);window.addEventListener('popstate',invalidate);window.addEventListener('pagehide',invalidate);window.addEventListener('message',parentHidden);document.addEventListener('visibilitychange',hidden);
-  return()=>{request.current?.abort();clear();generation.current++;window.removeEventListener('cos-private-data-invalidated',invalidate);window.removeEventListener('cos-workspace-navigation',invalidate);window.removeEventListener('hashchange',invalidate);window.removeEventListener('popstate',invalidate);window.removeEventListener('pagehide',invalidate);window.removeEventListener('message',parentHidden);document.removeEventListener('visibilitychange',hidden);};
+  window.addEventListener('cos-private-data-invalidated',invalidate);window.addEventListener('cos-workspace-navigation',invalidate);window.addEventListener('hashchange',invalidate);window.addEventListener('popstate',invalidate);window.addEventListener('pagehide',invalidate);window.addEventListener('message',parentHidden);document.addEventListener('visibilitychange',hidden);window.addEventListener('focus',resume);window.addEventListener('pageshow',resume);
+  return()=>{request.current?.abort();clear();generation.current++;window.removeEventListener('cos-private-data-invalidated',invalidate);window.removeEventListener('cos-workspace-navigation',invalidate);window.removeEventListener('hashchange',invalidate);window.removeEventListener('popstate',invalidate);window.removeEventListener('pagehide',invalidate);window.removeEventListener('message',parentHidden);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('focus',resume);window.removeEventListener('pageshow',resume);};
  },[]);
  const check=async()=>{
   if(pending.current)return;pending.current=true;setBusy(true);setOpen(true);setMessage('');clear();const gen=++generation.current,controller=new AbortController();request.current=controller;
@@ -29,7 +37,7 @@ export default function MhelpReconnect(){
   finally{if(request.current===controller)request.current=null;pending.current=false;setBusy(false);}
  };
  const submit=async(event:React.FormEvent<HTMLFormElement>)=>{
-  event.preventDefault();if(pending.current||attempt.current||status?.state!=='ready'||!status.portalId||!status.revision)return;
+  event.preventDefault();if(expire())return;if(pending.current||attempt.current||status?.state!=='ready'||!status.portalId||!status.revision)return;
   const accessToken=access.current?.value||'',refreshToken=refresh.current?.value||'';
   if(!valid(accessToken)||!valid(refreshToken)){clear();setMessage('Enter a fresh access token and its matching refresh token. Spaces are not allowed.');return;}
   const next={requestId:crypto.randomUUID(),expectedRevision:status.revision,portalId:status.portalId};attempt.current=next;
@@ -53,9 +61,9 @@ export default function MhelpReconnect(){
    {status?.state==='ready'&&!attempt.current&&<form onSubmit={event=>void submit(event)} autoComplete='off'>
     <p>Reconnect the existing company account.</p>
     <p>Obtain a fresh matching access-token and refresh-token pair yourself from mHelpDesk Developer Access. Keep the existing API Key and Secret unchanged. Never send tokens in chat.</p>
-    <p>Submitting replaces the stored pair for this portal and restores persistent API access using the existing client credentials. COS verifies the token renewal before saving. The fields clear when submitted or closed.</p>
-    <label>Fresh access token<input ref={access} type='password' autoComplete='off' data-1p-ignore='true' data-lpignore='true' autoCapitalize='none' spellCheck={false} maxLength={16384} required disabled={busy}/></label>
-    <label>Matching refresh token<input ref={refresh} type='password' autoComplete='off' data-1p-ignore='true' data-lpignore='true' autoCapitalize='none' spellCheck={false} maxLength={16384} required disabled={busy}/></label>
+    <p>Submitting replaces the stored pair for this portal and restores persistent API access using the existing client credentials. COS verifies the token renewal before saving. Unsubmitted fields stay in memory for up to five minutes from your first paste while you switch apps. They clear on submit, close, navigation or sign-out.</p>
+    <label>Fresh access token<input onInput={input} ref={accessRef} type='password' autoComplete='off' data-1p-ignore='true' data-lpignore='true' autoCapitalize='none' spellCheck={false} maxLength={16384} required disabled={busy}/></label>
+    <label>Matching refresh token<input onInput={input} ref={refreshRef} type='password' autoComplete='off' data-1p-ignore='true' data-lpignore='true' autoCapitalize='none' spellCheck={false} maxLength={16384} required disabled={busy}/></label>
     <button type='submit' disabled={busy}>Replace pair and verify renewal</button>
    </form>}
    <button className='secondary' type='button' onClick={close}>Close reconnect</button>

@@ -138,3 +138,59 @@ test('transient unattended renewal failure warns without asking for a pair and c
  const {frame,state,calls}=await mount(page,{openAdvanced:false,inventory});const panel=frame.getByRole('region',{name:'Automatic inventory status'});await expect(panel.getByRole('alert')).toContainText('automatic renewal check could not finish');await expect(panel.getByRole('button')).toHaveCount(0);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);
  state.inventory.mhelpPlacementSync.reliability.auth.renewalCheckFailed=false;await frame.getByRole('button',{name:'Refresh tracker',exact:true}).click();await expect(panel.getByRole('alert')).toHaveCount(0);expect(calls.filter(c=>c.path.startsWith('/api/mhelpdesk'))).toHaveLength(0);expect(state.errors).toEqual([]);
 });
+
+for(const resume of ['visibilitychange','focus','pageshow'])test('iPhone app switch retains inputs but suspended timers cannot extend expiry on '+resume,async({page})=>{
+ const {form,calls}=await mount(page);await page.clock.install();await openAndFill(form);
+ await form.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+ await expect(form.getByLabel('Fresh access token')).toHaveValue('synthetic-fresh-access');
+ await page.clock.setSystemTime(new Date(Date.now()+299000));
+ await form.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+ await expect(form.getByLabel('Matching refresh token')).toHaveValue('synthetic-fresh-refresh');
+ // No timer execution: model iOS suspending background JavaScript.
+ await page.clock.setSystemTime(new Date(Date.now()+301000));
+ await form.evaluate((_,event)=>{if(event==='visibilitychange')document.dispatchEvent(new Event(event));else window.dispatchEvent(new Event(event));},resume);
+ await expect(form.getByLabel('Fresh access token')).toHaveValue('');await expect(form.getByLabel('Matching refresh token')).toHaveValue('');
+ expect(calls.filter(c=>c.path===root)).toHaveLength(0);
+});
+test('editing and repeated switches cannot reset the first-paste deadline; active timer clears',async({page})=>{
+ const {form}=await mount(page);await page.clock.install();await openAndFill(form);await page.clock.runFor(240000);
+ await form.getByLabel('Fresh access token').fill('synthetic-edited');
+ await form.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+ await page.clock.runFor(60000);await expect(form.getByLabel('Fresh access token')).toHaveValue('');await expect(form.getByLabel('Matching refresh token')).toHaveValue('');
+});
+test('expired values cannot submit before a resume event',async({page})=>{
+ const {form,calls}=await mount(page);await page.clock.install();await openAndFill(form);await page.clock.setSystemTime(new Date(Date.now()+301000));
+ await form.locator('form').evaluate(el=>el.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ await expect(form.getByLabel('Fresh access token')).toHaveValue('');expect(calls.filter(c=>c.path===root)).toHaveLength(0);
+});
+for(const boundary of ['pagehide','hashchange','cos-workspace-navigation'])test('unsubmitted values clear on '+boundary,async({page})=>{
+ const {form,calls}=await mount(page);await openAndFill(form);const inputs=await form.locator('input').elementHandles();
+ await form.evaluate((_,event)=>window.dispatchEvent(new Event(event)),boundary);
+ for(const input of inputs)expect(await input.evaluate(el=>el.value)).toBe('');expect(calls.filter(c=>c.path===root)).toHaveLength(0);
+});
+test('parent remount never restores either secret',async({page})=>{
+ const {form}=await mount(page);await openAndFill(form);
+ await page.evaluate(()=>{const old=document.querySelector('iframe'),next=old.cloneNode();old.replaceWith(next);});
+ const frame=page.frameLocator('iframe');await frame.getByText('Advanced / IT tools',{exact:true}).click();
+ const fresh=frame.getByRole('region',{name:'Secure mHelpDesk reconnect'});await fresh.getByRole('button',{name:'Reconnect mHelpDesk',exact:true}).click();
+ await expect(fresh.getByLabel('Fresh access token')).toHaveValue('');await expect(fresh.getByLabel('Matching refresh token')).toHaveValue('');
+});
+test('app switch during uncertain submit clears and cannot send a second pair',async({page})=>{
+ const {form,calls,state}=await mount(page);await openAndFill(form);let finish;state.delay=new Promise(resolve=>{finish=resolve;});
+ await form.getByRole('button',{name:'Replace pair and verify renewal'}).click();await expect.poll(()=>calls.filter(c=>c.path===root).length).toBe(1);
+ await form.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+ await expect(form.locator('input')).toHaveCount(0);finish();
+ await expect(form.getByRole('button',{name:'Check reconnect result'})).toBeEnabled();await form.getByRole('button',{name:'Check reconnect result'}).click();
+ await expect(form.locator('input')).toHaveCount(0);expect(calls.filter(c=>c.path===root)).toHaveLength(1);
+});
+test('unmount clears detached input nodes, and no draft is persisted or logged',async({page})=>{
+ const consoleText=[];page.on('console',msg=>consoleText.push(msg.text()));
+ await page.addInitScript(()=>{window.secretWrites=[];const set=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(String(k).includes('synthetic-fresh')||String(v).includes('synthetic-fresh'))window.secretWrites.push('storage');return set.call(this,k,v);};const put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(JSON.stringify(args).includes('synthetic-fresh'))window.secretWrites.push('indexedDB');return put.apply(this,args);};});
+ const {form,frame,calls}=await mount(page);await openAndFill(form);
+ await form.evaluate(el=>{window.detachedReconnectInputs=[...el.querySelectorAll('input')];});
+ await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(form).toHaveCount(0);
+ expect(await frame.locator('body').evaluate(()=>window.detachedReconnectInputs.map(el=>el.value))).toEqual(['','']);
+ expect(await frame.locator('body').evaluate(()=>window.secretWrites)).toEqual([]);
+ expect(await frame.locator('body').evaluate(()=>document.cookie+location.href+JSON.stringify(localStorage)+JSON.stringify(sessionStorage))).not.toContain('synthetic-fresh');
+ expect(consoleText.join('\n')).not.toContain('synthetic-fresh');expect(calls.filter(c=>c.path===root)).toHaveLength(0);
+});
