@@ -1,0 +1,157 @@
+# Branch-only validation and inert blob staging. No ref writes, merge or deployment.
+name: COS design follow-through (no deploy)
+on:
+  push:
+    branches: [design/cos-approved-navigation-20261101]
+    paths:
+      - '.github/workflows/cos-design-followthrough-20261102.yml'
+      - 'tech-checks/operations/dist/index.html'
+      - 'tech-checks/operations/dist/assets/index-Dt1DI4lZ.css'
+      - 'tech-checks/operations/dist/assets/index-rZM_1HTP.js'
+permissions:
+  contents: read
+concurrency:
+  group: cos-design-followthrough-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  CI: 'true'
+  COS_RUN_LIVE_SMOKE: '0'
+  SOURCE_BASE: 758b0ea229ab7243cc2ea49af88b984d0f27cd6b
+jobs:
+  verify:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    outputs:
+      tests: ${{ steps.tests.outcome }}
+      build: ${{ steps.build.outcome }}
+      bytes: ${{ steps.bytes.outcome }}
+      gate: ${{ steps.gate.outcome }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Prove unchanged application and unchanged TV assertions
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$COS_RUN_LIVE_SMOKE" = 0
+          mkdir -p ../../cos-design-followthrough
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-design-followthrough/source-sha.txt
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync} from 'node:fs';
+          const allowed=new Set(['.github/workflows/cos-design-followthrough-20261102.yml','tech-checks/operations/tests/owner-tv-display-lifecycle.test.mjs','tech-checks/operations/dist/index.html','tech-checks/operations/dist/assets/index-Dt1DI4lZ.css','tech-checks/operations/dist/assets/index-rZM_1HTP.js']);
+          const changed=execFileSync('git',['diff','--name-only',process.env.SOURCE_BASE,'HEAD'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+          assert.ok(changed.every(path=>allowed.has(path)),'Unreviewed source change');
+          const path='tech-checks/operations/tests/owner-tv-display-lifecycle.test.mjs';
+          const original=execFileSync('git',['show',process.env.SOURCE_BASE+':'+path],{encoding:'utf8'});
+          const expected=original.replace("import * as navigation from '../src/workspaceNavigation.ts';\n","import * as navigation from '../src/workspaceNavigation.ts';\nimport * as approvedNavigation from '../src/approvedCosNavigation.ts';\n").replace("  './visionAreas':{primaryAreas}","  './approvedCosNavigation':approvedNavigation,\n  './visionAreas':{primaryAreas}");
+          assert.notEqual(expected,original);assert.equal(readFileSync('tests/owner-tv-display-lifecycle.test.mjs','utf8'),expected);
+          console.log('Only the real navigation import/module-map entry changed; TV assertions and runtime sources are unchanged.');
+          JS
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Reproduce the original three failures without altering assertions
+        run: |
+          set -euo pipefail
+          file=tests/owner-tv-display-lifecycle.test.mjs
+          cp "$file" "$RUNNER_TEMP/owner-tv-corrected.mjs"
+          trap 'cp "$RUNNER_TEMP/owner-tv-corrected.mjs" "$file"' EXIT
+          git show "$SOURCE_BASE:tech-checks/operations/$file" > "$file"
+          set +e
+          node --import tsx --test "$file" > ../../cos-design-followthrough/before-tv.log 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          grep -F 'approvedCosNavigation_1.approvedArea) is not a function' ../../cos-design-followthrough/before-tv.log
+          grep -Fx '# fail 3' ../../cos-design-followthrough/before-tv.log
+      - name: Verify corrected TV and all focused design regressions
+        id: tests
+        run: node --import tsx --test --test-concurrency=1 tests/owner-tv-display-lifecycle.test.mjs tests/approved-cos-navigation.test.mjs tests/board-record-details.test.mjs tests/approved-navigation-cascade.test.mjs 2>&1 | tee ../../cos-design-followthrough/focused-tests.log
+      - name: Full project typecheck and original technician preservation
+        run: |
+          npm run typecheck 2>&1 | tee ../../cos-design-followthrough/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-design-followthrough/auth-preservation.log
+      - name: Rebuild exact application with the existing toolchain
+        id: build
+        run: npm run build 2>&1 | tee ../../cos-design-followthrough/build.log
+      - name: Match the previously recovered candidate bytes
+        id: bytes
+        run: |
+          git diff --exit-code HEAD -- . ':!dist'
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
+          const expected={'dist/index.html':'ddb1807f4a237bf3eea526b12ae5428dc361e7999fed328cb41b9cf7d99c9453','dist/assets/index-Dt1DI4lZ.css':'7cb8bf5a8cf7c0b6df7bdfed23fd52f1b3c8ba5b8dc6e3e45e8c6cd306e6398a','dist/assets/index-rZM_1HTP.js':'30332e5850a1d658832dcd8b259282e8352c0ab533e40ea7cb5fb43aaa357c3e'};
+          for(const [path,sha]of Object.entries(expected))assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'),sha,path);
+          writeFileSync('../../cos-design-followthrough/matched-bytes.json',JSON.stringify({commit:process.env.GITHUB_SHA,releaseApproved:false,sourceArtifact:13147602833,files:expected},null,2)+'\n');
+          JS
+      - name: Original committed-artifact gate (not waived)
+        id: gate
+        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-design-followthrough/artifact-check.log
+      - name: Retain targeted results and original gate outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-design-followthrough-${{ github.sha }}
+          path: cos-design-followthrough/
+          retention-days: 7
+  stage-blobs:
+    # Creates three inert Git objects only. A separately verified connector write
+    # must still attach them to the approved design branch; never update a ref here.
+    needs: verify
+    if: ${{ always() && !cancelled() && needs.verify.outputs.tests == 'success' && needs.verify.outputs.build == 'success' && needs.verify.outputs.bytes == 'success' && needs.verify.outputs.gate == 'failure' && github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cos-design-build-758b0ea229ab7243cc2ea49af88b984d0f27cd6b
+          run-id: 41458575550
+          github-token: ${{ github.token }}
+          path: input-artifact
+      - name: Verify authenticated prior build and stage only exact reviewed bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,json,hashlib,tarfile,base64,urllib.request,pathlib
+          expected={'dist/index.html':('ddb1807f4a237bf3eea526b12ae5428dc361e7999fed328cb41b9cf7d99c9453','d4119e0a134c6d60860d411a353bb2c62b70b5ad'),'dist/assets/index-Dt1DI4lZ.css':('7cb8bf5a8cf7c0b6df7bdfed23fd52f1b3c8ba5b8dc6e3e45e8c6cd306e6398a','8492c937628d40c8e766a5665e46ca1f56b0853a'),'dist/assets/index-rZM_1HTP.js':('30332e5850a1d658832dcd8b259282e8352c0ab533e40ea7cb5fb43aaa357c3e','35792a2099e356f4ff70f0b12eb20e28bfce73f9')}
+          manifest=json.loads(pathlib.Path('input-artifact/candidate-manifest.json').read_text())
+          assert manifest['commit']==os.environ['SOURCE_BASE'] and manifest['releaseApproved'] is False
+          by_path={row['path']:row['sha256'] for row in manifest['files']}
+          repo=os.environ['GITHUB_REPOSITORY'];assert repo=='cypressriveroasis2023-sudo/neon-oasis-game'
+          def request(path,body=None):
+              data=None if body is None else json.dumps(body).encode()
+              req=urllib.request.Request('https://api.github.com/repos/'+repo+path,data=data,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},method='GET' if body is None else 'POST')
+              with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+          ref=request('/git/ref/heads/design/cos-approved-navigation-20261101');assert ref['object']['sha']==os.environ['GITHUB_SHA'],'Design branch advanced; do not stage stale bytes'
+          rows=[]
+          with tarfile.open('input-artifact/candidate-dist.tar.gz','r:gz') as tar:
+              for path,(sha256,blob) in expected.items():
+                  matches=[m for m in tar.getmembers() if m.name==path];assert len(matches)==1 and matches[0].isfile() and matches[0].size<2000000
+                  data=tar.extractfile(matches[0]).read();assert hashlib.sha256(data).hexdigest()==sha256==by_path[path]
+                  assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==blob
+                  result=request('/git/blobs',{'content':base64.b64encode(data).decode(),'encoding':'base64'});assert result['sha']==blob
+                  rows.append({'path':'tech-checks/operations/'+path,'sha256':sha256,'blob':blob,'bytes':len(data)})
+          pathlib.Path('staging-evidence').mkdir();pathlib.Path('staging-evidence/receipt.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'sourceArtifact':13147602833,'refUpdated':False,'deployed':False,'files':rows},indent=2)+'\n')
+          print(json.dumps({'staged':rows,'refUpdated':False,'deployed':False},indent=2))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cos-design-blob-receipt-${{ github.sha }}
+          path: staging-evidence/
+          retention-days: 7
