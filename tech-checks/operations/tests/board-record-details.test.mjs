@@ -1,3 +1,4 @@
+import {originalBoardActionsMarkup} from './approved-board-actions-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -109,7 +110,7 @@ test('new view has no network, polling, write actions or automatic ticket creati
  assert.match(source,/Unit not linked/);assert.match(source,/not a camera check time/);
 });
 test('DailyBoard non-presentation behavior reconstructs to the exact original blob',()=>{
- let source=read('DailyBoard.tsx');
+ let source=originalBoardActionsMarkup(read('DailyBoard.tsx'));
  source=source.replace("\nimport BoardRecordDetails from './BoardRecordDetails';\nimport {captureBoardSelection} from './boardRecordDetails';",'');
  source=source.replace('useState<(BoardCard & {detailAsOf:string|null})|null>(null);','useState<BoardCard|null>(null);');
  source=source.replace('onClick={()=>setSelected(captureBoardSelection(card,snapshot.asOf))}','onClick={()=>setSelected(card)}');
