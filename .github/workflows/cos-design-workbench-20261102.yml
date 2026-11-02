@@ -1,4 +1,4 @@
-# Candidate validation only. No branch write, merge or deployment from CI.
+# Candidate validation with the single-root selector. No branch write, merge or deployment from CI.
 name: COS design shell regressions (no deploy)
 on:
   push:
