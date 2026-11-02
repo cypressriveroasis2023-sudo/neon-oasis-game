@@ -30,7 +30,7 @@ async function mount(page,{bad=false,missing=false}={}){
  return {app,hub,state};
 }
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.writes).toEqual([]);};
-const member=hub=>hub.locator('.record.op-record').filter({has:hub.getByText('Example IT technician',{exact:true})});
+const member=hub=>hub.locator('.record.op-record').filter({hasText:'Example IT technician'});
 test('two identical display numbers retain different saved job IDs and original assignment counts',async({page},info)=>{
  const {hub,state}=await mount(page),row=member(hub),links=row.getByRole('link');
  await expect(row.getByText('IT Technician · 2 active assigned jobs',{exact:true})).toBeVisible();await expect(row).toContainText('Readiness: Ready');
