@@ -1,4 +1,4 @@
-# Candidate validation with the single-root selector. No branch write, merge or deployment from CI.
+# Candidate validation only. No branch write, merge or deployment from CI.
 name: COS design shell regressions (no deploy)
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Apply only the reviewed duplicate-menu correction and exact test adaptations
+      - name: Apply only reviewed phone CSS and exact test adaptations
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code c8d2bbc4348ec94dd44e9edd1e01d92e5fa307f3 HEAD -- src dist ../supabase ../app.js ../operations-host.js package.json package-lock.json
@@ -34,12 +34,14 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > ../../cos-shell-candidate/source-sha.txt
           node tests/approved-shell-test-source.mjs apply
           node tests/approved-shell-test-source.mjs check
+          node tests/approved-phone-navigation-source.mjs apply
+          node tests/approved-phone-navigation-source.mjs check
           node tests/approved-more-drawer-source.mjs apply
           node tests/approved-more-drawer-source.mjs check
           git diff -- tests src > ../../cos-shell-candidate/reviewed-changes.patch
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Focused preservation and duplicate-menu regressions
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-board-actions.test.mjs tests/approved-tech-checks.test.mjs tests/approved-team-job-links.test.mjs tests/approved-more-drawer.test.mjs 2>&1 | tee ../../cos-shell-candidate/unit.log
+      - name: Focused source-preservation and phone-navigation regressions
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-board-actions.test.mjs tests/approved-tech-checks.test.mjs tests/approved-team-job-links.test.mjs tests/approved-more-drawer.test.mjs tests/approved-phone-navigation-preservation.test.mjs 2>&1 | tee ../../cos-shell-candidate/unit.log
       - name: Full typecheck and unchanged authentication preservation
         run: |
           npm run typecheck 2>&1 | tee ../../cos-shell-candidate/typecheck.log
@@ -51,21 +53,23 @@ jobs:
           git diff --exit-code HEAD -- src ':!src/approvedCosNavigation.css' package.json package-lock.json ../app.js ../operations-host.js ../supabase
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Complete adapted shell suites More search and existing IT navigation
+      - name: Complete shell suites More search and preserved IT navigation
         run: npm run test:browser -- tests/company-theme.browser.spec.mjs tests/company-overview.browser.spec.mjs tests/responsive-host.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-shell-candidate/browser.log
       - name: Stage only hash-verified reviewed source and generated entries
         id: validated
         run: |
           node tests/approved-shell-test-source.mjs check
+          node tests/approved-phone-navigation-source.mjs check
           node tests/approved-more-drawer-source.mjs check
           node --input-type=module <<'NODE'
           import {hashes} from './tests/approved-shell-test-source.mjs';
+          import {cases} from './tests/approved-phone-navigation-source.mjs';
           import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
           const html=readFileSync('dist/index.html','utf8');
           const assets=[...html.matchAll(/(?:src|href)=["']\.\/(assets\/index-[A-Za-z0-9_-]+\.(?:js|css))["']/g)].map(m=>'dist/'+m[1]);
           if(assets.length!==2)throw Error('Unexpected entry assets');
-          const files=[...Object.keys(hashes).map(f=>'tests/'+f),'src/approvedCosNavigation.css','dist/index.html',...assets];
-          if(new Set(files).size!==8)throw Error('Unexpected staged paths');
+          const files=[...[...Object.keys(hashes),...Object.keys(cases)].map(f=>'tests/'+f),'src/approvedCosNavigation.css','dist/index.html',...assets];
+          if(new Set(files).size!==11)throw Error('Unexpected staged paths');
           const entries=files.map(file=>{const bytes=readFileSync(file),sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');writeFileSync('../../cos-shell-candidate/stage/'+sha,bytes);return {path:'tech-checks/operations/'+file,sha,sha256:createHash('sha256').update(bytes).digest('hex')};});
           writeFileSync('../../cos-shell-candidate/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,entries},null,2));
           NODE
@@ -102,10 +106,10 @@ jobs:
           python - <<'PY'
           import base64,hashlib,json,os,pathlib,re,urllib.request
           root=pathlib.Path('evidence/cos-shell-candidate');m=json.loads((root/'manifest.json').read_text())
-          assert m['source']==os.environ['GITHUB_SHA'] and len(m['entries'])==8
+          assert m['source']==os.environ['GITHUB_SHA'] and len(m['entries'])==11
           prefix='tech-checks/operations/'
-          fixed={prefix+'tests/'+x for x in ['company-theme.browser.spec.mjs','company-overview.browser.spec.mjs','responsive-host.browser.spec.mjs','approved-layout.browser.spec.mjs']}|{prefix+'src/approvedCosNavigation.css',prefix+'dist/index.html'}
-          paths={e['path'] for e in m['entries']};assert fixed<=paths and len(paths)==8
+          fixed={prefix+'tests/'+x for x in ['company-theme.browser.spec.mjs','company-overview.browser.spec.mjs','responsive-host.browser.spec.mjs','approved-layout.browser.spec.mjs','navigation-helper.mjs','approved-workspace-navigation.browser.spec.mjs','fleet-first-navigation.browser.spec.mjs']}|{prefix+'src/approvedCosNavigation.css',prefix+'dist/index.html'}
+          paths={e['path'] for e in m['entries']};assert fixed<=paths and len(paths)==11
           assert all(re.fullmatch(r'tech-checks/operations/dist/assets/index-[A-Za-z0-9_-]+\.(js|css)',p) for p in paths-fixed)
           result=[]
           for e in m['entries']:
