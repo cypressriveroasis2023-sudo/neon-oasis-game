@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+import {mountTransfers} from './helpers/transfer-fixture.mjs';
+let f;
+test.afterEach(async()=>{await f?.close();f=null;});
+test('mobile search preserves exact families, holds, keyboard and selection',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
+ await f.db.exec("insert into equipment_master values('solar_spotter:53','53','Solar Spotter','Solar Spotter','Solar Spotter','Solar Spotter 053','shop',now()),('sniper:53','53','Sniper','Sniper','Sniper','Sniper 053','field_or_unknown',now())");
+ await page.getByRole('button',{name:'Reload handoffs',exact:true}).click();
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ const search=page.getByRole('searchbox',{name:'Search equipment'}),select=page.getByLabel('Select equipment');
+ await search.fill('053');await expect(select.locator('option')).toHaveCount(3);
+ await expect(page.getByRole('list',{name:'Equipment hold reasons'})).toContainText('Sniper 053');
+ await expect(select.locator('option[value="sniper:53"]')).toHaveJSProperty('disabled',true);
+ await search.fill('SolarSpotter053');await expect(select.locator('option')).toHaveCount(2);
+ await search.press('Enter');await expect(select).toBeFocused();expect(f.calls.filter(c=>c.name==='submit_techcheck_transfer_v2')).toHaveLength(0);
+ await select.selectOption('solar_spotter:53');await page.getByLabel('What is this equipment for?').selectOption('installation');
+ await expect(search).toHaveValue('SolarSpotter053');await expect(select).toHaveValue('solar_spotter:53');
+ await search.fill('does not exist');await expect(select).toHaveValue('');await expect(page.getByText(/0 matching units/)).toBeVisible();
+ await page.getByRole('button',{name:'Add unit to handoff',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Select an available Shop unit');
+ await page.getByRole('button',{name:'Clear equipment search',exact:true}).click();await expect(search).toBeFocused();await expect(search).toHaveValue('');
+ await search.fill('53');await select.selectOption('solar_spotter:53');await page.getByRole('button',{name:'Back to handoffs',exact:true}).click();await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ await expect(search).toHaveValue('53');await expect(select).toHaveValue('solar_spotter:53');
+ await page.getByRole('button',{name:'Add unit to handoff',exact:true}).click();await expect(page.getByLabel('Unit number 1',{exact:true})).toHaveValue('53');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(f.errors).toEqual([]);
+});
+test('search uses repaired placement eligibility with existing truck form',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page,{placementEvidence:true});await expect(page.getByRole('button',{name:'Check Out / Hand Off',exact:true})).toBeVisible({timeout:5000}).catch(async e=>{console.log(await page.locator('body').innerText(),f.errors,f.unexpected);throw e;});await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();
+ await page.getByRole('searchbox',{name:'Search equipment'}).fill('SolarSpotter39');
+ await expect(page.getByLabel('Select equipment').locator('option[value="solar_spotter:039"]')).toHaveJSProperty('disabled',false);
+ await page.getByLabel('Select equipment').selectOption('solar_spotter:039');await page.getByLabel('What is this equipment for?').selectOption('truck_replenishment');
+ await page.getByRole('button',{name:'Add unit to handoff',exact:true}).click();await expect(page.getByLabel('Unit number 1',{exact:true})).toHaveValue('039');expect(f.errors).toEqual([]);
+});
