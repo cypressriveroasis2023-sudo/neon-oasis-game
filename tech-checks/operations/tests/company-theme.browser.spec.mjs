@@ -1,4 +1,5 @@
 import { openWorkspace } from './navigation-helper.mjs';
+import { primaryNav, expectApprovedAreas, openApprovedMore, dismissApprovedMore, openCheckManagement } from './approved-shell-acceptance.mjs';
 import { test, expect } from '@playwright/test';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import {readFileSync} from 'node:fs';
@@ -43,26 +44,29 @@ test('approved shell is dark with exact desktop proportions and a compact mobile
   const {frame}=await mount(page);
   await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
   const facts=await frame.locator('.company-shell').evaluate(shell=>({theme:document.documentElement.dataset.theme,font:getComputedStyle(shell).fontFamily,bg:getComputedStyle(shell).backgroundColor,sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).backgroundColor,width:shell.querySelector('.operations-sidebar').getBoundingClientRect().width,bar:shell.querySelector('.company-utility-bar').getBoundingClientRect().height,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
-  expect(facts.theme).toBe('dark');expect(facts.font).toContain('Open Sans');expect(facts.bg).toBe('rgb(17, 27, 42)');expect(facts.sidebar).toBe('rgb(23, 35, 55)');expect(facts.scroll).toBeLessThanOrEqual(facts.viewport+1);
-  if(facts.viewport>700){expect(facts.width).toBe(184);expect(facts.bar).toBe(76);await expect(frame.getByRole('navigation',{name:'COS Operations'}).getByRole('button')).toHaveCount(8);}else{await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button')).toHaveCount(4);}
+  expect(facts.theme).toBe('dark');expect(facts.font).toContain('Open Sans');expect(facts.bg).toBe('rgb(17, 27, 42)');expect(facts.sidebar).toBe('rgb(13, 33, 55)');expect(facts.scroll).toBeLessThanOrEqual(facts.viewport+1);
+  if(facts.viewport>700){expect(facts.width).toBe(184);expect(facts.bar).toBe(76);}
+  await expectApprovedAreas(frame);
   await page.screenshot({path:testInfo.outputPath('company-approved-shell.png'),fullPage:true});
 });
-test('Single menu, focus trapping, Escape and return focus work without changing the active route',async({page})=>{
-  const {frame}=await mount(page);
-  const more=frame.getByRole('button',{name:'More',exact:true});
-  await more.click();
-  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
-  const close=menu.getByRole('button',{name:'Close menu'});
-  await expect(close).toBeFocused();
-  expect((await auditDarkPresentation(menu)).failures).toEqual([]);
-  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button')).toHaveCount(8);
-  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
-  await expect(menu.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
-  await close.focus();await close.press('Shift+Tab');
-  await expect(menu.getByRole('button',{name:'Sign out',exact:true})).toBeFocused();
-  await page.keyboard.press('Tab');await expect(close).toBeFocused();
-  await close.press('Escape');await expect(menu).toHaveCount(0);await expect(more).toBeFocused();
+test('Single phone menu traps focus; desktop More is a page and browser Back restores the route',async({page})=>{
+  const {frame,requests}=await mount(page);
+  await expectApprovedAreas(frame);
+  const opened=await openApprovedMore(frame),{tools,dialog,mobile}=opened;
+  expect((await auditDarkPresentation(mobile?dialog:tools)).failures).toEqual([]);
+  await expect(tools.locator('details')).toHaveCount(5);
+  await tools.getByRole('searchbox',{name:'Find a tool',exact:true}).fill('InHand Routers');
+  await expect(tools.getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
+  await expect(tools.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
+  if(mobile){
+    const close=dialog.getByRole('button',{name:'Close menu'});
+    await close.focus();await close.press('Shift+Tab');
+    await expect(dialog.getByRole('button',{name:'Sign out',exact:true})).toBeFocused();
+    await page.keyboard.press('Tab');await expect(close).toBeFocused();
+  }
+  await dismissApprovedMore(frame,opened);
   await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
+  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 test('native records forms and load errors remain dark and readable on narrow screens',async({page},testInfo)=>{
   const {frame}=await mount(page);

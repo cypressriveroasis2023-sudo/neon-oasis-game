@@ -14,7 +14,11 @@ test('all five approved Owner destinations remain reachable by visible navigatio
  const nav=app.getByRole('navigation',{name:mobile?'Mobile Operations navigation':'COS Operations',exact:true});
  await expect(nav.getByRole('button')).toHaveText(['Fleet','Boards','Tech Check','Team','More']);
  for(const [workspace,hash] of [['Daily Board','#daily-board'],['Tech Check','#tech-check'],['Team','#team'],['Operations','#operations'],['Field Map','#fleet-dashboard']]){
-  await openWorkspace(app,workspace);await expect.poll(()=>route(app)).toBe(hash);await expect(menu(app)).toHaveCount(0);
+  const before=await route(app);await openWorkspace(app,workspace);
+  if(mobile&&workspace==='Operations'){
+   await expect(menu(app)).toBeVisible();await expect(menu(app).getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();
+   await expect(menu(app).locator('.operations-area-nav')).toBeHidden();await expect.poll(()=>route(app)).toBe(before);
+  }else{await expect.poll(()=>route(app)).toBe(hash);await expect(menu(app)).toHaveCount(0);}
  }
  await expect(app.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();safe(state);
 });
@@ -32,7 +36,7 @@ test('existing power and router tools open through More and keep their real save
 test('an already open phone menu and stale search do not hide the next destination',async({page})=>{
  const {app,state}=await mountFleet(page);const mobile=page.viewportSize().width<=700;
  await openWorkspace(app,'Operations');
- if(mobile)await app.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).getByRole('button',{name:'More',exact:true}).click();
+ if(mobile)await expect(menu(app)).toBeVisible();
  const container=mobile?menu(app):app.locator('main');
  await container.getByRole('searchbox',{name:'Find a tool',exact:true}).fill('no-such-tool');
  await expect(container.getByRole('region',{name:'Operations workspaces',exact:true}).getByRole('status')).toContainText('No tools match');

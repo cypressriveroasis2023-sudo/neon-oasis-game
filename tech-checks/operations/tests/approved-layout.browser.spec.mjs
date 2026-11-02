@@ -1,4 +1,5 @@
 import { openWorkspace } from './navigation-helper.mjs';
+import { primaryNav, expectApprovedAreas, openApprovedMore, dismissApprovedMore, openCheckManagement } from './approved-shell-acceptance.mjs';
 import { test, expect } from '@playwright/test';
 const origin='http://127.0.0.1:4173';
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -39,13 +40,15 @@ test('old VISION links open only the approved workspace and keep native navigati
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));
   expect(size.content).toBeLessThanOrEqual(size.width);
  }
- await frame.getByRole('button',{name:'More',exact:true}).click();
- const nav=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('navigation',{name:'COS Operations',exact:true});
- const styles=await nav.locator('button').evaluateAll(buttons=>buttons.map(button=>({active:button.getAttribute('aria-current'),color:getComputedStyle(button).color})));
- expect(styles.find(button=>button.active).color).toBe('rgb(145, 176, 255)');
- expect(styles.filter(button=>!button.active).every(button=>button.color!=='rgb(145, 176, 255)')).toBe(true);
- await frame.getByRole('button',{name:'Close menu'}).press('Escape');
- await expect(frame.getByRole('button',{name:'More',exact:true})).toBeFocused();
+ const nav=await expectApprovedAreas(frame);
+ const selected=nav.locator('button.cos-approved-selected');
+ await expect(selected).toHaveCount(1);
+ await expect(selected).toHaveText('More');
+ await expect(selected).toHaveCSS('background-color','rgb(200, 13, 36)');
+ await expect(selected).toHaveCSS('color','rgb(255, 255, 255)');
+ const backgrounds=await nav.locator('button:not(.cos-approved-selected)').evaluateAll(buttons=>buttons.map(button=>getComputedStyle(button).backgroundColor));
+ expect(backgrounds.every(color=>color!=='rgb(200, 13, 36)')).toBe(true);
+ const opened=await openApprovedMore(frame);await dismissApprovedMore(frame,opened);
  await frame.locator('.company-utility-bar').screenshot({path:testInfo.outputPath('approved-header.png')});
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });

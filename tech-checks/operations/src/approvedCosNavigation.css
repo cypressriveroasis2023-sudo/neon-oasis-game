@@ -158,3 +158,10 @@
 @media (min-width:701px) {
   #root .operations-shell.cos-approved-shell .operations-bottom-nav {display:none !important;}
 }
+
+/* The phone More drawer contains secondary tools, not a duplicate primary menu. */
+@media (max-width:700px) {
+  #root .operations-shell.cos-approved-shell > .operations-sidebar.operations-sidebar-open > .operations-area-nav {
+    display:none !important;
+  }
+}

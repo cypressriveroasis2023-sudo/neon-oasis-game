@@ -21,10 +21,13 @@ export async function openWorkspace(frame, workspace) {
   const menu = frame.getByRole('dialog', { name: 'Operations navigation', exact: true });
   const mobile = frame.getByRole('navigation', { name: 'Mobile Operations navigation', exact: true });
   const sidebar = frame.getByRole('navigation', { name: 'COS Operations', exact: true });
-  const nav = await menu.isVisible() ? menu.getByRole('navigation', { name: 'COS Operations', exact: true })
-    : await mobile.isVisible() ? mobile : sidebar;
-
   const approved = Boolean(await frame.locator('.cos-approved-shell').count());
+  // Owner phone More contains secondary tools only. Close it before using a
+  // primary bottom-bar destination; do not click a hidden duplicate menu.
+  if (approved && primaryLabels[workspace] && workspace !== 'Operations' && await menu.isVisible())
+    await menu.getByRole('button', { name: /Close menu/ }).click();
+  const nav = !approved && await menu.isVisible() ? menu.getByRole('navigation', { name: 'COS Operations', exact: true })
+    : await mobile.isVisible() ? mobile : sidebar;
   if (!approved) await expect(frame.getByRole('navigation', { name: 'COS Operations', exact: true, includeHidden: true })
     .getByRole('button', { name: restrictedLabels[workspace] || workspace, exact: true, includeHidden: true })).toHaveCount(1);
 
@@ -65,11 +68,11 @@ export async function openWorkspace(frame, workspace) {
   } else {
     if (!(await menu.isVisible())) await nav.getByRole('button', { name: 'More', exact: true }).click();
     if (workspace === 'Operations') {
-      // On a phone the bottom More opens a drawer; its primary More opens
-      // the actual More page. Desktop More already opens that page.
-      if (await menu.isVisible()) await menu.getByRole('navigation', { name: 'COS Operations', exact: true })
-        .getByRole('button', { name: 'More', exact: true }).click();
-      await expect(frame.locator('main').getByRole('region', { name: 'Operations workspaces', exact: true })).toBeVisible();
+      // More is the existing drawer on phones and the tools page on desktop.
+      // Neither route injection nor a duplicate primary row is needed.
+      const container = await menu.isVisible() ? menu : frame.locator('main');
+      await expect(container.getByRole('region', { name: 'Operations workspaces', exact: true })).toBeVisible();
+      return;
     } else {
       const container = await menu.isVisible() ? menu : frame.locator('main');
       const directory = container.getByRole('region', { name: 'Operations workspaces', exact: true });

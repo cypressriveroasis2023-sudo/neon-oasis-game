@@ -1,4 +1,5 @@
 import { openWorkspace } from './navigation-helper.mjs';
+import { primaryNav, expectApprovedAreas, openApprovedMore, dismissApprovedMore, openCheckManagement } from './approved-shell-acceptance.mjs';
 import { test, expect } from '@playwright/test';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -84,22 +85,14 @@ async function fillsViewport(page) {
 
 test('shared Operations menu opens tools, loads a workspace and closes with Escape', async ({ page }, testInfo) => {
   const { frame, requests } = await mount(page);
-  const more=frame.getByRole('button',{name:'More',exact:true});
-  await more.click();
-  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
-  await expect(menu).toBeVisible();
   await responsiveLayout(page,frame);
-  await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
-  await menu.getByRole('button',{name:'Tech Checks',exact:true}).click();
-  await expect(menu).toHaveCount(0);
+  const opened=await openApprovedMore(frame);
+  await opened.tools.screenshot({path:testInfo.outputPath('unified-menu.png')});
+  await dismissApprovedMore(frame,opened);
+  await openWorkspace(frame,'Tech Check');
+  await expect(frame.getByRole('dialog',{name:'Operations navigation'})).toHaveCount(0);
   await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#tech-check');
-  await more.click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).screenshot({path:testInfo.outputPath('unified-menu.png')});
-  await frame.getByRole('button',{name:'Close menu'}).press('Escape');
-  await expect(menu).toHaveCount(0);
-  await expect(more).toBeFocused();
-  await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
   const sizes=await frame.locator('body').evaluate(()=>({viewport:innerWidth,content:document.documentElement.scrollWidth}));
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
   await frame.locator('.operations-shell').screenshot({path:testInfo.outputPath('unified-operations.png')});
@@ -113,20 +106,20 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
 async function responsiveLayout(page, frame) {
   await expect(frame.getByText('OPERATIONS CONNECTED', { exact:true })).toBeAttached();
   await fillsViewport(page);
-  await expect(frame.getByRole('button',{name:'More',exact:true})).toBeVisible();
+  await expectApprovedAreas(frame);
   const size = await frame.locator('.company-utility-bar').evaluate(header => {
     const main=header.parentElement, style=getComputedStyle(main);
     return {width:innerWidth,content:document.documentElement.scrollWidth,
       main:main.getBoundingClientRect().toJSON(),header:header.getBoundingClientRect().toJSON(),
       padding:parseFloat(style.paddingLeft)+parseFloat(style.paddingRight),
-      menu:header.querySelector('.operations-open-menu').getBoundingClientRect().toJSON()};
+      menu:main.parentElement.querySelector(innerWidth>700?'.operations-area-nav button:last-child':'.operations-bottom-nav button:last-child').getBoundingClientRect().toJSON()};
   });
   expect(size.content).toBeLessThanOrEqual(size.width);
   expect(size.main.width).toBeCloseTo(size.width-(size.width>700?184:0),0);
   expect(size.header.width).toBeCloseTo(size.main.width,0);
   if(size.width>700){
-    expect(size.menu.left).toBeGreaterThanOrEqual(size.header.left);
-    expect(size.menu.right).toBeLessThanOrEqual(size.header.right);
+    expect(size.menu.left).toBeGreaterThanOrEqual(0);
+    expect(size.menu.right).toBeLessThanOrEqual(size.main.left);
   }else{
     await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'More',exact:true})).toBeVisible();
   }
@@ -187,8 +180,8 @@ test('old VISION bookmarks preserve route and query parameters under the approve
 
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
   const { frame } = await mount(page);
-  await frame.getByRole('button', { name:'More', exact:true }).click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+  await openWorkspace(frame,'Tech Check');
+  await openCheckManagement(frame);
   await frame.getByRole('button',{name:/Technician accounts/}).click();
   await expect(page.locator('body')).toHaveClass(/cos-operations-legacy/);
   await expect(page.locator('#cosOperationsMount')).toBeHidden();
@@ -225,8 +218,8 @@ for (const colorScheme of ['light','dark']) {
     await page.emulateMedia({colorScheme});
     const {frame}=await mount(page);
     for (const [label,heading] of [['Technician accounts','Technician Accounts'],['Owner test center','Test Center']]) {
-      await frame.getByRole('button',{name:'More',exact:true}).click();
-      await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+      await openWorkspace(frame,'Tech Check');
+      await openCheckManagement(frame);
       await frame.getByRole('button',{name:new RegExp(label)}).click();
       await expect(page.locator('#ownerAppPage h1')).toHaveText(heading);
       const contentWidth=await page.locator('#ownerAppPage').evaluate(e=>e.getBoundingClientRect().width);
