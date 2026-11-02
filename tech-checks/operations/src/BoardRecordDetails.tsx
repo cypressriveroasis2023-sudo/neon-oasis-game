@@ -1,3 +1,4 @@
+import ApprovedBoardUnitLink from './ApprovedBoardUnitLink';
 import type {BoardCard} from './dailyBoardData';
 import {boardDateLabel} from './dailyBoardData';
 import {boardRecordDetail,boardRecordTime} from './boardRecordDetails';
@@ -27,11 +28,13 @@ export default function BoardRecordDetails({card,sourceUnavailable,close}: Props
       {card.kind==='job'&&<><div><dt>Job type</dt><dd>{detail.jobType || 'Not supplied'}</dd></div><div><dt>Equipment model</dt><dd>{detail.equipment || 'Not supplied'}</dd></div></>}
       <div><dt>{detail.equipmentLabel}</dt><dd>{detail.equipmentTag || 'Not supplied'}</dd></div>
     </dl>
+    <ApprovedBoardUnitLink card={card} sourceUnavailable={sourceUnavailable} close={close}>
     <section className='cos-board-record-unit' aria-label='Unit link availability'>
       <h4>Unit not linked</h4>
       <p>This board response does not supply a verified unit ID. The equipment tag alone cannot open an exact unit.</p>
       <small>No camera status, last camera check or map location is inferred from this work record.</small>
     </section>
+    </ApprovedBoardUnitLink>
     <section className='cos-board-record-next' aria-label='Recorded next step'>
       <h4>Next step</h4>
       {detail.instructions?<><small>Recorded task instructions — not a new progress update</small><p>{detail.instructions}</p></>:<p>No next step is recorded in this board response. Review the existing job and saved notes.</p>}
