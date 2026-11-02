@@ -1,11 +1,11 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 export const originalBlob='eab5e2dbf42f1085128cec573a2bee4b0a0beca4';
-export const correctedSHA256='7757d25852fece2b1f4d16649695c69f7acd74f938cb264b1a07fb532c7abb18';
+export const correctedSHA256='2e2187326131b899a6354b06bd0d91f35936ffc2ec5e31a98e4d352e628a16bd';
 export const addition=`
 /* The phone More drawer contains secondary tools, not a duplicate primary menu. */
 @media (max-width:700px) {
-  #root#root .operations-shell.cos-approved-shell > .operations-sidebar-open > .operations-area-nav {
+  #root .operations-shell.cos-approved-shell > .operations-sidebar.operations-sidebar-open > .operations-area-nav {
     display:none !important;
   }
 }

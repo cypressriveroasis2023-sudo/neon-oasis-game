@@ -7,7 +7,7 @@ test('phone More fix retains every original navigation style byte',()=>{
 });
 test('duplicate primary row is hidden only in the approved Owner phone drawer',()=>{
  assert.match(addition,/@media \(max-width:700px\)/);
- assert.match(addition,/#root#root \.operations-shell\.cos-approved-shell > \.operations-sidebar-open > \.operations-area-nav/);
+ assert.match(addition,/#root \.operations-shell\.cos-approved-shell > \.operations-sidebar\.operations-sidebar-open > \.operations-area-nav/);
  assert.equal((addition.match(/display:none/g)||[]).length,1);
  assert.doesNotMatch(addition,/operations-bottom-nav|cos-fleet|cos-tv|login|content:|visibility:|pointer-events:/);
 });
