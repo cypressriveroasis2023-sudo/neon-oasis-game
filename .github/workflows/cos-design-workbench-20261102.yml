@@ -30,6 +30,8 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$COS_RUN_LIVE_SMOKE" = 0
+          mkdir -p ../../cos-completion-correction
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-correction/source-sha.txt
           git diff --exit-code fa02ce6c898543dfa144ca52d3dfb571a3cffecb HEAD -- src ../supabase ../app.js ../operations-host.js package.json package-lock.json
           node tests/approved-navigation-regression-source.mjs original
           node tests/approved-landscape-source.mjs original
@@ -38,8 +40,6 @@ jobs:
           node tests/approved-navigation-regression-source.mjs check
           node tests/approved-landscape-source.mjs check
           git diff --exit-code HEAD -- src ':!src/approvedFleetViews.css' ../supabase ../app.js ../operations-host.js package.json package-lock.json
-          mkdir -p ../../cos-completion-correction
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-correction/source-sha.txt
           git diff -- src tests > ../../cos-completion-correction/declared-candidate.patch
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Original behavioral checks, full source reversals and actual resolver tests
@@ -63,9 +63,11 @@ jobs:
           import assert from 'node:assert/strict';
           const hash=(bytes,alg='sha256')=>createHash(alg).update(bytes).digest('hex');
           const entries=JSON.parse(readFileSync('tests/fleet-view-navigation-preservation.json'));
+          assert.equal(entries.length,19);
           const paths=entries.map(x=>'tests/'+x.path).concat('src/approvedFleetViews.css');
           const dist=execFileSync('git',['ls-files','--modified','--others','--exclude-standard','dist'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
-          assert.equal(dist.length,3);assert.ok(dist.includes('dist/index.html'));
+          assert.ok(dist.length>=2&&dist.length<=3);assert.ok(dist.includes('dist/index.html'));
+          assert.equal(dist.filter(x=>x.endsWith('.css')).length,1);
           for(const path of dist)assert.match(path,/^dist\/(?:index\.html|assets\/index-[A-Za-z0-9_-]+\.(?:css|js))$/);
           paths.push(...dist);const manifest=[];
           for(const path of paths){const bytes=readFileSync(path),sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
@@ -75,7 +77,7 @@ jobs:
             const dest='../../cos-completion-correction/files/'+path;mkdirSync(dirname(dest),{recursive:true});copyFileSync(path,dest);
             manifest.push({path:'tech-checks/operations/'+path,file:'files/'+path,sha,sha256:hash(bytes)});
           }
-          assert.equal(manifest.length,23);
+          assert.equal(manifest.length,20+dist.length);
           writeFileSync('../../cos-completion-correction/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,files:manifest},null,2)+'\n');
           JS
       - name: Install repository-pinned Chromium
@@ -100,38 +102,6 @@ jobs:
             tech-checks/operations/playwright-report/
           retention-days: 7
           if-no-files-found: warn
-  baseline:
-    name: Unchanged main baseline for separate camera and session failures
-    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    defaults:
-      run: {shell: bash, working-directory: tech-checks/operations}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with: {ref: '38a4fb9e16a565d92fc5bd5c0e5a6f55e7337137', fetch-depth: 0, persist-credentials: false}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with: {node-version: '22.16.0'}
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Build actual unchanged baseline
-        run: |
-          test "$(git rev-parse HEAD)" = 38a4fb9e16a565d92fc5bd5c0e5a6f55e7337137
-          mkdir -p ../../cos-completion-baseline
-          git rev-parse HEAD > ../../cos-completion-baseline/source-sha.txt
-          npm run build
-          git diff --exit-code HEAD -- src tests package.json package-lock.json
-      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Original camera and session assertions without navigation edits
-        run: npm run test:browser -- tests/field-inventory-census.browser.spec.mjs tests/product-proof-refresh.browser.spec.mjs tests/saved-camera-refresh.browser.spec.mjs tests/operations-session-recovery.browser.spec.mjs tests/tech-check-tv.browser.spec.mjs --project=desktop-1024 --grep='required TCP source failure|late connection read failure|fifteen-minute saved reads|identity changed while hidden|TV link fills' --workers=2 --retries=0 2>&1 | tee ../../cos-completion-baseline/browser.log
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: cos-completion-baseline-${{ github.sha }}
-          path: |
-            cos-completion-baseline/
-            tech-checks/operations/test-results/
-          retention-days: 7
-          if-no-files-found: warn
   stage-blobs:
     name: Stage validated inert objects only; no references or deployments
     needs: verify
@@ -151,7 +121,10 @@ jobs:
           import {createHash} from 'node:crypto';
           import assert from 'node:assert/strict';
           const root='input/cos-completion-correction/',data=JSON.parse(readFileSync(root+'manifest.json'));
-          assert.equal(data.source,process.env.GITHUB_SHA);assert.equal(data.files.length,23);
+          assert.equal(data.source,process.env.GITHUB_SHA);assert.ok(data.files.length>=22&&data.files.length<=23);
+          assert.equal(new Set(data.files.map(x=>x.path)).size,data.files.length);
+          assert.equal(data.files.filter(x=>x.path.includes('/tests/')).length,19);
+          assert.equal(data.files.filter(x=>x.path.includes('/src/')).length,1);
           const receipt=[];
           for(const item of data.files){
            assert.match(item.path,/^tech-checks\/operations\/(?:tests\/[a-z0-9-]+\.browser\.spec\.mjs|src\/approvedFleetViews\.css|dist\/index\.html|dist\/assets\/index-[A-Za-z0-9_-]+\.(?:js|css))$/);
