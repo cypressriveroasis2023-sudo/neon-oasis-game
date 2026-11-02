@@ -36,13 +36,13 @@ test('two identical display numbers retain different saved job IDs and original 
  await expect(row.getByText('IT Technician · 2 active assigned jobs',{exact:true})).toBeVisible();await expect(row).toContainText('Readiness: Ready');
  await expect(links).toHaveCount(2);await expect(links.nth(0)).toHaveAttribute('href','#jobs?job='+first);await expect(links.nth(1)).toHaveAttribute('href','#jobs?job='+second);
  await expect(row).not.toContainText('Other site');await expect(row).not.toContainText('Closed work');
- expect(state.calls.filter(p=>p==='/api/jobs')).toHaveLength(1);await page.screenshot({path:info.outputPath('team-saved-jobs.png')});safe(state);
+ expect(state.calls.filter(p=>p==='/api/jobs')).toHaveLength(1);await row.scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath('team-saved-jobs.png')});safe(state);
 });
 test('normal click opens only the selected saved job and browser Back returns to Team',async({page})=>{
  const {app,hub,state}=await mount(page);await member(hub).getByRole('link').nth(1).click();
  const jobs=app.locator('.ops-workflows[aria-label="COS Jobs"]');await expect(jobs).toBeVisible();
  await expect(jobs.locator('.record.op-record')).toHaveCount(1);await expect(jobs).toContainText('Second saved customer');await expect(jobs).not.toContainText('First saved customer');
- expect(await jobs.evaluate(()=>location.hash)).toBe('#jobs?job='+second);await page.goBack();await expect(hub).toBeVisible();await expect(member(hub).getByRole('link')).toHaveCount(2);safe(state);
+ expect(await jobs.evaluate(()=>location.hash)).toBe('#jobs?job='+second);await page.evaluate(()=>history.back());await expect(hub).toBeVisible();expect(await hub.evaluate(()=>location.hash)).toBe('#team');await expect(member(hub).getByRole('link')).toHaveCount(2);safe(state);
 });
 test('missing saved identifier remains visible but cannot become a job or unit link',async({page})=>{
  const {hub,state}=await mount(page,{missing:true}),row=member(hub);
