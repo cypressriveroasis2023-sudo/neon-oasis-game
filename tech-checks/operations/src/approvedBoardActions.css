@@ -1,0 +1,32 @@
+/* Only the existing Board work-details actions, not TV, Fleet or assignment forms. */
+#root .operations-shell .daily-board-detail .cos-approved-board-actions {
+  display:grid; gap:16px; min-width:0; max-width:100%; margin-top:16px;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-actions .daily-board-actions {
+  display:flex; flex-wrap:wrap; gap:12px; min-width:0; margin:0;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-actions button {
+  min-height:48px; max-width:100%; white-space:normal; overflow-wrap:anywhere;
+  line-height:1.4; text-align:center; box-sizing:border-box;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-management {
+  min-width:0; border:1px solid #b8c6d5; border-radius:10px; background:#f1f5f9;
+  color:#102337; overflow-wrap:anywhere;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-management > summary {
+  min-height:48px; padding:14px 16px; font-size:15px; font-weight:700;
+  line-height:1.4; color:#102337; cursor:pointer; box-sizing:border-box;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-management > p {
+  margin:0; padding:0 16px 16px; font-size:14px; line-height:1.5; color:#4b5d70;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-management > .daily-board-actions {
+  padding:0 16px 16px;
+}
+#root .operations-shell .daily-board-detail .cos-approved-board-actions :is(button,summary):focus-visible {
+  outline:3px solid #245baf; outline-offset:3px;
+}
+@media(max-width:700px) {
+  #root .operations-shell .daily-board-detail .cos-approved-board-actions .daily-board-actions {flex-direction:column;}
+  #root .operations-shell .daily-board-detail .cos-approved-board-actions button {width:100%;}
+}
