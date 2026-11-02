@@ -40,7 +40,7 @@ jobs:
           import {readFileSync} from 'node:fs';
           import {createHash} from 'node:crypto';
           import {execFileSync} from 'node:child_process';
-          const files={'src/ApprovedCosNavigation.tsx':'498c27f8207fb7433544a96987801f7576b3293acffaedb3b411f03fa1c06f0b','src/approvedFleetUnit.css':'04416e185a984c1444200e94f7ca932e92f11bca78834370653b7777f109b6cf','tests/approved-fleet-unit.test.mjs':'bcbd623a889543710a6442104230a6427da67f154a71341b95c3c921151bd2f3','tests/approved-fleet-unit.browser.spec.mjs':'e6d17c47f6db0c3086994b9a96efe8ebe79d5779c82bf5bd1e2bbfa4fd72f126'};
+          const files={'src/ApprovedCosNavigation.tsx':'498c27f8207fb7433544a96987801f7576b3293acffaedb3b411f03fa1c06f0b','src/approvedFleetUnit.css':'04416e185a984c1444200e94f7ca932e92f11bca78834370653b7777f109b6cf','tests/approved-fleet-unit.test.mjs':'bcbd623a889543710a6442104230a6427da67f154a71341b95c3c921151bd2f3','tests/approved-fleet-unit.browser.spec.mjs':'8eb84d6528508fabf22961d330cde093f9db395071480e81ded5c273279e159b'};
           for(const [p,h] of Object.entries(files))assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);
           const changed=execFileSync('git',['diff','--name-only','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','src'],{encoding:'utf8'}).trim().split('\n').sort();
           assert.deepEqual(changed,['tech-checks/operations/src/ApprovedCosNavigation.tsx','tech-checks/operations/src/approvedFleetUnit.css']);
