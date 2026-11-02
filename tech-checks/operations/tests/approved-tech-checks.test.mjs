@@ -23,7 +23,7 @@ test('the original management title and class are retained',()=>{
 });
 test('new styles are limited to the approved check hub, not technician forms',()=>{
  const text=read('approvedCheckManagement.css');assert.doesNotMatch(text,/\.(?:cos-fleet|camera|daily-board|tech-check-tv|login)|#view-(?:it|svc)|\bdisplay\s*:\s*none/);
- for(const block of text.matchAll(/([^{}]+)\{/g)){const selector=block[1].replace(/\/\*[\s\S]*?\*\//g,'').trim();if(selector&&!selector.startsWith('@'))assert.ok(selector.startsWith('#root .operations-shell.cos-approved-shell .cos-approved-checks'),selector);}
+ for(const block of text.matchAll(/([^{}]+)\{/g)){const selector=block[1].replace(/\/\*[\s\S]*?\*\//g,'').trim();if(selector&&!selector.startsWith('@'))assert.ok(/^#root(?:#root)? \.operations-shell\.cos-approved-shell \.cos-approved-checks/.test(selector),selector);}
 });
 test('phone tools stack and their original labels cannot be clipped by fixed heights',()=>{
  const text=read('approvedCheckManagement.css');assert.match(text,/min-height:88px !important/);assert.match(text,/min-height:52px !important/);assert.match(text,/grid-template-columns:minmax\(0,1fr\)/);assert.match(text,/overflow-wrap:anywhere/);assert.doesNotMatch(text,/(?:^|[;\n])\s*height:/);

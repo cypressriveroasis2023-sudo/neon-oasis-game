@@ -43,3 +43,15 @@
     overflow-wrap:anywhere;
   }
 }
+/* The legacy double-root theme must not put dark text on dark secondary cards. */
+#root#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid > button.secondary {
+  background:#f4f7fb !important;
+  border-color:#b8c5d3 !important;
+  color:#15283e !important;
+}
+#root#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid > button.secondary b {
+  color:#15283e !important;
+}
+#root#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid > button.secondary span {
+  color:#4d5d71 !important;
+}

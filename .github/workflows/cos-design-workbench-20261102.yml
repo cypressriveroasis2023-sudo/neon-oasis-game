@@ -1,4 +1,4 @@
-# Isolated design candidate validation; production and previews remain excluded.
+# Isolated design candidate validation, including the corrected secondary-card contrast.
 name: COS design Tech Check navigation (no deploy)
 on:
   push:
@@ -42,7 +42,7 @@ jobs:
           const blob=createHash('sha1').update('blob '+before.length+'\0').update(before).digest('hex');
           if(blob!=='e969fa255099463b0fc2547b2d7f7e8240b3ef2a')throw Error('Unexpected host-test source');
           writeFileSync(path,adaptTechCheckHost(before.toString('utf8')));
-          const expected={'src/TechChecksWorkspace.tsx':'cd84a1291e8738f3afdba0a655cbb44c527e97165ae6c7888e7126bf3e27a161','src/ApprovedCheckManagement.tsx':'3d26da4925def6f251fb31289fe0fe77933820db11340a2331648ab51be460ef','src/approvedCheckManagement.css':'ee7577d132d334b41992194bfb37c60eb6b53c525a35fc883c31e76570f00d37','tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e'};
+          const expected={'src/TechChecksWorkspace.tsx':'cd84a1291e8738f3afdba0a655cbb44c527e97165ae6c7888e7126bf3e27a161','src/ApprovedCheckManagement.tsx':'3d26da4925def6f251fb31289fe0fe77933820db11340a2331648ab51be460ef','src/approvedCheckManagement.css':'2b003761f259573e1210f3883d3a0ef289ad44fef38459073bc2762746e2170b','tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e'};
           for(const [file,hash]of Object.entries(expected))if(createHash('sha256').update(readFileSync(file)).digest('hex')!==hash)throw Error('Candidate mismatch: '+file);
           NODE
       - run: npm ci --ignore-scripts --no-audit --no-fund
@@ -57,15 +57,15 @@ jobs:
           npm run build 2>&1 | tee ../../cos-check-candidate/build.log
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const expected={'tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e','dist/index.html':'82804b8b826059149e0a2ff81c03f5bcb7a0642c5ef58e3f477a6ccdabb009c0','dist/assets/index-CPVRSGaP.js':'9847796693819ae5a13742d149678e022b1392a0b0459f7a2ba2e50d1ed428bd','dist/assets/index-DffzpubX.css':'aaeda35231e8df87d99f00aa7b24cd3b39818d9e01d14f359a998f98927893f1'};
+          const expected={'tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e','dist/index.html':'9a19f5305656947bbc9dc2cd025b9a71321e7a244067e1d1cd9432f6ec66380f','dist/assets/index-DoLghfwS.js':'9847796693819ae5a13742d149678e022b1392a0b0459f7a2ba2e50d1ed428bd','dist/assets/index-raphd5mm.css':'d8bf5ce649fd64de491148c900203489d36b2cabef0fd2f516db3bd980cf5841'};
           const files=[];for(const [path,sha256]of Object.entries(expected)){const bytes=readFileSync(path);if(createHash('sha256').update(bytes).digest('hex')!==sha256)throw Error('Byte mismatch '+path);const sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');writeFileSync('../../cos-check-candidate/stage/'+sha,bytes);files.push({path:'tech-checks/operations/'+path,sha,sha256});}
           writeFileSync('../../cos-check-candidate/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,files},null,2));
           NODE
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Original host return history sign-out and new responsive Tech Check behavior
+      - name: Original host navigation responsive controls and computed text contrast
         id: browser
-        run: npm run test:browser -- tests/approved-tech-checks.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/approved-board-actions.browser.spec.mjs tests/approved-fleet-views.browser.spec.mjs tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-check-candidate/browser.log
+        run: npm run test:browser -- tests/approved-tech-checks.browser.spec.mjs tests/approved-tech-checks-contrast.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/approved-board-actions.browser.spec.mjs tests/approved-fleet-views.browser.spec.mjs tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-check-candidate/browser.log
       - name: Original committed-artifact gate (failure is not waived)
         id: artifact
         run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-check-candidate/artifact-gate.log
@@ -97,7 +97,7 @@ jobs:
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
           const dir='evidence/cos-check-candidate',m=JSON.parse(readFileSync(dir+'/manifest.json'));
-          const expected={'tech-checks/operations/tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e','tech-checks/operations/dist/index.html':'82804b8b826059149e0a2ff81c03f5bcb7a0642c5ef58e3f477a6ccdabb009c0','tech-checks/operations/dist/assets/index-CPVRSGaP.js':'9847796693819ae5a13742d149678e022b1392a0b0459f7a2ba2e50d1ed428bd','tech-checks/operations/dist/assets/index-DffzpubX.css':'aaeda35231e8df87d99f00aa7b24cd3b39818d9e01d14f359a998f98927893f1'};
+          const expected={'tech-checks/operations/tests/tech-checks-navigation.browser.spec.mjs':'6a8b8d5a9632e192a06ace74554ce194314630a0ad04df409851504081aeae9e','tech-checks/operations/dist/index.html':'9a19f5305656947bbc9dc2cd025b9a71321e7a244067e1d1cd9432f6ec66380f','tech-checks/operations/dist/assets/index-DoLghfwS.js':'9847796693819ae5a13742d149678e022b1392a0b0459f7a2ba2e50d1ed428bd','tech-checks/operations/dist/assets/index-raphd5mm.css':'d8bf5ce649fd64de491148c900203489d36b2cabef0fd2f516db3bd980cf5841'};
           if(m.source!==process.env.GITHUB_SHA||m.files.length!==4||new Set(m.files.map(f=>f.path)).size!==4)throw Error('Invalid manifest');
           const receipt=[];for(const f of m.files){const bytes=readFileSync(dir+'/stage/'+f.sha);if(expected[f.path]!==f.sha256||createHash('sha256').update(bytes).digest('hex')!==f.sha256||createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex')!==f.sha)throw Error('Unverified object');const r=await fetch('https://api.github.com/repos/cypressriveroasis2023-sudo/neon-oasis-game/git/blobs',{method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({content:bytes.toString('base64'),encoding:'base64'})});if(!r.ok)throw Error('Blob creation failed '+r.status);const result=await r.json();if(result.sha!==f.sha)throw Error('Returned SHA mismatch');receipt.push({path:f.path,sha:result.sha});}
           writeFileSync('blob-receipt.json',JSON.stringify({source:m.source,files:receipt},null,2));
