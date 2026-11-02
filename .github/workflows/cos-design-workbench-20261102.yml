@@ -1,0 +1,51 @@
+# Read-only workbench for the approved existing-app design branch; never a publisher.
+name: COS design source workbench (no deploy)
+on:
+  push:
+    branches: [design/cos-approved-navigation-20261101]
+    paths: ['.github/workflows/cos-design-workbench-20261102.yml']
+permissions:
+  contents: read
+concurrency:
+  group: cos-design-source-workbench
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Prepare tracked source without repository credentials or published bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p cos-design-workbench
+          printf '%s\n' "$GITHUB_SHA" > cos-design-workbench/source-sha.txt
+          git ls-tree -r HEAD -- tech-checks .github/scripts > cos-design-workbench/source-tree.txt
+          git ls-files -z -- tech-checks .github/scripts | python3 -c 'import sys; paths=sys.stdin.buffer.read().split(b"\0"); sys.stdout.buffer.write(b"\0".join(p for p in paths if p and b"/dist/" not in p and not p.rsplit(b"/",1)[-1].startswith(b".env"))+b"\0")' > "$RUNNER_TEMP/cos-design-source-paths"
+          tar --null -T "$RUNNER_TEMP/cos-design-source-paths" -czf cos-design-workbench/source.tar.gz
+      - name: Install only the existing locked tools, with install scripts disabled
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Retain exact development tools for offline source editing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD -- tech-checks/operations/package-lock.json
+          tar -C tech-checks/operations -czf cos-design-workbench/locked-tools.tar.gz node_modules
+          sha256sum cos-design-workbench/source.tar.gz cos-design-workbench/locked-tools.tar.gz tech-checks/operations/package-lock.json > cos-design-workbench/SHA256SUMS
+          node --version > cos-design-workbench/node-version.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-design-workbench-${{ github.sha }}
+          path: cos-design-workbench/
+          retention-days: 1
+          if-no-files-found: error
