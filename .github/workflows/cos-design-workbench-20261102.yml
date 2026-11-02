@@ -1,5 +1,5 @@
-# Final read-only validation. No stage-blobs, merge, branch write or deployment.
-name: COS design unit drawer workbench (no deploy)
+# Read-only navigation integration checks; no runtime edits or publishing.
+name: COS design navigation integration (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
@@ -16,7 +16,7 @@ jobs:
   verify:
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     defaults:
       run:
         shell: bash
@@ -26,36 +26,67 @@ jobs:
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Verify unchanged tested source and protected paths
+      - name: Prove this continuation changes tests only and retains runtime and bundle
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git diff --exit-code b632508be55cc4c67c033d9d2c39fc2470e0f361 HEAD -- . ':!dist'
-          git diff --exit-code 86180b5cd30be32d839f52ffdb594e845881e132 HEAD -- ../supabase ../app.js ../operations-host.js
-          mkdir -p ../../cos-unit-final
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-unit-final/source-sha.txt
+          git diff --exit-code ddf729a6712058c396761684d1e96ef15d9fc08c HEAD -- . ':!tests'
+          git diff --exit-code ddf729a6712058c396761684d1e96ef15d9fc08c HEAD -- ../supabase ../app.js ../operations-host.js
+          node --input-type=module <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const base='ddf729a6712058c396761684d1e96ef15d9fc08c';
+          const allowed=new Set(['.github/workflows/cos-design-workbench-20261102.yml','tech-checks/operations/tests/navigation-helper.mjs','tech-checks/operations/tests/fleet-first-navigation.browser.spec.mjs','tech-checks/operations/tests/approved-workspace-navigation.browser.spec.mjs']);
+          const paths=execFileSync('git',['diff','--name-only',base,'HEAD'],{encoding:'utf8'}).trim().split('\n');
+          for(const path of paths)assert.ok(allowed.has(path),'Unexpected change: '+path);
+          const path='tech-checks/operations/tests/fleet-first-navigation.browser.spec.mjs';
+          let original=execFileSync('git',['show',base+':'+path],{encoding:'utf8'});
+          const edits=[
+            ["toHaveText('Fleet Dashboard');","toHaveText(it?'Fleet Dashboard':'Fleet');"],
+            ["name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');","name:it?'Fleet Dashboard':'Fleet',exact:true})).toHaveAttribute('aria-current','page');"],
+            ["await nav.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();","await nav.getByRole('button',{name:'Fleet',exact:true}).click();"],
+            ["await nav.getByRole('button',{name:'Overview',exact:true}).click();","await openWorkspace(app,'Today');"]
+          ];
+          for(const [from,to] of edits){assert.equal(original.split(from).length-1,1);original=original.replace(from,to);}
+          assert.equal(readFileSync('tests/fleet-first-navigation.browser.spec.mjs','utf8'),original,'Only approved Owner navigation expectations may differ');
+          console.log(JSON.stringify({changedPaths:paths,runtimeUnchanged:true,originalOperationalAssertionsPreserved:true}));
+          JS
+          mkdir -p ../../cos-navigation-integration
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-navigation-integration/source-sha.txt
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Focused navigation Board TV and source-preservation tests
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-unit-final/unit.log
-      - name: Full project typecheck and technician authentication preservation
+      - name: Preserve focused navigation Board TV and unit regressions
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-navigation-integration/unit.log
+      - name: Full typecheck and original technician authentication preservation
         run: |
-          npm run typecheck 2>&1 | tee ../../cos-unit-final/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-unit-final/auth.log
-      - name: Complete build and original unchanged artifact gate
+          npm run typecheck 2>&1 | tee ../../cos-navigation-integration/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-navigation-integration/auth.log
+      - name: Rebuild and verify original committed artifact without changing it
         run: |
-          npm run build 2>&1 | tee ../../cos-unit-final/build.log
-          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-unit-final/artifact-gate.log
+          npm run build 2>&1 | tee ../../cos-navigation-integration/build.log
+          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-navigation-integration/artifact-gate.log
           git diff --exit-code HEAD -- .
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Full-App unit drawers and More navigation at three screen sizes
-        run: npm run test:browser -- tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-unit-final/browser.log
-      - name: Preserve results and screenshots including failures
+      - name: Exercise actual menus and unchanged destination assertions at all three widths
+        run: >-
+          npm run test:browser --
+          tests/approved-workspace-navigation.browser.spec.mjs
+          tests/fleet-first-navigation.browser.spec.mjs
+          tests/vrm.browser.spec.mjs
+          tests/routers.browser.spec.mjs
+          tests/directories.browser.spec.mjs
+          tests/finance.browser.spec.mjs
+          tests/owner-watchful-shortcut.browser.spec.mjs
+          --workers=2 --retries=0
+          2>&1 | tee ../../cos-navigation-integration/browser.log
+      - name: Preserve evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-unit-final-${{ github.sha }}
+          name: cos-navigation-integration-${{ github.sha }}
           path: |
-            cos-unit-final/
+            cos-navigation-integration/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
           retention-days: 7
