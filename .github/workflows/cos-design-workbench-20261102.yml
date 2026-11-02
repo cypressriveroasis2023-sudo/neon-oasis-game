@@ -1,9 +1,9 @@
-# Approved design branch only. No merge, branch write, hosting change or deployment.
+# Final read-only validation. No stage-blobs, merge, branch write or deployment.
 name: COS design unit drawer workbench (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
-    paths: ['.github/workflows/cos-design-workbench-20261102.yml', 'tech-checks/operations/dist/index.html']
+    paths: ['.github/workflows/cos-design-workbench-20261102.yml']
 permissions:
   contents: read
 concurrency:
@@ -17,9 +17,6 @@ jobs:
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
-    outputs:
-      eligible: ${{ steps.browser.outcome == 'success' && steps.build.outcome == 'success' && steps.source.outcome == 'success' && steps.unit.outcome == 'success' && steps.types.outcome == 'success' }}
-      gate: ${{ steps.gate.outcome }}
     defaults:
       run:
         shell: bash
@@ -29,92 +26,37 @@ jobs:
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Verify candidate and protected source
-        id: source
+      - name: Verify unchanged tested source and protected paths
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          mkdir -p ../../cos-unit-evidence/candidate
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-unit-evidence/source-sha.txt
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import {readFileSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          import {execFileSync} from 'node:child_process';
-          const files={'src/ApprovedCosNavigation.tsx':'498c27f8207fb7433544a96987801f7576b3293acffaedb3b411f03fa1c06f0b','src/approvedFleetUnit.css':'04416e185a984c1444200e94f7ca932e92f11bca78834370653b7777f109b6cf','tests/approved-fleet-unit.test.mjs':'bcbd623a889543710a6442104230a6427da67f154a71341b95c3c921151bd2f3','tests/approved-fleet-unit.browser.spec.mjs':'8eb84d6528508fabf22961d330cde093f9db395071480e81ded5c273279e159b'};
-          for(const [p,h] of Object.entries(files))assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);
-          const changed=execFileSync('git',['diff','--name-only','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','src'],{encoding:'utf8'}).trim().split('\n').sort();
-          assert.deepEqual(changed,['tech-checks/operations/src/ApprovedCosNavigation.tsx','tech-checks/operations/src/approvedFleetUnit.css']);
-          execFileSync('git',['diff','--exit-code','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','package.json','package-lock.json','../supabase','../app.js','../operations-host.js'],{stdio:'inherit'});
-          JS
+          git diff --exit-code b632508be55cc4c67c033d9d2c39fc2470e0f361 HEAD -- . ':!dist'
+          git diff --exit-code 86180b5cd30be32d839f52ffdb594e845881e132 HEAD -- ../supabase ../app.js ../operations-host.js
+          mkdir -p ../../cos-unit-final
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-unit-final/source-sha.txt
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Navigation Board TV and unit source-preservation tests
-        id: unit
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-unit-evidence/unit.log
-      - name: Full typecheck and technician preservation
-        id: types
+      - name: Focused navigation Board TV and source-preservation tests
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-unit-final/unit.log
+      - name: Full project typecheck and technician authentication preservation
         run: |
-          npm run typecheck 2>&1 | tee ../../cos-unit-evidence/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-unit-evidence/auth.log
-      - name: Full build and independent byte comparison
-        id: build
+          npm run typecheck 2>&1 | tee ../../cos-unit-final/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-unit-final/auth.log
+      - name: Complete build and original unchanged artifact gate
         run: |
-          npm run build 2>&1 | tee ../../cos-unit-evidence/build.log
-          git diff --exit-code HEAD -- . ':!dist'
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          import {dirname} from 'node:path';
-          const files={'dist/index.html':'c379fb758e5deb18917f6ae8da9c61f4e1ba3e521caa905d518933f153b96f27','dist/assets/index-D5Y_Ayrf.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa','dist/assets/index-C5f3H8wy.css':'4fb59efc73bd8e6e0e684367e4534c89b59560544a46d9555dd0a0346b5268e4'};
-          for(const [p,h] of Object.entries(files)){assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);const d='../../cos-unit-evidence/candidate/'+p;mkdirSync(dirname(d),{recursive:true});copyFileSync(p,d);}
-          writeFileSync('../../cos-unit-evidence/candidate/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,releaseApproved:false,files},null,2));
-          JS
-      - name: Install pinned Chromium
+          npm run build 2>&1 | tee ../../cos-unit-final/build.log
+          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-unit-final/artifact-gate.log
+          git diff --exit-code HEAD -- .
+      - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Full-app unit and More browser tests
-        id: browser
-        run: npm run test:browser -- tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-unit-evidence/browser.log
-      - name: Original committed-artifact gate (not waived)
-        id: gate
-        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-unit-evidence/artifact-gate.log
-      - name: Preserve results including failures
+      - name: Full-App unit drawers and More navigation at three screen sizes
+        run: npm run test:browser -- tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-unit-final/browser.log
+      - name: Preserve results and screenshots including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-unit-evidence-${{ github.sha }}
+          name: cos-unit-final-${{ github.sha }}
           path: |
-            cos-unit-evidence/
+            cos-unit-final/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
           retention-days: 7
           if-no-files-found: warn
-  stage-blobs:
-    needs: verify
-    if: ${{ always() && !cancelled() && needs.verify.outputs.eligible == 'true' && needs.verify.outputs.gate == 'failure' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {contents: write, actions: read}
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'cos-unit-evidence-${{ github.sha }}', path: evidence}
-      - name: Stage three verified Git objects only; no branch update
-        env: {GH_TOKEN: '${{ github.token }}'}
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          const base='evidence/cos-unit-evidence/candidate/',manifest=JSON.parse(readFileSync(base+'manifest.json','utf8'));
-          assert.equal(manifest.source,process.env.GITHUB_SHA);assert.equal(manifest.releaseApproved,false);
-          const expected={'dist/index.html':'c379fb758e5deb18917f6ae8da9c61f4e1ba3e521caa905d518933f153b96f27','dist/assets/index-D5Y_Ayrf.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa','dist/assets/index-C5f3H8wy.css':'4fb59efc73bd8e6e0e684367e4534c89b59560544a46d9555dd0a0346b5268e4'};
-          assert.deepEqual(manifest.files,expected);const blobs=[];
-          for(const [path,sha256] of Object.entries(expected)){
-            const b=readFileSync(base+path);assert.equal(createHash('sha256').update(b).digest('hex'),sha256);
-            const expectedBlob=createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex');
-            const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/git/blobs',{method:'POST',headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json','content-type':'application/json'},body:JSON.stringify({encoding:'base64',content:b.toString('base64')})});
-            assert.equal(r.status,201);const result=await r.json();assert.equal(result.sha,expectedBlob);blobs.push({path:'tech-checks/operations/'+path,sha:result.sha,sha256});
-          }
-          mkdirSync('receipt',{recursive:true});writeFileSync('receipt/blobs.json',JSON.stringify({source:process.env.GITHUB_SHA,blobs},null,2));
-          JS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with: {name: 'cos-unit-blob-receipt-${{ github.sha }}', path: receipt/, retention-days: 7}
