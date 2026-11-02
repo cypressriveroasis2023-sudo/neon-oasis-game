@@ -34,3 +34,21 @@
 @media(max-width:700px) {
   #root .operations-shell .cos-board-record :is(.cos-board-record-facts,.cos-board-record-history dl) {grid-template-columns:minmax(0,1fr);}
 }
+
+/* Keep this work-record dialog centered. The scheduling/TV dialogs retain their styles. */
+#root .operations-shell .daily-board-detail:has(.cos-board-record) {
+  position:fixed; inset:0; margin:auto; width:calc(100% - 32px); max-width:720px;
+  height:fit-content; max-height:calc(100dvh - 32px); box-sizing:border-box;
+  padding:0; border:0; overflow:auto; overscroll-behavior:contain;
+}
+#root .operations-shell .daily-board-detail:has(.cos-board-record):not([open]) {display:none;}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section {padding:20px;}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section > button:first-child {
+  position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:center;
+  min-height:48px!important; min-width:44px; width:100%; box-sizing:border-box;
+  background:#11253c!important; color:#fff!important; border:1px solid #566c81!important;
+}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section > small {display:block; margin-top:14px;}
+@media(max-width:700px) {
+  #root .operations-shell .daily-board-detail:has(.cos-board-record) > section {padding:16px;}
+}

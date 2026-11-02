@@ -15,7 +15,7 @@ export function ApprovedCosIcon({name}:{name:ApprovedIcon}) {
 export default function ApprovedCosNavigation({active,navigate,mobile=false}:{active:string;navigate:(workspace:string)=>void;mobile?:boolean}) {
   return <>{approvedPrimaryAreas.filter(area=>!mobile||area.workspace!=='Operations').map(area=><button
     type='button' key={area.workspace}
-    className={approvedArea(active)===area.workspace?'active':''}
+    className={approvedArea(active)===area.workspace?'cos-approved-selected':''}
     aria-current={approvedArea(active)===area.workspace?'page':undefined}
     onClick={()=>navigate(area.workspace)}
   ><ApprovedCosIcon name={area.icon}/><span>{area.label}</span></button>)}</>;

@@ -16,11 +16,11 @@
   font-weight: 600 !important;
   gap: 12px !important;
 }
-#root .operations-shell.cos-approved-shell .operations-area-nav button.active {
+#root .operations-shell.cos-approved-shell .operations-area-nav button.cos-approved-selected {
   background: var(--approved-red) !important;
   color: #fff !important;
 }
-#root .operations-shell.cos-approved-shell .operations-area-nav button:hover:not(.active) {
+#root .operations-shell.cos-approved-shell .operations-area-nav button:hover:not(.cos-approved-selected) {
   background: #223e59 !important;
   color: #fff !important;
 }
@@ -141,7 +141,7 @@
     line-height:1.2;
     white-space:normal;
   }
-  #root .operations-shell.cos-approved-shell .operations-bottom-nav > button.active {background:var(--approved-red) !important;color:#fff !important;}
+  #root .operations-shell.cos-approved-shell .operations-bottom-nav > button.cos-approved-selected {background:var(--approved-red) !important;color:#fff !important;}
   #root .operations-shell.cos-approved-shell .operations-sidebar-open {
     width:min(420px,100vw) !important;
     max-width:100vw;
