@@ -33,6 +33,18 @@ function mockGoogle(override={}){
   {properties:{sheetId:1900169011,title:'MHELP MATCH INDEX',sheetType:'GRID',hidden:false,gridProperties:{rowCount:1200,columnCount:9}}}
  ]};
  const responses=ranges();
+ const archiveRanges=["'WALL-E'!A1:B1000","'WALL-E'!G1:G1000","'WALL-E'!BE1:BH1000"];
+ const archiveValues=[
+  [['UNIT #','PLACEMENT'],['WA 001','SHOP']],
+  [['IP'],['8.8.8.8']],
+  [['MHELP EQUIPMENT ID','MASTER MEMBERSHIP','MHELP PLACEMENT','LIFECYCLE RESTRICTION'],['99','ARCHIVED','SHOP','DECOMMISSIONED']]
+ ].map((values,i)=>({range:archiveRanges[i],majorDimension:'ROWS',values}));
+ if(override.archived){
+  if(!override.prunedIndex){responses[3].values.push(['WALL-E|WA 001','99']);responses[4].values.push(['WA 001','Cameras OnSite']);responses[5].values.push([filename]);}
+  if(!override.missingArchiveTab)metadata.sheets.push({properties:{sheetId:1900162011,title:'WALL-E',sheetType:'GRID',hidden:false,gridProperties:{rowCount:1000,columnCount:65}}});
+  if(override.wrongArchiveTab)metadata.sheets.at(-1).properties.sheetId=123;
+  if(override.unconfirmedArchive)archiveValues[2].values[1][3]='';
+ }
  if(override.badId)responses[1].values[1][0]='999';
  if(override.movedIp)responses[6].values[2]=['8.8.8.8'];
  if(override.badHeader)responses[6].values[0]=['MHELP IP ADDRESS'];
@@ -43,6 +55,8 @@ function mockGoogle(override={}){
   if(target==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-access-token',token_type:'Bearer',expires_in:3600});
   if(!target.startsWith('https://sheets.googleapis.com/v4/spreadsheets/'+TRACKER_IP_WORKBOOK))throw Error('Wrong source request');
   if(init?.headers?.Authorization!=='Bearer synthetic-access-token')throw Error('Wrong authorization');
+  override.calls?.push({target,method:init.method});
+  if(target.includes('/values:batchGet')&&new URL(target).searchParams.getAll('ranges').some(r=>r.startsWith("'WALL-E'!")))return Response.json({valueRanges:archiveValues});
   if(target.includes('/values:batchGet'))return Response.json({valueRanges:responses});
   return Response.json(metadata);
  };
@@ -51,6 +65,15 @@ const read=(override={})=>read2027ProductIpsFromGoogle({
  getServiceAccountJson:()=>credentials,
  signAssertion:async()=> 'synthetic.header.signature',
  fetch:mockGoogle(override),candidate:records(),expectedMhelpSourceSha256:sourceHash,now:()=>at,
+});
+test('Google reader independently verifies exact archive metadata and reads only the bounded archive columns',async()=>{
+ const calls=[],proof=await read({archived:true,calls});
+ assert.equal(proof.records.length,2);assert.deepEqual(proof.records[0].reviewReasons,['tracker_restriction']);
+ const reads=calls.filter(c=>c.target.includes('/values:batchGet'));
+ assert.equal(reads.length,2);assert.ok(calls.every(c=>c.method==='GET'));
+ assert.deepEqual(new URL(reads[1].target).searchParams.getAll('ranges'),["'WALL-E'!A1:B1000","'WALL-E'!G1:G1000","'WALL-E'!BE1:BH1000"]);
+ assert.deepEqual((await read({archived:true,prunedIndex:true})).records[0].reviewReasons,['tracker_restriction']);
+ for(const override of [{missingArchiveTab:true},{wrongArchiveTab:true},{unconfirmedArchive:true}])await assert.rejects(read({archived:true,...override}),/evidence is unavailable/);
 });
 test('protected Google viewer loads exact 2027 Product IDs with IP and Field/Shop, never interpreting a provider name',async()=>{
  const result=await read();

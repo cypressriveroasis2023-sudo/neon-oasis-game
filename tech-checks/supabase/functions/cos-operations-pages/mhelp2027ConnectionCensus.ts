@@ -34,7 +34,8 @@ function rows(value:unknown,expectedRange:string):string[][]{
 }
 export async function verify2027ConnectionCensus(
  valueRanges:unknown,rangeNames:readonly string[],candidate:readonly EquipmentCsvRow[],
- expectedMhelpSourceSha256:string,verifiedAt:string
+ expectedMhelpSourceSha256:string,verifiedAt:string,
+ archive?:{valueRanges:unknown;rangeNames:readonly string[]}
 ):Promise<VerifiedTrackerIpCensusV2>{
  if(!Array.isArray(valueRanges)||valueRanges.length!==7||rangeNames.length!==7
   ||!HASH.test(expectedMhelpSourceSha256)||!Number.isFinite(Date.parse(verifiedAt))
@@ -65,6 +66,36 @@ export async function verify2027ConnectionCensus(
   if(sourceExport!==null&&sourceExport!==e[0])return fail();
   sourceExport=e[0];indexed.set(a[1],{key:a[0],model:d[0],customer:d[1]});
  }
+ // The overview deliberately excludes decommissioned WALL-E records, while
+ // the historical match index preserves them. Admit only independently read,
+ // exact-ID archive evidence; never infer retirement from absence or a name.
+ const extraIds=new Set([...indexed.keys()].filter(id=>!expected.has(id)));
+ const archived:Array<{productId:string;publicIp:string|null;sourceRow:number}>=[];
+ if(extraIds.size||archive){
+  if(!archive||!Array.isArray(archive.valueRanges)||archive.valueRanges.length!==3||!Array.isArray(archive.rangeNames)||archive.rangeNames.length!==3)return fail();
+  const bounds=[['A','B'],['G','G'],['BE','BH']];
+  archive.rangeNames.forEach((name,i)=>{const s=rangeSpec(name),b=bounds[i];
+   if(!s||s.sheet!=='WALL-E'||s.fromCol!==b[0]||s.toCol!==b[1]||s.fromRow!==1||s.toRow>12000)return fail();
+  });
+  const [labels,archiveIps,membership]=archive.valueRanges.map((v,i)=>rows(v,archive.rangeNames[i]));
+  if(labels[0]?.[0]!=='UNIT #'||labels[0]?.[1]!=='PLACEMENT'||archiveIps[0]?.[0]!=='IP'
+   ||membership[0]?.[0]!=='MHELP EQUIPMENT ID'||membership[0]?.[1]!=='MASTER MEMBERSHIP'
+   ||membership[0]?.[2]!=='MHELP PLACEMENT'||membership[0]?.[3]!=='LIFECYCLE RESTRICTION')return fail();
+  const seenArchive=new Set<string>();
+  for(let i=1;i<Math.max(labels.length,archiveIps.length,membership.length);i++){
+   const a=labels[i]||[],m=membership[i]||[],ip=archiveIps[i]?.[0]||'';
+   if(![...a,...m,ip].some(v=>v.trim()))continue;
+   const id=m[0],index=indexed.get(id);
+   if(!ID.test(id)||seenArchive.has(id)||!a[0]||index&&(index.key!=='WALL-E|'+a[0]||index.model!==a[0])
+    ||!['FIELD','SHOP'].includes(a[1])||!['FIELD','SHOP'].includes(m[2])||ip.length>80)return fail();
+   seenArchive.add(id);
+   if(m[1]==='ARCHIVED'){
+    if(expected.has(id)||a[1]!=='SHOP'||m[2]!=='SHOP'||m[3]!=='DECOMMISSIONED')return fail();
+    archived.push({productId:id,publicIp:ip.trim()||null,sourceRow:i+1});
+   }else if(m[1]!=='CURRENT MASTER'||!expected.has(id)||!index)return fail();
+  }
+  if([...extraIds].some(id=>!archived.some(r=>r.productId===id)))return fail();
+ }
  const records:VerifiedTrackerIpCensusV2['records']=[],seen=new Set<string>();
  for(let i=1;i<Math.max(info.length,ids.length,placement.length,ips.length);i++){
   const a=info[i]||[],id=ids[i]?.[0]||'',p=placement[i]||[],ip=ips[i]?.[0]||'';
@@ -82,14 +113,18 @@ export async function verify2027ConnectionCensus(
    ||equipmentCustomerPlacement(customer)!==currentPlacement)reviewReasons.push('customer_mismatch');
   if(normalized(index.model)!==normalized(source.unitNumber))reviewReasons.push('identity_mismatch');
   if(p[0]!==currentPlacement||Boolean(p[1])&&p[1]!==currentPlacement)reviewReasons.push('tracker_restriction');
+  // Archived IP ownership is not erased by leaving the active inventory.
+  // Carry a hold into the existing strict consumer instead of adding an
+  // envelope field that older consumers might silently ignore.
+  if(ip.trim()&&archived.some(r=>r.publicIp===ip.trim())&&!reviewReasons.includes('tracker_restriction'))reviewReasons.push('tracker_restriction');
   records.push({productId:id,recordId:'mhelp_product:'+id,placement:currentPlacement as 'FIELD'|'SHOP',
    publicIp:ip.trim()||null,reviewReasons,sourceRow:i+1});
  }
- if(!sourceExport||records.length!==expected.size||indexed.size!==expected.size
+ if(!sourceExport||records.length!==expected.size||indexed.size!==expected.size+extraIds.size
   ||[...expected.keys()].some(id=>!seen.has(id)||!indexed.has(id)))return fail();
  // A source revision covers the complete exact-ID census including held IP
  // reservations. It is internal provenance, not exported network evidence.
- const bytes=new TextEncoder().encode(JSON.stringify({rangeNames,sourceExport,records}));
+ const bytes=new TextEncoder().encode(JSON.stringify({rangeNames,sourceExport,records,...(archived.length?{archiveRangeNames:archive!.rangeNames,archived}: {})}));
  const trackerSourceSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
  return {contract:TRACKER_CONNECTION_CENSUS_V2,workbookId:TRACKER_IP_WORKBOOK,expectedMhelpSourceSha256,
   verifiedAt,trackerSourceSha256,sourceExport,records};
