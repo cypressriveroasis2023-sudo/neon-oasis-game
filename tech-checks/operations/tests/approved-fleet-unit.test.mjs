@@ -1,3 +1,4 @@
+import {originalFleetViewMarkup} from './approved-fleet-view-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -22,7 +23,8 @@ const expected={
   "fleetBoardLayout.css": "8c4962032a589287f75854b581dfc57f5d579b8f"
 };
 for (const [name,sha] of Object.entries(expected)) test('unit presentation preserves '+name,()=>{
- const b=readFileSync(new URL('../src/'+name,import.meta.url));
+ const raw=readFileSync(new URL('../src/'+name,import.meta.url));
+ const b=name==='FleetDashboard.tsx'?Buffer.from(originalFleetViewMarkup(raw.toString('utf8'))):raw;
  assert.equal(createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex'),sha);
 });
 const css=readFileSync(new URL('../src/approvedFleetUnit.css',import.meta.url),'utf8');

@@ -1,0 +1,93 @@
+/* Owner Fleet navigation only: the original view buttons keep their callbacks and count text. */
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views {
+ display:grid;
+ grid-template-columns:minmax(72px,.7fr) minmax(110px,1fr) minmax(125px,1.25fr);
+ position:relative;
+ z-index:501;
+ gap:8px;
+ padding:8px;
+ margin:0;
+ min-width:0;
+ overflow:visible;
+ align-items:start;
+ border-radius:10px;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views > button,
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary,
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tool-buttons > button {
+ box-sizing:border-box;
+ min-height:48px;
+ min-width:0;
+ width:100%;
+ margin:0;
+ padding:10px 12px;
+ white-space:normal;
+ overflow-wrap:anywhere;
+ font-size:14px;
+ line-height:1.4;
+ border-radius:8px;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary {
+ cursor:pointer;
+ border:1px solid #526783;
+ background:#17283d;
+ color:#f1f5fc;
+ font-weight:600;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary[aria-current=page] {
+ background:#8f1028;
+ border-color:#d52b43;
+ color:#fff;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary small {
+ display:block;
+ margin:4px 0 0;
+ font-size:12px;
+ line-height:1.4;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary small span { display:none; }
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tool-buttons {
+ position:absolute;
+ top:calc(100% + 4px);
+ left:0;
+ right:0;
+ display:grid;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:8px;
+ padding:12px;
+ box-sizing:border-box;
+ border:1px solid #526783;
+ border-radius:10px;
+ background:#101e2e;
+ box-shadow:0 10px 24px #0006;
+}
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tool-buttons > button { text-align:left; }
+#root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views :is(button,summary):focus-visible {
+ outline:3px solid #fff;
+ outline-offset:2px;
+}
+@media(max-width:750px) {
+ #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views {
+  grid-template-columns:minmax(0,.65fr) minmax(0,1fr) minmax(0,1.25fr);
+  gap:6px;
+  padding:6px 0;
+ }
+ #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views > button,
+ #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools > summary {
+  padding:8px;
+  font-size:13px;
+ }
+ #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tool-buttons { grid-template-columns:minmax(0,1fr); }
+ #root#root .cos-approved-shell .cos-fleet-board .cos-fleet-map-jump {
+  position:static;
+  display:block;
+  width:auto;
+  max-width:100%;
+  height:auto;
+  min-height:48px;
+  margin:6px 0 0 auto;
+  padding:10px 12px;
+  font-size:13px;
+ }
+ #root#root .cos-approved-shell .cos-fleet-board .cos-fleet-map-jump::after { content:none; }
+}
