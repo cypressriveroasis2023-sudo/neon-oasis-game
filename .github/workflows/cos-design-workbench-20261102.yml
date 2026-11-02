@@ -1,11 +1,9 @@
-# Exact approved design branch only; no merge, ref write, hosting change or deployment.
+# Approved design branch only. No merge, branch write, hosting change or deployment.
 name: COS design unit drawer workbench (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
-    paths:
-      - '.github/workflows/cos-design-workbench-20261102.yml'
-      - 'tech-checks/operations/dist/index.html'
+    paths: ['.github/workflows/cos-design-workbench-20261102.yml', 'tech-checks/operations/dist/index.html']
 permissions:
   contents: read
 concurrency:
@@ -28,17 +26,12 @@ jobs:
         working-directory: tech-checks/operations
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
+        with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22.16.0'
-      - name: Verify exact candidate and unchanged application boundaries
+        with: {node-version: '22.16.0'}
+      - name: Verify candidate and protected source
         id: source
         run: |
-          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           mkdir -p ../../cos-unit-evidence/candidate
           printf '%s\n' "$GITHUB_SHA" > ../../cos-unit-evidence/source-sha.txt
@@ -51,18 +44,18 @@ jobs:
           for(const [p,h] of Object.entries(files))assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);
           const changed=execFileSync('git',['diff','--name-only','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','src'],{encoding:'utf8'}).trim().split('\n').sort();
           assert.deepEqual(changed,['tech-checks/operations/src/ApprovedCosNavigation.tsx','tech-checks/operations/src/approvedFleetUnit.css']);
-          execFileSync('git',['diff','--exit-code','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','package.json','package-lock.json','../supabase','../app.js','../operations-host.js','.'],{stdio:'ignore'});
+          execFileSync('git',['diff','--exit-code','86180b5cd30be32d839f52ffdb594e845881e132','HEAD','--','package.json','package-lock.json','../supabase','../app.js','../operations-host.js'],{stdio:'inherit'});
           JS
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Focused navigation Board TV and unit source-preservation checks
+      - name: Navigation Board TV and unit source-preservation tests
         id: unit
         run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-unit-evidence/unit.log
-      - name: Full project typecheck and original technician preservation
+      - name: Full typecheck and technician preservation
         id: types
         run: |
           npm run typecheck 2>&1 | tee ../../cos-unit-evidence/typecheck.log
           node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-unit-evidence/auth.log
-      - name: Build complete app and match independently built candidate
+      - name: Full build and independent byte comparison
         id: build
         run: |
           npm run build 2>&1 | tee ../../cos-unit-evidence/build.log
@@ -73,18 +66,18 @@ jobs:
           import {createHash} from 'node:crypto';
           import {dirname} from 'node:path';
           const files={'dist/index.html':'c379fb758e5deb18917f6ae8da9c61f4e1ba3e521caa905d518933f153b96f27','dist/assets/index-D5Y_Ayrf.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa','dist/assets/index-C5f3H8wy.css':'4fb59efc73bd8e6e0e684367e4534c89b59560544a46d9555dd0a0346b5268e4'};
-          for(const [p,h] of Object.entries(files)){assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);const dest='../../cos-unit-evidence/candidate/'+p;mkdirSync(dirname(dest),{recursive:true});copyFileSync(p,dest);}
+          for(const [p,h] of Object.entries(files)){assert.equal(createHash('sha256').update(readFileSync(p)).digest('hex'),h,p);const d='../../cos-unit-evidence/candidate/'+p;mkdirSync(dirname(d),{recursive:true});copyFileSync(p,d);}
           writeFileSync('../../cos-unit-evidence/candidate/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,releaseApproved:false,files},null,2));
           JS
-      - name: Install the repository-pinned browser
+      - name: Install pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Complete-app unit drawers and More navigation at three widths
+      - name: Full-app unit and More browser tests
         id: browser
         run: npm run test:browser -- tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-unit-evidence/browser.log
-      - name: Original committed-artifact gate remains mandatory
+      - name: Original committed-artifact gate (not waived)
         id: gate
         run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-unit-evidence/artifact-gate.log
-      - name: Keep all results including failures
+      - name: Preserve results including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -100,24 +93,18 @@ jobs:
     if: ${{ always() && !cancelled() && needs.verify.outputs.eligible == 'true' && needs.verify.outputs.gate == 'failure' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: write
-      actions: read
+    permissions: {contents: write, actions: read}
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: cos-unit-evidence-${{ github.sha }}
-          path: evidence
-      - name: Stage only three hash-verified Git objects; never update a branch
-        env:
-          GH_TOKEN: ${{ github.token }}
+        with: {name: 'cos-unit-evidence-${{ github.sha }}', path: evidence}
+      - name: Stage three verified Git objects only; no branch update
+        env: {GH_TOKEN: '${{ github.token }}'}
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
           import {createHash} from 'node:crypto';
-          const base='evidence/cos-unit-evidence/candidate/';
-          const manifest=JSON.parse(readFileSync(base+'manifest.json','utf8'));
+          const base='evidence/cos-unit-evidence/candidate/',manifest=JSON.parse(readFileSync(base+'manifest.json','utf8'));
           assert.equal(manifest.source,process.env.GITHUB_SHA);assert.equal(manifest.releaseApproved,false);
           const expected={'dist/index.html':'c379fb758e5deb18917f6ae8da9c61f4e1ba3e521caa905d518933f153b96f27','dist/assets/index-D5Y_Ayrf.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa','dist/assets/index-C5f3H8wy.css':'4fb59efc73bd8e6e0e684367e4534c89b59560544a46d9555dd0a0346b5268e4'};
           assert.deepEqual(manifest.files,expected);const blobs=[];
@@ -130,7 +117,4 @@ jobs:
           mkdirSync('receipt',{recursive:true});writeFileSync('receipt/blobs.json',JSON.stringify({source:process.env.GITHUB_SHA,blobs},null,2));
           JS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: cos-unit-blob-receipt-${{ github.sha }}
-          path: receipt/
-          retention-days: 7
+        with: {name: 'cos-unit-blob-receipt-${{ github.sha }}', path: receipt/, retention-days: 7}
