@@ -1,0 +1,160 @@
+/* Approved Owner navigation only. No Fleet/status/provider/host selectors. */
+#root .operations-shell.cos-approved-shell {
+  --approved-navy: #0d2137;
+  --approved-red: #c80d24;
+  --approved-ink: #15283e;
+  --approved-muted: #4d5d71;
+}
+#root .operations-shell.cos-approved-shell > .operations-sidebar {
+  background: var(--approved-navy) !important;
+  border-right-color: #294057 !important;
+}
+#root .operations-shell.cos-approved-shell .company-brand {margin-bottom: 28px;}
+#root .operations-shell.cos-approved-shell .operations-area-nav button {
+  min-height: 50px !important;
+  color: #e8eef5 !important;
+  font-weight: 600 !important;
+  gap: 12px !important;
+}
+#root .operations-shell.cos-approved-shell .operations-area-nav button.active {
+  background: var(--approved-red) !important;
+  color: #fff !important;
+}
+#root .operations-shell.cos-approved-shell .operations-area-nav button:hover:not(.active) {
+  background: #223e59 !important;
+  color: #fff !important;
+}
+#root .operations-shell.cos-approved-shell :is(.operations-area-nav,.operations-bottom-nav) svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+#root .operations-shell.cos-approved-shell .company-utility-bar {gap: 12px;}
+#root .operations-shell.cos-approved-shell .company-breadcrumb {font-weight: 700;color:#e8eef5;}
+#root .operations-shell.cos-approved-shell .cos-approved-tools {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  gap: 12px;
+  min-width: 0;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-tools-note {margin:0 0 4px;}
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group {
+  min-width: 0;
+  border: 1px solid #cdd6e0;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--approved-ink);
+  overflow-wrap: anywhere;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group > summary {
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  color: var(--approved-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group > :not(summary) {padding:0 14px 14px;}
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group .operations-directory-links {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));
+  gap:10px;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group button.secondary {
+  min-height:48px !important;
+  box-sizing:border-box;
+  border:1px solid #b8c5d3 !important;
+  background:#f4f7fb !important;
+  color:var(--approved-ink) !important;
+  padding:12px 14px !important;
+  text-align:left;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks {
+  background:#fff !important;
+  color:var(--approved-ink) !important;
+  border:1px solid #cdd6e0 !important;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks :is(h2,h3,b) {color:var(--approved-ink) !important;}
+#root .operations-shell.cos-approved-shell .cos-approved-checks :is(p,span) {color:var(--approved-muted) !important;}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .panelhead {color:var(--approved-ink) !important;}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));
+  gap:12px;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid > button {
+  min-height:88px;
+  border-radius:10px !important;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:16px !important;
+  background:#f4f7fb !important;
+  border:1px solid #b8c5d3 !important;
+  color:var(--approved-ink) !important;
+  white-space:normal;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks > .cos-approved-primary-checks > button {
+  border-left:4px solid var(--approved-red) !important;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks > .cos-approved-tool-group {margin-top:20px;}
+#root .operations-shell.cos-approved-shell :is(.cos-approved-tools,.cos-approved-checks) :focus-visible {
+  outline:3px solid #1748bb !important;
+  outline-offset:3px;
+}
+#root .operations-shell.cos-approved-shell :is(.operations-area-nav,.operations-bottom-nav) button:focus-visible {
+  outline:3px solid #fff !important;
+  outline-offset:-4px;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-more-drawer {min-width:0;}
+#root .operations-shell.cos-approved-shell .operations-sidebar-open .cos-approved-more-drawer h2 {font-size:22px;}
+#root .operations-shell.cos-approved-shell .operations-sidebar-open .company-sidebar-footer {display:block !important;padding-top:20px;}
+@media (max-width:700px) {
+  #root .operations-shell.cos-approved-shell {padding-bottom:calc(76px + env(safe-area-inset-bottom)) !important;}
+  #root .operations-shell.cos-approved-shell .operations-bottom-nav {
+    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+    gap:0 !important;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom)) !important;
+    background:var(--approved-navy) !important;
+    border-top:1px solid #294057 !important;
+    box-sizing:border-box;
+    width:100%;
+    max-width:100%;
+  }
+  #root .operations-shell.cos-approved-shell .operations-bottom-nav > button {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-width:0;
+    min-height:58px !important;
+    padding:6px 1px !important;
+    gap:4px;
+    border:0 !important;
+    border-radius:8px !important;
+    background:transparent !important;
+    color:#e8eef5 !important;
+    font-size:11px !important;
+    font-weight:600 !important;
+    line-height:1.2;
+    white-space:normal;
+  }
+  #root .operations-shell.cos-approved-shell .operations-bottom-nav > button.active {background:var(--approved-red) !important;color:#fff !important;}
+  #root .operations-shell.cos-approved-shell .operations-sidebar-open {
+    width:min(420px,100vw) !important;
+    max-width:100vw;
+    box-sizing:border-box;
+    padding:18px !important;
+  }
+  #root .operations-shell.cos-approved-shell .operations-sidebar-open .company-brand {display:none;}
+  #root .operations-shell.cos-approved-shell .operations-sidebar-open .operations-menu-close {min-height:48px;}
+  #root .operations-shell.cos-approved-shell .cos-approved-tool-group .operations-directory-links {grid-template-columns:minmax(0,1fr);}
+  #root .operations-shell.cos-approved-shell .company-utility-bar {flex-wrap:wrap;height:auto;min-height:68px;padding-top:10px;padding-bottom:10px;}
+  #root .operations-shell.cos-approved-shell .company-connection {white-space:normal;text-align:right;font-size:9px;max-width:120px;}
+  #root .operations-shell.cos-approved-shell .company-breadcrumb {font-size:13px;}
+}
+@media (min-width:701px) {
+  #root .operations-shell.cos-approved-shell .operations-bottom-nav {display:none !important;}
+}

@@ -1,7 +1,12 @@
-import { workspaceGroups, workspaceLabel } from './workspaceNavigation';
-export default function OperationsAreas({ navigate }: { navigate(workspace: string): void }) {
-  return <section className='operations-directory' aria-label='Operations workspaces'>
-    {workspaceGroups.filter(group => group.label !== 'Equipment' && group.label !== 'Team').map(group => <section className='panel' key={group.label}><h2>{group.label}</h2><div className='operations-directory-links'>{group.items.filter(name => !['Today','Operations'].includes(name)).map(name => <button className='secondary' key={name} onClick={() => navigate(name)}>{workspaceLabel(name)}</button>)}</div></section>)}
-    <section className='panel'><h2>Manage equipment &amp; people</h2><div className='operations-directory-links'>{['Fleet Dashboard', 'Equipment', 'Owner Tasks'].map(name => <button className='secondary' key={name} onClick={() => navigate(name)}>{workspaceLabel(name)}</button>)}</div></section>
+import {workspaceLabel} from './workspaceNavigation';
+import {approvedToolGroups,visibleApprovedTools} from './approvedCosNavigation';
+
+export default function OperationsAreas({navigate,trackerVisible=false}:{navigate:(workspace:string)=>void;trackerVisible?:boolean}) {
+  return <section className='operations-directory cos-approved-tools' aria-label='Operations workspaces'>
+    <p className='cos-approved-tools-note'>Open an existing COS tool. Service jobs are created in mHelp.</p>
+    {approvedToolGroups.map(group=><details className='cos-approved-tool-group' key={group.label}>
+      <summary>{group.label}</summary>
+      <div className='operations-directory-links'>{visibleApprovedTools(group.items,trackerVisible).map(name=><button type='button' className='secondary' key={name} onClick={()=>navigate(name)}>{name==='Units On Hand'?'Shop inventory':workspaceLabel(name)}</button>)}</div>
+    </details>)}
   </section>;
 }
