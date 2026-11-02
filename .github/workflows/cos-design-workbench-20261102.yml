@@ -29,14 +29,14 @@ jobs:
       - name: Verify exact source and preserve all other runtime
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git diff --exit-code a979d205300cd00d9ab5ba70a96ff8e838d9e39b HEAD -- .
+          git diff --exit-code b930ff514388b383add842a89168133a22643f24 HEAD -- .
           git diff --exit-code 0a5bd8f612924b761466dff5dfc95130fc74d0c6 HEAD -- ../supabase ../app.js ../operations-host.js package.json package-lock.json
           git diff --exit-code 0a5bd8f612924b761466dff5dfc95130fc74d0c6 HEAD -- src ':!src/TeamWorkspace.tsx' ':!src/ApprovedTeamJobLink.tsx' ':!src/approvedTeamJobRoute.ts' ':!src/approvedTeamJobs.css'
           mkdir -p ../../cos-team-candidate/stage
           printf '%s\n' "$GITHUB_SHA" > ../../cos-team-candidate/source-sha.txt
           node --input-type=module <<'NODE'
           import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const expected={'src/TeamWorkspace.tsx':'881e613f5a23c96cb7c81dacde02bc81f932afee8a1b0c9924559f665774881d','src/ApprovedTeamJobLink.tsx':'27e2711b2ac0371de3adcc864a18d1778d0224a96a8e2fefad1b215f9e2b75d2','src/approvedTeamJobRoute.ts':'bad5a11bc86e931a2f21ed6e51e093e5784670895d6024dd13bf6bc000e0565c','src/approvedTeamJobs.css':'fc8ac44dbf09fd8f3c4fb814a6e143f2e3a75f1674267ab2ce7954b5ffd5e734','tests/approved-team-job-links.test.mjs':'8c93a7753ce50fc9f0bc70f2304dcc67de041a44bcd0168e67046b91e66161d1','tests/approved-team-job-links.browser.spec.mjs':'5b650065ba86930be60ca80e7b2a9b86f181013f2f41aa33f871b8f96a3e9947'};
+          const expected={'src/TeamWorkspace.tsx':'881e613f5a23c96cb7c81dacde02bc81f932afee8a1b0c9924559f665774881d','src/ApprovedTeamJobLink.tsx':'27e2711b2ac0371de3adcc864a18d1778d0224a96a8e2fefad1b215f9e2b75d2','src/approvedTeamJobRoute.ts':'bad5a11bc86e931a2f21ed6e51e093e5784670895d6024dd13bf6bc000e0565c','src/approvedTeamJobs.css':'fc8ac44dbf09fd8f3c4fb814a6e143f2e3a75f1674267ab2ce7954b5ffd5e734','tests/approved-team-job-links.test.mjs':'8c93a7753ce50fc9f0bc70f2304dcc67de041a44bcd0168e67046b91e66161d1','tests/approved-team-job-links.browser.spec.mjs':'3820fcdc98a9552e00d70d85d738fb6bd9afa820ed0ddf39ad199a76dcc5034a'};
           for(const [file,hash]of Object.entries(expected))if(createHash('sha256').update(readFileSync(file)).digest('hex')!==hash)throw Error('Candidate mismatch: '+file);
           NODE
       - run: npm ci --ignore-scripts --no-audit --no-fund
@@ -58,10 +58,10 @@ jobs:
           git diff --exit-code HEAD -- src tests package.json package-lock.json
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Exact Team job selection and current menu integration
-        run: npm run test:browser -- tests/approved-team-job-links.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-team-candidate/browser.log
       - name: Preserve original Team assignment and readiness assertions
         run: npm run test:browser -- tests/directories.browser.spec.mjs --grep 'Team shows only actual roster' --workers=2 --retries=0 2>&1 | tee ../../cos-team-candidate/original-team.log
+      - name: Exact Team job selection and current menu integration
+        run: npm run test:browser -- tests/approved-team-job-links.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-team-candidate/browser.log
       - id: ready
         run: echo 'ready=yes' >> "$GITHUB_OUTPUT"
       - name: Original committed-artifact gate (failure is not waived)
