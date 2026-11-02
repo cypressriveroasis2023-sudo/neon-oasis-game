@@ -11,8 +11,8 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} opens Fleet first
  const mobile=page.viewportSize().width<=700;
  if(mobile)await app.getByRole('button',{name:'More',exact:true}).click();
  const nav=app.getByRole('navigation',{name:'COS Operations',exact:true});
- await expect(nav.getByRole('button').first()).toHaveText('Fleet Dashboard');
- await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav.getByRole('button').first()).toHaveText(it?'Fleet Dashboard':'Fleet');
+ await expect(nav.getByRole('button',{name:it?'Fleet Dashboard':'Fleet',exact:true})).toHaveAttribute('aria-current','page');
  if(it){
   await expect(nav.getByRole('button')).toHaveCount(2);
   await expect(nav.getByRole('button',{name:'IT Dashboard',exact:true})).toHaveCount(0);
@@ -31,9 +31,9 @@ test('an explicit Owner overview bookmark stays available and Fleet remains one 
  await expect(app.getByRole('region',{name:'Fleet Dashboard shortcut',exact:true})).toBeVisible();
  const mobile=page.viewportSize().width<=700;
  const nav=app.getByRole('navigation',{name:mobile?'Mobile Operations navigation':'COS Operations',exact:true});
- await nav.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
+ await nav.getByRole('button',{name:'Fleet',exact:true}).click();
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(1);
- await nav.getByRole('button',{name:'Overview',exact:true}).click();
+ await openWorkspace(app,'Today');
  await expect(app.getByRole('region',{name:'Fleet Dashboard shortcut',exact:true})).toBeVisible();
  expect(state.errors).toEqual([]);
 });
