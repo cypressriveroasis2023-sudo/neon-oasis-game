@@ -1,4 +1,4 @@
-# Isolated design validation. Staging creates inert Git blobs only, never refs or deployments.
+# Final read-only validation of the attached candidate. No patching, staging, ref writes or deployment.
 name: COS design Team job links (no deploy)
 on:
   push:
@@ -17,8 +17,6 @@ jobs:
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      ready: ${{ steps.ready.outputs.ready }}
     defaults:
       run: {shell: bash, working-directory: tech-checks/operations}
     steps:
@@ -26,77 +24,41 @@ jobs:
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Verify exact source and preserve all other runtime
+      - name: Verify attached source and unchanged protected runtime
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git diff --exit-code 2e6c1b34c240152cd0141e3b45ec09fa818b7956 HEAD -- .
+          test "$COS_RUN_LIVE_SMOKE" = 0
+          git diff --exit-code b3105bfa44d3afd689e5b73611315634e0edbe99 HEAD -- .
           git diff --exit-code 0a5bd8f612924b761466dff5dfc95130fc74d0c6 HEAD -- ../supabase ../app.js ../operations-host.js package.json package-lock.json
           git diff --exit-code 0a5bd8f612924b761466dff5dfc95130fc74d0c6 HEAD -- src ':!src/TeamWorkspace.tsx' ':!src/ApprovedTeamJobLink.tsx' ':!src/approvedTeamJobRoute.ts' ':!src/approvedTeamJobs.css'
-          mkdir -p ../../cos-team-candidate/stage
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-team-candidate/source-sha.txt
-          node --input-type=module <<'NODE'
-          import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const expected={'src/TeamWorkspace.tsx':'881e613f5a23c96cb7c81dacde02bc81f932afee8a1b0c9924559f665774881d','src/ApprovedTeamJobLink.tsx':'27e2711b2ac0371de3adcc864a18d1778d0224a96a8e2fefad1b215f9e2b75d2','src/approvedTeamJobRoute.ts':'bad5a11bc86e931a2f21ed6e51e093e5784670895d6024dd13bf6bc000e0565c','src/approvedTeamJobs.css':'fc8ac44dbf09fd8f3c4fb814a6e143f2e3a75f1674267ab2ce7954b5ffd5e734','tests/approved-team-job-links.test.mjs':'8c93a7753ce50fc9f0bc70f2304dcc67de041a44bcd0168e67046b91e66161d1','tests/approved-team-job-links.browser.spec.mjs':'2dc7bf45fa6a388d00a8f3d0f6ea6cef5299e1d8e141a8e5fefe0f5780cc40fe'};
-          for(const [file,hash]of Object.entries(expected))if(createHash('sha256').update(readFileSync(file)).digest('hex')!==hash)throw Error('Candidate mismatch: '+file);
-          NODE
+          mkdir -p ../../cos-team-final
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-team-final/source-sha.txt
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Source-preservation and focused regressions
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-board-actions.test.mjs tests/approved-tech-checks.test.mjs tests/approved-team-job-links.test.mjs 2>&1 | tee ../../cos-team-candidate/unit.log
+      - name: Focused preservation navigation Board Fleet Tech Check and Team tests
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-board-actions.test.mjs tests/approved-tech-checks.test.mjs tests/approved-team-job-links.test.mjs 2>&1 | tee ../../cos-team-final/unit.log
       - name: Full typecheck and original authentication preservation
         run: |
-          npm run typecheck 2>&1 | tee ../../cos-team-candidate/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-team-candidate/auth.log
-      - name: Full build and independent compiled-byte check
+          npm run typecheck 2>&1 | tee ../../cos-team-final/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-team-final/auth.log
+      - name: Full application build and original unmodified compiled-artifact gate
         run: |
-          npm run build 2>&1 | tee ../../cos-team-candidate/build.log
-          node --input-type=module <<'NODE'
-          import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const expected={'dist/index.html':['efec549e4a1df57a8b76b0286acc9bb3f3832e79a618a792071f79421d92ccd2','87876adcdf4a882b27922736c2732942b627d217'],'dist/assets/index-B_VwSvln.js':['1eca0d103590616a956e8802c5db94bcc7e5269fa42d1936e61cbf072317f1e7','1a4a7ab38f76fd32af9671afe7c33525f26cef7a'],'dist/assets/index-F2oU6lyH.css':['6822a52527f41a2cb3d36e3e7b2f002cb223edbed1e0dd7e6797aec26a49e888','bfe5280b4b2582cbbf68151cf16dd8b93700c557']};
-          for(const [file,[digest,blob]]of Object.entries(expected)){const bytes=readFileSync(file);if(createHash('sha256').update(bytes).digest('hex')!==digest||createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex')!==blob)throw Error('Compiled mismatch: '+file);writeFileSync('../../cos-team-candidate/stage/'+blob,bytes);}
-          writeFileSync('../../cos-team-candidate/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,entries:expected},null,2));
-          NODE
-          git diff --exit-code HEAD -- src tests package.json package-lock.json
+          npm run build 2>&1 | tee ../../cos-team-final/build.log
+          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-team-final/artifact-gate.log
+          git diff --exit-code HEAD -- .
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Preserve original Team assignment and readiness assertions
-        run: npm run test:browser -- tests/directories.browser.spec.mjs --grep 'Team shows only actual roster' --workers=2 --retries=0 2>&1 | tee ../../cos-team-candidate/original-team.log
-      - name: Exact Team job selection and current menu integration
-        run: npm run test:browser -- tests/approved-team-job-links.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-team-candidate/browser.log
-      - id: ready
-        run: echo 'ready=yes' >> "$GITHUB_OUTPUT"
-      - name: Original committed-artifact gate (failure is not waived)
-        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-team-candidate/artifact-gate.log
-      - name: Retain evidence including failures
+      - name: Original Team assignment and readiness assertions
+        run: npm run test:browser -- tests/directories.browser.spec.mjs --grep 'Team shows only actual roster' --workers=2 --retries=0 2>&1 | tee ../../cos-team-final/original-team.log
+      - name: Exact Team job selection browser history and existing navigation
+        run: npm run test:browser -- tests/approved-team-job-links.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-team-final/browser.log
+      - name: Retain results and screenshots including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-team-candidate-${{ github.sha }}
+          name: cos-team-final-${{ github.sha }}
           path: |
-            cos-team-candidate/
+            cos-team-final/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
           retention-days: 7
           if-no-files-found: warn
-  stage-blobs:
-    needs: verify
-    if: always() && needs.verify.outputs.ready == 'yes' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'cos-team-candidate-${{ github.sha }}', path: evidence}
-      - name: Create three verified inert Git blobs only, never update refs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --input-type=module <<'NODE'
-          import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const entries={'dist/index.html':['efec549e4a1df57a8b76b0286acc9bb3f3832e79a618a792071f79421d92ccd2','87876adcdf4a882b27922736c2732942b627d217'],'dist/assets/index-B_VwSvln.js':['1eca0d103590616a956e8802c5db94bcc7e5269fa42d1936e61cbf072317f1e7','1a4a7ab38f76fd32af9671afe7c33525f26cef7a'],'dist/assets/index-F2oU6lyH.css':['6822a52527f41a2cb3d36e3e7b2f002cb223edbed1e0dd7e6797aec26a49e888','bfe5280b4b2582cbbf68151cf16dd8b93700c557']};
-          const receipt=[];
-          for(const [path,[digest,blob]]of Object.entries(entries)){const b=readFileSync('evidence/cos-team-candidate/stage/'+blob);if(createHash('sha256').update(b).digest('hex')!==digest)throw Error('Digest mismatch');const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/git/blobs',{method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({content:b.toString('base64'),encoding:'base64'})});if(!r.ok)throw Error('Blob staging HTTP '+r.status);const result=await r.json();if(result.sha!==blob)throw Error('Git blob mismatch');receipt.push({path,sha:blob,digest});}
-          writeFileSync('receipt.json',JSON.stringify(receipt,null,2));
-          NODE
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with: {name: 'cos-team-blob-receipt-${{ github.sha }}', path: receipt.json, retention-days: 7}
