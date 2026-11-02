@@ -1,5 +1,5 @@
-# Final exact-head validation: no workdir patching, staging, ref writes or deployment.
-name: COS design Board unit navigation (no deploy)
+# Read-only completion review on the approved design branch. No deployment or writeback.
+name: COS design completion verification (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
@@ -12,54 +12,122 @@ concurrency:
 env:
   CI: 'true'
   COS_RUN_LIVE_SMOKE: '0'
+  COS_REVIEWED_SOURCE: fa02ce6c898543dfa144ca52d3dfb571a3cffecb
+defaults:
+  run:
+    shell: bash
+    working-directory: tech-checks/operations
 jobs:
-  verify:
+  build:
+    name: Exact source, typecheck and original build gate
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    defaults:
-      run: {shell: bash, working-directory: tech-checks/operations}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Verify attached candidate and unchanged protected runtime
+      - name: Verify source and preserve exact tracked files without Git credentials
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$COS_RUN_LIVE_SMOKE" = 0
-          git diff --exit-code e7e54d5512f62153d0f81067498b0e222aef272a HEAD -- .
-          git diff --exit-code b9d8a728f9212b204603f9a9ae5b46ed34e26973 HEAD -- src ':!src/BoardRecordDetails.tsx' ':!src/ApprovedBoardUnitLink.tsx' ':!src/approvedBoardUnitLink.ts' ../supabase ../app.js ../operations-host.js package.json package-lock.json proposals
-          mkdir -p ../../cos-unit-link-final
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-unit-link-final/source-sha.txt
-          node --input-type=module <<'NODE'
-          import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          const hashes={'src/BoardRecordDetails.tsx':'c2beb901bc364be020967922eb8932e768279a0910909f3c8902eb445501feaa','src/ApprovedBoardUnitLink.tsx':'eb728d229238a670361ef68b997454148f4c76bedbdc7e10dbeaf38c077b917b','src/approvedBoardUnitLink.ts':'bff69bce207c2038ceef6d8dbed3f003bc202aa52711016fa8e34b734a7e8a73','tests/approved-board-unit-link.test.mjs':'2addbc7c4418049fed90bda7a6b3e6a9bd2a0acb95b7d356201dc0e57002afc9','tests/approved-board-unit-link.browser.spec.mjs':'4300192d5ce37840308cb7eda6c3dea2ca44ac87e7f8d0f2cc7bc8de407e0189'};
-          for(const [file,hash]of Object.entries(hashes))if(createHash('sha256').update(readFileSync(file)).digest('hex')!==hash)throw Error('Attached source mismatch: '+file);
-          NODE
+          git diff --exit-code "$COS_REVIEWED_SOURCE" HEAD -- . ../supabase ../app.js ../operations-host.js
+          mkdir -p ../../cos-completion-source ../../cos-completion-build
+          git archive --format=tar.gz --output=../../cos-completion-source/tracked-source.tar.gz HEAD
+          git ls-tree -r HEAD > ../../cos-completion-source/git-tree.txt
+          git diff 38a4fb9e16a565d92fc5bd5c0e5a6f55e7337137 HEAD -- src tests proposals ../../docs/cos-approved-navigation > ../../cos-completion-source/design-source.patch
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-source/source-sha.txt
+          sha256sum ../../cos-completion-source/tracked-source.tar.gz > ../../cos-completion-source/archive.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-completion-source-${{ github.sha }}
+          path: cos-completion-source/
+          retention-days: 7
+          if-no-files-found: error
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Preserved original behavior and exact unit-link tests
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-board-actions.test.mjs tests/approved-tech-checks.test.mjs tests/approved-team-job-links.test.mjs tests/approved-board-unit-link.test.mjs proposals/board-unit-link/*.test.mjs 2>&1 | tee ../../cos-unit-link-final/unit.log
-      - name: Full TypeScript and original authentication-preservation check
+      - name: Full project typecheck and original authentication preservation
         run: |
-          npm run typecheck 2>&1 | tee ../../cos-unit-link-final/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-unit-link-final/auth.log
-      - name: Full application build and original unmodified artifact gate
+          npm run typecheck 2>&1 | tee ../../cos-completion-build/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-completion-build/auth.log
+      - name: Exact source-preservation adapters
         run: |
-          npm run build 2>&1 | tee ../../cos-unit-link-final/build.log
-          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-unit-link-final/artifact-gate.log
+          node tests/approved-shell-test-source.mjs check
+          node tests/approved-phone-navigation-source.mjs check
+          node tests/approved-more-drawer-source.mjs check
+      - name: Complete build and original unmodified compiled-artifact gate
+        run: |
+          npm run build 2>&1 | tee ../../cos-completion-build/build.log
+          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-completion-build/artifact-gate.log
+          git diff --exit-code HEAD -- .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cos-completion-build-${{ github.sha }}
+          path: cos-completion-build/
+          retention-days: 7
+          if-no-files-found: warn
+  unit:
+    name: Complete current unit suite and inactive identity resolver
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Complete existing synthetic unit suite without filtering or assertion changes
+        run: |
+          mkdir -p ../../cos-completion-unit
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-unit/source-sha.txt
+          npm test 2>&1 | tee ../../cos-completion-unit/unit.log
+      - name: Inactive server identity SQL and route proposal checks
+        if: ${{ !cancelled() }}
+        run: node --import tsx --test proposals/board-unit-link/tests/*.test.mjs 2>&1 | tee ../../cos-completion-unit/resolver.log
+      - name: Source and lockfile remain unchanged
+        if: always()
+        run: git diff --exit-code HEAD -- .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cos-completion-unit-${{ github.sha }}
+          path: cos-completion-unit/
+          retention-days: 7
+          if-no-files-found: warn
+  browser:
+    name: Full browser regression shard ${{ matrix.shard }} of 6
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build exact candidate and verify original artifact gate
+        run: |
+          mkdir -p ../../cos-completion-browser
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-browser/source-sha.txt
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
           git diff --exit-code HEAD -- .
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Board exact unit route original actions and Fleet evidence
-        run: npm run test:browser -- tests/approved-board-unit-link.browser.spec.mjs tests/approved-board-actions.browser.spec.mjs tests/approved-fleet-unit.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-unit-link-final/browser.log
-      - name: Retain results and screenshots including failures
+      - name: Full test distribution; stop this shard after fifteen failures without hiding them
+        run: npm run test:browser -- --shard=${{ matrix.shard }}/6 --workers=2 --retries=0 --max-failures=15 2>&1 | tee ../../cos-completion-browser/browser.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-unit-link-final-${{ github.sha }}
+          name: cos-completion-browser-${{ matrix.shard }}-${{ github.sha }}
           path: |
-            cos-unit-link-final/
+            cos-completion-browser/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
           retention-days: 7
