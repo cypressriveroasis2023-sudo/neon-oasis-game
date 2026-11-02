@@ -1,3 +1,4 @@
+import './approvedFleetUnit.css';
 import {approvedArea,approvedPrimaryAreas,type ApprovedIcon} from './approvedCosNavigation';
 
 export function ApprovedCosIcon({name}:{name:ApprovedIcon}) {
