@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,fresh,now} from './fleet-dashboard-fixtures.mjs';
 import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
@@ -22,7 +23,7 @@ for(const it of [false,true])test(`inline camera checks keep ${it?'IT':'Owner'} 
 for(const it of [false,true])test(`every Fleet tab has the compact COS theme for ${it?'IT':'Owner'}`,async({page})=>{
  const {app}=await mountFleet(page,it);for(const [label,view] of [['Fleet health','fleet'],['Location verification','verify'],['Needs setup','setup'],['Data sources','sources'],['Map','map']]){
   if(it&&view==='setup'){await expect(app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:label,exact:false})).toHaveCount(0);continue;}
-  await app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:label,exact:false}).click();
+  await openFleetView(app,new RegExp('^'+label));
   const board=app.locator('.cos-fleet-board');await expect(board).toHaveAttribute('data-fleet-view',view);await expect(board.locator('.cos-fleet-clock')).toBeHidden();
   expect(await board.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
   if(view!=='map'){await expect(board.locator('.cos-fleet-tab-summary')).not.toHaveAttribute('open','');await board.locator('.cos-fleet-tab-summary>summary').click();await expect(board.locator('.cos-fleet-stat-field')).toBeVisible();}

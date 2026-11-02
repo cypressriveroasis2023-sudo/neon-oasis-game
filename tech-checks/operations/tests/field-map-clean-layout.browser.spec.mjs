@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 // Isolated fixture only. All external traffic is blocked; counts and locations are synthetic.
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
@@ -37,7 +38,7 @@ test('canonical dashboard retains full fleet counts, bounded map, readable marke
  await frame.locator('.cos-fleet-unit-row').first().click();await expect(frame.getByRole('dialog')).toContainText('Solar Spotter 1');
  await frame.getByRole('button',{name:'Close unit details',exact:true}).click();
  await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(frame.getByRole('dialog')).toHaveCount(0);
- await frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Location verification/}).click();
+ await openFleetView(frame,/Location verification/);
  await expect(frame.getByRole('heading',{name:'Location verification · 309 units'})).toBeVisible();
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
  await page.screenshot({path:info.outputPath('unified-fleet-large-review.png')});

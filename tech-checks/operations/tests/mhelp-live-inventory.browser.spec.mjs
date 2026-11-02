@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,field,fresh} from './fleet-dashboard-fixtures.mjs';
 import {recordedRoster} from './fixtures/recorded-roster-fixtures.mjs';
@@ -16,7 +17,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} sees automatic API invento
  await app.locator('.cos-fleet-diagnostic-records > summary').click();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).locator('[aria-label="camera: Online"]')).toBeVisible();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Spotter 1'}).locator('[aria-label="camera: Offline"]')).toBeVisible();
- await app.getByRole('button',{name:/Data sources/}).click();const status=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(status).toContainText('mHelpDesk automatic inventory updates');await expect(status).toContainText('Last successful inventory update');
+ await openFleetView(app,/Data sources/);const status=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(status).toContainText('mHelpDesk automatic inventory updates');await expect(status).toContainText('Last successful inventory update');
  await page.screenshot({path:test.info().outputPath('automatic-mhelp-inventory.png'),fullPage:true});
  state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');
  expect(state.calls.every(c=>c.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);

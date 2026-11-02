@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
@@ -23,7 +24,7 @@ for(const it of [false,true])for(const width of [320,390,430])test(`${it?'IT':'O
  await anchored();
  for(const name of ['Fleet health','Location verification','Needs setup','Data sources']){
   if(it&&name==='Needs setup'){await expect(app.getByRole('button',{name:new RegExp('^'+name)})).toHaveCount(0);await anchored();continue;}
-  await app.getByRole('button',{name:new RegExp('^'+name)}).click();
+  await openFleetView(app,new RegExp('^'+name));
   await anchored();
   if(name==='Fleet health'){
    const table=app.locator('.cos-fleet-health-table table');

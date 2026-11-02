@@ -119,6 +119,7 @@ async function assignmentDialog(frame) {
   await frame.locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' }).click();
   const details = frame.getByRole('dialog', { name: 'Work details' });
   await expect(details).toBeVisible();
+  await details.locator('summary').filter({hasText:'Manage this work'}).click();
   await details.getByRole('button', { name: 'Schedule / Reassign' }).click();
   const dialog = frame.getByRole('dialog', { name: 'Schedule and reassign job' });
   await expect(dialog).toBeVisible();
@@ -233,12 +234,14 @@ test('Daily Board keeps the last snapshot when refresh fails and reports unverif
   expect(state.writes).toHaveLength(1);
   const card = frame.locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' });
   await card.click();
+  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
   await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
   await frame.getByRole('button', { name: 'Close details' }).click();
   state.failedPaths.add('/api/daily-board');
   await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
   await expect(frame.getByRole('alert').first()).toContainText('Showing the last successful snapshot.');
   await card.click();
+  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
   await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
   await frame.getByRole('button', { name: 'Close details' }).click();
   expect(state.writes).toHaveLength(1);

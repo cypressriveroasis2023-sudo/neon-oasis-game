@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {revealInstallationEvidence} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,field,vrm,now,fresh} from './fleet-dashboard-fixtures.mjs';
@@ -26,7 +27,7 @@ test('denied supporting read and session invalidation never retain current batte
 });
 
 test('source and setup tabs preserve the selected field scope and label unit counts accurately',async({page})=>{
- const {app}=await mountFleet(page);await app.getByLabel('Search units, customers, sites or addresses').fill('Helios');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-online')).toContainText('UNITS ONLINE');for(const name of [/Data sources/,/Needs setup/,/^.*Map$/]){await app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name}).click();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');}await expect(app.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Helios');await expect(app.getByLabel('Fleet placement')).toHaveValue('field');
+ const {app}=await mountFleet(page);await app.getByLabel('Search units, customers, sites or addresses').fill('Helios');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-online')).toContainText('UNITS ONLINE');for(const name of [/Data sources/,/Needs setup/,/^.*Map$/]){await openFleetView(app,name);await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');}await expect(app.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Helios');await expect(app.getByLabel('Fleet placement')).toHaveValue('field');
 });
 
 

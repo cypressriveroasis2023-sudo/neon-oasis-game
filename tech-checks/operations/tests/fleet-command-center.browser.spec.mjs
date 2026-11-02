@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
@@ -5,7 +6,7 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('all mHelp Field Product IDs remain visible with searchable system and health lists',async({page},testInfo)=>{
  const fixture=fieldProductFixture();
  const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await expect(board).toBeVisible();
  await expect(board).toContainText("These totals count equipment connectivity, not camera channels.");

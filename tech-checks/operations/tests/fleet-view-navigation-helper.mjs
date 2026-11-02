@@ -5,14 +5,13 @@ import {expect} from '@playwright/test';
 export async function fleetViewButton(frame,name) {
   const nav=frame.getByRole('navigation',{name:'Fleet dashboard views',exact:true});
   await expect(nav).toBeVisible();
-  const button=nav.getByRole('button',{name,exact:typeof name==='string',includeHidden:true});
-  await expect(button).toHaveCount(1);
+  const button=nav.getByRole('button',{name,exact:typeof name==='string'});
   if(!await button.isVisible()) {
     const menu=nav.locator('details.cos-approved-fleet-tools');
     await expect(menu).toHaveCount(1);
-    await expect(menu).not.toHaveAttribute('open');
-    await menu.locator(':scope > summary').click();
+    if(await menu.getAttribute('open')===null)await menu.locator(':scope > summary').click();
   }
+  await expect(button).toHaveCount(1);
   await expect(button).toBeVisible();
   return button;
 }

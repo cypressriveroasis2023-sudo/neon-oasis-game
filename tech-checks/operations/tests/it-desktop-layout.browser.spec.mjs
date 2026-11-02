@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
@@ -41,13 +42,13 @@ for(const view of views)test(view.name+' retains Fleet search and saved evidence
  await expect(dialog.getByRole('button',{name:'Move to Shop / ROOT',exact:true})).toBeVisible();
  await dialog.getByRole('button',{name:'Close unit details',exact:true}).click();
  if(view.management){
-  await tabs.getByRole('button',{name:/Needs setup/}).click();
+  await openFleetView(app,/Needs setup/);
   await expect(app.getByRole('heading',{name:'HELIOS 011',exact:true})).toBeVisible();
   await expect(app.getByRole('button',{name:'Register in COS inventory →',exact:true})).toBeVisible();
  }else{
   await expect(tabs.getByRole('button',{name:/Needs setup/})).toHaveCount(0);
   await expect(app.getByRole('button',{name:'Register in COS inventory →',exact:true})).toHaveCount(0);
-  await tabs.getByRole('button',{name:/Location verification/}).click();
+  await openFleetView(app,/Location verification/);
   await app.locator('.cos-fleet-review-grid article').filter({hasText:'Spotter 2'}).getByRole('button',{name:'View saved evidence →',exact:true}).click();
   const evidence=app.getByRole('dialog',{name:'Spotter 2 unit intelligence',exact:true});
   await expect(evidence).toBeVisible();
@@ -73,7 +74,7 @@ for(const view of views)test(view.name+' shows complete source evidence with CSV
   field:fixture.field,health:fixture.health,productConnections:fixture.connections,
  });
  const originalField=structuredClone(state.field);
- await app.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Data sources/}).click();
+ await openFleetView(app,/Data sources/);
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center',exact:true});
  await expect(board).toBeVisible();
  await expect(board.locator('.cos-command-rows .cos-command-row')).toHaveCount(7);

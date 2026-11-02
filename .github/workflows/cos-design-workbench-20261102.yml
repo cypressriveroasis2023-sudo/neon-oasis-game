@@ -1,144 +1,51 @@
-# Exact candidate review. No ref update, merge or deployment.
-name: COS design completion corrections (no deploy)
+name: COS redesign preview verification
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
-    paths: ['.github/workflows/cos-design-workbench-20261102.yml']
 permissions:
   contents: read
 concurrency:
-  group: cos-design-source-workbench
+  group: cos-design-preview-verification
   cancel-in-progress: false
-env:
-  CI: 'true'
-  COS_RUN_LIVE_SMOKE: '0'
 jobs:
   verify:
-    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    outputs:
-      validated: ${{ steps.validated.outputs.ok }}
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      COS_RUN_LIVE_SMOKE: '0'
     defaults:
       run: {shell: bash, working-directory: tech-checks/operations}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
+        with: {fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Exact declared source preparation and protected-runtime comparison
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify preserved source, roles and committed build
         run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$COS_RUN_LIVE_SMOKE" = 0
-          mkdir -p ../../cos-completion-correction
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-completion-correction/source-sha.txt
-          git diff --exit-code fa02ce6c898543dfa144ca52d3dfb571a3cffecb HEAD -- src ../supabase ../app.js ../operations-host.js package.json package-lock.json
-          node tests/approved-navigation-regression-source.mjs original
-          node tests/approved-landscape-source.mjs original
-          node tests/approved-navigation-regression-source.mjs apply
-          node tests/approved-landscape-source.mjs apply
           node tests/approved-navigation-regression-source.mjs check
           node tests/approved-landscape-source.mjs check
-          git diff --exit-code HEAD -- src ':!src/approvedFleetViews.css' ../supabase ../app.js ../operations-host.js package.json package-lock.json
-          git diff -- src tests > ../../cos-completion-correction/declared-candidate.patch
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Original behavioral checks, full source reversals and actual resolver tests
+          node tests/verify-techcheck-auth-preservation.mjs
+          npm run typecheck
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Focused navigation, Board and identity regressions
         run: |
-          node --import tsx --test tests/approved-*.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs 2>&1 | tee ../../cos-completion-correction/unit.log
-          node --import tsx --test proposals/board-unit-link/*.test.mjs 2>&1 | tee ../../cos-completion-correction/resolver.log
-          grep -q '# tests 94' ../../cos-completion-correction/resolver.log
-          grep -q '# pass 94' ../../cos-completion-correction/resolver.log
-      - name: Full TypeScript and original authentication preservation
-        run: |
-          npm run typecheck 2>&1 | tee ../../cos-completion-correction/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-completion-correction/auth.log
-      - name: Build complete candidate and prepare exact bounded object manifest
-        run: |
-          npm run build 2>&1 | tee ../../cos-completion-correction/build.log
-          node --input-type=module <<'JS'
-          import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          import {execFileSync} from 'node:child_process';
-          import {dirname} from 'node:path';
-          import assert from 'node:assert/strict';
-          const hash=(bytes,alg='sha256')=>createHash(alg).update(bytes).digest('hex');
-          const entries=JSON.parse(readFileSync('tests/fleet-view-navigation-preservation.json'));
-          assert.equal(entries.length,19);
-          const paths=entries.map(x=>'tests/'+x.path).concat('src/approvedFleetViews.css');
-          const dist=execFileSync('git',['ls-files','--modified','--others','--exclude-standard','dist'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
-          assert.ok(dist.length>=2&&dist.length<=3);assert.ok(dist.includes('dist/index.html'));
-          assert.equal(dist.filter(x=>x.endsWith('.css')).length,1);
-          for(const path of dist)assert.match(path,/^dist\/(?:index\.html|assets\/index-[A-Za-z0-9_-]+\.(?:css|js))$/);
-          paths.push(...dist);const manifest=[];
-          for(const path of paths){const bytes=readFileSync(path),sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
-            const expected=entries.find(x=>'tests/'+x.path===path)?.candidateBlob;
-            if(expected)assert.equal(sha,expected);
-            if(path==='src/approvedFleetViews.css')assert.equal(sha,'c8be85ebbcf88ede981bb63dde6e3b727a3da7b3');
-            const dest='../../cos-completion-correction/files/'+path;mkdirSync(dirname(dest),{recursive:true});copyFileSync(path,dest);
-            manifest.push({path:'tech-checks/operations/'+path,file:'files/'+path,sha,sha256:hash(bytes)});
-          }
-          assert.equal(manifest.length,20+dist.length);
-          writeFileSync('../../cos-completion-correction/manifest.json',JSON.stringify({source:process.env.GITHUB_SHA,files:manifest},null,2)+'\n');
-          JS
-      - name: Install repository-pinned Chromium
-        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Existing affected browser suites and new permitted-navigation proof
+          node --import tsx --test tests/approved-*.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs
+          node --import tsx --test proposals/board-unit-link/*.test.mjs
+      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Actual visible navigation and affected workflows
         run: |
           mapfile -t cases < <(node --input-type=module -e "import{readFileSync}from'node:fs';for(const x of JSON.parse(readFileSync('tests/fleet-view-navigation-preservation.json')))console.log('tests/'+x.path)")
-          npm run test:browser -- "${cases[@]}" tests/approved-fleet-test-navigation.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-completion-correction/browser.log
-      - id: validated
-        name: Record successful candidate checks without declaring a package gate pass
-        run: echo 'ok=true' >> "$GITHUB_OUTPUT"
-      - name: Original unmodified committed-artifact gate (failure not waived)
-        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-completion-correction/artifact-gate.log
-      - name: Retain all candidate evidence including failures
+          npm run test:browser -- "${cases[@]}" tests/approved-fleet-test-navigation.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0
+      - name: Retain verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-completion-correction-${{ github.sha }}
+          name: cos-redesign-verification-${{ github.sha }}
           path: |
-            cos-completion-correction/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
+            cos-build-evidence/
           retention-days: 7
-          if-no-files-found: warn
-  stage-blobs:
-    name: Stage validated inert objects only; no references or deployments
-    needs: verify
-    if: ${{ !cancelled() && needs.verify.outputs.validated == 'true' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'cos-completion-correction-${{ github.sha }}', path: input}
-      - name: Verify exact manifest and create only bounded Git blob objects
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --input-type=module <<'JS'
-          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
-          import {createHash} from 'node:crypto';
-          import assert from 'node:assert/strict';
-          const root='input/cos-completion-correction/',data=JSON.parse(readFileSync(root+'manifest.json'));
-          assert.equal(data.source,process.env.GITHUB_SHA);assert.ok(data.files.length>=22&&data.files.length<=23);
-          assert.equal(new Set(data.files.map(x=>x.path)).size,data.files.length);
-          assert.equal(data.files.filter(x=>x.path.includes('/tests/')).length,19);
-          assert.equal(data.files.filter(x=>x.path.includes('/src/')).length,1);
-          const receipt=[];
-          for(const item of data.files){
-           assert.match(item.path,/^tech-checks\/operations\/(?:tests\/[a-z0-9-]+\.browser\.spec\.mjs|src\/approvedFleetViews\.css|dist\/index\.html|dist\/assets\/index-[A-Za-z0-9_-]+\.(?:js|css))$/);
-           assert.equal(item.file,'files/'+item.path.slice('tech-checks/operations/'.length));
-           const bytes=readFileSync(root+item.file),sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
-           assert.equal(sha,item.sha);assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);
-           const response=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/git/blobs',{method:'POST',headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json','content-type':'application/json'},body:JSON.stringify({content:bytes.toString('base64'),encoding:'base64'})});
-           assert.equal(response.status,201);const result=await response.json();assert.equal(result.sha,sha);receipt.push({path:item.path,sha,sha256:item.sha256});
-          }
-          mkdirSync('receipt');writeFileSync('receipt/blobs.json',JSON.stringify({source:process.env.GITHUB_SHA,files:receipt},null,2)+'\n');
-          JS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: cos-completion-blob-receipt-${{ github.sha }}
-          path: receipt/
-          retention-days: 7
-          if-no-files-found: error

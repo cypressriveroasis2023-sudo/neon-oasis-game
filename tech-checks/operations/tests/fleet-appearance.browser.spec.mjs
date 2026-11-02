@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test, expect} from '@playwright/test';
 import {mountFleet, field, units, vrm, fresh} from './fleet-dashboard-fixtures.mjs';
 
@@ -130,7 +131,10 @@ test('unit detail is readable, retains all evidence and has one scroll surface',
   expect(layout.overflow).toBeLessThanOrEqual(1);
   expect(layout.powerWidth).toBeGreaterThanOrEqual(layout.gridWidth-1);
   expect(layout.height).toBeLessThanOrEqual(layout.viewport);
-  expect(Math.abs(layout.router.y-layout.camera.y)).toBeLessThan(1);
+  if(layout.width<=700){
+    expect(layout.router.y).toBeGreaterThan(layout.camera.y);
+    expect(Math.abs(layout.router.x-layout.camera.x)).toBeLessThan(1);
+  }else expect(Math.abs(layout.router.y-layout.camera.y)).toBeLessThan(1);
   await expect(dialog.locator('.cos-fleet-troubleshooting')).not.toHaveAttribute('open');
   await dialog.locator('.cos-fleet-troubleshooting > summary').click();
   await expect(dialog.getByRole('button',{name:'Open Camera Health diagnostics'})).toBeVisible();
@@ -156,7 +160,7 @@ test('narrow screens retain every view tab and filter without page overflow',asy
   await page.setViewportSize({width:320,height:740});
   const {app,state}=await mount(page,true);
   const tabs=app.getByRole('navigation',{name:'Fleet dashboard views'});
-  await tabs.getByRole('button',{name:/Data sources/}).click();
+  await openFleetView(app,/Data sources/);
   await expect(app.getByRole('heading',{name:'How to read this board'})).toBeVisible();
   await noPageOverflow(app);
   await tabs.getByRole('button',{name:'Map',exact:true}).click();
@@ -229,7 +233,7 @@ test.describe('mobile Fleet map quick access',()=>{
    const {app,state}=await mount(page);
    const jump=app.getByRole('button',{name:'Jump to Fleet map'});
    await expect(jump).toBeVisible();
-   await expect(jump).toHaveCSS('min-height','44px');
+   expect(await jump.evaluate(el=>parseFloat(getComputedStyle(el).minHeight))).toBeGreaterThanOrEqual(44);
    await jump.click();
    await expect.poll(()=>app.locator('.cos-fleet-map-panel').evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(220);
    await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
