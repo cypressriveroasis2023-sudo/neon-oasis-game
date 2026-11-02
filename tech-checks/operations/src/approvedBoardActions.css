@@ -6,7 +6,7 @@
   display:flex; flex-wrap:wrap; gap:12px; min-width:0; margin:0;
 }
 #root .operations-shell .daily-board-detail .cos-approved-board-actions button {
-  min-height:48px; max-width:100%; white-space:normal; overflow-wrap:anywhere;
+  min-height:48px!important; max-width:100%; white-space:normal; overflow-wrap:anywhere;
   line-height:1.4; text-align:center; box-sizing:border-box;
 }
 #root .operations-shell .daily-board-detail .cos-approved-board-management {
