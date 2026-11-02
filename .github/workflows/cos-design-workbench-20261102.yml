@@ -1,5 +1,5 @@
-# Read-only navigation integration checks, including already-open page continuity.
-name: COS design navigation integration (no deploy)
+# Approved design candidate only; no merge, ref update or deployment.
+name: COS design Fleet views (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
@@ -17,6 +17,8 @@ jobs:
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      stage: ${{ steps.source.outputs.applied == 'true' && steps.unit.outcome == 'success' && steps.types.outcome == 'success' && steps.package.outcome == 'success' && steps.browser.outcome == 'success' }}
     defaults:
       run:
         shell: bash
@@ -26,68 +28,125 @@ jobs:
         with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22.16.0'}
-      - name: Prove this continuation changes tests only and retains runtime and bundle
+      - name: Verify protected paths and apply only the exact reviewed view wrapper
+        id: source
         run: |
-          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git diff --exit-code ddf729a6712058c396761684d1e96ef15d9fc08c HEAD -- . ':!tests'
-          git diff --exit-code ddf729a6712058c396761684d1e96ef15d9fc08c HEAD -- ../supabase ../app.js ../operations-host.js
+          test "$COS_RUN_LIVE_SMOKE" = 0
+          git diff --exit-code 730e78a3f51e33a7d9209578ccbf77684563c1b8 HEAD -- ../supabase ../app.js ../operations-host.js package.json package-lock.json
+          git diff --exit-code 730e78a3f51e33a7d9209578ccbf77684563c1b8 HEAD -- src ':!src/FleetDashboard.tsx' ':!src/ApprovedFleetViews.tsx' ':!src/approvedFleetViews.css'
+          mkdir -p ../../cos-fleet-views-evidence
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-fleet-views-evidence/source-sha.txt
           node --input-type=module <<'JS'
-          import {execFileSync} from 'node:child_process';
-          import {readFileSync} from 'node:fs';
+          import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
           import assert from 'node:assert/strict';
-          const base='ddf729a6712058c396761684d1e96ef15d9fc08c';
-          const allowed=new Set(['.github/workflows/cos-design-workbench-20261102.yml','tech-checks/operations/tests/navigation-helper.mjs','tech-checks/operations/tests/fleet-first-navigation.browser.spec.mjs','tech-checks/operations/tests/approved-workspace-navigation.browser.spec.mjs']);
-          const paths=execFileSync('git',['diff','--name-only',base,'HEAD'],{encoding:'utf8'}).trim().split('\n');
-          for(const path of paths)assert.ok(allowed.has(path),'Unexpected change: '+path);
-          const path='tech-checks/operations/tests/fleet-first-navigation.browser.spec.mjs';
-          let original=execFileSync('git',['show',base+':'+path],{encoding:'utf8'});
-          const edits=[
-            ["toHaveText('Fleet Dashboard');","toHaveText(it?'Fleet Dashboard':'Fleet');"],
-            ["name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');","name:it?'Fleet Dashboard':'Fleet',exact:true})).toHaveAttribute('aria-current','page');"],
-            ["await nav.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();","await nav.getByRole('button',{name:'Fleet',exact:true}).click();"],
-            ["await nav.getByRole('button',{name:'Overview',exact:true}).click();","await openWorkspace(app,'Today');"]
-          ];
-          for(const [from,to] of edits){assert.equal(original.split(from).length-1,1);original=original.replace(from,to);}
-          assert.equal(readFileSync('tests/fleet-first-navigation.browser.spec.mjs','utf8'),original,'Only approved Owner navigation expectations may differ');
-          console.log(JSON.stringify({changedPaths:paths,runtimeUnchanged:true,originalOperationalAssertionsPreserved:true}));
+          const path='src/FleetDashboard.tsx';
+          let content=readFileSync(path,'utf8');
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const blob=b=>createHash('sha1').update('blob '+Buffer.byteLength(b)+'\0').update(b).digest('hex');
+          let applied=false;
+          if(blob(content)==='497804d708b885789ab0dce6ee7af7c7c7e0e58e'){
+            const old="<nav className='cos-fleet-tabs' aria-label='Fleet dashboard views'>";
+            assert.equal(content.split(old).length-1,1);
+            const line=content.split('\n').find(s=>s.includes(old));assert.equal(line.split('</nav>').length-1,1);
+            const replacement=line.replace(old,'<ApprovedFleetViews compact={ownerManagementEnabled}>').replace('</nav>','</ApprovedFleetViews>');
+            content="import ApprovedFleetViews from './ApprovedFleetViews';\n"+content.replace(line,replacement);
+            writeFileSync(path,content);applied=true;
+          }
+          assert.equal(hash(content),'024f485ab04e567a396a3b4c6caecfab10d6d01b67582ad46256021a5e83e653');
+          appendFileSync(process.env.GITHUB_OUTPUT,'applied='+applied+'\n');
           JS
-          mkdir -p ../../cos-navigation-integration
-          printf '%s\n' "$GITHUB_SHA" > ../../cos-navigation-integration/source-sha.txt
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Preserve focused navigation Board TV and unit regressions
-        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs 2>&1 | tee ../../cos-navigation-integration/unit.log
+      - name: Existing protected-source checks plus new Fleet grouping tests
+        id: unit
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs 2>&1 | tee ../../cos-fleet-views-evidence/unit.log
       - name: Full typecheck and original technician authentication preservation
+        id: types
         run: |
-          npm run typecheck 2>&1 | tee ../../cos-navigation-integration/typecheck.log
-          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-navigation-integration/auth.log
-      - name: Rebuild and verify original committed artifact without changing it
+          npm run typecheck 2>&1 | tee ../../cos-fleet-views-evidence/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-fleet-views-evidence/auth.log
+      - name: Canonical full build and independent candidate byte comparison
+        id: package
         run: |
-          npm run build 2>&1 | tee ../../cos-navigation-integration/build.log
-          node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-navigation-integration/artifact-gate.log
-          git diff --exit-code HEAD -- .
+          npm run build 2>&1 | tee ../../cos-fleet-views-evidence/build.log
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
+          import {dirname} from 'node:path';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const files={
+           'src/FleetDashboard.tsx':'024f485ab04e567a396a3b4c6caecfab10d6d01b67582ad46256021a5e83e653',
+           'dist/index.html':'fcf71b110a971ff81bfbef914a01556121031550965bb5426bea5dc4c1358a5b',
+           'dist/assets/index-DH4U4k6b.js':'8bbae01d9aa772b1fd00e860fb851820c5ae89ef0c7e39b21daae7bf2d15cc3d',
+           'dist/assets/index-CKRqGtUt.css':'8d1a891c449bbf0513d26b33efa165c5dd2870c2bd3606074705cefdfaae5ae7'
+          };
+          for(const [path,sha256] of Object.entries(files)){
+           assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'),sha256,path);
+           const destination='../../cos-fleet-views-evidence/package/'+path;mkdirSync(dirname(destination),{recursive:true});copyFileSync(path,destination);
+          }
+          writeFileSync('../../cos-fleet-views-evidence/candidate.json',JSON.stringify({source:process.env.GITHUB_SHA,releaseApproved:false,files},null,2));
+          JS
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - name: Exercise actual menus and unchanged destination assertions at all three widths
-        run: >-
-          npm run test:browser --
-          tests/approved-workspace-navigation.browser.spec.mjs
-          tests/fleet-first-navigation.browser.spec.mjs
-          tests/vrm.browser.spec.mjs
-          tests/routers.browser.spec.mjs
-          tests/directories.browser.spec.mjs
-          tests/finance.browser.spec.mjs
-          tests/owner-watchful-shortcut.browser.spec.mjs
-          --workers=2 --retries=0
-          2>&1 | tee ../../cos-navigation-integration/browser.log
-      - name: Preserve evidence including failures
+      - name: Full-App Fleet tools exact-unit opening and existing navigation at three widths
+        id: browser
+        run: npm run test:browser -- tests/approved-fleet-views.browser.spec.mjs tests/approved-fleet-unit.browser.spec.mjs tests/approved-tool-search.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-fleet-views-evidence/browser.log
+      - name: Original committed-artifact gate (failure is not waived)
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-fleet-views-evidence/artifact-gate.log
+      - name: Retain evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-navigation-integration-${{ github.sha }}
+          name: cos-fleet-views-${{ github.sha }}
           path: |
-            cos-navigation-integration/
+            cos-fleet-views-evidence/
             tech-checks/operations/test-results/
             tech-checks/operations/playwright-report/
           retention-days: 7
           if-no-files-found: warn
+  stage-blobs:
+    needs: verify
+    if: ${{ always() && needs.verify.outputs.stage == 'true' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cos-fleet-views-${{ github.sha }}
+          path: evidence
+      - name: Stage four exact verified Git objects only; never update a ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const base='evidence/cos-fleet-views-evidence/';
+          const candidate=JSON.parse(readFileSync(base+'candidate.json','utf8'));
+          assert.equal(candidate.source,process.env.GITHUB_SHA);assert.equal(candidate.releaseApproved,false);
+          const expected={
+           'src/FleetDashboard.tsx':'024f485ab04e567a396a3b4c6caecfab10d6d01b67582ad46256021a5e83e653',
+           'dist/index.html':'fcf71b110a971ff81bfbef914a01556121031550965bb5426bea5dc4c1358a5b',
+           'dist/assets/index-DH4U4k6b.js':'8bbae01d9aa772b1fd00e860fb851820c5ae89ef0c7e39b21daae7bf2d15cc3d',
+           'dist/assets/index-CKRqGtUt.css':'8d1a891c449bbf0513d26b33efa165c5dd2870c2bd3606074705cefdfaae5ae7'
+          };assert.deepEqual(candidate.files,expected);
+          const files=[];
+          for(const [path,sha256] of Object.entries(expected)){
+           const bytes=readFileSync(base+'package/'+path);assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256);
+           const response=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/git/blobs',{method:'POST',headers:{authorization:'Bearer '+process.env.GH_TOKEN,'content-type':'application/json',accept:'application/vnd.github+json'},body:JSON.stringify({content:bytes.toString('base64'),encoding:'base64'})});
+           assert.equal(response.status,201);const object=await response.json();assert.equal(object.sha,createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex'));
+           files.push({path:'tech-checks/operations/'+path,sha:object.sha,sha256});
+          }
+          writeFileSync('blob-receipt.json',JSON.stringify({source:process.env.GITHUB_SHA,files},null,2));
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-fleet-view-blobs-${{ github.sha }}
+          path: blob-receipt.json
+          retention-days: 7
