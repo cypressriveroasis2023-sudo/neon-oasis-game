@@ -3,6 +3,8 @@ import { hasOpenGoBack } from './deliveryGoBackData';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { boardDateLabel, chicagoDay, dailyBoardCards, isTestRecord, readinessSummary, type BoardCard, type BoardScope } from './dailyBoardData';
 import './dailyBoard.css';
+import BoardRecordDetails from './BoardRecordDetails';
+import {captureBoardSelection} from './boardRecordDetails';
 import { createBoardReader, createBoardAssignmentSaver, type BoardSnapshot } from './boardPersistence';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import TechCheckTvBoard from './TechCheckTvBoard';
@@ -46,7 +48,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
   const [tv,setTv]=useState(initialTv??launch.enabled);
   const [rotation,setRotation]=useState(0);
   useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(','),tvSettings.settings.rotationSeconds]);
-  const [selected,setSelected]=useState<BoardCard|null>(null);
+  const [selected,setSelected]=useState<(BoardCard & {detailAsOf:string|null})|null>(null);
   const [dragged,setDragged]=useState<BoardCard|null>(null);
   const [assigning,setAssigning]=useState<BoardCard|null>(null);
   const [assignment,setAssignment]=useState<AssignmentDraft>({date:'',startTime:'08:00',endTime:'10:00',technician:''});
@@ -256,7 +258,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
       return <section key={name} className={'daily-board-person'+(name==='Unassigned'?' unassigned':'')+(dropReady?' drop-ready':'')} aria-label={name} onDragOver={e=>{if(dropReady)e.preventDefault();}} onDrop={()=>dropOn(name)}>
         <h3><span>{name}</span><b>{items.length}</b>{technician&&<small>{technician.department.toUpperCase()}</small>}</h3>
         {tv&&pages>1&&<small className='daily-board-page'>Page {page+1} of {pages} · Rotates every 15 seconds</small>}
-        {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(card)}>
+        {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(captureBoardSelection(card,snapshot.asOf))}>
           <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.kind==='job'?(card.record.completionKind==='visit'?'COMPLETED VISIT':'COS JOB'):'ASSIGNED TASK'}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
           <strong>{card.title}</strong>
           {hasOpenGoBack(card.record)&&<b className='daily-board-card-note'>GO-BACK REQUIRED · Ticket open</b>}
@@ -277,10 +279,8 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
       <small>{selected.kind==='job'?'COS JOB':'OWNER TASK'} · {selected.priority.toUpperCase()}</small>
       <h3>{selected.title}</h3>
       <p>{[selected.reference,selected.site].filter(Boolean).join(' · ')}</p>
-      <p>{selected.assignee} · {selected.status} · {boardDateLabel(selected.date)}</p>
-      <p>{selected.kind==='job'?[selected.record.jobType,selected.record.equipment,selected.record.equipmentUnitTag].filter(Boolean).join(' · '):selected.record.instructions||''}</p>
+      <BoardRecordDetails card={selected} sourceUnavailable={Boolean(error||stale)} close={()=>setSelected(null)}/>
       {selected.record.completionKind!=='visit'&&<DeliveryGoBackSummary job={selected.record}/>}
-      {jobNotes(selected)&&<p className='daily-board-detail-note'>{jobNotes(selected)}</p>}
       <div className='daily-board-actions'>{canManage(selected)&&<button disabled={busy||refreshRequired} onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&!hasOpenGoBack(selected.record)&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></div>
     </section></dialog>}
 
