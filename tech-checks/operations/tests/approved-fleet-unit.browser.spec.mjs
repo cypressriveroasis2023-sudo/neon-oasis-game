@@ -54,10 +54,11 @@ test('existing IT drawer is not restyled or granted Owner navigation',async({pag
 });
 
 test('camera status and saved time remain independent for online offline and unverified records',async({page})=>{
- const {app,state}=await mountFleet(page);const states=[];
+ const {app,state}=await mountFleet(page);const states=[],classes=[];
  for(const name of ['Helios 1','Spotter 1','Spotter 2']){
-  const drawer=await open(app,name),camera=drawer.locator('.cos-fleet-camera-card');states.push(await camera.locator('.camera-unit-state').innerText());
+  const drawer=await open(app,name),camera=drawer.locator('.cos-fleet-camera-card');states.push(await camera.locator('.camera-unit-state').innerText());classes.push(await camera.locator('.camera-unit-state').getAttribute('class'));
   await expect(camera.locator(':scope > small').first()).not.toBeEmpty();await drawer.getByRole('button',{name:'Close unit details',exact:true}).click();
  }
- expect(states[0]).toMatch(/online/i);expect(states[1]).toMatch(/offline/i);expect(states[2]).toMatch(/unverified/i);safe(state);
+ expect(states).toEqual(['Camera records online','Camera outage observed','Camera status unverified']);
+ for(const [index,status] of ['online','offline','unknown'].entries())expect(classes[index].split(/\s+/)).toContain('camera-status-'+status);safe(state);
 });
