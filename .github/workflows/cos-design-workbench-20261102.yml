@@ -35,6 +35,7 @@ jobs:
           git diff --exit-code e50a4b63811c5eb2704ef68a63b1b8c0a92d9c4d HEAD -- src ':!src/ApprovedBoardActions.tsx' ':!src/approvedBoardActions.css'
           test "$(git hash-object src/DailyBoard.tsx)" = 0734601d3a4e5d0f18128c1cfb8197d1f50ee834
           test "$(git hash-object tests/board-record-details.test.mjs)" = fc1a2873e579c4588602a3e77bf94e836e0f84e1
+          test "$(git hash-object src/approvedBoardActions.css)" = cbb9799bc62e3e5ab9381af5fbdde5374761db1b
           python - <<'PY'
           from pathlib import Path
           p=Path('src/DailyBoard.tsx');s=p.read_text()
@@ -65,10 +66,10 @@ jobs:
         id: build
         run: |
           npm run build 2>&1 | tee ../../cos-board-candidate/build.log
-          printf '%s\n' '319b9cda9c832242633a54589c0ea007a901b041134376d3775fa23acd90127f  dist/index.html' 'b60a4826b86f1444837baa36067823e9f2ce7d064f9297d98bba1c8c6437e82e  dist/assets/index-Gizqz7GE.js' '2a9865a208acf32b0a165b3272b2c848fbb981fd31aa3e6b904531afd80b92ba  dist/assets/index-Dzi1oI7O.css' | sha256sum --check
+          printf '%s\n' 'a8528d24a49e624f5219b1a687d37e5d11d9ef95fdfdcdb8034507cd57b8cc81  dist/index.html' 'b60a4826b86f1444837baa36067823e9f2ce7d064f9297d98bba1c8c6437e82e  dist/assets/index-DH3TUQ9n.js' 'e02e429a900f4713810722e8d0602c1bb80e9c992eed8d72131d6e1e4495ea73  dist/assets/index-BrnUPkGR.css' | sha256sum --check
           mkdir -p ../../cos-board-candidate/payload/dist/assets
           cp dist/index.html ../../cos-board-candidate/payload/dist/
-          cp dist/assets/index-Gizqz7GE.js dist/assets/index-Dzi1oI7O.css ../../cos-board-candidate/payload/dist/assets/
+          cp dist/assets/index-DH3TUQ9n.js dist/assets/index-BrnUPkGR.css ../../cos-board-candidate/payload/dist/assets/
           git diff --exit-code HEAD -- package-lock.json
       - name: Install repository-pinned Chromium
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
@@ -106,7 +107,7 @@ jobs:
           assert.equal(process.env.GITHUB_REPOSITORY,'cypressriveroasis2023-sudo/neon-oasis-game');
           assert.equal(process.env.GITHUB_REF,'refs/heads/design/cos-approved-navigation-20261101');
           assert.equal(readFileSync('verified/cos-board-candidate/source-sha.txt','utf8').trim(),process.env.GITHUB_SHA);
-          const expected={'src/DailyBoard.tsx':'32879e05ce3d0b95971dc8e225ebbbb7de2752f32ef322038175389b6a93a6fd','tests/board-record-details.test.mjs':'80c30f7190b553a965d23ff5ac098472e80b6b1f985e07fadd88fe3ee5d95763','dist/index.html':'319b9cda9c832242633a54589c0ea007a901b041134376d3775fa23acd90127f','dist/assets/index-Gizqz7GE.js':'b60a4826b86f1444837baa36067823e9f2ce7d064f9297d98bba1c8c6437e82e','dist/assets/index-Dzi1oI7O.css':'2a9865a208acf32b0a165b3272b2c848fbb981fd31aa3e6b904531afd80b92ba'};
+          const expected={'src/DailyBoard.tsx':'32879e05ce3d0b95971dc8e225ebbbb7de2752f32ef322038175389b6a93a6fd','tests/board-record-details.test.mjs':'80c30f7190b553a965d23ff5ac098472e80b6b1f985e07fadd88fe3ee5d95763','dist/index.html':'a8528d24a49e624f5219b1a687d37e5d11d9ef95fdfdcdb8034507cd57b8cc81','dist/assets/index-DH3TUQ9n.js':'b60a4826b86f1444837baa36067823e9f2ce7d064f9297d98bba1c8c6437e82e','dist/assets/index-BrnUPkGR.css':'e02e429a900f4713810722e8d0602c1bb80e9c992eed8d72131d6e1e4495ea73'};
           const files=Object.entries(expected).map(([path,digest])=>{const bytes=readFileSync('verified/cos-board-candidate/payload/'+path);assert.equal(createHash('sha256').update(bytes).digest('hex'),digest);return {path,bytes,sha:createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex')};});
           const receipt=[];
           for(const file of files){const response=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/git/blobs',{method:'POST',headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({encoding:'base64',content:file.bytes.toString('base64')})});assert.equal(response.status,201);const data=await response.json();assert.equal(data.sha,file.sha);receipt.push({path:'tech-checks/operations/'+file.path,sha:data.sha});}
