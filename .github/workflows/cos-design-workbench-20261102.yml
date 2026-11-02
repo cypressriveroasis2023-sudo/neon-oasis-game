@@ -1,4 +1,4 @@
-# Read-only navigation integration checks; no runtime edits or publishing.
+# Read-only navigation integration checks, including already-open page continuity.
 name: COS design navigation integration (no deploy)
 on:
   push:
