@@ -1,3 +1,4 @@
+import ApprovedCheckManagement from './ApprovedCheckManagement';
 import { openLegacy } from './api';
 
 // These destinations retain the original authenticated checks and saved evidence.
@@ -26,8 +27,8 @@ export default function TechChecksWorkspace() {
     <p className='tech-check-record-note'>Equipment check-in, check-out and transfers stay in your existing workflow. Required checks, photos and signatures still apply. Service jobs are created in mHelp.</p>
     <h3>Handoffs &amp; follow-up</h3>
     <div className='operations-tool-grid'>{tools.filter(tool=>['handoffs','attention','history'].includes(tool.route)).map(tool=><button type='button' className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div>
-    <details className='cos-approved-tool-group'><summary>Manage Tech Checks</summary>
+    <ApprovedCheckManagement>
       <div className='operations-tool-grid'>{tools.filter(tool=>!['handoffs','attention','history'].includes(tool.route)).map(tool=><button type='button' className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div>
-    </details>
+    </ApprovedCheckManagement>
   </section>;
 }

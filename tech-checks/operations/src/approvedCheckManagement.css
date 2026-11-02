@@ -1,0 +1,45 @@
+/* Existing Owner Tech Check hub only; never the original technician forms or TV. */
+#root .operations-shell.cos-approved-shell .cos-approved-checks {
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .panelhead {
+  flex-wrap:wrap;
+  gap:8px 16px;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid > button {
+  min-width:0;
+  min-height:88px !important;
+  box-sizing:border-box;
+  text-align:left;
+  align-items:flex-start;
+  justify-content:center;
+  overflow-wrap:anywhere;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .tech-check-record-note {
+  margin:16px 0;
+  line-height:1.6;
+  overflow-wrap:anywhere;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .cos-approved-check-management > summary {
+  min-height:52px !important;
+  cursor:pointer;
+  line-height:1.5;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks .cos-approved-check-management[open] > summary {
+  border-bottom:1px solid #cdd6e0;
+  margin-bottom:14px;
+}
+@media (max-width:700px) {
+  #root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid {
+    grid-template-columns:minmax(0,1fr);
+  }
+  #root .operations-shell.cos-approved-shell .cos-approved-checks .panelhead > * {
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+}
