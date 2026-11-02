@@ -47,5 +47,19 @@ test('restricted IT keeps its two original destinations and never exposes Owner 
  await expect(app.locator('.cos-approved-shell')).toHaveCount(0);
  await expect(app.getByRole('region',{name:'Operations workspaces',exact:true})).toHaveCount(0);
  await expect(app.getByRole('searchbox',{name:'Find a tool',exact:true})).toHaveCount(0);
- await expect(app.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button')).toHaveText(['Fleet Dashboard','Camera Health']);safe(state);
+ const mobile=page.viewportSize().width<=700;
+ if(mobile)await app.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).getByRole('button',{name:'More',exact:true}).click();
+ await expect(app.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button')).toHaveText(['Fleet Dashboard','Camera Health']);
+ if(mobile)await menu(app).getByRole('button',{name:/Close menu/}).click();safe(state);
+});
+
+
+test('requesting the already open power page preserves selection and adds no saved read',async({page})=>{
+ const {app,state}=await mountFleet(page);
+ await openWorkspace(app,'Victron VRM');
+ await expect(app.getByRole('navigation',{name:'Helios installations',exact:true}).getByRole('button')).toHaveCount(2);
+ await app.getByRole('button',{name:'Next Helios unit',exact:true}).click();
+ const selected=app.getByRole('definition').filter({hasText:/^\d+$/});await expect(selected).toHaveText('1011');
+ const reads=state.calls.length;await openWorkspace(app,'Victron VRM');
+ await expect(selected).toHaveText('1011');expect(state.calls.length).toBe(reads);safe(state);
 });

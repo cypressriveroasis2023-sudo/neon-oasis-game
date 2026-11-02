@@ -24,7 +24,31 @@ export async function openWorkspace(frame, workspace) {
   const nav = await menu.isVisible() ? menu.getByRole('navigation', { name: 'COS Operations', exact: true })
     : await mobile.isVisible() ? mobile : sidebar;
 
-  if (!(await frame.locator('.cos-approved-shell').count())) {
+  const approved = Boolean(await frame.locator('.cos-approved-shell').count());
+  if (!approved) await expect(frame.getByRole('navigation', { name: 'COS Operations', exact: true, includeHidden: true })
+    .getByRole('button', { name: restrictedLabels[workspace] || workspace, exact: true, includeHidden: true })).toHaveCount(1);
+
+  // A caller may already have opened this workspace through its bookmark.
+  // Do not leave it for More and remount it: that adds an artificial saved read
+  // and resets selection. Read the URL only; never assign or inject a hash.
+  const routeAliases = {
+    Today: ['today', 'overview', 'dashboard'],
+    'Field Map': ['fleet-dashboard', 'field-map', 'field-view', ''],
+    'Field View': ['fleet-dashboard', 'field-map', 'field-view', ''],
+    'Fleet Dashboard': ['fleet-dashboard', 'field-map', 'field-view', ''],
+    'Daily Board': ['daily-board', 'dispatch-board'],
+    'Victron VRM': ['victron-vrm', 'victron-power'],
+    Invoices: ['invoices', 'billing'], Billing: ['billing', 'invoices'],
+  };
+  const keys = routeAliases[workspace] || [workspace.toLowerCase().replaceAll(' ', '-')];
+  const currentKey = await frame.locator('body').evaluate(() => location.hash.replace(/^#/, '').split('?')[0]);
+  if (keys.includes(currentKey)) {
+    if (await menu.isVisible()) await menu.getByRole('button', { name: /Close menu/ }).click();
+    await expect(frame.locator('main')).toBeVisible();
+    return;
+  }
+
+  if (!approved) {
     // Keep IT's existing restricted destinations. Missing entries must fail;
     // this helper never mounts an Owner tool to get around a denied route.
     const label = restrictedLabels[workspace] || workspace;
