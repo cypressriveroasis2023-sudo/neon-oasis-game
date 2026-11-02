@@ -1,5 +1,5 @@
-# Read-only workbench for the approved existing-app design branch; never a publisher.
-name: COS design source workbench (no deploy)
+# Isolated approved navigation candidate; no merge, ref update, or deployment.
+name: COS design More navigation workbench (no deploy)
 on:
   push:
     branches: [design/cos-approved-navigation-20261101]
@@ -9,43 +9,121 @@ permissions:
 concurrency:
   group: cos-design-source-workbench
   cancel-in-progress: false
+env:
+  CI: 'true'
+  COS_RUN_LIVE_SMOKE: '0'
 jobs:
-  prepare:
+  verify:
     if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
+    outputs:
+      needs_stage: ${{ steps.patch.outputs.needs_stage }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.16.0'
-      - name: Prepare tracked source without repository credentials or published bundles
+      - name: Apply only the exact reviewed mobile More class correction
+        id: patch
+        run: |
+          set -euo pipefail
+          mkdir -p ../../cos-more-evidence
+          git diff --exit-code d92aa7dcdb80bdbcbd59587402cab372d1fcc7e4 -- . ':!src/App.tsx' ':!src/OperationsAreas.tsx' ':!src/approvedToolSearch.ts' ':!src/approvedCosToolSearch.css' ':!tests/approved-tool-search.test.mjs' ':!tests/approved-tool-search.browser.spec.mjs' ':!dist'
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const path='src/App.tsx',raw=readFileSync(path),blob=b=>createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`),b])).digest('hex');
+          const before='c0a9de4091a114c5ed4c1c47b507eed7ef8db1b0',after='340003125f6376b5512524f5ad1e91acf4d7f8e5',needs=blob(raw)!==after;
+          if(needs){assert.equal(blob(raw),before);const old="className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}",replacement=old.replace("?'active'","?'cos-approved-selected'");const text=raw.toString();assert.equal(text.split(old).length,2);writeFileSync(path,text.replace(old,replacement));}
+          assert.equal(blob(readFileSync(path)),after);
+          appendFileSync(process.env.GITHUB_OUTPUT,`needs_stage=${needs}\n`);
+          writeFileSync('../../cos-more-evidence/source-sha.txt',process.env.GITHUB_SHA+'\n');
+          JS
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check all focused navigation, Board, TV and new search tests
+        run: node --import tsx --test tests/approved-cos-navigation.test.mjs tests/approved-navigation-cascade.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs tests/approved-tool-search.test.mjs 2>&1 | tee ../../cos-more-evidence/unit.log
+      - name: Full typecheck and original technician authentication preservation
+        run: |
+          npm run typecheck 2>&1 | tee ../../cos-more-evidence/typecheck.log
+          node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-more-evidence/auth.log
+      - name: Build the complete application and match independently built bytes
+        run: |
+          npm run build 2>&1 | tee ../../cos-more-evidence/build.log
+          git diff --exit-code HEAD -- package-lock.json
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const expected={'src/App.tsx':'93dc01e47065e1bb44c013b99b43ee30c121b2a3c398060c72b5abc667c7b0ad','dist/index.html':'94e6046ac6f1a0eb6747136e3f6f614c55ea6ce0983a38ec5c64b5903ce02fe4','dist/assets/index-KnHt5PIf.css':'8f551bf286f3f0a79e5c37588cc0a9d5c445f358d68d96e40b010ef783d9aeba','dist/assets/index-BQyqhIRj.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa'};
+          for(const [path,digest]of Object.entries(expected))assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'),digest,path);
+          writeFileSync('../../cos-more-evidence/verified-manifest.json',JSON.stringify({commit:process.env.GITHUB_SHA,releaseApproved:false,files:expected},null,2)+'\n');
+          JS
+          tar -czf ../../cos-more-evidence/candidate.tar.gz src/App.tsx dist/index.html dist/assets/index-KnHt5PIf.css dist/assets/index-BQyqhIRj.js
+      - name: Install the project-pinned Chromium
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Exercise actual full-app More search at all three configured widths
+        run: npm run test:browser -- tests/approved-tool-search.browser.spec.mjs --workers=2 --retries=0 2>&1 | tee ../../cos-more-evidence/browser.log
+      - name: Unmodified committed-artifact gate on attached candidate
+        if: ${{ steps.patch.outputs.needs_stage == 'false' }}
+        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-more-evidence/artifact-gate.log
+      - name: Preserve evidence, including any failed assertions
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-more-evidence-${{ github.sha }}
+          path: |
+            cos-more-evidence/
+            tech-checks/operations/test-results/
+            tech-checks/operations/playwright-report/
+          retention-days: 7
+          if-no-files-found: warn
+  stage-blobs:
+    needs: verify
+    if: ${{ needs.verify.result == 'success' && needs.verify.outputs.needs_stage == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cos-more-evidence-${{ github.sha }}
+          path: evidence
+      - name: Stage only four independently verified Git blobs; never update a ref
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          mkdir -p cos-design-workbench
-          printf '%s\n' "$GITHUB_SHA" > cos-design-workbench/source-sha.txt
-          git ls-tree -r HEAD -- tech-checks .github/scripts > cos-design-workbench/source-tree.txt
-          git ls-files -z -- tech-checks .github/scripts | python3 -c 'import sys; paths=sys.stdin.buffer.read().split(b"\0"); sys.stdout.buffer.write(b"\0".join(p for p in paths if p and b"/dist/" not in p and not p.rsplit(b"/",1)[-1].startswith(b".env"))+b"\0")' > "$RUNNER_TEMP/cos-design-source-paths"
-          tar --null -T "$RUNNER_TEMP/cos-design-source-paths" -czf cos-design-workbench/source.tar.gz
-      - name: Install only the existing locked tools, with install scripts disabled
-        working-directory: tech-checks/operations
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Retain exact development tools for offline source editing
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --exit-code HEAD -- tech-checks/operations/package-lock.json
-          tar -C tech-checks/operations -czf cos-design-workbench/locked-tools.tar.gz node_modules
-          sha256sum cos-design-workbench/source.tar.gz cos-design-workbench/locked-tools.tar.gz tech-checks/operations/package-lock.json > cos-design-workbench/SHA256SUMS
-          node --version > cos-design-workbench/node-version.txt
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,tarfile,urllib.request,base64
+          expected={'src/App.tsx':'93dc01e47065e1bb44c013b99b43ee30c121b2a3c398060c72b5abc667c7b0ad','dist/index.html':'94e6046ac6f1a0eb6747136e3f6f614c55ea6ce0983a38ec5c64b5903ce02fe4','dist/assets/index-KnHt5PIf.css':'8f551bf286f3f0a79e5c37588cc0a9d5c445f358d68d96e40b010ef783d9aeba','dist/assets/index-BQyqhIRj.js':'d85fedb070f5dd6357a54f8bef986aca5ecfd8ba732ac572295f5197dcf4e0fa'}
+          matches=list(pathlib.Path('evidence').rglob('candidate.tar.gz'));assert len(matches)==1
+          receipt=[]
+          with tarfile.open(matches[0]) as t:
+              assert sorted(t.getnames())==sorted(expected)
+              for path,digest in expected.items():
+                  member=t.getmember(path);assert member.isfile()
+                  data=t.extractfile(member).read();assert hashlib.sha256(data).hexdigest()==digest
+                  payload=json.dumps({'content':base64.b64encode(data).decode(),'encoding':'base64'}).encode()
+                  request=urllib.request.Request('https://api.github.com/repos/cypressriveroasis2023-sudo/neon-oasis-game/git/blobs',data=payload,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='POST')
+                  with urllib.request.urlopen(request,timeout=30) as response: result=json.load(response)
+                  blob=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest();assert result['sha']==blob
+                  receipt.append({'path':'tech-checks/operations/'+path,'sha':blob,'sha256':digest})
+          pathlib.Path('receipt.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'files':receipt},indent=2)+'\n')
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cos-design-workbench-${{ github.sha }}
-          path: cos-design-workbench/
-          retention-days: 1
-          if-no-files-found: error
+          name: cos-more-blob-receipt-${{ github.sha }}
+          path: receipt.json
+          retention-days: 7
