@@ -1,0 +1,45 @@
+name: Verify COS TV cadence follow-up
+on:
+  push:
+    branches: [design/cos-approved-navigation-20261101]
+    paths:
+      - tech-checks/operations/tests/tech-check-tv.browser.spec.mjs
+      - .github/workflows/cos-tv-cadence-followup.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CI: 'true'
+      COS_RUN_LIVE_SMOKE: '0'
+    defaults:
+      run: {shell: bash, working-directory: tech-checks/operations}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - name: Prove unchanged runtime and package
+        run: |
+          git diff --exit-code 10ad20aa89f1a9ee25a3c736b433e6a8d71a621a HEAD -- src dist ../supabase ../app.js ../operations-host.js package.json package-lock.json
+          test "$COS_RUN_LIVE_SMOKE" = 0
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - run: node tests/verify-techcheck-auth-preservation.mjs
+      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Verify existing TV label and saved-read retry boundaries
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "TV link fills the host|initial field-map HTTP546 retries|persistent initial HTTP546" --workers=2 --retries=0
+      - name: Retain all check results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-tv-cadence-${{ github.sha }}
+          path: |
+            tech-checks/operations/test-results/
+            tech-checks/operations/playwright-report/
+            cos-build-evidence/
+          retention-days: 7
