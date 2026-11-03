@@ -11,7 +11,7 @@ begin
  with wanted as materialized (
   select r,ord from jsonb_array_elements(p_records) with ordinality x(r,ord)
   where (r->'binding' is null or r->'binding'='null'::jsonb)
-   and coalesce(r->>'holdReason','') in ('api_equipment_label_changed',
+   and coalesce(r->>'holdReason','') in ('','api_equipment_label_changed',
     'Product ID identity label changed; confirm before linking',
     'Prior reviewed scoped identity or assignment requires Owner installation review',
     'Source assignment or protection changed; Owner installation review required')
@@ -28,7 +28,7 @@ begin
        and coalesce(r->'apiAssignment'->>'serviceLocationId','')~'^[1-9][0-9]{0,14}$'))
  ), original_batches as materialized (
   select b.* from cos_mhelp_placement_private.upload_batches b
-  where b.receipt->>'contract'='COS_MHELP_UPLOAD_V1' and b.receipt->>'reviewed'='true'
+  where b.receipt->>'contract'='COS_MHELP_UPLOAD_V1'
    and b.receipt->>'sourceSha256'=b.source_sha256
    and b.payload_sha256=encode(sha256(convert_to(jsonb_build_object('receipt',b.receipt,'records',b.records)::text,'UTF8')),'hex')
  ), history as materialized (
@@ -38,9 +38,13 @@ begin
   join wanted w on w.r->>'productId'=h->>'productId'
   join cos_mhelp_placement_private.links l on l.equipment_id=h->>'productId'
   join app_private.cos_geocode_sources s on s.product_id=l.equipment_id and s.tracker_id=l.tracker_id
-   and s.native_unit_id is not distinct from l.native_unit_id and s.source_revision=l.source_revision
-   and s.active and s.source_system='mhelpdesk_product_import'
+   and ((l.native_unit_id is null and s.entity_kind='tracker') or (s.entity_kind='equipment_unit' and s.native_unit_id=l.native_unit_id))
+   and s.source_system='mhelpdesk_product_import'
+   and ((s.active and s.source_revision=l.source_revision) or (w.r->>'placement'='SHOP' and cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id)))
   where h->'binding'->>'matchMethod'='reviewed_product_id'
+   and h->'binding'->'reviewEvidence'->>'review_state' in ('confirmed','held')
+   and l.reviewed_at is not null and l.authorization_sha256~'^[a-f0-9]{64}$'
+   and h->'binding'->'reviewEvidence'->>'reviewed_product_id'=l.equipment_id
    and h->'binding'->>'productId'=l.equipment_id
    and h->'binding'->>'trackerId'=l.tracker_id::text
    and h->'binding'->>'nativeUnitId' is not distinct from l.native_unit_id::text
@@ -48,7 +52,7 @@ begin
    and h->'binding'->>'nativeLabel' is not distinct from l.native_label
    and lower(regexp_replace(h->>'category','[[:space:]]','','g'))=lower(regexp_replace(w.r->>'category','[[:space:]]','','g'))
    and w.r->'apiAssignment'->'placementProof'->'model'=coalesce(to_jsonb(l.model),'null'::jsonb)
-   and l.baseline_guard=cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id)
+   and (l.baseline_guard=cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id) or (w.r->>'placement'='SHOP' and cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id)))
    and not exists(select 1 from app_private.cos_geocode_sources other where other.active and other.product_id<>l.equipment_id
       and (other.tracker_id=l.tracker_id or other.native_unit_id=l.native_unit_id))
    and not exists(select 1 from jsonb_array_elements(p_records) other where other->>'productId'<>l.equipment_id
