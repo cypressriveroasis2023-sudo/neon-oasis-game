@@ -12,5 +12,6 @@ export default function VrmEnergyFlow({row,now,paused=false}:{row?:SafeVrmPower;
   <div className='cos-energy-node cos-energy-hub'><span aria-hidden='true'>▰</span><small>Helios energy</small><strong>Victron</strong></div>
   <div className={'cos-energy-line'+(flowing(load)?' is-flowing':'')} aria-hidden='true'><i/><i/><i/></div>
   <div className='cos-energy-node'><span aria-hidden='true'>⚡</span><small>DC load</small><strong>{label(load)}</strong></div>
+  <small className='cos-energy-flow-caption'>{paused||row?.errorCode?'Saved power · refresh unavailable':!solar&&!load?'Waiting for saved power': [solar,load].some(r=>r&&!readingIsFresh(r,now))?'Stale saved power · animation paused':'Saved power · follows fleet sync'}</small>
  </div>;
 }

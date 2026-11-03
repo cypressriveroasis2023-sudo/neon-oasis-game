@@ -7,11 +7,11 @@ for(const it of [false,true])test(`Helios card embeds matching saved energy dash
  power.power[0].measurements.push({metric:'solar_power',value:220,unit:'W',instance:0,source:'system',observedAt:fresh},{metric:'load_power',value:82,unit:'W',instance:0,source:'system',observedAt:fresh});
  const {app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections,vrm:power,skipInitialFieldCount:true});
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ await expect(board.locator('.cos-field-helios-energy .is-flowing')).toHaveCount(2);
  await board.getByRole('button',{name:'View helios →',exact:true}).click();
- const card=board.locator('.cos-equipment-grid article').filter({has:app.getByRole('heading',{name:'Helios 1',exact:true})}).first();
  const dashboard=board.getByRole('region',{name:'HELIOS 001 read-only power dashboard'});
  await expect(dashboard).toBeVisible();await expect(dashboard).toContainText('220');await expect(dashboard).toContainText('82');
- await expect(board.getByText('Dashboard sharing enabled',{exact:false})).toBeVisible();
+ await expect(board.locator('.cos-equipment-grid').getByText('Dashboard sharing enabled',{exact:false})).toBeVisible();
  await expect(dashboard.locator('.is-flowing')).toHaveCount(2);
  expect(await dashboard.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
  await dashboard.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('helios-integrated-victron.png'),fullPage:true});
