@@ -101,8 +101,8 @@ test('identity changed while hidden cannot reuse the healthy prior Owner fingerp
  const {app,state,initialSessions}=await mount(page);await hideForLegacy(page,app);state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';await page.evaluate(()=>window.syntheticSession='synthetic-session-b');
  // The synthetic host retains its iframe to exercise the child's additional identity check.
  // The real host's separate source tests require destroying it on an actual account change.
- // The next automatic saved-data read is due after fifteen minutes, not four.
- await page.clock.runFor(15*60000-1);expect(await reasons(app)).toEqual([]);expect(state.sessionReads).toBe(initialSessions);
+ // The next automatic saved-data read is due after ten minutes, not four.
+ await page.clock.runFor(10*60000-1);expect(await reasons(app)).toEqual([]);expect(state.sessionReads).toBe(initialSessions);
  await page.clock.runFor(1);await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);await page.evaluate(()=>document.querySelector('iframe').hidden=false);await blocked(app);readOnly(state);
 });
 test('late old GPS callbacks cannot expose a captured unit in the global toast during or after recovery',async({page})=>{

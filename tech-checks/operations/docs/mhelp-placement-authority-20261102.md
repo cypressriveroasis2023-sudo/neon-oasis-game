@@ -40,3 +40,29 @@ mHelp precedence for newer assignments before enabling any reverse tracker
 worker. Verify real naturally occurring Field-to-Shop and Shop-to-Field changes
 through COS inventory, map membership and tracker readback. Never make a fake
 production move or clear manual edits merely to demonstrate a successful run.
+
+
+## Product-ID and freshness diagnosis
+
+The diagnostic run at10:37PM completed with295 source_unverified,
+77 manual_sheet_change and62 sheet_identity_changed. A fresh read of the
+2027 Product-ID index and bounded equipment identity columns resolves every
+one of434 bindings to exactly one current indexed unit. Precisely62 bound
+positions/labels differ; no fuzzy or IP match is needed. No bindings or
+spreadsheet cells have been changed by this diagnosis.
+
+The source predicate previously considered only the oldest cached customer/site
+metadata clock, despite a new complete equipment assignment pass. The additive
+SQL proof path instead requires a fresh complete accepted mHelp API snapshot,
+exact unique Product ID, full label/model, matching confirmed customer/service/
+placement/site, active lifecycle and unheld source, with unchanged native guard
+and no operational override. The existing20-minute actual source/control window
+and separate3-hour metadata limits remain. No timestamp is rewritten. Existing
+fresh direct observations retain their prior path. A read-only production preview
+returns415 eligible and19 held, compared with0 eligible under the old predicate.
+This is eligibility, not a claim of writes, Field movements or two-way sync.
+
+The guarded migration refuses any unexpected installed definition. Tests cover
+unchanged metadata clocks,19 identity/assignment/metadata mutations, duplicate
+Product IDs, stale/failed/paused/incomplete/superseded source, native guard and
+operational override rejection, old-path compatibility and migration drift.

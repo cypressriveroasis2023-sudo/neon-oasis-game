@@ -1,0 +1,52 @@
+{
+  "reviewed": true,
+  "status": "Engineering encoding bridge established from current stored keys, reviewed native binding and full-census uniqueness; not production activation",
+  "inventorySourceSha256": "511c53aad122977375441c665aec2f379bfd414dd4009ce36ac7fe729dcc6ed1",
+  "inventorySavedAt": "2026-11-02T21:36:08.2917+00:00",
+  "records": [
+    {
+      "productId": "2300342",
+      "equipmentKey": "solar_spotter:53",
+      "family": "Solar Spotter",
+      "unitTag": "53",
+      "nativeUnitId": "3316ab55-4f24-49c5-9d8e-9751e06e1da3",
+      "trackerId": "f9cea33a-bc56-4c9b-ab1b-ff0a98a73c3d",
+      "reviewedNativeCanonicalKey": "SOLAR SPOTTER:53",
+      "matchMethod": "reviewed_product_id",
+      "guardCurrent": true,
+      "bindingEvidenceSha256": "70b17163812cbe22b72da84e90785ef02084c6d6b3f088bb5b1c2783fb1cda3f",
+      "representationEvidenceSha256": "72b9d73ce8fde3e276ae88729b38cd93f47c8f60e6398ee82ba7aa7903cc927c",
+      "placement": "SHOP",
+      "bridgeEvidence": "Exact stored key encoding and unique canonical/native census; no display-label or IP matching"
+    }
+  ],
+  "held": [
+    {
+      "productId": "2300344",
+      "candidateEquipmentKey": "solar_spotter:54",
+      "placement": "SHOP",
+      "reason": "No native binding; not eligible for admission. Candidate legacy key is a review lead only."
+    }
+  ],
+  "evidenceChecked": [
+    "Current complete native cos_mhelp_inventory_baseline binding and saved timestamp",
+    "Exact legacy equipment_master primary keys, family, unit tag and source timestamp",
+    "No native Owner crosswalk claim for these Product IDs or SS053 native ID",
+    "No native provider match for SS053 native ID",
+    "No identity_binding_receipts row for either Product ID"
+  ],
+  "releaseScope": [
+    "solar_spotter:50",
+    "solar_spotter:51",
+    "solar_spotter:52",
+    "solar_spotter:53",
+    "solar_spotter:54",
+    "solar_spotter:55"
+  ],
+  "legacyCensus": {
+    "records": 762,
+    "encodedRecords": 724,
+    "solarSpotterRecords": 61,
+    "solarSpotterEncodedRecords": 61
+  }
+}

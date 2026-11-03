@@ -21,7 +21,11 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact 
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 test('late connection read failure is visible and removes retained exact checks',async({page})=>{
- const f=fieldProductFixture();const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true});
+ const f=fieldProductFixture();
+ // No independent provider observation may mask removal of retained TCP proof.
+ // Keep the exact native/resource identities and all failure assertions intact.
+ f.health.rows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,status:'unknown',observedAt:null,lastOnlineAt:null}}));
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true});
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  let release;state.proofGate=new Promise(resolve=>{release=resolve;});
  await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
