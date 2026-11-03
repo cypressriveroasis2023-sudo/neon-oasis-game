@@ -14,7 +14,7 @@ for(const it of [false,true])test(`Helios card embeds matching saved energy dash
  await expect(board.locator('.cos-equipment-grid').getByText('Dashboard sharing enabled',{exact:false})).toBeVisible();
  await expect(dashboard.locator('.is-flowing')).toHaveCount(2);
  expect(await dashboard.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
- await dashboard.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('helios-integrated-victron.png'),fullPage:true});
+ await dashboard.scrollIntoViewIfNeeded();await dashboard.screenshot({path:testInfo.outputPath('helios-integrated-victron.png')});
  await page.emulateMedia({reducedMotion:'reduce'});
  await expect(dashboard.locator('.is-flowing i').first()).toHaveCSS('animation-name','none');
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
