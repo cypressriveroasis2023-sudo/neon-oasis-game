@@ -144,8 +144,12 @@ for(const it of [false,true])test((it?'IT':'Owner')+' health headline selections
  expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 
-test('required TCP source failure makes connectivity Unknown without losing or moving any Product IDs',async({page})=>{
- const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
+test('TCP source failure with no provider observations makes connectivity Unknown without losing or moving any Product IDs',async({page})=>{
+ const f=fieldProductFixture();
+ // Exact identities remain verified, but no independent provider observation
+ // may hide the loss of the completed direct-connection proof in this case.
+ f.health.rows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,status:'unknown',observedAt:null,lastOnlineAt:null}}));
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
  const before=structuredClone(state.field);
@@ -159,4 +163,19 @@ test('required TCP source failure makes connectivity Unknown without losing or m
  expect(state.field).toEqual(before);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);
+});
+
+
+test('TCP source failure retains separately reviewed provider evidence with explicit labels and the same Product IDs',async({page})=>{
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
+ const before=structuredClone(state.field);
+ state.productConnections=null;await app.locator('.cos-fleet-refresh').click();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('4');
+ await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
+ await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('1');
+ const list=app.getByRole('region',{name:'Field inventory health breakdown'});
+ for(const product of ['1001','1002'])await expect(list.locator('details > ul > li').filter({hasText:'Product '+product})).toContainText('Provider-reported, not direct-connection verified.');
+ expect(state.field).toEqual(before);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });

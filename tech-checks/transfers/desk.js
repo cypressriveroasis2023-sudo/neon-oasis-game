@@ -1,4 +1,5 @@
 import '../tech-check-rules.js';
+import {matchesEquipment,equipmentHold,equipmentEligible} from './equipment-search.js';
 import {createDailySignoff,newSignature,signatureJpeg,hasSignatureInk} from '../service-signoff-ui.js';
 import {normalizeManifest,receiptDifferences,latestReceiptEvent,canRecordReceipt,TRANSFER_STATEMENT,INTAKE_CHECKS,transferTitle,TRANSFER_PURPOSES,transferPurposeLabel,hasTransferPurpose,installationBatteryPlan} from './model.js';
 import {transferClient,deviceDraft,transferJpeg} from './client.js';
@@ -20,6 +21,7 @@ function loadStyle(){if(document.querySelector('[data-transfer-style]'))return;c
 export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}){
  loadStyle();root.classList.add('tc-transfer');root.setAttribute('aria-label',role==='it'?'IT equipment check in and check out':'Equipment received from IT');
  const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
+ const picker={query:'',selected:''};
  const current=()=>!disposed&&client.current()&&root.isConnected;
  const guard=()=>{client.assert();if(disposed||!root.isConnected)throw new Error('This transfer screen is no longer active.');};
  const message=(text,error=false)=>{if(!current())return;if(!statusNode?.isConnected){statusNode=element('p','','tc-status');root.append(statusNode);}statusNode.textContent=text;statusNode.setAttribute('role',error?'alert':'status');};
@@ -250,8 +252,21 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    if(draft.purpose==='truck_replenishment')form.append(element('p','Truck replenishment — add these units to the truck. Spare batteries are counted separately in the daily truck inventory.','tc-purpose-note'));
    if(draft.purpose==='installation')form.append(element('p','Installation — prepare the equipment and its required installation battery package.','tc-purpose-note'));
    const recipient=element('select');recipient.required=true;recipient.setAttribute('aria-label','Receiving Service technician');recipient.append(new Option('Choose Service technician',''));for(const tech of data.technicians)recipient.append(new Option(tech.name,tech.id));recipient.value=draft.serviceActor;recipient.onchange=()=>{draft.serviceActor=recipient.value;changed();};form.append(label('Hand off to',recipient));
-   const equipment=element('select');equipment.setAttribute('aria-label','Select equipment');equipment.append(new Option('Choose a saved Shop unit',''));for(const item of data.equipment){const option=new Option((item.unit_name||item.family+' '+item.unit_tag)+(item.hold_reason?' · '+item.hold_reason:item.reserved?' · already held':!item.supported?' · check mapping required':item.tracker_state!=='shop'?' · not Shop':''),item.equipment_key);option.disabled=item.reserved||!item.supported||item.tracker_state!=='shop';equipment.append(option);}
-   form.append(label('Equipment',equipment),button('Add unit to handoff',()=>{if(!hasTransferPurpose(draft.purpose))return message('Choose the handoff purpose first.',true);const e=data.equipment.find(i=>i.equipment_key===equipment.value);if(!e)return message('Select an available Shop unit.',true);if(draft.items.some(i=>i.equipment_key===e.equipment_key))return message('That unit is already included.',true);if(draft.items.length>=20)return message('Use at most 20 units.',true);const plan=installationBatteryPlan(e.workflow_type||e.family);draft.items.push({equipment_key:e.equipment_key,family:e.family,unit_tag:e.unit_tag,workflow_type:e.workflow_type,simText:'',batteryText:draft.purpose==='installation'&&plan.count===0?'0':'',batteryConfiguration:plan.configuration,partsText:'',checks:{},missing:false});changed();render(transfer);},true));
+   const search=element('input');search.type='search';search.setAttribute('aria-label','Search equipment');search.placeholder='Unit number, name or keywords';search.value=picker.query;
+   const equipment=element('select');equipment.setAttribute('aria-label','Select equipment');equipment.onchange=()=>{picker.selected=equipment.value;};
+   const results=element('p');results.setAttribute('role','status');results.setAttribute('aria-live','polite');
+   const holds=element('ul');holds.setAttribute('aria-label','Equipment hold reasons');
+   const filter=()=>{
+    const matches=data.equipment.filter(item=>matchesEquipment(item,picker.query));
+    equipment.replaceChildren(new Option(matches.length?'Choose a saved Shop unit':'No matching equipment',''));holds.replaceChildren();
+    for(const item of matches){const name=item.unit_name||item.family+' '+item.unit_tag,reason=equipmentHold(item);const option=new Option(name+(reason?' · '+reason:''),item.equipment_key);option.disabled=!equipmentEligible(item);equipment.append(option);if(reason&&picker.query.trim())holds.append(element('li',name+' — '+reason));}
+    if(!matches.some(item=>item.equipment_key===picker.selected&&equipmentEligible(item)))picker.selected='';
+    equipment.value=picker.selected;
+    results.textContent=matches.length+' matching units · '+matches.filter(equipmentEligible).length+' available. '+(!matches.length?'Try another number or name.':'Held units cannot be selected.');
+   };
+   search.oninput=()=>{picker.query=search.value;filter();};search.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();equipment.focus();}};filter();
+   form.append(label('Search equipment',search),button('Clear equipment search',()=>{picker.query='';search.value='';filter();search.focus();},true),results,holds);
+   form.append(label('Equipment',equipment),button('Add unit to handoff',()=>{if(!hasTransferPurpose(draft.purpose))return message('Choose the handoff purpose first.',true);const e=data.equipment.find(i=>i.equipment_key===equipment.value);if(!equipmentEligible(e))return message(e?equipmentHold(e):'Select an available Shop unit.',true);if(draft.items.some(i=>i.equipment_key===e.equipment_key))return message('That unit is already included.',true);if(draft.items.length>=20)return message('Use at most 20 units.',true);const plan=installationBatteryPlan(e.workflow_type||e.family);draft.items.push({placement_evidence:e.placement_evidence,equipment_key:e.equipment_key,family:e.family,unit_tag:e.unit_tag,workflow_type:e.workflow_type,simText:'',batteryText:draft.purpose==='installation'&&plan.count===0?'0':'',batteryConfiguration:plan.configuration,partsText:'',checks:{},missing:false});changed();render(transfer);},true));
   }else{
    form.append(element('strong',transferPurposeLabel(draft.purpose),'tc-purpose'),element('p',`${transfer.it_name} → ${transfer.service_name}`),element('small','Handoff '+transfer.id));
    if(draft.purpose==='truck_replenishment')form.append(element('p','Confirm the equipment you received. Spare batteries are counted separately in your daily truck inventory.','tc-purpose-note'));
@@ -304,6 +319,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    let photos;
    if(!draft.request){
     const items=normalizeManifest(draft.items.filter(i=>!i.missing).map(item=>itemInput(item,draft.purpose)),{allowEmpty:draft.kind==='receipt',purpose:draft.purpose,requirePlan:draft.kind==='checkout'});
+    if(draft.kind==='checkout')for(const item of items){const proof=draft.items.find(i=>i.equipment_key===item.equipment_key)?.placement_evidence;if(proof)item.placement_evidence=proof;}
     if(!draft.signature.confirmed)throw new Error('Sign and confirm the accuracy statement.');
     const name=context.getProfile()?.full_name||context.getProfile()?.username||'';const sig={method:draft.signature.method,name:draft.signature.method==='typed'?draft.signature.typedName:name,confirmed:true};
     if(sig.name.trim().replace(/\s+/g,' ').toLowerCase()!==name.trim().replace(/\s+/g,' ').toLowerCase())throw new Error('Use the name on your signed-in account.');

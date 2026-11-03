@@ -7,7 +7,7 @@ export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',TEST_IT='05bf20fe-19f7-4d
 export const OWNER='00000000-0000-4000-8000-000000000004';
 const linkedIT=new Map([[IT,{name:'Synthetic IT',actorId:'d0757b64-9623-4adc-afff-21cc7853e88a'}],[TEST_IT,{name:'Test IT',actorId:'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'}]]);
 const root=new URL('../../../',import.meta.url).pathname;
-export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0}={}){
+export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0,placementEvidence=false}={}){
  const itIdentity=linkedIT.get(itActor);if(!itIdentity)throw Error('Unknown synthetic IT identity');
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create schema app_private;
@@ -49,6 +49,20 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  }
  if(legacyHandoff)await db.exec(purposeMigration);
  await db.exec(await readFile(root+'database-maintenance/techcheck-owner-handoff-resolution-v1.sql','utf8'));
+ if(placementEvidence){
+  for(const file of ['storage.sql','wiring.sql'])await db.exec(await readFile(root+'operations/transfer-placement-review/'+file,'utf8'));
+  const {projectTransferPlacement}=await import('../../transfer-placement-review/projectPlacement.mjs');
+  const equipment=(await db.query('select * from equipment_master order by equipment_key')).rows;
+  const source={contract:'COS_MHELP_API_V1',origin:'mhelpdesk_api',complete:true,reviewed:true,sourceSha256:'a'.repeat(64),apiSync:{enabled:true,lastSuccessAt:new Date().toISOString()},records:equipment.map((e,i)=>({productId:String(1001+i),placement:'SHOP',lifecycle:'UNFLAGGED',binding:{productId:String(1001+i),nativeUnitId:'synthetic-native-'+i,guardCurrent:true,expectedGuard:'b'.repeat(64)}}))};
+  const crosswalk={reviewed:true,revision:'c'.repeat(64),records:equipment.map((e,i)=>({productId:String(1001+i),nativeUnitId:'synthetic-native-'+i,equipmentKey:e.equipment_key,family:e.canonical_family,unitTag:e.unit_tag}))};
+  await db.query("select set_config('test.jwt_role','service_role',false)");
+  await db.exec('set role service_role');
+  await db.query('select public.cos_admit_transfer_placement_v1(0,$1)',[projectTransferPlacement(source,crosswalk)]);
+  await db.exec('reset role');await db.query("select set_config('test.jwt_role','',false)");
+  await db.exec("update equipment_master set tracker_state='field_or_unknown'");
+ }
+
+
  if(rollout==='missing')await db.exec('drop function public.techcheck_transfer_readiness_v1()');
  if(rollout==='disabled')await db.exec('update app_private.techcheck_transfer_settings set enabled=false');
  if(rollout==='reports-held')await db.exec('update app_private.techcheck_transfer_settings set reports_ready=false');
