@@ -29,6 +29,7 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
       <h5>{label}</h5>{metric === 'battery_soc' && readings.length > 1 && <p className='vrm-native-multiple'>Separate source readings · no combined charge</p>}
       {readings.length ? readings.map((reading,index) => <div className='vrm-native-reading' key={reading.source+':'+reading.instance+':'+index}>
         <strong className='vrm-native-value'>{reading.value.toLocaleString(undefined,{maximumFractionDigits:2})}<small> {reading.unit}</small></strong>
+        {metric==='battery_soc'&&<meter className='cos-energy-charge' min={0} max={100} low={20} optimum={80} value={reading.value} aria-label={'Saved battery charge · '+reading.source+' '+reading.instance}>{reading.value}%</meter>}
         <p><span className={readingIsFresh(reading,now)?'':'vrm-native-warning'}>{readingIsFresh(reading,now)?'Saved reading':'Stale'} · {time(reading.observedAt)}</span><span className='vrm-native-source'>{reading.source} · instance {reading.instance}</span></p>
       </div>) : <><strong className='vrm-native-value'>—</strong><p>Not reported</p></>}
     </article>)}</div>

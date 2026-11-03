@@ -23,7 +23,7 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const matches=key?.startsWith('HELIOS|')?power.filter(r=>canonicalCameraUnit(r.name)===key):[];
   const p=matches.length===1&&vrm.items.filter((item:{name:string})=>canonicalCameraUnit(item.name)===key).length===1&&units.filter(u=>canonicalCameraUnit(u.unitNumber)===key).length===1?matches[0]:null;
   const installation=p?vrm.items.find((item:VrmUnit)=>item.installationId===p.installationId&&canonicalCameraUnit(item.name)===key):null;
-  const vrmInstallation:VrmUnit|null=installation?{...installation,embedUrl:validVrmEmbed(installation.embedUrl,installation.installationId)?installation.embedUrl:null}:null;
+  const vrmInstallation:VrmUnit|null=installation?{...installation,embedUrl:installation.sharingEnabled!==false&&installation.available!==false&&validVrmEmbed(installation.embedUrl,installation.installationId)?installation.embedUrl:null}:null;
   let batteryState:Signal='not_available',batteryPercent:number|null=null,batteryReadings:BatteryReading[]=[];
   const batteryReadIssue=key?.startsWith('HELIOS|')?(p?.errorCode||vrm?.sync?.error||vrm?.sync?.state==='error'?'Latest Victron read unavailable':vrm?.sync?.state==='stale'?'Victron sync is stale':null):null;
   if(key?.startsWith('HELIOS|')){
