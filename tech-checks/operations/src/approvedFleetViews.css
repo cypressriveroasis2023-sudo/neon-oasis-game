@@ -1,7 +1,7 @@
 /* Owner Fleet navigation only: the original view buttons keep their callbacks and count text. */
 #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views {
  display:grid;
- grid-template-columns:minmax(72px,.7fr) minmax(110px,1fr) minmax(125px,1.25fr);
+ grid-template-columns:repeat(4,minmax(0,1fr));
  position:relative;
  z-index:501;
  gap:8px;
@@ -68,7 +68,7 @@
 }
 @media(max-width:750px) {
  #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-views {
-  grid-template-columns:minmax(0,.65fr) minmax(0,1fr) minmax(0,1.25fr);
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:6px;
   padding:6px 0;
  }
@@ -77,6 +77,7 @@
   padding:8px;
   font-size:13px;
  }
+ #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tools { grid-column:1/-1; }
  #root#root .cos-approved-shell .cos-fleet-board .cos-approved-fleet-tool-buttons { grid-template-columns:minmax(0,1fr); }
  #root#root .cos-approved-shell .cos-fleet-board .cos-fleet-map-jump {
   position:static;
