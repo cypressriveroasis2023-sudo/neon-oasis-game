@@ -1,0 +1,9 @@
+{
+  "baseVersion": 64,
+  "baseArchiveSha256": "12bf99331377e33a69eca36359a489c00d0da75265d1d41de4b1c6d2e06238c1",
+  "verifyJwt": false,
+  "fileName": "camera-health-sweep/index.ts",
+  "expectedBefore": "b81455a4f0b1efc9f2480c0e390beb4c8cfad5ccbf4864ca6d65ec9c1559cf65",
+  "expectedAfter": "e9d5614a44cb93eb4ccc45d05fa8e1725812478525a01f61f2c4cc74f06f284b",
+  "overlaySha256": "e2ddf8ca49d2ef672d443712427a16805ef87a872f79ac5867a72e87ac83c83f"
+}
