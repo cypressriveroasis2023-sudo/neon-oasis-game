@@ -128,7 +128,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   // Saved map reads can exceed 30s. Owner actions have a75s native admission
   // bound including authentication. These are observation limits, never retry grants.
   const connectionCheck = method === 'POST' && /^\/api\/camera-health\/devices\/[0-9]+\/check$/.test(path);
-  const timeoutMs = connectionCheck ? 60000 : ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
+  const timeoutMs = method==='POST'&&path==='/api/product-connections/verify' ? 100000 : connectionCheck ? 60000 : ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
   const controller = new AbortController();
   let abortKind: 'timeout' | 'cancelled' | null = null;
   const cancel = () => { abortKind ??= 'cancelled'; controller.abort(); };

@@ -1,0 +1,25 @@
+{
+  "description": "Explicit Owner/IT Product-ID Verify now action. Current protected mHelp/tracker source admits saved IP/port checks, rechecks sources, and confirms persisted evidence. No inventory, IP, port, ownership or activation settings changed.",
+  "project": "tughscoxralhofrckvxy",
+  "beforeVersion": 140,
+  "beforeArchive": "890913b8680925c618d2404eeab3d1c3535e345129d4e341987077ed3fe631ff",
+  "afterVersion": 141,
+  "afterArchive": "b4bed31c13da584f72a8e75e3b962f04ab0ecdbdcd07679c935b192adca30767",
+  "verifyJwtUnchanged": true,
+  "allServedFilesVerified": true,
+  "newFile": "tech-checks/supabase/functions/cos-operations-pages/productVerifyNow.ts",
+  "patch": {
+    "file": "serve.ts",
+    "prepend": "import {verifyProductsNow} from './productVerifyNow.ts';\n",
+    "needle": "if(path==='/api/product-tcp-proof'||path==='/api/product-tcp-preview'){",
+    "insertBefore": "\nif(path==='/api/product-connections/verify'){\n if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail16('An active COS Owner or verified IT account is required.',403);\n if(method!=='POST'||new URL(request.url).search)fail16('Use an explicit POST for verification.',405);\n try{\n  if(body===null)body=await requestBody(request);\n  const read=async(signal)=>{\n   const bounded=CosProductTcpDisabledStage.cancellableIo(Date.now()+24000,Date.now,signal);\n   const [full,checks]=await bounded.request(s=>Promise.all([\n    CosProductTcpDisabledStage.createProtectedSourceReader(cosProductSourceContext(context))(s),\n    legacyAll('camera_health_current?select=camera_device_id,port_status&order=camera_device_id.asc',context.headers,s)\n   ]),24000);\n   const source=await CosProductTcpDisabledStage.productResourceMembership(full);\n   const byId=new Map(checks.map(r=>[String(r.camera_device_id),r]));\n   if(byId.size!==checks.length)throw Error('Saved checks have conflicting identities.');\n   const devices=full.identitySources.devices;\n   return {census:source.census,tracker:full.tracker,devices,endpoints:devices.map(d=>({deviceId:d.id,publicIp:d.public_ip,expectedPorts:d.expected_ports,connectionRevision:d.connection_revision,monitoringEnabled:d.monitoring_enabled,activationState:d.activation_state,portStatus:byId.get(String(d.id))?.port_status||null}))};\n  };\n  return json(await verifyProductsNow(body,{\n   read,signal:request.signal,\n   classify:s=>CosProductTcpDisabledStage.buildTrackerIpReachability(s.census,s.tracker,s.endpoints),\n   check:(d,signal)=>CosInlineCameraDiagnostics.checkSavedCamera({id:String(d.id),body:{unitKey:d.unit_key,publicIp:d.public_ip,ports:d.expected_ports,mode:'ports'},headers:context.headers,fetcher:requestFetch,signal})\n  }));\n }catch(error){return json({error:'Verification could not be confirmed. Refresh saved results before retrying; check the current tracker IP and enabled ports.'},503);}\n}\n",
+    "occurrences": 1
+  },
+  "unchangedFiles": [
+    "trackerEndpointRead.mjs",
+    "trackerEndpointProducer.mjs",
+    "productTcpRuntime.ts",
+    "deno.json"
+  ],
+  "warning": "Production is a recorded overlay. Do not deploy the repository backend directory wholesale."
+}

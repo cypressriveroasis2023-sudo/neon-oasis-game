@@ -47,6 +47,7 @@ export type SavedTcpEndpoint={
  expectedPorts:number[];
  connectionRevision:number|string;
  monitoringEnabled:boolean;
+ activationState?:string;
  portStatus:Record<string,unknown>|null;
 };
 export type ExactProductConnectionStatus='online'|'offline'|'unknown';
@@ -141,7 +142,7 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
 export function buildExactProductConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>
+ acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>,reachabilityOnly=false
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
  if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
@@ -152,6 +153,7 @@ export function buildExactProductConnections(
   ||!Array.isArray(tracker.records)||tracker.records.length!==authority.total
   ||!Array.isArray(devices)||devices.length>10000)return null;
  const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
+ if(reachabilityOnly&&!isolated)return null;
  if(isolated&&(!HASH.test(tracker.trackerSourceSha256)||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(tracker.sourceExport)))return null;
  const products=(acceptedMhelp as {records:Record<string,any>[]}).records;
  const expected=new Map(products.map(p=>[p.productId,p]));
@@ -176,9 +178,10 @@ export function buildExactProductConnections(
   if(publicIp(row.publicIp))ipClaims.set(row.publicIp!,(ipClaims.get(row.publicIp!)||0)+1);
  }
  if(byProduct.size!==expected.size||[...expected.keys()].some(id=>!byProduct.has(id)))return null;
- const endpoints=new Map<string,SavedTcpEndpoint[]>();
+ const endpoints=new Map<string,SavedTcpEndpoint[]>(),endpointIds=new Set<string>();
  for(const device of devices){
   if(!object(device)||!deviceId(device.deviceId)||!Array.isArray(device.expectedPorts))return null;
+  if(reachabilityOnly&&endpointIds.has(String(device.deviceId)))return null;endpointIds.add(String(device.deviceId));
   const ip=publicIp(device.publicIp);
   if(!ip)continue;
   const list=endpoints.get(ip)||[];list.push(device as SavedTcpEndpoint);endpoints.set(ip,list);
@@ -194,6 +197,14 @@ export function buildExactProductConnections(
   if(!ip)return unknown(pid,'No verified public tracker IP is available for this Product ID.');
   if(ipClaims.get(ip)!==1)return unknown(pid,'Another Product ID claims this tracker IP; verify endpoint ownership.');
   const devicesForIp=endpoints.get(ip)||[];
+  if(reachabilityOnly){
+   const active=devicesForIp.filter(d=>d.monitoringEnabled===true&&(d.activationState===undefined||d.activationState==='active'));
+   if(!active.length)return unknown(pid,'No enabled service-port check configuration matches the current tracker IP.');
+   const checks=active.map(d=>completedSavedTcpCheck(d,now));
+   if(checks.some(c=>!c))return unknown(pid,'No fresh, completed check covers every enabled service-port configuration at this tracker IP.');
+   const completed=checks as NonNullable<ReturnType<typeof completedSavedTcpCheck>>[],positive=completed.find(c=>c.status==='online'),result=positive||completed[0];
+   return {productId:pid,...result,checkedAt:completed.map(c=>c.checkedAt!).sort()[0],reason:positive?'Completed service-port checks responded at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.':'Completed service-port checks had no response at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'};
+  }
   if(devicesForIp.length!==1)return unknown(pid,devicesForIp.length?'More than one saved endpoint claims this tracker IP; verify exact device ownership.':'No saved camera endpoint matches the current tracker IP.');
   const result=completedSavedTcpCheck(devicesForIp[0],now);
   if(!result)return unknown(pid,'No fresh, completed, exact-target TCP/service-port check is available.');
@@ -203,6 +214,9 @@ export function buildExactProductConnections(
  if(items.length!==authority.field)return null;
  return {contract:EXACT_PRODUCT_CONNECTION_CONTRACT,sourceSha256:authority.sourceSha256,trackerVerifiedAt:safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)!,items};
 }
+
+/** Same saved reachability classifier used by the deployed Fleet bridge. */
+export function buildTrackerIpReachability(acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()){return buildExactProductConnections(acceptedMhelp,tracker,devices,now,undefined,true);}
 
 /** Browser-facing verification also rejects an incomplete/replayed census.
  * This is a presentation check, not a substitute for the protected server's
