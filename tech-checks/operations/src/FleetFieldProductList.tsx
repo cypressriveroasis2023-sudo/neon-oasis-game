@@ -4,7 +4,7 @@ import VrmEnergyFlow from './VrmEnergyFlow';
 import FleetVerifyNow from './FleetVerifyNow';
 import FleetVictronSummary from './FleetVictronSummary';
 import type {FleetCommandProduct} from './fleetCommandCenterModel';
-type Props={onVerified?:()=>Promise<unknown>;rows?:FleetDashboardRow[];now?:number;products:FleetCommandProduct[];status:string;query:string;onOpen:(product:FleetCommandProduct)=>void};
+type Props={onVerified?:(connections?:unknown)=>Promise<unknown>;rows?:FleetDashboardRow[];now?:number;products:FleetCommandProduct[];status:string;query:string;onOpen:(product:FleetCommandProduct)=>void};
 /** Compact Product-ID inventory. It consumes the reconciled status; it never tests or guesses health. */
 export default function FleetFieldProductList({products,status,query,onOpen,rows=[],now=Date.now(),onVerified}:Props){
  const [limit,setLimit]=useState(40),term=query.trim().toLowerCase();

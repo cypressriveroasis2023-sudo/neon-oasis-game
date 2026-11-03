@@ -102,6 +102,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
+  if(method==='POST'&&path==='/api/product-connections/verify')return sendRequest<T>(method,path,session.token,body,options?.signal);
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
@@ -293,6 +294,11 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     pendingFleetSnapshots.set(key,read);return read;
 }
 export const api = {
+  adoptProductConnections:(receipt:unknown)=>{
+    if(!lastVerifiedSession)return false;const mode=new URLSearchParams(location.search).get('mode'),key=JSON.stringify([lastVerifiedSession.token,lastVerifiedSession.role,mode]),saved=fleetSnapshots.get(key),upload=(saved?.value.fieldMap as any)?.uploadInventory;
+    if(!saved||!upload||!readExactProductConnections(receipt,upload.sourceSha256,upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId),Date.now()))return false;
+    fleetSnapshots.set(key,{...saved,value:{...saved.value,fieldMap:{...saved.value.fieldMap,productConnections:receipt,productConnectionsState:'ready'} as FleetSnapshot['fieldMap']}});return true;
+  },
   // Capture before asynchronous draft preparation, not after it has already crossed a session boundary.
   captureSession: () => { const revision=privateSessionRevision; return () => revision===privateSessionRevision; },
   get: <T = any>(path: string) => request<T>('GET', path),
