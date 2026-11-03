@@ -49,7 +49,7 @@ async function mount(page){
 }
 function counts(state){const count=path=>state.calls.filter(call=>call.path===path).length;return {health:count(summaryPath),map:count(mapPath),routers:count('/api/routers'),power:count('/api/vrm-fleet')};}
 async function visible(app,value){await app.locator('body').evaluate((_,isVisible)=>{Object.defineProperty(document,'hidden',{configurable:true,value:!isVisible});document.dispatchEvent(new Event('visibilitychange'));},value);}
-function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
+function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/product-connections','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
 
 test('ten-minute saved reads evaluate expiry only at completed updates without vendor polling',async({page})=>{
  const {app,state}=await mount(page);
@@ -115,7 +115,7 @@ test('returning to Fleet keeps the cached pair original refresh deadline',async(
 test('a failed saved read waits ten minutes to retry and manual reload remains immediate',async({page})=>{
  const {app,state}=await mount(page);state.failed=true;
  await page.clock.runFor(597000);await expect.poll(()=>counts(state).health).toBe(2);
- await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  await page.clock.runFor(540000);await visible(app,true);expect(counts(state).health).toBe(2);
  await page.clock.runFor(60000);await expect.poll(()=>counts(state).health).toBe(3);
@@ -129,7 +129,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  const {app,state}=await mount(page);state.failed=true;state.gate=deferred();
  await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:2,power:2});
- await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  // The failed pair is already visible while its original map response is held.
  // A forced consumer and a newly mounted normal consumer must share that peer.
@@ -141,14 +141,14 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
  await openWorkspace(app,'Field Map');
  await expect.poll(()=>counts(state).routers).toBe(4);
- await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(counts(state).health).toBe(2);expect(counts(state).map).toBe(2);
  state.gate.resolve();state.gate=null;
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
- await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  // Settled partial data was not promoted into a complete current snapshot.
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect.poll(()=>counts(state).health).toBe(3);await expect.poll(()=>counts(state).map).toBe(3);
@@ -160,7 +160,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
 test('automatic partial failure adopts newer placement without asserting successful health',async({page})=>{
  const {app,state}=await mount(page);state.failed=true;state.mapCustomer='Updated authoritative customer';
  await page.clock.runFor(597000);
- await expect(app.locator('.cos-fleet-message')).toContainText('Synthetic saved camera read unavailable');
+ await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.locator('.cos-fleet-unit-list')).toContainText('Updated authoritative customer');
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');

@@ -98,11 +98,11 @@ export default function FleetDashboard({openMhelpConnection,entryRevision=0,init
  const [savedShop,setSavedShop]=useState<any[]>([]);
  const [verifiedConnections,setVerifiedConnections]=useState<any>(null);
  useEffect(()=>{const clear=()=>setVerifiedConnections(null);window.addEventListener('cos-private-data-invalidated',clear);return()=>window.removeEventListener('cos-private-data-invalidated',clear);},[]);
- const connectionRead=(mapSnapshot&&Date.parse(mapSnapshot.generatedAt)>=Date.parse(cameras.refreshMap?.generatedAt||'2000-01-01')?mapSnapshot:cameras.refreshMap)||mapSnapshot||cameras.fleet?.fieldMap;
+ const connectionRead=(cameras.refreshMap as any)?.productConnectionsState==='pending'?cameras.refreshMap:mapSnapshot||cameras.refreshMap||cameras.fleet?.fieldMap;
  const baseMapSource=preferredFleetMap(cameras.fleet?.fieldMap,mapSnapshot);
  // Classify a completed read once. Wall-clock ticks update the header only.
  const verifiedReadAt=useRef(0);
- const snapshotNow=verifiedConnections?verifiedReadAt.current||cameras.now:(baseMapSource as any)?.productConnectionsState==='ready'?(baseMapSource===cameras.fleet?.fieldMap?Date.parse(cameras.fleet.readAt):Number((baseMapSource as any)?.clientReadAt)||cameras.now):cameras.now;
+ const snapshotNow=verifiedConnections?verifiedReadAt.current||cameras.now:(baseMapSource as any)?.productConnectionsState==='ready'?(baseMapSource===cameras.fleet?.fieldMap?Date.parse(cameras.fleet?.readAt||''):Number((baseMapSource as any)?.clientReadAt)||cameras.now):cameras.now;
  const baseMap=useMemo(()=>{const upload=(baseMapSource as any)?.uploadInventory;return upload&&verifiedConnections&&Date.parse(verifiedConnections.trackerVerifiedAt)>=Date.parse((baseMapSource as any)?.productConnections?.trackerVerifiedAt||'2000-01-01')&&readExactProductConnections(verifiedConnections,upload.sourceSha256,upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId),snapshotNow)?{...baseMapSource,productConnections:verifiedConnections,productConnectionsState:'ready'}:baseMapSource;},[baseMapSource,verifiedConnections,snapshotNow]);
  const map=useMemo(()=>baseMap&&savedShop.length?projectManualShop(baseMap,{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[...((baseMap as any).manualPlacementOverrides?.items||[]).filter((r:any)=>!savedShop.some(s=>s.unitId===r.unitId)),...savedShop.filter(s=>!((baseMap as any).manualPlacementOverrides&&Date.parse((baseMap as any).generatedAt)>Date.parse(s.recordedAt)+1000&&!((baseMap as any).manualPlacementOverrides.items||[]).some((r:any)=>r.unitId===s.unitId&&r.auditId===s.auditId)))]}):baseMap,[baseMap,savedShop]);
  const effectiveUpload=useMemo(()=>manualShopInventory((map as any)?.uploadInventory,(map as any)?.manualPlacementOverrides),[map]);
