@@ -1,13 +1,17 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
+const verifyingProducts=new Set<string>();
 type Product={productId:string;unitNumber:string};
 type Result={productId:string;status:'online'|'offline'|'unknown';reason:string;checkedAt:string|null};
 export default function FleetVerifyNow({products,onComplete,label='Verify now',disabled=false,onBusyChange}:{products:Product[];onComplete:()=>Promise<unknown>;label?:string;disabled?:boolean;onBusyChange?:(busy:boolean)=>void}){
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[results,setResults]=useState<(Result&{name:string})[]>([]);
- const active=useRef<AbortController|null>(null);
- useEffect(()=>()=>{if(active.current){active.current.abort();active.current=null;onBusyChange?.(false);}},[onBusyChange]);
+ const active=useRef<AbortController|null>(null),locked=useRef<string[]>([]);
+ const unlock=()=>{locked.current.forEach(id=>verifyingProducts.delete(id));locked.current=[];};
+ useEffect(()=>()=>{if(active.current){active.current.abort();active.current=null;unlock();onBusyChange?.(false);}},[onBusyChange]);
  const run=async()=>{
   if(active.current||disabled||!products.length)return;
+  if(products.some(p=>verifyingProducts.has(p.productId))){setMessage('This equipment is already being verified. Wait for the current check.');return;}
+  locked.current=products.map(p=>p.productId);locked.current.forEach(id=>verifyingProducts.add(id));
   const controller=new AbortController(),session=api.captureSession();active.current=controller;setBusy(true);onBusyChange?.(true);setResults([]);setMessage('Checking current tracker IPs and all enabled service ports…');
   const current=()=>active.current===controller&&!controller.signal.aborted&&session();
   try{
@@ -22,10 +26,10 @@ export default function FleetVerifyNow({products,onComplete,label='Verify now',d
    }
    await onComplete();if(current())setMessage('Saved fleet results refreshed. Online and Offline reflect completed checks; remaining items show the correction needed.');
   }catch(error){if(current()){setMessage(error instanceof Error?error.message:'The check could not complete. Refresh saved results before retrying.');try{await onComplete();}catch{/* Keep the action error visible. */}}}
-  finally{if(active.current===controller){active.current=null;setBusy(false);onBusyChange?.(false);}}
+  finally{if(active.current===controller){active.current=null;unlock();setBusy(false);onBusyChange?.(false);}}
  };
  return <div className='cos-verify-now'>
   <button type='button' disabled={busy||disabled||!products.length} onClick={()=>void run()}>{busy?'Verifying…':label}</button>
-  <div aria-live='polite'>{message&&<p role='status'>{message}</p>}{results.length>0&&<ul>{results.map(r=><li key={r.productId}><strong>{r.name}: {r.status==='unknown'?'Needs correction':r.status==='online'?'Online':'Offline'}</strong><small>{r.reason}</small></li>)}</ul>}</div>
+  <div aria-live='polite'>{message&&<p role='status'>{message}</p>}{results.length>0&&<ul>{results.map(r=><li key={r.productId}><strong>{r.name}: {r.status==='unknown'?'Needs correction':r.status==='online'?'Online':'Offline'}</strong><small>{r.reason}</small>{r.status==='unknown'&&<a href={'../../camera-health.html?q='+encodeURIComponent(r.name)}>Open camera setup →</a>}</li>)}</ul>}</div>
  </div>;
 }
