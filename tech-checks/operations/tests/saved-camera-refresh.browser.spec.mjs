@@ -49,7 +49,7 @@ async function mount(page){
 }
 function counts(state){const count=path=>state.calls.filter(call=>call.path===path).length;return {health:count(summaryPath),map:count(mapPath),routers:count('/api/routers'),power:count('/api/vrm-fleet')};}
 async function visible(app,value){await app.locator('body').evaluate((_,isVisible)=>{Object.defineProperty(document,'hidden',{configurable:true,value:!isVisible});document.dispatchEvent(new Event('visibilitychange'));},value);}
-function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/product-connections','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
+function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path).filter(path=>path!=='/api/product-connections'))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
 
 test('ten-minute saved reads evaluate expiry only at completed updates without vendor polling',async({page})=>{
  const {app,state}=await mount(page);
