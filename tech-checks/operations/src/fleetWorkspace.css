@@ -1,0 +1,162 @@
+/* One Fleet visual system. Scoped to this workspace, including the Owner and IT shells. */
+#root#root .cos-fleet-board.cos-fleet-dashboard {
+ --cos-vision-bg:#0c1016;--cos-vision-panel:#131a24;--cos-vision-raised:#1b2431;
+ --cos-border:#2a3545;--cos-text:#f2f5fa;--cos-muted:#a6b2c3;--cos-selected:#283449;
+ --fleet-bg:#0c1016;--fleet-panel:#131a24;--fleet-line:#2a3545;--fleet-muted:#a6b2c3;
+ background:var(--fleet-bg);border:1px solid #283140;border-radius:20px;padding:0 24px 24px;
+ font-family:Inter,'Open Sans',Arial,sans-serif;box-shadow:0 18px 60px #0002;
+}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs {
+ display:flex;align-items:center;gap:6px;padding:12px 24px;margin:0 -24px;
+ background:#111720;border-bottom:1px solid #283140;min-height:72px;overflow:visible;position:relative;z-index:4;flex-wrap:wrap;border-radius:20px 20px 0 0;
+}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button,
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tools>summary {
+ display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;padding:10px 17px;
+ border:1px solid transparent!important;border-radius:10px!important;background:transparent!important;color:#aeb8c8;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;
+}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button[aria-current=page] {background:#a8102d!important;border-color:#d33351!important;color:#fff;box-shadow:0 3px 12px #0003}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button:hover {background:#263043!important;color:#fff}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tools{margin-left:auto;position:relative;grid-column:auto}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tools>summary{border-color:#303b4c!important;background:#19212d!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tool-buttons{right:0;left:auto;min-width:250px;background:#17202b;z-index:20}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-content{padding-top:26px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading{margin-bottom:22px;gap:20px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading h1{font-size:clamp(26px,2.5vw,38px);letter-spacing:-1.1px;font-weight:650;line-height:1.16}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-eyebrow{color:#fa7891;font-size:10px;letter-spacing:.17em;margin-bottom:9px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading p{font-size:13px;color:#a6b2c3;margin-top:8px;line-height:1.6}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-refresh{background:#f1f4f9!important;border:1px solid #fff!important;color:#121a26;border-radius:9px;font-size:13px;padding:10px 16px;font-weight:700}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stats{gap:10px;margin:0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat {background:#151d28!important;border:1px solid #303c4c!important;min-height:102px;border-radius:12px!important;grid-template-columns:22px minmax(0,1fr);padding:16px 13px;gap:7px 9px;transition:background .15s,border-color .15s}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat:hover{background:#1e2938!important;border-color:#76869a!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>strong{font-size:32px;letter-spacing:-.7px;font-weight:600}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>span{font-size:10px;letter-spacing:.04em;color:#b9c3d2}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>.cos-card-icon{width:21px;height:21px;color:#92a2b9}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-status-dot{width:10px!important;height:10px!important;box-shadow:0 0 0 5px #ffffff06;margin:5px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-provider-grid>button{background:#121923!important;border:1px solid #2b3544!important;border-radius:12px;padding:15px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-provider-title{font-size:13px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-provider-values b{font-size:23px;font-weight:600}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-provider-values>span{font-size:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-system-note{font-size:11px;color:#a6b2c3}
+#root#root .cos-fleet-board.cos-fleet-dashboard :is(.cos-board-search,.cos-fleet-search){background:#101720;border:1px solid #3b485b;border-radius:10px;margin:16px 0;box-shadow:none}
+#root#root .cos-fleet-board.cos-fleet-dashboard :is(.cos-board-search,.cos-fleet-search) input{border-radius:10px;color:#edf2fa;font-size:14px;min-height:48px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-filters{background:#131a24;border:1px solid #2a3545;border-radius:12px;padding:14px;margin:16px 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-filters>.cos-fleet-filter-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-filters select{background:#101720;border:1px solid #3b485b;font-size:12px;border-radius:8px;min-height:44px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-workspace{border:0;gap:16px;overflow:visible;grid-template-columns:minmax(285px,.34fr) minmax(0,.66fr)}
+#root#root .cos-fleet-board.cos-fleet-dashboard :is(.cos-fleet-unit-panel,.cos-fleet-map-panel){background:#121923;border:1px solid #303b4c;border-radius:14px;overflow:hidden}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-map-toolbar{background:#18212e;padding:12px 14px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-unit-row{background:#17212e!important;border-color:#303c4c!important;border-radius:10px!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard :is(.cos-fleet-badge,.cos-equipment-placement){border-radius:999px;font-size:11px;padding:5px 9px;line-height:1.4}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-section-heading h2{font-size:17px;letter-spacing:-.25px}
+#root#root .cos-fleet-board.cos-fleet-dashboard :is(.cos-fleet-tab-summary>summary,.cos-equipment-comparison>summary){background:#151d28;border:1px solid #303c4c;border-radius:10px;font-size:12px;padding:12px;cursor:pointer}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card{min-width:0;display:flex;flex-direction:column;border:1px solid #344052;border-radius:16px;background:#141c27;overflow:hidden;box-shadow:0 4px 15px #0001}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card>header{display:flex;align-items:center;gap:12px;padding:20px 18px 14px;background:transparent;border:0;min-height:0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card>header>div:nth-child(2){min-width:0;flex:1}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card h3{font-size:20px;letter-spacing:-.4px;overflow-wrap:anywhere;margin:3px 0 0;line-height:1.35}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card header small{font-size:9px;letter-spacing:.1em;color:#b3bfd0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-icon{display:grid;place-items:center;width:42px;height:42px;background:#253044;border:1px solid #3a4860;border-radius:12px;flex:none;color:#cedbf0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-icon svg{width:23px;height:23px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placement{background:#202c3a;border:1px solid #46576e;color:#d6e4f8;white-space:nowrap}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-placement-field{background:#162f2a;border-color:#366553;color:#a4ecc8}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-site{padding:0 18px 16px;min-height:94px;overflow-wrap:anywhere}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-site strong{font-size:13px;color:#e0e7f1}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-site p{font-size:12px;color:#b3bfd0;margin:5px 0;line-height:1.6}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-site small{font-size:10px;color:#9cabc0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signals{display:grid;grid-template-columns:1fr 1fr;border-block:1px solid #2d394a;margin:0 18px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signal{padding:13px 0;min-width:0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signal+div{border-left:1px solid #2d394a;padding-left:14px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signal>span{display:block;font-size:10px;color:#acb9cc;margin-bottom:6px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signal strong{font-size:13px;display:flex;align-items:center;gap:7px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-signal i{width:7px;height:7px;border-radius:50%;background:currentColor}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-evidence{font-size:10px;line-height:1.6;padding:10px 18px;color:#a9b8cc}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-power{margin:4px 18px 18px;padding:14px;background:#101820;border:1px solid #30464a;border-radius:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-power .cos-fleet-battery-summary{margin:0 0 12px;padding:0;border:0;background:none}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-power .cos-fleet-battery-summary>strong{font-size:32px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-power p{font-size:11px;line-height:1.6}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-power small{font-size:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-helios-victron>strong{font-size:12px;color:#ccebdc}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-helios-victron ul{padding-left:16px;font-size:12px;line-height:1.9;margin:8px 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-helios-victron a{display:inline-flex;align-items:center;min-height:44px;color:#afe5d2;font-size:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-actions{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-top:1px solid #2d394a}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-actions small{font-size:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-actions button{background:#263247!important;border:1px solid #4a5d78!important;border-radius:8px;font-size:12px;padding:9px 12px;white-space:nowrap}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-support-note{display:flex;gap:12px;margin:0 18px 18px;padding:14px;background:#1b2635;border:1px solid #33445d;border-radius:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-support-note svg{width:25px;height:25px;color:#adc4e7;flex:none}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-support-note strong{font-size:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-support-note small{font-size:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-comparison{margin:20px 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-load-more{margin-top:16px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-record{background:#141c27;border:1px solid #344052;border-radius:14px;padding:18px;overflow-wrap:anywhere}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-record p{font-size:12px;line-height:1.7}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-record small{font-size:11px}
+@media(min-width:751px) and (max-width:1200px){#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:750px){
+ #root#root .cos-fleet-board.cos-fleet-dashboard{padding:0 12px 16px;border-radius:14px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:8px;margin:0 -12px;border-radius:14px 14px 0 0}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{padding:9px 4px;font-size:12px;gap:3px;white-space:normal;min-height:48px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button>span{font-size:16px;margin-right:3px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tools{grid-column:1/-1;margin-left:0}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tools>summary{font-size:11px;min-height:44px;justify-content:space-between;padding:8px 12px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-approved-fleet-tool-buttons{width:100%;min-width:0;box-sizing:border-box}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-content{padding-top:16px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading{gap:10px;align-items:flex-start;margin-bottom:16px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading h1{font-size:25px;letter-spacing:-.6px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading p{display:none}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:last-child{max-width:137px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:last-child>small{font-size:9px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-eyebrow{font-size:9px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat{padding:11px 8px;grid-template-columns:13px minmax(0,1fr);gap:5px;min-height:79px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>strong{font-size:26px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>span{font-size:8px;letter-spacing:0}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-stat>.cos-card-icon{width:14px;height:14px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-board-status-dot{width:7px!important;height:7px!important;margin:2px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-filters>.cos-fleet-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-workspace{display:flex;flex-direction:column-reverse;gap:12px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card>header{padding-top:16px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-map-jump{display:none}
+}
+@media(prefers-reduced-motion:reduce){#root#root .cos-fleet-board.cos-fleet-dashboard *{transition:none!important}}
+/* Equipment families are summary cards, never primary tabs. */
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-totals{margin:18px 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card{min-width:0;border:1px solid #3b485b;border-radius:14px;background:#141c27;padding:16px;display:flex;flex-direction:column}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card h2{display:flex;align-items:center;gap:10px;font-size:19px;letter-spacing:-.4px;margin:0 0 12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card h2 svg{width:26px;height:26px;color:#c2d2e8;flex:none}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-number{display:flex;align-items:center;justify-content:space-between;width:100%;background:transparent!important;border:0!important;padding:0 0 10px;text-align:left}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-number span{font-size:12px;color:#b8c5d8}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-number strong{font-size:36px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements{display:grid;grid-template-columns:1fr 1fr;gap:8px;border-block:1px solid #303c4d;padding:6px 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements button{display:flex;justify-content:space-between;align-items:center;border:0!important;background:transparent!important;padding:8px 4px;font-size:12px;color:#bfcde0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements b{color:#fff;font-size:17px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-health-scope{font-size:10px;color:#a9b9cf;margin:10px 0 2px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:3px 0 10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses button{display:grid;grid-template-columns:7px 1fr;align-content:center;gap:5px;min-width:0;min-height:58px;padding:7px 4px;border:1px solid transparent!important;background:transparent!important;border-radius:7px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses button:hover,#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses button[aria-pressed=true]{border-color:#68809f!important;background:#253247!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses button i{width:7px;height:7px;background:currentColor;border-radius:50%;align-self:center}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses span{color:#c4d0e2;font-size:10px;text-align:left}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses b{grid-column:2;font-size:20px;font-variant-numeric:tabular-nums;text-align:left}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer{display:flex;justify-content:space-between;align-items:center;gap:8px;letter-spacing:0;padding-top:10px;margin-top:auto;border-color:#303c4d}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer small{font-size:10px;line-height:1.5}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer button{font-size:11px;background:transparent!important;border:0!important;padding:6px;white-space:nowrap}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-totals-note{font-size:11px;color:#a9b9cf;margin:9px 0;line-height:1.6}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list{border:1px solid #445974;border-radius:12px;padding:16px;margin-top:14px;background:#141e2b}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list>div{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list h3{font-size:16px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list ul{list-style:none;padding:0;margin:10px 0 0;max-height:440px;overflow:auto}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #303c4d;overflow-wrap:anywhere}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list small{font-size:11px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list li button{flex:none;font-size:12px}
+@media(max-width:750px){
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs{grid-template-columns:1fr 1fr}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-helios{order:-1}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card{padding:14px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list li{align-items:flex-start;flex-direction:column}
+}

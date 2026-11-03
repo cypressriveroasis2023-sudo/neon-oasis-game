@@ -1,5 +1,5 @@
 import {recordedAddressText} from './fleetDisplayAddress';
-import {canonicalCameraUnit} from './fieldCameraHealth';
+import {canonicalCameraUnit,isSupportEquipment} from './fieldCameraHealth';
 import type {DashboardUnit,FleetFilters} from './fleetDashboardModel';
 import {inventoryPlacement} from './fleetSnapshot';
 
@@ -37,7 +37,7 @@ export const recordedSourceLabel=(r:RecordedEquipment)=>({mhelpdesk_api:'MHelp A
 /** Non-UUID source rows stay outside camera classification and native write actions. */
 export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map'){
  const q=filters.query.trim().toLowerCase();
- return items.filter(r=>r.kind!=='unit'&&(view!=='setup'||r.active&&r.placement==='field')&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')
+ return items.filter(r=>(view!=='cameras'||!isSupportEquipment({id:r.id,unitNumber:r.unitNumber,modelName:r.category||r.family||''}))&&r.kind!=='unit'&&(view!=='helios'||recordedFamily(r)==='HELIOS')&&(view!=='stands'||isSupportEquipment({id:r.id,unitNumber:r.unitNumber,modelName:r.category||r.family||''}))&&(view!=='setup'||r.active&&r.placement==='field')&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')
   &&(!q||[r.unitNumber,r.displayUnitNumber,r.customer,recordedAddressText(r.sourceAddress),r.category,...r.productIds].filter(Boolean).join(' ').toLowerCase().includes(q))
   &&['all','unknown'].includes(filters.status)&&!filters.nearbyId&&(!filters.installationStatus||filters.installationStatus==='all')&&view!=='verify');
 }
