@@ -5,7 +5,7 @@ import FleetCardIcon from './FleetCardIcon';
 import FleetVerifyNow from './FleetVerifyNow';
 const titles={cameras:'Camera units',helios:'Helios',stands:'Stands'};
 type Status='all'|'online'|'offline'|'unverified';
-export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified}:{upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:()=>Promise<unknown>}){
+export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified}:{upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:(connections?:unknown)=>Promise<unknown>}){
  const totals=fleetEquipmentTotals(upload,data,now);
  const [selection,setSelection]=useState<{group:EquipmentGroup;status:Status}|null>(null);
  const [verificationBusy,setVerificationBusy]=useState(false);

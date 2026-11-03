@@ -41,3 +41,7 @@ test('retained fresh observations cannot substitute for the newly requested chec
  const f=fixture();await f.check(f.devices[0]);f.checks.get(41)._connection.checkedAt=new Date(Date.now()-5*60000).toISOString();f.calls.length=0;f.check=async()=>{};
  const r=await verifyProductsNow({productIds:['1001']},f);assert.equal(r.items[0].status,'unknown');
 });
+test('fresh saved checks can be revalidated without running redundant probes and retain their actual timestamps',async()=>{
+ const f=fixture();await f.check(f.devices[0]);const at=f.checks.get(41)._connection.checkedAt;f.calls.length=0;
+ const r=await verifyProductsNow({productIds:['1001']},{...f,reuseCurrent:true});assert.equal(r.items[0].status,'online');assert.equal(r.items[0].checkedAt,at);assert.equal(f.calls.length,0);assert.ok(r.connections);
+});

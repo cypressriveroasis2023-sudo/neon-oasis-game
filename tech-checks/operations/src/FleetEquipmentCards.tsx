@@ -10,7 +10,7 @@ import {unitHealthLabel} from './fieldCameraHealth';
 const words:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'No cameras',not_available:'Not available'};
 function SignalValue({label,state}:{label:string;state:Signal}){return <div className={'cos-equipment-signal cos-signal-'+state}><span>{label}</span><strong><i aria-hidden='true'/> {words[state]}</strong></div>;}
 /** Presentation of reconciled rows only; never creates status, identity, or power evidence. */
-export default function FleetEquipmentCards({rows,now,onOpen,lastKnown,onVerified,verifyProduct}:{onVerified?:()=>Promise<unknown>;verifyProduct?:(row:FleetDashboardRow)=>{productId:string;unitNumber:string}|null;rows:FleetDashboardRow[];now:number;lastKnown:(row:FleetDashboardRow)=>LastKnownCamera|null;onOpen:(id:string)=>void}){
+export default function FleetEquipmentCards({rows,now,onOpen,lastKnown,onVerified,verifyProduct}:{onVerified?:(connections?:unknown)=>Promise<unknown>;verifyProduct?:(row:FleetDashboardRow)=>{productId:string;unitNumber:string}|null;rows:FleetDashboardRow[];now:number;lastKnown:(row:FleetDashboardRow)=>LastKnownCamera|null;onOpen:(id:string)=>void}){
  return <div className='cos-equipment-grid'>{rows.map(row=>{
  const product=verifyProduct?.(row);
  const helios=row.family.toUpperCase().startsWith('HELIOS');
