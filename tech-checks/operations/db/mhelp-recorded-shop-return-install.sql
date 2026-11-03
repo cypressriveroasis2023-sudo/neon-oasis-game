@@ -1,7 +1,7 @@
 DO $guard$ BEGIN IF md5(pg_get_functiondef('public.cos_mhelp_placement_from_inventory()'::regprocedure))<>'275549a5cfb2d7c6efce21277358c697' OR md5(pg_get_functiondef('cos_sheets_placement_private.source_current(cos_mhelp_placement_private.links)'::regprocedure))<>'a49a2d8a46fd192946f51257bd9ebf14' THEN RAISE EXCEPTION 'Placement authority drift';END IF; END $guard$;
 -- A real, recorded Shop return must not require reactivating its old Field
 -- geocoding source or erasing its placement history.
-create function cos_mhelp_placement_private.recorded_shop_return_current(p_product text,p_tracker uuid,p_native uuid)
+create or replace function cos_mhelp_placement_private.recorded_shop_return_current(p_product text,p_tracker uuid,p_native uuid)
 returns boolean language sql stable set search_path='' as $function$
  select coalesce(exists(
   select 1 from cos_mhelp_placement_private.links l
