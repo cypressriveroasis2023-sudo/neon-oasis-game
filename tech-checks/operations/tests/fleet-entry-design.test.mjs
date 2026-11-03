@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import FleetFieldProductList from '../src/FleetFieldProductList.tsx';
+const products=[{productId:'1001',unitNumber:'Helios 001',customer:'Example site',address:'123 Example Road',status:'online',reason:'Saved exact connection succeeded.'},{productId:'1002',unitNumber:'Helios 002',customer:'Other site',address:'456 Example Road',status:'unverified',reason:'No completed saved check.'},{productId:'1003',unitNumber:'Stand 001',customer:'Example site',address:'123 Example Road',status:'not_applicable',reason:'Support equipment.'}];
+const render=(status='all',query='')=>renderToStaticMarkup(React.createElement(FleetFieldProductList,{products,status,query,onOpen:()=>{}}));
+test('compact Field cards preserve Product IDs, addresses, status and closed evidence',()=>{const html=render();assert.match(html,/123 Example Road/);assert.match(html,/Product 1001/);assert.match(html,/Online/);assert.match(html,/Unverified/);assert.match(html,/No cameras/);assert.match(html,/<details><summary>Status evidence/);assert.doesNotMatch(html,/<details open/);});
+test('compact Field search and unknown filter use the same reconciled status',()=>{assert.match(render('unknown'),/Helios 002/);assert.doesNotMatch(render('unknown'),/Helios 001|Stand 001/);assert.match(render('all','1001'),/Helios 001/);assert.doesNotMatch(render('all','1001'),/Helios 002/);assert.match(render('support'),/Stand 001/);});
+test('Fleet entry starts from its workspace and clears the obsolete saved subview',()=>{const source=readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8');assert.match(source,/useState<View>\(initialView\)/);assert.match(source,/setView\(initialView\)/);assert.match(source,/entryUrl.searchParams.delete\('fleetView'\)/);assert.doesNotMatch(source,/fleetViewFromUrl|searchParams.set\('fleetView'/);});
