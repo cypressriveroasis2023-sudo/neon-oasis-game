@@ -3,13 +3,14 @@ import {inventoryPlacement} from './fleetSnapshot';
 import {isCurrentFieldPin,locationExplanation} from './fieldLocations';
 import {routerStatus,type RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
+import {validVrmEmbed,type VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {FleetDisplayAddress} from './fleetDisplayAddress';
 import {cameraTimestamp} from './cameraEvidence';
 
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
-export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
+export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;vrmInstallation?:VrmUnit|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
 export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
 export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'all',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
@@ -21,6 +22,8 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const routerStates=linkedRouters.map(r=>routerStatus(r,now)).map(s=>s==='reachable'?'online':s==='unreachable'?'offline':'unknown') as Signal[];
   const matches=key?.startsWith('HELIOS|')?power.filter(r=>canonicalCameraUnit(r.name)===key):[];
   const p=matches.length===1&&vrm.items.filter((item:{name:string})=>canonicalCameraUnit(item.name)===key).length===1&&units.filter(u=>canonicalCameraUnit(u.unitNumber)===key).length===1?matches[0]:null;
+  const installation=p?vrm.items.find((item:VrmUnit)=>item.installationId===p.installationId&&canonicalCameraUnit(item.name)===key):null;
+  const vrmInstallation:VrmUnit|null=installation?{...installation,embedUrl:validVrmEmbed(installation.embedUrl,installation.installationId)?installation.embedUrl:null}:null;
   let batteryState:Signal='not_available',batteryPercent:number|null=null,batteryReadings:BatteryReading[]=[];
   const batteryReadIssue=key?.startsWith('HELIOS|')?(p?.errorCode||vrm?.sync?.error||vrm?.sync?.state==='error'?'Latest Victron read unavailable':vrm?.sync?.state==='stale'?'Victron sync is stale':null):null;
   if(key?.startsWith('HELIOS|')){
@@ -41,7 +44,7 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const locationVerified=isCurrentFieldPin(unit),locationNeedsReview=placement==='field'&&!locationVerified;
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];
   const providers=[...new Set(camera.rows.map(r=>r.evidence?.source).filter(Boolean))];
-  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,locationVerified,locationNeedsReview,review};
+  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,vrmInstallation,locationVerified,locationNeedsReview,review};
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){

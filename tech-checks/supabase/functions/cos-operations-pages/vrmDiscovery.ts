@@ -82,7 +82,7 @@ export async function discoverVrmInstallations(token: string, fetcher: typeof fe
   const items = result.records.map(row => {
     if (!row || !validInstallationId(row.idSite) || seen.has(row.idSite) || !validVrmName(row.name)) throw new VrmDiscoveryError('invalid_response');
     seen.add(row.idSite);
-    return { installationId: row.idSite, name: row.name };
+    return { installationId: row.idSite, name: row.name, ...(typeof row.shared === 'boolean' ? {sharingEnabled:row.shared} : {}) };
   });
   return {userId:user.id,items};
 }
@@ -107,7 +107,7 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
         const checked = vrmPortalConfig(JSON.stringify(approvals),base.items,sync);
         const byId = new Map(checked.items.filter(item => item.embedUrl !== null).map(item => [item.installationId,item.embedUrl]));
         fleet = readVrmFleetConfig({items:base.items.map(item => ({
-          ...item,embedUrl:item.available === false ? null : byId.get(item.installationId) ?? item.embedUrl,
+          ...item,embedUrl:item.available === false || item.sharingEnabled === false ? null : byId.get(item.installationId) ?? item.embedUrl,
         })),sync:base.sync});
       } catch {
         // A private approval lookup failure cannot remove existing approved dashboards or the saved fleet.
