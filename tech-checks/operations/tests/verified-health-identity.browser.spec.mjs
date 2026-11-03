@@ -1,5 +1,6 @@
 import {showAllFieldHealth} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
+import {CAMERA_AUTO_REFRESH_MS,AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {writeFile} from 'node:fs/promises';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 
@@ -76,11 +77,11 @@ function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.
 function pollingReads(state){return Object.fromEntries(['health','map','routers','power'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/vrm-fleet'][index]).length]));}
 async function settlePollingMinute(page,frame,state,baseline,minute){
  // Stop at each real scheduling boundary. A multi-minute runFor can run the
- // 15-minute source tick and its 10-second auth timeout before the parent's
+ // scheduled source tick and its 10-second auth timeout before the parent's
  // posted token response gets an event-loop turn. That creates a synthetic
  // expired session even though the parent responds immediately.
  await page.clock.runFor(60000);
- await expect.poll(()=>pollingReads(state)).toEqual({health:baseline.health+Math.floor(minute/15),map:baseline.map+Math.floor(minute/15),routers:baseline.routers+Math.floor(minute/15),power:baseline.power+Math.floor(minute/15)});
+ await expect.poll(()=>pollingReads(state)).toEqual({health:baseline.health+Math.floor(minute*60000/CAMERA_AUTO_REFRESH_MS),map:baseline.map+Math.floor(minute*60000/CAMERA_AUTO_REFRESH_MS),routers:baseline.routers+Math.floor(minute*60000/AUTO_REFRESH_MS),power:baseline.power+Math.floor(minute*60000/AUTO_REFRESH_MS)});
  await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(await frame.locator('body').evaluate(()=>Date.now())).toBe(Date.parse(now)+minute*60000);
  expect(await frame.locator('body').evaluate(()=>window.fixtureSessionDiagnostics.invalidations)).toEqual([]);
@@ -179,7 +180,7 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  noWrites(state);
 });
 
-test('fifteen-minute saved-data polling preserves the 20-minute source expiry',async({page},info)=>{
+test('ten-minute camera and fifteen-minute ancillary polling preserve the 20-minute source expiry',async({page},info)=>{
  const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
  const samples=[];
  const sample=async label=>{
@@ -200,7 +201,7 @@ test('fifteen-minute saved-data polling preserves the 20-minute source expiry',a
   // Saved observations begin five minutes old and remain unchanged by reads:
   // after sixteen elapsed minutes they must be gray despite a saved-data reload.
   await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
-  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 15 minutes');
+  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 10 minutes');await expect(frame.locator('.field-map-info')).toContainText('router and power reads refresh every 15 minutes');
   noWrites(state);
  }finally{
   await sample('final').catch(error=>samples.push({label:'diagnostic capture unavailable',error:String(error)}));
@@ -214,7 +215,7 @@ test('scheduled saved-data refresh rejects a revoked parent before transport',as
  const {frame,state}=await mount(page,{diagnostics:true,pausedClock:true});
  await expand(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  const baseline=pollingReads(state);
- for(let minute=1;minute<=14;minute++)await settlePollingMinute(page,frame,state,baseline,minute);
+ for(let minute=1;minute<CAMERA_AUTO_REFRESH_MS/60000;minute++)await settlePollingMinute(page,frame,state,baseline,minute);
  await page.evaluate(()=>{window.fixtureAuth=false;});
  await page.clock.runFor(60000);
  await expect(frame.getByRole('alert')).toContainText('Your session changed. Reload COS Operations to verify your account and permissions.');
