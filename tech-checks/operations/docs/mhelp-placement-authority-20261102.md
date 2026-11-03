@@ -30,7 +30,7 @@ or authorization. The native preparer requires exact v10 archive/source hashes,
 changes one response expression and proves exact reversal. Preserve all three
 native files, including the endpoint-source and camera-snapshot integrations.
 
-Verification:16 focused publisher/runtime/mHelp-movement checks pass; native
+Initial verification:16 focused publisher/runtime/mHelp-movement checks passed; native
 entry compilation and exact rollback pass. The new test checks reason totals,
 zero writes for held rows and no unit/customer details in the response.
 
@@ -66,3 +66,42 @@ The guarded migration refuses any unexpected installed definition. Tests cover
 unchanged metadata clocks,19 identity/assignment/metadata mutations, duplicate
 Product IDs, stale/failed/paused/incomplete/superseded source, native guard and
 operational override rejection, old-path compatibility and migration drift.
+
+
+## Verified live follow-through
+
+Applied the guarded assignment-proof correction and verified the original
+postgres-only execution ACL, invoker setting and empty search_path are intact.
+Stored metadata observation times remain02:35–02:36UTC; no clock was renewed.
+The existing scheduled publisher then reported295 unchanged/139 held/0 writes.
+
+A second fresh Google read corroborated72 independently repairable bindings by
+exact indexed Product ID, exact four cell snapshots, unchanged validation/rich
+metadata and current mHelp agreement. The existing repair_bindings administrator
+procedure accepted all72 atomically and saved its original/after audit. Combined
+customer/site display styles were retained or correctly marked combined. No
+Google cells, native equipment placements or telemetry were changed. Remaining
+row dependencies were excluded rather than assigned temporary fake positions.
+
+The actual publisher run started04:49:53UTC (10:49PM Central) returned HTTP200,
+committed=true,367 unchanged,67 held,0 published/0 recovered. The holds are
+61 sheet_identity_changed and6 manual_sheet_change. These are reviewed tracker
+rows, not Field units or cameras. Existing linked coverage remains434; the full
+accepted mHelp inventory is925 products. This does not establish full tracker
+coverage, a real equipment movement, or working reverse synchronization.
+
+All24 focused publisher, runtime, mHelp-movement, SQL preservation and new
+assignment-proof tests pass. The4 new SQL tests include19 mutations plus source
+failure/age/identity/override checks. Main advanced to5909e55 via PR324; the
+repair branch merges that parent and preserves it without merging this PR.
+
+Reverse synchronization remains disabled because there is no verified vendor
+Equipment assignment update contract in the implemented source. The Owner CSV
+admission bridge updates COS source admission, not mHelp equipment. The vendor's
+October15 support reply confirms Partner API retrieval and ticket updates, but
+does not confirm equipment reassignment write semantics. Its linked Partner API
+reference was unavailable to the web retrieval tool. Do not substitute a Ticket
+PUT or infer a partial Equipment PUT from a GET schema. The shared repair room
+was asked for existing verified implementation/documentation; no other assistant
+response or autonomous wake-up is assumed.
+
