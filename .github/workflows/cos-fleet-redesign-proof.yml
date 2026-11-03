@@ -1,0 +1,37 @@
+name: Verify Fleet redesign and default entry
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/**'
+      - '.github/workflows/cos-fleet-redesign-proof.yml'
+permissions:
+  contents: read
+jobs:
+  fleet-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: node --import tsx --test tests/fleet-entry-design.test.mjs tests/fleet-equipment-totals.test.mjs tests/fleet-workspace.test.mjs tests/fleet-dashboard.test.mjs tests/fleet-recorded-roster.test.mjs tests/fleet-command-center.test.mjs tests/recon-battery.test.mjs
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser -- tests/fleet-entry-design.browser.spec.mjs
+      - name: Preserve actual desktop and phone screen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-redesign-browser-evidence
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore

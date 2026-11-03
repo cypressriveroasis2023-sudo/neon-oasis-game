@@ -156,7 +156,36 @@
 @media(max-width:750px){
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs{grid-template-columns:1fr 1fr}
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-grid{grid-template-columns:minmax(0,1fr);gap:10px}
- #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-helios{order:-1}
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card{padding:14px}
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list li{align-items:flex-start;flex-direction:column}
 }
+
+/* The live Product-ID list uses the same compact cards as the approved mockup. */
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards{padding:2px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-count{font-size:11px;color:#b0bed0;padding:4px 8px 10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards article{margin:0 0 10px;border:1px solid #354357;border-radius:11px;background:#151f2c;overflow:hidden}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards article>button{width:100%;text-align:left;padding:15px;border:0!important;background:transparent!important;border-radius:0;display:block}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards article>button>div{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards strong{font-size:16px;overflow-wrap:anywhere;letter-spacing:-.2px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards small{font-size:11px;color:#bac7db;line-height:1.6}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards p{font-size:12px;line-height:1.6;margin:6px 0;overflow-wrap:anywhere;color:#b9c8dc}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status{display:inline-flex;align-items:center;gap:5px;flex:none;border:1px solid #526177;background:#293447;border-radius:999px;padding:3px 7px;font-size:10px;white-space:nowrap;color:#c1cddd}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status i{width:6px;height:6px;background:currentColor;border-radius:50%}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-online{color:#8ee6b4;border-color:#3b7558;background:#17372b}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-offline{color:#ffacb6;border-color:#96475a;background:#3a1f2b}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards details{border-top:1px solid #2c3a4d;padding:0 12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards summary{font-size:10px;min-height:44px;cursor:pointer}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details{border:1px solid #2d3a4c;border-radius:10px;margin:12px 0;padding:0 12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details>summary{cursor:pointer;font-size:12px;min-height:44px;align-content:center}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-map-canvas{background:#18232e}
+#root#root .cos-fleet-board.cos-fleet-dashboard .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.72) saturate(.4)}
+/* Keep the three family summaries at the compact height shown in the mockup. */
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card{display:grid;grid-template-columns:1fr 1.35fr;grid-template-rows:auto auto auto 1fr auto;column-gap:12px;align-content:stretch}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card h2{grid-column:1/-1}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-number{grid-column:1;grid-row:2}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements{grid-column:2;grid-row:2;border-block:0;padding:0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements button{display:block;text-align:center;font-size:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-placements b{display:block;font-size:17px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-health-scope{grid-column:1/-1;grid-row:3;border-top:1px solid #303c4d;padding-top:8px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses{grid-column:1/-1;grid-row:4}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer{grid-column:1/-1;grid-row:5}
