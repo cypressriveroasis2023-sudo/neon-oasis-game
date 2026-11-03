@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cameras Onsite | Recording checks</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#18202a;font:16px Arial,sans-serif}header{background:#111;color:white;padding:22px max(24px,calc((100vw - 1120px)/2));border-bottom:5px solid #bd242b}header b{font-size:23px;color:#fff}header small{display:block;color:#ddd;margin-top:8px}main{max-width:1120px;margin:24px auto;padding:0 18px}h1{font-size:28px;margin:8px 0 14px}h2{font-size:21px}button,.button{cursor:pointer;border:1px solid #b51f29;border-radius:7px;background:#b51f29;color:#fff;padding:12px 18px;font:inherit;font-weight:bold;text-decoration:none;display:inline-block}button.secondary{background:white;color:#a81923}button:disabled{opacity:.5;cursor:wait}input,select,textarea{font:inherit;width:100%;border:1px solid #9ba2ac;border-radius:6px;background:#fff;padding:11px}textarea{min-height:110px;resize:vertical}label{display:block;font-weight:bold;font-size:14px;margin:13px 0 5px}label small{font-weight:normal;color:#53606c}input[type=checkbox]{width:auto;min-width:20px;min-height:20px;vertical-align:middle}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.toolbar>div{flex:1;min-width:180px}.notice{background:#fff4d7;border-left:5px solid #ce9b1c;padding:14px;margin-bottom:20px;line-height:1.5}.muted{color:#596472;font-size:14px;line-height:1.5}.panel,details{background:white;border:1px solid #d5d8dd;border-radius:10px;margin:16px 0;padding:18px}summary{cursor:pointer;font-size:18px;font-weight:bold;line-height:1.6}summary small{display:block;color:#596472;font-size:14px;font-weight:normal}.checkrow{display:flex;flex-wrap:wrap;gap:15px}.upload{background:#f9f1f2;border:2px dashed #b51f29;border-radius:9px;padding:20px;margin:18px 0}.files{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.file{padding:10px;border:1px solid #ccc;border-radius:6px;background:white;max-width:100%;overflow-wrap:anywhere}.file a{color:#9f1721;font-weight:bold}.message{white-space:pre-wrap;line-height:1.5;margin:12px 0}.success{color:#176635}.error{color:#a21320}a{color:#a81923}.footer{margin:30px 0;color:#596472}fieldset{border:0;padding:0;margin:0}legend{font-size:18px;font-weight:bold;margin:24px 0 0}dialog{max-width:850px;width:95%;border:1px solid #bbb;border-radius:10px}dialog img,dialog video{max-width:100%;max-height:70vh}dialog::backdrop{background:#0009}@media(max-width:650px){.grid{grid-template-columns:1fr}main{padding:0 10px}button{min-height:46px}header{padding:18px}}
@@ -31,16 +31,17 @@ fieldset{margin-top:28px;padding-top:5px;border-top:1px solid var(--line)}legend
 </style>
 <header><b>CAMERAS <span style="color:#ff525c">ONSITE</span></b><small>Recorded footage  /  IT checks and evidence</small></header>
 <main><p class="eyebrow">Camera service desk</p><h1>Recording checks</h1><p class="subtitle">Check the footage. Document the work. Keep the proof.</p><div id="global" class="message" role="status">Checking your COS sign-in / </div>
-<section id="login" class="panel" hidden><h2>Sign in with your COS account</h2><p>Use your normal COS username and password. This form uses the same company sign-in.</p><form id="loginForm"><label>COS username<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form></section>
-<section id="workspace" hidden><div id="preview" class="notice" hidden><b>James / s review copy  /  not sent to IT.</b> You can try the controls and upload a sample. Review-copy entries are recorded under your name. These assignments remain hidden from technicians until approved.</div>
+<section id="workspace" hidden><div id="preview" class="notice">Private link: no COS sign-in needed. Keep this link within your team. Camera apps may still require their own login.</div>
 <p class="muted">Choose a status, add your notes, and upload evidence from your computer. A reported repair stays pending independent playback verification and tomorrow / s recheck.</p>
 <div class="toolbar"><div><label>Technician<select id="owner"><option value="">All assigned cameras</option><option>Teddy</option><option>Victor</option></select></label></div><div><label>Find unit, camera or IP<input id="search" type="search" placeholder="Search your cameras"></label></div><button id="refresh" class="secondary">Refresh</button></div>
 <div id="count" class="muted"></div><div id="cards"></div><p class="footer">Private evidence  /  Files stay with the camera / s history. Selecting  / Repair complete - verify /  does not close an issue.</p></section>
 <dialog id="viewer"><button id="closeViewer" class="secondary">Close</button><div id="viewerContent"></div></dialog>
 </main>
 <script type="module">
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm';
-const db=createClient('https://goqrnolcvqnirjmzaeyk.supabase.co','sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw');
+const token=new URLSearchParams(location.hash.slice(1)).get('key')||'';
+const endpoint='https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/recording-review-link';
+let viewer;
+async function api(body){const multipart=body instanceof FormData;const res=await fetch(endpoint,{method:'POST',headers:{'x-review-token':token,...(multipart?{}:{'Content-Type':'application/json'})},body:multipart?body:JSON.stringify(body),cache:'no-store',referrerPolicy:'no-referrer'});const data=await res.json();if(!res.ok)throw Error(data.error||'Request failed');return data;}
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bucket='recording-review-evidence', types=['image/jpeg','image/png','image/webp','application/pdf','video/mp4'];
 let user,assignments=[],returns=[],files=[],dirty=false;const pending=new Map(), dirtyIds=new Set();
@@ -49,15 +50,15 @@ const options=(name,values,value)=>'<select name="'+name+'">'+values.map(v=>'<op
 const input=(name,value,type='text')=>'<input name="'+name+'" type="'+type+'" value="'+esc(value??'')+'">';
 const choice=(label,name,values,value)=>'<div><label>'+label+'</label>'+options(name,values,value)+'</div>';
 function card(a){
- let own=returns.find(r=>r.assignment_id===a.id&&r.author_id===user.id&&!r.submitted_at),latest=returns.find(r=>r.assignment_id===a.id),r=own||{};
+ let own=returns.find(r=>r.assignment_id===a.id&&r.access_link_id===viewer.link_id&&!r.submitted_at),latest=returns.find(r=>r.assignment_id===a.id),r=viewer.role==='reviewer'?(latest||{}):(own||{});
  const detail=document.createElement('details');detail.dataset.id=a.id;
- detail.innerHTML='<summary>'+esc(a.unit_name)+'  /  '+esc(a.camera_name)+'<small>'+esc(a.assignee_name)+'  /  '+esc(a.public_ip||'IP unavailable')+'  /  '+(latest?.submitted_at?'Response submitted  /  pending verification':'Response needed')+'</small></summary><p>'+esc(a.finding)+'</p><p class="muted"><b>Next check:</b> '+esc(a.next_action)+'</p>'+(a.camera_url&&/^http:\/\/[^\s]+$/.test(a.camera_url)?'<p><a href="'+esc(a.camera_url)+'" target="_blank" rel="noopener noreferrer">Open camera  / </a></p>':'')+
+ detail.innerHTML='<summary>'+esc(a.unit_name)+'  /  '+esc(a.camera_name)+'<small>'+esc(a.assignee_name)+'  /  '+esc(a.public_ip||'IP unavailable')+'  /  '+(latest?.submitted_at?'Response submitted  /  pending verification':'Response needed')+'</small></summary><p>'+esc(a.finding)+'</p><p class="muted"><b>Next check:</b> '+esc(a.next_action)+'</p>'+(a.camera_url&&/^http:\/\/[^\s]+$/.test(a.camera_url)?'<p><a href="'+esc(a.camera_url)+'" target="_blank" rel="noopener noreferrer">Open camera &rarr;</a></p>':'')+
  '<form><fieldset><legend>1. What happened?</legend>'+
  choice('Select a status','status',['Needs review','Not resolved','Waiting','Partly completed','Repair complete - verify'],r.status||'Needs review')+
  '<label>Actual work / result<textarea name="notes" maxlength="20000" placeholder="What did you check or fix? What did you see?">'+esc(r.notes||'')+'</textarea></label><div class="grid"><div><label>Remaining action<textarea name="next_action" maxlength="10000" placeholder="What still needs to happen?">'+esc(r.next_action||'')+'</textarea></label></div><div><label>ETA / next update'+input('eta',r.eta)+'</label></div></div>'+
  '<label>Work performed <small>(select all that apply)</small></label><div class="checkrow">'+['Checked playback','Checked SD card','Corrected time / DST','Replaced SD card','Replaced camera','Field visit needed','Formatting performed with approval'].map(v=>'<label><input type="checkbox" name="actions" value="'+esc(v)+'"'+((r.actions||[]).includes(v)?' checked':'')+'> '+esc(v)+'</label>').join('')+'</div></fieldset>'+
  '<fieldset><legend>2. Playback and picture</legend><div class="grid">'+choice('Recorded playback','playback',['Not tested','Passed','Failed','Unable to access'],r.playback||'Not tested')+choice('Picture quality','picture',['Not checked','Clear / usable','Dark or black','Blurred / obstructed','Frozen / incorrect view'],r.picture||'Not checked')+'<div><label>Footage date and time <small>(visible timestamp)</small>'+input('footage_time',(r.footage_time||'').slice(0,19),'datetime-local')+'</label></div><div><label>Timezone'+input('footage_timezone','America/Chicago')+'</label></div><div><label>Seconds played'+input('duration_seconds',r.duration_seconds,'number')+'</label></div>'+choice('SD card','sd_card',['Not checked','Normal','No card detected','Not initialized','Fault / replace','Unable to read'],r.sd_card||'Not checked')+choice('Central time / automatic DST','central_dst',['Not checked','Verified correct','Corrected and verified','Still incorrect','Unable to check'],r.central_dst||'Not checked')+'</div></fieldset>'+
- '<fieldset><legend>3. Add photos or attachments</legend><div class="upload"><b>Recorded-footage screenshot required for a repair claim</b><p class="muted">Keep the footage timestamp visible. Add other files if useful. JPG, PNG, WebP, PDF or MP4  /  20 MB per file.</p><input class="picker" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4" multiple hidden><button type="button" class="pick"> /  Choose files from computer</button> <button type="button" class="uploadNow secondary" hidden>Upload selected files</button><div class="selected files"></div><div class="uploaded files"></div></div></fieldset>'+
+ '<fieldset><legend>3. Add photos or attachments</legend><div class="upload"><b>Recorded-footage screenshot required for a repair claim</b><p class="muted">Keep the footage timestamp visible. Add other files if useful. JPG, PNG, WebP, PDF or MP4  /  20 MB per file.</p><input class="picker" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4" multiple hidden><button type="button" class="pick">+ Choose files from computer</button> <button type="button" class="uploadNow secondary" hidden>Upload selected files</button><div class="selected files"></div><div class="uploaded files"></div></div></fieldset>'+
  '<div class="message local" role="status"></div><button type="button" class="save secondary">Save draft</button> <button type="submit">Submit response to James</button><p class="muted">Save draft lets you return later. Submit records your response for review; it does not send an email or close the issue.</p></form>';
  const form=detail.querySelector('form'),picker=detail.querySelector('.picker'),local=detail.querySelector('.local');
  form.elements.footage_timezone.readOnly=true;form.elements.duration_seconds.min='0';form.elements.duration_seconds.max='3600';form.elements.footage_time.step='1';
@@ -67,17 +68,14 @@ function card(a){
  picker.onchange=()=>{const chosen=[...picker.files];pending.set(a.id,chosen);detail.querySelector('.selected').textContent=chosen.map(f=>f.name+' ('+Math.ceil(f.size/1024)+' KB)').join('  /  ');detail.querySelector('.uploadNow').hidden=!chosen.length;dirty=true;dirtyIds.add(a.id);};
  function showFiles(){
   const host=detail.querySelector('.uploaded');host.replaceChildren();
-  for(const f of files.filter(f=>f.assignment_id===a.id)){const box=document.createElement('div');box.className='file';const link=document.createElement('a');link.href='#';link.textContent='Open photo / attachment: '+f.filename;link.onclick=async e=>{e.preventDefault();try{const {data,error}=await db.storage.from(bucket).createSignedUrl(f.storage_path,300,{download:f.filename});if(error)throw error;window.open(data.signedUrl,'_blank','noopener,noreferrer');}catch(e){msg('Could not open file: '+e.message,true);}};box.append(link);const note=document.createElement('div');note.className='muted';note.textContent='Uploaded '+new Date(f.created_at).toLocaleString('en-US',{timeZone:'America/Chicago'})+' Central';box.append(note);host.append(box);}
+  for(const f of files.filter(f=>f.assignment_id===a.id)){const box=document.createElement('div');box.className='file';const link=document.createElement('a');link.href='#';link.textContent='Open photo / attachment: '+f.filename;link.onclick=async e=>{e.preventDefault();const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const data=await api({action:'open',file_id:f.id});if(popup)popup.location.replace(data.url);else{link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Click again to open: '+f.filename;link.onclick=null;}}catch(e){if(popup)popup.close();msg('Could not open file: '+e.message,true);}};box.append(link);const note=document.createElement('div');note.className='muted';note.textContent='Uploaded '+new Date(f.created_at).toLocaleString('en-US',{timeZone:'America/Chicago'})+' Central';box.append(note);host.append(box);}
  }
  async function upload(){
   const selected=pending.get(a.id)||[];if(!selected.length)return;
   for(const f of selected)if(!types.includes(f.type)||f.size<1||f.size>20971520)throw Error(f.name+': use a supported file no larger than 20 MB.');
   const btn=detail.querySelector('.uploadNow');btn.disabled=true;
-  try{for(const f of [...selected]){msg('Uploading '+f.name+' / ');const id=crypto.randomUUID(),safe=f.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-140),storage_path=a.id+'/'+user.id+'/'+id+'-'+safe;
-   const up=await db.storage.from(bucket).upload(storage_path,f,{upsert:false,contentType:f.type});if(up.error)throw up.error;
-   const row={assignment_id:a.id,uploader_id:user.id,storage_path,filename:f.name.slice(0,200),mime_type:f.type,size_bytes:f.size};
-   const saved=await db.from('recording_review_files').insert(row).select().single();if(saved.error)throw Error('File uploaded but its record could not be saved. Keep this page open and contact James: '+saved.error.message);
-   files.push(saved.data);pending.set(a.id,(pending.get(a.id)||[]).filter(x=>x!==f));showFiles();
+  try{for(const f of [...selected]){msg('Uploading '+f.name+' / ');const data=new FormData();data.append('assignment_id',a.id);data.append('file',f);const saved=await api(data);
+   files.push(saved.file);pending.set(a.id,(pending.get(a.id)||[]).filter(x=>x!==f));showFiles();
   }picker.value='';detail.querySelector('.selected').textContent='';btn.hidden=true;msg('Upload complete. Use Open photo / attachment above to check your file.');}finally{btn.disabled=false;}
  }
  detail.querySelector('.uploadNow').onclick=()=>upload().catch(e=>msg(e.message,true));
@@ -85,27 +83,39 @@ function card(a){
   const buttons=[...form.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
   try{await upload();const fd=new FormData(form),v=k=>String(fd.get(k)||'').trim();
    if(submit&&v('status')==='Repair complete - verify'&&(v('playback')!=='Passed'||Number(v('duration_seconds'))<20||!v('footage_time')||!v('notes')))throw Error('For a repair claim, add notes, successful playback of at least 20 seconds, a footage timestamp and an uploaded screenshot.');
-   const row={assignment_id:a.id,author_id:user.id,status:v('status'),notes:v('notes'),next_action:v('next_action'),eta:v('eta'),playback:v('playback'),picture:v('picture'),sd_card:v('sd_card'),central_dst:v('central_dst'),footage_time:v('footage_time')||null,footage_timezone:'America/Chicago',duration_seconds:v('duration_seconds')?Number(v('duration_seconds')):null,actions:fd.getAll('actions'),submitted_at:submit?new Date().toISOString():null};
-   const res=own?await db.from('recording_review_returns').update(row).eq('id',own.id).select().single():await db.from('recording_review_returns').insert(row).select().single();
-   if(res.error)throw res.error;dirtyIds.delete(a.id);dirty=dirtyIds.size>0;msg(submit?'Submitted  /  pending independent verification. Next-day recheck: '+res.data.recheck_on+'.':'Draft saved. Your uploaded files are retained.');
+   const values={status:v('status'),notes:v('notes'),next_action:v('next_action'),eta:v('eta'),playback:v('playback'),picture:v('picture'),sd_card:v('sd_card'),central_dst:v('central_dst'),footage_time:v('footage_time')||null,duration_seconds:v('duration_seconds')?Number(v('duration_seconds')):null,actions:fd.getAll('actions')};
+   const result=await api({action:'save',assignment_id:a.id,return_id:own?.id,values,submit});const res={data:result.response};
+   dirtyIds.delete(a.id);dirty=dirtyIds.size>0;msg(submit?'Submitted  /  pending independent verification. Next-day recheck: '+res.data.recheck_on+'.':'Draft saved. Your uploaded files are retained.');
    if(submit){form.querySelectorAll('input,select,textarea,button').forEach(e=>e.disabled=true);detail.querySelector('summary small').textContent=a.assignee_name+'  /  Response submitted  /  pending verification';}
    else{own=res.data;}
   }catch(e){msg(e.message,true);}finally{if(!form.querySelector('summary')&&!local.textContent.startsWith('Submitted'))buttons.forEach(b=>b.disabled=false);}
  }
- detail.querySelector('.save').onclick=()=>save(false);form.onsubmit=e=>{e.preventDefault();void save(true);};showFiles();return detail;
+ detail.querySelector('.save').onclick=()=>save(false);form.onsubmit=e=>{e.preventDefault();void save(true);};showFiles();
+ if(viewer.role==='reviewer'){
+  form.querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=true);
+  detail.querySelector('.upload .pick').hidden=true;
+  detail.querySelector('.save').hidden=true;form.querySelector('button[type=submit]').hidden=true;
+  const history=document.createElement('section');history.className='panel';
+  const records=returns.filter(x=>x.assignment_id===a.id);
+  const h=document.createElement('h2');h.textContent='Response history';history.append(h);
+  if(!records.length){const p=document.createElement('p');p.textContent='No response yet.';history.append(p);}
+  for(const x of records){const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=(x.submitted_at?'Submitted':'Draft')+' | '+new Date(x.updated_at).toLocaleString('en-US',{timeZone:'America/Chicago'})+' Central | '+(x.access_link_id?'via private technician link':'via COS sign-in')+'\n'+x.status+'\n'+x.notes+'\nNext action: '+x.next_action+'\nETA: '+x.eta+(x.recheck_on?'\nRecheck date: '+x.recheck_on:'');history.append(p);}
+  detail.append(history);
+ }
+ return detail;
 }
 function render(){const name=$('#owner').value,q=$('#search').value.toLowerCase();const shown=assignments.filter(a=>(!name||a.assignee_name===name)&&[a.unit_name,a.camera_name,a.public_ip].join(' ').toLowerCase().includes(q));$('#cards').replaceChildren(...shown.map(card));$('#count').textContent=shown.length+' camera assignments';}
 async function load(force=false){
  if(dirty&&!force&&!confirm('You have unsaved entries. Refresh and discard them?'))return;
- notice('Loading your camera assignments / ');const auth=await db.auth.getSession();user=auth.data.session?.user;
- $('#login').hidden=!!user;$('#workspace').hidden=!user;if(!user){notice('Sign in to open your private form.');return;}
- const result=await db.from('recording_review_assignments').select('*').order('unit_name').order('camera_name');if(result.error)throw result.error;assignments=result.data;
- const [rr,ff]=await Promise.all([db.from('recording_review_returns').select('*').order('created_at',{ascending:false}),db.from('recording_review_files').select('*').order('created_at')]);if(rr.error||ff.error)throw rr.error||ff.error;returns=rr.data;files=ff.data;
- $('#preview').hidden=!assignments.some(a=>!a.published&&a.reviewer_id===user.id);notice(assignments.length?'Signed in. Your work and files stay private.':'No released assignments are available for this account.');dirty=false;render();
+ if(!/^[0-9a-f]{64}$/.test(token)){notice('Open the complete private link James provided. No account sign-in is needed.',true);return;}
+ notice('Loading your camera assignments...');const data=await api({action:'list'});
+ assignments=data.assignments;returns=data.returns;files=data.files;viewer=data.viewer;user={id:viewer.actor_id};
+ $('#workspace').hidden=false;
+ if(viewer.role==='technician'){$('#owner').value=viewer.name;$('#owner').disabled=true;}
+ $('#preview').textContent=viewer.role==='reviewer'?"James's review: view both technicians' progress, responses and attachments here. This link is read-only. Bookmark it to return anytime.":"Your private "+viewer.name+" form: no COS sign-in required. Responses are recorded as submitted through this link. Keep it within your team.";
+ notice(viewer.name+' | Report date: '+viewer.report_date+' | No COS sign-in required.');dirty=false;dirtyIds.clear();pending.clear();render();
 }
-$('#loginForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),username=String(fd.get('username')).trim().toLowerCase();const email=username.includes('@')?username:username+'@cameras-on-site.invalid';const password=String(fd.get('password'));const r=await db.auth.signInWithPassword({email,password});e.target.elements.password.value='';if(r.error){notice('Sign-in failed. Use your normal COS username and password.',true);return;}load().catch(e=>notice(e.message,true));};
-const owner=new URL(location.href).searchParams.get('assignee');if(['Teddy','Victor'].includes(owner))$('#owner').value=owner;
-for(const id of ['owner','search'])$('#'+id).onchange=()=>{if(dirty&&!confirm('Changing the view discards unsaved entries. Continue?'))return;dirty=false;render();};
+for(const id of ['owner','search'])$('#'+id).onchange=()=>{if(dirty&&!confirm('Changing the view discards unsaved entries. Continue?'))return;dirty=false;dirtyIds.clear();pending.clear();render();};
 $('#refresh').onclick=()=>load().catch(e=>notice(e.message,true));window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 load().catch(e=>notice('Unable to load form: '+e.message,true));
 </script></html>
