@@ -136,3 +136,4 @@ $function$
 
 ;
 drop function cos_mhelp_placement_private.authoritative_product_records(jsonb,boolean);
+drop function cos_mhelp_placement_private.recorded_shop_return_current(text,uuid,uuid);
