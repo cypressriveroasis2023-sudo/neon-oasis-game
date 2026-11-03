@@ -1,0 +1,19 @@
+{
+  "baseVersion": 138,
+  "baseArchiveSha256": "24716983d4df4b271ae0abc2b191a1437528079cda372ba5d912f439d086474c",
+  "overlaySha256": "80e649526271d7b77e1f350a16865a4ff001d2e0ccd14d81e07fd23232b82e1b",
+  "expectedBefore": {
+    "serve.ts": "3e1dc7b4f2ef766776eea35bebc8a4da5c4d8a1f3d5baf182e211fff06eea66c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "productTcpRuntime.ts": "cb89bbd87f18b6e9286425800a5cab969d4152eef0ed67b55426044522fba854",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "serve.ts": "11adeb666c91b1e3f96746bcca127b9d60e77a8fca440cf7d15da3939ac3a834",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "productTcpRuntime.ts": "2219ec3bd3cd8deb44603995d2cb215ba7b46188a4aead1db0d739b83fb6a0d3",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  }
+}

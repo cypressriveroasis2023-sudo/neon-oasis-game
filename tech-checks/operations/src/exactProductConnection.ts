@@ -47,6 +47,7 @@ export type SavedTcpEndpoint={
  expectedPorts:number[];
  connectionRevision:number|string;
  monitoringEnabled:boolean;
+ activationState?:string;
  portStatus:Record<string,unknown>|null;
 };
 export type ExactProductConnectionStatus='online'|'offline'|'unknown';
@@ -140,8 +141,8 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  * keeps explicit per-Product-ID source holds as Unknown, never relocates
  * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
-export function buildExactProductConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>
+function buildProductConnections(
+ acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>,reachabilityOnly=false
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
  if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
@@ -152,6 +153,7 @@ export function buildExactProductConnections(
   ||!Array.isArray(tracker.records)||tracker.records.length!==authority.total
   ||!Array.isArray(devices)||devices.length>10000)return null;
  const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
+ if(reachabilityOnly&&!isolated)return null;
  if(isolated&&(!HASH.test(tracker.trackerSourceSha256)||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(tracker.sourceExport)))return null;
  const products=(acceptedMhelp as {records:Record<string,any>[]}).records;
  const expected=new Map(products.map(p=>[p.productId,p]));
@@ -176,9 +178,11 @@ export function buildExactProductConnections(
   if(publicIp(row.publicIp))ipClaims.set(row.publicIp!,(ipClaims.get(row.publicIp!)||0)+1);
  }
  if(byProduct.size!==expected.size||[...expected.keys()].some(id=>!byProduct.has(id)))return null;
- const endpoints=new Map<string,SavedTcpEndpoint[]>();
+ const endpoints=new Map<string,SavedTcpEndpoint[]>(),endpointIds=new Set<string>();
  for(const device of devices){
   if(!object(device)||!deviceId(device.deviceId)||!Array.isArray(device.expectedPorts))return null;
+  if(reachabilityOnly&&endpointIds.has(String(device.deviceId)))return null;
+  endpointIds.add(String(device.deviceId));
   const ip=publicIp(device.publicIp);
   if(!ip)continue;
   const list=endpoints.get(ip)||[];list.push(device as SavedTcpEndpoint);endpoints.set(ip,list);
@@ -194,6 +198,22 @@ export function buildExactProductConnections(
   if(!ip)return unknown(pid,'No verified public tracker IP is available for this Product ID.');
   if(ipClaims.get(ip)!==1)return unknown(pid,'Another Product ID claims this tracker IP; verify endpoint ownership.');
   const devicesForIp=endpoints.get(ip)||[];
+  if(reachabilityOnly){
+   // The Owner's current exact Product-ID/IP assignment defines this network
+   // target. Native equipment/provider identity is a separate claim. Existing
+   // monitored service checks may establish reachability, never video, camera
+   // counts or physical resource membership. Disabled configurations stay out.
+   const active=devicesForIp.filter(d=>d.monitoringEnabled===true&&(d.activationState===undefined||d.activationState==='active'));
+   if(!active.length)return unknown(pid,'No enabled service-port check configuration matches the current tracker IP.');
+   const checks=active.map(d=>completedSavedTcpCheck(d,now));
+   if(checks.some(c=>!c))return unknown(pid,'No fresh, completed check covers every enabled service-port configuration at this tracker IP.');
+   const completed=checks as NonNullable<ReturnType<typeof completedSavedTcpCheck>>[];
+   const positive=completed.find(c=>c.status==='online'),result=positive||completed[0];
+   const oldest=completed.map(c=>c.checkedAt!).sort()[0];
+   return {productId:pid,...result,checkedAt:oldest,
+    reason:positive?'Completed service-port checks responded at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'
+     :'Completed service-port checks had no response at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'};
+  }
   if(devicesForIp.length!==1)return unknown(pid,devicesForIp.length?'More than one saved endpoint claims this tracker IP; verify exact device ownership.':'No saved camera endpoint matches the current tracker IP.');
   const result=completedSavedTcpCheck(devicesForIp[0],now);
   if(!result)return unknown(pid,'No fresh, completed, exact-target TCP/service-port check is available.');
@@ -202,6 +222,18 @@ export function buildExactProductConnections(
  });
  if(items.length!==authority.field)return null;
  return {contract:EXACT_PRODUCT_CONNECTION_CONTRACT,sourceSha256:authority.sourceSha256,trackerVerifiedAt:safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)!,items};
+}
+
+/** Original strict physical-resource attribution boundary, unchanged. */
+export function buildExactProductConnections(acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>){
+ return buildProductConnections(acceptedMhelp,tracker,devices,now,resourceMembership);
+}
+/** Owner-authorized unit IP/service reachability. Uses only a complete current
+ * V2 Product-ID/IP census. Does not require a native equipment UUID or assert
+ * physical camera membership; all source, lifecycle and IP ownership holds stay.
+ */
+export function buildTrackerIpReachability(acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now()){
+ return buildProductConnections(acceptedMhelp,tracker,devices,now,undefined,true);
 }
 
 /** Browser-facing verification also rejects an incomplete/replayed census.
