@@ -27,15 +27,19 @@ const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
 type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
 const pendingFleetSnapshots=new Map<string,FleetReads>();
 let fleetRevision=0,privateSessionRevision=0;
+let durableFleetEnabled=false,durableFleetStatus:any=null;
+export function savedFleetStatus(){return durableFleetStatus;}
+export function usesDurableFleetBoard(){return durableFleetEnabled;}
+const publishDurableStatus=(value:any)=>{durableFleetStatus=value;window.dispatchEvent?.(new Event('cos-durable-fleet-status'));};
 // Reasons contain no token or identity. Missing/unknown reasons remain hard stops.
 function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide') {
  window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason}}));
 }
 function clearSharedReads(){pendingReads.clear();fleetSnapshots.clear();pendingFleetSnapshots.clear();fleetRevision++;}
 if(typeof window!=='undefined'){
- window.addEventListener?.('cos-private-data-invalidated',()=>{privateSessionRevision++;clearSharedReads();});
- window.addEventListener?.('pagehide',()=>{privateSessionRevision++;clearSharedReads();});
- window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){privateSessionRevision++;clearSharedReads();}});
+ window.addEventListener?.('cos-private-data-invalidated',()=>{privateSessionRevision++;durableFleetStatus=null;clearSharedReads();});
+ window.addEventListener?.('pagehide',()=>{privateSessionRevision++;durableFleetStatus=null;clearSharedReads();});
+ window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){privateSessionRevision++;durableFleetStatus=null;clearSharedReads();}});
 }
 let tokenRequest: Promise<ParentSession> | null = null;
 let lastVerifiedSession: ParentSession | null = null;
@@ -102,7 +106,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
-  if(method==='POST'&&path==='/api/product-connections/verify')return sendRequest<T>(method,path,session.token,body,options?.signal);
+  if(method==='POST'&&path==='/api/product-connections/verify'){const result=await sendRequest<T>(method,path,session.token,body,options?.signal);if(durableFleetEnabled)void sendRequest('POST','/api/fleet-saved-board/refresh',session.token,{}).catch(()=>{});return result;}
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
@@ -186,6 +190,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     }
     if(!response.ok&&scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',response.status),{diagnostic:readConnectionDiagnostic(data?.diagnostic)});
     if (!response.ok) throw new OperationsApiError(typeof data?.error === 'string' ? data.error : 'Operations request failed.', response.status);
+    if(path==='/api/session')durableFleetEnabled=data?.features?.durableFleetBoard===true;
     return { data };
   } finally { window.clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
 }
@@ -201,6 +206,23 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     const session=await requestParentToken();
     if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
     const key=JSON.stringify([session.token,session.role,mode]);
+    if(durableFleetEnabled){
+      const pending=pendingFleetSnapshots.get(key);if(pending)return pending;
+      const generation=++fleetRevision,privateRevision=privateSessionRevision;
+      const current=()=>generation===fleetRevision&&privateRevision===privateSessionRevision&&lastVerifiedSession?.token===session.token&&lastVerifiedSession?.role===session.role;
+      const previous=fleetSnapshots.get(key);if(previous)onSaved?.(previous.value);
+      const publish=(value:FleetSnapshot)=>{if(!current())return;fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));};
+      const paired=import('./durableFleetClient').then(({durableFleetRead})=>durableFleetRead({
+        read:async refresh=>(await sendRequest<any>(refresh?'POST':'GET',refresh?'/api/fleet-saved-board/refresh':'/api/fleet-saved-board',session.token,refresh?{}:undefined)).data,
+        current,status:value=>{if(current())publishDurableStatus(value);},publish,
+        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}
+      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});return value;});
+      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);
+      const reads={paired,health,fieldMap,connectionMap:fieldMap};
+      for(const part of [paired,health,fieldMap])void part.catch(()=>{});
+      pendingFleetSnapshots.set(key,reads);void paired.finally(()=>{if(pendingFleetSnapshots.get(key)===reads)pendingFleetSnapshots.delete(key);}).catch(()=>{});
+      return reads;
+    }
     const saved=fleetSnapshots.get(key);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
     if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};

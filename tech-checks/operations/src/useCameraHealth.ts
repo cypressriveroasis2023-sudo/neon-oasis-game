@@ -13,7 +13,7 @@ export function useCameraHealth(){
   const completed=useRef<FleetSnapshot|null>(null);
   // Independently loaded map authority can arrive after the health response.
   // Evaluate accepted data at local arrival time without starting another read.
-  const updateClock=useCallback(()=>setNow(Date.now()),[]);
+  const updateClock=useCallback(()=>setNow(completed.current?Date.parse(completed.current.readAt):Date.now()),[]);
   const refresh=useCallback(async(force=false)=>{
     if(running.current)return;
     running.current=true;lastAttemptAt.current=Date.now(); const request=++revision.current,historyRequest=historyRevision.current;setLoading(true);

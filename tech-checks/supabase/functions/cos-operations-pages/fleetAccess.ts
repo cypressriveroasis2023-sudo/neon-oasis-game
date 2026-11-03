@@ -7,16 +7,16 @@ export function verifiedItFleet(context: any): boolean {
      (context.legacyId === '05bf20fe-19f7-4db7-ac05-5b2a5f681fdf' && context.actorId === 'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'));
 }
 export function fleetRouteAllowed(method: string, path: string): boolean {
-  return method === 'GET' && (path === '/api/unit-tracker' || /^\/api\/unit-tracker\/(?:requests\/)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(path))
-    || method === 'POST' && (path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
+  return method === 'GET' && /^\/api\/fleet-saved-board\/history\/[a-f0-9-]{36}$/i.test(path) || method === 'GET' && (path === '/api/unit-tracker' || /^\/api\/unit-tracker\/(?:requests\/)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(path))
+    || method === 'POST' && (path === '/api/fleet-saved-board/refresh' || path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
     || method === 'GET' && new Set([
-    '/api/session', '/api/field-map', '/api/camera-health/summary',
+    '/api/fleet-saved-board', '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/product-connections', '/api/routers',
     // Saved, read-only installations only. /refresh and all discovery/sharing writes stay Owner-only.
     '/api/vrm-fleet',
   ]).has(path);
 }
 export function fleetFeatures() {
-  return {unitTracker:true, fleetAccess:true, vrmRead:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
+  return { durableFleetBoard: true,unitTracker:true, fleetAccess:true, vrmRead:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
     cameraHealthV2:true, fieldLocationVerification:false, mhelpTicketImport:false, deliveryGoBack:false};
 }

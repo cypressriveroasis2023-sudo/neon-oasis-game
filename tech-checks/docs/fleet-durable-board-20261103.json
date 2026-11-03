@@ -1,0 +1,24 @@
+{
+  "repair": "durable shared completed Fleet board",
+  "baseCommit": "354b83f0bd9e03f6f4f3037aa9ef227d5ac23012",
+  "backendProject": "tughscoxralhofrckvxy",
+  "backendFunction": "cos-operations-pages",
+  "backendVersion": 145,
+  "backendArtifactSha256": "1c1ae748fdece341c5000b269d44e7407ae65369b0144f954db608f45dd19a7f",
+  "migration": "cos_durable_fleet_board",
+  "preservedHistoricalUpdates": 48,
+  "validation": {
+    "typecheck": "passed",
+    "apiAndHookRegressionTests": 161,
+    "durableProjectionDatabaseClientTests": 6,
+    "accessTests": 10,
+    "mobileBrowser": "reopen, elapsed clock, failed refresh, complete negative replacement, unit history, session invalidation passed",
+    "productionFirstNewBatch": "pending an authenticated normal app read; historical data is not activated as a current board"
+  },
+  "boundaries": {
+    "source": "mHelp Product IDs and placements; exact 2027 tracker connection authority",
+    "failedBatch": "keeps last completed board and records error",
+    "checks": "reads saved observations; existing provider and probe schedules are unchanged",
+    "storage": "private service-only invoker functions; original tokens are never persisted"
+  }
+}
