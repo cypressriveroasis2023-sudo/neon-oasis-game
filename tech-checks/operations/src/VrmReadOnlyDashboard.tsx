@@ -1,3 +1,4 @@
+import VrmEnergyFlow from './VrmEnergyFlow';
 import type { VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import type { SafeVrmPower } from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import type { PowerMetric } from '../../supabase/functions/cos-operations-pages/vrmPower';
@@ -12,7 +13,7 @@ const cards: { metric: PowerMetric; label: string; kind: string }[] = [
   {metric:'battery_power',label:'Battery power',kind:'detail'},
 ];
 const time = (value:string) => new Date(value).toLocaleString(undefined,{timeZoneName:'short',hour12:true});
-export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed=false,now}:{unit:VrmUnit;rows:SafeVrmPower[];invalid?:boolean;readFailed?:boolean;now:number}) {
+export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed=false,now,embedded=false}:{unit:VrmUnit;rows:SafeVrmPower[];invalid?:boolean;readFailed?:boolean;now:number;embedded?:boolean}) {
   const row = dashboardPowerFor(unit, rows);
   const selected = cards.map(card => ({...card,readings:card.metric === 'battery_soc' ? chargeReadings(row,now) : [selectReading(row,card.metric,now)].filter(reading => reading !== undefined)}));
   const reported = selected.flatMap(card => card.readings);
@@ -20,13 +21,15 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
   const issue = readFailed || invalid || Boolean(row?.errorCode);
   const status = unit.available === false ? 'Installation unavailable' : issue ? 'Readings could not be refreshed' : !reported.length ? 'Waiting for readings' : old ? 'Saved readings · some are stale' : 'Recent saved readings';
   const alarms = row?.measurements.filter(reading => reading.unit === 'state' && reading.value > 0) ?? [];
-  return <section id='vrm-native-dashboard' className='vrm-native-dashboard' aria-label={unit.name+' read-only power dashboard'}>
+  return <section id={embedded?undefined:'vrm-native-dashboard'} className={'vrm-native-dashboard'+(embedded?' vrm-native-embedded':'')} aria-label={unit.name+' read-only power dashboard'}>
     <div className='vrm-native-heading'><div><span className='vrm-eyebrow'>COS · READ-ONLY ENERGY</span><h4>Power overview</h4></div><span className={'vrm-native-status'+(old||issue?' vrm-native-warning':'')} role='status'>{status}</span></div>
     <p className='vrm-native-caption'>Saved Victron measurements. This view updates with fleet sync; it is not a live Remote Console.</p>
+    <VrmEnergyFlow row={row} now={now} paused={issue||unit.available===false}/>
     <div className='vrm-native-grid'>{selected.map(({metric,label,kind,readings}) => <article key={metric} className={'vrm-native-card vrm-native-'+kind} aria-label={label}>
       <h5>{label}</h5>{metric === 'battery_soc' && readings.length > 1 && <p className='vrm-native-multiple'>Separate source readings · no combined charge</p>}
       {readings.length ? readings.map((reading,index) => <div className='vrm-native-reading' key={reading.source+':'+reading.instance+':'+index}>
         <strong className='vrm-native-value'>{reading.value.toLocaleString(undefined,{maximumFractionDigits:2})}<small> {reading.unit}</small></strong>
+        {metric==='battery_soc'&&<meter className='cos-energy-charge' min={0} max={100} low={20} optimum={80} value={reading.value} aria-label={'Saved battery charge · '+reading.source+' '+reading.instance}>{reading.value}%</meter>}
         <p><span className={readingIsFresh(reading,now)?'':'vrm-native-warning'}>{readingIsFresh(reading,now)?'Saved reading':'Stale'} · {time(reading.observedAt)}</span><span className='vrm-native-source'>{reading.source} · instance {reading.instance}</span></p>
       </div>) : <><strong className='vrm-native-value'>—</strong><p>Not reported</p></>}
     </article>)}</div>

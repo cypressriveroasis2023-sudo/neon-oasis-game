@@ -1,0 +1,68 @@
+{
+  "checkedAt": "2026-11-03T17:03:00Z",
+  "project": "tughscoxralhofrckvxy",
+  "description": "Read provider shared boolean during existing scheduled discovery; surface exact installation flags; suppress iframe when sharing is disabled. No share settings, secrets, authentication or inventory changed.",
+  "migration": "tech-checks/operations/db/20261103_cos_vrm_sharing_status.sql",
+  "backend": {
+    "slug": "cos-operations-pages",
+    "beforeVersion": 139,
+    "beforeArchive": "120bcc46b2c95b408291e7e368a1ca42550d44e9de46f6ffc32f0bb97a84d1be",
+    "afterVersion": 140,
+    "afterArchive": "890913b8680925c618d2404eeab3d1c3535e345129d4e341987077ed3fe631ff",
+    "verifyJwtPreserved": true,
+    "allFilesReadbackMatch": true,
+    "edits": [
+      {
+        "file": "serve.ts",
+        "occurrences": 1,
+        "needle": "unit.available===!1?null:typeof links",
+        "replacement": "unit.available===!1||unit.sharingEnabled===!1?null:typeof links"
+      },
+      {
+        "file": "serve.ts",
+        "occurrences": 1,
+        "needle": "item.available!==void 0&&typeof item.available!=\"boolean\"||item.lastSeenAt",
+        "replacement": "item.available!==void 0&&typeof item.available!=\"boolean\"||item.sharingEnabled!==void 0&&item.sharingEnabled!==null&&typeof item.sharingEnabled!=\"boolean\"||item.lastSeenAt"
+      },
+      {
+        "file": "serve.ts",
+        "occurrences": 1,
+        "needle": "embedUrl:item.embedUrl,...item.number",
+        "replacement": "embedUrl:item.embedUrl,...item.sharingEnabled===void 0?{}:{sharingEnabled:item.sharingEnabled},...item.number"
+      },
+      {
+        "file": "serve.ts",
+        "occurrences": 1,
+        "needle": "{installationId:row2.idSite,name:row2.name}});return{userId:user.id,items}}",
+        "replacement": "{installationId:row2.idSite,name:row2.name,...typeof row2.shared===\"boolean\"?{sharingEnabled:row2.shared}:{}}});return{userId:user.id,items}}"
+      },
+      {
+        "file": "serve.ts",
+        "occurrences": 1,
+        "needle": "embedUrl:item.available===!1?null:(byId",
+        "replacement": "embedUrl:item.available===!1||item.sharingEnabled===!1?null:(byId"
+      }
+    ],
+    "unchangedFiles": [
+      "trackerEndpointRead.mjs",
+      "trackerEndpointProducer.mjs",
+      "productTcpRuntime.ts",
+      "deno.json"
+    ]
+  },
+  "scheduler": {
+    "slug": "cos-vrm-fleet-sync",
+    "beforeVersion": 4,
+    "beforeArchive": "a30e177689b3d4973284c9c53b010be259a66a95e78a2bde233764ea2728ab15",
+    "afterVersion": 5,
+    "afterArchive": "b923e5bd94798c3de66afe166134a9c1dcbc0d407eb7f0f158fbef6e7c5d23b4",
+    "verifyJwtPreserved": true,
+    "allFilesReadbackMatch": true,
+    "changedFiles": [
+      "cos-operations-pages/vrm.ts",
+      "cos-operations-pages/vrmDiscovery.ts"
+    ]
+  },
+  "officialProviderSchema": "https://vrm-api-docs.victronenergy.com/docs/Commands/User/docs/InstallationsCommand.yaml",
+  "warning": "Production bridge is a recorded overlay. Do not deploy the repository cos-operations-pages directory wholesale."
+}

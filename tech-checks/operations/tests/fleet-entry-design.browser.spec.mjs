@@ -12,7 +12,7 @@ for(const it of [false,true])test(`Fleet opens first with compact summary design
  await expect(board.locator('.cos-equipment-total-helios .cos-equipment-total-number strong')).toHaveText('1');
  await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
  await expect(board.locator('.cos-field-product-cards')).toBeVisible();
- await expect(board.locator('.cos-field-product-cards article').first().locator('details')).not.toHaveAttribute('open','');
+ await expect(board.locator('.cos-field-product-cards article').first().locator('details').first()).not.toHaveAttribute('open','');
  expect(await board.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
  if(testInfo.project.name!=='mobile-390'){
   const mapTab=await nav.getByRole('button',{name:/Map/}).boundingBox(),fleetTab=await nav.getByRole('button',{name:/Fleet health/}).boundingBox();

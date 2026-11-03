@@ -11,7 +11,7 @@ export const heliosVrmUnits = [
   { number: 8, name: 'HELIOS 008', installationId: 1039531 },
   { number: 9, name: 'HELIOS 009', installationId: 1039500 },
 ] as const;
-export type VrmInstallation = { number?: number; name: string; installationId: number; lastSeenAt?: string | null; available?: boolean };
+export type VrmInstallation = { number?: number; name: string; installationId: number; lastSeenAt?: string | null; available?: boolean; sharingEnabled?: boolean | null };
 export type VrmUnit = VrmInstallation & { portalUrl: string; embedUrl: string | null };
 export type VrmSync = {
   state: 'not_configured' | 'idle' | 'syncing' | 'current' | 'stale' | 'error';
@@ -43,7 +43,7 @@ export function vrmPortalConfig(raw?: string, installations: readonly VrmInstall
     if (!validInstallationId(id) || String(id) !== key || link !== null && !validVrmEmbed(link, id)) throw new Error('VRM dashboard configuration is unavailable.');
   }
   const items = installations.map(unit => ({ ...unit, portalUrl: vrmPortalUrl(unit.installationId),
-    embedUrl: unit.available === false ? null : typeof links[String(unit.installationId)] === 'string' ? links[String(unit.installationId)] as string : null }));
+    embedUrl: unit.available === false || unit.sharingEnabled === false ? null : typeof links[String(unit.installationId)] === 'string' ? links[String(unit.installationId)] as string : null }));
   return readVrmFleetConfig({ items, sync });
 }
 export function readVrmFleetConfig(value: unknown): VrmFleetConfig {
@@ -54,9 +54,11 @@ export function readVrmFleetConfig(value: unknown): VrmFleetConfig {
     if (!item || !validInstallationId(item.installationId) || seen.has(item.installationId) || !validVrmName(item.name) ||
       item.portalUrl !== vrmPortalUrl(item.installationId) || (item.embedUrl !== null && !validVrmEmbed(item.embedUrl, item.installationId)) ||
       item.number !== undefined && !validInstallationId(item.number) || item.available !== undefined && typeof item.available !== 'boolean' ||
+      item.sharingEnabled !== undefined && item.sharingEnabled !== null && typeof item.sharingEnabled !== 'boolean' ||
       item.lastSeenAt !== undefined && !validTime(item.lastSeenAt) || item.available === false && item.embedUrl !== null) throw new Error('VRM returned inconsistent installation links.');
     seen.add(item.installationId);
     return { installationId: item.installationId, name: item.name, portalUrl: item.portalUrl, embedUrl: item.embedUrl,
+      ...(item.sharingEnabled === undefined ? {} : { sharingEnabled: item.sharingEnabled }),
       ...(item.number === undefined ? {} : { number: item.number }), ...(item.available === undefined ? {} : { available: item.available }),
       ...(item.lastSeenAt === undefined ? {} : { lastSeenAt: item.lastSeenAt }) };
   });
