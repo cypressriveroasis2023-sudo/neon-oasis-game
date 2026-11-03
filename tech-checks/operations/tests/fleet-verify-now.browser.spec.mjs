@@ -80,3 +80,16 @@ test('40 mixed units retain 26 Online and 14 Offline after a cold reload with fa
  await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-unverified b')).toHaveText('0');
  expect(posts).toBe(10);expect(state.errors).toEqual([]);
 });
+
+test('saved connection refresh runs before the provider cache expires and never triggers probes',async({page})=>{
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true,advancingClock:true});
+ const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ const reads=state.calls.filter(c=>c.path==='/api/product-connections').length,health=state.calls.filter(c=>c.path==='/api/camera-health/summary-v3').length;
+ Object.assign(state.productConnections.items.find(i=>i.productId==='1001'),{status:'offline',reason:'Completed saved nonresponse.'});
+ await page.clock.fastForward(2*60*1000);
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('1');
+ expect(state.calls.filter(c=>c.path==='/api/product-connections').length).toBeGreaterThan(reads);
+ expect(state.calls.filter(c=>c.path==='/api/camera-health/summary-v3')).toHaveLength(health);
+ expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});
