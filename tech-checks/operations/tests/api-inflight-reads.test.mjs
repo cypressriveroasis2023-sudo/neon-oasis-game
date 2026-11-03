@@ -1,3 +1,4 @@
+import * as fleetSnapshotStorage from '../src/fleetSnapshotStorage.ts';
 import {readConnectionDiagnostic} from '../src/connectionDiagnostics.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -58,7 +59,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./fleetSnapshotStorage'?fleetSnapshotStorage:name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');

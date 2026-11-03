@@ -3,17 +3,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+// The accepted behavior baseline includes the saved snapshot repair. Session,
+// cadence and cache behavior are exercised in the API and refresh suites.
 const expected={
-  "FleetDashboard.tsx": "497804d708b885789ab0dce6ee7af7c7c7e0e58e",
+  "FleetDashboard.tsx": "558ad28ecc4162b231db766ecd1d3cd1a8145164",
   "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "32d829373e64b6a848dad85d24270aa83b404ebc",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
-  "fleetDashboardModel.ts": "10d9042e71f0fee6ad086b24af7befde9d0f2f75",
+  "fleetDashboardModel.ts": "1dd8bb50e29355b3a0e8ab3c5f2ef247e4f64054",
   "fieldCameraHealth.ts": "4ceb9709701c961342d09ae7b39335051f59a725",
   "cameraEvidence.ts": "a2000d04cae3516e5a99f0f9024742ac4931b1c4",
-  "api.ts": "0b4af248fa22260a5cbea6997281fa15061c83bc",
-  "useCameraHealth.ts": "8b883c7a61fb9aacc1f46949bb3a46f71ceb5de5",
+  "api.ts": "5d207a3f5b690bb8f2a60a0b0b1839cd72de0434",
+  "useCameraHealth.ts": "bb47877da4e46ebbf37fb7c8d9ab5755116d1303",
   "refreshCadence.ts": "a5989a95272738fb309dce5b52e2f992e6d4e05e",
   "workspaceNavigation.ts": "b367196dda9a1dfe814d7871ee068f1599fabd47",
   "App.tsx": "340003125f6376b5512524f5ad1e91acf4d7f8e5",

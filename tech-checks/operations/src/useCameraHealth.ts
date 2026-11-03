@@ -14,11 +14,11 @@ export function useCameraHealth(){
   const refresh=useCallback(async(force=false)=>{
     if(running.current)return;
     running.current=true;lastAttemptAt.current=Date.now(); const request=++revision.current,historyRequest=historyRevision.current;setLoading(true);
-    try {const next=await api.fleet(force,saved=>{if(request===revision.current){setFleet(saved);const savedAt=Date.parse(saved.readAt);if(historyRequest===historyRevision.current&&Number.isFinite(savedAt))setCameraHistory(previous=>rememberCameraHistory(previous,saved,savedAt));updateClock();}});validateCameraHealth(next.health);if(request===revision.current){
+    try {const next=await api.fleet(force,saved=>{if(request===revision.current){setFleet(saved);updateClock();}});validateCameraHealth(next.health);if(request===revision.current){
       // Adopting a cached pair is not a new saved-data read. Keep the original
       // request deadline when a view mounts or another consumer publishes it.
       if(typeof next.readStartedAt==='number'&&Number.isFinite(next.readStartedAt)&&next.readStartedAt<=Date.now())lastAttemptAt.current=next.readStartedAt;
-      const acceptedAt=Date.parse(next.readAt);if(historyRequest===historyRevision.current&&Number.isFinite(acceptedAt))setCameraHistory(previous=>historyRequest===historyRevision.current?rememberCameraHistory(previous,next,acceptedAt):previous);
+      const acceptedAt=Date.now();if(historyRequest===historyRevision.current)setCameraHistory(previous=>historyRequest===historyRevision.current?rememberCameraHistory(previous,next,acceptedAt):previous);
       setFleet(next);setError('');updateClock();}}
     catch(cause){if(request===revision.current){setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
     finally{if(request===revision.current){running.current=false;setLoading(false);}}

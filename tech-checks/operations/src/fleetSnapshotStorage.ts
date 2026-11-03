@@ -8,7 +8,7 @@ export type FleetSnapshotCacheEntry={value:FleetSnapshot;at:number};
 /** Bind a local display cache to the authenticated actor without storing its bearer token. */
 export async function fleetSnapshotStorageKey(token:string,role:string,mode:string|null):Promise<string|null>{
  try{
-  if(!globalThis.crypto?.subtle||typeof TextEncoder==='undefined')return null;
+  if(typeof localStorage==='undefined'||!globalThis.crypto?.subtle||typeof TextEncoder==='undefined')return null;
   // Access tokens may rotate during an otherwise unchanged signed-in session.
   // Use the signed subject only as a cache namespace; all requests still pass
   // through the existing parent-auth handshake and backend authorization.
