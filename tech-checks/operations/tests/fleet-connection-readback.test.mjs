@@ -15,3 +15,13 @@ test('inventory refresh cannot relabel old proof, bypass a session change or acc
   await assert.rejects(()=>fleetConnectionReadback(value,map(sha),{current:()=>current,now:()=>at,readReceipt:async()=>value,readMap:async()=>{if(kind==='session')current=false;const m=map(other);if(kind==='wrong-source')m.uploadInventory.sourceSha256='c'.repeat(64);return m;}}));
  }
 });
+test('failed same-source refresh preserves completed results but changed inventory and completed negatives replace them',()=>{
+ const old={...map(sha),productConnectionsState:'ready'};
+ const failed={...map(sha,at+60000),productConnections:null,productConnectionsState:'timeout'};
+ assert.equal(preferredFleetMap(old,failed),old);
+ const changed={...failed,uploadInventory:{...failed.uploadInventory,sourceSha256:other}};
+ assert.equal(preferredFleetMap(old,changed),changed);
+ const completed={...failed,productConnections:receipt(sha),productConnectionsState:'ready'};
+ completed.productConnections.items[0].status='offline';
+ assert.equal(preferredFleetMap(old,completed),completed);
+});

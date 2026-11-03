@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {retainCompletedSnapshot} from '../src/snapshotRetention.ts';
 import {readConnectionDiagnostic} from '../src/connectionDiagnostics.ts';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -35,7 +36,7 @@ function fixture({autoReply=true}={}){
  const document={hidden:false,addEventListener:(type,fn)=>add(documentListeners,type,fn),removeEventListener:(type,fn)=>documentListeners.get(type)?.delete(fn)};
  const ClockDate=class extends Date{static now(){return clock;}};
  const exports={};
- const modules={'./connectionDiagnostics':{readConnectionDiagnostic},'./exactProductConnection':{readExactProductConnections:()=>null},'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./cameraLastKnown':{rememberCameraHistory},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
+ const modules={'./snapshotRetention':{retainCompletedSnapshot},'./connectionDiagnostics':{readConnectionDiagnostic},'./exactProductConnection':{readExactProductConnections:()=>null},'./fleetSnapshot':{reconcileFleetSnapshot:(h,m)=>reconcileFleetSnapshot(h,m,clock)},'./fieldCameraHealth':{validateCameraHealth},'./cameraLastKnown':{rememberCameraHistory},'./gpsPersistence':{checkedFieldMap},'./refreshCadence':{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS,automaticRefreshDue},'../../it-feature-availability':{IT_DAILY_ONLY:true}};
  vm.runInNewContext(apiSource,{exports,window,location,URLSearchParams,AbortController,Event,Error,Date:ClockDate,require:name=>{assert.ok(modules[name],'Unexpected import '+name);return modules[name];},crypto:{randomUUID:()=>`synthetic-request-${++requestId}`},fetch(url,init){assert.equal(url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');if(JSON.parse(init.body).path==='/api/product-connections')return Promise.resolve({ok:false,status:503,json:async()=>({error:'Synthetic connection receipt unavailable'})});const result=deferred();init.signal.addEventListener('abort',()=>result.reject(new Error('Synthetic aborted request')),{once:true});requests.push({url,init,envelope:JSON.parse(init.body),result});return result.promise;}},{filename:'api.ts'});
  const api=exports.api;
  function mount(){
@@ -89,7 +90,7 @@ test('a failed read retains its full attempt backoff',async()=>{
 });
 
 test('hidden tabs pause reads and repeated visibility events resume only one shared pair',async()=>{
- const {f,hook}=await boot();await f.visible(false);await f.advance(20*60000);assert.equal(f.requests.length,2);assert.equal(hook.now,start+20*60000,'the observation clock still advances without renewing saved evidence');
+ const {f,hook}=await boot();await f.visible(false);await f.advance(20*60000);assert.equal(f.requests.length,2);assert.equal(hook.now,start,'the displayed classification stays at the last completed read while wall time advances');
  await f.visible(true);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);assert.equal(hook.loading,true);f.answerPair(2);await flush();assert.equal(hook.fleet.readStartedAt,start+20*60000);await f.advance(60000);assert.equal(f.requests.length,4);
 });
 

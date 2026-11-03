@@ -21,7 +21,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
   const unitError=error;const loadUnits=()=>refresh();
   const [ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
   const selected=units?.find(unit=>unit.id===initialUnitId);
-  const source=health&&fleet?cameraFieldProducts(fleet.fieldMap,health,now,!error):null;
+  const source=health&&fleet?cameraFieldProducts(fleet.fieldMap,health,now,true):null;
   const accepted=(source?.items||[]).flatMap(item=>item.linked?[item.linked]:[]);
   const rawDetail=selected?fieldCameraHealth(selected,units||[],health,now):null;
   const detail=selected?productConnectionUnitDetail(rawDetail,selected.id,accepted):null;
@@ -29,7 +29,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
   const group=selected&&health?cameraOverview(health,now,units||[]).groups.find(group=>group.unitIdentity?.unitId===selected.id):undefined;
   return <section className={'panel module camera-health-native'+(embedded?' cos-fleet-camera-troubleshooting':'')} aria-label='Camera Health'>
     <div className='panelhead'><div>{embedded?<h3>Camera troubleshooting</h3>:<><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></>}</div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Fleet Dashboard</button>}<button disabled={loading} onClick={()=>{void refresh(true);}}>{loading?'Reading saved results…':'Reload saved results'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
-    {error&&<div className='operations-error' role='alert'>{error} Current camera state cannot be verified.</div>}
+    {error&&<div className='operations-error' role='alert'>{error} {health?'Last completed results remain displayed with their original check times.':'Current camera state cannot be verified.'}</div>}
 
     {initialUnitId&&<section className='camera-unit-detail' aria-label='Selected field unit Camera Health'>
       {!units?<p role={unitError?'alert':'status'}>{unitError?'The selected field unit could not be verified. Reload saved results to retry.':'Verifying the selected field unit…'}</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
@@ -46,7 +46,7 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
       </>}
     </section>}
     {!health&&!error?<p role='status'>Loading Camera Health…</p>:health&&<>
-      {!initialUnitId&&<CameraHealthOverview fieldMap={fleet?.fieldMap} healthReadSucceeded={!error} roster={(fleet?.fieldMap as any)?.fleetRoster} powerReadEnabled={powerReadEnabled} health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
+      {!initialUnitId&&<CameraHealthOverview fieldMap={fleet?.fieldMap} healthReadSucceeded={Boolean(health)} roster={(fleet?.fieldMap as any)?.fleetRoster} powerReadEnabled={powerReadEnabled} health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh(true);}}/>}
       {initialUnitId&&<>
       <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every {Math.round(CAMERA_AUTO_REFRESH_MS/60000)} minutes while visible</p>
       <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2} fieldRecorderObservation={detail?.classification?.fieldRecorderVerified?detail.observation:undefined}/>
