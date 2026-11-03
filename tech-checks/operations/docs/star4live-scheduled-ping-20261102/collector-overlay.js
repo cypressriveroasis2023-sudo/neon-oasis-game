@@ -71,7 +71,7 @@ var CosStar4LiveScheduledPing20261102 = (() => {
     return p.online ? p.latency_ms !== null && !p.error : typeof p.error === "string" && ["timeout", "Connection refused (os error 111)", "Connection timed out (os error 110)"].includes(p.error);
   }
   async function collectScheduledStar4Live(db, probe, options = {}) {
-    const now = options.now ?? Date.now, start = options.startedAt ?? now(), deadline = start + Math.min(95e3, options.deadlineMs ?? 95e3), workers = 8;
+    const now = options.now ?? Date.now, start = options.startedAt ?? now(), deadline = start + Math.min(95e3, options.deadlineMs ?? 95e3), workers = 15;
     const call = (fn) => boundedRequest((s) => fn(options.signal ? AbortSignal.any([s, options.signal]) : s), deadline, now, options.ioTimeoutMs ?? 4e3);
     const seed = [];
     for (let offset2 = 0; offset2 < 1e4; offset2 += 1e3) {
@@ -98,8 +98,9 @@ var CosStar4LiveScheduledPing20261102 = (() => {
       const wave = queue.slice(cursor, cursor + workers);
       cursor += wave.length;
       const observations = await Promise.all(wave.map((c) => {
-        const { host, ports } = c.config, key = JSON.stringify([host, ports]);
-        if (transport.has(key)) return transport.get(key);
+        const { host, ports } = c.config, key = JSON.stringify([host, ports]), cached = transport.get(key);
+        if (cached && now() - cached.startedAt >= 0 && now() - cached.startedAt < 3e4) return cached.observation;
+        const startedAt = now();
         const observation = (async () => {
           try {
             const atStart = now(), values = await Promise.all(ports.map(async (p) => [String(p), await call(() => probe(host, p, 2200))])), at = now();
@@ -109,7 +110,7 @@ var CosStar4LiveScheduledPing20261102 = (() => {
             return null;
           }
         })();
-        transport.set(key, observation);
+        transport.set(key, { startedAt, observation });
         return observation;
       }));
       let current;

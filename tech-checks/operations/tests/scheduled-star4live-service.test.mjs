@@ -70,8 +70,24 @@ test('inventory/prior-health errors fail before sockets; duplicate IDs reject th
 test('abort/deadline prevents further work and deferred rows keep their previous observation time',async()=>{
  const f=fixture([device(),device({id:2})]),controller=new AbortController();controller.abort();await assert.rejects(f.run(undefined,{signal:controller.signal}));assert.equal(f.state.writes.length,0);
  const many=fixture(Array.from({length:17},(_,i)=>device({id:i+1,public_ip:'11.1.1.'+(i+1)})));let at=now;
- const r=await many.run(async()=>{at=now+96000;return response();},{now:()=>at});assert.equal(r.scanned,8);assert.equal(r.deferred,9);assert.equal(r.published,0);
+ const r=await many.run(async()=>{at=now+96000;return response();},{now:()=>at});assert.equal(r.scanned,15);assert.equal(r.deferred,2);assert.equal(r.published,0);
 });
 test('bounded hung inventory settles without sockets or publication',async()=>{
  const f=fixture();f.state.hang='camera_devices';await assert.rejects(f.run(undefined,{ioTimeoutMs:20}),/timed out/);assert.equal(f.state.writes.length,0);
+});
+
+test('312 configured resources fit the 95-second budget with bounded 15-resource waves',async()=>{
+ const f=fixture(Array.from({length:312},(_,i)=>device({id:i+1,public_ip:`11.1.${Math.floor(i/250)}.${i%250+1}`})));
+ let at=now,probes=0,writes=0;
+ f.state.beforePublish=()=>{if(writes++%15===0)at+=1500;};
+ const r=await f.run(async()=>{if(probes++%30===0)at+=2200;return response(false);},{now:()=>at});
+ assert.equal(r.scanned,312);assert.equal(r.published,312);assert.equal(r.deferred,0);assert.equal(r.complete,true);
+ assert.ok(at-now<95000);assert.equal(probes,624);
+});
+test('shared-IP evidence older than 30 seconds causes a real new probe without renewing cached timestamps',async()=>{
+ const f=fixture(Array.from({length:90},(_,i)=>device({id:i+1})));let at=now,probes=0,writes=0;
+ f.state.beforePublish=()=>{if(writes++%15===0)at+=10000;};
+ const r=await f.run(async()=>{probes++;return response();},{now:()=>at});
+ assert.equal(r.published,90);assert.equal(probes,4);
+ assert.deepEqual([...new Set(f.state.writes.map(w=>w.p_health.checked_at))],[new Date(now).toISOString(),new Date(now+30000).toISOString()]);
 });

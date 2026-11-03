@@ -4,6 +4,6 @@
   "verifyJwt": false,
   "fileName": "camera-health-sweep/index.ts",
   "expectedBefore": "b81455a4f0b1efc9f2480c0e390beb4c8cfad5ccbf4864ca6d65ec9c1559cf65",
-  "expectedAfter": "f658d533b1f4154fbcda9807284dad3922e417d6bd3a529c176567ad2568e67e",
-  "overlaySha256": "fbee429fbc0dfc7cec095d665dd54ab553074cba8386068572e4aef1b8741298"
+  "expectedAfter": "e9d5614a44cb93eb4ccc45d05fa8e1725812478525a01f61f2c4cc74f06f284b",
+  "overlaySha256": "e2ddf8ca49d2ef672d443712427a16805ef87a872f79ac5867a72e87ac83c83f"
 }

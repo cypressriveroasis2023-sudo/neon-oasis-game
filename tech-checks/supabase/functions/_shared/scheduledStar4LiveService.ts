@@ -25,7 +25,7 @@ function completed(v:unknown):v is Probe{
  * changes, no guessed ports, no activation and no browser-selected target.
  */
 export async function collectScheduledStar4Live(db:any,probe:(host:string,port:number,timeout:number)=>Promise<Probe>,options:{startedAt?:number;deadlineMs?:number;now?:()=>number;signal?:AbortSignal;ioTimeoutMs?:number}={}){
- const now=options.now??Date.now,start=options.startedAt??now(),deadline=start+Math.min(95000,options.deadlineMs??95000),workers=8;
+ const now=options.now??Date.now,start=options.startedAt??now(),deadline=start+Math.min(95000,options.deadlineMs??95000),workers=15;
  const call=<T>(fn:(signal:AbortSignal)=>PromiseLike<T>)=>boundedRequest(s=>fn(options.signal?AbortSignal.any([s,options.signal]):s),deadline,now,options.ioTimeoutMs??4000);
  const seed:Row[]=[];
  for(let offset=0;offset<10000;offset+=1000){
@@ -44,17 +44,20 @@ export async function collectScheduledStar4Live(db:any,probe:(host:string,port:n
  const oldest=[...candidates].sort((a,b)=>Number(times.get(String(a.device.id))??0)-Number(times.get(String(b.device.id))??0)||Number(a.device.id)-Number(b.device.id));
  const offset=oldest.length?Math.floor(start/900000)*workers%oldest.length:0;
  const reserved=oldest.length?Array.from({length:Math.min(workers,oldest.length)},(_,i)=>oldest[(offset+i)%oldest.length]):[],ids=new Set(reserved.map(c=>String(c.device.id)));
- const queue=[...reserved,...oldest.filter(c=>!ids.has(String(c.device.id)))],results:Row[]=[],transport=new Map<string,Promise<{ports:Row;at:number}|null>>();
+ const queue=[...reserved,...oldest.filter(c=>!ids.has(String(c.device.id)))],results:Row[]=[],transport=new Map<string,{startedAt:number;observation:Promise<{ports:Row;at:number}|null>}>();
  let cursor=0;
  while(cursor<queue.length&&!options.signal?.aborted&&now()+3300<deadline){
   const wave=queue.slice(cursor,cursor+workers);cursor+=wave.length;
   const observations=await Promise.all(wave.map(c=>{
-   const {host,ports}=c.config!,key=JSON.stringify([host,ports]);if(transport.has(key))return transport.get(key)!;
+   const {host,ports}=c.config!,key=JSON.stringify([host,ports]),cached=transport.get(key);
+   // Share recent socket evidence; old evidence must cause an actual new probe.
+   if(cached&&now()-cached.startedAt>=0&&now()-cached.startedAt<30000)return cached.observation;
+   const startedAt=now();
    const observation=(async()=>{try{
     const atStart=now(),values=await Promise.all(ports.map(async p=>[String(p),await call(()=>probe(host,p,2200))] as const)),at=now();
     if(options.signal?.aborted||at<atStart||at-atStart>2700||values.some(([,v])=>!completed(v)))return null;
     return {ports:Object.fromEntries(values),at};
-   }catch{return null;}})();transport.set(key,observation);return observation;
+   }catch{return null;}})();transport.set(key,{startedAt,observation});return observation;
   }));
   let current:Row[];
   try{const r:any=await call(s=>db.from('camera_devices').select(FIELDS).eq('source','vigilant_control_center').in('id',wave.map(c=>c.device.id)).abortSignal(s));if(r.error||!Array.isArray(r.data)||new Set(r.data.map((d:Row)=>id(d.id))).size!==r.data.length)throw Error('Changed');current=r.data;}

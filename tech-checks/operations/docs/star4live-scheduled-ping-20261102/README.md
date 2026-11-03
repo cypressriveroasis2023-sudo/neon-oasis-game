@@ -18,11 +18,12 @@ configurations. Run it in parallel with the unchanged Sniper/CAMV collector,
 under the same authenticated cron handler and request budget. No new schedule,
 API, credentials, Field/Shop assignments, provider bindings or database schema.
 The existing job remains at minutes0/15/30/45 with its existing145-second HTTP
-timeout; the new collector uses at most95seconds and8 bounded workers.
+timeout; the new collector uses at most95seconds and15 bounded workers.
 
 Only actual configured public IPv4 hosts and ports are used; no mHelp IP or
 guessed default port. Share a transport observation for identical host/port
-sets, but retain independent per-resource rereads and guarded publications.
+sets for up to30seconds, then perform new sockets rather than renew a cached
+timestamp. Retain independent per-resource rereads and guarded publications.
 Revalidate configuration/source/activation before publishing through the
 existing revision/IP/ports/profile CAS RPC. Retain observation timestamps.
 Incomplete, technical-error, changed or unconfirmed writes remain unverified.
@@ -61,7 +62,7 @@ COS Field-unit classifications separately from raw resource counts.
 
 ## Verification
 
-- 58 focused checks pass locally on Node24.22.1, including the original direct
+- 38 focused checks pass after throughput tuning locally on Node24.22.1, including the original direct
   scheduler/diagnostic regressions and new Star4Live collector/native routing.
 - New module passes a standalone strict TypeScript check. Full prepared native
   bundle compiles for ES2022 with zero warnings, keeping existing imports external.
@@ -83,3 +84,18 @@ node scripts/prepareStar4LiveSweepRuntime.mjs fresh-deployed.json rollback-nativ
 Require the pinned candidate file hash before reverting. Restore only this
 collector integration; no SQL, device, tracker, provider-status or schedule
 rollback is required. New saved TCP observations remain historical evidence.
+
+## First live run and throughput correction
+
+Native v65 produced186 fresh saved resource observations (166 Online/20 Offline)
+from312 eligible configurations, but its8-worker run deferred96 resources at the
+95-second limit. COS then showed119 Online/1 Offline/33 Unverified Star4Live Field
+units, up from78/1/74. Resource statuses are not Field-unit or channel counts.
+
+Increase to15 bounded resource workers, leaving the original10 direct workers,
+95-second deadline and15-minute schedule unchanged. Cache observations for at
+most30seconds; late shared-IP resources cause real new socket checks. Tests
+cover312 resources under simulated2.2-second sockets plus1.5-second publication
+waves, and repeated shared-IP probes with original observation timestamps.
+The tuned native candidate differs from v65 only in the isolated overlay.
+Full native compilation, strict module TypeScript and exact v64 rollback pass.
