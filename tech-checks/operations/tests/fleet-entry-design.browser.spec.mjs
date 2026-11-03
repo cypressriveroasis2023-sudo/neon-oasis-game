@@ -3,7 +3,7 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 for(const it of [false,true])test(`Fleet opens first with compact summary design for ${it?'IT':'Owner'}`,async({page},testInfo)=>{
  const f=fieldProductFixture();
- const {app,state}=await mountFleet(page,it,{hash:'?fleetView=helios#fleet-dashboard',field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
+ const {app,state}=await mountFleet(page,it,{hash:(it?'&':'?')+'fleetView=helios#fleet-dashboard',field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
  await expect(board).toHaveAttribute('data-fleet-view','map');
  const nav=app.getByRole('navigation',{name:'Fleet dashboard views',exact:true});
