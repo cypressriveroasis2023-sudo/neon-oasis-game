@@ -1,0 +1,22 @@
+{
+  "description": "Fleet now reloads saved TCP evidence through the same lean protected source as Verify. Expired individual browser checks become Unknown without discarding other fresh Product IDs.",
+  "beforeVersion": 142,
+  "beforeArchive": "be93bef95304692c12ab8109e26af38c24de5c124abed39f2cea8acf7c88b117",
+  "afterVersion": 143,
+  "afterArchive": "9136179671b7dd97af1ea04150d56daa8fe4490e11906183ce0088f490ad3e08",
+  "allServedFilesVerified": true,
+  "modifiedProductionFiles": [
+    "serve.ts"
+  ],
+  "unchangedFiles": [
+    "productCheckSource.ts",
+    "productVerifyNow.ts",
+    "trackerEndpointRead.mjs",
+    "trackerEndpointProducer.mjs",
+    "productTcpRuntime.ts",
+    "deno.json"
+  ],
+  "frontendBundle": "index-DSNQ-rdh.js",
+  "validation": "166 focused tests; typecheck; production build. CI browser checks pending.",
+  "limits": "No permanent Online assignment. Existing 15-minute sweep and observation timestamps preserved. Missing/disabled endpoint configurations still require correction. No inventory, placement, IP, ports, activation or authentication changes."
+}

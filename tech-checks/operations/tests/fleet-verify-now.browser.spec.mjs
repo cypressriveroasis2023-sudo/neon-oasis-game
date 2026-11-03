@@ -26,6 +26,13 @@ for(const it of [false,true])test(`Verify now confirms saved Helios status for $
  await expect(list).toContainText('Helios 1: Online');
  await expect(board.locator('.cos-helios-count-equation')).toContainText('1 inventory = 1 Field + 0 Shop');
  await list.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('verify-now-saved-result.png'),fullPage:true});
+ // A full reload destroys the manual overlay and every browser cache. The
+ // normal saved GET must recover the verified result without another POST.
+ state.fail=false;const beforeReload=state.calls.length;await page.reload();
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('0');
+ expect(state.calls.slice(beforeReload).some(c=>c.path==='/api/product-connections')).toBe(true);
+ expect(posts).toHaveLength(1);
  expect(state.errors).toEqual([]);
 });
 test('a held check shows the correction and never fabricates an Online count',async({page})=>{

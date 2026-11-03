@@ -232,12 +232,18 @@ export function readExactProductConnections(value:unknown,sourceSha256:string,ex
   if(!object(raw)||!ID.test(raw.productId)||seen.has(raw.productId)
    ||!['online','offline','unknown'].includes(raw.status)||raw.basis!=='tcp_service_port'||typeof raw.reason!=='string'||raw.reason.length>300
    ||!(raw.resourceId===null||deviceId(raw.resourceId)===raw.resourceId))return null;
-  if(raw.status==='unknown'&&(raw.resourceId!==null||raw.checkedAt!==null)||raw.status!=='unknown'&&(!raw.resourceId||!cameraTimestamp(raw.checkedAt,now).fresh))return null;
+  if(raw.status==='unknown'&&(raw.resourceId!==null||raw.checkedAt!==null))return null;
+  const observed=raw.status==='unknown'?null:cameraTimestamp(raw.checkedAt,now);
+  if(raw.status!=='unknown'&&(!raw.resourceId||!observed?.at))return null;
   // A later authenticated Shop move can narrow the Field view without
   // changing the upstream reviewed mHelp source digest. Never surface its
   // saved Field connection under Shop; do not require an identical subset.
   seen.add(raw.productId);
-  if(expected.has(raw.productId))result.set(raw.productId,raw as ExactProductConnection);
+  // A result can expire while the response is in flight or on screen. Age
+  // belongs to that Product ID; it must not invalidate other fresh cameras.
+  if(expected.has(raw.productId))result.set(raw.productId,observed&&!observed.fresh
+   ?unknown(raw.productId,'The saved connection check has expired; awaiting the next automatic check.')
+   :raw as ExactProductConnection);
  }
  return result.size===expected.size?result:null;
 }

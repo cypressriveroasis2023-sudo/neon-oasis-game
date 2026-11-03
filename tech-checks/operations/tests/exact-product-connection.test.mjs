@@ -179,5 +179,13 @@ test('cached pre-attribution V1 positives and negatives are rejected without ren
  const accepted=readExactProductConnections(current,sha,['1001','1002','1003'],now);
  assert.equal(accepted.get('1001').checkedAt,current.items[0].checkedAt);
  assert.equal(accepted.get('1002').checkedAt,current.items[1].checkedAt);
- assert.equal(readExactProductConnections(current,sha,['1001','1002','1003'],now+20*60_000),null);
+ assert.ok([...readExactProductConnections(current,sha,['1001','1002','1003'],now+20*60_000).values()].every(r=>r.status==='unknown'));
+});
+
+test('one result expiring in transit does not erase another fresh Product ID',()=>{
+ const receipt=run();receipt.items[0].checkedAt=new Date(now-20*60_000-1).toISOString();
+ const map=readExactProductConnections(receipt,sha,['1001','1002','1003'],now);
+ assert.equal(map.get('1001').status,'unknown');assert.equal(map.get('1001').checkedAt,null);
+ assert.equal(map.get('1002').status,'offline');assert.equal(map.get('1002').checkedAt,current);
+ assert.equal(receipt.items[0].status,'online');
 });
