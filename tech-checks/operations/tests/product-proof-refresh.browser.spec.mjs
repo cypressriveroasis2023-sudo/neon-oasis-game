@@ -20,7 +20,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact 
  expect(state.calls.filter(r=>r.path==='/api/product-connections')).toHaveLength(2);
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
-test('late connection read failure is visible and removes retained exact checks',async({page})=>{
+test('late connection read failure is visible and preserves completed exact checks',async({page})=>{
  const f=fieldProductFixture();
  // No independent provider observation may mask removal of retained TCP proof.
  // Keep the exact native/resource identities and all failure assertions intact.
@@ -33,7 +33,7 @@ test('late connection read failure is visible and removes retained exact checks'
  await page.clock.runFor(6600);await expect(app.getByRole('status').filter({hasText:'Connection source is still loading'})).toBeVisible();
  state.productConnections=null;release();state.proofGate=null;
  await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  expect(state.calls.every(r=>r.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 test('Fleet warning renders only bounded source diagnostics and clears them on recovery or invalidation',async({page})=>{
