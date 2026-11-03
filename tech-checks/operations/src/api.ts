@@ -5,6 +5,7 @@ import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
 import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS} from './refreshCadence';
 import {readExactProductConnections} from './exactProductConnection';
+import {clearFleetSnapshotCache, fleetSnapshotStorageKey, readFleetSnapshotCache, writeFleetSnapshotCache} from './fleetSnapshotStorage';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -33,8 +34,11 @@ function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authenti
 }
 function clearSharedReads(){pendingReads.clear();fleetSnapshots.clear();pendingFleetSnapshots.clear();fleetRevision++;}
 if(typeof window!=='undefined'){
- window.addEventListener?.('cos-private-data-invalidated',()=>{privateSessionRevision++;clearSharedReads();});
+ window.addEventListener?.('cos-private-data-invalidated',event=>{privateSessionRevision++;clearSharedReads();const reason=(event as CustomEvent<{reason?:string}>).detail?.reason;if(reason==='authentication-denied'||reason==='security-hide')clearFleetSnapshotCache();});
  window.addEventListener?.('pagehide',()=>{privateSessionRevision++;clearSharedReads();});
+ // The host sends this for ordinary navigation as well as hiding the iframe.
+ // Keep the actor-scoped local snapshot; it is only restored after the parent
+ // supplies a current session, and otherwise the host's in-memory view clears.
  window.addEventListener?.('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){privateSessionRevision++;clearSharedReads();}});
 }
 let tokenRequest: Promise<ParentSession> | null = null;
@@ -105,6 +109,8 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
+    const cacheKey=await fleetSnapshotStorageKey(session.token,session.role,mode);
+    clearFleetSnapshotCache(cacheKey);
     clearSharedReads();
     try { return await sendRequest<T>(method, path, session.token, body, options?.signal); }
     finally { clearSharedReads(); }
@@ -200,7 +206,9 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     const session=await requestParentToken();
     if(mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('The fleet view changed. Reload your session.',401);
     const key=JSON.stringify([session.token,session.role,mode]);
-    const saved=fleetSnapshots.get(key);
+    const storageKey=await fleetSnapshotStorageKey(session.token,session.role,mode);
+    let saved=fleetSnapshots.get(key)||readFleetSnapshotCache(storageKey);
+    if(saved)fleetSnapshots.set(key,saved);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
     if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     // Only the newly authorized actor may see the dated complete saved pair.
@@ -267,8 +275,8 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       return {...map,productConnections:result?result.receipt:retained,productConnectionsState:result?.state||'pending',productConnectionsDiagnostic:result?.diagnostic};
     });
     const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
-      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
-    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
+      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});writeFleetSnapshotCache(storageKey,value,requestedAt);window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
+    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){if(saved)fleetSnapshots.set(key,saved);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
     // Publish only into this generation's successful pair. A failed pair,
     // refresh, write, hide, account/role/mode change cannot be revived by proof.
     void read.paired.then(async initial=>{
@@ -282,6 +290,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const value={...initial,fieldMap:{...map,productConnections:accepted?result.receipt:null,
         productConnectionsState:result.state==='ready'&&!accepted?'rejected':result.state,productConnectionsDiagnostic:result.state==='ready'&&!accepted?{stage:'connection_envelope',code:'validation_rejected'}:result.diagnostic}};
       fleetSnapshots.set(key,{value,at:requestedAt});
+      writeFleetSnapshotCache(storageKey,value,requestedAt);
       window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));
       window.dispatchEvent?.(new Event('cos-fleet-proof-updated'));
     }).catch(()=>{});
