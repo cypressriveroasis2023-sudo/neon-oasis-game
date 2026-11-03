@@ -4,6 +4,7 @@ on:
     paths:
       - 'tech-checks/operations/**'
       - 'tech-checks/supabase/functions/cos-operations-pages/vrm*.ts'
+      - 'tech-checks/supabase/functions/cos-operations-pages/productVerifyNow.ts'
       - '.github/workflows/cos-fleet-redesign-proof.yml'
 permissions:
   contents: read
@@ -23,10 +24,10 @@ jobs:
           cache-dependency-path: tech-checks/operations/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
-      - run: node --import tsx --test tests/fleet-entry-design.test.mjs tests/fleet-equipment-totals.test.mjs tests/fleet-workspace.test.mjs tests/fleet-dashboard.test.mjs tests/fleet-recorded-roster.test.mjs tests/fleet-command-center.test.mjs tests/recon-battery.test.mjs tests/helios-victron-cards.test.mjs tests/vrm-sharing-database.test.mjs tests/vrm-read-only-model.test.mjs tests/vrm-discovery.test.mjs
+      - run: node --import tsx --test tests/fleet-entry-design.test.mjs tests/fleet-equipment-totals.test.mjs tests/fleet-workspace.test.mjs tests/fleet-dashboard.test.mjs tests/fleet-recorded-roster.test.mjs tests/fleet-command-center.test.mjs tests/recon-battery.test.mjs tests/helios-victron-cards.test.mjs tests/vrm-sharing-database.test.mjs tests/vrm-read-only-model.test.mjs tests/vrm-discovery.test.mjs tests/product-verify-now.test.mjs tests/exact-product-connection.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser -- tests/fleet-entry-design.browser.spec.mjs tests/helios-victron-cards.browser.spec.mjs
+      - run: npm run test:browser -- --workers=3 --retries=0 tests/fleet-entry-design.browser.spec.mjs tests/helios-victron-cards.browser.spec.mjs tests/fleet-verify-now.browser.spec.mjs
       - name: Preserve actual desktop and phone screen evidence
         if: always()
         uses: actions/upload-artifact@v4
