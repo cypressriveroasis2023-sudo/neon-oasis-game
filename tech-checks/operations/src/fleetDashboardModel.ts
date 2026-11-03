@@ -49,6 +49,8 @@ export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilte
  const miles=(r:FleetDashboardRow)=>{const rad=(v:number)=>v*Math.PI/180,a=rad(Number(nearby!.unit.latitude)),b=rad(Number(r.unit.latitude)),d=a-b,l=rad(Number(nearby!.unit.longitude)-Number(r.unit.longitude));return 3958.7613*2*Math.asin(Math.sqrt(Math.min(1,Math.sin(d/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(l/2)**2)));};
  return rows.filter(r=>{
   const state=r.support?'support':r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
+  if(view==='helios'&&!r.family.toUpperCase().startsWith('HELIOS'))return false;
+  if(view==='stands'&&!r.support)return false;
   return (filters.retired||!r.retired)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||r.family===filters.family)&&(filters.provider==='all'||r.provider===filters.provider)
    &&(!q||[r.name,r.displayName,r.family,r.provider,r.displayCustomer,r.displayAddress?.text,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
    &&(filters.status==='all'||filters.status==='operational'&&['online','offline','support'].includes(state)||filters.status===state)
