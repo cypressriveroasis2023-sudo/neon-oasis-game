@@ -42,8 +42,11 @@ test('every company destination remains reachable with a dark responsive boundar
   test.setTimeout(120000);
   const {frame, requests} = await mount(page);
   for (const workspace of workspaces.filter(name => !['Vision','Invoices'].includes(name))) {
+    const previousHash=await frame.locator('body').evaluate(()=>location.hash);
     await openWorkspace(frame, workspace);
-    await expect.poll(() => frame.locator('body').evaluate(()=>location.hash)).toBe('#' + workspace.toLowerCase().replaceAll(' ','-'));
+    const phoneMore=workspace==='Operations'&&await frame.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).isVisible();
+    if(phoneMore)await expect(frame.getByRole('dialog',{name:'Operations navigation',exact:true})).toBeVisible();
+    await expect.poll(() => frame.locator('body').evaluate(()=>location.hash)).toBe(phoneMore?previousHash:'#' + workspace.toLowerCase().replaceAll(' ','-'));
     await expect(frame.locator('.owner-it-main')).toBeVisible();
     if (external.includes(workspace)) {
       const boundary = frame.getByRole('region',{name:workspace+' workspace'});
@@ -66,7 +69,7 @@ test('every company destination remains reachable with a dark responsive boundar
 test('denied company access retains readable legacy exits without loading company records', async ({page}) => {
   const {frame,requests}=await mount(page,true);
   await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();
-  await expect(frame.getByRole('region',{name:'Tech Check workspaces'}).getByRole('button',{name:/^IT Preparation/})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Tech Check workspaces'}).getByRole('button',{name:/^IT check in [/] out/})).toBeVisible();
   expect(requests.map(request=>request.path)).toEqual(['/api/session']);
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);

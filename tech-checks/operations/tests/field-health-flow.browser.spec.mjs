@@ -135,7 +135,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
  await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toBeVisible();
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue('');
  await child.evaluate(()=>{location.hash='tech-check';});
- await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
+ await expect(frame.getByRole('heading',{name:'Tech Check',exact:true})).toBeVisible();
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
  expect(state.writes).toHaveLength(0);
 });

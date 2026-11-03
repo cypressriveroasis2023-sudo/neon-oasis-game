@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
+import { primaryNav, expectApprovedAreas, openApprovedMore, dismissApprovedMore, openCheckManagement } from './approved-shell-acceptance.mjs';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import {resource,snapshot,withStatus,now} from './fixtures/camera-evidence-fixtures.mjs';
 const origin = 'http://127.0.0.1:4173';
@@ -162,18 +163,18 @@ test('approved red eye branding stays readable through responsive navigation and
     expect(geometry.width/geometry.height).toBeCloseTo(1490/530,1);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });
-    const more = frame.getByRole('button', { name: 'More', exact: true });
-    await more.click();
-    const menu = frame.getByRole('dialog', { name: 'Operations navigation' });
-    await expect(menu.locator('.company-brand')).toBeVisible();
-    await expect(menu.locator('.cos-company-logo')).toHaveAttribute('data-company-logo','full');
-    expect(await menu.locator('.company-brand-mark').evaluate(el => getComputedStyle(el).borderRadius)).toBe('0px');
-    const close = menu.getByRole('button', { name: 'Close menu' });
-    expect((await close.boundingBox()).height).toBeGreaterThanOrEqual(44);
-    await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
-    await expect(more).toBeFocused();
-    await more.click();
+    await expectApprovedAreas(frame);
+    const opened=await openApprovedMore(frame);
+    if(opened.mobile){
+      // The approved compact drawer intentionally does not repeat the large logo.
+      await expect(opened.dialog.locator('.company-brand')).toBeHidden();
+      await expect(opened.dialog.getByRole('heading',{name:'More',exact:true})).toBeVisible();
+      expect((await opened.dialog.getByRole('button',{name:'Close menu'}).boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }else{
+      await expect(brand).toBeVisible();
+      await expect(brand.locator('.cos-company-logo')).toHaveAttribute('data-company-logo','full');
+    }
+    await dismissApprovedMore(frame,opened);
     await openWorkspace(frame, 'Jobs');
     await expect(frame.getByRole('heading', { name: 'Job flow', exact: true })).toBeVisible();
     await expect(brand).toBeVisible();

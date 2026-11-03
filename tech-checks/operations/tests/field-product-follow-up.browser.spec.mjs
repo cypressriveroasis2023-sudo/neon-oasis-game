@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
@@ -8,7 +9,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} sees read-only next steps,
  f.connections.items.find(row=>row.productId==='1003').reason='No verified public tracker IP is available for this Product ID.';
  f.connections.items.find(row=>row.productId==='1004').reason='Current tracker and mHelp source disagree for this Product ID. Placement or identity review is required; no connection status is assigned.';
  const {app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  const row=id=>board.locator('.cos-command-row').filter({hasText:'Product '+id});
  await row('1003').click();

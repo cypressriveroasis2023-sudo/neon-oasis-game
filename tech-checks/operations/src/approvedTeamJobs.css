@@ -1,0 +1,17 @@
+/* Exact saved-job links only; no Fleet/TV or shared-directory theme changes. */
+#root#root .operations-shell .operations-team .cos-team-job-link {
+  display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px;
+  box-sizing: border-box; min-height: 48px; max-width: 100%; width: fit-content;
+  padding: 10px 14px; border: 1px solid #b91c1c; border-radius: 8px;
+  background: #b91c1c !important; color: #ffffff !important;
+  text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere;
+}
+#root#root .operations-shell .operations-team .cos-team-job-link b,
+#root#root .operations-shell .operations-team .cos-team-job-link span { color: inherit !important; }
+#root#root .operations-shell .operations-team .cos-team-job-link:hover {
+  background: #991b1b !important; border-color: #991b1b;
+}
+#root#root .operations-shell .operations-team .cos-team-job-link:focus-visible {
+  outline: 3px solid #2563eb; outline-offset: 3px;
+}
+.operations-shell .operations-team .cos-team-job-unlinked { display: grid; gap: 4px; overflow-wrap: anywhere; }

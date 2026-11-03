@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
@@ -11,7 +12,7 @@ test('Field products show device links, source times and partial coverage separa
  await expect(coverage).toContainText('Incomplete check · 18 held records');
  await coverage.locator('summary').click();await expect(coverage).toContainText('Saved endpoint unavailable: 5');
  await expect(coverage).toContainText('not Field Product-ID or camera outage totals');
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  const board=app.getByRole('region',{name:'Complete mHelpDesk Fleet command center'});
  await board.locator('.cos-command-row').filter({hasText:'Product 1003'}).click();
  const detail=board.getByRole('region',{name:'Selected Field equipment details'});

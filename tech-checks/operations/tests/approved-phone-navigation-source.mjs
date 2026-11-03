@@ -1,0 +1,27 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+export const cases={"navigation-helper.mjs":{"original":"0a72b6435927108ab180bc0ebe9ccd36ff8f1b34","candidate":"9388cd8bb0cd28fb24b6a359afbeae3e83bee786","edits":[["  const nav = await menu.isVisible() ? menu.getByRole('navigation', { name: 'COS Operations', exact: true })\n    : await mobile.isVisible() ? mobile : sidebar;\n\n  const approved = Boolean(await frame.locator('.cos-approved-shell').count());","  const approved = Boolean(await frame.locator('.cos-approved-shell').count());\n  // Owner phone More contains secondary tools only. Close it before using a\n  // primary bottom-bar destination; do not click a hidden duplicate menu.\n  if (approved && primaryLabels[workspace] && workspace !== 'Operations' && await menu.isVisible())\n    await menu.getByRole('button', { name: /Close menu/ }).click();\n  const nav = !approved && await menu.isVisible() ? menu.getByRole('navigation', { name: 'COS Operations', exact: true })\n    : await mobile.isVisible() ? mobile : sidebar;"],["      // On a phone the bottom More opens a drawer; its primary More opens\n      // the actual More page. Desktop More already opens that page.\n      if (await menu.isVisible()) await menu.getByRole('navigation', { name: 'COS Operations', exact: true })\n        .getByRole('button', { name: 'More', exact: true }).click();\n      await expect(frame.locator('main').getByRole('region', { name: 'Operations workspaces', exact: true })).toBeVisible();","      // More is the existing drawer on phones and the tools page on desktop.\n      // Neither route injection nor a duplicate primary row is needed.\n      const container = await menu.isVisible() ? menu : frame.locator('main');\n      await expect(container.getByRole('region', { name: 'Operations workspaces', exact: true })).toBeVisible();\n      return;"]]},"approved-workspace-navigation.browser.spec.mjs":{"original":"c8cdd8781fd1d99f83a304cfe75345e9a77d6565","candidate":"e091702d0d5bafc96999e348f9b302e81a3939dd","edits":[["  await openWorkspace(app,workspace);await expect.poll(()=>route(app)).toBe(hash);await expect(menu(app)).toHaveCount(0);","  const before=await route(app);await openWorkspace(app,workspace);\n  if(mobile&&workspace==='Operations'){\n   await expect(menu(app)).toBeVisible();await expect(menu(app).getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();\n   await expect(menu(app).locator('.operations-area-nav')).toBeHidden();await expect.poll(()=>route(app)).toBe(before);\n  }else{await expect.poll(()=>route(app)).toBe(hash);await expect(menu(app)).toHaveCount(0);}"],[" if(mobile)await app.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).getByRole('button',{name:'More',exact:true}).click();\n const container=mobile?menu(app):app.locator('main');"," if(mobile)await expect(menu(app)).toBeVisible();\n const container=mobile?menu(app):app.locator('main');"]]},"fleet-first-navigation.browser.spec.mjs":{"original":"b61d65996567bda2a396f1f6b807122101b64387","candidate":"8c3a34136a5c6a3c49f761c50e177630746c7f41","edits":[[" if(mobile)await app.getByRole('button',{name:'More',exact:true}).click();\n const nav=app.getByRole('navigation',{name:'COS Operations',exact:true});"," if(mobile&&it)await app.getByRole('button',{name:'More',exact:true}).click();\n const nav=app.getByRole('navigation',{name:mobile&&!it?'Mobile Operations navigation':'COS Operations',exact:true});"],[" if(mobile)await app.getByRole('button',{name:/Close menu/}).click();"," if(mobile&&it)await app.getByRole('button',{name:/Close menu/}).click();"]]}};
+
+const blob=text=>createHash('sha1').update('blob '+Buffer.byteLength(text)+'\0').update(text).digest('hex');
+export function adapt(file,text){
+ const entry=cases[file];if(blob(text)!==entry.original)throw Error('Original phone test differs: '+file);
+ for(const [before,after]of entry.edits){if(text.split(before).length!==2)throw Error('Non-unique phone edit: '+file);text=text.replace(before,after);}
+ if(blob(text)!==entry.candidate)throw Error('Phone candidate differs: '+file);return text;
+}
+export function verify(file,text){
+ const entry=cases[file];if(blob(text)!==entry.candidate)throw Error('Committed phone test differs: '+file);
+ for(const [before,after]of [...entry.edits].reverse()){if(text.split(after).length!==2)throw Error('Non-unique reversal: '+file);text=text.replace(after,before);}
+ if(blob(text)!==entry.original)throw Error('Phone reversal differs: '+file);
+}
+if(process.argv[2]){
+ const mode=process.argv[2];if(!['apply','check'].includes(mode))throw Error('Use apply or check');
+ for(const file of Object.keys(cases)){
+  const path=new URL(file,import.meta.url),current=readFileSync(path,'utf8');
+  if(mode==='apply'){
+   const original=execFileSync('git',['show','c8d2bbc4348ec94dd44e9edd1e01d92e5fa307f3:tech-checks/operations/tests/'+file],{encoding:'utf8'});
+   if(current!==original)throw Error('Working phone test differs: '+file);writeFileSync(path,adapt(file,original));
+  }else verify(file,current);
+  console.log(mode+': '+file+' exact original navigation preserved outside declared UI adaptation');
+ }
+}

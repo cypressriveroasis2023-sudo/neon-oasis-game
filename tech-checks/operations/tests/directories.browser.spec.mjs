@@ -60,9 +60,7 @@ async function setup(page){
   await page.goto('/directory-fixture');
   const frame=page.frameLocator('#operations');
   await expect(frame.locator('.operations-shell')).toBeAttached();
-  const more=frame.getByRole('button',{name:'More',exact:true});
-  if(await more.isVisible())await more.click();
-  await expect(frame.getByRole('navigation',{name:'COS Operations'})).toBeVisible();
+  await expect(frame.locator('.company-connection')).toHaveText('OPERATIONS CONNECTED');
   return{state,frame};
 }
 async function open(frame,name){

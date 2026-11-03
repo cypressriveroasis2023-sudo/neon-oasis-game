@@ -1,0 +1,51 @@
+name: COS redesign preview verification
+on:
+  push:
+    branches: [design/cos-approved-navigation-20261101]
+permissions:
+  contents: read
+concurrency:
+  group: cos-design-preview-verification
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      COS_RUN_LIVE_SMOKE: '0'
+    defaults:
+      run: {shell: bash, working-directory: tech-checks/operations}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify preserved source, roles and committed build
+        run: |
+          node tests/approved-navigation-regression-source.mjs check
+          node tests/approved-landscape-source.mjs check
+          node tests/verify-techcheck-auth-preservation.mjs
+          npm run typecheck
+          npm run build
+          node ../../.github/scripts/verify-cos-build-artifact.mjs
+      - name: Focused navigation, Board and identity regressions
+        run: |
+          node --import tsx --test tests/approved-*.test.mjs tests/board-record-details.test.mjs tests/owner-tv-display-lifecycle.test.mjs
+          node --import tsx --test proposals/board-unit-link/*.test.mjs
+      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Actual visible navigation and affected workflows
+        run: |
+          mapfile -t cases < <(node --input-type=module -e "import{readFileSync}from'node:fs';for(const x of JSON.parse(readFileSync('tests/fleet-view-navigation-preservation.json')))console.log('tests/'+x.path)")
+          npm run test:browser -- "${cases[@]}" tests/approved-fleet-test-navigation.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/approved-workspace-navigation.browser.spec.mjs --workers=2 --retries=0
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-redesign-verification-${{ github.sha }}
+          path: |
+            tech-checks/operations/test-results/
+            tech-checks/operations/playwright-report/
+            cos-build-evidence/
+          retention-days: 7

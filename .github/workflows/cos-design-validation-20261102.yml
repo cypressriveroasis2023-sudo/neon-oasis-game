@@ -1,0 +1,156 @@
+# Isolated review of the approved design branch. No deployment, merge, or writeback.
+name: COS design validation (no deploy)
+on:
+  push:
+    branches: [design/cos-approved-navigation-20261101]
+    paths:
+      - '.github/workflows/cos-design-validation-20261102.yml'
+      - 'tech-checks/operations/src/**'
+      - 'tech-checks/operations/tests/**'
+      - 'tech-checks/operations/package.json'
+      - 'tech-checks/operations/package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: cos-design-validation-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  CI: 'true'
+  COS_RUN_LIVE_SMOKE: '0'
+  COS_DESIGN_SOURCE_BASE: ffe2ef4e2734cfb1bd83d8b79be81fe3f6c087af
+defaults:
+  run:
+    shell: bash
+    working-directory: tech-checks/operations
+jobs:
+  build:
+    name: Full typecheck, build and unchanged artifact gate
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Verify exact source and keep production smoke disabled
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$COS_DESIGN_SOURCE_BASE" HEAD
+          test "$COS_RUN_LIVE_SMOKE" = 0
+          mkdir -p ../../cos-design-validation
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-design-validation/source-sha.txt
+          node --version | tee ../../cos-design-validation/node-version.txt
+          npm --version | tee ../../cos-design-validation/npm-version.txt
+      - name: Install existing locked dependencies without install scripts
+        id: install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full project TypeScript check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck 2>&1 | tee ../../cos-design-validation/typecheck.log
+      - name: Original technician authentication preservation check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node tests/verify-techcheck-auth-preservation.mjs 2>&1 | tee ../../cos-design-validation/auth-preservation.log
+      - name: Build complete existing application
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build 2>&1 | tee ../../cos-design-validation/build.log
+      - name: Preserve exact unapproved candidate bytes and source manifest
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD -- . ':!dist'
+          node --input-type=module <<'JS'
+          import {readFileSync,readdirSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const walk=d=>readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(d+'/'+e.name):[d+'/'+e.name]).sort();
+          const manifest={commit:process.env.GITHUB_SHA,releaseApproved:false,lockSha256:hash(readFileSync('package-lock.json')),files:walk('dist').map(path=>({path,sha256:hash(readFileSync(path))}))};
+          writeFileSync('../../cos-design-validation/candidate-manifest.json',JSON.stringify(manifest,null,2)+'\n');
+          JS
+          tar -czf ../../cos-design-validation/candidate-dist.tar.gz dist
+      - name: Original reviewed-artifact check (failure is NOT waived)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: node ../../.github/scripts/verify-cos-build-artifact.mjs 2>&1 | tee ../../cos-design-validation/committed-artifact-check.log
+      - name: Retain build evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-design-build-${{ github.sha }}
+          path: cos-design-validation/
+          if-no-files-found: warn
+          retention-days: 7
+  unit:
+    name: Full existing unit suite and source-preservation checks
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full synthetic Node suite
+        run: |
+          set -euo pipefail
+          mkdir -p ../../cos-design-unit
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-design-unit/source-sha.txt
+          npm test 2>&1 | tee ../../cos-design-unit/unit.log
+      - name: Preserve unchanged tracked source and lockfile
+        if: always()
+        run: git diff --exit-code HEAD -- .
+      - name: Retain unit evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-design-unit-${{ github.sha }}
+          path: cos-design-unit/
+          if-no-files-found: warn
+          retention-days: 7
+  browser:
+    name: Complete application Playwright suite
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref == 'refs/heads/design/cos-approved-navigation-20261101'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build this exact complete application, never the old committed bundle
+        run: |
+          set -euo pipefail
+          mkdir -p ../../cos-design-browser
+          printf '%s\n' "$GITHUB_SHA" > ../../cos-design-browser/source-sha.txt
+          npm run build 2>&1 | tee ../../cos-design-browser/build.log
+          git diff --exit-code HEAD -- . ':!dist'
+      - name: Install the repository-pinned Chromium
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Run unchanged full browser suite at all three configured widths
+        run: npm run test:browser -- --workers=2 2>&1 | tee ../../cos-design-browser/browser.log
+      - name: Retain browser traces and screenshots, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cos-design-browser-${{ github.sha }}
+          path: |
+            cos-design-browser/
+            tech-checks/operations/test-results/
+            tech-checks/operations/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7

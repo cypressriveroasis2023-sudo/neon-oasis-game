@@ -29,7 +29,27 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} explicit menu and repeated
  const source=()=>app.locator('.cos-fleet-source-record').filter({hasText:'Ranger 901'}).getByRole('button',{name:'View estimated address'});
  const open=async()=>{await source().click();await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toBeVisible();};
  // Synthetic menu clicks exercise the normal navigate callback even while the modal blocks pointer input.
- const enter=async name=>{await app.getByRole('button',{name:'More',exact:true}).first().dispatchEvent('click');const menu=app.getByRole('dialog',{name:'Operations navigation'});await expect(menu).toBeVisible();await menu.getByRole('button',{name,exact:true}).dispatchEvent('click');await expect(menu).toHaveCount(0);await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);};
+ const enter=async name=>{
+  const menu=app.getByRole('dialog',{name:'Operations navigation'});
+  if(it){
+   await app.getByRole('button',{name:'More',exact:true}).first().dispatchEvent('click');
+   await expect(menu).toBeVisible();await menu.getByRole('button',{name,exact:true}).dispatchEvent('click');
+  }else{
+   const mobile=app.getByRole('navigation',{name:'Mobile Operations navigation',exact:true});
+   const nav=await mobile.isVisible()?mobile:app.getByRole('navigation',{name:'COS Operations',exact:true});
+   if(name==='Fleet Dashboard')await nav.getByRole('button',{name:'Fleet',exact:true}).dispatchEvent('click');
+   else{
+    await nav.getByRole('button',{name:'More',exact:true}).dispatchEvent('click');
+    const container=await mobile.isVisible()?menu:app.locator('main');
+    const directory=container.getByRole('region',{name:'Operations workspaces',exact:true});
+    await expect(directory).toBeVisible();
+    // Existing callback-only test: native source modal prevents real pointer interaction.
+    const target=directory.getByRole('button',{name,exact:true,includeHidden:true});
+    await expect(target).toHaveCount(1);await target.dispatchEvent('click');
+   }
+  }
+  await expect(menu).toHaveCount(0);await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
+ };
  for(let repeat=0;repeat<2;repeat++){
   await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
   await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();

@@ -1,3 +1,4 @@
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 const sha='a'.repeat(64),stageId='11111111-1111-4111-8111-111111111111';
@@ -14,7 +15,7 @@ test('Owner must inspect and explicitly approve exact assignment identities befo
   if(request.path.endsWith('/commit')){commits++;data={contract:'COS_OWNER_EQUIPMENT_COMMIT_V1',sourceSha256:sha,records:1,field:0,shop:1,applied:true};}
   return route.fulfill({headers,json:data});
  });
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  await app.getByLabel('Original mHelpDesk equipment CSV').setInputFiles({name:'ServiceItem_List_20261020172623.csv',mimeType:'text/csv',buffer:Buffer.from('synthetic complete CSV')});
  await app.getByRole('button',{name:'Preview equipment changes'}).click();await app.getByRole('button',{name:'Stage reviewed inventory (no Fleet changes)'}).click();
  const apply=app.getByRole('button',{name:'Apply reviewed source through protected COS backend'});await expect(apply).toBeDisabled();
@@ -41,7 +42,7 @@ test('large continuity review stays compact, exposes the exact manifest, and kee
   if(request.path.endsWith('/commit'))throw Error('Final Apply must remain held');
   return route.fulfill({headers,json:data});
  });
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  await app.getByLabel('Original mHelpDesk equipment CSV').setInputFiles({name:'ServiceItem_List_20261020172623.csv',mimeType:'text/csv',buffer:Buffer.from('synthetic complete CSV')});
  await app.getByRole('button',{name:'Preview equipment changes'}).click();await app.getByRole('button',{name:'Stage reviewed inventory (no Fleet changes)'}).click();
  await app.getByRole('button',{name:'Review current assignment identities'}).click();const review=app.getByRole('region',{name:'Review existing equipment assignments'});
@@ -66,7 +67,7 @@ test('failed source proof shows safe diagnostics and keeps Stage hidden until a 
   if(!request.path.endsWith('/preview')){writes++;return route.abort();}
   return route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{contract:'COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1',previewOnly:true,readyToCommit:false,sourceSha256:sha,inventory:{total:1001,field:284,shop:717,inactive:0},changes:{unchanged:1001,added:0,absent:0,placement:0,customer:0,address:0,identityReview:0},samples:[],censusStatus:verified?'verified':'unavailable',...(!verified?{censusFailureReason:'The tracker source-export evidence is incomplete or cites a different export. Reconcile the current source explicitly; preserve historical evidence.'}:{}),admission:{counts:{unchanged:1001,assignment_change:0,new_source_only:0},totalHeld:0},guardNotice:'Explicit Owner review required'}});
  });
- await app.getByRole('button',{name:'Data sources',exact:true}).click();
+ await openFleetView(app,'Data sources');
  await app.getByLabel('Original mHelpDesk equipment CSV').setInputFiles({name:'ServiceItem_List_20261022134456.csv',mimeType:'text/csv',buffer:Buffer.from('synthetic complete CSV')});
  await app.getByRole('button',{name:'Preview equipment changes'}).click();
  await expect(app.getByText(/The tracker source-export evidence/)).toBeVisible();

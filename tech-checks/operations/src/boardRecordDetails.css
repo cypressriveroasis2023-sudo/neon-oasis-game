@@ -1,0 +1,54 @@
+/* Scoped to the additive Board record view; no Fleet, TV or global theme selectors. */
+#root .operations-shell .daily-board-detail .cos-board-record {
+  --record-ink:#102337; --record-muted:#4b5d70; --record-line:#d9e2ec;
+  display:grid; gap:16px; min-width:0; max-width:100%; margin:18px 0;
+  color:var(--record-ink); overflow-wrap:anywhere;
+}
+#root .operations-shell .cos-board-record :is(section,.cos-board-record-snapshot,.cos-board-record-facts) {
+  min-width:0; margin:0; padding:16px; border:1px solid var(--record-line);
+  border-radius:10px; background:#fff; color:var(--record-ink);
+}
+#root .operations-shell .cos-board-record :is(h4,strong,dd) {color:var(--record-ink)!important;}
+#root .operations-shell .cos-board-record :is(p,dt,small,span) {color:var(--record-muted)!important;}
+#root .operations-shell .cos-board-record h4 {font-size:16px;line-height:1.4;margin:0 0 8px;}
+#root .operations-shell .cos-board-record p {font-size:14px;line-height:1.6;margin:8px 0;white-space:pre-wrap;}
+#root .operations-shell .cos-board-record small {display:block;font-size:12px;line-height:1.6;}
+#root .operations-shell .cos-board-record-snapshot {display:grid;gap:5px;}
+#root .operations-shell .cos-board-record-facts {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+#root .operations-shell .cos-board-record dl div {min-width:0;}
+#root .operations-shell .cos-board-record dt {font-size:12px;line-height:1.5;}
+#root .operations-shell .cos-board-record dd {margin:5px 0 0;font-size:15px;font-weight:600;line-height:1.5;}
+#root .operations-shell .cos-board-record .cos-board-record-unit {background:#f1f5f9;}
+#root .operations-shell .cos-board-record .cos-board-record-next {border-left:4px solid #cf1422;}
+#root .operations-shell .cos-board-record .cos-board-record-history {margin:0;border:1px solid var(--record-line);border-radius:10px;background:#fff;color:var(--record-ink);}
+#root .operations-shell .cos-board-record-history summary {min-height:48px;box-sizing:border-box;padding:14px 16px;color:var(--record-ink);font-size:14px;font-weight:700;cursor:pointer;}
+#root .operations-shell .cos-board-record-history>p {padding:0 16px 12px;}
+#root .operations-shell .cos-board-record-history ol {margin:0;padding:0 16px 16px 36px;}
+#root .operations-shell .cos-board-record-history li {margin:12px 0;padding:0 0 12px;border-bottom:1px solid var(--record-line);}
+#root .operations-shell .cos-board-record-history li:last-child {border-bottom:0;}
+#root .operations-shell .cos-board-record-history dl {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+#root .operations-shell .cos-board-record :is(.cos-board-record-visit,.cos-board-record-link-missing) {background:#f1f5f9;border-radius:8px;margin:0;padding:14px;}
+#root .operations-shell .cos-board-record-link {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;box-sizing:border-box;padding:12px 16px;border:1px solid #cf1422;border-radius:8px;background:#cf1422;color:#fff!important;font-size:15px;font-weight:700;text-decoration:none;}
+#root .operations-shell .cos-board-record-link span {color:#fff!important;}
+#root .operations-shell .cos-board-record :is(a,summary):focus-visible {outline:3px solid #245baf!important;outline-offset:3px;}
+@media(max-width:700px) {
+  #root .operations-shell .cos-board-record :is(.cos-board-record-facts,.cos-board-record-history dl) {grid-template-columns:minmax(0,1fr);}
+}
+
+/* Keep this work-record dialog centered. The scheduling/TV dialogs retain their styles. */
+#root .operations-shell .daily-board-detail:has(.cos-board-record) {
+  position:fixed; inset:0; margin:auto; width:calc(100% - 32px); max-width:720px;
+  height:fit-content; max-height:calc(100dvh - 32px); box-sizing:border-box;
+  padding:0; border:0; overflow:auto; overscroll-behavior:contain;
+}
+#root .operations-shell .daily-board-detail:has(.cos-board-record):not([open]) {display:none;}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section {padding:20px;}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section > button:first-child {
+  position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:center;
+  min-height:48px!important; min-width:44px; width:100%; box-sizing:border-box;
+  background:#11253c!important; color:#fff!important; border:1px solid #566c81!important;
+}
+#root .operations-shell .daily-board-detail:has(.cos-board-record) > section > small {display:block; margin-top:14px;}
+@media(max-width:700px) {
+  #root .operations-shell .daily-board-detail:has(.cos-board-record) > section {padding:16px;}
+}

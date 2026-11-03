@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import {openWorkspace} from './navigation-helper.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,23 +47,24 @@ async function mount(page,path='/tech-checks/') {
   return {frame:page.frameLocator('#cosOperationsFrame'),requests};
 }
 async function openChecks(frame){
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
-  await expect(menu.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(1);
-  await expect(menu.getByRole('button',{name:'Accounts & Permissions',exact:true})).toHaveCount(0);
-  await menu.getByRole('button',{name:'Tech Checks',exact:true}).click();
-  await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
+  await openWorkspace(frame,'Tech Check');
+  await expect(frame.getByRole('heading',{name:'Tech Check',exact:true})).toBeVisible();
+}
+async function openCheckTool(hub,label){
+  const button=hub.getByRole('button',{name:new RegExp('^'+label)});
+  if(!await button.isVisible())await hub.locator('summary').filter({hasText:'Manage Tech Checks'}).click();
+  await button.click();
 }
 
 test('one Tech Checks front door contains IT, Service and preserved check tools',async({page},testInfo)=>{
   const {frame,requests}=await mount(page);await openChecks(frame);
   const hub=frame.getByRole('region',{name:'Tech Check workspaces'});
-  await expect(hub.getByRole('button',{name:/^IT Preparation/})).toBeVisible();
-  await expect(hub.getByRole('button',{name:/^Service Truck/})).toBeVisible();
-  await expect(hub).toContainText('dispatch jobs are in Operations');
+  await expect(hub.getByRole('button',{name:/^IT check in \/ out/})).toBeVisible();
+  await expect(hub.getByRole('button',{name:/^Service handoffs/})).toBeVisible();
+  await expect(hub).toContainText('Service jobs are created in mHelp.');
   await page.screenshot({path:testInfo.outputPath('one-tech-checks-hub.png')});
   for(const [label,route] of [['Technician accounts','accounts'],['Check assignments','assign'],['Truck & team readiness','team'],['Review completed checks','review'],['Check handoffs & returns','handoffs'],['Check schedule','calendar'],['Checks needing attention','attention'],['Checked equipment','units'],['Check history','history'],['Check activity','activity']]){
-    await hub.getByRole('button',{name:new RegExp('^'+label)}).click();
+    await openCheckTool(hub,label);
     await expect(page.locator('#cosTechCheckToolTitle')).toHaveText(label);
 
     await expect(page.locator('#cosTechCheckToolTitle')).toBeVisible();
@@ -106,7 +108,7 @@ test('IT and Service checks return to the same hub and preserve in-progress inpu
 test('old dashboard links and browser Back return to Tech Checks rather than a second dashboard',async({page})=>{
   const {frame}=await mount(page);await openChecks(frame);
   const hub=frame.getByRole('region',{name:'Tech Check workspaces'});
-  await hub.getByRole('button',{name:/^Technician accounts/}).click();
+  await openCheckTool(hub,'Technician accounts');
   await page.getByRole('button',{name:'Old dashboard link'}).click();
   await expect(hub).toBeVisible();await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
   await page.goBack();await expect(page.locator('#cosTechCheckToolTitle')).toHaveText('Technician accounts');
@@ -116,7 +118,7 @@ test('old dashboard links and browser Back return to Tech Checks rather than a s
 test('bookmarked tools load in their scoped view and stay owner-only across auth changes',async({page})=>{
   const {frame}=await mount(page,'/tech-checks/#tech-checks/accounts');
   await expect(page.locator('#cosTechCheckToolTitle')).toHaveText('Technician accounts');
-  await page.locator('#cosOperationsReturn').click();await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
+  await page.locator('#cosOperationsReturn').click();await expect(frame.getByRole('heading',{name:'Tech Check',exact:true})).toBeVisible();
   await page.evaluate(()=>logout());await expect(page.locator('#cosOperationsFrame')).toHaveCount(0);
   for(const role of ['it','service']){
     await page.goto('/tech-checks/?role='+role+'#tech-checks/accounts');
@@ -130,9 +132,8 @@ test('bookmarked tools load in their scoped view and stay owner-only across auth
 
 test('leaving Tech Checks clears the scoped bookmark without hijacking another workspace',async({page})=>{
   const {frame}=await mount(page,'/tech-checks/#tech-checks');
-  await expect(frame.getByRole('heading',{name:'Tech Checks',exact:true})).toBeVisible();
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Overview',exact:true}).click();
+  await expect(frame.getByRole('heading',{name:'Tech Check',exact:true})).toBeVisible();
+  await openWorkspace(frame,'Today');
   await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe('');
   await page.reload();

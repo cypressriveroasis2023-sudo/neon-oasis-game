@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import * as navigation from '../src/workspaceNavigation.ts';
+import * as approvedNavigation from '../src/approvedCosNavigation.ts';
 import {primaryAreas} from '../src/visionAreas.ts';
 import {createOperationsSessionRecovery,guardSessionCallback} from '../src/operationsSessionRecovery.ts';
 
@@ -48,6 +49,7 @@ async function fixture(){
   react:hooks.hooks,'react/jsx-runtime':{Fragment:'fragment',jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},
   './useOperationsSession':sessionHook,'./api':{api:{},openLegacy(){assert.fail('No legacy navigation is expected');}},
   './workspaceNavigation':{...navigation,readWorkspaceRoute:()=>navigation.readWorkspaceRoute(location.hash)},
+  './approvedCosNavigation':approvedNavigation,
   './visionAreas':{primaryAreas},'./VisionAreas':{default:'VisionAreas',AreaIcon:'AreaIcon',primaryWorkspace:active=>active},
   './unitTracker':{trackerAccess:()=>false},'../../it-feature-availability':{IT_DAILY_ONLY:false},
  };

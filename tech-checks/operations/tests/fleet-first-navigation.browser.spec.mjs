@@ -9,17 +9,17 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} opens Fleet first
  await expect(app.locator('.cos-fleet-brand')).toHaveCount(0);
  await expect(app.locator('.cos-fleet-clock time')).toHaveText(/\d{1,2}:\d{2}\s*[AP]M/);
  const mobile=page.viewportSize().width<=700;
- if(mobile)await app.getByRole('button',{name:'More',exact:true}).click();
- const nav=app.getByRole('navigation',{name:'COS Operations',exact:true});
- await expect(nav.getByRole('button').first()).toHaveText('Fleet Dashboard');
- await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ if(mobile&&it)await app.getByRole('button',{name:'More',exact:true}).click();
+ const nav=app.getByRole('navigation',{name:mobile&&!it?'Mobile Operations navigation':'COS Operations',exact:true});
+ await expect(nav.getByRole('button').first()).toHaveText(it?'Fleet Dashboard':'Fleet');
+ await expect(nav.getByRole('button',{name:it?'Fleet Dashboard':'Fleet',exact:true})).toHaveAttribute('aria-current','page');
  if(it){
   await expect(nav.getByRole('button')).toHaveCount(2);
   await expect(nav.getByRole('button',{name:'IT Dashboard',exact:true})).toHaveCount(0);
   await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toHaveCount(1);
   for(const name of ['Victron Power','2027 Unit Tracker'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);
  }
- if(mobile)await app.getByRole('button',{name:/Close menu/}).click();
+ if(mobile&&it)await app.getByRole('button',{name:/Close menu/}).click();
  const design=await app.locator('.cos-fleet-dashboard').evaluate(el=>({font:getComputedStyle(el).fontFamily,border:getComputedStyle(el).borderTopWidth,panel:getComputedStyle(el.querySelector('.cos-fleet-stats button')).backgroundImage,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
  expect(design.font).toContain('Open Sans');expect(design.border).toBe('1px');expect(design.panel).toBe('linear-gradient(145deg, rgb(23, 41, 59), rgb(17, 30, 45))');expect(design.scroll).toBeLessThanOrEqual(design.viewport+1);
  await page.screenshot({path:info.outputPath((it?'it':'owner')+'-fleet-first-native.png'),fullPage:true});
@@ -31,9 +31,9 @@ test('an explicit Owner overview bookmark stays available and Fleet remains one 
  await expect(app.getByRole('region',{name:'Fleet Dashboard shortcut',exact:true})).toBeVisible();
  const mobile=page.viewportSize().width<=700;
  const nav=app.getByRole('navigation',{name:mobile?'Mobile Operations navigation':'COS Operations',exact:true});
- await nav.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
+ await nav.getByRole('button',{name:'Fleet',exact:true}).click();
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(1);
- await nav.getByRole('button',{name:'Overview',exact:true}).click();
+ await openWorkspace(app,'Today');
  await expect(app.getByRole('region',{name:'Fleet Dashboard shortcut',exact:true})).toBeVisible();
  expect(state.errors).toEqual([]);
 });
