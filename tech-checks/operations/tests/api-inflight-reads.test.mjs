@@ -790,7 +790,7 @@ for(const bodyStall of [false,true])test('never-resolving '+(bodyStall?'body':'f
 for(const [name,mutate] of [
  ['malformed',r=>({...r,items:null})],['source mismatch',r=>({...r,sourceSha256:'b'.repeat(64)})],
  ['census mismatch',r=>({...r,items:[{...r.items[0],productId:'9999'}]})],['duplicate identity',r=>({...r,items:[r.items[0],r.items[0]]})],
- ['stale tracker',r=>({...r,trackerVerifiedAt:'2026-10-28T14:00:00Z'})],['stale check',r=>({...r,items:[{...r.items[0],checkedAt:'2026-10-28T14:00:00Z'}]})],
+ ['stale tracker',r=>({...r,trackerVerifiedAt:'2026-10-28T14:00:00Z'})],
 ])test('late '+name+' proof is rejected without a provider fallback',async()=>{
  const f=proofFixture(),{pending,index}=await startProof(f);f.advance(PROOF_PRESENTATION_BUDGET_MS);await pending;
  f.answer(index,mutate(exactReceipt(f)));await flush();const next=await f.api.fleet();assert.equal(next.fieldMap.productConnectionsState,'rejected');assert.equal(next.fieldMap.productConnections,null);
@@ -841,4 +841,13 @@ test('identity-source 403 preserves the existing private-session invalidation ra
  const f=proofFixture(),read=await startProof(f),rejected=assert.rejects(read.pending);
  f.answer(read.index,{error:'Saved connection source could not be verified.',diagnostic:{stage:'endpoint_evaluation',code:'source_unavailable'}},403);
  await rejected;assert.ok(f.invalidations.includes('cos-private-data-invalidated'));
+});
+
+test('a late expired camera check becomes Unknown without rejecting the whole receipt',async()=>{
+ const f=proofFixture(),{pending,index}=await startProof(f);f.advance(PROOF_PRESENTATION_BUDGET_MS);await pending;
+ const receipt=exactReceipt(f);receipt.items[0].checkedAt='2026-10-28T14:00:00Z';
+ f.answer(index,receipt);await flush();const next=await f.api.fleet();
+ assert.equal(next.fieldMap.productConnectionsState,'ready');
+ const results=readExactProductConnections(next.fieldMap.productConnections,receipt.sourceSha256,['1001'],f.elapsed);
+ assert.equal(results.get('1001').status,'unknown');assert.equal(results.get('1001').checkedAt,null);
 });
