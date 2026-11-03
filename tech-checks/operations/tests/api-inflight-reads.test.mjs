@@ -851,3 +851,22 @@ test('a late expired camera check becomes Unknown without rejecting the whole re
  const results=readExactProductConnections(next.fieldMap.productConnections,receipt.sourceSha256,['1001'],f.elapsed);
  assert.equal(results.get('1001').status,'unknown');assert.equal(results.get('1001').checkedAt,null);
 });
+
+test('independent TCP map completes after failed provider health without reviving the failed pair',async()=>{
+ const f=proofFixture(),pair=f.api.fleet(),failed=assert.rejects(pair,status(503)),map=f.api.fleetConnectionMap();
+ await flush();f.answer(0,{},503);f.answer(1,proofMap());await flush();
+ f.advance(PROOF_PRESENTATION_BUDGET_MS);await failed;
+ const receipt=exactReceipt(f);f.answer(2,receipt);const completed=await map;
+ assert.equal(completed.productConnectionsState,'ready');assert.deepEqual(completed.productConnections,receipt);
+ assert.equal(f.invalidations.includes('cos-fleet-snapshot-updated'),false);
+});
+test('independent TCP map still rejects a source mismatch and cannot cross a private-session invalidation',async()=>{
+ for(const invalidated of [false,true]){
+  const f=proofFixture(),pair=f.api.fleet(),failed=assert.rejects(pair,status(503)),map=f.api.fleetConnectionMap();
+  const denied=invalidated?assert.rejects(map,status(409)):null;
+  await flush();f.answer(0,{},503);f.answer(1,proofMap());await flush();f.advance(PROOF_PRESENTATION_BUDGET_MS);await failed;
+  if(invalidated)f.window.dispatchEvent(new Event('cos-private-data-invalidated'));
+  f.answer(2,exactReceipt(f,'b'.repeat(64)));
+  if(denied)await denied;else{await flush();f.answer(3,fleetHealth);f.answer(4,proofMap('b'.repeat(64)));await flush();f.answer(5,exactReceipt(f,'b'.repeat(64)));const completed=await map;assert.equal(completed.productConnectionsState,'ready');assert.equal(completed.uploadInventory.sourceSha256,'b'.repeat(64));assert.equal(completed.productConnections.sourceSha256,'b'.repeat(64));}
+ }
+});

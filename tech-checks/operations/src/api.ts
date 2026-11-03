@@ -24,7 +24,7 @@ const sharedReadPaths = new Set([
 ]);
 const pendingReads = new Map<string, Promise<ApiResponse>>();
 const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
-type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
+type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
 const pendingFleetSnapshots=new Map<string,FleetReads>();
 let fleetRevision=0,privateSessionRevision=0;
 // Reasons contain no token or identity. Missing/unknown reasons remain hard stops.
@@ -203,7 +203,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     const key=JSON.stringify([session.token,session.role,mode]);
     const saved=fleetSnapshots.get(key);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
-    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     // Only the newly authorized actor may see the dated complete saved pair.
     // This callback does not renew the cache or any observation timestamps.
     if(saved)onSaved?.(saved.value);
@@ -222,9 +222,9 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const deadline=new Promise<ProofResult>(resolve=>{timer=window.setTimeout(()=>{
         resolve({receipt:null,state:'timeout',diagnostic:{stage:'connection_transport',code:'timeout'}});controller.abort();
       },30000);});
-      const attempt=()=>sendRequest('GET','/api/product-connections',session.token,undefined,controller.signal)
+      const attempt=()=>sendRequest<any>('GET','/api/product-connections',session.token,undefined,controller.signal)
         .then(({data})=>readExactProductConnections(data,hash,ids,Date.now())
-          ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const,diagnostic:{stage:'connection_envelope' as const,code:'validation_rejected'}})
+          ?{receipt:data,state:'ready' as const}:{receipt:null,state:'rejected' as const,diagnostic:{stage:'connection_envelope' as const,code:data?.contract==='COS_EXACT_PRODUCT_CONNECTIONS_V2'&&/^[a-f0-9]{64}$/.test(data.sourceSha256)&&data.sourceSha256!==hash?'inventory_changed':'validation_rejected'}})
         .catch(cause=>({receipt:null,state:'error' as const,diagnostic:readConnectionDiagnostic(cause?.diagnostic)}));
       // A cold app open can lose the first request before it reaches the
       // network: the diagnostic is request_failed, not timeout, and the same
@@ -267,7 +267,21 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const retained=!result&&readExactProductConnections(previous,upload.sourceSha256,fieldIds,Date.now())?previous:null;
       return {...map,productConnections:result?result.receipt:retained,productConnectionsState:result?.state||'pending',productConnectionsDiagnostic:result?.diagnostic};
     });
-    const read: FleetReads={health,fieldMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
+    // Fleet's independent placement reader must receive the completed TCP
+    // source even when provider health fails and the paired cache is rejected.
+    // It keeps the same actor, generation, census and transport deadline.
+    const connectionMap=fieldMap.then(async map=>{
+      if(!proofCompletion||(map as any).productConnectionsState!=='pending')return map;
+      const result=await proofCompletion;current();
+      const upload=(map as any).uploadInventory;
+      const ids=upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId);
+      const accepted=result.state==='ready'&&readExactProductConnections(result.receipt,upload.sourceSha256,ids,Date.now());
+      return {...map,productConnections:accepted?result.receipt:null,
+        productConnectionsState:result.state==='ready'&&!accepted?'rejected':result.state,
+        productConnectionsDiagnostic:result.state==='ready'&&!accepted?{stage:'connection_envelope',code:'validation_rejected'}:result.diagnostic};
+    });
+    void connectionMap.catch(()=>{});
+    const read: FleetReads={health,fieldMap,connectionMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
       current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
     // Publish only into this generation's successful pair. A failed pair,
@@ -304,6 +318,14 @@ export const api = {
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
   fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,
+  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{
+    const first=await (await readFleet(force)).connectionMap;
+    if((first as any).productConnectionsDiagnostic?.code!=='inventory_changed'
+      &&(!expectedSourceSha||(first as any).uploadInventory?.sourceSha256===expectedSourceSha))return first;
+    // The protected connection read observed a newer census than the map.
+    // Invalidate that generation and reload authority once, never re-probe.
+    clearSharedReads();return (await readFleet(true)).connectionMap;
+  },
   fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);

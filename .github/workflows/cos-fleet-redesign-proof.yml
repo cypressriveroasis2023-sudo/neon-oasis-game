@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: tech-checks/operations/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
-      - run: node --import tsx --test tests/fleet-entry-design.test.mjs tests/fleet-equipment-totals.test.mjs tests/fleet-workspace.test.mjs tests/fleet-dashboard.test.mjs tests/fleet-recorded-roster.test.mjs tests/fleet-command-center.test.mjs tests/recon-battery.test.mjs tests/helios-victron-cards.test.mjs tests/vrm-sharing-database.test.mjs tests/vrm-read-only-model.test.mjs tests/vrm-discovery.test.mjs tests/product-check-source.test.mjs tests/fleet-connection-reload.test.mjs tests/api-inflight-reads.test.mjs tests/product-verify-now.test.mjs tests/exact-product-connection.test.mjs
+      - run: node --import tsx --test tests/fleet-entry-design.test.mjs tests/fleet-equipment-totals.test.mjs tests/fleet-workspace.test.mjs tests/fleet-dashboard.test.mjs tests/fleet-recorded-roster.test.mjs tests/fleet-command-center.test.mjs tests/recon-battery.test.mjs tests/helios-victron-cards.test.mjs tests/vrm-sharing-database.test.mjs tests/vrm-read-only-model.test.mjs tests/vrm-discovery.test.mjs tests/product-check-source.test.mjs tests/fleet-connection-reload.test.mjs tests/fleet-connection-readback.test.mjs tests/api-inflight-reads.test.mjs tests/product-verify-now.test.mjs tests/exact-product-connection.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser -- --workers=3 --retries=0 tests/fleet-entry-design.browser.spec.mjs tests/helios-victron-cards.browser.spec.mjs tests/fleet-verify-now.browser.spec.mjs

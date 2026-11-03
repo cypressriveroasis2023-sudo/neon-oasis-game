@@ -1,5 +1,8 @@
 /** Automatic reads are gentle; manual actions still read immediately. Clock ticks never probe. */
 export const AUTO_REFRESH_MS=15*60*1000;
+// A 15-minute producer plus a 10-minute browser cache can miss the 20-minute
+// evidence window. Refresh saved TCP receipts independently; never re-probe.
+export const CONNECTION_AUTO_REFRESH_MS=2*60*1000;
 // Camera evidence expires 20 minutes after the PROVIDER OBSERVED it
 // (cameraTimestamp measures now-observedAt, not now-fetchedAt), so a read does
 // not buy a full 20 minutes of display life. Measured 2026-10-30: the youngest
