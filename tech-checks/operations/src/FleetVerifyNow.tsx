@@ -24,7 +24,7 @@ export default function FleetVerifyNow({products,onComplete,label='Verify now',d
     accepted.push(...value.items.map((r:Result)=>({...r,name:batch.find(p=>p.productId===r.productId)!.unitNumber})));
     setResults([...accepted]);setMessage('Checked '+accepted.length+' of '+snapshot.length+'. Updating saved fleet totals…');
    }
-   await onComplete();if(current())setMessage('Saved fleet results refreshed. Online and Offline reflect completed checks; remaining items show the correction needed.');
+   await onComplete();if(current())setMessage('Verification finished. Fleet totals reloaded from saved evidence. Any unfinished check shows its next step below.');
   }catch(error){if(current()){setMessage(error instanceof Error?error.message:'The check could not complete. Refresh saved results before retrying.');try{await onComplete();}catch{/* Keep the action error visible. */}}}
   finally{if(active.current===controller){active.current=null;unlock();setBusy(false);onBusyChange?.(false);}}
  };
