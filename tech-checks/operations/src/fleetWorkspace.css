@@ -189,3 +189,20 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-health-scope{grid-column:1/-1;grid-row:3;border-top:1px solid #303c4d;padding-top:8px}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses{grid-column:1/-1;grid-row:4}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer{grid-column:1/-1;grid-row:5}
+/* Override legacy full-width navigation and global button colors in the real shell. */
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{width:auto!important;flex:0 0 auto!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading{display:flex!important;flex-wrap:nowrap;justify-content:space-between;align-items:center}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:first-child{min-width:0;flex:1}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:last-child{display:flex!important;flex-direction:column;align-items:flex-end;max-width:280px;width:auto;flex:none}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-refresh{color:#121a26!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2!important}
+@media(max-width:750px){
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{width:100%!important;flex:initial!important}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:first-child{grid-column:1/-1}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:last-child{display:contents!important}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading .cos-fleet-refresh{grid-column:2;grid-row:2;min-width:120px;font-size:12px}
+ #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading>div:last-child>small{grid-column:1;grid-row:2;max-width:none;text-align:left}
+}

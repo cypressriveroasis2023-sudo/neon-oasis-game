@@ -14,7 +14,15 @@ for(const it of [false,true])test(`Fleet opens first with compact summary design
  await expect(board.locator('.cos-field-product-cards')).toBeVisible();
  await expect(board.locator('.cos-field-product-cards article').first().locator('details')).not.toHaveAttribute('open','');
  expect(await board.evaluate(n=>n.scrollWidth<=n.clientWidth+2)).toBe(true);
+ if(testInfo.project.name!=='mobile-390'){
+  const mapTab=await nav.getByRole('button',{name:/Map/}).boundingBox(),fleetTab=await nav.getByRole('button',{name:/Fleet health/}).boundingBox();
+  expect(Math.abs(mapTab.y-fleetTab.y)).toBeLessThan(3);
+ }
+ await expect(board.locator('.cos-fleet-refresh')).toHaveCSS('color','rgb(18, 26, 38)');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online')).toHaveCSS('color','rgb(43, 255, 53)');
  await page.screenshot({path:testInfo.outputPath('fleet-dashboard-default.png'),fullPage:true});
+ await board.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
+ await page.screenshot({path:testInfo.outputPath('fleet-map-cards.png'),fullPage:true});
  await board.getByRole('button',{name:'View helios →',exact:true}).click();
  await expect(board).toHaveAttribute('data-fleet-view','helios');
  await expect(board.locator('.cos-equipment-grid')).toBeVisible();
