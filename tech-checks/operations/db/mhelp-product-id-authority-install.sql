@@ -6,6 +6,43 @@ END $guard$;
 -- Owner direction: mHelp supplies current labels and assignments. An already
 -- reviewed exact Product ID survives label/assignment changes; names are not keys.
 -- Restore only original reviewed links whose protected native graph is unchanged.
+-- Owner direction: mHelp supplies current labels and assignments. An already
+-- reviewed exact Product ID survives label/assignment changes; names are not keys.
+-- Restore only original reviewed links whose protected native graph is unchanged.
+-- Owner direction: mHelp supplies current labels and assignments. An already
+-- reviewed exact Product ID survives label/assignment changes; names are not keys.
+-- Restore only original reviewed links whose protected native graph is unchanged.
+-- A real, recorded Shop return must not require reactivating its old Field
+-- geocoding source or erasing its placement history.
+create function cos_mhelp_placement_private.recorded_shop_return_current(p_product text,p_tracker uuid,p_native uuid)
+returns boolean language sql stable set search_path='' as $function$
+ select coalesce(exists(
+  select 1 from cos_mhelp_placement_private.links l
+  join public.equipment_units u on u.id=l.native_unit_id and u.organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'
+  join app_private.vision_tracker_locations t on t.id=l.tracker_id and t.organization_id=u.organization_id
+  join app_private.cos_geocode_sources s on s.product_id=l.equipment_id and s.tracker_id=t.id and s.native_unit_id=u.id
+   and s.organization_id=u.organization_id and s.entity_kind='equipment_unit' and s.source_system='mhelpdesk_product_import'
+  cross join lateral(select m.* from app_private.cos_fleet_shop_moves m where m.unit_id=u.id and m.organization_id=u.organization_id order by m.created_at desc,m.id desc limit 1) m
+  where l.equipment_id=p_product and l.tracker_id=p_tracker and l.native_unit_id=p_native
+   and l.reviewed_at is not null and l.authorization_sha256~'^[a-f0-9]{64}$'
+   and u.unit_number=l.native_label and t.unit_number=l.tracker_label
+   and u.current_location_type='shop' and u.status='available' and u.retired_at is null
+   and u.installed_site_id is null and u.current_location_ref is null
+   and u.gps_latitude is null and u.gps_longitude is null
+   and not s.active and s.eligibility='tombstone'
+   and m.unit_number=u.unit_number and m.model_id=u.model_id
+   and exists(select 1 from jsonb_array_elements(m.source_bindings) b where b->>'productId'=p_product and b->>'sourceUnitNumber'=btrim(l.full_label))
+   and exists(select 1 from app_private.cos_geocode_source_events e where e.event_id=s.event_id and e.kind='tombstone' and e.product_id=p_product and e.native_unit_id=u.id and e.source_revision=s.source_revision)
+   and not exists(select 1 from app_private.cos_owner_identity_claims c where c.native_unit_id=u.id)
+   and not exists(select 1 from app_private.cos_archived_representations a where t.id in(a.archived_tracker_id,a.canonical_tracker_id) or u.id in(a.archived_native_id,a.canonical_native_id))
+   and not exists(select 1 from app_private.cos_geocode_sources other where other.active and other.product_id<>p_product and (other.tracker_id=t.id or other.native_unit_id=u.id))
+ ),false)
+$function$;
+revoke all on function cos_mhelp_placement_private.recorded_shop_return_current(text,uuid,uuid) from public,anon,authenticated,service_role;
+
+-- Owner direction: mHelp supplies current labels and assignments. An already
+-- reviewed exact Product ID survives label/assignment changes; names are not keys.
+-- Restore only original reviewed links whose protected native graph is unchanged.
 create function cos_mhelp_placement_private.authoritative_product_records(p_records jsonb,p_projection boolean default false)
 returns jsonb language plpgsql stable set search_path='' as $function$
 declare result jsonb;
@@ -16,7 +53,7 @@ begin
  with wanted as materialized (
   select r,ord from jsonb_array_elements(p_records) with ordinality x(r,ord)
   where (r->'binding' is null or r->'binding'='null'::jsonb)
-   and coalesce(r->>'holdReason','') in ('api_equipment_label_changed',
+   and coalesce(r->>'holdReason','') in ('','api_equipment_label_changed',
     'Product ID identity label changed; confirm before linking',
     'Prior reviewed scoped identity or assignment requires Owner installation review',
     'Source assignment or protection changed; Owner installation review required')
@@ -33,7 +70,7 @@ begin
        and coalesce(r->'apiAssignment'->>'serviceLocationId','')~'^[1-9][0-9]{0,14}$'))
  ), original_batches as materialized (
   select b.* from cos_mhelp_placement_private.upload_batches b
-  where b.receipt->>'contract'='COS_MHELP_UPLOAD_V1' and b.receipt->>'reviewed'='true'
+  where b.receipt->>'contract'='COS_MHELP_UPLOAD_V1'
    and b.receipt->>'sourceSha256'=b.source_sha256
    and b.payload_sha256=encode(sha256(convert_to(jsonb_build_object('receipt',b.receipt,'records',b.records)::text,'UTF8')),'hex')
  ), history as materialized (
@@ -43,9 +80,13 @@ begin
   join wanted w on w.r->>'productId'=h->>'productId'
   join cos_mhelp_placement_private.links l on l.equipment_id=h->>'productId'
   join app_private.cos_geocode_sources s on s.product_id=l.equipment_id and s.tracker_id=l.tracker_id
-   and s.native_unit_id is not distinct from l.native_unit_id and s.source_revision=l.source_revision
-   and s.active and s.source_system='mhelpdesk_product_import'
+   and ((l.native_unit_id is null and s.entity_kind='tracker') or (s.entity_kind='equipment_unit' and s.native_unit_id=l.native_unit_id))
+   and s.source_system='mhelpdesk_product_import'
+   and ((s.active and s.source_revision=l.source_revision) or (w.r->>'placement'='SHOP' and cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id)))
   where h->'binding'->>'matchMethod'='reviewed_product_id'
+   and h->'binding'->'reviewEvidence'->>'review_state' in ('confirmed','held')
+   and l.reviewed_at is not null and l.authorization_sha256~'^[a-f0-9]{64}$'
+   and h->'binding'->'reviewEvidence'->>'reviewed_product_id'=l.equipment_id
    and h->'binding'->>'productId'=l.equipment_id
    and h->'binding'->>'trackerId'=l.tracker_id::text
    and h->'binding'->>'nativeUnitId' is not distinct from l.native_unit_id::text
@@ -53,7 +94,7 @@ begin
    and h->'binding'->>'nativeLabel' is not distinct from l.native_label
    and lower(regexp_replace(h->>'category','[[:space:]]','','g'))=lower(regexp_replace(w.r->>'category','[[:space:]]','','g'))
    and w.r->'apiAssignment'->'placementProof'->'model'=coalesce(to_jsonb(l.model),'null'::jsonb)
-   and l.baseline_guard=cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id)
+   and (l.baseline_guard=cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id) or (w.r->>'placement'='SHOP' and cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id)))
    and not exists(select 1 from app_private.cos_geocode_sources other where other.active and other.product_id<>l.equipment_id
       and (other.tracker_id=l.tracker_id or other.native_unit_id=l.native_unit_id))
    and not exists(select 1 from jsonb_array_elements(p_records) other where other->>'productId'<>l.equipment_id
@@ -78,6 +119,7 @@ begin
  return result;
 end $function$;
 revoke all on function cos_mhelp_placement_private.authoritative_product_records(jsonb,boolean) from public,anon,authenticated,service_role;
+
 
 CREATE OR REPLACE FUNCTION public.cos_mhelp_live_inventory_session(p_action text, p_payload jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
