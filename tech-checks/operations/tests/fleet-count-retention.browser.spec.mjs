@@ -53,3 +53,20 @@ test('reopening Fleet shows the last completed reading before any new camera rea
  await saved.getByRole('button',{name:/Refresh data/}).click();
  await expect.poll(()=>cameraReads().length).toBeGreaterThan(0);
 });
+
+
+test('completed connection counts persist when the provider read fails',async({page})=>{
+ const f=fieldProductFixture();
+ const {app,state}=await mountFleet(page,false,{
+  field:f.field,health:f.health,productConnections:f.connections,
+  skipInitialFieldCount:true,advancingClock:true,failHealth:true,
+  productionOwnerUserId:'00000000-0000-4000-8000-000000000002',
+ });
+ await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ await expect.poll(()=>app.locator('body').evaluate(()=>Object.keys(localStorage).some(key=>key.startsWith('cos-saved-fleet-reading-v1:')))).toBe(true);
+ state.calls.length=0;await page.reload();
+ const saved=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ await expect(saved.getByText(/Last completed reading/)).toBeVisible();
+ expect(state.calls.filter(call=>['/api/camera-health/summary-v3','/api/field-map','/api/product-connections'].includes(call.path))).toHaveLength(0);
+ expect(state.errors).toEqual([]);
+});

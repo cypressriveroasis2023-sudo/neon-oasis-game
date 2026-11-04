@@ -155,12 +155,14 @@ function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRe
  const healthAvailable=Boolean(cameras.data)&&!failed||connectionSourceReady;
  const fieldInventory=useMemo(()=>fieldInventoryCensus(effectiveUpload,fieldProducts,healthAvailable,snapshotNow,fieldProducts),[effectiveUpload,fieldProducts,healthAvailable,snapshotNow]);
  const boardData=useMemo(()=>buildFleetCommandCenter(effectiveUpload,fieldProducts,healthAvailable,rows,mhelpAddresses,sourceErrors.victron?null:vrm,snapshotNow,cameras.data?.refreshedAt||null),[map,fieldProducts,healthAvailable,rows,mhelpAddresses,sourceErrors.victron,vrm,snapshotNow]);
- const completedReading=Boolean(connectionSourceReady&&fieldProducts&&boardData&&cameras.data&&Number.isFinite(snapshotNow));
+ // Exact Product-ID connection evidence is sufficient to retain the completed
+ // reading. An unrelated provider read failure must not prevent persistence.
+ const completedReading=Boolean(connectionSourceReady&&fieldProducts&&boardData&&Number.isFinite(snapshotNow));
  const [savedReading,setSavedReading]=useState(()=>readFleetReading(window.localStorage,readingKey));
  useEffect(()=>{
   if(!readingKey||!completedReading||!boardData)return;
   const reading={
-   checkedAt:snapshotNow,field:boardData.field,shop:boardData.shop,
+   checkedAt:Math.trunc(snapshotNow),field:boardData.field,shop:boardData.shop,
    online:boardData.counts.online,offline:boardData.counts.offline,unverified:boardData.counts.unverified,
   };
   saveFleetReading(window.localStorage,readingKey,reading);

@@ -2,392 +2,392 @@ TAP version 13
 # Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
 ok 1 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
   ---
-  duration_ms: 18.916753
+  duration_ms: 5.878253
   type: 'test'
   ...
 # Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
 ok 2 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
   ---
-  duration_ms: 0.495283
+  duration_ms: 0.40701
   type: 'test'
   ...
 # Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
 ok 3 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
   ---
-  duration_ms: 24.710721
+  duration_ms: 19.592846
   type: 'test'
   ...
 # Subtest: a provider name or suffix collision cannot influence independent product proof
 ok 4 - a provider name or suffix collision cannot influence independent product proof
   ---
-  duration_ms: 0.314656
+  duration_ms: 0.388927
   type: 'test'
   ...
 # Subtest: duplicate tracker IP claimed by Shop or another Field product is held
 ok 5 - duplicate tracker IP claimed by Shop or another Field product is held
   ---
-  duration_ms: 0.338341
+  duration_ms: 0.389988
   type: 'test'
   ...
 # Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
 ok 6 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
   ---
-  duration_ms: 0.262469
+  duration_ms: 0.30508
   type: 'test'
   ...
 # Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
 ok 7 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
   ---
-  duration_ms: 0.345945
+  duration_ms: 0.390639
   type: 'test'
   ...
 # Subtest: all 2027 product identities and placements must reconcile before using any check
 ok 8 - all 2027 product identities and placements must reconcile before using any check
   ---
-  duration_ms: 0.294759
+  duration_ms: 9.550604
   type: 'test'
   ...
 # Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
 ok 9 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
   ---
-  duration_ms: 0.685909
+  duration_ms: 0.89389
   type: 'test'
   ...
 # Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
 ok 10 - browser-facing source receipt must cover every exact Product ID and retain the original check time
   ---
-  duration_ms: 1.247245
+  duration_ms: 1.340354
   type: 'test'
   ...
 # Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
 ok 11 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
   ---
-  duration_ms: 0.747874
+  duration_ms: 3.989893
   type: 'test'
   ...
 # Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
 ok 12 - live saved port schema requires measured attempt evidence, not invented Boolean port state
   ---
-  duration_ms: 0.801544
+  duration_ms: 0.805135
   type: 'test'
   ...
 # Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
 ok 13 - a stale reviewed mHelp source cannot authorize currently online camera product claims
   ---
-  duration_ms: 0.348359
+  duration_ms: 0.258212
   type: 'test'
   ...
 # Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
 ok 14 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
   ---
-  duration_ms: 0.772399
+  duration_ms: 0.676019
   type: 'test'
   ...
 # Subtest: one result expiring in transit does not erase another fresh Product ID
 ok 15 - one result expiring in transit does not erase another fresh Product ID
   ---
-  duration_ms: 0.428148
+  duration_ms: 0.33191
   type: 'test'
   ...
 # Subtest: actual deployed reader and classifier accept truthful API provenance together
 ok 16 - actual deployed reader and classifier accept truthful API provenance together
   ---
-  duration_ms: 61.774135
+  duration_ms: 48.76144
   type: 'test'
   ...
 # Subtest: recorded deployment still accepts legacy CSV provenance
 ok 17 - recorded deployment still accepts legacy CSV provenance
   ---
-  duration_ms: 10.419047
+  duration_ms: 5.942903
   type: 'test'
   ...
 # Subtest: explicitly absent historical index rows do not block current equipment
 ok 18 - explicitly absent historical index rows do not block current equipment
   ---
-  duration_ms: 14.822994
+  duration_ms: 6.021961
   type: 'test'
   ...
 # Subtest: unexplained historical membership is still rejected
 ok 19 - unexplained historical membership is still rejected
   ---
-  duration_ms: 3.865183
+  duration_ms: 3.14716
   type: 'test'
   ...
 # Subtest: an active Product ID cannot also be declared absent
 ok 20 - an active Product ID cannot also be declared absent
   ---
-  duration_ms: 2.101456
+  duration_ms: 4.122693
   type: 'test'
   ...
 # Subtest: duplicate and invalid absence evidence are rejected
 ok 21 - duplicate and invalid absence evidence are rejected
   ---
-  duration_ms: 3.799802
+  duration_ms: 3.268456
   type: 'test'
   ...
 # Subtest: a changed protected source stops before any Google request
 ok 22 - a changed protected source stops before any Google request
   ---
-  duration_ms: 0.297885
+  duration_ms: 0.280664
   type: 'test'
   ...
 # Subtest: the deployed archive-IP reservation still prevents a positive
 ok 23 - the deployed archive-IP reservation still prevents a positive
   ---
-  duration_ms: 23.870115
+  duration_ms: 9.438563
   type: 'test'
   ...
 # Subtest: a shared Shop IP remains held and Shop is excluded from Field results
 ok 24 - a shared Shop IP remains held and Shop is excluded from Field results
   ---
-  duration_ms: 15.121941
+  duration_ms: 3.148482
   type: 'test'
   ...
 # Subtest: cancellation stops before reading protected inventory
 ok 25 - cancellation stops before reading protected inventory
   ---
-  duration_ms: 0.887424
+  duration_ms: 0.629206
   type: 'test'
   ...
 # Subtest: the publisher writes exactly the three approved cells, including the separate solar-pole layout
 ok 26 - the publisher writes exactly the three approved cells, including the separate solar-pole layout
   ---
-  duration_ms: 12.932892
+  duration_ms: 3.84285
   type: 'test'
   ...
 # Subtest: manual edits, row movement, duplicate labels, source holds and native guard changes cannot publish
 ok 27 - manual edits, row movement, duplicate labels, source holds and native guard changes cannot publish
   ---
-  duration_ms: 1.206418
+  duration_ms: 1.132415
   type: 'test'
   ...
 # Subtest: formulas, chips, unsupported validation and invalid dropdown values are held; existing equivalent Shop names are retained
 ok 28 - formulas, chips, unsupported validation and invalid dropdown values are held; existing equivalent Shop names are retained
   ---
-  duration_ms: 0.941154
+  duration_ms: 1.129471
   type: 'test'
   ...
 # Subtest: ambiguous failed writes are recoverable only from exact intended readback; changed pending assignments remain held
 ok 29 - ambiguous failed writes are recoverable only from exact intended readback; changed pending assignments remain held
   ---
-  duration_ms: 7.069285
+  duration_ms: 2.315936
   type: 'test'
   ...
 # Subtest: metadata reads only identity/placement/customer/site columns and reject layout changes and global duplicates
 ok 30 - metadata reads only identity/placement/customer/site columns and reject layout changes and global duplicates
   ---
-  duration_ms: 4.915611
+  duration_ms: 3.048215
   type: 'test'
   ...
 # Subtest: authentication and bounded request parsing precede any Google/database work
 ok 31 - authentication and bounded request parsing precede any Google/database work
   ---
-  duration_ms: 67.307033
+  duration_ms: 34.468156
   type: 'test'
   ...
 # Subtest: a changed second read prevents staging and all writes; source refusal also prevents Google POST
 ok 32 - a changed second read prevents staging and all writes; source refusal also prevents Google POST
   ---
-  duration_ms: 5.187527
+  duration_ms: 1.746353
   type: 'test'
   ...
 # Subtest: publish requires exact readback; a collaborator change is held and cannot advance the baseline
 ok 33 - publish requires exact readback; a collaborator change is held and cannot advance the baseline
   ---
-  duration_ms: 3.466581
+  duration_ms: 3.303752
   type: 'test'
   ...
 # Subtest: only otherwise writable stale changes request evidence; manual corrections and pending writes never do
 ok 34 - only otherwise writable stale changes request evidence; manual corrections and pending writes never do
   ---
-  duration_ms: 0.669227
+  duration_ms: 0.729363
   type: 'test'
   ...
 # Scheduled endpoint source failure Error Read unavailable
 # Subtest: scheduled source passes the same complete absence proof into the repaired tracker reader
 ok 35 - scheduled source passes the same complete absence proof into the repaired tracker reader
   ---
-  duration_ms: 29.084903
+  duration_ms: 16.41088
   type: 'test'
   ...
 # Subtest: stale, incomplete, duplicate or mismatched baselines fail before the tracker read
 ok 36 - stale, incomplete, duplicate or mismatched baselines fail before the tracker read
   ---
-  duration_ms: 1.152759
+  duration_ms: 1.416777
   type: 'test'
   ...
 # Subtest: missing, duplicate and present-as-absent IDs cannot certify source membership
 ok 37 - missing, duplicate and present-as-absent IDs cannot certify source membership
   ---
-  duration_ms: 0.689324
+  duration_ms: 0.800244
   type: 'test'
   ...
 # Subtest: Do Not Use and identity or placement conflicts stay visible as held
 ok 38 - Do Not Use and identity or placement conflicts stay visible as held
   ---
-  duration_ms: 1.429374
+  duration_ms: 1.398393
   type: 'test'
   ...
 # Subtest: per-equipment review reasons are preserved rather than manufactured as an outage
 ok 39 - per-equipment review reasons are preserved rather than manufactured as an outage
   ---
-  duration_ms: 0.391109
+  duration_ms: 0.465289
   type: 'test'
   ...
 # Subtest: changed, incomplete or duplicate tracker census is rejected
 ok 40 - changed, incomplete or duplicate tracker census is rejected
   ---
-  duration_ms: 2.012551
+  duration_ms: 2.295799
   type: 'test'
   ...
 # Subtest: scheduled routes reject missing secret, browser origin and invalid methods without reading private data
 ok 41 - scheduled routes reject missing secret, browser origin and invalid methods without reading private data
   ---
-  duration_ms: 29.018078
+  duration_ms: 28.696834
   type: 'test'
   ...
 # Subtest: authenticated failure is a source error, never an Offline reading
 ok 42 - authenticated failure is a source error, never an Offline reading
   ---
-  duration_ms: 14.435762
+  duration_ms: 8.915156
   type: 'test'
   ...
 # Subtest: actual API pull provenance is accepted without inventing a CSV filename
 ok 43 - actual API pull provenance is accepted without inventing a CSV filename
   ---
-  duration_ms: 22.469797
+  duration_ms: 28.458218
   type: 'test'
   ...
 # Subtest: legacy CSV labels continue to be accepted
 ok 44 - legacy CSV labels continue to be accepted
   ---
-  duration_ms: 3.600369
+  duration_ms: 5.650697
   type: 'test'
   ...
 # Subtest: API labels require the exact format and a real calendar date
 ok 45 - API labels require the exact format and a real calendar date
   ---
-  duration_ms: 0.559793
+  duration_ms: 1.006009
   type: 'test'
   ...
 # Subtest: mixed source labels cannot certify one census
 ok 46 - mixed source labels cannot certify one census
   ---
-  duration_ms: 2.349328
+  duration_ms: 3.908933
   type: 'test'
   ...
 # Subtest: API label does not weaken exact Product ID and row/column guards
 ok 47 - API label does not weaken exact Product ID and row/column guards
   ---
-  duration_ms: 2.485652
+  duration_ms: 6.055934
   type: 'test'
   ...
 # Subtest: shared-IP ownership remains held for API provenance
 ok 48 - shared-IP ownership remains held for API provenance
   ---
-  duration_ms: 7.595525
+  duration_ms: 11.217882
   type: 'test'
   ...
 # Subtest: API label never bypasses stale timestamps or source-hash mismatch
 ok 49 - API label never bypasses stale timestamps or source-hash mismatch
   ---
-  duration_ms: 3.183653
+  duration_ms: 1.780165
   type: 'test'
   ...
 # Subtest: each batch reaches saved readback before another POST starts
 ok 50 - each batch reaches saved readback before another POST starts
   ---
-  duration_ms: 4.411772
+  duration_ms: 4.657054
   type: 'test'
   ...
 # Subtest: a failed middle POST is not retried and cannot hide successful batches
 ok 51 - a failed middle POST is not retried and cannot hide successful batches
   ---
-  duration_ms: 0.89096
+  duration_ms: 0.925479
   type: 'test'
   ...
 # Subtest: a failed final batch still gets a read-only recovery
 ok 52 - a failed final batch still gets a read-only recovery
   ---
-  duration_ms: 0.502556
+  duration_ms: 0.453267
   type: 'test'
   ...
 # Subtest: display readback failure does not discard returned readings or retry checks
 ok 53 - display readback failure does not discard returned readings or retry checks
   ---
-  duration_ms: 5.783538
+  duration_ms: 0.792251
   type: 'test'
   ...
 # Subtest: authorization failure stops subsequent batches
 ok 54 - authorization failure stops subsequent batches
   ---
-  duration_ms: 0.486026
+  duration_ms: 0.562631
   type: 'test'
   ...
 # Subtest: malformed, duplicate, wrong-target, or missing-timestamp results stop safely
 ok 55 - malformed, duplicate, wrong-target, or missing-timestamp results stop safely
   ---
-  duration_ms: 0.913071
+  duration_ms: 1.111477
   type: 'test'
   ...
 # Subtest: session changes prevent readback and publication of late POST results
 ok 56 - session changes prevent readback and publication of late POST results
   ---
-  duration_ms: 0.323543
+  duration_ms: 0.39572
   type: 'test'
   ...
 # Subtest: a session change during readback prevents the next POST
 ok 57 - a session change during readback prevents the next POST
   ---
-  duration_ms: 0.396709
+  duration_ms: 0.48146
   type: 'test'
   ...
 # Subtest: unknown is unresolved, never counted as online, offline or successful setup
 ok 58 - unknown is unresolved, never counted as online, offline or successful setup
   ---
-  duration_ms: 3.71872
+  duration_ms: 0.776651
   type: 'test'
   ...
 # Subtest: input list changes during readback do not lose selected targets
 ok 59 - input list changes during readback do not lose selected targets
   ---
-  duration_ms: 0.770837
+  duration_ms: 0.776421
   type: 'test'
   ...
 # Subtest: duplicate products are checked once and batch size remains four
 ok 60 - duplicate products are checked once and batch size remains four
   ---
-  duration_ms: 0.354921
+  duration_ms: 0.35851
   type: 'test'
   ...
 # Subtest: offline evidence remains offline, not rewritten by the browser
 ok 61 - offline evidence remains offline, not rewritten by the browser
   ---
-  duration_ms: 0.288959
+  duration_ms: 0.240238
   type: 'test'
   ...
 # Subtest: a lost API response retains its bounded explanation without replaying the check
 ok 62 - a lost API response retains its bounded explanation without replaying the check
   ---
-  duration_ms: 1.797679
+  duration_ms: 2.064117
   type: 'test'
   ...
 # Subtest: untrusted and oversized error details are not copied into results
 ok 63 - untrusted and oversized error details are not copied into results
   ---
-  duration_ms: 1.905231
+  duration_ms: 0.626059
   type: 'test'
   ...
 # Subtest: missing setup and failed checks have different labels without changing status
 ok 64 - missing setup and failed checks have different labels without changing status
   ---
-  duration_ms: 0.418269
+  duration_ms: 0.335858
   type: 'test'
   ...
 # Subtest: completed readings survive a new reader and stay scoped to the verified Owner
 ok 65 - completed readings survive a new reader and stay scoped to the verified Owner
   ---
-  duration_ms: 1.997152
+  duration_ms: 2.297612
   type: 'test'
   ...
 1..65
@@ -398,4 +398,4 @@ ok 65 - completed readings survive a new reader and stay scoped to the verified 
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1500.065376
+# duration_ms 1350.270758
