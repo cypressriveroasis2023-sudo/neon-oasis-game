@@ -9,5 +9,15 @@ export function readFieldMapView(state:any):Partial<FieldMapView>{
 }
 export function saveFieldMapView(value:Partial<FieldMapView>){
   if(!/^#(?:fleet-dashboard|field-map|field-view)(?:\?|$)/.test(location.hash))return;
-  history.replaceState({...history.state,cosFieldMapView:{...readFieldMapView(history.state),...value}},'');
+  const state = history.state;
+  const previous = readFieldMapView(state);
+  const next = { ...previous, ...value };
+  if (JSON.stringify(previous) === JSON.stringify(next)) return;
+  try {
+    history.replaceState({ ...state, cosFieldMapView: next }, '');
+  } catch (error) {
+    // Safari can throttle history writes during map movements. The live map
+    // remains usable even when the browser declines to remember its view.
+    if (!(error instanceof DOMException) || error.name !== 'SecurityError') throw error;
+  }
 }

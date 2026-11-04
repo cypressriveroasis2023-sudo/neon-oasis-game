@@ -1,3 +1,4 @@
+import {prepareImmutableIdentityEnvelope} from './verifiedUnitIdentity';
 import {reconcileFleetSnapshot,type FleetSnapshot} from './fleetSnapshot';
 export function restoredFleet(value:any):FleetSnapshot|null{
  if(!value?.latest)return null;
@@ -5,7 +6,9 @@ export function restoredFleet(value:any):FleetSnapshot|null{
  if(value.contract!=='COS_DURABLE_FLEET_RESPONSE_V1'||raw?.contract!=='COS_SAVED_FLEET_BOARD_V1')throw Error('Saved fleet record is invalid.');
  const at=Date.parse(raw.fleet?.readAt);
  if(!Number.isFinite(at)||at>Date.now()+300000)throw Error('Saved fleet time is invalid.');
- const pair=reconcileFleetSnapshot(raw.fleet.health,raw.fleet.fieldMap,at);
+ const health = prepareImmutableIdentityEnvelope(raw.fleet.health);
+ const pair = reconcileFleetSnapshot(health, raw.fleet.fieldMap, at);
+ prepareImmutableIdentityEnvelope(pair.health);
  return {...pair,fieldMap:{...pair.fieldMap,savedBoardReadAt:pair.readAt} as FleetSnapshot['fieldMap'],readStartedAt:Date.now()};
 }
 /** All clients read one server-published pair. Opening never clears its record. */
