@@ -1,0 +1,67 @@
+name: COS Fleet baseline failure comparison
+on:
+  push:
+    branches: [fix/fleet-verification-progress-20261104]
+    paths: ['.github/workflows/cos-fleet-baseline-20261104.yml']
+permissions:
+  contents: write
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fleet-verification-progress-20261104
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Install pinned test dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compare only the observed failing test files
+        working-directory: tech-checks/operations
+        run: |
+          mkdir -p ../../repair-evidence/combined
+          files='tests/approved-cos-navigation.test.mjs tests/approved-fleet-unit.test.mjs tests/approved-fleet-views.test.mjs tests/approved-tool-search.test.mjs tests/owner-census-fleet-snapshot.test.mjs'
+          set +e
+          timeout 90s node --import tsx --test --test-concurrency=1 $files > ../../repair-evidence/combined/candidate-failure-comparison.txt 2>&1
+          candidate=$?
+          git worktree add --detach /tmp/cos-main-baseline 1ddb5df2228d1a584393884182406bca90efd1d8
+          ln -s "$PWD/node_modules" /tmp/cos-main-baseline/tech-checks/operations/node_modules
+          (cd /tmp/cos-main-baseline/tech-checks/operations && timeout 90s node --import tsx --test --test-concurrency=1 $files) > ../../repair-evidence/combined/baseline-failure-comparison.txt 2>&1
+          baseline=$?
+          printf '{"candidateExit":%s,"baselineExit":%s}\n' "$candidate" "$baseline" > ../../repair-evidence/combined/failure-comparison-exits.json
+          exit 0
+      - name: Record comparison and exact static hashes
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          const root='repair-evidence/combined/';
+          const failures=name=>[...fs.readFileSync(root+name,'utf8').matchAll(/^not ok \d+ - (.*)$/gm)].map(m=>m[1]).sort();
+          const candidate=failures('candidate-failure-comparison.txt'),baseline=failures('baseline-failure-comparison.txt');
+          const report={at:new Date().toISOString(),scope:'Five observed failing files only; the full repository suite is not claimed passed',productionBaseline:'1ddb5df2228d1a584393884182406bca90efd1d8',...JSON.parse(fs.readFileSync(root+'failure-comparison-exits.json')),candidateFailures:candidate,baselineFailures:baseline,candidateOnly:candidate.filter(n=>!baseline.includes(n)),baselineOnly:baseline.filter(n=>!candidate.includes(n))};
+          fs.writeFileSync(root+'baseline-comparison.json',JSON.stringify(report,null,2)+'\n');
+          const base='tech-checks/operations/dist';
+          const walk=dir=>fs.readdirSync(dir).flatMap(n=>{const p=path.join(dir,n);return fs.statSync(p).isDirectory()?walk(p):[p];});
+          const files=walk(base).map(p=>{const b=fs.readFileSync(p);return {path:p,bytes:b.length,sha256:crypto.createHash('sha256').update(b).digest('hex'),md5:crypto.createHash('md5').update(b).digest('hex')};});
+          fs.writeFileSync(root+'static-manifest.json',JSON.stringify({sourceCommit:process.env.GITHUB_SHA,files},null,2)+'\n');
+          if(report.candidateExit===124||report.baselineExit===124)throw Error('Bounded comparison timed out; do not treat it as a completed result');
+          NODE
+      - name: Preserve comparison without changing application code
+        if: always()
+        run: |
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Record baseline failure comparison and exact static release hashes'
+          git push origin HEAD:fix/fleet-verification-progress-20261104
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-fleet-baseline-comparison
+          path: repair-evidence/combined
+          retention-days: 3
