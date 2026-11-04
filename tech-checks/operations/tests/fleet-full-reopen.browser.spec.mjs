@@ -3,27 +3,7 @@ import {mountFleet,now} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 const owner='00000000-0000-4000-8000-000000000001';
 const reads=state=>state.calls.filter(c=>['/api/camera-health/summary-v3','/api/field-map','/api/product-connections','/api/routers','/api/vrm-fleet'].includes(c.path));
-async function setup(page,extra={}){
- const f=fieldProductFixture();
- const value=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:owner,...extra});
- await expect(value.app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
- try{await expect.poll(()=>value.app.locator('body').evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('cos-saved-fleet-presentation-v1:')))).toBe(true);}
- catch(error){
-  // Synthetic fixture only: capture the failed save's actual hook inputs. No
-  // production credentials or customer records are read by this browser test.
-  const detail=await value.app.locator('body').evaluate(()=>{
-   const el=document.querySelector('.cos-fleet-dashboard');
-   let fiber=el?.[Object.keys(el||{}).find(k=>k.startsWith('__reactFiber$'))];
-   while(fiber&&!(typeof fiber.type==='function'&&fiber.memoizedProps?.readingKey))fiber=fiber.return;
-   const hooks=[];let h=fiber?.memoizedState;
-   for(let i=0;h&&i<130;i++,h=h.next){const v=h.memoizedState;const seen=new WeakSet();let text;try{text=JSON.stringify(v,(k,x)=>{if(typeof x==='function')return '[function]';if(x&&typeof x==='object'){if(seen.has(x))return '[cycle]';seen.add(x);if(x instanceof Map)return {mapSize:x.size};}return x;});}catch{text='unserializable';}hooks.push({i,value:text});}
-   return {now:Date.now(),props:fiber?.memoizedProps?{readingKey:fiber.memoizedProps.readingKey,session:fiber.memoizedProps.session}:null,keys:Object.keys(localStorage),hooks};
-  });
-  console.log('SYNTHETIC_PERSISTENCE_FAILURE '+JSON.stringify(detail));
-  throw error;
- }
- return {...value,f};
-}
+async function setup(page,extra={}){const f=fieldProductFixture();const value=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:owner,...extra});await expect(value.app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');await expect.poll(()=>value.app.locator('body').evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('cos-saved-fleet-presentation-v1:')))).toBe(true);return {...value,f};}
 test('cold desktop reopen restores FULL dashboard, search, map, cards and verify controls without source reads',async({page},testInfo)=>{
  const {app,state}=await setup(page);state.calls.length=0;await page.reload();
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});

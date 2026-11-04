@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFleetPresentation,saveFleetPresentation,clearFleetPresentations} from '../src/savedFleetPresentation.ts';
-import {fleetReadingKey} from '../src/savedFleetReading.ts';
+import {readFleetPresentation,saveFleetPresentation,clearFleetPresentations,fleetDisplaySaveTime} from '../src/savedFleetPresentation.ts';
+import {fleetReadingKey,saveFleetReading,readFleetReading} from '../src/savedFleetReading.ts';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 const session={authorized:true,legacyOwner:true,role:'Owner',productionOwnerUserId:'00000000-0000-4000-8000-000000000001',features:{fleetAccess:true,vrmRead:true}};
 const key=fleetReadingKey(session,'');
@@ -37,4 +37,19 @@ test('older presentation cannot replace a newer completed dashboard',()=>{
  const f=fixture();saveFleetPresentation(f.storage,key,f.presentation,f.now);
  assert.equal(saveFleetPresentation(f.storage,key,{...f.presentation,checkedAt:f.now-1},f.now),false);
  assert.equal(readFleetPresentation(f.storage,key,f.now).checkedAt,f.now);
+});
+test('one-millisecond local display clock mismatch saves both views without changing camera observations',()=>{
+ const f=fixture(),observations=JSON.stringify(f.presentation.fieldMap.productConnections);
+ f.presentation.checkedAt=fleetDisplaySaveTime(f.now+1,f.now);assert.equal(f.presentation.checkedAt,f.now);
+ assert.equal(saveFleetPresentation(f.storage,key,f.presentation,f.now),true);
+ const counts={checkedAt:f.presentation.checkedAt,field:7,shop:1,online:1,offline:1,unverified:4};
+ saveFleetReading(f.storage,key,counts,f.now);assert.deepEqual(readFleetReading(f.storage,key,f.now),counts);
+ assert.equal(JSON.stringify(readFleetPresentation(f.storage,key,f.now).fieldMap.productConnections),observations);
+});
+test('local display clock normalization never renews old readings or accepts larger clock reversals',()=>{
+ assert.equal(fleetDisplaySaveTime(1000,10000),1000);assert.equal(fleetDisplaySaveTime(1001,1000),1000);
+ assert.equal(fleetDisplaySaveTime(1002,1000),null);assert.equal(fleetDisplaySaveTime(Infinity,1000),null);
+ assert.equal(fleetDisplaySaveTime(1000,NaN),null);assert.equal(fleetDisplaySaveTime(-1,1000),null);
+ const f=fixture();f.presentation.fieldMap.productConnections.items[0].checkedAt=new Date(f.now+1).toISOString();
+ assert.equal(saveFleetPresentation(f.storage,key,f.presentation,f.now),false);
 });
