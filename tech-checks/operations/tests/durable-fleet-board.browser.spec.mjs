@@ -8,7 +8,7 @@ test('reopening restores server counts, retains failures, replaces one completed
  const first=completedBoard(f.health,f.field,f.connections,null,f.now);
  let value={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-1',payload:first},refresh:{state:'completed'},history:[{id:'00000000-0000-4000-8000-000000000001',state:'completed',finished_at:first.fleet.readAt,counts:first.counts}]};
  const calls=[];
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()!=='POST')return route.fallback();const req=route.request().postDataJSON();
   if(!req.path.startsWith('/api/fleet-saved-board'))return route.fallback();calls.push(req);
   const data=req.path.includes('/history/')?{completedAt:first.fleet.readAt,units:first.units}:value;

@@ -39,7 +39,7 @@ test('late connection read failure is visible and preserves completed exact chec
 test('Fleet warning renders only bounded source diagnostics and clears them on recovery or invalidation',async({page})=>{
  const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true});
  let mode='safe';
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()!=='POST'||route.request().postDataJSON().path!=='/api/product-connections'||mode==='success')return route.fallback();
   return route.fulfill({status:503,headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{error:'SECRET_RAW_ERROR',diagnostic:mode==='safe'?{stage:'saved_checks',code:'source_unavailable'}:{stage:'saved_checks',code:'SECRET_RAW_ERROR'}}});
  });

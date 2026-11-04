@@ -1,0 +1,153 @@
+name: COS Owner equipment release validation
+on:
+  push:
+    branches: [feat/owner-equipment-panel-20261104]
+    paths:
+      - '.github/workflows/cos-owner-equipment-release.yml'
+      - '.github/scripts/prepare-owner-equipment-20261104.mjs'
+      - '.github/scripts/owner-equipment-refinements.mjs'
+      - 'tech-checks/operations/src/**'
+      - 'tech-checks/operations/tests/owner-equipment*'
+      - 'tech-checks/operations/db/owner-equipment-controls.sql'
+      - 'tech-checks/supabase/functions/cos-owner-equipment/**'
+permissions:
+  contents: write
+concurrency:
+  group: cos-owner-equipment-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_DB: owner_editor_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Prepare integration on exact current source
+        run: |
+          mkdir -p repair-evidence/owner-editor
+          if ! grep -q 'const ownerRoute=' tech-checks/operations/src/api.ts; then
+            node .github/scripts/prepare-owner-equipment-20261104.mjs
+          fi
+          node .github/scripts/owner-equipment-refinements.mjs
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root='tech-checks/operations/tests/';
+          for(const f of fs.readdirSync(root).filter(n=>n.endsWith('.browser.spec.mjs'))){const p=root+f,s=fs.readFileSync(p,'utf8');fs.writeFileSync(p,s.replaceAll("'**/functions/v1/cos-operations-pages'","'**/functions/v1/cos-*'"));}
+          NODE
+      - name: Install locked dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test isolated database persistence and access
+        id: database
+        continue-on-error: true
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: psql -h localhost -U postgres -d owner_editor_test -f tech-checks/operations/tests/owner-equipment.database.test.sql > repair-evidence/owner-editor/database-tests.txt 2>&1
+      - name: Test contracts, types and production build
+        id: source
+        continue-on-error: true
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          node --import tsx --test tests/owner-equipment.test.mjs tests/mhelp-field-health.test.mjs tests/fleet-recorded-roster.test.mjs tests/product-connection-fleet-rows.test.mjs tests/exact-product-connection.test.mjs tests/saved-fleet-presentation.test.mjs > ../../repair-evidence/owner-editor/unit-tests.txt 2>&1
+          unit=$?
+          npm run typecheck > ../../repair-evidence/owner-editor/typecheck.txt 2>&1
+          types=$?
+          npm run build > ../../repair-evidence/owner-editor/build.txt 2>&1
+          build=$?
+          printf '{"unit":%s,"types":%s,"build":%s}\n' "$unit" "$types" "$build" > ../../repair-evidence/owner-editor/source-results.json
+          test "$unit" = 0 && test "$types" = 0 && test "$build" = 0
+      - name: Check server entrypoint types
+        id: edge
+        continue-on-error: true
+        run: deno check tech-checks/supabase/functions/cos-owner-equipment/index.ts > repair-evidence/owner-editor/edge-types.txt 2>&1
+      - name: Install browser
+        if: steps.source.outcome == 'success'
+        working-directory: tech-checks/operations
+        run: npx playwright install --with-deps chromium
+      - name: Test Owner editor and existing Fleet reopening
+        id: browser
+        if: steps.source.outcome == 'success'
+        continue-on-error: true
+        working-directory: tech-checks/operations
+        run: npm run test:browser -- --workers=3 --retries=0 tests/owner-equipment.browser.spec.mjs tests/fleet-full-reopen.browser.spec.mjs tests/fleet-verify-now.browser.spec.mjs > ../../repair-evidence/owner-editor/browser-tests.txt 2>&1
+      - name: Require every release gate
+        id: gate
+        if: always()
+        env:
+          DATABASE: ${{ steps.database.outcome }}
+          SOURCE: ${{ steps.source.outcome }}
+          EDGE: ${{ steps.edge.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+        run: |
+          mkdir -p repair-evidence/owner-editor
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const checks=Object.fromEntries(['DATABASE','SOURCE','EDGE','BROWSER'].map(k=>[k,process.env[k]||'not_run']));
+          fs.writeFileSync('repair-evidence/owner-editor/gates.json',JSON.stringify({at:new Date().toISOString(),source:process.env.GITHUB_SHA,checks},null,2)+'\n');
+          if(Object.values(checks).some(v=>v!=='success'))process.exit(1);
+          NODE
+      - name: Produce exact tested deploy bundle and static manifest
+        if: steps.gate.outcome == 'success'
+        working-directory: tech-checks/operations
+        run: |
+          npx --no-install esbuild ../supabase/functions/cos-owner-equipment/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=../../repair-evidence/owner-editor/edge-index.ts
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';
+          const rows=[];const walk=(dir)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())walk(p);else{const b=fs.readFileSync(p);rows.push({path:p,bytes:b.length,sha256:crypto.createHash('sha256').update(b).digest('hex'),md5:crypto.createHash('md5').update(b).digest('hex')});}}};walk('dist');
+          fs.writeFileSync('../../repair-evidence/owner-editor/static-manifest.json',JSON.stringify(rows,null,2)+'\n');
+          NODE
+      - name: Record results; publish built files only after all gates pass
+        if: always()
+        env:
+          PASS: ${{ steps.gate.outcome }}
+        run: |
+          git config user.name 'COS Owner editor verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add repair-evidence/owner-editor
+          if [ "$PASS" = success ]; then
+            git add tech-checks/operations/src tech-checks/operations/tests tech-checks/operations/dist tech-checks/supabase/functions/cos-owner-equipment
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record Owner editor validation and gated build evidence'
+            git push origin HEAD:feat/owner-equipment-panel-20261104
+          fi
+      - name: Archive reviewable source
+        if: always()
+        run: git archive --format=zip HEAD -o /tmp/cos-owner-editor-source.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-owner-editor-source
+          path: /tmp/cos-owner-editor-source.zip
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-owner-editor-browser-evidence
+          path: |
+            repair-evidence/owner-editor
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+          retention-days: 3

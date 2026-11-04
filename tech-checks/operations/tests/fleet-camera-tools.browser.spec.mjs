@@ -5,7 +5,7 @@ import {resource,snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 const health=snapshot([resource(12,'Helios 1',{connection:{publicIp:'8.8.8.8',ports:[80,443,8443]}})]);
 for(const it of [false,true])test(`inline camera checks keep ${it?'IT':'Owner'} in the unit card`,async({page},info)=>{
  const {app,state}=await mountFleet(page,it,{health});const probes=[];let fail=false;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()!=='POST')return route.fallback();const call=route.request().postDataJSON();
   if(!call.path?.endsWith('/check'))return route.fallback();probes.push(call);
   return route.fulfill({status:fail?503:200,headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:fail?{error:'The connection check could not be completed. No new result is confirmed.'}:{deviceId:12,unitKey:'Helios 1',publicIp:'8.8.8.8',mode:call.body.mode,checkedAt:fresh,ports:[{port:80,reachable:true,latencyMs:12},{port:443,reachable:false,latencyMs:null}]}});
@@ -35,7 +35,7 @@ test('a failed health refresh keeps equipment and shows unavailable health total
 });
 test('pending checks disable repeat taps and closing the card discards a late result',async({page})=>{
  const {app}=await mountFleet(page,false,{health});let release,received;const gate=new Promise(r=>release=r),started=new Promise(r=>received=r);let checks=0;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()!=='POST')return route.fallback();const call=route.request().postDataJSON();if(!call.path?.endsWith('/check'))return route.fallback();checks++;received();await gate;await route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{deviceId:12,unitKey:'Helios 1',publicIp:'8.8.8.8',mode:'quick',checkedAt:fresh,ports:[{port:80,reachable:true,latencyMs:1}]}}).catch(()=>{});
  });
  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();const card=app.getByRole('dialog',{name:'Helios 1 unit intelligence'}),tools=card.getByRole('region',{name:'Camera connection tools'});await tools.getByRole('button',{name:'Ping',exact:true}).click();await started;
@@ -46,7 +46,7 @@ test('pending checks disable repeat taps and closing the card discards a late re
 
 test('connection results require the exact target and distinguish incomplete, offline and stale checks',async({page})=>{
  const {app,state}=await mountFleet(page,false,{health});let variant='wrong-target',checks=0;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()!=='POST')return route.fallback();const call=route.request().postDataJSON();
   if(!call.path?.endsWith('/check'))return route.fallback();checks++;
   const ports=(variant==='partial'?[80]:[80,443,8443]).map(port=>({port,reachable:variant==='positive'&&port===80,latencyMs:variant==='positive'&&port===80?10:null}));

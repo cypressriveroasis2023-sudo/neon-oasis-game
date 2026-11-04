@@ -6,7 +6,7 @@ const address={street:'Shop postal address',city:'Houston',state:'TX',zip:'77064
 const item={productId:'2229931',unitNumber:'Solar Stand 015',before:{placement:'FIELD',customer:'Old customer',customerId:'100',address},after:{placement:'SHOP',customer:'Cameras OnSite',customerId:'200',address},identity:{nativeUnitId:null,nativeLabel:null,trackerId:'existing-tracker',trackerLabel:'Solar Stand 72 015'},current:{nativePlacement:null,nativeStatus:null,internalTrackerPlacement:'FIELD',internalTrackerCustomer:'Old customer',internalTrackerSite:'Old site',gpsPresent:false,shopReceiptId:null,shopRecordedAt:null},guardChanged:false,eligible:true,blocker:null};
 test('Owner must inspect and explicitly approve exact assignment identities before final source Apply',async({page})=>{
  const {app}=await mountFleet(page,false,{features:{ownerEquipmentImportEnabled:true}});let approvals=0,commits=0;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()==='OPTIONS')return route.fallback();const request=route.request().postDataJSON();if(!request.path.startsWith('/api/mhelpdesk/equipment/'))return route.fallback();
   const headers={'access-control-allow-origin':'http://127.0.0.1:4173'};let data;
   if(request.path.endsWith('/preview'))data={contract:'COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1',previewOnly:true,readyToCommit:false,sourceSha256:sha,inventory:{total:1,field:0,shop:1,inactive:0},changes:{unchanged:0,added:0,absent:0,placement:1,customer:1,address:1,identityReview:0},samples:[],censusStatus:'verified',admission:{counts:{unchanged:0,assignment_change:1,new_source_only:0},totalHeld:1},guardNotice:'Current identity review required'};
@@ -30,7 +30,7 @@ test('Owner must inspect and explicitly approve exact assignment identities befo
 test('large continuity review stays compact, exposes the exact manifest, and keeps Apply held after a 409 or blocked evidence',async({page})=>{
  const {assignmentContinuityItems}=await import('./fixtures/assignment-continuity-ui.mjs');
  const items=assignmentContinuityItems(item),{app}=await mountFleet(page,false,{features:{ownerEquipmentImportEnabled:true}});let approvals=0,stages=0,blocked=false;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()==='OPTIONS')return route.fallback();const request=route.request().postDataJSON();if(!request.path.startsWith('/api/mhelpdesk/equipment/'))return route.fallback();
   const headers={'access-control-allow-origin':'http://127.0.0.1:4173'};let data;
   if(request.path.endsWith('/preview'))data={contract:'COS_MHELP_EQUIPMENT_CSV_PREVIEW_V1',previewOnly:true,readyToCommit:false,sourceSha256:sha,inventory:{total:1001,field:284,shop:717,inactive:0},changes:{unchanged:996,added:0,absent:0,placement:5,customer:5,address:1,identityReview:0},samples:[],censusStatus:'verified',admission:{counts:{unchanged:996,assignment_change:5,new_source_only:0},totalHeld:352},guardNotice:'Current evidence review required'};
@@ -61,7 +61,7 @@ test('large continuity review stays compact, exposes the exact manifest, and kee
 
 test('failed source proof shows safe diagnostics and keeps Stage hidden until a fresh verified preview',async({page})=>{
  const {app}=await mountFleet(page,false,{features:{ownerEquipmentImportEnabled:true}});let verified=false,writes=0;
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   if(route.request().method()==='OPTIONS')return route.fallback();
   const request=route.request().postDataJSON();if(!request.path.startsWith('/api/mhelpdesk/equipment/'))return route.fallback();
   if(!request.path.endsWith('/preview')){writes++;return route.abort();}
