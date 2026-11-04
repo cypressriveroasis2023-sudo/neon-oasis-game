@@ -5,7 +5,9 @@ async function savedFleetBoard({ rpc, read, force = false, waitUntil, now = Date
     const work = (async () => {
       try {
         const before = await rpc("cos_fleet_board_read", {});
-        const [health, map, connections] = await Promise.all([read("/api/camera-health/summary-v3"), read("/api/fleet-map-source"), read("/api/product-connections")]);
+        const map = await read("/api/fleet-map-source");
+        const connections = await read("/api/product-connections");
+        const health = await read("/api/camera-health/summary-v3");
         const capturedAt = now();
         if (!await rpc("cos_fleet_board_stage", { p_run: lease.id, p_sources: { health, map, connections, capturedAt } })) throw Error("staging_unconfirmed");
         const value = project(health, map, connections, before?.latest?.payload, capturedAt);
