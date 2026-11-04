@@ -1,3 +1,4 @@
+import {retainCompletedConnectionMap} from './snapshotRetention';
 import {readExactProductConnections} from './exactProductConnection';
 const time=(v:unknown)=>typeof v==='string'&&Number.isFinite(Date.parse(v))?Date.parse(v):0;
 /** Choose current inventory before comparing connection observations. */
@@ -5,9 +6,8 @@ export function preferredFleetMap(paired:any,independent:any){
  if(!paired)return independent;if(!independent)return paired;
  // A failed read of the same inventory cannot erase a completed result.
  // A changed source hash is never bridged.
- if(paired.uploadInventory?.sourceSha256===independent.uploadInventory?.sourceSha256
-   &&paired.productConnectionsState==='ready'
-   &&['pending','error','timeout','rejected'].includes(independent.productConnectionsState))return paired;
+ if(retainCompletedConnectionMap(paired,independent))return paired;
+ if(retainCompletedConnectionMap(independent,paired))return independent;
  const a=time(paired.uploadInventory?.receivedAt),b=time(independent.uploadInventory?.receivedAt);
  if(a!==b)return b>a?independent:paired;
  const x=time(paired.generatedAt),y=time(independent.generatedAt);
