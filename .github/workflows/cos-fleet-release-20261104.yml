@@ -1,0 +1,94 @@
+name: COS combined Fleet release verification
+on:
+  push:
+    branches: [fix/fleet-verification-progress-20261104]
+    paths:
+      - '.github/workflows/cos-fleet-release-20261104.yml'
+permissions:
+  contents: write
+concurrency:
+  group: cos-fleet-combined-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fleet-verification-progress-20261104
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Combine reviewed reopening repair and prepare scheduled reader
+        run: |
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git merge --no-edit 3a3667023b70e65983520d5ce016a62720fb56d5
+          node .github/scripts/prepare-scheduled-publisher-repair.mjs
+          mkdir -p repair-evidence/combined
+      - name: Install locked dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify scheduled source and exact backend protections
+        working-directory: tech-checks/operations
+        run: |
+          set -o pipefail
+          node --import tsx --test tests/fleet-scheduled-reader.test.mjs tests/fleet-scheduled-publisher.test.mjs tests/fleet-backend-provenance.test.mjs tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/fleet-verification-explanations.test.mjs tests/exact-product-connection.test.mjs > ../../repair-evidence/combined/targeted-tests.txt 2>&1
+      - name: Preserve tested backend candidate
+        run: |
+          git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Record tested scheduled-reader candidate and combine reopening repair'
+          git push origin HEAD:fix/fleet-verification-progress-20261104
+      - name: Typecheck and build combined application
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          npm run typecheck > ../../repair-evidence/combined/typecheck.txt 2>&1
+          types=$?
+          npm run build > ../../repair-evidence/combined/build.txt 2>&1
+          build=$?
+          printf '{"typecheck":%s,"build":%s}\n' "$types" "$build" > ../../repair-evidence/combined/build-results.json
+          test "$types" = 0 && test "$build" = 0
+      - name: Install project browser
+        working-directory: tech-checks/operations
+        run: npx playwright install --with-deps chromium
+      - name: Verify combined browser behavior
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          files=$(find tests -maxdepth 1 -type f \( -name 'fleet-verify-now.browser.spec.mjs' -o -name 'durable-fleet-board.browser.spec.mjs' -o -iname '*reading*browser.spec.mjs' \) | sort)
+          test -n "$files" || exit 1
+          npm run test:browser -- --workers=2 --retries=0 $files > ../../repair-evidence/combined/browser-tests.txt 2>&1
+          result=$?
+          printf '{"browserTests":%s}\n' "$result" > ../../repair-evidence/combined/browser-results.json
+          exit "$result"
+      - name: Commit exact tested static bundle
+        run: |
+          git add tech-checks/operations/dist repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Build verified combined Fleet frontend for existing Pages deployment'
+          git push origin HEAD:fix/fleet-verification-progress-20261104
+      - name: Preserve failure evidence without publishing an unverified bundle
+        if: failure()
+        run: |
+          git add repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Record combined Fleet verification failure; no release bundle published'
+          git push origin HEAD:fix/fleet-verification-progress-20261104
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-combined-fleet-evidence
+          path: |
+            repair-evidence/combined
+            tech-checks/operations/test-results
+          retention-days: 3
+      - name: Archive exact reviewed source
+        if: always()
+        run: git archive --format=zip HEAD -o /tmp/cos-combined-source.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-combined-source
+          path: /tmp/cos-combined-source.zip
+          retention-days: 3
