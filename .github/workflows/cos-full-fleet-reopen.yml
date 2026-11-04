@@ -1,0 +1,84 @@
+name: COS full Fleet reopening repair
+on:
+  push:
+    branches: [fix/full-fleet-dashboard-reopen-20261104]
+    paths:
+      - '.github/workflows/cos-full-fleet-reopen.yml'
+      - '.github/scripts/prepare-full-dashboard-reopen.mjs'
+      - 'tech-checks/operations/src/savedFleetPresentation.ts'
+      - 'tech-checks/operations/tests/fleet-full-reopen.browser.spec.mjs'
+      - 'tech-checks/operations/tests/saved-fleet-presentation.test.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: cos-full-fleet-reopen
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/full-fleet-dashboard-reopen-20261104
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Prepare exact reviewed correction
+        run: |
+          mkdir -p repair-evidence/full-reopen
+          node .github/scripts/prepare-full-dashboard-reopen.mjs
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tech-checks/operations/src/FleetDashboard.tsx tech-checks/operations/src/useCameraHealth.ts tech-checks/operations/src/savedFleetReading.ts
+          git diff --cached --quiet || git commit -m 'Restore full Fleet presentation instead of counts-only reopening gate'
+          git push origin HEAD:fix/full-fleet-dashboard-reopen-20261104
+      - name: Install locked dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check scoped storage, session boundaries and retained verification
+        working-directory: tech-checks/operations
+        run: node --import tsx --test tests/saved-fleet-presentation.test.mjs tests/saved-fleet-reading.test.mjs tests/fleet-verification-progress.test.mjs tests/exact-product-connection.test.mjs > ../../repair-evidence/full-reopen/unit-tests.txt 2>&1
+      - name: Typecheck and build existing application
+        working-directory: tech-checks/operations
+        run: |
+          npm run typecheck > ../../repair-evidence/full-reopen/typecheck.txt 2>&1
+          npm run build > ../../repair-evidence/full-reopen/build.txt 2>&1
+      - name: Install pinned browser using runner system libraries
+        timeout-minutes: 2
+        working-directory: tech-checks/operations
+        run: npx playwright install chromium
+      - name: Exercise full reopening, verification and previous regressions
+        working-directory: tech-checks/operations
+        run: npm run test:browser -- --workers=2 --retries=0 tests/fleet-full-reopen.browser.spec.mjs tests/fleet-count-retention.browser.spec.mjs tests/fleet-verify-now.browser.spec.mjs tests/durable-fleet-board.browser.spec.mjs > ../../repair-evidence/full-reopen/browser-tests.txt 2>&1
+      - name: Repeat full reopening regressions
+        working-directory: tech-checks/operations
+        run: npm run test:browser -- --workers=2 --retries=0 --repeat-each=2 tests/fleet-full-reopen.browser.spec.mjs > ../../repair-evidence/full-reopen/browser-repeat.txt 2>&1
+      - name: Record exact tested bundle
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';import crypto from 'node:crypto';
+          const root='tech-checks/operations/dist/',html=fs.readFileSync(root+'index.html','utf8');
+          const assets=[...html.matchAll(/(?:src|href)="\.\/([^\"]+)"/g)].map(m=>m[1]);
+          for(const a of [...assets])if(a.endsWith('.js')){const text=fs.readFileSync(root+a,'utf8');for(const m of text.matchAll(/durableFleetClient-[A-Za-z0-9_-]+\.js/g))assets.push('assets/'+m[0]);}
+          const files=[...new Set(['index.html',...assets])].map(path=>{const b=fs.readFileSync(root+path);return {path,bytes:b.length,md5:crypto.createHash('md5').update(b).digest('hex'),sha256:crypto.createHash('sha256').update(b).digest('hex')};});
+          fs.writeFileSync('repair-evidence/full-reopen/static-manifest.json',JSON.stringify({testedAt:new Date().toISOString(),source:process.env.GITHUB_SHA,files},null,2)+'\n');
+          NODE
+          git add tech-checks/operations/dist repair-evidence/full-reopen
+          git diff --cached --quiet || git commit -m 'Build and record browser-tested full Fleet reopening release'
+          git push origin HEAD:fix/full-fleet-dashboard-reopen-20261104
+      - name: Preserve failure evidence without releasing a failed build
+        if: failure()
+        run: |
+          git add repair-evidence/full-reopen
+          git diff --cached --quiet || git commit -m 'Record full-dashboard test failure without publishing bundle'
+          git push origin HEAD:fix/full-fleet-dashboard-reopen-20261104
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-full-reopen-evidence
+          path: |
+            repair-evidence/full-reopen
+            tech-checks/operations/test-results
+          retention-days: 3

@@ -24,8 +24,8 @@ export function fleetReadingKey(session: OperationsSession, mode: string) {
   return owner ? 'cos-saved-fleet-reading-v1:' + owner : null;
 }
 
-export function readFleetReading(storage: Storage, key: string | null, now = Date.now()) {
-  if (!key) return null;
+export function readFleetReading(storage: Storage | null, key: string | null, now = Date.now()) {
+  if (!storage || !key) return null;
   try {
     const value = JSON.parse(storage.getItem(key) ?? 'null') as SavedFleetReading | null;
     return validReading(value, now) ? value : null;
@@ -34,8 +34,8 @@ export function readFleetReading(storage: Storage, key: string | null, now = Dat
   }
 }
 
-export function saveFleetReading(storage: Storage, key: string | null, reading: SavedFleetReading, now = Date.now()) {
-  if (!key || !validReading(reading, now)) return;
+export function saveFleetReading(storage: Storage | null, key: string | null, reading: SavedFleetReading, now = Date.now()) {
+  if (!storage || !key || !validReading(reading, now)) return;
   const previous = readFleetReading(storage, key, now);
   if (previous && previous.checkedAt >= reading.checkedAt) return;
   try { storage.setItem(key, JSON.stringify(reading)); } catch { /* Storage may be disabled. */ }

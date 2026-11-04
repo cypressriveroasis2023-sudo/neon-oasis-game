@@ -1,4 +1,4 @@
-import SavedFleetReadingView from './SavedFleetReadingView';
+import {browserFleetStorage,readFleetPresentation,saveFleetPresentation,fleetDisplaySaveTime,type SavedFleetPresentation} from './savedFleetPresentation';
 import {fleetReadingKey,readFleetReading,saveFleetReading} from './savedFleetReading';
 import {retainCompletedConnectionMap} from './snapshotRetention';
 import ViewErrorBoundary from './ViewErrorBoundary';
@@ -11,7 +11,7 @@ import {connectionDiagnosticText} from './connectionDiagnostics';
 import {manualShopInventory,manualShopAddresses,projectManualShop} from '../../supabase/functions/cos-operations-pages/fleetShopProjection';
 import CameraSweepCoverage from './CameraSweepCoverage';
 import {fleetAddressHealth,addressGroupHealth} from './fleetStatusPins';
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import FleetDashboardMap from './FleetDashboardMap';
 import {fleetLocationPins,sourceEquipmentLocationPins,fleetLocationPinId,fleetLocationCoverage,type FleetMapPin,type SourceEquipmentLocationPin} from './fleetLocationPins';
@@ -73,26 +73,19 @@ export default function FleetDashboard(props:Props){
  return <FleetDashboardEntry key={key||'uncached'} {...props} readingKey={key}/>;
 }
 function FleetDashboardEntry(props:Props & {readingKey:string|null}){
- const [saved]=useState(()=>readFleetReading(window.localStorage,props.readingKey));
- const [start,setStart]=useState(!saved);
- const [forceOnEntry,setForceOnEntry]=useState(false);
- const directEntry=Boolean(props.initialUnitId||props.initialUnitLabel)||(props.initialView??'map')!=='map';
- useEffect(()=>{
-  if(start||!saved)return;
-  const timer=window.setInterval(()=>{
-   if(automaticRefreshDue(saved.checkedAt,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))setStart(true);
-  },60000);
-  return()=>window.clearInterval(timer);
- },[start,saved]);
- if(!start&&!directEntry&&saved)return <SavedFleetReadingView reading={saved} refresh={()=>{setForceOnEntry(true);setStart(true);}}/>;
- return <FleetDashboardLive {...props} forceOnEntry={forceOnEntry}/>;
+ const [presentation]=useState(()=>readFleetPresentation(browserFleetStorage(),props.readingKey));
+ // Always mount the working dashboard. A saved aggregate is not a replacement
+ // for its map, search, inventory cards or verification controls.
+ return <FleetDashboardLive {...props} initialPresentation={presentation}/>;
 }
-function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRevision=0,initialView='map',openAdvancedDiagnostics,session,navigate,initialUnitId='',initialUnitLabel='',onSelectUnit,openUnitHealth,show,historyReadEnabled,locationWritesEnabled,ownerManagementEnabled,ownerCensusEnabled,registerEquipment,createTicket}:Props & {readingKey:string|null;forceOnEntry:boolean}){
+function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,entryRevision=0,initialView='map',openAdvancedDiagnostics,session,navigate,initialUnitId='',initialUnitLabel='',onSelectUnit,openUnitHealth,show,historyReadEnabled,locationWritesEnabled,ownerManagementEnabled,ownerCensusEnabled,registerEquipment,createTicket}:Props & {readingKey:string|null;initialPresentation:SavedFleetPresentation|null}){
  const canManageOwner=ownerManagementEnabled&&(session.legacyOwner===true||session.legacyOwner!==false&&session.role==='Owner');
  const canOpenInstallation=canManageOwner||locationWritesEnabled;
  const restored=useRef(readFieldMapView(history.state));
- const cameras=useCameraHealth(forceOnEntry),[mapSnapshot,setMapSnapshot]=useState<ReturnType<typeof checkedFieldMap>|null>(null),[mapError,setMapError]=useState('');
- const [routers,setRouters]=useState<RouterSnapshot|null>(null),[vrm,setVrm]=useState<any>(null),[sourceErrors,setSourceErrors]=useState<Record<string,string>>({}),[sourceLoading,setSourceLoading]=useState(false);
+ const initialCamera=useRef(initialPresentation?{readAt:initialPresentation.checkedAt,fleet:initialPresentation.health?{health:initialPresentation.health,fieldMap:initialPresentation.fieldMap,readAt:new Date(initialPresentation.checkedAt).toISOString(),readStartedAt:initialPresentation.checkedAt}:null}:null);
+ const cameras=useCameraHealth(false,initialCamera.current),[mapSnapshot,setMapSnapshot]=useState<ReturnType<typeof checkedFieldMap>|null>(()=>initialPresentation?.fieldMap||null),[mapError,setMapError]=useState('');
+ const [restoredPresentation,setRestoredPresentation]=useState(Boolean(initialPresentation));
+ const [routers,setRouters]=useState<RouterSnapshot|null>(()=>initialPresentation?.routers||null),[vrm,setVrm]=useState<any>(()=>initialPresentation?.vrm||null),[sourceErrors,setSourceErrors]=useState<Record<string,string>>(()=>initialPresentation?.sourceErrors||{}),[sourceLoading,setSourceLoading]=useState(false);
  const [view,setView]=useState<View>(initialView),[filters,setFilters]=useState<FleetFilters>({...initialFleetFilters,query:restored.current.search||'',status:restored.current.health||initialFleetFilters.status,installationStatus:restored.current.status==='field'?'all':restored.current.status||'all',nearbyId:restored.current.nearbyId||'',radius:restored.current.radius||10}),[selected,setSelected]=useState(restored.current.selectionExplicit?restored.current.selectedId||'':''),[limit,setLimit]=useState(80),[clock,setClock]=useState(()=>new Date());
  const [editorBusy,setEditorBusy]=useState(false),[selectedSourceId,setSelectedSourceId]=useState(''),[selectedMhelpProductId,setSelectedMhelpProductId]=useState('');
  const [boardSystem,setBoardSystem]=useState('all');
@@ -102,7 +95,7 @@ function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRe
  const [locationEditing,setLocationEditing]=useState(false),[locationPicker,setLocationPicker]=useState<((point:[number,number]|null)=>void)|null>(null),[selectionNotice,setSelectionNotice]=useState('');
  useEffect(()=>{setView(initialView);const entryUrl=new URL(window.location.href);if(entryUrl.searchParams.has('fleetView')){entryUrl.searchParams.delete('fleetView');window.history.replaceState(window.history.state,'',entryUrl);}setLimit(80);setSelectedMhelpProductId('');setSelectedSourceId('');setLocationEditing(false);locationPicker?.(null);setLocationPicker(null);},[initialView,entryRevision]);
  const processedSelection=useRef('');
- const mapRevision=useRef(0),revision=useRef(0),lastSourceRead=useRef(0),lastMapRead=useRef(0),running=useRef(false),valid=useRef(true),dialog=useRef<HTMLDivElement>(null),lastFocus=useRef<HTMLElement|null>(null);
+ const mapRevision=useRef(0),revision=useRef(0),lastSourceRead=useRef(initialPresentation?.checkedAt??0),lastMapRead=useRef(initialPresentation?.checkedAt??0),running=useRef(false),valid=useRef(true),dialog=useRef<HTMLDivElement>(null),lastFocus=useRef<HTMLElement|null>(null);
  const sources=useCallback(async()=>{if(running.current||!valid.current)return;running.current=true;lastSourceRead.current=Date.now();const request=++revision.current;setSourceLoading(true);
   const specs=[['routers',()=>api.get('/api/routers')],...(!fleetVrmReadAllowed(session)?[]:[['victron',()=>api.get('/api/vrm-fleet')]])] as [string,()=>Promise<any>][];
   if(!fleetVrmReadAllowed(session))setSourceErrors(previous=>({...previous,victron:'Victron access is not enabled for this account.'}));
@@ -119,7 +112,7 @@ function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRe
 
  },[session]);
  const readMap=useCallback(async(force=false)=>{lastMapRead.current=Date.now();const request=++mapRevision.current;try{const map=await api.fleetConnectionMap(force);if(valid.current&&request===mapRevision.current){const received={...map,clientReadAt:Date.now()} as typeof map;setMapSnapshot(previous=>retainCompletedConnectionMap(previous,received)?previous:received);setMapError('');}}catch(e){if(valid.current&&request===mapRevision.current)setMapError(e instanceof Error?e.message:'Placement data unavailable');}},[]);
- useEffect(()=>{valid.current=true;let active=true;queueMicrotask(()=>{if(active){void sources();void readMap();}});const tick=()=>{setClock(new Date());if(automaticRefreshDue(lastSourceRead.current,Date.now(),document.hidden))void sources();if(automaticRefreshDue(lastMapRead.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void readMap();};const timer=window.setInterval(tick,60000);const clear=()=>{valid.current=false;revision.current++;mapRevision.current++;running.current=false;setRouters(null);setVrm(null);setMapSnapshot(null);setSavedShop([]);setSelectedMhelpProductId('');setSelected('');setSelectedSourceId('');setSourceLoading(false);setSourceErrors({session:'Your session changed. Reload COS Operations.'});};window.addEventListener('cos-private-data-invalidated',clear);return()=>{active=false;valid.current=false;revision.current++;mapRevision.current++;running.current=false;window.clearInterval(timer);window.removeEventListener('cos-private-data-invalidated',clear);};},[sources,readMap]);
+ useEffect(()=>{valid.current=true;let active=true;queueMicrotask(()=>{if(active&&!initialPresentation){void sources();void readMap();}});const tick=()=>{setClock(new Date());if(automaticRefreshDue(lastSourceRead.current,Date.now(),document.hidden))void sources();if(automaticRefreshDue(lastMapRead.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void readMap();};const timer=window.setInterval(tick,60000);const clear=()=>{valid.current=false;revision.current++;mapRevision.current++;running.current=false;setRouters(null);setVrm(null);setMapSnapshot(null);setSavedShop([]);setSelectedMhelpProductId('');setSelected('');setSelectedSourceId('');setSourceLoading(false);setSourceErrors({session:'Your session changed. Reload COS Operations.'});};window.addEventListener('cos-private-data-invalidated',clear);return()=>{active=false;valid.current=false;revision.current++;mapRevision.current++;running.current=false;window.clearInterval(timer);window.removeEventListener('cos-private-data-invalidated',clear);};},[sources,readMap]);
  const [savedShop,setSavedShop]=useState<any[]>([]);
  const [verifiedConnections,setVerifiedConnections]=useState<any>(null);
  useEffect(()=>{const clear=()=>setVerifiedConnections(null);window.addEventListener('cos-private-data-invalidated',clear);return()=>window.removeEventListener('cos-private-data-invalidated',clear);},[]);
@@ -158,16 +151,39 @@ function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRe
  // Exact Product-ID connection evidence is sufficient to retain the completed
  // reading. An unrelated provider read failure must not prevent persistence.
  const completedReading=Boolean(connectionSourceReady&&fieldProducts&&boardData&&Number.isFinite(snapshotNow));
- const [savedReading,setSavedReading]=useState(()=>readFleetReading(window.localStorage,readingKey));
- useEffect(()=>{
+ const [savedReading,setSavedReading]=useState(()=>readFleetReading(browserFleetStorage(),readingKey));
+ // Commit the accepted display before paint so an immediate reload cannot
+ // observe a successful reading whose local presentation has not been saved.
+ useLayoutEffect(()=>{
   if(!readingKey||!completedReading||!boardData)return;
+  const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
+  if(checkedAt===null)return;
   const reading={
-   checkedAt:Math.trunc(snapshotNow),field:boardData.field,shop:boardData.shop,
+   checkedAt,field:boardData.field,shop:boardData.shop,
    online:boardData.counts.online,offline:boardData.counts.offline,unverified:boardData.counts.unverified,
   };
-  saveFleetReading(window.localStorage,readingKey,reading);
+  saveFleetReading(browserFleetStorage(),readingKey,reading,saveNow);
   setSavedReading(previous=>previous&&previous.checkedAt>=reading.checkedAt?previous:reading);
  },[readingKey,completedReading,boardData,snapshotNow]);
+ useEffect(()=>{
+  if(!readingKey||!completedReading||!map)return;
+  let cancelled=false,attempts=0,timer:number|undefined;
+  const stop=()=>{cancelled=true;window.clearTimeout(timer);};
+  // Only retry this already accepted LOCAL presentation. Never repeat a camera
+  // check, renew its evidence, or write after account/source invalidation.
+  const persist=()=>{
+   if(cancelled)return;
+   const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
+   const saved=valid.current&&checkedAt!==null&&saveFleetPresentation(browserFleetStorage(),readingKey,{
+    checkedAt,fieldMap:map,health:cameras.data,routers,vrm,sourceErrors,
+   },saveNow);
+   if(saved){if(initialPresentation&&snapshotNow>initialPresentation.checkedAt)setRestoredPresentation(false);return;}
+   if(++attempts<3)timer=window.setTimeout(persist,500);
+  };
+  window.addEventListener('cos-private-data-invalidated',stop);
+  persist();
+  return()=>{stop();window.removeEventListener('cos-private-data-invalidated',stop);};
+ },[readingKey,completedReading,map,snapshotNow,cameras.data,routers,vrm,sourceErrors,initialPresentation]);
  const effective=failed&&filters.status==='operational'?{...filters,status:'all'}:filters;
  const filteredBase=useMemo(()=>filterFleetDashboard(rows,effective,view),[rows,effective,view]);
  const filtered=view==='verify'?filteredBase.filter(row=>!row.retired&&row.placement==='field'&&locationsReady&&(locationQueue==='missing'?!pinIds.has(row.id):pinIds.has(row.id))):filteredBase;
@@ -219,12 +235,11 @@ function FleetDashboardLive({readingKey,forceOnEntry,openMhelpConnection,entryRe
  const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,online:boardData?.counts.online??'—',offline:boardData?.counts.offline??'—',unknown:boardData?.counts.unverified??'—'}:counts;
  const mapEquipmentList=<div className='cos-fleet-unit-list' aria-busy={editorBusy||loading}>{filtered.slice(0,limit).map(row=><button key={row.id} data-unit-id={row.id} disabled={editorBusy} className={'cos-fleet-unit-row'+(selected===row.id?' selected':'')} onClick={()=>open(row.id)}><span className='cos-fleet-unit-copy'><strong><i className={'cos-fleet-row-dot cos-signal-'+row.cameraState} aria-hidden='true'>●</i>{row.displayName||row.name}</strong><small>{row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied'}</small><small>{row.displayAddress?.label||'Installation address'}: {(row.displayAddress?.text??row.unit.address)||'Not supplied'}</small><small className='cos-fleet-card-location'>{row.placement==='shop'?(shopOnly(row)?'SHOP':'SHOP / ROOT'):row.placement.toUpperCase()} · {row.locationVerified?'Verified location':locationTag(row.unit)}</small><FleetBatterySummary row={row} now={snapshotNow} compact/>{!shopOnly(row)&&<><small className='cos-fleet-card-evidence'>{unitHealthLabel(row.camera)}</small><LastKnownCameraStatus observation={lastKnown(row)} now={snapshotNow}/></>}</span><Signals row={row}/></button>)}{filteredSource.length>0&&<section className='cos-fleet-source-group' aria-label='Unlinked equipment in view'><h3>Unlinked equipment <b>{filteredSource.length}</b></h3><p>Recorded assignments without a verified COS health link. Accepted address estimates are labeled separately from health and verified installation locations.</p>{filteredSource.slice(0,limit).map(record=><FleetSourceEquipment key={record.id} record={record} now={snapshotNow} estimate={sourcePins.get(record.id)?.estimate} onSelect={sourcePins.has(record.id)?()=>openSource(record.id):undefined}/>)}</section>}{!filtered.length&&!filteredSource.length&&<p className='field-map-empty'>{!map&&!failed?'Loading saved inventory…':'No units match. Change the filters or open the review queue.'}</p>}{Math.max(filtered.length,filteredSource.length)>limit&&<button onClick={()=>setLimit(v=>v+80)}>Show more equipment ({Math.max(0,filtered.length-limit)+Math.max(0,filteredSource.length-limit)})</button>}</div>;
 
- if(savedReading&&!completedReading&&valid.current&&view==='map'&&!initialUnitId&&!initialUnitLabel)
-  return <SavedFleetReadingView reading={savedReading} refresh={refresh} busy={loading}/>;
  return <section className={'cos-fleet-dashboard cos-fleet-board'+(view==='map'?' cos-fleet-simple-map':'')} data-fleet-view={view} aria-label='COS Fleet Dashboard'>
   <ApprovedFleetViews compact>{(['map','fleet','verify','setup','sources'] as View[]).map((name,i)=>name==='setup'&&!canManageOwner?null:<button key={name} aria-current={view===name?'page':undefined} onClick={()=>tab(name)}><span aria-hidden='true'>{['◎','▦','⌖','＋','↔'][i]}</span>{['Map','Fleet health','Location verification','Needs setup','Data sources'][i]}{name==='verify'&&<b>{recorded.error?'—':locationsReady?allCoverage.missing:'…'}</b>}{name==='setup'&&<b>{setupSource.length}</b>}</button>)}</ApprovedFleetViews>
   {view==='map'&&<button type='button' className='cos-fleet-map-jump' aria-label='Jump to Fleet map' onClick={()=>document.querySelector('.cos-fleet-map-panel')?.scrollIntoView({block:'start'})}>↓ Jump to map</button>}
-  <div className='cos-fleet-content'><div className='cos-fleet-heading'><div><div className='cos-fleet-eyebrow'>FLEET DASHBOARD</div><h1>{view==='map'?'Fleet Dashboard':title[view]}</h1><p>{view==='stands'?'Stands and other no-camera equipment stay in inventory and are excluded from camera totals and outages.':view==='helios'?'Helios units grouped here with their existing camera, router and Victron battery readings.':'Camera health, router checks and power for each unit.'}</p></div><div><div className='cos-fleet-clock'><time>{clock.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit',hour12:true})}</time><small>{clock.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric',year:'numeric'})} · CENTRAL</small></div><button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button><small>{cameras.data?.refreshedAt?'Saved health '+cameraTime(cameras.data.refreshedAt,snapshotNow):loading?'Loading saved health…':'No successful saved health read'} · {Math.round(CAMERA_AUTO_REFRESH_MS/60000)}-minute health refresh</small></div></div>
+  <div className='cos-fleet-content'><div className='cos-fleet-heading'><div><div className='cos-fleet-eyebrow'>FLEET DASHBOARD</div><h1>{view==='map'?'Fleet Dashboard':title[view]}</h1><p>{view==='stands'?'Stands and other no-camera equipment stay in inventory and are excluded from camera totals and outages.':view==='helios'?'Helios units grouped here with their existing camera, router and Victron battery readings.':'Camera health, router checks and power for each unit.'}</p></div><div><div className='cos-fleet-clock'><time>{clock.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit',hour12:true})}</time><small>{clock.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric',year:'numeric'})} · CENTRAL</small></div><button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button><small>{restoredPresentation&&initialPresentation?'Last completed reading '+cameraTime(new Date(initialPresentation.checkedAt).toISOString(),Date.now()):cameras.data?.refreshedAt?'Saved health '+cameraTime(cameras.data.refreshedAt,snapshotNow):loading?'Loading saved health…':'No successful saved health read'} · {Math.round(CAMERA_AUTO_REFRESH_MS/60000)}-minute health refresh</small></div></div>
+  {savedReading&&!completedReading&&valid.current&&view==='map'&&<div className='cos-fleet-message' role='status'><strong>Last completed reading {cameraTime(new Date(savedReading.checkedAt).toISOString(),Date.now())}</strong><p>Field {savedReading.field} · Online {savedReading.online} · Offline {savedReading.offline} · Unverified {savedReading.unverified} · Shop {savedReading.shop}. Restoring saved unit details; controls remain available.</p></div>}
   <SavedFleetHistory/>
   {(failed||cameras.error||mapError||Object.keys(sourceErrors).length>0)&&<div className='cos-fleet-message' role='alert'><strong>{failed?(usesDurableFleetBoard()&&!map?'The first saved Fleet board is not ready':'Health refresh unavailable · saved equipment remains visible'):'A supporting source could not be refreshed'}</strong><p>{failed?'Online and offline totals are unavailable. Saved observations keep their original time. You can still open a unit and run a connection check.':'Last completed results remain displayed with their original check times. The next successful update will replace them.'}</p><details><summary>Refresh details</summary><p>{cameras.error||mapError}</p>{Object.entries(sourceErrors).map(([key,value])=><p key={key}>{key}: {value}</p>)}</details></div>}
   {(connectionRead as any)?.productConnectionsState==='pending'&&<p className='cos-fleet-message' role='status'>Connection source is still loading. Available saved checks keep their original times; unverified connections remain Unknown.</p>}
