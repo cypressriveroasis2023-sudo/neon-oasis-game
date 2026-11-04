@@ -5,7 +5,7 @@ import {type FleetSnapshot} from './fleetSnapshot';
 import { api } from './api';
 import { validateCameraHealth,type Health } from './fieldCameraHealth';
 import {rememberCameraHistory,type CameraHistory} from './cameraLastKnown';
-export function useCameraHealth(){
+export function useCameraHealth(forceOnEntry=false){
   const [fleet,setFleet]=useState<FleetSnapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[now,setNow]=useState(Date.now());
   const [cameraHistory,setCameraHistory]=useState<CameraHistory>(new Map());
   const revision=useRef(0),running=useRef(false),lastAttemptAt=useRef(0),historyRevision=useRef(0);
@@ -32,7 +32,7 @@ export function useCameraHealth(){
     catch(cause){if(request===revision.current){setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
     finally{if(request===revision.current){running.current=false;setLoading(false);}}
   },[updateClock]);
-  useEffect(()=>{void refresh();const timer=window.setInterval(()=>{if(automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void refresh();},60000);const visible=()=>{if(!document.hidden&&(api.usesDurableFleetBoard?.()||automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS)))void refresh();};document.addEventListener('visibilitychange',visible);return()=>{revision.current++;running.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
+  useEffect(()=>{void refresh(forceOnEntry);const timer=window.setInterval(()=>{if(automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void refresh();},60000);return()=>{revision.current++;running.current=false;window.clearInterval(timer);};},[refresh,forceOnEntry]);
   // Ordinary host navigation hides historical evidence without changing the
   // baseline fleet/session state. Pre-hide reads cannot restore that history.
   useEffect(()=>{const clear=()=>{revision.current++;historyRevision.current++;running.current=false;completed.current=null;setRefreshMap(null);setFleet(null);setCameraHistory(new Map());setLoading(false);setError('Your fleet session changed. Reload to verify the current account.');};const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){historyRevision.current++;setCameraHistory(new Map());}};const changed=()=>{void refresh();};const failed=()=>setError('The shared camera and placement refresh failed. Reload saved results to verify current status.');window.addEventListener('cos-private-data-invalidated',clear);window.addEventListener('message',hidden);window.addEventListener('cos-fleet-snapshot-updated',changed);window.addEventListener('cos-fleet-snapshot-failed',failed);return()=>{window.removeEventListener('cos-private-data-invalidated',clear);window.removeEventListener('message',hidden);window.removeEventListener('cos-fleet-snapshot-updated',changed);window.removeEventListener('cos-fleet-snapshot-failed',failed);};},[refresh]);
