@@ -64,3 +64,21 @@ test('session invalidation removes full cached details and prevents restoring th
  await expect.poll(()=>app.locator('body').evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('cos-saved-fleet-presentation-v1:')).length)).toBe(0);
  await expect(app.locator('.cos-equipment-total-helios')).toHaveCount(0);
 });
+test('a transient local save failure recovers without another source read or camera probe',async({page})=>{
+ await page.addInitScript(()=>{const original=Storage.prototype.setItem;window.__cosFirstLocalSave=null;window.__cosLocalSaveAttempts=0;Storage.prototype.setItem=function(key,value){if(key.startsWith('cos-saved-fleet-presentation-v1:')){window.__cosLocalSaveAttempts++;window.__cosFirstLocalSave??=Date.now();if(Date.now()-window.__cosFirstLocalSave<200)throw new DOMException('Synthetic transient storage failure','QuotaExceededError');}return original.call(this,key,value);};});
+ const {app,state}=await setup(page);
+ expect(await app.locator('body').evaluate(()=>window.__cosLocalSaveAttempts)).toBeGreaterThan(1);
+ state.calls.length=0;await page.reload();await expect(app.getByText(/Last completed reading/)).toBeVisible();
+ await expect(app.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();
+ expect(reads(state)).toHaveLength(0);expect(state.errors).toEqual([]);
+});
+test('pending local-save retry cannot restore private data after invalidation',async({page})=>{
+ await page.addInitScript(()=>{const original=Storage.prototype.setItem;window.__cosBlockLocalSave=true;window.__cosLocalSaveAttempts=0;Storage.prototype.setItem=function(key,value){if(key.startsWith('cos-saved-fleet-presentation-v1:')){window.__cosLocalSaveAttempts++;if(window.__cosBlockLocalSave)throw new DOMException('Synthetic blocked storage','QuotaExceededError');}return original.call(this,key,value);};});
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:owner});
+ await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ await expect.poll(()=>app.locator('body').evaluate(()=>window.__cosLocalSaveAttempts)).toBeGreaterThan(0);
+ await app.locator('body').evaluate(()=>{window.dispatchEvent(new Event('cos-private-data-invalidated'));window.__cosBlockLocalSave=false;});
+ await page.waitForTimeout(1500);
+ expect(await app.locator('body').evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('cos-saved-fleet-presentation-v1:')))).toBe(false);
+ await expect(app.locator('.cos-equipment-total-helios')).toHaveCount(0);expect(state.errors).toEqual([]);
+});
