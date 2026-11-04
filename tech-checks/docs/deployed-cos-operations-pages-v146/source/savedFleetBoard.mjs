@@ -1021,9 +1021,10 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
   const prior = previous?.fleet;
   const priorBoard = prior ? cameraFieldProducts(prior.fieldMap, prior.health, Date.parse(prior.readAt), true) : null;
+  const canonical = (value) => JSON.stringify(value, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]])) : v);
   const binding = (m, id) => {
     const r = m?.uploadInventory?.records?.find((p) => p.productId === id);
-    return JSON.stringify([r?.placement, r?.uploadLifecycle, r?.binding]);
+    return canonical([r?.placement, r?.uploadLifecycle, r?.binding]);
   };
   const lost = board.items.filter((p) => p.status === "unverified" && priorBoard?.items.some((old) => old.productId === p.productId && ["online", "offline"].includes(old.status)) && binding(pair.fieldMap, p.productId) === binding(prior?.fieldMap, p.productId));
   if (lost.length) throw Object.assign(Error("checks_incomplete"), { products: lost.map((p) => p.productId) });

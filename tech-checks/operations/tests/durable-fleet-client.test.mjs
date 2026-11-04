@@ -20,6 +20,9 @@ test('pending reads preserve old counts and publish only a finished new batch; s
  await durableFleetRead({read:async()=>++n===1?old:next,current:()=>true,status:()=>{},publish:p=>events.push(p),failed:()=>assert.fail('completed'),delay:async()=>{}});
  await new Promise(r=>setImmediate(r));assert.equal(events.length,1);
 });
+test('a queued force keeps polling the saved board until its follow-up completes',async()=>{
+ const old=fixture();old.refresh.state='queued';const next=structuredClone(old);next.refresh.state='completed';next.latest.id='after-queue';let n=0,published=0;await durableFleetRead({read:async()=>++n===1?old:next,current:()=>true,status:()=>{},publish:()=>published++,failed:()=>assert.fail('queued is not failure'),delay:async()=>{}});await new Promise(r=>setImmediate(r));assert.equal(published,1);
+});
 test('failed update reports failure while returning the saved dated result',async()=>{
  const old=fixture();old.refresh.state='failed';let failed=0;
  const pair=await durableFleetRead({read:async()=>old,current:()=>true,status:()=>{},publish:()=>assert.fail('no partial publication'),failed:()=>failed++});

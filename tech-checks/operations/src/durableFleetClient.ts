@@ -14,8 +14,8 @@ export async function durableFleetRead(io:{read:(force:boolean)=>Promise<any>;cu
  const first=await io.read(force);if(!io.current())throw Error('Your fleet session changed.');
  io.status(first);const saved=restoredFleet(first);
  const poll=async()=>{
-  let value=first;const deadline=Date.now()+120000;
-  for(let i=0;i<40&&Date.now()<deadline&&(!value.latest||value.refresh?.state==='running');i++){
+  let value=first;const deadline=Date.now()+240000;
+  for(let i=0;i<80&&Date.now()<deadline&&(!value.latest||['running','queued'].includes(value.refresh?.state));i++){
    await delay(3000);if(!io.current())return null;
    value=await io.read(false);if(!io.current())return null;io.status(value);
    const next=restoredFleet(value);
@@ -24,6 +24,6 @@ export async function durableFleetRead(io:{read:(force:boolean)=>Promise<any>;cu
   if(value.refresh?.state!=='completed')io.failed();
   return restoredFleet(value);
  };
- if(saved){if(first.refresh?.state==='running')void poll().catch(()=>{if(io.current())io.failed();});else if(first.refresh?.state==='failed')io.failed();return saved;}
+ if(saved){if(['running','queued'].includes(first.refresh?.state))void poll().catch(()=>{if(io.current())io.failed();});else if(first.refresh?.state==='failed')io.failed();return saved;}
  const next=await poll();if(!next)throw Error('The first complete fleet update is not available yet. The server will keep completed results once a batch succeeds.');return next;
 }

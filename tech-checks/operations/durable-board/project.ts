@@ -10,9 +10,10 @@ export function completedBoard(health:any,map:any,connections:any,previous:any,a
  if(!board||!board.healthVerified)throw Error('inventory_source_incomplete');
  const prior=previous?.fleet;
  const priorBoard=prior?cameraFieldProducts(prior.fieldMap,prior.health,Date.parse(prior.readAt),true):null;
+ const canonical=(value:any)=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
  const binding=(m:any,id:string)=>{
   const r=m?.uploadInventory?.records?.find((p:any)=>p.productId===id);
-  return JSON.stringify([r?.placement,r?.uploadLifecycle,r?.binding]);
+  return canonical([r?.placement,r?.uploadLifecycle,r?.binding]);
  };
  // A previously definitive unit going unknown with the same binding means the
  // next batch is incomplete. Keep the entire dated board, not a partial total.
