@@ -1,3 +1,4 @@
+import {savedFleetBoard,completedBoard} from './savedFleetBoard.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -611,13 +612,35 @@ export function createOperationsHandler(options) {
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
+        features: { durableFleetBoard: Boolean(context.actorId), unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), vrmRead: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), ownerEquipmentImportEnabled: Boolean(context.actorId)&&options.ownerEquipmentImportEnabled===true, deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+const savedHistoryMatch=/^\/api\/fleet-saved-board\/history\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.exec(path);
+if(method==='GET'&&savedHistoryMatch)return json(await rpc('cos_fleet_board_history',{p_run:savedHistoryMatch[1]}));
+if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
+ const force=path.endsWith('/refresh');
+ if(method!==(force?'POST':'GET'))return json({error:'Unsupported saved board action'},405);
+ if(body&&Object.keys(body).length)return json({error:'Empty saved board request required'},400);
+ const origin=request.headers.get('Origin'),batchController=new AbortController();
+ const read=async source=>{
+  const deadline=Date.now()+85000;
+  for(let attempt=0;attempt<2;attempt++){
+   const response=await fetch(Deno.env.get('SUPABASE_URL')+'/functions/v1/cos-operations-pages',{
+    method:'POST',headers:{Authorization:context.authorization,'Content-Type':'application/json',...(origin?{Origin:origin}:{})},
+    body:JSON.stringify({path:source,method:'GET',body:null}),cache:'no-store',redirect:'error',signal:AbortSignal.any([batchController.signal,AbortSignal.timeout(Math.max(1,deadline-Date.now()))])
+   });
+   if(response.ok)return response.json();
+   if(response.status<500||attempt===1)throw Error('source_read_failed');
+   await response.body?.cancel();
+  }
+ };
+ return json(await savedFleetBoard({rpc,read,force,abort:()=>batchController.abort(),project:completedBoard,waitUntil:task=>EdgeRuntime.waitUntil(task)}));
+}
+
       if (path === '/api/product-connections') {
         // Independent Owner/IT read: no browser-supplied IP, Product ID,
         // resource ID, sheet range or credential. No live device probes.
