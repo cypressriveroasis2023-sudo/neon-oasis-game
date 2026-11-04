@@ -14,10 +14,10 @@ test('cold desktop reopen restores FULL dashboard, search, map, cards and verify
  await expect(board.locator('.cos-fleet-map-panel')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('full-fleet-after-reload.png')});
  const search=board.getByPlaceholder('Find a unit, customer or address…');await expect(search).toBeVisible();await search.fill('Helios');
- // The same products also exist inside closed family/details panels. Check
- // the actual visible Field list rather than those deliberately hidden views.
+ // Count actual equipment cards, not the nested Victron metric articles
+ // inside the Helios card. Search must leave exactly one equipment card.
  const unitPanel=board.getByRole('region',{name:'Fleet units in view'});
- await expect(unitPanel.locator('.cos-field-product-cards article')).toHaveCount(1);
+ await expect(unitPanel.locator('.cos-field-product-cards > article')).toHaveCount(1);
  await expect(unitPanel.getByRole('button',{name:'Open Helios 1 Product 1001'})).toBeVisible();
  await search.fill('');
  await board.getByRole('button',{name:/^Camera units unverified /}).click();
@@ -49,14 +49,18 @@ test('provider outage still restores full connection-based cards without another
 });
 test('timer reads saved results at cadence, never probes; successful newer result replaces restored status',async({page})=>{
  const {app,state}=await setup(page);state.calls.length=0;await page.reload();
- // Authentication must finish before advancing ten minutes. Advancing while
- // /api/session is in flight would test the 45-second auth timeout instead.
  await expect(app.getByText(/Last completed reading/)).toBeVisible();
  expect(reads(state)).toHaveLength(0);
- const stamp=new Date(now+10*60000+5000).toISOString();
+ // Move the wall clock beyond the cadence, but let the next interval start
+ // its network work without also jumping across the transport timeout.
+ const current=await app.locator('body').evaluate(()=>Date.now());
+ await page.clock.pauseAt(new Date(current+1000));
+ await page.clock.setSystemTime(new Date(now+11*60000));
+ const stamp=new Date(now+10*60000).toISOString();
  state.productConnections.trackerVerifiedAt=stamp;for(const item of state.productConnections.items)if(item.checkedAt)item.checkedAt=stamp;
  Object.assign(state.productConnections.items.find(i=>i.productId==='1001'),{status:'offline',reason:'Completed newer saved test.'});
- await page.clock.fastForward(11*60000);
+ for(let tick=0;tick<61&&reads(state).length===0;tick++)await page.clock.runFor(1000);
+ await page.clock.resume();
  await expect(app.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('1');
  expect(reads(state).length).toBeGreaterThan(0);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
