@@ -2,463 +2,463 @@ TAP version 13
 # Subtest: the server uses the existing exact Product-ID classifier and rejects partial replacement
 ok 1 - the server uses the existing exact Product-ID classifier and rejects partial replacement
   ---
-  duration_ms: 45.77736
+  duration_ms: 43.797143
   type: 'test'
   ...
 # Subtest: refresh returns the stored board while a bounded background batch runs; failure does not publish
 ok 2 - refresh returns the stored board while a bounded background batch runs; failure does not publish
   ---
-  duration_ms: 0.575727
+  duration_ms: 0.665461
   type: 'test'
   ...
 # Subtest: database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure
 ok 3 - database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure
   ---
-  duration_ms: 3148.694848
+  duration_ms: 3535.099124
   type: 'test'
   ...
 # Subtest: a fresh app instance restores the exact original dated board without reading each vendor
 ok 4 - a fresh app instance restores the exact original dated board without reading each vendor
   ---
-  duration_ms: 16.638052
+  duration_ms: 31.422259
   type: 'test'
   ...
 # Subtest: pending reads preserve old counts and publish only a finished new batch; sign-out fences late data
 ok 5 - pending reads preserve old counts and publish only a finished new batch; sign-out fences late data
   ---
-  duration_ms: 10.761916
+  duration_ms: 15.75162
   type: 'test'
   ...
 # Subtest: a queued force keeps polling the saved board until its follow-up completes
 ok 6 - a queued force keeps polling the saved board until its follow-up completes
   ---
-  duration_ms: 3.994734
+  duration_ms: 14.713233
   type: 'test'
   ...
 # Subtest: failed update reports failure while returning the saved dated result
 ok 7 - failed update reports failure while returning the saved dated result
   ---
-  duration_ms: 2.234237
+  duration_ms: 8.966164
   type: 'test'
   ...
 # Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
 ok 8 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
   ---
-  duration_ms: 11.83134
+  duration_ms: 4.763616
   type: 'test'
   ...
 # Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
 ok 9 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
   ---
-  duration_ms: 0.374381
+  duration_ms: 0.372355
   type: 'test'
   ...
 # Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
 ok 10 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
   ---
-  duration_ms: 7.591721
+  duration_ms: 6.508179
   type: 'test'
   ...
 # Subtest: a provider name or suffix collision cannot influence independent product proof
 ok 11 - a provider name or suffix collision cannot influence independent product proof
   ---
-  duration_ms: 0.318138
+  duration_ms: 0.30555
   type: 'test'
   ...
 # Subtest: duplicate tracker IP claimed by Shop or another Field product is held
 ok 12 - duplicate tracker IP claimed by Shop or another Field product is held
   ---
-  duration_ms: 0.343896
+  duration_ms: 0.420615
   type: 'test'
   ...
 # Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
 ok 13 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
   ---
-  duration_ms: 0.320402
+  duration_ms: 0.288348
   type: 'test'
   ...
 # Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
 ok 14 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
   ---
-  duration_ms: 0.321212
+  duration_ms: 0.343431
   type: 'test'
   ...
 # Subtest: all 2027 product identities and placements must reconcile before using any check
 ok 15 - all 2027 product identities and placements must reconcile before using any check
   ---
-  duration_ms: 0.320632
+  duration_ms: 0.306803
   type: 'test'
   ...
 # Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
 ok 16 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
   ---
-  duration_ms: 0.553985
+  duration_ms: 0.638841
   type: 'test'
   ...
 # Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
 ok 17 - browser-facing source receipt must cover every exact Product ID and retain the original check time
   ---
-  duration_ms: 1.020241
+  duration_ms: 0.993683
   type: 'test'
   ...
 # Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
 ok 18 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
   ---
-  duration_ms: 0.576127
+  duration_ms: 0.569112
   type: 'test'
   ...
 # Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
 ok 19 - live saved port schema requires measured attempt evidence, not invented Boolean port state
   ---
-  duration_ms: 0.558632
+  duration_ms: 4.646688
   type: 'test'
   ...
 # Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
 ok 20 - a stale reviewed mHelp source cannot authorize currently online camera product claims
   ---
-  duration_ms: 0.247354
+  duration_ms: 2.891383
   type: 'test'
   ...
 # Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
 ok 21 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
   ---
-  duration_ms: 1.361664
+  duration_ms: 0.700276
   type: 'test'
   ...
 # Subtest: one result expiring in transit does not erase another fresh Product ID
 ok 22 - one result expiring in transit does not erase another fresh Product ID
   ---
-  duration_ms: 0.391326
+  duration_ms: 0.377104
   type: 'test'
   ...
 # Subtest: actual API pull provenance is accepted without inventing a CSV filename
 ok 23 - actual API pull provenance is accepted without inventing a CSV filename
   ---
-  duration_ms: 14.544051
+  duration_ms: 14.405399
   type: 'test'
   ...
 # Subtest: legacy CSV labels continue to be accepted
 ok 24 - legacy CSV labels continue to be accepted
   ---
-  duration_ms: 3.01749
+  duration_ms: 2.358078
   type: 'test'
   ...
 # Subtest: API labels require the exact format and a real calendar date
 ok 25 - API labels require the exact format and a real calendar date
   ---
-  duration_ms: 0.561165
+  duration_ms: 0.489944
   type: 'test'
   ...
 # Subtest: mixed source labels cannot certify one census
 ok 26 - mixed source labels cannot certify one census
   ---
-  duration_ms: 1.438437
+  duration_ms: 1.884224
   type: 'test'
   ...
 # Subtest: API label does not weaken exact Product ID and row/column guards
 ok 27 - API label does not weaken exact Product ID and row/column guards
   ---
-  duration_ms: 2.35863
+  duration_ms: 2.618144
   type: 'test'
   ...
 # Subtest: shared-IP ownership remains held for API provenance
 ok 28 - shared-IP ownership remains held for API provenance
   ---
-  duration_ms: 5.449099
+  duration_ms: 12.152557
   type: 'test'
   ...
 # Subtest: API label never bypasses stale timestamps or source-hash mismatch
 ok 29 - API label never bypasses stale timestamps or source-hash mismatch
   ---
-  duration_ms: 2.243171
+  duration_ms: 4.915348
   type: 'test'
   ...
 # Subtest: each batch reaches saved readback before another POST starts
 ok 30 - each batch reaches saved readback before another POST starts
   ---
-  duration_ms: 3.046022
+  duration_ms: 3.404009
   type: 'test'
   ...
 # Subtest: a failed middle POST is not retried and cannot hide successful batches
 ok 31 - a failed middle POST is not retried and cannot hide successful batches
   ---
-  duration_ms: 0.895137
+  duration_ms: 0.851629
   type: 'test'
   ...
 # Subtest: a failed final batch still gets a read-only recovery
 ok 32 - a failed final batch still gets a read-only recovery
   ---
-  duration_ms: 0.453717
+  duration_ms: 0.454868
   type: 'test'
   ...
 # Subtest: display readback failure does not discard returned readings or retry checks
 ok 33 - display readback failure does not discard returned readings or retry checks
   ---
-  duration_ms: 3.292836
+  duration_ms: 0.57379
   type: 'test'
   ...
 # Subtest: authorization failure stops subsequent batches
 ok 34 - authorization failure stops subsequent batches
   ---
-  duration_ms: 0.452066
+  duration_ms: 0.466711
   type: 'test'
   ...
 # Subtest: malformed, duplicate, wrong-target, or missing-timestamp results stop safely
 ok 35 - malformed, duplicate, wrong-target, or missing-timestamp results stop safely
   ---
-  duration_ms: 0.645049
+  duration_ms: 0.925577
   type: 'test'
   ...
 # Subtest: session changes prevent readback and publication of late POST results
 ok 36 - session changes prevent readback and publication of late POST results
   ---
-  duration_ms: 0.264469
+  duration_ms: 0.295711
   type: 'test'
   ...
 # Subtest: a session change during readback prevents the next POST
 ok 37 - a session change during readback prevents the next POST
   ---
-  duration_ms: 0.330807
+  duration_ms: 0.491256
   type: 'test'
   ...
 # Subtest: unknown is unresolved, never counted as online, offline or successful setup
 ok 38 - unknown is unresolved, never counted as online, offline or successful setup
   ---
-  duration_ms: 0.382302
+  duration_ms: 0.566126
   type: 'test'
   ...
 # Subtest: input list changes during readback do not lose selected targets
 ok 39 - input list changes during readback do not lose selected targets
   ---
-  duration_ms: 1.692861
+  duration_ms: 0.844265
   type: 'test'
   ...
 # Subtest: duplicate products are checked once and batch size remains four
 ok 40 - duplicate products are checked once and batch size remains four
   ---
-  duration_ms: 0.389012
+  duration_ms: 0.424321
   type: 'test'
   ...
 # Subtest: offline evidence remains offline, not rewritten by the browser
 ok 41 - offline evidence remains offline, not rewritten by the browser
   ---
-  duration_ms: 0.301544
+  duration_ms: 0.238946
   type: 'test'
   ...
 # Subtest: complete exact-ID census isolates one conflicting placement without relocating it or blocking other products
 ok 42 - complete exact-ID census isolates one conflicting placement without relocating it or blocking other products
   ---
-  duration_ms: 11.184508
+  duration_ms: 13.775614
   type: 'test'
   ...
 # Subtest: the equipment import verifier remains all-or-nothing for a changed physical placement
 ok 43 - the equipment import verifier remains all-or-nothing for a changed physical placement
   ---
-  duration_ms: 1.553727
+  duration_ms: 2.157985
   type: 'test'
   ...
 # Subtest: held records still reserve IP ownership across Field and Shop
 ok 44 - held records still reserve IP ownership across Field and Shop
   ---
-  duration_ms: 2.026662
+  duration_ms: 4.783272
   type: 'test'
   ...
 # Subtest: missing/extra/duplicate Product IDs, shifted rows/columns and inconsistent source index fail the entire source
 ok 45 - missing/extra/duplicate Product IDs, shifted rows/columns and inconsistent source index fail the entire source
   ---
-  duration_ms: 2.861772
+  duration_ms: 4.176219
   type: 'test'
   ...
 # Subtest: source identity/customer/restriction changes hold that exact Product ID
 ok 46 - source identity/customer/restriction changes hold that exact Product ID
   ---
-  duration_ms: 5.328892
+  duration_ms: 7.408158
   type: 'test'
   ...
 # Subtest: safe A1 quoting and trailing empty cells are allowed, row indices remain stable
 ok 47 - safe A1 quoting and trailing empty cells are allowed, row indices remain stable
   ---
-  duration_ms: 1.118266
+  duration_ms: 1.809044
   type: 'test'
   ...
 # Subtest: a malformed V2 hold cannot permit status under an unmatched placement or checksum
 ok 48 - a malformed V2 hold cannot permit status under an unmatched placement or checksum
   ---
-  duration_ms: 1.276769
+  duration_ms: 6.141785
   type: 'test'
   ...
 # Subtest: protected owner route returns current exact-ID statuses while holding mismatched product
 ok 49 - protected owner route returns current exact-ID statuses while holding mismatched product
   ---
-  duration_ms: 59.082959
+  duration_ms: 123.477851
   type: 'test'
   ...
 # Subtest: protected it route returns current exact-ID statuses while holding mismatched product
 ok 50 - protected it route returns current exact-ID statuses while holding mismatched product
   ---
-  duration_ms: 5.583316
+  duration_ms: 13.480994
   type: 'test'
   ...
 # Subtest: unauthorized service active=true cannot read source or endpoint configuration
 ok 51 - unauthorized service active=true cannot read source or endpoint configuration
   ---
-  duration_ms: 2.477235
+  duration_ms: 3.642113
   type: 'test'
   ...
 # Subtest: unauthorized owner active=false cannot read source or endpoint configuration
 ok 52 - unauthorized owner active=false cannot read source or endpoint configuration
   ---
-  duration_ms: 1.366981
+  duration_ms: 1.423444
   type: 'test'
   ...
 # Subtest: unauthorized it active=false cannot read source or endpoint configuration
 ok 53 - unauthorized it active=false cannot read source or endpoint configuration
   ---
-  duration_ms: 1.038928
+  duration_ms: 1.533009
   type: 'test'
   ...
 # Subtest: corrupted full source remains unavailable through the authenticated route, never partly certified
 ok 54 - corrupted full source remains unavailable through the authenticated route, never partly certified
   ---
-  duration_ms: 6.529288
+  duration_ms: 6.917553
   type: 'test'
   ...
 # Subtest: full 1,001-ID membership stays intact while only three assignment conflicts are held
 ok 55 - full 1,001-ID membership stays intact while only three assignment conflicts are held
   ---
-  duration_ms: 47.804283
+  duration_ms: 35.566208
   type: 'test'
   ...
 # Subtest: a view mounting on a nearly-due cache rereads at the original deadline, not a full interval later
 ok 56 - a view mounting on a nearly-due cache rereads at the original deadline, not a full interval later
   ---
-  duration_ms: 60.119313
+  duration_ms: 47.414729
   type: 'test'
   ...
 # Subtest: snapshot update adoption cannot reset the actual pair deadline
 ok 57 - snapshot update adoption cannot reset the actual pair deadline
   ---
-  duration_ms: 6.64601
+  duration_ms: 10.453227
   type: 'test'
   ...
 # Subtest: delayed authentication and a late peer preserve the original paired request start
 ok 58 - delayed authentication and a late peer preserve the original paired request start
   ---
-  duration_ms: 7.276207
+  duration_ms: 8.124035
   type: 'test'
   ...
 # Subtest: a failed read retains its full attempt backoff
 ok 59 - a failed read retains its full attempt backoff
   ---
-  duration_ms: 7.22394
+  duration_ms: 7.24744
   type: 'test'
   ...
 # Subtest: hidden tabs pause reads and repeated visibility events resume only one shared pair
 ok 60 - hidden tabs pause reads and repeated visibility events resume only one shared pair
   ---
-  duration_ms: 4.672726
+  duration_ms: 6.433694
   type: 'test'
   ...
 # Subtest: a session change clears the hook and rejects late old-session bodies
 ok 61 - a session change clears the hook and rejects late old-session bodies
   ---
-  duration_ms: 5.435138
+  duration_ms: 4.551571
   type: 'test'
   ...
 # Subtest: a pair never adopts one successful half while the health response is pending
 ok 62 - a pair never adopts one successful half while the health response is pending
   ---
-  duration_ms: 4.415838
+  duration_ms: 3.120421
   type: 'test'
   ...
 # Subtest: a pair never adopts one successful half while the fieldMap response is pending
 ok 63 - a pair never adopts one successful half while the fieldMap response is pending
   ---
-  duration_ms: 9.472879
+  duration_ms: 2.981853
   type: 'test'
   ...
 # Subtest: the real hook retains actual accepted history through read failure, then drops newer unknown evidence
 ok 64 - the real hook retains actual accepted history through read failure, then drops newer unknown evidence
   ---
-  duration_ms: 19.072535
+  duration_ms: 9.399604
   type: 'test'
   ...
 # Subtest: session invalidation clears nonempty camera history and rejects late old-session results
 ok 65 - session invalidation clears nonempty camera history and rejects late old-session results
   ---
-  duration_ms: 5.532281
+  duration_ms: 3.256645
   type: 'test'
   ...
 # Subtest: only a verified parent hide clears camera history, including an in-flight read
 ok 66 - only a verified parent hide clears camera history, including an in-flight read
   ---
-  duration_ms: 24.1118
+  duration_ms: 10.219364
   type: 'test'
   ...
 # Subtest: unmount discards hook-local history and a cold remount cannot invent it from cached stale observations
 ok 67 - unmount discards hook-local history and a cold remount cannot invent it from cached stale observations
   ---
-  duration_ms: 13.292509
+  duration_ms: 4.898598
   type: 'test'
   ...
 # Subtest: real 401 saved-read denial clears history before late paired data can return
 ok 68 - real 401 saved-read denial clears history before late paired data can return
   ---
-  duration_ms: 6.750984
+  duration_ms: 3.043968
   type: 'test'
   ...
 # Subtest: real 403 saved-read denial clears history before late paired data can return
 ok 69 - real 403 saved-read denial clears history before late paired data can return
   ---
-  duration_ms: 4.986568
+  duration_ms: 3.558539
   type: 'test'
   ...
 # Subtest: a real same-role bearer rollover clears accepted history and fences old responses
 ok 70 - a real same-role bearer rollover clears accepted history and fences old responses
   ---
-  duration_ms: 7.630929
+  duration_ms: 2.88983
   type: 'test'
   ...
 # Subtest: nonempty history adds no background reads while hidden and cannot advance its source time
 ok 71 - nonempty history adds no background reads while hidden and cannot advance its source time
   ---
-  duration_ms: 5.626479
+  duration_ms: 3.745036
   type: 'test'
   ...
 # Subtest: hide messages require both the exact parent source and the same origin
 ok 72 - hide messages require both the exact parent source and the same origin
   ---
-  duration_ms: 3.378431
+  duration_ms: 2.564374
   type: 'test'
   ...
 # Subtest: healthy hide clears only history and a new accepted refresh establishes new history
 ok 73 - healthy hide clears only history and a new accepted refresh establishes new history
   ---
-  duration_ms: 4.366044
+  duration_ms: 3.579858
   type: 'test'
   ...
 # Subtest: a pre-hide request awaiting parent authorization cannot repopulate cleared history
 ok 74 - a pre-hide request awaiting parent authorization cannot repopulate cleared history
   ---
-  duration_ms: 6.99968
+  duration_ms: 3.78998
   type: 'test'
   ...
 # Subtest: a queued history updater cannot repopulate evidence after healthy hide
 ok 75 - a queued history updater cannot repopulate evidence after healthy hide
   ---
-  duration_ms: 5.093705
+  duration_ms: 3.37197
   type: 'test'
   ...
 # Subtest: expired-cache remount shows the authorized dated pair while one fresh pair is pending
 ok 76 - expired-cache remount shows the authorized dated pair while one fresh pair is pending
   ---
-  duration_ms: 4.134013
+  duration_ms: 3.332116
   type: 'test'
   ...
 # Subtest: expired saved pair is never exposed to a changed actor on remount
 ok 77 - expired saved pair is never exposed to a changed actor on remount
   ---
-  duration_ms: 2.456374
+  duration_ms: 2.571868
   type: 'test'
   ...
 1..77
@@ -469,4 +469,4 @@ ok 77 - expired saved pair is never exposed to a changed actor on remount
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4269.693439
+# duration_ms 4563.119514
