@@ -1,0 +1,38 @@
+name: Check recorded COS backend provenance patch
+on:
+  push:
+    branches: [fix/fleet-verification-progress-20261104]
+    paths:
+      - '.github/workflows/cos-backend-provenance-check.yml'
+      - '.github/scripts/fleet-backend-provenance-patch.mjs'
+      - 'tech-checks/operations/tests/fleet-backend-provenance.spec.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: cos-recorded-backend-provenance-candidate
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fleet-verification-progress-20261104
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Prepare only the recorded deployed artifact
+        run: node .github/scripts/fleet-backend-provenance-patch.mjs
+      - name: Test the actual patched production module
+        run: |
+          set -o pipefail
+          mkdir -p repair-evidence
+          node --experimental-strip-types --test tech-checks/operations/tests/fleet-backend-provenance.spec.mjs | tee repair-evidence/backend-provenance-tests.txt
+      - name: Save candidate and test evidence without deploying
+        run: |
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tech-checks/docs/fleet-provenance-repair-20261104 repair-evidence/backend-provenance-tests.txt
+          git commit -m 'Record tested narrow production-backend provenance candidate'
+          git push origin HEAD:fix/fleet-verification-progress-20261104
