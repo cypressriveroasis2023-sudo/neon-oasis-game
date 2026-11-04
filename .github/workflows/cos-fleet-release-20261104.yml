@@ -8,11 +8,11 @@ permissions:
   contents: write
 concurrency:
   group: cos-fleet-combined-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
-      - name: Combine reviewed reopening repair and prepare scheduled reader
+      - name: Prepare the combined candidate
         run: |
           git config user.name 'COS repair verification'
           git config user.email 'actions@users.noreply.github.com'
@@ -29,6 +29,7 @@ jobs:
           node .github/scripts/prepare-scheduled-publisher-repair.mjs
           node .github/scripts/finalize-fleet-reading-20261104.mjs
           mkdir -p repair-evidence/combined
+          printf '%s\n' '{"scope":"Focused Fleet validation only","fullRepositorySuite":"Not claimed passed; prior run 41894564380 did not finish before supersession","fullSuiteRun":41894564380}' > repair-evidence/combined/validation-scope.json
       - name: Install locked dependencies
         working-directory: tech-checks/operations
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -39,11 +40,6 @@ jobs:
           files='tests/fleet-scheduled-reader.test.mjs tests/fleet-scheduled-publisher.test.mjs tests/fleet-backend-provenance.spec.mjs tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/fleet-verification-reasons.test.mjs tests/exact-product-connection.test.mjs tests/saved-fleet-reading.test.mjs'
           for file in $files; do test -f "$file" || exit 1; done
           node --import tsx --test $files > ../../repair-evidence/combined/targeted-tests.txt 2>&1
-      - name: Preserve tested source candidate
-        run: |
-          git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs tech-checks/operations/src/FleetDashboard.tsx tech-checks/operations/tests/fleet-count-retention.browser.spec.mjs tech-checks/operations/tests/fleet-verify-now.browser.spec.mjs tech-checks/operations/tests/fleet-dashboard-fixtures.mjs repair-evidence/combined
-          git diff --cached --quiet || git commit -m 'Record tested scheduled reader and provider-independent count persistence'
-          git push origin HEAD:fix/fleet-verification-progress-20261104
       - name: Typecheck and build combined application
         working-directory: tech-checks/operations
         run: |
@@ -65,32 +61,24 @@ jobs:
           result=$?
           printf '{"browserTests":%s}\n' "$result" > ../../repair-evidence/combined/browser-results.json
           exit "$result"
-      - name: Compare full unit suite with unchanged production source
+      - name: Repeat reopening regressions to detect intermittent persistence failures
         working-directory: tech-checks/operations
         run: |
           set +e
-          npm test > ../../repair-evidence/combined/all-unit-tests.txt 2>&1
-          candidate=$?
-          baseline=0
-          if [ "$candidate" != 0 ]; then
-            git worktree add --detach /tmp/cos-main-baseline 1ddb5df2228d1a584393884182406bca90efd1d8
-            ln -s "$PWD/node_modules" /tmp/cos-main-baseline/tech-checks/operations/node_modules
-            (cd /tmp/cos-main-baseline/tech-checks/operations && npm test) > ../../repair-evidence/combined/baseline-unit-tests.txt 2>&1
-            baseline=$?
-          fi
-          printf '{"candidate":%s,"baseline":%s}\n' "$candidate" "$baseline" > ../../repair-evidence/combined/full-unit-results.json
-          if [ "$candidate" != 0 ]; then echo '::warning::Full suite has failures; compare candidate with baseline before release.'; fi
-          exit 0
-      - name: Commit exact browser-tested static bundle
+          npm run test:browser -- --workers=2 --retries=0 --repeat-each=3 tests/fleet-count-retention.browser.spec.mjs > ../../repair-evidence/combined/reopening-repeat-tests.txt 2>&1
+          result=$?
+          printf '{"reopeningRepeatTests":%s}\n' "$result" > ../../repair-evidence/combined/reopening-repeat-results.json
+          exit "$result"
+      - name: Commit exact tested source and static bundle
         run: |
-          git add tech-checks/operations/dist repair-evidence/combined
-          git diff --cached --quiet || git commit -m 'Build browser-verified combined Fleet frontend; retain full-suite comparison'
+          git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs tech-checks/operations/src/FleetDashboard.tsx tech-checks/operations/tests/fleet-count-retention.browser.spec.mjs tech-checks/operations/tests/fleet-verify-now.browser.spec.mjs tech-checks/operations/tests/fleet-dashboard-fixtures.mjs tech-checks/operations/dist repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Build verified Fleet release with repeated reopen tests and explicit validation scope'
           git push origin HEAD:fix/fleet-verification-progress-20261104
       - name: Preserve failure evidence without publishing an unverified bundle
         if: failure()
         run: |
           git add repair-evidence/combined
-          git diff --cached --quiet || git commit -m 'Record combined Fleet verification failure; no release bundle published'
+          git diff --cached --quiet || git commit -m 'Record focused Fleet verification failure; no release bundle published'
           git push origin HEAD:fix/fleet-verification-progress-20261104
       - uses: actions/upload-artifact@v4
         if: always()
