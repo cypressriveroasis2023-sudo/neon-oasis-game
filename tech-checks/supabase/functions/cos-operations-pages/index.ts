@@ -619,6 +619,7 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+const commonFleetMapRead=path==='/api/fleet-map-source';if(commonFleetMapRead)path='/api/field-map';
 const savedHistoryMatch=/^\/api\/fleet-saved-board\/history\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.exec(path);
 if(method==='GET'&&savedHistoryMatch)return json(await rpc('cos_fleet_board_history',{p_run:savedHistoryMatch[1]}));
 if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
@@ -1009,9 +1010,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
           const archiveContext={nativeUnits:freshUnits,identity:freshBundle.identity,archivedRepresentations:freshArchivedRepresentations,previousArchivedRepresentations:archivedRepresentations};
           const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources)};
           const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
-          const ownerCensusEvidence=await readOwnerCensusEvidence({actorId:context.actorId,records:context.legacyOwner?geocodes:geocodes.filter(r=>r.censusOnlyState==='consumed'&&r.status==='success'),rawSnapshot:freshSnapshot,snapshot:base,bundle:freshBundle,mhelpReceipt,
-            readTarget:id=>readOwnerCensusTarget(context,geocodes.find(r=>r.censusOnlyGuard?.nativeUnitId===id)?.unitKey,id)},context.legacyOwner);
-          let projected=await projectFieldGeocodes({...base,ownerCensusProofs:ownerCensusEvidence.proofs},geocodes,censusUnavailable,ownerCensusEvidence.receipts,context.legacyOwner);
+          const ownerCensusEvidence=await readOwnerCensusEvidence({actorId:context.actorId,records:(context.legacyOwner&&!commonFleetMapRead)?geocodes:geocodes.filter(r=>r.censusOnlyState==='consumed'&&r.status==='success'),rawSnapshot:freshSnapshot,snapshot:base,bundle:freshBundle,mhelpReceipt,
+            readTarget:id=>readOwnerCensusTarget(context,geocodes.find(r=>r.censusOnlyGuard?.nativeUnitId===id)?.unitKey,id)},(context.legacyOwner&&!commonFleetMapRead));
+          let projected=await projectFieldGeocodes({...base,ownerCensusProofs:ownerCensusEvidence.proofs},geocodes,censusUnavailable,ownerCensusEvidence.receipts,(context.legacyOwner&&!commonFleetMapRead));
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{fail('Imported address lookup results are unavailable. The map could not be refreshed.',503);}
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
@@ -1032,7 +1033,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
           // native actor/permission route. No new legacy credential or provider call.
           try{
             const candidates=await sourceEquipmentAddressCandidates(withMhelpAddress,mhelpReceipt?.upload);
-            if(!candidates.length)return json(withMhelpAddress);
+            if(!candidates.length)return json({...(withMhelpAddress),sharedFleetView:commonFleetMapRead});
             // This optional receipt read and projection have a two-second added-latency ceiling.
             // Race explicitly: a transport that ignores abort must not hold the map open.
             const controller=new AbortController(),deadline=Date.now()+2000;
@@ -1053,9 +1054,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
                 return controller.signal.aborted||Date.now()>=deadline?unavailable():projected;
               })().catch(()=>unavailable());
               const result=await Promise.race([operation,stopped]);
-              return json(controller.signal.aborted||Date.now()>=deadline?unavailable():result);
+              return json({...(controller.signal.aborted||Date.now()>=deadline?unavailable():result),sharedFleetView:commonFleetMapRead});
             }finally{clearTimeout(timer);request.signal.removeEventListener('abort',cancel);controller.abort();}
-          }catch{return json({...withMhelpAddress,sourceEquipmentEstimatesStatus:'unavailable'});}
+          }catch{return json({...({...withMhelpAddress,sourceEquipmentEstimatesStatus:'unavailable'}),sharedFleetView:commonFleetMapRead});}
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {

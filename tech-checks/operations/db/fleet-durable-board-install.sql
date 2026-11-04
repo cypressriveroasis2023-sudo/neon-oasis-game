@@ -1,7 +1,7 @@
 create schema if not exists cos_fleet_board_private;
 revoke all on schema cos_fleet_board_private from public,anon,authenticated;
 grant usage on schema cos_fleet_board_private to service_role;
-create table cos_fleet_board_private.runs(id uuid primary key default gen_random_uuid(),started_at timestamptz not null default clock_timestamp(),finished_at timestamptz,state text not null check(state in ('running','completed','failed')),error_code text,products jsonb not null default '[]',payload jsonb,counts jsonb,inventory jsonb,units jsonb);
+create table cos_fleet_board_private.runs(id uuid primary key default gen_random_uuid(),started_at timestamptz not null default clock_timestamp(),finished_at timestamptz,state text not null check(state in ('running','completed','failed')),error_code text,products jsonb not null default '[]',payload jsonb,staged jsonb,counts jsonb,inventory jsonb,units jsonb);
 create index fleet_board_runs_started on cos_fleet_board_private.runs(started_at desc);
 create table cos_fleet_board_private.control(singleton boolean primary key default true check(singleton),latest_id uuid references cos_fleet_board_private.runs(id),active_id uuid references cos_fleet_board_private.runs(id),next_at timestamptz not null default '-infinity',queued boolean not null default false);
 insert into cos_fleet_board_private.control(singleton) values(true);
@@ -16,6 +16,7 @@ begin
  if c.active_id is not null and exists(select 1 from cos_fleet_board_private.runs where id=c.active_id and started_at>clock_timestamp()-interval '120 seconds' and state='running') then if p_force then update cos_fleet_board_private.control set queued=true where singleton;end if;return null;end if;
  if clock_timestamp()<c.next_at and ((not p_force and c.latest_id is not null) or exists(select 1 from cos_fleet_board_private.runs where started_at>clock_timestamp()-interval '60 seconds')) then if p_force then update cos_fleet_board_private.control set queued=true,next_at=least(next_at,(select max(started_at)+interval '60 seconds' from cos_fleet_board_private.runs)) where singleton;end if;return null;end if;
  update cos_fleet_board_private.runs set state='failed',error_code='worker_interrupted',finished_at=clock_timestamp() where id=c.active_id and state='running';
+ update cos_fleet_board_private.runs set staged=null where staged is not null and started_at<clock_timestamp()-interval '1 hour';
  insert into cos_fleet_board_private.runs(state) values('running') returning id into r;
  update cos_fleet_board_private.control set active_id=r,queued=false,next_at=clock_timestamp()+interval '10 minutes' where singleton;
  return jsonb_build_object('id',r);
@@ -32,8 +33,8 @@ begin
  select * into c from cos_fleet_board_private.control where singleton for update;
  if c.active_id is distinct from p_run then return false;end if;
  if not exists(select 1 from cos_fleet_board_private.runs where id=p_run and state='running' and started_at>clock_timestamp()-interval '120 seconds') then return false;end if;
- if p_payload->>'contract' is distinct from 'COS_SAVED_FLEET_BOARD_V1' or jsonb_typeof(p_payload->'fleet') is distinct from 'object' or octet_length(p_payload::text)>12000000 then raise exception 'Invalid completed board';end if;
- update cos_fleet_board_private.runs set state='completed',finished_at=clock_timestamp(),payload=p_payload,counts=p_payload->'counts',inventory=p_payload->'inventory',units=p_payload->'units' where id=p_run and state='running';
+ if p_payload->>'contract' is distinct from 'COS_SAVED_FLEET_BOARD_V1' or jsonb_typeof(p_payload->'fleet') is distinct from 'object' or (p_payload#>'{fleet,fieldMap,sharedFleetView}') is distinct from 'true'::jsonb or octet_length(p_payload::text)>12000000 then raise exception 'Invalid completed board';end if;
+ update cos_fleet_board_private.runs set state='completed',finished_at=clock_timestamp(),payload=p_payload,staged=null,counts=p_payload->'counts',inventory=p_payload->'inventory',units=p_payload->'units' where id=p_run and state='running';
  update cos_fleet_board_private.control set latest_id=p_run,active_id=null,next_at=case when queued then greatest(clock_timestamp(),(select started_at+interval '60 seconds' from cos_fleet_board_private.runs where id=p_run)) else next_at end where singleton;
  update cos_fleet_board_private.runs set payload=null where id<>p_run and payload is not null;
  return true;

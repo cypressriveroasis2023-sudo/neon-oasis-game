@@ -3,10 +3,13 @@
   "baseCommit": "354b83f0bd9e03f6f4f3037aa9ef227d5ac23012",
   "backendProject": "tughscoxralhofrckvxy",
   "backendFunction": "cos-operations-pages",
-  "backendVersion": 146,
+  "backendVersion": 150,
   "migration": [
     "cos_durable_fleet_board",
-    "cos_fleet_board_forced_refresh_queue"
+    "cos_fleet_board_forced_refresh_queue",
+    "cos_fleet_board_staging",
+    "cos_fleet_board_staging_retention",
+    "cos_fleet_board_shared_view_guard"
   ],
   "preservedHistoricalUpdates": 48,
   "validation": {
@@ -14,14 +17,19 @@
     "apiAndHookRegressionTests": 155,
     "durableProjectionDatabaseClientTests": 7,
     "accessTests": 10,
-    "mobileBrowser": "reopen, elapsed clock, failed refresh, complete negative replacement, unit history, session invalidation passed",
-    "productionFirstNewBatch": "pending an authenticated normal app read; historical data is not activated as a current board"
+    "mobileBrowser": "warm visibility resume, cold reopen, elapsed clock, failed refresh, completed negative replacement, unit history and session invalidation passed",
+    "productionFirstNewBatch": "post-CPU-fix authenticated opening still required",
+    "firstProductionAttempt": "CPUTime termination; no board published; recorded failed",
+    "scale": "925 records / 739 resources; pure-model outputs retained, CPU test below 1500ms",
+    "scaleTests": 2,
+    "releaseRegressionTests": 186
   },
   "boundaries": {
     "source": "mHelp Product IDs and placements; exact 2027 tracker connection authority",
     "failedBatch": "keeps last completed board and records error",
     "checks": "reads saved observations; existing provider and probe schedules are unchanged",
-    "storage": "private service-only invoker functions; original tokens are never persisted"
+    "storage": "private service-only invoker functions; original tokens are never persisted",
+    "sharedProjection": "committed common Owner/approved IT map only; Owner pending geocode previews excluded and publication guarded in SQL"
   },
-  "backendArtifactSha256": "83fc74cf605c85effb9bfd3bea88b39434c7683f1adaebe0282cc3410eb55b05"
+  "backendArtifactSha256": "6ad8a5120748713b88825a0f05b892f8c46976428f17fa8b2421c73aaa69ca07"
 }

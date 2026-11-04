@@ -16,6 +16,12 @@ Rebuild the deployed pure projection/runtime module with the locked esbuild depe
 
     node node_modules/esbuild/bin/esbuild durable-board/index.ts --bundle --platform=neutral --format=esm --resolve-extensions=.ts,.mjs,.js,.tsx,.json --outfile=../supabase/functions/cos-operations-pages/savedFleetBoard.mjs
 
-Matched deployed function source is archived in `tech-checks/docs/deployed-cos-operations-pages-v146/source`. The database install is `db/fleet-durable-board-install.sql`. Keep deployment source and canonical `index.ts` / `fleetAccess.ts` changes together. The earlier completed-snapshot log remains intact; 48 historical entries were copied as historical count/unit logs without activating an obsolete board as current.
+Matched deployed function source is archived in `tech-checks/docs/deployed-cos-operations-pages-v150/source`. The database install is `db/fleet-durable-board-install.sql`. Keep deployment source and canonical `index.ts` / `fleetAccess.ts` changes together. The earlier completed-snapshot log remains intact; 48 historical entries were copied as historical count/unit logs without activating an obsolete board as current.
 
 Roll back the client capability flag to the previous source path if needed. Preserve the private history tables; do not delete recorded runs. The backend's new routes can remain unused during a frontend rollback.
+
+Production follow-up: the first real batch was stopped by the Edge CPU limit before committing. A bounded pure label parser cache and opt-in, deeply immutable identity-envelope validation remove repeated work without caching health/freshness decisions. The previous unit log is reused for comparison, and derived duplicate inventory is omitted from stored health (clients restore it). The scale test covers 925 equipment records and 739 resources with a 1500ms CPU ceiling, below the 2000ms Edge limit.
+
+Apply `db/fleet-board-staging.sql` after the main install. Staged inputs are private, never returned by the board API, cleared on successful publication, and expired after one hour on subsequent runs. They support diagnosis/recovery of an interrupted worker. Source observations retain their original capture time.
+
+The internal `/api/fleet-map-source` route reads the shared committed map projection for either approved role. It excludes Owner pending geocode previews. Completed publication requires the shared-view marker in SQL, preventing older workers from publishing a role-private map. Normal Owner map tools keep their existing projection and authorization.

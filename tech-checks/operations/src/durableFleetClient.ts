@@ -18,11 +18,11 @@ export async function durableFleetRead(io:{read:(force:boolean)=>Promise<any>;cu
   for(let i=0;i<80&&Date.now()<deadline&&(!value.latest||['running','queued'].includes(value.refresh?.state));i++){
    await delay(3000);if(!io.current())return null;
    value=await io.read(false);if(!io.current())return null;io.status(value);
-   const next=restoredFleet(value);
+   const next=value.latest?.id!==first.latest?.id?restoredFleet(value):null;
    if(next&&value.latest?.id!==first.latest?.id){io.publish(next);return next;}
   }
   if(value.refresh?.state!=='completed')io.failed();
-  return restoredFleet(value);
+  return saved||restoredFleet(value);
  };
  if(saved){if(['running','queued'].includes(first.refresh?.state))void poll().catch(()=>{if(io.current())io.failed();});else if(first.refresh?.state==='failed')io.failed();return saved;}
  const next=await poll();if(!next)throw Error('The first complete fleet update is not available yet. The server will keep completed results once a batch succeeds.');return next;

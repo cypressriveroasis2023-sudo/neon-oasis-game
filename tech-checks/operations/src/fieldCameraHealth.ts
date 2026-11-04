@@ -33,7 +33,17 @@ export function validateCameraHealth(value:any):Health {
 }
 const plain=(value:string)=>value.trim().replace(/\s+/g,' ').toUpperCase();
 /** Fully anchored family + numeric asset tag; never device/site-name substring matching. */
+// Label parsing is pure; do not repeat its regular expressions for every
+// pairwise collision check in a full-fleet batch. Health is never cached here.
+const canonicalUnitCache=new Map<string,string|null>();
 export function canonicalCameraUnit(value:string):string|null {
+ const cacheable=value.length<=512;
+ if(cacheable&&canonicalUnitCache.has(value))return canonicalUnitCache.get(value)!;
+ const result=parseCanonicalCameraUnit(value);
+ if(cacheable){if(canonicalUnitCache.size>=4096)canonicalUnitCache.clear();canonicalUnitCache.set(value,result);}
+ return result;
+}
+function parseCanonicalCameraUnit(value:string):string|null {
   // A variant discriminator must end before the asset tag: Sniper 201 is not Sniper 2 01.
   const match=/^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim())
     || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
