@@ -1,0 +1,36 @@
+
+> cos-operations-pages@1.0.0 test:browser
+> playwright test --config tests/playwright.config.mjs --workers=2 --retries=0 --repeat-each=3 tests/fleet-count-retention.browser.spec.mjs
+
+
+Running 27 tests using 2 workers
+
+  ✓  2 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.8s)
+  ✓  1 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.0s)
+  ✓  3 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.2s)
+  ✓  4 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (1.9s)
+  ✓  5 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.7s)
+  ✓  6 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.3s)
+  ✓  7 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.1s)
+  ✓  8 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.9s)
+  ✓  9 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.2s)
+  ✓  10 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.0s)
+  ✓  11 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.9s)
+  ✓  12 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.4s)
+  ✓  14 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.8s)
+  ✓  13 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.2s)
+  ✓  15 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.4s)
+  ✓  16 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (1.9s)
+  ✓  17 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.8s)
+  ✓  18 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.4s)
+  ✓  20 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.9s)
+  ✓  19 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.2s)
+  ✓  21 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.4s)
+  ✓  22 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.1s)
+  ✓  23 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (2.0s)
+  ✓  24 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.5s)
+  ✓  25 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.2s)
+  ✓  26 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (2.1s)
+  ✓  27 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.1s)
+
+  27 passed (34.5s)
