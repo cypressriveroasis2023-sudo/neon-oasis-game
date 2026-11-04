@@ -1,0 +1,30 @@
+{
+  "testedAt": "2026-11-04T21:09:32.994Z",
+  "source": "5c4a287c0940df8465a16d0a09a059a9e665d36c",
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 496,
+      "md5": "d3b73890129a1dfb222ee0903c0d8813",
+      "sha256": "d45d2f52cb20cc68ce36c55550f787f0713e7c99d75c3e91e9c46fa6aa26dfe3"
+    },
+    {
+      "path": "assets/index-dY60w2Ta.js",
+      "bytes": 1610811,
+      "md5": "d9f26685ddd6c2dfd975ba1b913be47e",
+      "sha256": "7abb189f2987d412d156ba475f37d71bc161c4f727f84c3022ef293d20cad1cd"
+    },
+    {
+      "path": "assets/index-DMHoyrPr.css",
+      "bytes": 470754,
+      "md5": "95771abe3c4609fe53f3e3cecbc6e4d5",
+      "sha256": "002f58e3d5bd355647b597ad8e55d7053a7de7b9b5f746e6867af5477188157a"
+    },
+    {
+      "path": "assets/durableFleetClient-BJadfqyJ.js",
+      "bytes": 1687,
+      "md5": "e8dc7dfa1cad2b7679462529f0e3522c",
+      "sha256": "3971dca32ee2f4de1165e3a7c2c3868a61e5fbeced995397b2a6b7ad6f160340"
+    }
+  ]
+}
