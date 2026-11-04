@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
-import {runFleetVerification,verificationSummaryText,type VerifyProduct,type VerificationRow} from './fleetVerificationRun';
+import {runFleetVerification,verificationSummaryText,verificationOutcomeLabel,type VerifyProduct,type VerificationRow} from './fleetVerificationRun';
 const verifyingProducts=new Set<string>();
 export default function FleetVerifyNow({products,onComplete,label='Verify now',disabled=false,onBusyChange}:{products:VerifyProduct[];onComplete:(connections?:unknown)=>Promise<unknown>;label?:string;disabled?:boolean;onBusyChange?:(busy:boolean)=>void}){
  const [busy,setBusy]=useState(false),[phase,setPhase]=useState<'checking'|'reading'>('checking'),[message,setMessage]=useState(''),[results,setResults]=useState<VerificationRow[]>([]);
@@ -33,6 +33,6 @@ export default function FleetVerifyNow({products,onComplete,label='Verify now',d
  };
  return <div className='cos-verify-now'>
   <button type='button' disabled={busy||disabled||!products.length} onClick={()=>void run()}>{busy?(phase==='checking'?'Verifying…':'Updating totals…'):label}</button>
-  <div aria-live='polite'>{message&&<p role='status'>{message}</p>}{results.length>0&&<ul>{results.map(r=><li key={r.productId}><strong>{r.name}: {r.outcome==='not_confirmed'?'Check not confirmed':r.status==='unknown'?'Unresolved':r.status==='online'?'Online':'Offline'}</strong><small>{r.reason}</small>{r.checkedAt&&<small>Completed check: {new Date(r.checkedAt).toLocaleString('en-US',{timeZone:'America/Chicago',timeZoneName:'short'})}</small>}{r.status==='unknown'&&r.outcome==='returned'&&<a href={'../../camera-health.html?q='+encodeURIComponent(r.name)}>Review camera setup →</a>}</li>)}</ul>}</div>
+  <div aria-live='polite'>{message&&<p role='status'>{message}</p>}{results.length>0&&<ul>{results.map(r=><li key={r.productId}><strong>{r.name}: {verificationOutcomeLabel(r)}</strong><small>{r.reason}</small>{r.checkedAt&&<small>Completed check: {new Date(r.checkedAt).toLocaleString('en-US',{timeZone:'America/Chicago',timeZoneName:'short'})}</small>}{r.status==='unknown'&&r.outcome==='returned'&&<a href={'../../camera-health.html?q='+encodeURIComponent(r.name)}>Review camera setup →</a>}</li>)}</ul>}</div>
  </div>;
 }
