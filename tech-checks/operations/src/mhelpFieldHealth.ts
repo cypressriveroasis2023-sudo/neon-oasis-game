@@ -1,3 +1,4 @@
+import {checkedControl,ownerConnection} from './ownerEquipmentCore';
 import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import {readRecordedRoster,type RecordedRoster} from './fleetRecordedRoster';
 import {isSupportEquipment,unitHealthLabel} from './fieldCameraHealth';
@@ -31,6 +32,13 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   const label=typeof product.unitNumber==='string'&&product.unitNumber.trim()?product.unitNumber:'Product '+product.productId;
   const exact=connections?.get(product.productId);
   const support=Boolean(row?.support)||isSupportEquipment({id:product.recordId,unitNumber:label,modelName:typeof product.category==='string'?product.category:undefined});
+  const owner=checkedControl(product.ownerControl,product.productId);
+  if(owner?.active&&!owner.projectionHold&&product.uploadLifecycle==='UNFLAGGED'&&record?.active&&record.lifecycle==='active'&&related.length===1&&record.productIds.length===1){
+   const observation=ownerConnection(owner,now)!;
+   const state:FieldProductHealth=support?'support':observation.status==='online'?'online':observation.status==='offline'?'offline':'unverified';
+   counts[state]++;
+   return {productId:product.productId,unitNumber:label,state,reason:support?'Support equipment; no camera check applies.':observation.reason,unitId:record.kind==='unit'?record.unitId:null,recordId:record.kind!=='unit'?record.id:null,evidence:{gap:support?'not_applicable':state==='unverified'?'no_current_reading':null,association:'owner_product_endpoint',basis:'connection',observedAt:observation.checkedAt,video:'not_verified',observations:state==='online'||state==='offline'?[{resourceId:'owner:'+product.productId,source:'Owner-configured COS cloud TCP check',kind:'connection',observedAt:observation.checkedAt,fresh:true,reportedStatus:state,currentState:state}]:[]}};
+  }
   // Connection does not depend on provider/channel acceptance, but still
   // respects current Product-ID ownership, placement, support and holds.
   const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length<=1

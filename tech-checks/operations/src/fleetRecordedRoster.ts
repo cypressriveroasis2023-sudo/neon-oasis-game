@@ -1,9 +1,10 @@
+import {ownerConnection} from './ownerEquipmentCore';
 import {recordedAddressText} from './fleetDisplayAddress';
 import {canonicalCameraUnit,isSupportEquipment} from './fieldCameraHealth';
 import type {DashboardUnit,FleetFilters} from './fleetDashboardModel';
 import {inventoryPlacement} from './fleetSnapshot';
 
-export type RecordedEquipment={id:string;kind:'unit'|'source_equipment'|'identity_review';unitId:string|null;unit:DashboardUnit|null;unitNumber:string;placement:'field'|'shop'|'unknown';lifecycle:'active'|'do_not_use'|'missing'|'retired'|'decommissioned';active:boolean;source:'mhelpdesk_api'|'owner_supplied_mhelp_export'|'current_tracker'|'recorded_inventory'|'owner';observedAt:string|null;productIds:string[];sourceRecordIds:string[];representedUnitIds:string[];customer:string|null;sourceAddress:Record<string,unknown>|null;reviewReason:string|null;family?:string;category?:string|null;displayUnitNumber?:string;recordedSourcePlacement?:'field'|'shop'|'unknown';candidateUnitIds?:string[];candidatePlacements?:{unitId:string;unitNumber:string;placement:'field'|'shop'|'unknown';source:string;observedAt:string|null}[]};
+export type RecordedEquipment={ownerControl?:any;id:string;kind:'unit'|'source_equipment'|'identity_review';unitId:string|null;unit:DashboardUnit|null;unitNumber:string;placement:'field'|'shop'|'unknown';lifecycle:'active'|'do_not_use'|'missing'|'retired'|'decommissioned';active:boolean;source:'mhelpdesk_api'|'owner_supplied_mhelp_export'|'current_tracker'|'recorded_inventory'|'owner';observedAt:string|null;productIds:string[];sourceRecordIds:string[];representedUnitIds:string[];customer:string|null;sourceAddress:Record<string,unknown>|null;reviewReason:string|null;family?:string;category?:string|null;displayUnitNumber?:string;recordedSourcePlacement?:'field'|'shop'|'unknown';candidateUnitIds?:string[];candidatePlacements?:{unitId:string;unitNumber:string;placement:'field'|'shop'|'unknown';source:string;observedAt:string|null}[]};
 export type RecordedRoster={contract:'COS_COMBINED_FLEET_ROSTER_V1';items:RecordedEquipment[];summary:Record<string,number>;countBasis:'equipment_records_with_reviewed_cross_source_links';physicalDeduplication:'incomplete'};
 const text=(value:unknown,max=512)=>typeof value==='string'&&value.length<=max;
 const strings=(value:unknown)=>Array.isArray(value)&&value.length<=1001&&value.every(v=>text(v,180));
@@ -35,9 +36,10 @@ export function readRecordedRoster(value:unknown,inventory?:DashboardUnit[]):{ro
 export const recordedFamily=(r:RecordedEquipment)=>canonicalCameraUnit(r.unitNumber)?.split('|')[0]||r.family||r.category||'Other equipment';
 export const recordedSourceLabel=(r:RecordedEquipment)=>({mhelpdesk_api:'MHelp API',owner_supplied_mhelp_export:'MHelp export',current_tracker:'2027 tracker',recorded_inventory:'Recorded inventory',owner:'Owner record'}[r.source]);
 /** Non-UUID source rows stay outside camera classification and native write actions. */
-export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map'){
+export function filterSourceEquipment(items:RecordedEquipment[],filters:FleetFilters,view='map',now=Date.now()){
+ const status=(r:RecordedEquipment)=>r.ownerControl?.active?(ownerConnection(r.ownerControl,now)?.status||'unknown'):'unknown';
  const q=filters.query.trim().toLowerCase();
  return items.filter(r=>(view!=='cameras'||!isSupportEquipment({id:r.id,unitNumber:r.unitNumber,modelName:r.category||r.family||''}))&&r.kind!=='unit'&&(view!=='helios'||recordedFamily(r)==='HELIOS')&&(view!=='stands'||isSupportEquipment({id:r.id,unitNumber:r.unitNumber,modelName:r.category||r.family||''}))&&(view!=='setup'||r.active&&r.placement==='field')&&(filters.retired||r.active)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||recordedFamily(r)===filters.family)&&(filters.provider==='all'||filters.provider==='Unlinked equipment')
   &&(!q||[r.unitNumber,r.displayUnitNumber,r.customer,recordedAddressText(r.sourceAddress),r.category,...r.productIds].filter(Boolean).join(' ').toLowerCase().includes(q))
-  &&['all','unknown'].includes(filters.status)&&!filters.nearbyId&&(!filters.installationStatus||filters.installationStatus==='all')&&view!=='verify');
+  &&(filters.status==='all'||filters.status===status(r)||filters.status==='operational'&&['online','offline'].includes(status(r)))&&!filters.nearbyId&&(!filters.installationStatus||filters.installationStatus==='all')&&view!=='verify');
 }

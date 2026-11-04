@@ -24,7 +24,7 @@ async function mount(page,{mode='valid'}={}){
  if(mode==='mismatch')job.unitLink.jobId=TASK;
  if(mode==='newer')job.unitLink.fleetAsOf='2026-10-06T18:01:00Z';
  const board={jobs:[job,visit],tasks:[task],readiness:[],asOf};const control={fail:false};
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   const r=route.request();if(r.method()==='OPTIONS')return route.fallback();const request=r.postDataJSON();
   if(request.method!=='GET'){state.calls.push(request);return route.abort('blockedbyclient');}
   if(request.path!=='/api/daily-board'&&request.path!=='/api/tv-board/settings')return route.fallback();

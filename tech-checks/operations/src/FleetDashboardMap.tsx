@@ -78,9 +78,9 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    let name:string,label:string,html:string,health:ReticleState,classes:string,member:CompactMapMember;
    if(item.kind==='address'){
     const address=item.pin,status=addressGroupHealth([address],mhelpAddressHealth||new Map());health=status.state==='mixed'?'unknown':status.state;name=address.unitNumber;
-    label=name+' · Product '+address.productId+' · '+addressPinStatusLabel(status.counts)+' · MHelp address: '+address.address;
+    label=name+' · Product '+address.productId+' · '+addressPinStatusLabel(status.counts)+' · '+(address.ownerManaged?'Owner address: ':'MHelp address: ')+address.address;
     html=fleetAddressPinMarkup(name,health);classes='cos-mhelp-address-marker';
-    member={key:'mhelp:'+address.productId,label:name+' · Product '+address.productId,health,site:address.customer,address:address.address,locationLabel:'MHelp customer address · not GPS',productId:address.productId,select:()=>{if(!picker.current){instance.closePopup();setGroupDetails(null);selectAddress.current?.(address.productId);}}};
+    member={key:'mhelp:'+address.productId,label:name+' · Product '+address.productId,health,site:address.customer,address:address.address,locationLabel:address.ownerManaged?'Owner map location · not live GPS':'MHelp customer address · not GPS',productId:address.productId,select:()=>{if(!picker.current){instance.closePopup();setGroupDetails(null);selectAddress.current?.(address.productId);}}};
    }else if(item.pin.kind==='source_equipment_estimate'){
     const source=item.pin.record;name=source.displayUnitNumber||source.unitNumber;health='unknown';label=name+' · Unlinked equipment · Estimated address · MHelp address: '+recordedAddressText(source.sourceAddress);
     html=fleetSourcePinMarkup(name);classes='cos-dashboard-marker cos-field-pin-wrap cos-source-equipment-marker';

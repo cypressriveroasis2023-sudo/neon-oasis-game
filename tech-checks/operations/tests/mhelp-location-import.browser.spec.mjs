@@ -4,7 +4,7 @@ async function mount(page){
  const calls=[],state={delay:null,deny:false};
  await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  await page.route(origin+'/location-import-fixture',route=>route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/?locationImport=1&locationUnit=Helios%20010&locationNonce=${nonce}"></iframe><script>window.exports=[];addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin);if(e.data.type==='COS_MHELP_LOCATION_EXPORT')exports.push(e.data);});</script>`}));
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();calls.push(request);const {delay,deny}=state;if(delay)await delay;

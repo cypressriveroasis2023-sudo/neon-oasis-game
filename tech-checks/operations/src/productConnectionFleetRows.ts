@@ -11,8 +11,8 @@ export function productConnectionFleetRows(
  const byUnitId=new Map<string,FieldProduct[]>();
  for(const product of products.items){
   const evidence=product.evidence;
-  if(!product.unitId||!evidence||!['exact_product_id_tracker_endpoint','product_id_connection_unavailable'].includes(evidence?.association||'')||evidence.basis!=='connection')continue;
-  const known=evidence.association==='exact_product_id_tracker_endpoint'&&['online','offline'].includes(product.state)
+  if(!product.unitId||!evidence||!['exact_product_id_tracker_endpoint','product_id_connection_unavailable','owner_product_endpoint'].includes(evidence?.association||'')||evidence.basis!=='connection')continue;
+  const known=['exact_product_id_tracker_endpoint','owner_product_endpoint'].includes(evidence.association||'')&&['online','offline'].includes(product.state)
    &&evidence.observations.length===1&&evidence.observations[0].fresh===true
    &&evidence.observations[0].currentState===product.state;
   const unresolved=product.state==='unverified'&&evidence.gap==='no_current_reading'
@@ -41,9 +41,9 @@ export function productConnectionUnitDetail(
 ):UnitCameraHealth|null{
  if(!original||!unitId||original.state==='support')return original;
  const claims=products.filter(product=>product.unitId===unitId&&product.evidence
-   &&['exact_product_id_tracker_endpoint','product_id_connection_unavailable'].includes(product.evidence?.association||'')
+   &&['exact_product_id_tracker_endpoint','product_id_connection_unavailable','owner_product_endpoint'].includes(product.evidence?.association||'')
    &&product.evidence.basis==='connection'
-   &&(product.evidence.association==='exact_product_id_tracker_endpoint'&&(product.state==='online'||product.state==='offline')
+   &&(['exact_product_id_tracker_endpoint','owner_product_endpoint'].includes(product.evidence.association||'')&&(product.state==='online'||product.state==='offline')
      ||product.state==='unverified'&&product.evidence.gap==='no_current_reading'));
  if(claims.length!==1)return original;
  const product=claims[0],status=product.state==='unverified'?'unknown':product.state as 'online'|'offline';

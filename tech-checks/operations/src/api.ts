@@ -15,6 +15,8 @@ export class OperationsApiError extends Error {
   }
 }
 const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+const ownerEndpoint=endpoint.replace(/cos-operations-pages$/,'cos-owner-equipment');
+const ownerRoute=(path:string)=>path.startsWith('/api/owner-equipment/')||['/api/field-map','/api/fleet-map-source','/api/product-connections','/api/product-connections/verify'].includes(path);
 type ParentSession = { token: string; role: string };
 // Only reviewed snapshot routes may share a pending read. A logical GET alone
 // is not enough: new routes can perform work or have independent-read semantics.
@@ -114,7 +116,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
     try { return await sendRequest<T>(method, path, session.token, body, options?.signal); }
     finally { clearSharedReads(); }
   }
-  if (!sharedReadPaths.has(path)) return sendRequest<T>(method, path, session.token, body);
+  if (!sharedReadPaths.has(path)) return sendRequest<T>(method, path, session.token, body, options?.signal);
   const key = JSON.stringify([session.token, session.role, mode, path]);
   const existing = pendingReads.get(key);
   if (existing) return existing;
@@ -133,7 +135,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   // Saved map reads can exceed 30s. Owner actions have a75s native admission
   // bound including authentication. These are observation limits, never retry grants.
   const connectionCheck = method === 'POST' && /^\/api\/camera-health\/devices\/[0-9]+\/check$/.test(path);
-  const timeoutMs = method==='POST'&&path==='/api/product-connections/verify' ? 100000 : connectionCheck ? 60000 : ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
+  const timeoutMs = method==='POST'&&path.startsWith('/api/owner-equipment/')&&path.endsWith('/check') ? 90000 : method==='POST'&&path==='/api/product-connections/verify' ? 100000 : connectionCheck ? 60000 : ownerAction ? 120000 : method === 'GET' && path === '/api/field-map' ? 90000 : 30000;
   const controller = new AbortController();
   let abortKind: 'timeout' | 'cancelled' | null = null;
   const cancel = () => { abortKind ??= 'cancelled'; controller.abort(); };
@@ -152,7 +154,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   try {
     let response: Response;
     try {
-      response = await fetch(endpoint, {
+      response = await fetch(ownerRoute(path)?ownerEndpoint:endpoint, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, method, body: body ?? null }),
@@ -338,7 +340,7 @@ export const api = {
   },
   // Capture before asynchronous draft preparation, not after it has already crossed a session boundary.
   captureSession: () => { const revision=privateSessionRevision; return () => revision===privateSessionRevision; },
-  get: <T = any>(path: string) => request<T>('GET', path),
+  get: <T = any>(path: string, options?: {signal?:AbortSignal}) => request<T>('GET', path, undefined, options),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
   fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,
   fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{

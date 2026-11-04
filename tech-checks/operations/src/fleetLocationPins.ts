@@ -20,7 +20,7 @@ export const fleetLocationPinId=(pin:FleetMapPin)=>pin.kind==='source_equipment_
 /** Source records retain their own identities and never become native equipment units. */
 export async function sourceEquipmentLocationPins(records:RecordedEquipment[],envelope:unknown,receiptBinding:unknown,now=Date.now()):Promise<SourceEquipmentLocationPin[]>{
  const ids=new Map<string,number>();for(const record of records)ids.set(record.id,(ids.get(record.id)||0)+1);
- const values=await Promise.all(records.filter(record=>ids.get(record.id)===1&&record.kind==='source_equipment'&&record.active&&record.lifecycle==='active'&&record.placement==='field').map(async record=>{
+ const values=await Promise.all(records.filter(record=>ids.get(record.id)===1&&record.kind==='source_equipment'&&!record.ownerControl?.active&&record.active&&record.lifecycle==='active'&&record.placement==='field').map(async record=>{
   const estimate=await checkedSourceEquipmentEstimate(record,envelope,receiptBinding,now).catch(()=>null);
   return estimate?{record,point:[estimate.latitude,estimate.longitude] as [number,number],kind:'source_equipment_estimate' as const,estimate}:null;
  }));

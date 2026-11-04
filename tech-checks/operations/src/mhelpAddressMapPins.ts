@@ -1,15 +1,16 @@
+import {ownerAddressPins} from './ownerEquipmentCore';
 import {compareAddress,parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
 /** Strict client boundary for MHelpDesk address pins.
  * Field/Shop comes from the current imported Product ID, NEVER GPS status or
  * a camera/provider identity. Address pin is not installation verification.
  */
-export type MhelpAddressMapPin={
+export type MhelpAddressMapPin={ownerManaged?:boolean;
   id:string;productId:string;unitNumber:string;customer:string;category:string;
   address:string;matchedAddress:string;point:[number,number];provider:string;geocodedAt:string;lookupAddress:string;lifecycle:string;placementHeld:boolean;
   state:'matched'|'address_review';verified:false;liveGps:false;
 };
 export type MhelpAddressMapReview={
-  id:string;productId:string;unitNumber:string;customer:string;category:string;
+  ownerManaged?:boolean;id:string;productId:string;unitNumber:string;customer:string;category:string;
   address:string;reason:string;lifecycle:string;placementHeld:boolean;state:'no_match'|'invalid_address';
 };
 export type MhelpAddressMapResult={
@@ -22,6 +23,7 @@ const object=(v:unknown):v is Obj=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const text=(v:unknown,max=600):v is string=>typeof v==='string'&&v.length<=max&& !/[\x00-\x1f\x7f<>]/.test(v);
 const hash=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 export const mhelpAddressProviderLabel=(provider:string):string=>({
+ owner_manual:'Owner map location · not live GPS',
  us_census_address_range:'US Census address range',
  geocodio:'Geocodio saved address result',
  municipal_address_point:'Municipal address point',
@@ -40,6 +42,9 @@ const validState=(s:unknown):s is MhelpAddressMapPin['state']|'no_match'|'invali
  ['matched','address_review','no_match','invalid_address'].includes(String(s));
 /** Every accepted file supplies its own complete Field/Shop membership proof. */
 export function readMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now()):MhelpAddressMapResult|null{
+ const h=head as any;return ownerAddressPins(readSourceMhelpAddressMapPins(raw,h?.ownerAddressSourceInventory||head,now),head);
+}
+function readSourceMhelpAddressMapPins(raw:unknown,head:unknown,now=Date.now()):MhelpAddressMapResult|null{
  if(raw===undefined||raw===null)return null;
  if(!object(raw)||!object(head)||raw.contract!=='COS_MHELP_CENSUS_ADDRESS_MAP_V1'
   ||!hash(raw.sourceSha256)||!hash(raw.payloadSha256)

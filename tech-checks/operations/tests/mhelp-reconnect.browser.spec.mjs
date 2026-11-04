@@ -6,7 +6,7 @@ async function mount(page,{role='owner',openAdvanced=true,inventory=null}={}){
  const calls=[],state={fail:false,delay:null,saved:false,bad:false,errors:[],inventory,mapFailed:false};page.on('pageerror',error=>state.errors.push(error.message));
  await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  await page.route(origin+'/reconnect-fixture',route=>route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style><iframe src="/${role==='it'?'?mode=fleet':''}#unit-tracker"></iframe><script>window.holdTokenReplies=false;window.pendingTokenReply=null;window.tokenValue='synthetic-only';addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST'){const respond=()=>e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${role}',accessToken:window.tokenValue},location.origin);if(window.holdTokenReplies)window.pendingTokenReply=respond;else respond();}})</script>`}));
- await page.route('**/functions/v1/cos-operations-pages',async route=>{
+ await page.route('**/functions/v1/cos-*',async route=>{
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();calls.push(request);
