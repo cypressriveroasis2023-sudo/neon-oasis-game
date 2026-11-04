@@ -165,15 +165,24 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
   saveFleetReading(browserFleetStorage(),readingKey,reading,saveNow);
   setSavedReading(previous=>previous&&previous.checkedAt>=reading.checkedAt?previous:reading);
  },[readingKey,completedReading,boardData,snapshotNow]);
- useLayoutEffect(()=>{
-  if(!readingKey||!completedReading||!map||!valid.current)return;
-  const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
-  if(checkedAt===null)return;
-  saveFleetPresentation(browserFleetStorage(),readingKey,{
-   checkedAt,fieldMap:map,health:cameras.data,
-   routers,vrm,sourceErrors,
-  },saveNow);
-  if(initialPresentation&&snapshotNow>initialPresentation.checkedAt)setRestoredPresentation(false);
+ useEffect(()=>{
+  if(!readingKey||!completedReading||!map)return;
+  let cancelled=false,attempts=0,timer:number|undefined;
+  const stop=()=>{cancelled=true;window.clearTimeout(timer);};
+  // Only retry this already accepted LOCAL presentation. Never repeat a camera
+  // check, renew its evidence, or write after account/source invalidation.
+  const persist=()=>{
+   if(cancelled)return;
+   const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
+   const saved=valid.current&&checkedAt!==null&&saveFleetPresentation(browserFleetStorage(),readingKey,{
+    checkedAt,fieldMap:map,health:cameras.data,routers,vrm,sourceErrors,
+   },saveNow);
+   if(saved){if(initialPresentation&&snapshotNow>initialPresentation.checkedAt)setRestoredPresentation(false);return;}
+   if(++attempts<3)timer=window.setTimeout(persist,500);
+  };
+  window.addEventListener('cos-private-data-invalidated',stop);
+  persist();
+  return()=>{stop();window.removeEventListener('cos-private-data-invalidated',stop);};
  },[readingKey,completedReading,map,snapshotNow,cameras.data,routers,vrm,sourceErrors,initialPresentation]);
  const effective=failed&&filters.status==='operational'?{...filters,status:'all'}:filters;
  const filteredBase=useMemo(()=>filterFleetDashboard(rows,effective,view),[rows,effective,view]);
