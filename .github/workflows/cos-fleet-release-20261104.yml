@@ -35,7 +35,9 @@ jobs:
         working-directory: tech-checks/operations
         run: |
           set -o pipefail
-          node --import tsx --test tests/fleet-scheduled-reader.test.mjs tests/fleet-scheduled-publisher.test.mjs tests/fleet-backend-provenance.test.mjs tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/fleet-verification-explanations.test.mjs tests/exact-product-connection.test.mjs > ../../repair-evidence/combined/targeted-tests.txt 2>&1
+          files='tests/fleet-scheduled-reader.test.mjs tests/fleet-scheduled-publisher.test.mjs tests/fleet-backend-provenance.spec.mjs tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/fleet-verification-reasons.test.mjs tests/exact-product-connection.test.mjs tests/saved-fleet-reading.test.mjs'
+          for file in $files; do test -f "$file" || exit 1; done
+          node --import tsx --test $files > ../../repair-evidence/combined/targeted-tests.txt 2>&1
       - name: Preserve tested backend candidate
         run: |
           git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs repair-evidence/combined
@@ -58,9 +60,7 @@ jobs:
         working-directory: tech-checks/operations
         run: |
           set +e
-          files=$(find tests -maxdepth 1 -type f \( -name 'fleet-verify-now.browser.spec.mjs' -o -name 'durable-fleet-board.browser.spec.mjs' -o -iname '*reading*browser.spec.mjs' \) | sort)
-          test -n "$files" || exit 1
-          npm run test:browser -- --workers=2 --retries=0 $files > ../../repair-evidence/combined/browser-tests.txt 2>&1
+          npm run test:browser -- --workers=2 --retries=0 tests/fleet-verify-now.browser.spec.mjs tests/durable-fleet-board.browser.spec.mjs tests/fleet-count-retention.browser.spec.mjs > ../../repair-evidence/combined/browser-tests.txt 2>&1
           result=$?
           printf '{"browserTests":%s}\n' "$result" > ../../repair-evidence/combined/browser-results.json
           exit "$result"
