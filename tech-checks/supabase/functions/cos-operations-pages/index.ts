@@ -619,7 +619,8 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
-const commonFleetMapRead=path==='/api/fleet-map-source';if(commonFleetMapRead)path='/api/field-map';
+const commonFleetMapRead = method === "GET" && path === "/api/fleet-map-source";
+      if (commonFleetMapRead) path = "/api/field-map";
 const savedHistoryMatch=/^\/api\/fleet-saved-board\/history\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.exec(path);
 if(method==='GET'&&savedHistoryMatch)return json(await rpc('cos_fleet_board_history',{p_run:savedHistoryMatch[1]}));
 if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){

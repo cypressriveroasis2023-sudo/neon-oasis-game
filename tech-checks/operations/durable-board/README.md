@@ -16,7 +16,7 @@ Rebuild the deployed pure projection/runtime module with the locked esbuild depe
 
     node node_modules/esbuild/bin/esbuild durable-board/index.ts --bundle --platform=neutral --format=esm --resolve-extensions=.ts,.mjs,.js,.tsx,.json --outfile=../supabase/functions/cos-operations-pages/savedFleetBoard.mjs
 
-Matched deployed function source is archived in `tech-checks/docs/deployed-cos-operations-pages-v150/source`. The database install is `db/fleet-durable-board-install.sql`. Keep deployment source and canonical `index.ts` / `fleetAccess.ts` changes together. The earlier completed-snapshot log remains intact; 48 historical entries were copied as historical count/unit logs without activating an obsolete board as current.
+Matched deployed function source is archived in `tech-checks/docs/deployed-cos-operations-pages-v151/source`. The database install is `db/fleet-durable-board-install.sql`. Keep deployment source and canonical `index.ts` / `fleetAccess.ts` changes together. The earlier completed-snapshot log remains intact; 48 historical entries were copied as historical count/unit logs without activating an obsolete board as current.
 
 Roll back the client capability flag to the previous source path if needed. Preserve the private history tables; do not delete recorded runs. The backend's new routes can remain unused during a frontend rollback.
 

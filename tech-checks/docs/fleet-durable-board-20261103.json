@@ -3,7 +3,7 @@
   "baseCommit": "354b83f0bd9e03f6f4f3037aa9ef227d5ac23012",
   "backendProject": "tughscoxralhofrckvxy",
   "backendFunction": "cos-operations-pages",
-  "backendVersion": 150,
+  "backendVersion": 151,
   "migration": [
     "cos_durable_fleet_board",
     "cos_fleet_board_forced_refresh_queue",
@@ -22,7 +22,8 @@
     "firstProductionAttempt": "CPUTime termination; no board published; recorded failed",
     "scale": "925 records / 739 resources; pure-model outputs retained, CPU test below 1500ms",
     "scaleTests": 2,
-    "releaseRegressionTests": 186
+    "releaseRegressionTests": 186,
+    "firstPostCpuFixAttempt": "Shared map route returned 404; dispatch corrected in v151"
   },
   "boundaries": {
     "source": "mHelp Product IDs and placements; exact 2027 tracker connection authority",
@@ -31,5 +32,5 @@
     "storage": "private service-only invoker functions; original tokens are never persisted",
     "sharedProjection": "committed common Owner/approved IT map only; Owner pending geocode previews excluded and publication guarded in SQL"
   },
-  "backendArtifactSha256": "6ad8a5120748713b88825a0f05b892f8c46976428f17fa8b2421c73aaa69ca07"
+  "backendArtifactSha256": "5c51af1f378c47d50a69029124a10c46af3b5fcb4cdf9b0248e7d94a39e28355"
 }
