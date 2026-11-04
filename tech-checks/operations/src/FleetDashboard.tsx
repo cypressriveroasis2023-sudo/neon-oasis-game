@@ -11,7 +11,7 @@ import {connectionDiagnosticText} from './connectionDiagnostics';
 import {manualShopInventory,manualShopAddresses,projectManualShop} from '../../supabase/functions/cos-operations-pages/fleetShopProjection';
 import CameraSweepCoverage from './CameraSweepCoverage';
 import {fleetAddressHealth,addressGroupHealth} from './fleetStatusPins';
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import FleetDashboardMap from './FleetDashboardMap';
 import {fleetLocationPins,sourceEquipmentLocationPins,fleetLocationPinId,fleetLocationCoverage,type FleetMapPin,type SourceEquipmentLocationPin} from './fleetLocationPins';
@@ -152,7 +152,9 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
  // reading. An unrelated provider read failure must not prevent persistence.
  const completedReading=Boolean(connectionSourceReady&&fieldProducts&&boardData&&Number.isFinite(snapshotNow));
  const [savedReading,setSavedReading]=useState(()=>readFleetReading(browserFleetStorage(),readingKey));
- useEffect(()=>{
+ // Commit the accepted display before paint so an immediate reload cannot
+ // observe a successful reading whose local presentation has not been saved.
+ useLayoutEffect(()=>{
   if(!readingKey||!completedReading||!boardData)return;
   const reading={
    checkedAt:Math.trunc(snapshotNow),field:boardData.field,shop:boardData.shop,
@@ -161,7 +163,7 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
   saveFleetReading(browserFleetStorage(),readingKey,reading);
   setSavedReading(previous=>previous&&previous.checkedAt>=reading.checkedAt?previous:reading);
  },[readingKey,completedReading,boardData,snapshotNow]);
- useEffect(()=>{
+ useLayoutEffect(()=>{
   if(!readingKey||!completedReading||!map||!valid.current)return;
   saveFleetPresentation(browserFleetStorage(),readingKey,{
    checkedAt:Math.floor(snapshotNow),fieldMap:map,health:cameras.data,
