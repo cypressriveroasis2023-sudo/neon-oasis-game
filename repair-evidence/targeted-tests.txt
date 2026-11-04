@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: each batch reaches saved readback before another POST starts
+ok 1 - each batch reaches saved readback before another POST starts
+  ---
+  duration_ms: 2.304605
+  type: 'test'
+  ...
+# Subtest: a failed middle POST is not retried and cannot hide successful batches
+ok 2 - a failed middle POST is not retried and cannot hide successful batches
+  ---
+  duration_ms: 0.560602
+  type: 'test'
+  ...
+# Subtest: a failed final batch still gets a read-only recovery
+ok 3 - a failed final batch still gets a read-only recovery
+  ---
+  duration_ms: 0.318342
+  type: 'test'
+  ...
+# Subtest: display readback failure does not discard returned readings or retry checks
+ok 4 - display readback failure does not discard returned readings or retry checks
+  ---
+  duration_ms: 0.443094
+  type: 'test'
+  ...
+# Subtest: authorization failure stops subsequent batches
+ok 5 - authorization failure stops subsequent batches
+  ---
+  duration_ms: 0.325585
+  type: 'test'
+  ...
+# Subtest: malformed, duplicate, wrong-target, or missing-timestamp results stop safely
+ok 6 - malformed, duplicate, wrong-target, or missing-timestamp results stop safely
+  ---
+  duration_ms: 0.686566
+  type: 'test'
+  ...
+# Subtest: session changes prevent readback and publication of late POST results
+ok 7 - session changes prevent readback and publication of late POST results
+  ---
+  duration_ms: 0.217144
+  type: 'test'
+  ...
+# Subtest: a session change during readback prevents the next POST
+ok 8 - a session change during readback prevents the next POST
+  ---
+  duration_ms: 0.339622
+  type: 'test'
+  ...
+# Subtest: unknown is unresolved, never counted as online, offline or successful setup
+ok 9 - unknown is unresolved, never counted as online, offline or successful setup
+  ---
+  duration_ms: 0.377041
+  type: 'test'
+  ...
+# Subtest: input list changes during readback do not lose selected targets
+ok 10 - input list changes during readback do not lose selected targets
+  ---
+  duration_ms: 0.511591
+  type: 'test'
+  ...
+# Subtest: duplicate products are checked once and batch size remains four
+ok 11 - duplicate products are checked once and batch size remains four
+  ---
+  duration_ms: 0.253602
+  type: 'test'
+  ...
+# Subtest: offline evidence remains offline, not rewritten by the browser
+ok 12 - offline evidence remains offline, not rewritten by the browser
+  ---
+  duration_ms: 0.172762
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 243.739462
