@@ -8,7 +8,7 @@ export type Dependencies={rpc:(name:string,args:Record<string,unknown>,signal:Ab
 function fail(message:string,status=400):never{throw Object.assign(Error(message),{status});}
 export function assertTarget(productId:string,ip:string,controls:any[],tracker:any){
  if(!publicIp(ip)||!tracker||!Array.isArray(tracker.rows)||!Number.isFinite(Date.parse(tracker.observedAt)))fail('Current target ownership cannot be checked.',503);
- const overrides=new Map(controls.filter(c=>checkedControl(c)&&c.active).map(c=>[c.productId,c.settings.publicIp]));
+ const overrides=new Map(controls.filter(c=>checkedControl(c)&&c.active&&c.settings.publicIp).map(c=>[c.productId,c.settings.publicIp]));
  const other=tracker.rows.filter((r:any)=>r.productId!==productId&&(r.productId&&overrides.has(r.productId)?overrides.get(r.productId):r.ip)===ip);
  if(other.length||controls.some(c=>checkedControl(c)&&c.active&&c.productId!==productId&&c.settings.publicIp===ip))fail('Another equipment record claims this IP. Correct its assignment before checking this target.',409);
 }
@@ -69,7 +69,7 @@ export function createOwnerHandler(d:Dependencies){
    if(path==='/api/product-connections/verify'&&method==='POST'){
     await authenticate(auth,signal,false);
     if(!body||Object.keys(body).join(',')!=='productIds'||!Array.isArray(body.productIds)||!body.productIds.length||body.productIds.length>16||new Set(body.productIds).size!==body.productIds.length||body.productIds.some((id:any)=>typeof id!=='string'||!/^[1-9][0-9]{0,14}$/.test(id)))fail('Select 1 to 16 distinct equipment Product IDs.');
-    const controls=await d.rpc('cos_owner_equipment_list_v1',{},signal),owned=body.productIds.filter((id:string)=>controls.some((c:any)=>c.productId===id&&c.active));
+    const controls=await d.rpc('cos_owner_equipment_list_v1',{},signal),owned=body.productIds.filter((id:string)=>controls.some((c:any)=>c.productId===id&&c.active&&(c.settings.publicIp||c.settings.ports.length||c.settings.monitoringEnabled)));
     if(!owned.length){const r=await upstream(auth,path,method,body,signal);return json(await r.json(),r.status);}
     const other=body.productIds.filter((id:string)=>!owned.includes(id));let receipt:any=null;const verdicts:any[]=[];
     const existing=other.length?(async()=>{const r=await upstream(auth,path,method,{productIds:other},signal);const v=await r.json();if(r.ok&&v.contract==='COS_VERIFY_PRODUCTS_NOW_V1'){receipt=v.connections;verdicts.push(...v.items);}else verdicts.push(...other.map((id:string)=>({productId:id,status:'unknown',checkedAt:null,reason:'The existing camera checker could not complete. Previously saved results were retained.'})));})().catch(()=>{verdicts.push(...other.filter((id:string)=>!verdicts.some(v=>v.productId===id)).map((id:string)=>({productId:id,status:'unknown',checkedAt:null,reason:'The existing camera checker could not complete. Previous saved readings were retained.'})));}):Promise.resolve();

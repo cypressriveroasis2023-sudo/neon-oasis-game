@@ -147,7 +147,7 @@ function fail(message, status = 400) {
 }
 function assertTarget(productId, ip, controls, tracker2) {
   if (!publicIp(ip) || !tracker2 || !Array.isArray(tracker2.rows) || !Number.isFinite(Date.parse(tracker2.observedAt))) fail("Current target ownership cannot be checked.", 503);
-  const overrides = new Map(controls.filter((c) => checkedControl(c) && c.active).map((c) => [c.productId, c.settings.publicIp]));
+  const overrides = new Map(controls.filter((c) => checkedControl(c) && c.active && c.settings.publicIp).map((c) => [c.productId, c.settings.publicIp]));
   const other = tracker2.rows.filter((r) => r.productId !== productId && (r.productId && overrides.has(r.productId) ? overrides.get(r.productId) : r.ip) === ip);
   if (other.length || controls.some((c) => checkedControl(c) && c.active && c.productId !== productId && c.settings.publicIp === ip)) fail("Another equipment record claims this IP. Correct its assignment before checking this target.", 409);
 }
@@ -243,7 +243,7 @@ function createOwnerHandler(d) {
       if (path === "/api/product-connections/verify" && method === "POST") {
         await authenticate(auth, signal, false);
         if (!body || Object.keys(body).join(",") !== "productIds" || !Array.isArray(body.productIds) || !body.productIds.length || body.productIds.length > 16 || new Set(body.productIds).size !== body.productIds.length || body.productIds.some((id) => typeof id !== "string" || !/^[1-9][0-9]{0,14}$/.test(id))) fail("Select 1 to 16 distinct equipment Product IDs.");
-        const controls = await d.rpc("cos_owner_equipment_list_v1", {}, signal), owned = body.productIds.filter((id) => controls.some((c) => c.productId === id && c.active));
+        const controls = await d.rpc("cos_owner_equipment_list_v1", {}, signal), owned = body.productIds.filter((id) => controls.some((c) => c.productId === id && c.active && (c.settings.publicIp || c.settings.ports.length || c.settings.monitoringEnabled)));
         if (!owned.length) {
           const r = await upstream(auth, path, method, body, signal);
           return json(await r.json(), r.status);
