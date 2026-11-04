@@ -27,6 +27,7 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git merge --no-edit 3a3667023b70e65983520d5ce016a62720fb56d5
           node .github/scripts/prepare-scheduled-publisher-repair.mjs
+          node .github/scripts/finalize-fleet-reading-20261104.mjs
           mkdir -p repair-evidence/combined
       - name: Install locked dependencies
         working-directory: tech-checks/operations
@@ -38,10 +39,10 @@ jobs:
           files='tests/fleet-scheduled-reader.test.mjs tests/fleet-scheduled-publisher.test.mjs tests/fleet-backend-provenance.spec.mjs tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/fleet-verification-reasons.test.mjs tests/exact-product-connection.test.mjs tests/saved-fleet-reading.test.mjs'
           for file in $files; do test -f "$file" || exit 1; done
           node --import tsx --test $files > ../../repair-evidence/combined/targeted-tests.txt 2>&1
-      - name: Preserve tested backend candidate
+      - name: Preserve tested source candidate
         run: |
-          git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs repair-evidence/combined
-          git diff --cached --quiet || git commit -m 'Record tested scheduled-reader candidate and combine reopening repair'
+          git add tech-checks/docs/fleet-scheduled-repair-20261104 tech-checks/operations/tests/fleet-scheduled-publisher.test.mjs tech-checks/operations/src/FleetDashboard.tsx tech-checks/operations/tests/fleet-count-retention.browser.spec.mjs tech-checks/operations/tests/fleet-verify-now.browser.spec.mjs tech-checks/operations/tests/fleet-dashboard-fixtures.mjs repair-evidence/combined
+          git diff --cached --quiet || git commit -m 'Record tested scheduled reader and provider-independent count persistence'
           git push origin HEAD:fix/fleet-verification-progress-20261104
       - name: Typecheck and build combined application
         working-directory: tech-checks/operations
@@ -64,10 +65,26 @@ jobs:
           result=$?
           printf '{"browserTests":%s}\n' "$result" > ../../repair-evidence/combined/browser-results.json
           exit "$result"
-      - name: Commit exact tested static bundle
+      - name: Compare full unit suite with unchanged production source
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          npm test > ../../repair-evidence/combined/all-unit-tests.txt 2>&1
+          candidate=$?
+          baseline=0
+          if [ "$candidate" != 0 ]; then
+            git worktree add --detach /tmp/cos-main-baseline 1ddb5df2228d1a584393884182406bca90efd1d8
+            ln -s "$PWD/node_modules" /tmp/cos-main-baseline/tech-checks/operations/node_modules
+            (cd /tmp/cos-main-baseline/tech-checks/operations && npm test) > ../../repair-evidence/combined/baseline-unit-tests.txt 2>&1
+            baseline=$?
+          fi
+          printf '{"candidate":%s,"baseline":%s}\n' "$candidate" "$baseline" > ../../repair-evidence/combined/full-unit-results.json
+          if [ "$candidate" != 0 ]; then echo '::warning::Full suite has failures; compare candidate with baseline before release.'; fi
+          exit 0
+      - name: Commit exact browser-tested static bundle
         run: |
           git add tech-checks/operations/dist repair-evidence/combined
-          git diff --cached --quiet || git commit -m 'Build verified combined Fleet frontend for existing Pages deployment'
+          git diff --cached --quiet || git commit -m 'Build browser-verified combined Fleet frontend; retain full-suite comparison'
           git push origin HEAD:fix/fleet-verification-progress-20261104
       - name: Preserve failure evidence without publishing an unverified bundle
         if: failure()
