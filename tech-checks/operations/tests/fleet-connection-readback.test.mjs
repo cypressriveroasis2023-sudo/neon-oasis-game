@@ -19,6 +19,7 @@ test('failed same-source refresh preserves completed results but changed invento
  const old={...map(sha),productConnectionsState:'ready'};
  const failed={...map(sha,at+60000),productConnections:null,productConnectionsState:'timeout'};
  assert.equal(preferredFleetMap(old,failed),old);
+ assert.equal(preferredFleetMap(failed,old),old);
  const changed={...failed,uploadInventory:{...failed.uploadInventory,sourceSha256:other}};
  assert.equal(preferredFleetMap(old,changed),changed);
  const completed={...failed,productConnections:receipt(sha),productConnectionsState:'ready'};

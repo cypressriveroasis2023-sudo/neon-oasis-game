@@ -1,3 +1,4 @@
+import {retainCompletedConnectionMap} from './snapshotRetention';
 import ViewErrorBoundary from './ViewErrorBoundary';
 import SavedFleetHistory from './SavedFleetHistory';
 import {usesDurableFleetBoard} from './api';
@@ -96,7 +97,7 @@ export default function FleetDashboard({openMhelpConnection,entryRevision=0,init
   if(request===revision.current){running.current=false;if(valid.current)setSourceLoading(false);}
 
  },[session]);
- const readMap=useCallback(async(force=false)=>{lastMapRead.current=Date.now();const request=++mapRevision.current;try{const map=await api.fleetConnectionMap(force);if(valid.current&&request===mapRevision.current){setMapSnapshot({...map,clientReadAt:Date.now()} as typeof map);setMapError('');}}catch(e){if(valid.current&&request===mapRevision.current)setMapError(e instanceof Error?e.message:'Placement data unavailable');}},[]);
+ const readMap=useCallback(async(force=false)=>{lastMapRead.current=Date.now();const request=++mapRevision.current;try{const map=await api.fleetConnectionMap(force);if(valid.current&&request===mapRevision.current){const received={...map,clientReadAt:Date.now()} as typeof map;setMapSnapshot(previous=>retainCompletedConnectionMap(previous,received)?previous:received);setMapError('');}}catch(e){if(valid.current&&request===mapRevision.current)setMapError(e instanceof Error?e.message:'Placement data unavailable');}},[]);
  useEffect(()=>{valid.current=true;let active=true;queueMicrotask(()=>{if(active){void sources();void readMap();}});const tick=()=>{setClock(new Date());if(automaticRefreshDue(lastSourceRead.current,Date.now(),document.hidden))void sources();if(automaticRefreshDue(lastMapRead.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void readMap();};const timer=window.setInterval(tick,60000);const visible=()=>{if(!document.hidden)tick();};document.addEventListener('visibilitychange',visible);const clear=()=>{valid.current=false;revision.current++;mapRevision.current++;running.current=false;setRouters(null);setVrm(null);setMapSnapshot(null);setSavedShop([]);setSelectedMhelpProductId('');setSelected('');setSelectedSourceId('');setSourceLoading(false);setSourceErrors({session:'Your session changed. Reload COS Operations.'});};window.addEventListener('cos-private-data-invalidated',clear);return()=>{active=false;valid.current=false;revision.current++;mapRevision.current++;running.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('cos-private-data-invalidated',clear);};},[sources,readMap]);
  const [savedShop,setSavedShop]=useState<any[]>([]);
  const [verifiedConnections,setVerifiedConnections]=useState<any>(null);
