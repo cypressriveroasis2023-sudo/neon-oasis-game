@@ -1,4 +1,4 @@
-import {browserFleetStorage,readFleetPresentation,saveFleetPresentation,type SavedFleetPresentation} from './savedFleetPresentation';
+import {browserFleetStorage,readFleetPresentation,saveFleetPresentation,fleetDisplaySaveTime,type SavedFleetPresentation} from './savedFleetPresentation';
 import {fleetReadingKey,readFleetReading,saveFleetReading} from './savedFleetReading';
 import {retainCompletedConnectionMap} from './snapshotRetention';
 import ViewErrorBoundary from './ViewErrorBoundary';
@@ -156,19 +156,23 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
  // observe a successful reading whose local presentation has not been saved.
  useLayoutEffect(()=>{
   if(!readingKey||!completedReading||!boardData)return;
+  const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
+  if(checkedAt===null)return;
   const reading={
-   checkedAt:Math.trunc(snapshotNow),field:boardData.field,shop:boardData.shop,
+   checkedAt,field:boardData.field,shop:boardData.shop,
    online:boardData.counts.online,offline:boardData.counts.offline,unverified:boardData.counts.unverified,
   };
-  saveFleetReading(browserFleetStorage(),readingKey,reading);
+  saveFleetReading(browserFleetStorage(),readingKey,reading,saveNow);
   setSavedReading(previous=>previous&&previous.checkedAt>=reading.checkedAt?previous:reading);
  },[readingKey,completedReading,boardData,snapshotNow]);
  useLayoutEffect(()=>{
   if(!readingKey||!completedReading||!map||!valid.current)return;
+  const saveNow=Date.now(),checkedAt=fleetDisplaySaveTime(snapshotNow,saveNow);
+  if(checkedAt===null)return;
   saveFleetPresentation(browserFleetStorage(),readingKey,{
-   checkedAt:Math.floor(snapshotNow),fieldMap:map,health:cameras.data,
+   checkedAt,fieldMap:map,health:cameras.data,
    routers,vrm,sourceErrors,
-  });
+  },saveNow);
   if(initialPresentation&&snapshotNow>initialPresentation.checkedAt)setRestoredPresentation(false);
  },[readingKey,completedReading,map,snapshotNow,cameras.data,routers,vrm,sourceErrors,initialPresentation]);
  const effective=failed&&filters.status==='operational'?{...filters,status:'all'}:filters;
