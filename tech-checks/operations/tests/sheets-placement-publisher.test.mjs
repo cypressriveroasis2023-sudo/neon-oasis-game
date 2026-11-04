@@ -76,3 +76,15 @@ test('only otherwise writable stale changes request evidence; manual corrections
  assert.deepEqual(publisherRefreshCandidates([stale],[{...row,cells:[base[0],base[1],cell('Manual correction'),base[3]]}]),[]);
  assert.deepEqual(publisherRefreshCandidates([stale],[{...row,unique:false}]),[]);
 });
+
+test('completed publisher returns aggregate hold reasons without row or customer details',async()=>{
+ let writes=0;
+ const h=createPublisherHandler({authenticate:async()=>true,
+ rpc:async(name)=>name.endsWith('begin')?{leaseId:'lease',bindings:[{...binding,sourceCurrent:false},{...binding,equipmentId:'456',row:3}]}:name.endsWith('finish')?{committed:true,held:2}:assert.fail(name),
+ read:async()=>[row,{...row,row:3,label:'Different identity'}],write:async()=>{writes++;}});
+ const result=await (await h(request())).json();
+ assert.equal(writes,0);assert.equal(result.held,2);
+ assert.deepEqual(result.heldReasons,{source_refresh_requested:1,sheet_identity_changed:1});
+ assert.equal(Object.values(result.heldReasons).reduce((a,b)=>a+b,0),2);
+ assert.doesNotMatch(JSON.stringify(result),/123|456|Spotter|Synthetic|Cameras Onsite/);
+});
