@@ -1,0 +1,87 @@
+name: COS Fleet repair check
+on:
+  push:
+    branches: [fix/fleet-verification-progress-20261104]
+    paths:
+      - '.github/workflows/cos-fleet-repair-check.yml'
+      - '.github/scripts/fleet-source-repair*'
+      - 'tech-checks/operations/src/**'
+      - 'tech-checks/operations/tests/fleet-verification-progress*'
+permissions:
+  contents: write
+concurrency:
+  group: cos-fleet-repair-check
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fleet-verification-progress-20261104
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Prepare evidence
+        run: mkdir -p repair-evidence
+      - name: Read-only live artifact preflight
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const report={at:new Date().toISOString(),credentialAvailable:!!process.env.SUPABASE_ACCESS_TOKEN,functions:[]};
+          if(process.env.SUPABASE_ACCESS_TOKEN)for(const slug of ['cos-sheets-placement-publish','cos-operations-pages']){
+            const base='https://api.supabase.com/v1/projects/tughscoxralhofrckvxy/functions/'+slug;
+            const headers={Authorization:'Bearer '+process.env.SUPABASE_ACCESS_TOKEN};
+            try{
+              const r=await fetch(base,{headers,signal:AbortSignal.timeout(30000)});
+              if(!r.ok){report.functions.push({slug,status:r.status});continue;}
+              const m=await r.json(),b=await fetch(base+'/body',{headers,signal:AbortSignal.timeout(30000)});
+              const entry={slug,version:m.version,archive:m.ezbr_sha256,bodyStatus:b.status,contentType:b.headers.get('content-type')};
+              if(b.ok&&b.headers.get('content-type')?.includes('json')){
+                const body=await b.json();
+                entry.files=(body.files||[]).map(f=>({name:f.name,bytes:Buffer.byteLength(f.content),sha256:crypto.createHash('sha256').update(f.content).digest('hex'),csvLabelChecks:f.content.split('^ServiceItem_List_[0-9]{14}\\.csv$').length-1}));
+              }
+              report.functions.push(entry);
+            }catch(e){report.functions.push({slug,error:e.name});}
+          }
+          fs.writeFileSync('repair-evidence/deployment-preflight.json',JSON.stringify(report,null,2)+'\n');
+          NODE
+      - name: Install pinned dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test and build without changing production
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          node --import tsx --test tests/fleet-verification-progress.test.mjs > ../../repair-evidence/targeted-tests.txt 2>&1
+          targeted=$?
+          npm run typecheck > ../../repair-evidence/typecheck.txt 2>&1
+          types=$?
+          npm run build > ../../repair-evidence/build.txt 2>&1
+          build=$?
+          printf '{"targetedTests":%s,"typecheck":%s,"build":%s}\n' "$targeted" "$types" "$build" > ../../repair-evidence/check-results.json
+          exit 0
+      - name: Preserve reviewable build evidence
+        if: always()
+        run: |
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add repair-evidence
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record Fleet repair tests and read-only deployment preflight'
+            git push origin HEAD:fix/fleet-verification-progress-20261104
+          fi
+      - name: Archive exact source for inspection
+        if: always()
+        run: git archive --format=zip HEAD -o /tmp/cos-fleet-repair-source.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-fleet-repair-source
+          path: /tmp/cos-fleet-repair-source.zip
+          retention-days: 3
