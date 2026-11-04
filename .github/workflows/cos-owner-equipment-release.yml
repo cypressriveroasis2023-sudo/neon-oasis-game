@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/cos-owner-equipment-release.yml'
       - '.github/scripts/prepare-owner-equipment-20261104.mjs'
+      - '.github/scripts/owner-equipment-refinements.mjs'
       - 'tech-checks/operations/src/**'
       - 'tech-checks/operations/tests/owner-equipment*'
       - 'tech-checks/operations/db/owner-equipment-controls.sql'
@@ -44,7 +45,10 @@ jobs:
       - name: Prepare integration on exact current source
         run: |
           mkdir -p repair-evidence/owner-editor
-          node .github/scripts/prepare-owner-equipment-20261104.mjs
+          if ! grep -q 'const ownerRoute=' tech-checks/operations/src/api.ts; then
+            node .github/scripts/prepare-owner-equipment-20261104.mjs
+          fi
+          node .github/scripts/owner-equipment-refinements.mjs
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const root='tech-checks/operations/tests/';
@@ -122,7 +126,7 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add repair-evidence/owner-editor
           if [ "$PASS" = success ]; then
-            git add tech-checks/operations/src tech-checks/operations/tests tech-checks/operations/dist
+            git add tech-checks/operations/src tech-checks/operations/tests tech-checks/operations/dist tech-checks/supabase/functions/cos-owner-equipment
           fi
           if ! git diff --cached --quiet; then
             git commit -m 'Record Owner editor validation and gated build evidence'
