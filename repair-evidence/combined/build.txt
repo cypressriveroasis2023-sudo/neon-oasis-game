@@ -1,0 +1,24 @@
+
+> cos-operations-pages@1.0.0 build
+> vite build
+
+[36mvite v6.0.11 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 314 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                               [39m[1m[2m    0.50 kB[22m[1m[22m[2m │ gzip:   0.33 kB[22m
+[2mdist/[22m[2massets/[22m[32mopen-sans-regular-BAbx6DeE.woff   [39m[1m[2m  112.57 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mopen-sans-semibold-BX6hcZqj.woff  [39m[1m[2m  114.98 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mopen-sans-bold-CKNCUI0c.woff      [39m[1m[2m  115.45 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mpdf.worker.min-Dkey6ZUl.mjs       [39m[1m[2m1,321.31 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[35mindex-DMHoyrPr.css                [39m[1m[2m  470.74 kB[22m[1m[22m[2m │ gzip:  82.16 kB[22m
+[2mdist/[22m[2massets/[22m[36mdurableFleetClient-BtnpAGi_.js    [39m[1m[2m    1.69 kB[22m[1m[22m[2m │ gzip:   0.85 kB[22m
+[2mdist/[22m[2massets/[22m[36mpdf-Au7fvAgB.js                   [39m[1m[33m  541.84 kB[39m[22m[2m │ gzip: 164.71 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-B1_ofteG.js                 [39m[1m[33m1,606.47 kB[39m[22m[2m │ gzip: 582.69 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 10.54s[39m
