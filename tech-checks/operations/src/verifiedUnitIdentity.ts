@@ -12,7 +12,18 @@ const object=(value:unknown):value is Record<string,any>=>Boolean(value&&typeof 
 const text=(value:unknown):value is string=>typeof value==='string'&&value.trim()!=='';
 const resourceId=(value:unknown):value is string=>typeof value==='string'&&/^[1-9]\d*$/.test(value);
 const sameSet=(a:string[],b:string[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(x=>b.includes(x));
+// Opt-in for a server-owned immutable batch. Mutable callers retain full
+// validation on every read; prepared inputs cannot change after validation.
+const immutableEnvelopes=new WeakMap<object,VerifiedUnitIdentity[]>();
+export function prepareImmutableIdentityEnvelope<T extends IdentityEnvelope>(value:T):T{
+ validateIdentityEnvelope(value);
+ const seen=new WeakSet<object>();const freeze=(item:any)=>{if(!item||typeof item!=='object'||seen.has(item))return;seen.add(item);for(const child of Object.values(item))freeze(child);Object.freeze(item);};
+ freeze(value);
+ immutableEnvelopes.set(value,Object.freeze([...(value.unitIdentities||[]),...(value.ownerConfirmedUnitIdentities||[]),...(value.reconProviderUnitIdentities||[])]) as unknown as VerifiedUnitIdentity[]);
+ return value;
+}
 export function validateIdentityEnvelope(value:IdentityEnvelope){
+  if(immutableEnvelopes.has(value))return;
   if(value.identityVersion===undefined){if(value.unitIdentities!==undefined||value.identityWarnings!==undefined||value.ownerConfirmedIdentityVersion!==undefined||value.ownerConfirmedUnitIdentities!==undefined||value.reconProviderIdentityVersion!==undefined||value.reconProviderUnitIdentities!==undefined)throw new Error('Equipment identity contract is incomplete.');return;}
   if(value.identityVersion!==1||value.evidenceVersion!==2||!Array.isArray(value.unitIdentities)||value.unitIdentities.length>1000)throw new Error('Equipment identity contract is unavailable.');
   if(value.ownerConfirmedIdentityVersion===undefined?value.ownerConfirmedUnitIdentities!==undefined:value.ownerConfirmedIdentityVersion!==1||!Array.isArray(value.ownerConfirmedUnitIdentities)||value.ownerConfirmedUnitIdentities.length>1000||value.ownerConfirmedUnitIdentities.some(row=>row.kind!=='owner_confirmed_native'))throw new Error('Owner-confirmed identity contract is unavailable.');
@@ -24,7 +35,7 @@ export function validateIdentityEnvelope(value:IdentityEnvelope){
   }
   if(value.identityWarnings!==undefined&&(!Array.isArray(value.identityWarnings)||value.identityWarnings.length>1000||value.identityWarnings.some(row=>!object(row)||!text(row.unitId)||!text(row.reason)||(row.deviceIds!==undefined&&(!Array.isArray(row.deviceIds)||!row.deviceIds.every(resourceId)))||(row.unitKeys!==undefined&&(!Array.isArray(row.unitKeys)||!row.unitKeys.every(text))))))throw new Error('Equipment identity warnings are malformed.');
 }
-export function allVerifiedUnitIdentities(value:IdentityEnvelope):VerifiedUnitIdentity[]{validateIdentityEnvelope(value);return [...(value.unitIdentities||[]),...(value.ownerConfirmedUnitIdentities||[]),...(value.reconProviderUnitIdentities||[])];}
+export function allVerifiedUnitIdentities(value:IdentityEnvelope):VerifiedUnitIdentity[]{const prepared=immutableEnvelopes.get(value);if(prepared)return prepared;validateIdentityEnvelope(value);return [...(value.unitIdentities||[]),...(value.ownerConfirmedUnitIdentities||[]),...(value.reconProviderUnitIdentities||[])];}
 function resolve(identity:VerifiedUnitIdentity,health:IdentityEnvelope,now=Date.now()):IdentityResolution{
   const fail=(reason:string):IdentityResolution=>({state:'conflict',reason});
   const identities=allVerifiedUnitIdentities(health);

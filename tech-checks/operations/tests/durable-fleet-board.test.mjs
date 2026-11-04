@@ -22,12 +22,13 @@ test('refresh returns the stored board while a bounded background batch runs; fa
  assert.equal(response.latest.payload.old,true);assert.equal(calls.includes('cos_fleet_board_finish'),false);release();await tasks[0];assert.equal(calls.at(-1),'cos_fleet_board_fail');
 });
 test('database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure',async()=>{
- const db=new PGlite();await db.exec('create role service_role bypassrls;create role anon;create role authenticated;');await db.exec(readFileSync(new URL('../db/fleet-durable-board-install.sql',import.meta.url),'utf8'));
+ const db=new PGlite();await db.exec('create role service_role bypassrls;create role anon;create role authenticated;');await db.exec(readFileSync(new URL('../db/fleet-durable-board-install.sql',import.meta.url),'utf8'));await db.exec(readFileSync(new URL('../db/fleet-board-staging.sql',import.meta.url),'utf8'));
  await assert.rejects(()=>db.exec('set role authenticated;select public.cos_fleet_board_read();'));
- await db.exec('reset role;set role service_role;');const a=(await db.query('select public.cos_fleet_board_begin(false) lease')).rows[0].lease;assert.ok(a.id);
+ await db.exec('reset role;set role service_role;');const a=(await db.query('select public.cos_fleet_board_begin(false) lease')).rows[0].lease;assert.ok(a.id);assert.equal((await db.query('select public.cos_fleet_board_stage($1,$2::jsonb) staged',[a.id,JSON.stringify({capturedAt:1,health:{source:'test'}})])).rows[0].staged,true);
  assert.equal((await db.query('select public.cos_fleet_board_begin(true) lease')).rows[0].lease,null);
- const payload={contract:'COS_SAVED_FLEET_BOARD_V1',fleet:{readAt:'2026-11-03T20:00:00Z'},counts:{online:7,offline:1},units:[{productId:'1001',status:'online'}]};
- assert.equal((await db.query('select public.cos_fleet_board_finish($1,$2::jsonb) ok',[a.id,JSON.stringify(payload)])).rows[0].ok,true);
+ const payload={contract:'COS_SAVED_FLEET_BOARD_V1',fleet:{readAt:'2026-11-03T20:00:00Z',fieldMap:{sharedFleetView:true}},counts:{online:7,offline:1},units:[{productId:'1001',status:'online'}]};
+ await assert.rejects(()=>db.query('select public.cos_fleet_board_finish($1,$2::jsonb)',[a.id,JSON.stringify({...payload,fleet:{...payload.fleet,fieldMap:{sharedFleetView:false}}})]),/Invalid completed board/);
+ assert.equal((await db.query('select public.cos_fleet_board_finish($1,$2::jsonb) ok',[a.id,JSON.stringify(payload)])).rows[0].ok,true);assert.equal((await db.query('select staged from cos_fleet_board_private.runs where id=$1',[a.id])).rows[0].staged,null);
  await db.exec("reset role;update cos_fleet_board_private.runs set started_at=started_at-interval '61 seconds';set role service_role;");
  const b=(await db.query('select public.cos_fleet_board_begin(true) lease')).rows[0].lease;
  await db.query("select public.cos_fleet_board_fail($1,'source_read_failed','[]')",[b.id]);

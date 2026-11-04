@@ -5,8 +5,10 @@ async function savedFleetBoard({ rpc, read, force = false, waitUntil, now = Date
     const work = (async () => {
       try {
         const before = await rpc("cos_fleet_board_read", {});
-        const [health, map, connections] = await Promise.all([read("/api/camera-health/summary-v3"), read("/api/field-map"), read("/api/product-connections")]);
-        const value = project(health, map, connections, before?.latest?.payload, now());
+        const [health, map, connections] = await Promise.all([read("/api/camera-health/summary-v3"), read("/api/fleet-map-source"), read("/api/product-connections")]);
+        const capturedAt = now();
+        if (!await rpc("cos_fleet_board_stage", { p_run: lease.id, p_sources: { health, map, connections, capturedAt } })) throw Error("staging_unconfirmed");
+        const value = project(health, map, connections, before?.latest?.payload, capturedAt);
         if (!await rpc("cos_fleet_board_finish", { p_run: lease.id, p_payload: value })) throw Error("commit_unconfirmed");
       } catch (cause) {
         abort?.();
@@ -19,9 +21,6 @@ async function savedFleetBoard({ rpc, read, force = false, waitUntil, now = Date
   }
   return rpc("cos_fleet_board_read", {});
 }
-
-// ../it-feature-availability.js
-var IT_DAILY_WORKSPACES = Object.freeze(["Fleet Dashboard", "Camera Health"]);
 
 // src/cameraEvidence.ts
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
@@ -80,27 +79,6 @@ function classifyCameraUnit(rows, now = Date.now()) {
   return { scope, state, providerState: scope === "inactive" || scope === "shop" ? "verifying" : provider, cameraState: scope === "inactive" || scope === "shop" ? "mapping" : camera, serviceState: scope === "inactive" || scope === "shop" ? "verifying" : service, systemKind: providers.length && providers.every((row) => resourceKind(row) === "recorders") ? "recorder" : providers.length && providers.every((row) => resourceKind(row) === "detectors") ? "detector" : "system", recorderOffline: active.some((row) => resourceKind(row) === "recorders" && providerState(row, now) === "offline") };
 }
 
-// src/fieldRecorderObservation.ts
-var object = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
-var sha = (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
-var same = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && a.every((v) => typeof v === "string" && b.includes(v));
-var validGuard = (v) => object(v) && typeof v.unitId === "string" && typeof v.unitNumber === "string" && v.unitNumber.trim() !== "" && sha(v.identityProof) && Array.isArray(v.deviceIds) && v.deviceIds.length > 0 && v.deviceIds.length <= 1e3 && new Set(v.deviceIds).size === v.deviceIds.length && v.deviceIds.every((id) => typeof id === "string" && /^[1-9]\d*$/.test(id)) && Array.isArray(v.unitKeys) && v.unitKeys.length > 0 && new Set(v.unitKeys).size === v.unitKeys.length && v.unitKeys.every((key) => typeof key === "string" && key.trim() !== "") && typeof v.checkedAt === "string" && typeof v.providerSyncAt === "string";
-function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()) {
-  const authority = unit.fieldRecorderAuthority, binding = unit.importedInstallation, guards = health.fieldRecorderObservationGuards;
-  if (identity.kind !== "native_provider" || health.fieldRecorderObservationVersion !== 1 || !Array.isArray(guards) || guards.length > 5 || guards.some((g) => !validGuard(g)) || !object(authority) || authority.schemaVersion !== 1 || !object(binding) || unit.readOnly !== false || unit.status !== "field" || unit.currentLocationType !== "field" || unit.importedPlacement !== "FIELD" || unit.placementSource === "owner" || unit.placementAuditId || binding.sourcePrecedence || binding.schemaVersion !== 1 || binding.sourceSystem !== "mhelpdesk_product_import" || binding.entityKind !== "equipment_unit" || binding.eligibility !== "FIELD" || binding.nativeUnitId !== unit.id || binding.unitNumber !== unit.unitNumber || identity.unitId !== unit.id || identity.unitNumber !== unit.unitNumber || !cameraTimestamp(authority.checkedAt, now).fresh) return null;
-  const selected = guards.filter((g) => g.unitId === unit.id);
-  if (selected.length !== 1) return null;
-  const guard = selected[0], sync = cameraTimestamp(selected[0].providerSyncAt, now);
-  if (!sync.fresh || !sync.at) return null;
-  for (const proof of [authority, guard]) if (proof.unitId !== unit.id || proof.unitNumber !== unit.unitNumber || proof.identityProof !== identity.proof || !sha(proof.identityProof) || !same(proof.deviceIds, identity.deviceIds) || !same(proof.unitKeys, identity.unitKeys) || !cameraTimestamp(proof.checkedAt, now).fresh) return null;
-  if (guards.some((g) => g !== guard && (g.deviceIds.some((v) => identity.deviceIds.includes(v)) || g.unitKeys.some((v) => identity.unitKeys.includes(v))))) return null;
-  for (const key of ["sourceRevision", "sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256", "eventId", "productId"]) if (typeof authority[key] !== "string" || authority[key] !== binding[key]) return null;
-  if (!["sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256"].every((k) => sha(binding[k])) || !same(rows.map((r) => String(r.id)), identity.deviceIds) || !same([...new Set(rows.map((r) => r.unit))], identity.unitKeys) || rows.some((r) => resourceKind(r) !== "recorders" || !providerRecord(r) || r.evidence?.source !== "Star4Live" || cameraTimestamp(r.evidence?.observedAt, now).at !== sync.at)) return null;
-  const states = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).fresh && ["online", "offline"].includes(r.evidence?.status || "") ? r.evidence.status : "verifying");
-  const state = combinedState(states), times = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).at).filter((v) => Boolean(v)).sort();
-  return { state, basis: "recorder", label: "RECORDER " + { online: "ONLINE", offline: "OFFLINE", degraded: "MIXED / PARTLY VERIFIED", verifying: "UNVERIFIED" }[state], checkedAt: times.at(-1) || null, providerState: state, cameraState: "mapping", serviceState: "verifying" };
-}
-
 // src/savedConnectionObservation.ts
 function savedConnectionObservation(row, now = Date.now()) {
   const evidence = row.serviceEvidence || (row.evidence?.kind === "service_port" ? row.evidence : void 0);
@@ -120,11 +98,26 @@ function healthObservationTime(rows, basis, state, now = Date.now()) {
 }
 
 // src/verifiedUnitIdentity.ts
-var object2 = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
+var object = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
 var text = (value) => typeof value === "string" && value.trim() !== "";
 var resourceId = (value) => typeof value === "string" && /^[1-9]\d*$/.test(value);
 var sameSet = (a, b) => a.length === b.length && new Set(a).size === a.length && new Set(b).size === b.length && a.every((x) => b.includes(x));
+var immutableEnvelopes = /* @__PURE__ */ new WeakMap();
+function prepareImmutableIdentityEnvelope(value) {
+  validateIdentityEnvelope(value);
+  const seen = /* @__PURE__ */ new WeakSet();
+  const freeze = (item) => {
+    if (!item || typeof item !== "object" || seen.has(item)) return;
+    seen.add(item);
+    for (const child of Object.values(item)) freeze(child);
+    Object.freeze(item);
+  };
+  freeze(value);
+  immutableEnvelopes.set(value, Object.freeze([...value.unitIdentities || [], ...value.ownerConfirmedUnitIdentities || [], ...value.reconProviderUnitIdentities || []]));
+  return value;
+}
 function validateIdentityEnvelope(value) {
+  if (immutableEnvelopes.has(value)) return;
   if (value.identityVersion === void 0) {
     if (value.unitIdentities !== void 0 || value.identityWarnings !== void 0 || value.ownerConfirmedIdentityVersion !== void 0 || value.ownerConfirmedUnitIdentities !== void 0 || value.reconProviderIdentityVersion !== void 0 || value.reconProviderUnitIdentities !== void 0) throw new Error("Equipment identity contract is incomplete.");
     return;
@@ -134,12 +127,14 @@ function validateIdentityEnvelope(value) {
   if (value.reconProviderIdentityVersion === void 0 ? value.reconProviderUnitIdentities !== void 0 : value.reconProviderIdentityVersion !== 1 || !Array.isArray(value.reconProviderUnitIdentities) || value.reconProviderUnitIdentities.length > 1e3 || value.reconProviderUnitIdentities.some((row) => row.kind !== "reconeyez_area")) throw new Error("Reconeyez provider-area contract is unavailable.");
   if (value.unitIdentities.some((row) => ["owner_confirmed_native", "reconeyez_area"].includes(row.kind))) throw new Error("Reviewed provider identities require their additive contract.");
   for (const row of [...value.unitIdentities, ...value.ownerConfirmedUnitIdentities || [], ...value.reconProviderUnitIdentities || []]) {
-    if (!object2(row) || !text(row.unitId) || !text(row.unitNumber) || !["native_provider", "owner_placement", "owner_confirmed_native", "reconeyez_area"].includes(row.kind) || !Array.isArray(row.deviceIds) || !row.deviceIds.length || row.deviceIds.length > 1e3 || !row.deviceIds.every(resourceId) || !Array.isArray(row.unitKeys) || !row.unitKeys.length || !row.unitKeys.every(text) || !/^[a-f0-9]{64}$/.test(row.proof) || row.kind === "owner_placement" && !resourceId(row.placementAuditId)) throw new Error("Equipment identity proof is malformed.");
-    if (row.kind === "reconeyez_area" && (!object2(row.providerArea) || !Number.isSafeInteger(row.providerArea.detectorCount) || row.providerArea.detectorCount !== row.deviceIds.length || typeof row.providerArea.inventoryObservedAt !== "string" || !(row.providerArea.bridgeLastEventAt === null || typeof row.providerArea.bridgeLastEventAt === "string"))) throw new Error("Reconeyez provider-area coverage is malformed.");
+    if (!object(row) || !text(row.unitId) || !text(row.unitNumber) || !["native_provider", "owner_placement", "owner_confirmed_native", "reconeyez_area"].includes(row.kind) || !Array.isArray(row.deviceIds) || !row.deviceIds.length || row.deviceIds.length > 1e3 || !row.deviceIds.every(resourceId) || !Array.isArray(row.unitKeys) || !row.unitKeys.length || !row.unitKeys.every(text) || !/^[a-f0-9]{64}$/.test(row.proof) || row.kind === "owner_placement" && !resourceId(row.placementAuditId)) throw new Error("Equipment identity proof is malformed.");
+    if (row.kind === "reconeyez_area" && (!object(row.providerArea) || !Number.isSafeInteger(row.providerArea.detectorCount) || row.providerArea.detectorCount !== row.deviceIds.length || typeof row.providerArea.inventoryObservedAt !== "string" || !(row.providerArea.bridgeLastEventAt === null || typeof row.providerArea.bridgeLastEventAt === "string"))) throw new Error("Reconeyez provider-area coverage is malformed.");
   }
-  if (value.identityWarnings !== void 0 && (!Array.isArray(value.identityWarnings) || value.identityWarnings.length > 1e3 || value.identityWarnings.some((row) => !object2(row) || !text(row.unitId) || !text(row.reason) || row.deviceIds !== void 0 && (!Array.isArray(row.deviceIds) || !row.deviceIds.every(resourceId)) || row.unitKeys !== void 0 && (!Array.isArray(row.unitKeys) || !row.unitKeys.every(text))))) throw new Error("Equipment identity warnings are malformed.");
+  if (value.identityWarnings !== void 0 && (!Array.isArray(value.identityWarnings) || value.identityWarnings.length > 1e3 || value.identityWarnings.some((row) => !object(row) || !text(row.unitId) || !text(row.reason) || row.deviceIds !== void 0 && (!Array.isArray(row.deviceIds) || !row.deviceIds.every(resourceId)) || row.unitKeys !== void 0 && (!Array.isArray(row.unitKeys) || !row.unitKeys.every(text))))) throw new Error("Equipment identity warnings are malformed.");
 }
 function allVerifiedUnitIdentities(value) {
+  const prepared = immutableEnvelopes.get(value);
+  if (prepared) return prepared;
   validateIdentityEnvelope(value);
   return [...value.unitIdentities || [], ...value.ownerConfirmedUnitIdentities || [], ...value.reconProviderUnitIdentities || []];
 }
@@ -191,6 +186,30 @@ function linkedUnitObservation(rows, now = Date.now()) {
   return { state, basis, label: prefix + " " + { online: "ONLINE", offline: "OFFLINE", degraded: "MIXED / PARTLY VERIFIED", verifying: "UNVERIFIED" }[state], checkedAt, providerState: provider, cameraState: camera, serviceState: service };
 }
 
+// ../it-feature-availability.js
+var IT_DAILY_WORKSPACES = Object.freeze(["Fleet Dashboard", "Camera Health"]);
+
+// src/fieldRecorderObservation.ts
+var object2 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
+var sha = (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
+var same = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && a.every((v) => typeof v === "string" && b.includes(v));
+var validGuard = (v) => object2(v) && typeof v.unitId === "string" && typeof v.unitNumber === "string" && v.unitNumber.trim() !== "" && sha(v.identityProof) && Array.isArray(v.deviceIds) && v.deviceIds.length > 0 && v.deviceIds.length <= 1e3 && new Set(v.deviceIds).size === v.deviceIds.length && v.deviceIds.every((id) => typeof id === "string" && /^[1-9]\d*$/.test(id)) && Array.isArray(v.unitKeys) && v.unitKeys.length > 0 && new Set(v.unitKeys).size === v.unitKeys.length && v.unitKeys.every((key) => typeof key === "string" && key.trim() !== "") && typeof v.checkedAt === "string" && typeof v.providerSyncAt === "string";
+function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()) {
+  const authority = unit.fieldRecorderAuthority, binding = unit.importedInstallation, guards = health.fieldRecorderObservationGuards;
+  if (identity.kind !== "native_provider" || health.fieldRecorderObservationVersion !== 1 || !Array.isArray(guards) || guards.length > 5 || guards.some((g) => !validGuard(g)) || !object2(authority) || authority.schemaVersion !== 1 || !object2(binding) || unit.readOnly !== false || unit.status !== "field" || unit.currentLocationType !== "field" || unit.importedPlacement !== "FIELD" || unit.placementSource === "owner" || unit.placementAuditId || binding.sourcePrecedence || binding.schemaVersion !== 1 || binding.sourceSystem !== "mhelpdesk_product_import" || binding.entityKind !== "equipment_unit" || binding.eligibility !== "FIELD" || binding.nativeUnitId !== unit.id || binding.unitNumber !== unit.unitNumber || identity.unitId !== unit.id || identity.unitNumber !== unit.unitNumber || !cameraTimestamp(authority.checkedAt, now).fresh) return null;
+  const selected = guards.filter((g) => g.unitId === unit.id);
+  if (selected.length !== 1) return null;
+  const guard = selected[0], sync = cameraTimestamp(selected[0].providerSyncAt, now);
+  if (!sync.fresh || !sync.at) return null;
+  for (const proof of [authority, guard]) if (proof.unitId !== unit.id || proof.unitNumber !== unit.unitNumber || proof.identityProof !== identity.proof || !sha(proof.identityProof) || !same(proof.deviceIds, identity.deviceIds) || !same(proof.unitKeys, identity.unitKeys) || !cameraTimestamp(proof.checkedAt, now).fresh) return null;
+  if (guards.some((g) => g !== guard && (g.deviceIds.some((v) => identity.deviceIds.includes(v)) || g.unitKeys.some((v) => identity.unitKeys.includes(v))))) return null;
+  for (const key of ["sourceRevision", "sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256", "eventId", "productId"]) if (typeof authority[key] !== "string" || authority[key] !== binding[key]) return null;
+  if (!["sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256"].every((k) => sha(binding[k])) || !same(rows.map((r) => String(r.id)), identity.deviceIds) || !same([...new Set(rows.map((r) => r.unit))], identity.unitKeys) || rows.some((r) => resourceKind(r) !== "recorders" || !providerRecord(r) || r.evidence?.source !== "Star4Live" || cameraTimestamp(r.evidence?.observedAt, now).at !== sync.at)) return null;
+  const states = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).fresh && ["online", "offline"].includes(r.evidence?.status || "") ? r.evidence.status : "verifying");
+  const state = combinedState(states), times = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).at).filter((v) => Boolean(v)).sort();
+  return { state, basis: "recorder", label: "RECORDER " + { online: "ONLINE", offline: "OFFLINE", degraded: "MIXED / PARTLY VERIFIED", verifying: "UNVERIFIED" }[state], checkedAt: times.at(-1) || null, providerState: state, cameraState: "mapping", serviceState: "verifying" };
+}
+
 // src/fieldCameraHealth.ts
 var cameraLabels = { online: "Camera records online", offline: "Camera outage observed", unknown: "Camera status unverified" };
 function validateCameraHealth(value) {
@@ -214,7 +233,18 @@ function validateCameraHealth(value) {
   return value;
 }
 var plain = (value) => value.trim().replace(/\s+/g, " ").toUpperCase();
+var canonicalUnitCache = /* @__PURE__ */ new Map();
 function canonicalCameraUnit(value) {
+  const cacheable = value.length <= 512;
+  if (cacheable && canonicalUnitCache.has(value)) return canonicalUnitCache.get(value);
+  const result = parseCanonicalCameraUnit(value);
+  if (cacheable) {
+    if (canonicalUnitCache.size >= 4096) canonicalUnitCache.clear();
+    canonicalUnitCache.set(value, result);
+  }
+  return result;
+}
+function parseCanonicalCameraUnit(value) {
   const match = /^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim()) || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
   if (!match) return null;
   let family = plain(match[1]).replace(/\s/g, "");
@@ -1016,17 +1046,21 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
 function completedBoard(health, map, connections, previous, at = Date.now()) {
   const upload = map?.uploadInventory, ids = upload?.records?.filter((r) => r.placement === "FIELD").map((r) => r.productId);
   if (!upload || !ids?.length || !readExactProductConnections(connections, upload.sourceSha256, ids, at)) throw Error("connection_source_incomplete");
-  const pair = reconcileFleetSnapshot(health, { ...map, productConnections: connections, productConnectionsState: "ready" }, at);
+  prepareImmutableIdentityEnvelope(health);
+  const reconciled = reconcileFleetSnapshot(health, { ...map, productConnections: connections, productConnectionsState: "ready" }, at);
+  const { fleetFieldUnits, ...storedHealth } = reconciled.health;
+  const pair = { ...reconciled, health: storedHealth };
+  prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
   const prior = previous?.fleet;
-  const priorBoard = prior ? cameraFieldProducts(prior.fieldMap, prior.health, Date.parse(prior.readAt), true) : null;
+  const priorItems = Array.isArray(previous?.units) ? previous.units : [];
   const canonical = (value) => JSON.stringify(value, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]])) : v);
   const binding = (m, id) => {
     const r = m?.uploadInventory?.records?.find((p) => p.productId === id);
     return canonical([r?.placement, r?.uploadLifecycle, r?.binding]);
   };
-  const lost = board.items.filter((p) => p.status === "unverified" && priorBoard?.items.some((old) => old.productId === p.productId && ["online", "offline"].includes(old.status)) && binding(pair.fieldMap, p.productId) === binding(prior?.fieldMap, p.productId));
+  const lost = board.items.filter((p) => p.status === "unverified" && priorItems.some((old) => old.productId === p.productId && ["online", "offline"].includes(old.status)) && binding(pair.fieldMap, p.productId) === binding(prior?.fieldMap, p.productId));
   if (lost.length) throw Object.assign(Error("checks_incomplete"), { products: lost.map((p) => p.productId) });
   return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
 }

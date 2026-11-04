@@ -330,6 +330,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     pendingFleetSnapshots.set(key,read);return read;
 }
 export const api = {
+  usesDurableFleetBoard,
   adoptProductConnections:(receipt:unknown)=>{
     if(!lastVerifiedSession)return false;const mode=new URLSearchParams(location.search).get('mode'),key=JSON.stringify([lastVerifiedSession.token,lastVerifiedSession.role,mode]),saved=fleetSnapshots.get(key),upload=(saved?.value.fieldMap as any)?.uploadInventory;
     if(!saved||!upload||!readExactProductConnections(receipt,upload.sourceSha256,upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId),Date.now()))return false;

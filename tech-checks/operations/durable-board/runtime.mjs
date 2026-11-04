@@ -5,8 +5,10 @@ export async function savedFleetBoard({rpc,read,force=false,waitUntil,now=Date.n
   const work=(async()=>{
    try{
     const before=await rpc('cos_fleet_board_read',{});
-    const [health,map,connections]=await Promise.all([read('/api/camera-health/summary-v3'),read('/api/field-map'),read('/api/product-connections')]);
-    const value=project(health,map,connections,before?.latest?.payload,now());
+    const [health,map,connections]=await Promise.all([read('/api/camera-health/summary-v3'),read('/api/fleet-map-source'),read('/api/product-connections')]);
+    const capturedAt=now();
+    if(!await rpc('cos_fleet_board_stage',{p_run:lease.id,p_sources:{health,map,connections,capturedAt}}))throw Error('staging_unconfirmed');
+    const value=project(health,map,connections,before?.latest?.payload,capturedAt);
     if(!await rpc('cos_fleet_board_finish',{p_run:lease.id,p_payload:value}))throw Error('commit_unconfirmed');
    }catch(cause){
     abort?.();
