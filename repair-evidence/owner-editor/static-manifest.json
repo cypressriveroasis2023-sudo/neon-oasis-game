@@ -42,6 +42,12 @@
     "md5": "2c4dbee4f3bcc9830de48e3a81c16ade"
   },
   {
+    "path": "dist/assets/durableFleetClient-DxsHx13x.js",
+    "bytes": 1687,
+    "sha256": "2d463a85f3c85fc87e29856b6a5799c5c3e89e040f763a916c3313925fe31d61",
+    "md5": "0512eeba8bec9cb0c274b30b126cd6dc"
+  },
+  {
     "path": "dist/assets/durableFleetClient-DyBY41qa.js",
     "bytes": 1687,
     "sha256": "51d59c12f73dd87ff07c76dc58f5d7d59b2642f7a5d9106b6f55cb2e1472b856",
@@ -882,6 +888,12 @@
     "md5": "ea742e18158be49a471eda3e43fa81bf"
   },
   {
+    "path": "dist/assets/index-FdsqBIXq.js",
+    "bytes": 1635960,
+    "sha256": "df1f8d8e131f5403340de1f36464d60c16bcedc95b7a6c75ae60ead06a93a52f",
+    "md5": "6155f3a1b114c504f3a4ae697b42a70c"
+  },
+  {
     "path": "dist/assets/index-HsuIhGFk.js",
     "bytes": 1528797,
     "sha256": "f125b44d4c0e74ae0597f424c23e17b89b803834e9910fa4fd3f889d0d670ebd",
@@ -1106,8 +1118,8 @@
   {
     "path": "dist/index.html",
     "bytes": 496,
-    "sha256": "f48d0b54fb84cd80fd93078bbd4d76a637c5dc464c693a1a9144d89ada521600",
-    "md5": "9e4a3b482997cf5bf8bd1f2336f70976"
+    "sha256": "f9d306718f14f7dcd0f7223ef2fddbba375c1617386639e0f065a587b73be86e",
+    "md5": "44858c05578b92245cbfdcd82788e101"
   },
   {
     "path": "dist/resources/cameras-on-site-logo.webp",

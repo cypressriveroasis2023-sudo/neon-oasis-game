@@ -2,435 +2,441 @@ TAP version 13
 # Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
 ok 1 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
   ---
-  duration_ms: 7.871498
+  duration_ms: 4.781118
   type: 'test'
   ...
 # Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
 ok 2 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
   ---
-  duration_ms: 0.791902
+  duration_ms: 0.311501
   type: 'test'
   ...
 # Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
 ok 3 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
   ---
-  duration_ms: 10.011554
+  duration_ms: 6.581962
   type: 'test'
   ...
 # Subtest: a provider name or suffix collision cannot influence independent product proof
 ok 4 - a provider name or suffix collision cannot influence independent product proof
   ---
-  duration_ms: 0.419857
+  duration_ms: 0.211839
   type: 'test'
   ...
 # Subtest: duplicate tracker IP claimed by Shop or another Field product is held
 ok 5 - duplicate tracker IP claimed by Shop or another Field product is held
   ---
-  duration_ms: 0.690132
+  duration_ms: 0.307483
   type: 'test'
   ...
 # Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
 ok 6 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
   ---
-  duration_ms: 0.466904
+  duration_ms: 0.25285
   type: 'test'
   ...
 # Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
 ok 7 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
   ---
-  duration_ms: 0.728284
+  duration_ms: 0.427973
   type: 'test'
   ...
 # Subtest: all 2027 product identities and placements must reconcile before using any check
 ok 8 - all 2027 product identities and placements must reconcile before using any check
   ---
-  duration_ms: 0.653133
+  duration_ms: 0.313253
   type: 'test'
   ...
 # Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
 ok 9 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
   ---
-  duration_ms: 1.168057
+  duration_ms: 0.622083
   type: 'test'
   ...
 # Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
 ok 10 - browser-facing source receipt must cover every exact Product ID and retain the original check time
   ---
-  duration_ms: 1.592572
+  duration_ms: 1.063764
   type: 'test'
   ...
 # Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
 ok 11 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
   ---
-  duration_ms: 0.680604
+  duration_ms: 0.59982
   type: 'test'
   ...
 # Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
 ok 12 - live saved port schema requires measured attempt evidence, not invented Boolean port state
   ---
-  duration_ms: 0.775863
+  duration_ms: 0.571485
   type: 'test'
   ...
 # Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
 ok 13 - a stale reviewed mHelp source cannot authorize currently online camera product claims
   ---
-  duration_ms: 0.302235
+  duration_ms: 0.27029
   type: 'test'
   ...
 # Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
 ok 14 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
   ---
-  duration_ms: 4.81179
+  duration_ms: 0.56927
   type: 'test'
   ...
 # Subtest: one result expiring in transit does not erase another fresh Product ID
 ok 15 - one result expiring in transit does not erase another fresh Product ID
   ---
-  duration_ms: 1.496242
+  duration_ms: 0.321774
   type: 'test'
   ...
 # Subtest: combined roster is one typed population with source equipment separate from UUID units
 ok 16 - combined roster is one typed population with source equipment separate from UUID units
   ---
-  duration_ms: 5.772338
+  duration_ms: 3.173292
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: duplicate record
 ok 17 - invalid roster cannot supply trusted counts: duplicate record
   ---
-  duration_ms: 0.613057
+  duration_ms: 0.664485
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: duplicate UUID
 ok 18 - invalid roster cannot supply trusted counts: duplicate UUID
   ---
-  duration_ms: 0.508522
+  duration_ms: 1.089919
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: invented UUID
 ok 19 - invalid roster cannot supply trusted counts: invented UUID
   ---
-  duration_ms: 0.253264
+  duration_ms: 0.209971
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: count mismatch
 ok 20 - invalid roster cannot supply trusted counts: count mismatch
   ---
-  duration_ms: 0.259956
+  duration_ms: 0.204302
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: unknown contract
 ok 21 - invalid roster cannot supply trusted counts: unknown contract
   ---
-  duration_ms: 0.175629
+  duration_ms: 0.140167
   type: 'test'
   ...
 # Subtest: invalid roster cannot supply trusted counts: invalid timestamp
 ok 22 - invalid roster cannot supply trusted counts: invalid timestamp
   ---
-  duration_ms: 0.275366
+  duration_ms: 0.261266
   type: 'test'
   ...
 # Subtest: source filters preserve field/shop/held and lifecycle distinctions without inventing health or nearby positions
 ok 23 - source filters preserve field/shop/held and lifecycle distinctions without inventing health or nearby positions
   ---
-  duration_ms: 1.072118
+  duration_ms: 2.453472
   type: 'test'
   ...
 # Subtest: source card is read-only, clearly unlinked and never turns customer address into installation evidence
 ok 24 - source card is read-only, clearly unlinked and never turns customer address into installation evidence
   ---
-  duration_ms: 55.336456
+  duration_ms: 42.73485
   type: 'test'
   ...
 # Subtest: identity-review source placement is visible but excluded from confirmed field and health
 ok 25 - identity-review source placement is visible but excluded from confirmed field and health
   ---
-  duration_ms: 2.047574
+  duration_ms: 2.200288
   type: 'test'
   ...
 # Subtest: alias display stays separate from source identity and all summary dimensions are checked
 ok 26 - alias display stays separate from source identity and all summary dimensions are checked
   ---
-  duration_ms: 1.708959
+  duration_ms: 1.964715
   type: 'test'
   ...
 # Subtest: canonical UUID inventory must be the same roster population, never an extra parallel count
 ok 27 - canonical UUID inventory must be the same roster population, never an extra parallel count
   ---
-  duration_ms: 0.50215
+  duration_ms: 0.754918
   type: 'test'
   ...
 # Subtest: linked placement and active eligibility cannot disagree between roster and canonical inventory
 ok 28 - linked placement and active eligibility cannot disagree between roster and canonical inventory
   ---
-  duration_ms: 0.525664
+  duration_ms: 0.707042
   type: 'test'
   ...
 # Subtest: identity review cannot be relabeled FIELD or SHOP even with matching recomputed totals
 ok 29 - identity review cannot be relabeled FIELD or SHOP even with matching recomputed totals
   ---
-  duration_ms: 0.264345
+  duration_ms: 0.402432
   type: 'test'
   ...
 # Subtest: Field setup excludes Shop ROOT, unresolved placement and inactive records without hiding them from inventory
 ok 30 - Field setup excludes Shop ROOT, unresolved placement and inactive records without hiding them from inventory
   ---
-  duration_ms: 0.150462
+  duration_ms: 0.276818
   type: 'test'
   ...
 # Subtest: every Field Product ID appears once in a complete partition; Shop never enters it
 ok 31 - every Field Product ID appears once in a complete partition; Shop never enters it
   ---
-  duration_ms: 18.125396
+  duration_ms: 13.746614
   type: 'test'
   ...
 # Subtest: possible candidate matches cannot inherit healthy native evidence
 ok 32 - possible candidate matches cannot inherit healthy native evidence
   ---
-  duration_ms: 2.952618
+  duration_ms: 2.76011
   type: 'test'
   ...
 # Subtest: inactive source lifecycle stays separate even when a linked service responds
 ok 33 - inactive source lifecycle stays separate even when a linked service responds
   ---
-  duration_ms: 2.411285
+  duration_ms: 1.667586
   type: 'test'
   ...
 # Subtest: missing, duplicate or inconsistent unit associations never assign an online product
 ok 34 - missing, duplicate or inconsistent unit associations never assign an online product
   ---
-  duration_ms: 5.433543
+  duration_ms: 3.395269
   type: 'test'
   ...
 # Subtest: malformed, incomplete or duplicate-source receipts cannot produce a certified count
 ok 35 - malformed, incomplete or duplicate-source receipts cannot produce a certified count
   ---
-  duration_ms: 1.298421
+  duration_ms: 1.119324
   type: 'test'
   ...
 # Subtest: service reachability retains its basis and never claims verified video
 ok 36 - service reachability retains its basis and never claims verified video
   ---
-  duration_ms: 1.79435
+  duration_ms: 1.316469
   type: 'test'
   ...
 # Subtest: all 287 Field Product IDs reconcile without importing the 714 Shop records into health
 ok 37 - all 287 Field Product IDs reconcile without importing the 714 Shop records into health
   ---
-  duration_ms: 29.910942
+  duration_ms: 14.972269
   type: 'test'
   ...
 # Subtest: obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health
 ok 38 - obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health
   ---
-  duration_ms: 2.052433
+  duration_ms: 1.276341
   type: 'test'
   ...
 # Subtest: Owner setup saves address without GPS and Field without a working camera
 ok 39 - Owner setup saves address without GPS and Field without a working camera
   ---
-  duration_ms: 2.45697
+  duration_ms: 2.482209
   type: 'test'
   ...
 # Subtest: private, malformed, duplicated, URL and unsupported endpoint settings are rejected
 ok 40 - private, malformed, duplicated, URL and unsupported endpoint settings are rejected
   ---
-  duration_ms: 1.090652
+  duration_ms: 0.991856
   type: 'test'
   ...
 # Subtest: unchanged source is byte-for-byte untouched with no Owner controls
 ok 41 - unchanged source is byte-for-byte untouched with no Owner controls
   ---
-  duration_ms: 0.553917
+  duration_ms: 0.631031
   type: 'test'
   ...
 # Subtest: held unlinked product gains Owner controls without inventing native/provider identity
 ok 42 - held unlinked product gains Owner controls without inventing native/provider identity
   ---
-  duration_ms: 5.280968
+  duration_ms: 5.234733
   type: 'test'
   ...
 # Subtest: complete exact Owner target check supplies connectivity, never provider membership or video
 ok 43 - complete exact Owner target check supplies connectivity, never provider membership or video
   ---
-  duration_ms: 1.629391
+  duration_ms: 1.599248
   type: 'test'
   ...
 # Subtest: technical errors retain last completed check while changed targets invalidate only health
 ok 44 - technical errors retain last completed check while changed targets invalidate only health
   ---
-  duration_ms: 0.282769
+  duration_ms: 0.296544
   type: 'test'
   ...
 # Subtest: incomplete port results cannot make Owner target Online
 ok 45 - incomplete port results cannot make Owner target Online
   ---
-  duration_ms: 0.394418
+  duration_ms: 0.355078
   type: 'test'
   ...
 # Subtest: Shop and Field changes reconcile Product totals independently of health
 ok 46 - Shop and Field changes reconcile Product totals independently of health
   ---
-  duration_ms: 1.053162
+  duration_ms: 1.093959
   type: 'test'
   ...
 # Subtest: missing and Do Not Use source records are never activated by a saved override
 ok 47 - missing and Do Not Use source records are never activated by a saved override
   ---
-  duration_ms: 0.507781
+  duration_ms: 0.781347
   type: 'test'
   ...
 # Subtest: Owner projection is idempotent and retains raw address provenance
 ok 48 - Owner projection is idempotent and retains raw address provenance
   ---
-  duration_ms: 5.24492
+  duration_ms: 1.213919
   type: 'test'
   ...
 # Subtest: connection receipts include Owner Field scope without forged TCP source positives
 ok 49 - connection receipts include Owner Field scope without forged TCP source positives
   ---
-  duration_ms: 0.814906
+  duration_ms: 0.844864
   type: 'test'
   ...
 # Subtest: manual Owner coordinates have honest labels and do not rewrite geocoder evidence
 ok 50 - manual Owner coordinates have honest labels and do not rewrite geocoder evidence
   ---
-  duration_ms: 0.774189
+  duration_ms: 1.039311
   type: 'test'
   ...
 # Subtest: IP collision checks include tracker claims and current Owner overrides
 ok 51 - IP collision checks include tracker claims and current Owner overrides
   ---
-  duration_ms: 0.649396
+  duration_ms: 0.544596
   type: 'test'
   ...
 # Subtest: reading settings does not check cameras
 ok 52 - reading settings does not check cameras
   ---
-  duration_ms: 37.098964
+  duration_ms: 39.864565
   type: 'test'
   ...
 # Subtest: non-Owner cannot save equipment or manufacture actor identity
 ok 53 - non-Owner cannot save equipment or manufacture actor identity
   ---
-  duration_ms: 1.419948
+  duration_ms: 1.346033
   type: 'test'
   ...
 # Subtest: invalid origin and anonymous calls reach no privileged RPC
 ok 54 - invalid origin and anonymous calls reach no privileged RPC
   ---
-  duration_ms: 1.61323
+  duration_ms: 1.511048
   type: 'test'
   ...
 # Subtest: manual check uses persisted target only and stores all actual completed outcomes
 ok 55 - manual check uses persisted target only and stores all actual completed outcomes
   ---
-  duration_ms: 3.025534
+  duration_ms: 2.567383
   type: 'test'
   ...
 # Subtest: technical check errors cannot be saved as Offline
 ok 56 - technical check errors cannot be saved as Offline
   ---
-  duration_ms: 2.651625
+  duration_ms: 2.097921
   type: 'test'
   ...
 # Subtest: private IP and malformed save fail before the database mutation
 ok 57 - private IP and malformed save fail before the database mutation
   ---
-  duration_ms: 2.21132
+  duration_ms: 1.11127
+  type: 'test'
+  ...
+# Subtest: placement-only Owner edit retains existing definitive connection
+ok 58 - placement-only Owner edit retains existing definitive connection
+  ---
+  duration_ms: 1.022806
   type: 'test'
   ...
 # Subtest: exact Product ID may change native Fleet display status but never raw provider proof
-ok 58 - exact Product ID may change native Fleet display status but never raw provider proof
+ok 59 - exact Product ID may change native Fleet display status but never raw provider proof
   ---
-  duration_ms: 5.40498
+  duration_ms: 2.122734
   type: 'test'
   ...
 # Subtest: duplicate ownership, Shop, support, inactive, malformed or stale observations cannot override the native signal
-ok 59 - duplicate ownership, Shop, support, inactive, malformed or stale observations cannot override the native signal
+ok 60 - duplicate ownership, Shop, support, inactive, malformed or stale observations cannot override the native signal
   ---
-  duration_ms: 0.431648
+  duration_ms: 0.430381
   type: 'test'
   ...
 # Subtest: verified Unknown TCP result supersedes a native provider Online label
-ok 60 - verified Unknown TCP result supersedes a native provider Online label
+ok 61 - verified Unknown TCP result supersedes a native provider Online label
   ---
-  duration_ms: 0.272951
+  duration_ms: 0.277622
   type: 'test'
   ...
 # Subtest: selected Camera Health unit detail uses Product-ID TCP status instead of provider Online
-ok 61 - selected Camera Health unit detail uses Product-ID TCP status instead of provider Online
+ok 62 - selected Camera Health unit detail uses Product-ID TCP status instead of provider Online
   ---
-  duration_ms: 0.364132
+  duration_ms: 0.345012
   type: 'test'
   ...
 # Subtest: unavailable required Product-ID source propagates Unknown without claiming endpoint identity
-ok 62 - unavailable required Product-ID source propagates Unknown without claiming endpoint identity
+ok 63 - unavailable required Product-ID source propagates Unknown without claiming endpoint identity
   ---
-  duration_ms: 0.287719
+  duration_ms: 0.246206
   type: 'test'
   ...
 # Subtest: full presentation round trip preserves unit details and ORIGINAL check time
-ok 63 - full presentation round trip preserves unit details and ORIGINAL check time
+ok 64 - full presentation round trip preserves unit details and ORIGINAL check time
   ---
-  duration_ms: 13.061495
+  duration_ms: 8.955555
   type: 'test'
   ...
 # Subtest: other account, mode, permissions and unauthenticated readers cannot restore private details
-ok 64 - other account, mode, permissions and unauthenticated readers cannot restore private details
+ok 65 - other account, mode, permissions and unauthenticated readers cannot restore private details
   ---
-  duration_ms: 1.435538
+  duration_ms: 2.142077
   type: 'test'
   ...
 # Subtest: partial checks, source mismatch, malformed dates and future readings are rejected
-ok 65 - partial checks, source mismatch, malformed dates and future readings are rejected
+ok 66 - partial checks, source mismatch, malformed dates and future readings are rejected
   ---
-  duration_ms: 3.292655
+  duration_ms: 2.450815
   type: 'test'
   ...
 # Subtest: valid connection-only dashboard persists when provider health is unavailable
-ok 66 - valid connection-only dashboard persists when provider health is unavailable
+ok 67 - valid connection-only dashboard persists when provider health is unavailable
   ---
-  duration_ms: 0.937986
+  duration_ms: 0.785806
   type: 'test'
   ...
 # Subtest: credential fields are never serialized and private invalidation leaves unrelated storage alone
-ok 67 - credential fields are never serialized and private invalidation leaves unrelated storage alone
+ok 68 - credential fields are never serialized and private invalidation leaves unrelated storage alone
   ---
-  duration_ms: 1.05741
+  duration_ms: 0.927466
   type: 'test'
   ...
 # Subtest: disabled storage, oversized data and corrupt cache are nonfatal
-ok 68 - disabled storage, oversized data and corrupt cache are nonfatal
+ok 69 - disabled storage, oversized data and corrupt cache are nonfatal
   ---
-  duration_ms: 22.443742
+  duration_ms: 19.947809
   type: 'test'
   ...
 # Subtest: older presentation cannot replace a newer completed dashboard
-ok 69 - older presentation cannot replace a newer completed dashboard
+ok 70 - older presentation cannot replace a newer completed dashboard
   ---
-  duration_ms: 1.797235
+  duration_ms: 1.063908
   type: 'test'
   ...
 # Subtest: one-millisecond local display clock mismatch saves both views without changing camera observations
-ok 70 - one-millisecond local display clock mismatch saves both views without changing camera observations
+ok 71 - one-millisecond local display clock mismatch saves both views without changing camera observations
   ---
-  duration_ms: 1.106552
+  duration_ms: 0.974028
   type: 'test'
   ...
 # Subtest: local display clock normalization never renews old readings or accepts larger clock reversals
-ok 71 - local display clock normalization never renews old readings or accepts larger clock reversals
+ok 72 - local display clock normalization never renews old readings or accepts larger clock reversals
   ---
-  duration_ms: 0.719186
+  duration_ms: 0.643808
   type: 'test'
   ...
-1..71
-# tests 71
+1..72
+# tests 72
 # suites 0
-# pass 71
+# pass 72
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1449.368155
+# duration_ms 1079.68993

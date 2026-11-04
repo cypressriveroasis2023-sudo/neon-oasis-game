@@ -62,12 +62,16 @@ export function projectOwnerMap(input:any,controls:any[]){
 export function projectOwnerConnections(receipt:any,controls:any[]){
  if(receipt?.contract!=='COS_EXACT_PRODUCT_CONNECTIONS_V2'||!Array.isArray(receipt.items))return receipt;
  const result=structuredClone(receipt);result.ownerOverrides=controls.filter(c=>checkedControl(c)&&c.active&&c.currentSourcePresent!==false);
- for(const c of controls){if(!checkedControl(c)||!c.active||c.currentSourcePresent===false||(c.currentSourceLifecycle??c.sourceLifecycle)!=='UNFLAGGED')continue;result.items=result.items.filter((p:any)=>p.productId!==c.productId);if(c.settings.placement==='FIELD')result.items.push({productId:c.productId,status:'unknown',basis:'tcp_service_port',resourceId:null,checkedAt:null,reason:'Owner-managed target. Its independently saved connection result is displayed on the equipment record.'});}
+ for(const c of controls){if(!checkedControl(c)||!c.active||c.currentSourcePresent===false||(c.currentSourceLifecycle??c.sourceLifecycle)!=='UNFLAGGED')continue;if(c.settings.placement==='FIELD'&&!c.settings.publicIp&&!c.settings.ports.length&&!c.settings.monitoringEnabled&&result.items.some((p:any)=>p.productId===c.productId))continue;result.items=result.items.filter((p:any)=>p.productId!==c.productId);if(c.settings.placement==='FIELD')result.items.push({productId:c.productId,status:'unknown',basis:'tcp_service_port',resourceId:null,checkedAt:null,reason:'Owner-managed target. Its independently saved connection result is displayed on the equipment record.'});}
  return result;
 }
 /** Validate the original address receipt first. Owner points never become geocoding/GPS evidence. */
 export function ownerAddressPins(base:any,head:any){
- if(!base||!Array.isArray(head?.ownerOverrides))return base;
+ if(!Array.isArray(head?.ownerOverrides)||!head.ownerOverrides.some((c:any)=>checkedControl(c)&&c.active))return base;
+ if(!base){
+  if(head.contract!=='COS_MHELP_UPLOAD_INVENTORY_V1'||!Array.isArray(head.records)||!/^[a-f0-9]{64}$/.test(head.sourceSha256)||new Set(head.records.map((p:any)=>p.productId)).size!==head.records.length)return null;
+  base={pins:[],reviews:head.records.filter((p:any)=>p.placement==='FIELD').map((p:any)=>({id:'mhelp_product:'+p.productId,productId:p.productId,unitNumber:p.unitNumber,customer:p.customer||'',category:p.category||'',address:[p.sourceAddress?.street,p.sourceAddress?.city,p.sourceAddress?.state,p.sourceAddress?.zip].filter(Boolean).join(', '),lifecycle:p.uploadLifecycle,placementHeld:Boolean(p.binding?.placementHeld),state:'no_match',reason:'The source address-coordinate read is unavailable. Equipment remains visible; an Owner can set a manual map location.'})),sourceSha256:head.sourceSha256,payloadSha256:head.payloadSha256||'',sourceUnavailable:true};
+ }
  const result={...base,pins:[...base.pins],reviews:[...base.reviews]};
  for(const c of head.ownerOverrides){if(!checkedControl(c)||!c.active)continue;
   const p=head.records.find((p:any)=>p.productId===c.productId&&p.ownerControl&&!p.ownerControl.projectionHold);if(!p)continue;

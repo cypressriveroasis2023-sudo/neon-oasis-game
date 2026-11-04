@@ -128,6 +128,7 @@ function projectOwnerConnections(receipt, controls) {
   result.ownerOverrides = controls.filter((c) => checkedControl(c) && c.active && c.currentSourcePresent !== false);
   for (const c of controls) {
     if (!checkedControl(c) || !c.active || c.currentSourcePresent === false || (c.currentSourceLifecycle ?? c.sourceLifecycle) !== "UNFLAGGED") continue;
+    if (c.settings.placement === "FIELD" && !c.settings.publicIp && !c.settings.ports.length && !c.settings.monitoringEnabled && result.items.some((p) => p.productId === c.productId)) continue;
     result.items = result.items.filter((p) => p.productId !== c.productId);
     if (c.settings.placement === "FIELD") result.items.push({ productId: c.productId, status: "unknown", basis: "tcp_service_port", resourceId: null, checkedAt: null, reason: "Owner-managed target. Its independently saved connection result is displayed on the equipment record." });
   }
@@ -257,7 +258,9 @@ function createOwnerHandler(d) {
             receipt = v.connections;
             verdicts.push(...v.items);
           } else verdicts.push(...other.map((id) => ({ productId: id, status: "unknown", checkedAt: null, reason: "The existing camera checker could not complete. Previously saved results were retained." })));
-        })() : Promise.resolve();
+        })().catch(() => {
+          verdicts.push(...other.filter((id) => !verdicts.some((v) => v.productId === id)).map((id) => ({ productId: id, status: "unknown", checkedAt: null, reason: "The existing camera checker could not complete. Previous saved readings were retained." })));
+        }) : Promise.resolve();
         let cursor = 0;
         await Promise.all(Array.from({ length: Math.min(4, owned.length) }, async () => {
           for (; ; ) {

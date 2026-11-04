@@ -33,7 +33,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   const exact=connections?.get(product.productId);
   const support=Boolean(row?.support)||isSupportEquipment({id:product.recordId,unitNumber:label,modelName:typeof product.category==='string'?product.category:undefined});
   const owner=checkedControl(product.ownerControl,product.productId);
-  if(owner?.active&&!owner.projectionHold&&product.uploadLifecycle==='UNFLAGGED'&&record?.active&&record.lifecycle==='active'&&related.length===1&&record.productIds.length===1){
+  if(owner?.active&&!owner.projectionHold&&(owner.settings.publicIp||owner.settings.ports.length||owner.settings.monitoringEnabled)&&product.uploadLifecycle==='UNFLAGGED'&&record?.active&&record.lifecycle==='active'&&related.length===1&&record.productIds.length===1){
    const observation=ownerConnection(owner,now)!;
    const state:FieldProductHealth=support?'support':observation.status==='online'?'online':observation.status==='offline'?'offline':'unverified';
    counts[state]++;
