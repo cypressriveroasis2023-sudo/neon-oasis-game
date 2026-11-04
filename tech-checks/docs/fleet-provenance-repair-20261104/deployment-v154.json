@@ -1,0 +1,31 @@
+{
+  "projectRef": "tughscoxralhofrckvxy",
+  "slug": "cos-operations-pages",
+  "version": 154,
+  "status": "ACTIVE",
+  "verifyJwt": false,
+  "archiveSha256": "254594ed3300a84e9d5b1bc58afffb5ff1698d04fd3bf5c4c2d01d1018bb6d31",
+  "sourceCommit": "baf1418c6884e90cb9e9dd457b2f91dd7aafa8c0",
+  "sourcePath": "tech-checks/docs/fleet-provenance-repair-20261104/source/serve.ts",
+  "deploymentMethod": "Supabase connector; immutable remote import of the tested recorded-v153 patch, bundled into the function",
+  "entrypoint": "index.ts",
+  "entrypointContent": "// Immutable, tested patch of the recorded production v153 artifact.\n// Preserves the application's existing authentication and all unrelated routes.\nimport \"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/baf1418c6884e90cb9e9dd457b2f91dd7aafa8c0/tech-checks/docs/fleet-provenance-repair-20261104/source/serve.ts\";\n",
+  "denoJson": {"nodeModulesDir":"auto","imports":{"jose":"npm:jose@6.2.12"}},
+  "previous": {
+    "version":153,
+    "archiveSha256":"4b3e304fd4b19aa801dd4ef68fbe7e18b6a96b6039b0cffbe1de03188eff4596",
+    "recordedSourceCommit":"1ddb5df2228d1a584393884182406bca90efd1d8",
+    "recordedSourcePath":"tech-checks/docs/deployed-cos-operations-pages-v153/source/serve.ts"
+  },
+  "verification": {
+    "metadataAndEntrypointReadback":true,
+    "immutableCandidateProductionModuleTests":{"passed":10,"failed":0},
+    "unauthenticatedProductConnectionsGet":{"status":401,"expected":"Sign in to Tech Check to continue."},
+    "unauthenticatedProductConnectionsVerifyPost":{"status":401,"expected":"Sign in to Tech Check to continue."},
+    "authenticatedFleetEndToEnd":"NOT YET VERIFIED",
+    "remoteDependencyByteReadback":"Management source readback returns the local import entrypoint, not the bundled remote dependency contents; source hashes are recorded separately in manifest.json."
+  },
+  "scope":"Accept truthful API-pull provenance and explicitly absent historical Product IDs; preserve existing exact-ID, freshness, archive-IP and ownership checks.",
+  "notCompleted":["Frontend changes in PR356 are not deployed","PR355 reopen change is not merged or deployed by this repair","cos-sheets-placement-publish v17 scheduled endpoint reader still requires its own verified patch","Automatic direct sweep recovery and persistent setup are not yet verified"],
+  "noChangesTo":["tracker IPs","Field/Shop authority","connection settings","authentication requirements","identity holds","status evidence"]
+}

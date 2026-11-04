@@ -1,0 +1,36 @@
+{
+  "scope": "Candidate, not deployed by this script",
+  "previous": {
+    "slug": "cos-sheets-placement-publish",
+    "version": 17,
+    "archive": "28b8a0733eff6aa2a14943d42edd309c7d0b98162bc4e29b8a0ccd3c364611f2"
+  },
+  "publisherSourceCommit": "1ddb5df2228d1a584393884182406bca90efd1d8",
+  "preserved": [
+    "publisher authentication",
+    "publisher bounded request parsing",
+    "publisher compare-before-write and readback",
+    "heldReasons diagnostic",
+    "snapshot-source contract",
+    "mHelp freshness and exact-ID holds"
+  ],
+  "change": "Scheduled source uses the v154 tested tracker reader; deployment must pin this complete commit.",
+  "files": [
+    {
+      "name": "index.ts",
+      "sha256": "19375bc129733f81a81ca59f863e4a100701fe50ee38e16a1a8cbc88d71ba69f"
+    },
+    {
+      "name": "runtime.ts",
+      "sha256": "5f74c29bd1d638d40e9249ad60d7eb8a37e79c899e7df271d70ee0c417a04068"
+    },
+    {
+      "name": "serve.ts",
+      "sha256": "79b16d67b7f1dc02beb54712af6535bdfae776ff1fdfe811802dbc2099c178bf"
+    },
+    {
+      "name": "trackerEndpointNativeSource.mjs",
+      "sha256": "1a4d04decab7508cbf3a5f2a25ea29558a9d9b9ff52aedab213ff02873f19614"
+    }
+  ]
+}

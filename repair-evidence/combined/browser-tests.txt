@@ -1,0 +1,39 @@
+
+> cos-operations-pages@1.0.0 test:browser
+> playwright test --config tests/playwright.config.mjs --workers=2 --retries=0 tests/fleet-verify-now.browser.spec.mjs tests/durable-fleet-board.browser.spec.mjs tests/fleet-count-retention.browser.spec.mjs
+
+
+Running 30 tests using 2 workers
+
+  ✓  1 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.2s)
+  ✓  2 [mobile-390] › tests/durable-fleet-board.browser.spec.mjs:5:1 › reopening restores server counts, retains failures, replaces one completed batch and exposes unit history (3.4s)
+  ✓  3 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.4s)
+  ✓  4 [mobile-390] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.6s)
+  ✓  5 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for Owner (2.4s)
+  ✓  7 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:39:1 › a held check shows the correction and never fabricates an Online count (1.2s)
+  ✓  6 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for IT (2.2s)
+  ✓  8 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:47:1 › failed verification unlocks immediately and keeps prior counts without a full dashboard refresh (1.2s)
+  ✓  10 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:84:1 › saved connection reads wait for the ten-minute cadence and never trigger probes (948ms)
+  ✓  9 [mobile-390] › tests/fleet-verify-now.browser.spec.mjs:58:1 › 40 mixed units retain 26 Online and 14 Offline after a cold reload with failed provider health (3.4s)
+  ✓  12 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.6s)
+  ✓  11 [desktop-1024] › tests/durable-fleet-board.browser.spec.mjs:5:1 › reopening restores server counts, retains failures, replaces one completed batch and exposes unit history (4.1s)
+  ✓  14 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.8s)
+  ✓  13 [desktop-1024] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (2.0s)
+  ✓  15 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for Owner (2.7s)
+  ✓  16 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for IT (2.6s)
+  ✓  17 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:39:1 › a held check shows the correction and never fabricates an Online count (1.6s)
+  ✓  18 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:47:1 › failed verification unlocks immediately and keeps prior counts without a full dashboard refresh (1.6s)
+  ✓  20 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:84:1 › saved connection reads wait for the ten-minute cadence and never trigger probes (1.3s)
+  ✓  19 [desktop-1024] › tests/fleet-verify-now.browser.spec.mjs:58:1 › 40 mixed units retain 26 Online and 14 Offline after a cold reload with failed provider health (3.3s)
+  ✓  21 [desktop-1440] › tests/durable-fleet-board.browser.spec.mjs:5:1 › reopening restores server counts, retains failures, replaces one completed batch and exposes unit history (3.7s)
+  ✓  22 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:4:1 › completed counts survive clock expiry and failed refresh, then change on a completed update (2.1s)
+  ✓  24 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:58:1 › completed connection counts persist when the provider read fails (1.5s)
+  ✓  23 [desktop-1440] › tests/fleet-count-retention.browser.spec.mjs:36:1 › reopening Fleet shows the last completed reading before any new camera read (1.8s)
+  ✓  25 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for Owner (2.3s)
+  ✓  26 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:4:30 › Verify now confirms saved Helios status for IT (2.3s)
+  ✓  27 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:39:1 › a held check shows the correction and never fabricates an Online count (1.3s)
+  ✓  28 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:47:1 › failed verification unlocks immediately and keeps prior counts without a full dashboard refresh (1.4s)
+  ✓  30 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:84:1 › saved connection reads wait for the ten-minute cadence and never trigger probes (1.2s)
+  ✓  29 [desktop-1440] › tests/fleet-verify-now.browser.spec.mjs:58:1 › 40 mixed units retain 26 Online and 14 Offline after a cold reload with failed provider health (2.5s)
+
+  30 passed (37.3s)

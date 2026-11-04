@@ -1,0 +1,106 @@
+{
+  "scope": "Candidate only. Not deployed by this script.",
+  "requiresLive": {
+    "project": "tughscoxralhofrckvxy",
+    "slug": "cos-operations-pages",
+    "version": 153,
+    "archive": "4b3e304fd4b19aa801dd4ef68fbe7e18b6a96b6039b0cffbe1de03188eff4596"
+  },
+  "files": [
+    {
+      "name": "deno.json",
+      "before": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+      "after": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+      "changed": false
+    },
+    {
+      "name": "productCheckSource.ts",
+      "before": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+      "after": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+      "changed": false
+    },
+    {
+      "name": "productTcpRuntime.ts",
+      "before": "e63eee978e8b3cc7e74f07cc56b79c0819771c7a58de47f3a699da1498e839de",
+      "after": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+      "changed": true
+    },
+    {
+      "name": "productVerifyNow.ts",
+      "before": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+      "after": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+      "changed": false
+    },
+    {
+      "name": "savedFleetBoard.mjs",
+      "before": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
+      "after": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
+      "changed": false
+    },
+    {
+      "name": "serve.ts",
+      "before": "27119046dacb47d3098e193fb1ae17cf808ff630a19c72588dc507988ae1543f",
+      "after": "27119046dacb47d3098e193fb1ae17cf808ff630a19c72588dc507988ae1543f",
+      "changed": false
+    },
+    {
+      "name": "trackerEndpointProducer.mjs",
+      "before": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+      "after": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+      "changed": false
+    },
+    {
+      "name": "trackerEndpointRead.mjs",
+      "before": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+      "after": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+      "changed": false
+    }
+  ],
+  "edits": [
+    {
+      "needle": "!/^ServiceItem_List_[0-9]{14}\\.csv$/.test(tracker.sourceExport)",
+      "replacement": "!isTrackerSourceLabel(tracker.sourceExport)",
+      "count": 2
+    },
+    {
+      "needle": "!/^ServiceItem_List_[0-9]{14}\\.csv$/.test(e[0])",
+      "replacement": "!isTrackerSourceLabel(e[0])",
+      "count": 2
+    },
+    {
+      "needle": "verifiedAt, archive) {",
+      "replacement": "verifiedAt, archive, absentProductIds = []) {",
+      "count": 1
+    },
+    {
+      "needle": "    const indexed = /* @__PURE__ */ new Map();",
+      "replacement": "    if (!Array.isArray(absentProductIds) || absentProductIds.length > 10000 || new Set(absentProductIds).size !== absentProductIds.length || absentProductIds.some(id => typeof id !== \"string\" || !ID.test(id) || expected.has(id))) return fail2();\n    const absent = new Set(absentProductIds);\n    const indexed = /* @__PURE__ */ new Map();",
+      "count": 1
+    },
+    {
+      "needle": "if ([...extraIds].some((id) => !archived.some((r) => r.productId === id))) return fail2();",
+      "replacement": "if ([...extraIds].some((id) => !absent.has(id) && !archived.some((r) => r.productId === id))) return fail2();",
+      "count": 1
+    },
+    {
+      "needle": "JSON.stringify({ rangeNames, sourceExport, records, ...archived.length ? { archiveRangeNames: archive.rangeNames, archived } : {} })",
+      "replacement": "JSON.stringify({ rangeNames, sourceExport, records, indexHistory: [...indexed.entries()], absentProductIds: [...absent].sort(), ...archived.length ? { archiveRangeNames: archive.rangeNames, archived } : {} })",
+      "count": 1
+    },
+    {
+      "needle": "new Date(at()).toISOString(), archive);",
+      "replacement": "new Date(at()).toISOString(), archive, options.absentProductIds);",
+      "count": 1
+    },
+    {
+      "needle": "tracker: async (candidate, sourceSha256, signal) => {",
+      "replacement": "tracker: async (candidate, sourceSha256, signal, absentProductIds) => {\n    if (signal.aborted) throw Error(\"Source cancelled\");\n    if (absentProductIds === undefined) {\n      if (typeof options.source.platformRpc !== \"function\") throw Error(\"Complete absence evidence required\");\n      const current = await options.source.platformRpc(\"cos_mhelp_placement_snapshot\", signal);\n      const upload = current?.upload;\n      if (signal.aborted || upload?.contract !== \"COS_MHELP_API_V1\" || upload.complete !== true || upload.sourceSha256 !== sourceSha256 || !Array.isArray(upload.apiMissingRecords)) throw Error(\"Complete current absence evidence required\");\n      absentProductIds = upload.apiMissingRecords.map(row => row.productId);\n    }",
+      "count": 1
+    },
+    {
+      "needle": "fetch: requestFetch, candidate, expectedMhelpSourceSha256: sourceSha256",
+      "replacement": "fetch: requestFetch, candidate, absentProductIds, expectedMhelpSourceSha256: sourceSha256",
+      "count": 1
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import {isTrackerSourceLabel} from '../../../operations/src/trackerSourceLabel.ts';
 /** Read-only connection attribution, not equipment admission or relocation.
  * The full Product-ID membership and row/column/source identities must agree.
  * A disagreement in one product's current assignment is a hold on THAT ID,
@@ -61,7 +62,7 @@ export async function verify2027ConnectionCensus(
  for(let i=1;i<Math.max(indexIds.length,indexDetails.length,exports.length);i++){
   const a=indexIds[i]||[],d=indexDetails[i]||[],e=exports[i]||[];
   if(![...a,...d,...e].some(v=>v.trim()))continue;
-  if(!a[0]||!ID.test(a[1])||indexed.has(a[1])||!d[0]||!d[1]||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(e[0]))return fail();
+  if(!a[0]||!ID.test(a[1])||indexed.has(a[1])||!d[0]||!d[1]||!isTrackerSourceLabel(e[0]))return fail();
   if(sourceExport!==null&&sourceExport!==e[0])return fail();
   sourceExport=e[0];indexed.set(a[1],{key:a[0],model:d[0],customer:d[1]});
  }

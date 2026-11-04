@@ -1,0 +1,1062 @@
+TAP version 13
+# Subtest: Owner navigation has exactly five unique original destinations
+ok 1 - Owner navigation has exactly five unique original destinations
+  ---
+  duration_ms: 2.156032
+  type: 'test'
+  ...
+# Subtest: mobile exposes four destinations plus the existing More dialog button
+ok 2 - mobile exposes four destinations plus the existing More dialog button
+  ---
+  duration_ms: 0.526079
+  type: 'test'
+  ...
+# Subtest: secondary workspaces select their primary area without redirecting
+ok 3 - secondary workspaces select their primary area without redirecting
+  ---
+  duration_ms: 0.230653
+  type: 'test'
+  ...
+# Subtest: short labels do not change canonical keys or secondary labels
+ok 4 - short labels do not change canonical keys or secondary labels
+  ---
+  duration_ms: 0.203151
+  type: 'test'
+  ...
+# Subtest: every original Owner workspace remains in primary or secondary navigation
+ok 5 - every original Owner workspace remains in primary or secondary navigation
+  ---
+  duration_ms: 0.48396
+  type: 'test'
+  ...
+# Subtest: tracker entry respects existing eligibility and does not mutate group metadata
+ok 6 - tracker entry respects existing eligibility and does not mutate group metadata
+  ---
+  duration_ms: 0.308691
+  type: 'test'
+  ...
+# Subtest: presentation metadata and primary buttons do not read or write operational data
+ok 7 - presentation metadata and primary buttons do not read or write operational data
+  ---
+  duration_ms: 0.368703
+  type: 'test'
+  ...
+# Subtest: native readers and Fleet/Board mounts have no added props or remount keys
+not ok 8 - native readers and Fleet/Board mounts have no added props or remount keys
+  ---
+  duration_ms: 1.886626
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-cos-navigation.test.mjs:51:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '1cd46ebcc23761421cb39bad170b0e07ecf6999ecdb8e4e27c1cfe9cc523cf12'
+    - '4c2dc9792c9cb492d5ee6ebf072bdcf9e8ca349de5f910d1fbe3f4f98f5ad0ee'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '4c2dc9792c9cb492d5ee6ebf072bdcf9e8ca349de5f910d1fbe3f4f98f5ad0ee'
+  actual: '1cd46ebcc23761421cb39bad170b0e07ecf6999ecdb8e4e27c1cfe9cc523cf12'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-cos-navigation.test.mjs:54:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unchanged protected source: ownerTaskWorkflow
+not ok 9 - unchanged protected source: ownerTaskWorkflow
+  ---
+  duration_ms: 0.670039
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-cos-navigation.test.mjs:89:48'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '8f84aee2187c3f970e7cb5fd7657850e3274c5392c951d6e4d87396275201f33'
+    - 'a9c2fa21704d30bda18614908d4e89e558fff5b9d5f12d81beb992c4f006024d'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'a9c2fa21704d30bda18614908d4e89e558fff5b9d5f12d81beb992c4f006024d'
+  actual: '8f84aee2187c3f970e7cb5fd7657850e3274c5392c951d6e4d87396275201f33'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-cos-navigation.test.mjs:92:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unchanged protected source: sessionAndTv
+ok 10 - unchanged protected source: sessionAndTv
+  ---
+  duration_ms: 0.490852
+  type: 'test'
+  ...
+# Subtest: unchanged protected source: roleEligibility
+ok 11 - unchanged protected source: roleEligibility
+  ---
+  duration_ms: 0.157085
+  type: 'test'
+  ...
+# Subtest: unchanged protected source: navigationAndUnitHandlers
+ok 12 - unchanged protected source: navigationAndUnitHandlers
+  ---
+  duration_ms: 0.134553
+  type: 'test'
+  ...
+# Subtest: unchanged protected source: sessionRedirect
+ok 13 - unchanged protected source: sessionRedirect
+  ---
+  duration_ms: 0.125135
+  type: 'test'
+  ...
+# Subtest: existing equipment workflow destinations are preserved exactly
+ok 14 - existing equipment workflow destinations are preserved exactly
+  ---
+  duration_ms: 0.373992
+  type: 'test'
+  ...
+# Subtest: More groups remain keyboard-operable under the existing focus trap
+ok 15 - More groups remain keyboard-operable under the existing focus trap
+  ---
+  duration_ms: 0.368332
+  type: 'test'
+  ...
+# Subtest: new style scope cannot change camera state, map, TV, or login selectors
+ok 16 - new style scope cannot change camera state, map, TV, or login selectors
+  ---
+  duration_ms: 0.349587
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves FleetDashboard.tsx
+not ok 17 - unit presentation preserves FleetDashboard.tsx
+  ---
+  duration_ms: 2.230412
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    exactly one view wrapper
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    originalFleetViewMarkup (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-view-source.mjs:7:9)
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:27:50)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: unit presentation preserves FleetUnitHealth.tsx
+ok 18 - unit presentation preserves FleetUnitHealth.tsx
+  ---
+  duration_ms: 0.56378
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves FleetCameraTools.tsx
+ok 19 - unit presentation preserves FleetCameraTools.tsx
+  ---
+  duration_ms: 0.243317
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves FleetBatterySummary.tsx
+ok 20 - unit presentation preserves FleetBatterySummary.tsx
+  ---
+  duration_ms: 0.158729
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves LastKnownCameraStatus.tsx
+ok 21 - unit presentation preserves LastKnownCameraStatus.tsx
+  ---
+  duration_ms: 0.150844
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves fleetDashboardModel.ts
+not ok 22 - unit presentation preserves fleetDashboardModel.ts
+  ---
+  duration_ms: 0.538692
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '0a7a25076bb63c8742af9fd6f8f49261c2e1ec3c'
+    - '10d9042e71f0fee6ad086b24af7befde9d0f2f75'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '10d9042e71f0fee6ad086b24af7befde9d0f2f75'
+  actual: '0a7a25076bb63c8742af9fd6f8f49261c2e1ec3c'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves fieldCameraHealth.ts
+not ok 23 - unit presentation preserves fieldCameraHealth.ts
+  ---
+  duration_ms: 0.286238
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'b524d935a9f92619e5e9617e19a5b04c5a924b33'
+    - '4ceb9709701c961342d09ae7b39335051f59a725'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '4ceb9709701c961342d09ae7b39335051f59a725'
+  actual: 'b524d935a9f92619e5e9617e19a5b04c5a924b33'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves cameraEvidence.ts
+ok 24 - unit presentation preserves cameraEvidence.ts
+  ---
+  duration_ms: 0.169679
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves api.ts
+not ok 25 - unit presentation preserves api.ts
+  ---
+  duration_ms: 0.571144
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '1647e0a906b2a8845f51c1b06441c591d5babc16'
+    - '0b4af248fa22260a5cbea6997281fa15061c83bc'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '0b4af248fa22260a5cbea6997281fa15061c83bc'
+  actual: '1647e0a906b2a8845f51c1b06441c591d5babc16'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves useCameraHealth.ts
+not ok 26 - unit presentation preserves useCameraHealth.ts
+  ---
+  duration_ms: 0.678565
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'a574e2b93147c60b0815552b3e57e8fb74cd91e9'
+    - '8b883c7a61fb9aacc1f46949bb3a46f71ceb5de5'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '8b883c7a61fb9aacc1f46949bb3a46f71ceb5de5'
+  actual: 'a574e2b93147c60b0815552b3e57e8fb74cd91e9'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves refreshCadence.ts
+not ok 27 - unit presentation preserves refreshCadence.ts
+  ---
+  duration_ms: 0.455225
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'c15e6e2959125f33ce43c2c152500062d8f5b167'
+    - 'a5989a95272738fb309dce5b52e2f992e6d4e05e'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'a5989a95272738fb309dce5b52e2f992e6d4e05e'
+  actual: 'c15e6e2959125f33ce43c2c152500062d8f5b167'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves workspaceNavigation.ts
+ok 28 - unit presentation preserves workspaceNavigation.ts
+  ---
+  duration_ms: 0.198443
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves App.tsx
+not ok 29 - unit presentation preserves App.tsx
+  ---
+  duration_ms: 0.283072
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'dc18ebf3a71b80fee56c7e66b4c111faff734beb'
+    - '340003125f6376b5512524f5ad1e91acf4d7f8e5'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '340003125f6376b5512524f5ad1e91acf4d7f8e5'
+  actual: 'dc18ebf3a71b80fee56c7e66b4c111faff734beb'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves fleetDashboard.css
+not ok 30 - unit presentation preserves fleetDashboard.css
+  ---
+  duration_ms: 0.242566
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:25:52'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '854c9d3d9e47c217d1ed7dc48c40108273e6fbc1'
+    - '2264d502ee4f8f34989722630cef8b2d0712f08a'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '2264d502ee4f8f34989722630cef8b2d0712f08a'
+  actual: '854c9d3d9e47c217d1ed7dc48c40108273e6fbc1'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-unit.test.mjs:28:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unit presentation preserves fleetAppearance.css
+ok 31 - unit presentation preserves fleetAppearance.css
+  ---
+  duration_ms: 0.168056
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves fleetSimpleCards.css
+ok 32 - unit presentation preserves fleetSimpleCards.css
+  ---
+  duration_ms: 0.211838
+  type: 'test'
+  ...
+# Subtest: unit presentation preserves fleetBoardLayout.css
+ok 33 - unit presentation preserves fleetBoardLayout.css
+  ---
+  duration_ms: 0.206037
+  type: 'test'
+  ...
+# Subtest: all presentation selectors are limited to the approved Owner unit drawer
+ok 34 - all presentation selectors are limited to the approved Owner unit drawer
+  ---
+  duration_ms: 1.326623
+  type: 'test'
+  ...
+# Subtest: no status colors, invented content, hidden evidence or reversed reading order
+ok 35 - no status colors, invented content, hidden evidence or reversed reading order
+  ---
+  duration_ms: 0.317327
+  type: 'test'
+  ...
+# Subtest: stylesheet is imported once only by approved navigation
+ok 36 - stylesheet is imported once only by approved navigation
+  ---
+  duration_ms: 0.157115
+  type: 'test'
+  ...
+# Subtest: approved navigation component changes only by its presentation import
+ok 37 - approved navigation component changes only by its presentation import
+  ---
+  duration_ms: 0.263876
+  type: 'test'
+  ...
+# Subtest: Owner only groups the original secondary buttons in a native closed disclosure
+ok 38 - Owner only groups the original secondary buttons in a native closed disclosure
+  ---
+  duration_ms: 8.472054
+  type: 'test'
+  ...
+# Subtest: restricted layout retains original direct buttons and no Owner disclosure
+ok 39 - restricted layout retains original direct buttons and no Owner disclosure
+  ---
+  duration_ms: 1.131457
+  type: 'test'
+  ...
+# Subtest: a missing setup button stays absent; no permission is inferred by presentation
+ok 40 - a missing setup button stays absent; no permission is inferred by presentation
+  ---
+  duration_ms: 0.645704
+  type: 'test'
+  ...
+# Subtest: the currently selected secondary view is visible in the collapsed summary
+ok 41 - the currently selected secondary view is visible in the collapsed summary
+  ---
+  duration_ms: 0.452891
+  type: 'test'
+  ...
+# Subtest: the complete original Fleet implementation is restored by the explicit wrapper reversal
+not ok 42 - the complete original Fleet implementation is restored by the explicit wrapper reversal
+  ---
+  duration_ms: 1.200697
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-views.test.mjs:37:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    exactly one view wrapper
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    originalFleetViewMarkup (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-view-source.mjs:7:9)
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-fleet-views.test.mjs:38:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: wrapper contains no data source, clock, link rewriting or new routing
+ok 43 - wrapper contains no data source, clock, link rewriting or new routing
+  ---
+  duration_ms: 0.210115
+  type: 'test'
+  ...
+# Subtest: Fleet navigation CSS does not retheme status evidence or change existing map sizing
+ok 44 - Fleet navigation CSS does not retheme status evidence or change existing map sizing
+  ---
+  duration_ms: 0.246343
+  type: 'test'
+  ...
+# Subtest: blank search preserves all existing eligible tools, groups, and order
+ok 45 - blank search preserves all existing eligible tools, groups, and order
+  ---
+  duration_ms: 2.359094
+  type: 'test'
+  ...
+# Subtest: whitespace behaves as browsing without removing tools
+ok 46 - whitespace behaves as browsing without removing tools
+  ---
+  duration_ms: 0.246333
+  type: 'test'
+  ...
+# Subtest: search uses visible labels and original canonical keys
+ok 47 - search uses visible labels and original canonical keys
+  ---
+  duration_ms: 0.347423
+  type: 'test'
+  ...
+# Subtest: matching is case-insensitive and requires every word
+ok 48 - matching is case-insensitive and requires every word
+  ---
+  duration_ms: 0.193995
+  type: 'test'
+  ...
+# Subtest: a group name can find its existing tools without inventing destinations
+ok 49 - a group name can find its existing tools without inventing destinations
+  ---
+  duration_ms: 0.34059
+  type: 'test'
+  ...
+# Subtest: tracker eligibility is applied before any search
+ok 50 - tracker eligibility is applied before any search
+  ---
+  duration_ms: 0.265689
+  type: 'test'
+  ...
+# Subtest: unexpected text is a literal query, not a regex or record lookup
+ok 51 - unexpected text is a literal query, not a regex or record lookup
+  ---
+  duration_ms: 0.324831
+  type: 'test'
+  ...
+# Subtest: search leaves metadata unchanged and does not duplicate tools
+ok 52 - search leaves metadata unchanged and does not duplicate tools
+  ---
+  duration_ms: 1.212599
+  type: 'test'
+  ...
+# Subtest: the More search has no operational reader, storage, timer, or HTML injection
+ok 53 - the More search has no operational reader, storage, timer, or HTML injection
+  ---
+  duration_ms: 0.77648
+  type: 'test'
+  ...
+# Subtest: the separate mobile More button uses the approved selection style
+ok 54 - the separate mobile More button uses the approved selection style
+  ---
+  duration_ms: 0.501462
+  type: 'test'
+  ...
+# Subtest: App differs only by the Owner mobile More highlight class
+not ok 55 - App differs only by the Owner mobile More highlight class
+  ---
+  duration_ms: 1.871758
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-tool-search.test.mjs:55:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '05cc472f4472fe61449bd08e9388b57836a3a4e1'
+    - 'c0a9de4091a114c5ed4c1c47b507eed7ef8db1b0'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'c0a9de4091a114c5ed4c1c47b507eed7ef8db1b0'
+  actual: '05cc472f4472fe61449bd08e9388b57836a3a4e1'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/approved-tool-search.test.mjs:58:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: same initial pair and a cache hit preserve exact map identity and preparation marker
+ok 56 - same initial pair and a cache hit preserve exact map identity and preparation marker
+  ---
+  duration_ms: 152.179298
+  type: 'test'
+  ...
+# Subtest: ordinary Prepare map GET publishes no fleet event and changes no displayed identity
+not ok 57 - ordinary Prepare map GET publishes no fleet event and changes no displayed identity
+  ---
+  duration_ms: 84.498216
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:56:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:57:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: unchanged
+not ok 58 - semantic admission preserves source/session/selection boundary: unchanged
+  ---
+  duration_ms: 64.46442
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: address
+not ok 59 - semantic admission preserves source/session/selection boundary: address
+  ---
+  duration_ms: 44.391465
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: marker
+not ok 60 - semantic admission preserves source/session/selection boundary: marker
+  ---
+  duration_ms: 43.967077
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: historical GPS
+not ok 61 - semantic admission preserves source/session/selection boundary: historical GPS
+  ---
+  duration_ms: 54.77403
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: alias
+not ok 62 - semantic admission preserves source/session/selection boundary: alias
+  ---
+  duration_ms: 48.413806
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: global proof
+not ok 63 - semantic admission preserves source/session/selection boundary: global proof
+  ---
+  duration_ms: 57.577381
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: other source
+not ok 64 - semantic admission preserves source/session/selection boundary: other source
+  ---
+  duration_ms: 44.482426
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: selection
+not ok 65 - semantic admission preserves source/session/selection boundary: selection
+  ---
+  duration_ms: 47.302144
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: semantic admission preserves source/session/selection boundary: session
+not ok 66 - semantic admission preserves source/session/selection boundary: session
+  ---
+  duration_ms: 36.38136
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:59:130'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:60:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: equality ignores only the top-level clock and object key ordering
+ok 67 - equality ignores only the top-level clock and object key ordering
+  ---
+  duration_ms: 0.943483
+  type: 'test'
+  ...
+# Subtest: real same-role parent token rollover clears preparation without clearing selected detail
+not ok 68 - real same-role parent token rollover clears preparation without clearing selected detail
+  ---
+  duration_ms: 37.254771
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:83:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:84:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a fleet pair begun before Prepare POST cannot publish after its revision fence
+not ok 69 - a fleet pair begun before Prepare POST cannot publish after its revision fence
+  ---
+  duration_ms: 34.575155
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:88:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:89:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: retains ordinary idle fleet adoption and its new read clock
+not ok 70 - retains ordinary idle fleet adoption and its new read clock
+  ---
+  duration_ms: 36.83881
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:94:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:95:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: fleet effect during POST preserves visible receipt
+not ok 71 - fleet effect during POST preserves visible receipt
+  ---
+  duration_ms: 33.180904
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:99:82'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:100:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: fleet effect during POST preserves visible source_hold
+not ok 72 - fleet effect during POST preserves visible source_hold
+  ---
+  duration_ms: 36.093278
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:99:82'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:100:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: fleet effect after finally preserves visible receipt
+not ok 73 - fleet effect after finally preserves visible receipt
+  ---
+  duration_ms: 37.813382
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:99:82'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:100:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: fleet effect after finally preserves visible source_hold
+not ok 74 - fleet effect after finally preserves visible source_hold
+  ---
+  duration_ms: 40.982397
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:99:82'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:100:14)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: dirty installation inputs keep the displayed snapshot until the existing pause clears
+not ok 75 - dirty installation inputs keep the displayed snapshot until the existing pause clears
+  ---
+  duration_ms: 31.88534
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:118:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The exact refresh harness must run all production dependencies before checking fleet adoption.
+    + actual - expected
+    
+    + 'setRefreshMap is not defined'
+    - ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: 'setRefreshMap is not defined'
+  operator: 'strictEqual'
+  stack: |-
+    boot (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:48:264)
+    async TestContext.<anonymous> (/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs:119:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..75
+# tests 75
+# suites 0
+# pass 45
+# fail 30
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3526.028201

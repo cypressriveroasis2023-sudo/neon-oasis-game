@@ -1,0 +1,21 @@
+{
+  "scope": "Source-label compatibility only; no production deployment performed",
+  "files": [
+    {
+      "path": "tech-checks/supabase/functions/cos-operations-pages/mhelp2027ConnectionCensus.ts",
+      "beforeSha256": "7db279a2f91261c38df55dfdae86a021e5fa836486860823c05d1e9b2bab8594",
+      "afterSha256": "a3600681b6b585273c7a0ceda348c60fe082a01259d7da9aec1af1e827b735a5",
+      "prepend": "import {isTrackerSourceLabel} from '../../../operations/src/trackerSourceLabel.ts';\n",
+      "needle": "!/^ServiceItem_List_[0-9]{14}\\.csv$/.test(e[0])",
+      "replacement": "!isTrackerSourceLabel(e[0])"
+    },
+    {
+      "path": "tech-checks/operations/src/exactProductConnection.ts",
+      "beforeSha256": "fac046c2e3833bb1de9ffce201640ceec4e40421794dde84407a981e8b51f653",
+      "afterSha256": "6528b0aff6968265c9f165a2e1ff368541499c3d4c50f54d45380ad05397ab19",
+      "prepend": "import {isTrackerSourceLabel} from './trackerSourceLabel';\n",
+      "needle": "!/^ServiceItem_List_[0-9]{14}\\.csv$/.test(tracker.sourceExport)",
+      "replacement": "!isTrackerSourceLabel(tracker.sourceExport)"
+    }
+  ]
+}

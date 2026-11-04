@@ -1,0 +1,72 @@
+TAP version 13
+# (node:2147) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual deployed reader and classifier accept truthful API provenance together
+ok 1 - actual deployed reader and classifier accept truthful API provenance together
+  ---
+  duration_ms: 22.649391
+  type: 'test'
+  ...
+# Subtest: recorded deployment still accepts legacy CSV provenance
+ok 2 - recorded deployment still accepts legacy CSV provenance
+  ---
+  duration_ms: 2.09873
+  type: 'test'
+  ...
+# Subtest: explicitly absent historical index rows do not block current equipment
+ok 3 - explicitly absent historical index rows do not block current equipment
+  ---
+  duration_ms: 2.342462
+  type: 'test'
+  ...
+# Subtest: unexplained historical membership is still rejected
+ok 4 - unexplained historical membership is still rejected
+  ---
+  duration_ms: 1.23066
+  type: 'test'
+  ...
+# Subtest: an active Product ID cannot also be declared absent
+ok 5 - an active Product ID cannot also be declared absent
+  ---
+  duration_ms: 1.890471
+  type: 'test'
+  ...
+# Subtest: duplicate and invalid absence evidence are rejected
+ok 6 - duplicate and invalid absence evidence are rejected
+  ---
+  duration_ms: 1.402264
+  type: 'test'
+  ...
+# Subtest: a changed protected source stops before any Google request
+ok 7 - a changed protected source stops before any Google request
+  ---
+  duration_ms: 0.124625
+  type: 'test'
+  ...
+# Subtest: the deployed archive-IP reservation still prevents a positive
+ok 8 - the deployed archive-IP reservation still prevents a positive
+  ---
+  duration_ms: 1.6344
+  type: 'test'
+  ...
+# Subtest: a shared Shop IP remains held and Shop is excluded from Field results
+ok 9 - a shared Shop IP remains held and Shop is excluded from Field results
+  ---
+  duration_ms: 1.497907
+  type: 'test'
+  ...
+# Subtest: cancellation stops before reading protected inventory
+ok 10 - cancellation stops before reading protected inventory
+  ---
+  duration_ms: 0.472222
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 190.996395

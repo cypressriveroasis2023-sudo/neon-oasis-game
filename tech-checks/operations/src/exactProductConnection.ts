@@ -1,3 +1,4 @@
+import {isTrackerSourceLabel} from './trackerSourceLabel';
 import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import {cameraTimestamp} from './cameraEvidence';
 import {savedCameraConnection} from '../../supabase/functions/cos-operations-pages/cameraEvidence';
@@ -154,7 +155,7 @@ export function buildExactProductConnections(
   ||!Array.isArray(devices)||devices.length>10000)return null;
  const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
  if(reachabilityOnly&&!isolated)return null;
- if(isolated&&(!HASH.test(tracker.trackerSourceSha256)||!/^ServiceItem_List_[0-9]{14}\.csv$/.test(tracker.sourceExport)))return null;
+ if(isolated&&(!HASH.test(tracker.trackerSourceSha256)||!isTrackerSourceLabel(tracker.sourceExport)))return null;
  const products=(acceptedMhelp as {records:Record<string,any>[]}).records;
  const expected=new Map(products.map(p=>[p.productId,p]));
  const byProduct=new Map<string,VerifiedTrackerIpRow>();

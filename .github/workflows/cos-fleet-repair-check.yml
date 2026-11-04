@@ -1,0 +1,82 @@
+name: COS Fleet repair check
+on:
+  push:
+    branches: [fix/fleet-verification-progress-20261104]
+    paths:
+      - '.github/workflows/cos-fleet-repair-check.yml'
+      - '.github/scripts/fleet-source-repair*'
+      - 'tech-checks/operations/src/**'
+      - 'tech-checks/operations/tests/fleet-verification-progress*'
+      - 'tech-checks/operations/tests/fleet-source-provenance*'
+permissions:
+  contents: write
+concurrency:
+  group: cos-fleet-repair-check
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fleet-verification-progress-20261104
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Prepare hash-guarded compatibility repair
+        run: node .github/scripts/fleet-source-repair-20261104.mjs
+      - name: Install pinned dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test and build without changing production
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          node --import tsx --test tests/fleet-source-provenance.test.mjs tests/fleet-verification-progress.test.mjs tests/mhelp-2027-connection-census.test.mjs tests/exact-product-connection.test.mjs tests/durable-fleet-board.test.mjs tests/durable-fleet-client.test.mjs tests/saved-camera-refresh-scheduling.test.mjs > ../../repair-evidence/targeted-tests.txt 2>&1
+          targeted=$?
+          npm run typecheck > ../../repair-evidence/typecheck.txt 2>&1
+          types=$?
+          npm run build > ../../repair-evidence/build.txt 2>&1
+          build=$?
+          printf '{"targetedTests":%s,"typecheck":%s,"build":%s}\n' "$targeted" "$types" "$build" > ../../repair-evidence/check-results.json
+          test "$targeted" = 0 && test "$types" = 0 && test "$build" = 0
+      - name: Install project browser
+        working-directory: tech-checks/operations
+        run: npx playwright install --with-deps chromium
+      - name: Verify browser persistence and verification
+        working-directory: tech-checks/operations
+        run: |
+          set +e
+          npm run test:browser -- --workers=2 --retries=0 tests/fleet-verify-now.browser.spec.mjs tests/durable-fleet-board.browser.spec.mjs > ../../repair-evidence/browser-tests.txt 2>&1
+          result=$?
+          printf '{"browserTests":%s}\n' "$result" > ../../repair-evidence/browser-results.json
+          exit "$result"
+      - name: Preserve reviewable source and evidence
+        if: always()
+        run: |
+          git config user.name 'COS repair verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add repair-evidence tech-checks/operations/src/trackerSourceLabel.ts tech-checks/operations/src/exactProductConnection.ts tech-checks/operations/tests/fleet-source-provenance.test.mjs tech-checks/supabase/functions/cos-operations-pages/mhelp2027ConnectionCensus.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record guarded API provenance repair and verified test outcomes'
+            git push origin HEAD:fix/fleet-verification-progress-20261104
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-fleet-repair-browser-evidence
+          path: |
+            repair-evidence
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: cos-fleet-repair-built-frontend
+          path: tech-checks/operations/dist
+          if-no-files-found: error
+          retention-days: 3
