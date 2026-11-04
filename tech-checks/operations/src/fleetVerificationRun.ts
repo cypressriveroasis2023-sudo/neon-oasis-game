@@ -15,6 +15,21 @@ type Options = {
 };
 class InvalidVerificationReceipt extends Error {}
 const blocked=(error:unknown)=>error instanceof InvalidVerificationReceipt||[401,403,409].includes(Number((error as {response?:{status?:unknown}})?.response?.status));
+/** Keep a bounded API explanation, not arbitrary thrown payloads or stacks. */
+function requestFailureDetail(error:unknown):string {
+ if(!(error instanceof Error)||error.name!=='OperationsApiError')return '';
+ const reported=(error as Error & {response?:{data?:{error?:unknown}}}).response?.data?.error;
+ return typeof reported==='string'&&reported===error.message&&reported.length>0&&reported.length<=500&&
+  !/[\x00-\x1f\x7f<>]/.test(reported)?reported+' ':'';
+}
+export function verificationOutcomeLabel(row:VerificationRow):string {
+ if(row.outcome==='not_confirmed')return 'Check not confirmed';
+ if(row.status==='online')return 'Online';
+ if(row.status==='offline')return 'Offline';
+ // A failed/stale check is not a request to change working camera settings.
+ return /^(?:No verified public tracker IP is available\b|Saved camera IP or port configuration needs correction\.)/.test(row.reason)
+  ?'Needs correction':'Unresolved';
+}
 function readReceipt(value:unknown,batch:VerifyProduct[]):Receipt {
  const v=value as Receipt|null;
  if(!v||v.contract!=='COS_VERIFY_PRODUCTS_NOW_V1'||!Array.isArray(v.items)||v.items.length!==batch.length||
@@ -43,8 +58,8 @@ export async function runFleetVerification(products:VerifyProduct[],options:Opti
    stop=blocked(error);
    rows.push(...batch.map(p=>({productId:p.productId,name:p.unitNumber,status:'unknown' as const,
     checkedAt:null,outcome:'not_confirmed' as const,
-    reason:stop?'Verification stopped because access, source state or the response could not be confirmed. No automatic retry was made.':
-     'This request did not return a confirmed result. It may have saved some checks; saved results are being reloaded. The request was not repeated.'})));
+    reason:requestFailureDetail(error)+(stop?'Verification stopped because access, source state or the response could not be confirmed. No automatic retry was made.':
+     'This request did not return a confirmed result. It may have saved some checks; saved results are being reloaded. The request was not repeated.')})));
   }
   if(!options.current())return null;
   options.progress?.([...rows],snapshot.length,'reading');
