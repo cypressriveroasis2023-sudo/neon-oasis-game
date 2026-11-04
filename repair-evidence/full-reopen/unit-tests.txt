@@ -2,211 +2,211 @@ TAP version 13
 # Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
 ok 1 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
   ---
-  duration_ms: 6.843461
+  duration_ms: 11.150412
   type: 'test'
   ...
 # Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
 ok 2 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
   ---
-  duration_ms: 3.484218
+  duration_ms: 0.438727
   type: 'test'
   ...
 # Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
 ok 3 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
   ---
-  duration_ms: 4.419879
+  duration_ms: 6.342399
   type: 'test'
   ...
 # Subtest: a provider name or suffix collision cannot influence independent product proof
 ok 4 - a provider name or suffix collision cannot influence independent product proof
   ---
-  duration_ms: 0.261929
+  duration_ms: 0.323433
   type: 'test'
   ...
 # Subtest: duplicate tracker IP claimed by Shop or another Field product is held
 ok 5 - duplicate tracker IP claimed by Shop or another Field product is held
   ---
-  duration_ms: 0.251283
+  duration_ms: 2.172385
   type: 'test'
   ...
 # Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
 ok 6 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
   ---
-  duration_ms: 0.18129
+  duration_ms: 0.332219
   type: 'test'
   ...
 # Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
 ok 7 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
   ---
-  duration_ms: 0.20884
+  duration_ms: 0.426204
   type: 'test'
   ...
 # Subtest: all 2027 product identities and placements must reconcile before using any check
 ok 8 - all 2027 product identities and placements must reconcile before using any check
   ---
-  duration_ms: 1.494642
+  duration_ms: 0.376651
   type: 'test'
   ...
 # Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
 ok 9 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
   ---
-  duration_ms: 0.427576
+  duration_ms: 0.739517
   type: 'test'
   ...
 # Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
 ok 10 - browser-facing source receipt must cover every exact Product ID and retain the original check time
   ---
-  duration_ms: 0.730946
+  duration_ms: 1.739178
   type: 'test'
   ...
 # Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
 ok 11 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
   ---
-  duration_ms: 0.408988
+  duration_ms: 0.615075
   type: 'test'
   ...
 # Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
 ok 12 - live saved port schema requires measured attempt evidence, not invented Boolean port state
   ---
-  duration_ms: 0.413324
+  duration_ms: 0.593956
   type: 'test'
   ...
 # Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
 ok 13 - a stale reviewed mHelp source cannot authorize currently online camera product claims
   ---
-  duration_ms: 0.165856
+  duration_ms: 0.280362
   type: 'test'
   ...
 # Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
 ok 14 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
   ---
-  duration_ms: 0.474295
+  duration_ms: 0.71404
   type: 'test'
   ...
 # Subtest: one result expiring in transit does not erase another fresh Product ID
 ok 15 - one result expiring in transit does not erase another fresh Product ID
   ---
-  duration_ms: 0.22882
+  duration_ms: 0.383453
   type: 'test'
   ...
 # Subtest: each batch reaches saved readback before another POST starts
 ok 16 - each batch reaches saved readback before another POST starts
   ---
-  duration_ms: 3.692728
+  duration_ms: 3.666788
   type: 'test'
   ...
 # Subtest: a failed middle POST is not retried and cannot hide successful batches
 ok 17 - a failed middle POST is not retried and cannot hide successful batches
   ---
-  duration_ms: 1.792724
+  duration_ms: 1.599728
   type: 'test'
   ...
 # Subtest: a failed final batch still gets a read-only recovery
 ok 18 - a failed final batch still gets a read-only recovery
   ---
-  duration_ms: 0.471431
+  duration_ms: 0.510521
   type: 'test'
   ...
 # Subtest: display readback failure does not discard returned readings or retry checks
 ok 19 - display readback failure does not discard returned readings or retry checks
   ---
-  duration_ms: 1.409215
+  duration_ms: 0.699563
   type: 'test'
   ...
 # Subtest: authorization failure stops subsequent batches
 ok 20 - authorization failure stops subsequent batches
   ---
-  duration_ms: 0.301087
+  duration_ms: 0.475745
   type: 'test'
   ...
 # Subtest: malformed, duplicate, wrong-target, or missing-timestamp results stop safely
 ok 21 - malformed, duplicate, wrong-target, or missing-timestamp results stop safely
   ---
-  duration_ms: 0.534043
+  duration_ms: 1.022804
   type: 'test'
   ...
 # Subtest: session changes prevent readback and publication of late POST results
 ok 22 - session changes prevent readback and publication of late POST results
   ---
-  duration_ms: 0.218826
+  duration_ms: 0.341897
   type: 'test'
   ...
 # Subtest: a session change during readback prevents the next POST
 ok 23 - a session change during readback prevents the next POST
   ---
-  duration_ms: 0.250413
+  duration_ms: 0.479764
   type: 'test'
   ...
 # Subtest: unknown is unresolved, never counted as online, offline or successful setup
 ok 24 - unknown is unresolved, never counted as online, offline or successful setup
   ---
-  duration_ms: 0.337542
+  duration_ms: 1.969197
   type: 'test'
   ...
 # Subtest: input list changes during readback do not lose selected targets
 ok 25 - input list changes during readback do not lose selected targets
   ---
-  duration_ms: 0.399494
+  duration_ms: 0.75204
   type: 'test'
   ...
 # Subtest: duplicate products are checked once and batch size remains four
 ok 26 - duplicate products are checked once and batch size remains four
   ---
-  duration_ms: 0.232225
+  duration_ms: 0.400546
   type: 'test'
   ...
 # Subtest: offline evidence remains offline, not rewritten by the browser
 ok 27 - offline evidence remains offline, not rewritten by the browser
   ---
-  duration_ms: 0.138496
+  duration_ms: 1.325689
   type: 'test'
   ...
 # Subtest: full presentation round trip preserves unit details and ORIGINAL check time
 ok 28 - full presentation round trip preserves unit details and ORIGINAL check time
   ---
-  duration_ms: 9.011111
+  duration_ms: 14.398029
   type: 'test'
   ...
 # Subtest: other account, mode, permissions and unauthenticated readers cannot restore private details
 ok 29 - other account, mode, permissions and unauthenticated readers cannot restore private details
   ---
-  duration_ms: 1.046776
+  duration_ms: 3.821126
   type: 'test'
   ...
 # Subtest: partial checks, source mismatch, malformed dates and future readings are rejected
 ok 30 - partial checks, source mismatch, malformed dates and future readings are rejected
   ---
-  duration_ms: 1.668449
+  duration_ms: 5.276505
   type: 'test'
   ...
 # Subtest: valid connection-only dashboard persists when provider health is unavailable
 ok 31 - valid connection-only dashboard persists when provider health is unavailable
   ---
-  duration_ms: 0.574994
+  duration_ms: 1.41276
   type: 'test'
   ...
 # Subtest: credential fields are never serialized and private invalidation leaves unrelated storage alone
 ok 32 - credential fields are never serialized and private invalidation leaves unrelated storage alone
   ---
-  duration_ms: 0.684437
+  duration_ms: 1.725793
   type: 'test'
   ...
 # Subtest: disabled storage, oversized data and corrupt cache are nonfatal
 ok 33 - disabled storage, oversized data and corrupt cache are nonfatal
   ---
-  duration_ms: 12.981613
+  duration_ms: 30.373064
   type: 'test'
   ...
 # Subtest: older presentation cannot replace a newer completed dashboard
 ok 34 - older presentation cannot replace a newer completed dashboard
   ---
-  duration_ms: 1.003661
+  duration_ms: 1.859533
   type: 'test'
   ...
 # Subtest: completed readings survive a new reader and stay scoped to the verified Owner
 ok 35 - completed readings survive a new reader and stay scoped to the verified Owner
   ---
-  duration_ms: 1.241916
+  duration_ms: 1.692291
   type: 'test'
   ...
 1..35
@@ -217,4 +217,4 @@ ok 35 - completed readings survive a new reader and stay scoped to the verified 
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 510.558122
+# duration_ms 692.36029
