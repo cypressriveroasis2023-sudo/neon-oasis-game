@@ -17,6 +17,6 @@ export function fleetRouteAllowed(method: string, path: string): boolean {
   ]).has(path);
 }
 export function fleetFeatures() {
-  return { durableFleetBoard: true,unitTracker:true, fleetAccess:true, vrmRead:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
+  return { durableFleetBoard: false,unitTracker:true, fleetAccess:true, vrmRead:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
     cameraHealthV2:true, fieldLocationVerification:false, mhelpTicketImport:false, deliveryGoBack:false};
 }
