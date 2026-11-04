@@ -1,0 +1,343 @@
+TAP version 13
+# Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
+ok 1 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
+  ---
+  duration_ms: 10.794145
+  type: 'test'
+  ...
+# Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
+ok 2 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
+  ---
+  duration_ms: 0.39678
+  type: 'test'
+  ...
+# Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
+ok 3 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
+  ---
+  duration_ms: 5.977187
+  type: 'test'
+  ...
+# Subtest: a provider name or suffix collision cannot influence independent product proof
+ok 4 - a provider name or suffix collision cannot influence independent product proof
+  ---
+  duration_ms: 0.257316
+  type: 'test'
+  ...
+# Subtest: duplicate tracker IP claimed by Shop or another Field product is held
+ok 5 - duplicate tracker IP claimed by Shop or another Field product is held
+  ---
+  duration_ms: 0.29449
+  type: 'test'
+  ...
+# Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
+ok 6 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
+  ---
+  duration_ms: 0.239696
+  type: 'test'
+  ...
+# Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
+ok 7 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
+  ---
+  duration_ms: 0.356242
+  type: 'test'
+  ...
+# Subtest: all 2027 product identities and placements must reconcile before using any check
+ok 8 - all 2027 product identities and placements must reconcile before using any check
+  ---
+  duration_ms: 0.284358
+  type: 'test'
+  ...
+# Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
+ok 9 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
+  ---
+  duration_ms: 2.341521
+  type: 'test'
+  ...
+# Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
+ok 10 - browser-facing source receipt must cover every exact Product ID and retain the original check time
+  ---
+  duration_ms: 0.921616
+  type: 'test'
+  ...
+# Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
+ok 11 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
+  ---
+  duration_ms: 3.488944
+  type: 'test'
+  ...
+# Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
+ok 12 - live saved port schema requires measured attempt evidence, not invented Boolean port state
+  ---
+  duration_ms: 1.390224
+  type: 'test'
+  ...
+# Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
+ok 13 - a stale reviewed mHelp source cannot authorize currently online camera product claims
+  ---
+  duration_ms: 2.221176
+  type: 'test'
+  ...
+# Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
+ok 14 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
+  ---
+  duration_ms: 0.493573
+  type: 'test'
+  ...
+# Subtest: one result expiring in transit does not erase another fresh Product ID
+ok 15 - one result expiring in transit does not erase another fresh Product ID
+  ---
+  duration_ms: 0.230858
+  type: 'test'
+  ...
+# Subtest: combined roster is one typed population with source equipment separate from UUID units
+ok 16 - combined roster is one typed population with source equipment separate from UUID units
+  ---
+  duration_ms: 1.886249
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: duplicate record
+ok 17 - invalid roster cannot supply trusted counts: duplicate record
+  ---
+  duration_ms: 0.419844
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: duplicate UUID
+ok 18 - invalid roster cannot supply trusted counts: duplicate UUID
+  ---
+  duration_ms: 0.326217
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: invented UUID
+ok 19 - invalid roster cannot supply trusted counts: invented UUID
+  ---
+  duration_ms: 0.115945
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: count mismatch
+ok 20 - invalid roster cannot supply trusted counts: count mismatch
+  ---
+  duration_ms: 0.122581
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: unknown contract
+ok 21 - invalid roster cannot supply trusted counts: unknown contract
+  ---
+  duration_ms: 0.113718
+  type: 'test'
+  ...
+# Subtest: invalid roster cannot supply trusted counts: invalid timestamp
+ok 22 - invalid roster cannot supply trusted counts: invalid timestamp
+  ---
+  duration_ms: 0.14722
+  type: 'test'
+  ...
+# Subtest: source filters preserve field/shop/held and lifecycle distinctions without inventing health or nearby positions
+ok 23 - source filters preserve field/shop/held and lifecycle distinctions without inventing health or nearby positions
+  ---
+  duration_ms: 0.668088
+  type: 'test'
+  ...
+# Subtest: source card is read-only, clearly unlinked and never turns customer address into installation evidence
+ok 24 - source card is read-only, clearly unlinked and never turns customer address into installation evidence
+  ---
+  duration_ms: 22.634598
+  type: 'test'
+  ...
+# Subtest: identity-review source placement is visible but excluded from confirmed field and health
+ok 25 - identity-review source placement is visible but excluded from confirmed field and health
+  ---
+  duration_ms: 1.693528
+  type: 'test'
+  ...
+# Subtest: alias display stays separate from source identity and all summary dimensions are checked
+ok 26 - alias display stays separate from source identity and all summary dimensions are checked
+  ---
+  duration_ms: 1.305851
+  type: 'test'
+  ...
+# Subtest: canonical UUID inventory must be the same roster population, never an extra parallel count
+ok 27 - canonical UUID inventory must be the same roster population, never an extra parallel count
+  ---
+  duration_ms: 0.431993
+  type: 'test'
+  ...
+# Subtest: linked placement and active eligibility cannot disagree between roster and canonical inventory
+ok 28 - linked placement and active eligibility cannot disagree between roster and canonical inventory
+  ---
+  duration_ms: 0.352897
+  type: 'test'
+  ...
+# Subtest: identity review cannot be relabeled FIELD or SHOP even with matching recomputed totals
+ok 29 - identity review cannot be relabeled FIELD or SHOP even with matching recomputed totals
+  ---
+  duration_ms: 0.186867
+  type: 'test'
+  ...
+# Subtest: Field setup excludes Shop ROOT, unresolved placement and inactive records without hiding them from inventory
+ok 30 - Field setup excludes Shop ROOT, unresolved placement and inactive records without hiding them from inventory
+  ---
+  duration_ms: 0.155658
+  type: 'test'
+  ...
+# Subtest: every Field Product ID appears once in a complete partition; Shop never enters it
+ok 31 - every Field Product ID appears once in a complete partition; Shop never enters it
+  ---
+  duration_ms: 9.579046
+  type: 'test'
+  ...
+# Subtest: possible candidate matches cannot inherit healthy native evidence
+ok 32 - possible candidate matches cannot inherit healthy native evidence
+  ---
+  duration_ms: 1.910816
+  type: 'test'
+  ...
+# Subtest: inactive source lifecycle stays separate even when a linked service responds
+ok 33 - inactive source lifecycle stays separate even when a linked service responds
+  ---
+  duration_ms: 1.05396
+  type: 'test'
+  ...
+# Subtest: missing, duplicate or inconsistent unit associations never assign an online product
+ok 34 - missing, duplicate or inconsistent unit associations never assign an online product
+  ---
+  duration_ms: 2.101225
+  type: 'test'
+  ...
+# Subtest: malformed, incomplete or duplicate-source receipts cannot produce a certified count
+ok 35 - malformed, incomplete or duplicate-source receipts cannot produce a certified count
+  ---
+  duration_ms: 0.999219
+  type: 'test'
+  ...
+# Subtest: service reachability retains its basis and never claims verified video
+ok 36 - service reachability retains its basis and never claims verified video
+  ---
+  duration_ms: 1.082317
+  type: 'test'
+  ...
+# Subtest: all 287 Field Product IDs reconcile without importing the 714 Shop records into health
+ok 37 - all 287 Field Product IDs reconcile without importing the 714 Shop records into health
+  ---
+  duration_ms: 12.412429
+  type: 'test'
+  ...
+# Subtest: obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health
+ok 38 - obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health
+  ---
+  duration_ms: 0.974895
+  type: 'test'
+  ...
+# file:///home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-equipment.test.mjs:3
+# import {createOwnerHandler,assertTarget} from '../../supabase/functions/cos-owner-equipment/runtime.ts';
+#                            ^^^^^^^^^^^^
+# SyntaxError: The requested module '../../supabase/functions/cos-owner-equipment/runtime.ts' does not provide an export named 'assertTarget'
+#     at ModuleJob._instantiate (node:internal/modules/esm/module_job:182:21)
+#     at async ModuleJob.run (node:internal/modules/esm/module_job:266:5)
+#     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+# Node.js v22.16.0
+# Subtest: tests/owner-equipment.test.mjs
+not ok 4 - tests/owner-equipment.test.mjs
+  ---
+  duration_ms: 363.561265
+  type: 'test'
+  location: '/home/runner/work/neon-oasis-game/neon-oasis-game/tech-checks/operations/tests/owner-equipment.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: exact Product ID may change native Fleet display status but never raw provider proof
+ok 40 - exact Product ID may change native Fleet display status but never raw provider proof
+  ---
+  duration_ms: 1.491015
+  type: 'test'
+  ...
+# Subtest: duplicate ownership, Shop, support, inactive, malformed or stale observations cannot override the native signal
+ok 41 - duplicate ownership, Shop, support, inactive, malformed or stale observations cannot override the native signal
+  ---
+  duration_ms: 0.289059
+  type: 'test'
+  ...
+# Subtest: verified Unknown TCP result supersedes a native provider Online label
+ok 42 - verified Unknown TCP result supersedes a native provider Online label
+  ---
+  duration_ms: 0.169568
+  type: 'test'
+  ...
+# Subtest: selected Camera Health unit detail uses Product-ID TCP status instead of provider Online
+ok 43 - selected Camera Health unit detail uses Product-ID TCP status instead of provider Online
+  ---
+  duration_ms: 0.211933
+  type: 'test'
+  ...
+# Subtest: unavailable required Product-ID source propagates Unknown without claiming endpoint identity
+ok 44 - unavailable required Product-ID source propagates Unknown without claiming endpoint identity
+  ---
+  duration_ms: 0.164623
+  type: 'test'
+  ...
+# Subtest: full presentation round trip preserves unit details and ORIGINAL check time
+ok 45 - full presentation round trip preserves unit details and ORIGINAL check time
+  ---
+  duration_ms: 5.870984
+  type: 'test'
+  ...
+# Subtest: other account, mode, permissions and unauthenticated readers cannot restore private details
+ok 46 - other account, mode, permissions and unauthenticated readers cannot restore private details
+  ---
+  duration_ms: 0.999059
+  type: 'test'
+  ...
+# Subtest: partial checks, source mismatch, malformed dates and future readings are rejected
+ok 47 - partial checks, source mismatch, malformed dates and future readings are rejected
+  ---
+  duration_ms: 2.657969
+  type: 'test'
+  ...
+# Subtest: valid connection-only dashboard persists when provider health is unavailable
+ok 48 - valid connection-only dashboard persists when provider health is unavailable
+  ---
+  duration_ms: 0.648057
+  type: 'test'
+  ...
+# Subtest: credential fields are never serialized and private invalidation leaves unrelated storage alone
+ok 49 - credential fields are never serialized and private invalidation leaves unrelated storage alone
+  ---
+  duration_ms: 0.707554
+  type: 'test'
+  ...
+# Subtest: disabled storage, oversized data and corrupt cache are nonfatal
+ok 50 - disabled storage, oversized data and corrupt cache are nonfatal
+  ---
+  duration_ms: 15.436304
+  type: 'test'
+  ...
+# Subtest: older presentation cannot replace a newer completed dashboard
+ok 51 - older presentation cannot replace a newer completed dashboard
+  ---
+  duration_ms: 0.808421
+  type: 'test'
+  ...
+# Subtest: one-millisecond local display clock mismatch saves both views without changing camera observations
+ok 52 - one-millisecond local display clock mismatch saves both views without changing camera observations
+  ---
+  duration_ms: 0.742346
+  type: 'test'
+  ...
+# Subtest: local display clock normalization never renews old readings or accepts larger clock reversals
+ok 53 - local display clock normalization never renews old readings or accepts larger clock reversals
+  ---
+  duration_ms: 0.474612
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 52
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 802.507123

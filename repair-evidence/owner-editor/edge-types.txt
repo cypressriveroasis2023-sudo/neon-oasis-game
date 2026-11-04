@@ -1,0 +1,1 @@
+[0m[32mCheck[0m tech-checks/supabase/functions/cos-owner-equipment/index.ts

@@ -1,0 +1,43 @@
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+CREATE SCHEMA
+CREATE SCHEMA
+CREATE TABLE
+INSERT 0 1
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE SCHEMA
+REVOKE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+CREATE TABLE
+ALTER TABLE
+REVOKE
+INSERT 0 1
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+BEGIN
+psql:tech-checks/operations/tests/owner-equipment.database.test.sql:30: NOTICE:  Owner persistence, conflict, privilege, idempotency, revision, lease, retention and release checks passed.
+DO
+ validated_list_call 
+---------------------
+                   1
+(1 row)
+
+ROLLBACK
