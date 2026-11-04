@@ -1,3 +1,5 @@
+import ViewErrorBoundary from './ViewErrorBoundary';
+import { savedFleetStatus } from './api';
 import AnimatedEye from './AnimatedEye';
 import {fleetVrmReadAllowed} from './fleetDashboardModel';
 import { AreaIcon } from './VisionAreas';
@@ -182,6 +184,21 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
     {!items&&!error?<p role='status'>Loading Owner Tasks…</p>:<div className='records'>{(items||[]).map(row=><button disabled={saving} type='button' className='record op-record' key={row.id} onClick={()=>edit(row)}><div><strong>{row.title}</strong><small>{String(row.priority||'').toUpperCase()} · {row.assignedTo||String(row.assignedDepartment||'').toUpperCase()} · {row.jobNumber||row.siteName||'General'}{row.dueAt?' · Due '+new Date(row.dueAt).toLocaleString():''}</small></div><em>{String(row.status||'').replaceAll('_',' ').toUpperCase()}</em></button>)}{items?.length===0&&<p>No Owner Tasks in the current records. Create a daily assignment for IT or Service.</p>}</div>}
   </section>;
 }
+function FleetDisplayRecovery({retry, reference}: {retry: () => void; reference: string}) {
+  const board = savedFleetStatus()?.latest?.payload;
+  const counts = board?.contract === 'COS_SAVED_FLEET_BOARD_V1' ? board.counts : null;
+  const checkedAt = board?.fleet?.readAt;
+  return <section className="cos-fleet-message" role="alert" aria-label="Fleet display recovery">
+    <h2>Fleet couldn’t display</h2>
+    {counts && [counts.online, counts.offline, counts.unverified].every(Number.isSafeInteger) &&
+      <p>Last saved camera units: {counts.online} online, {counts.offline} offline, {counts.unverified} unverified.
+        {typeof checkedAt === 'string' && Number.isFinite(Date.parse(checkedAt)) && <> Checked {new Date(checkedAt).toLocaleString()}.</>}
+      </p>}
+    <p>Display reference {reference}</p>
+    <button type="button" onClick={retry}>Reopen Fleet</button>
+  </section>;
+}
+
 function OwnerApp() {
   const [registerUnitName,setRegisterUnitName]=useState('');
   const [heliosUnit,setHeliosUnit]=useState(1);
@@ -382,7 +399,7 @@ function OwnerApp() {
         :active==='Operations'?<OperationsAreas navigate={navigate} trackerVisible={trackerAccess(session)}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate} openUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>
         :active==='Daily Board'?<>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate} initialTv={tvIntent.current} onTvChange={onTvChange} createTicket={createTicket}/>} {!tvDisplay&&(route.createType?<OwnerBoardControls key={'create-ticket-'+(route.unitId||'')} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>:<details className='cos-workspace-settings'><summary>Owner tools · import, create and manage jobs</summary>{session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key='board-controls' show={show} unitId={route.unitId} cancelCreateLabel='Back to dashboard' cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/></details>)}</>
-        :(active==='Fleet Dashboard'||active==='Camera Health'&&(!route.diagnostics||dailyOnly))?<FleetDashboard session={session!} navigate={navigate} openMhelpConnection={guardCurrent(()=>{navigate('Unit Tracker');setTrackerConnectionOpen(true);})} initialView={active==='Camera Health'?'fleet':'map'} entryRevision={fleetEntryRevision} openAdvancedDiagnostics={!fleetOnly&&!dailyOnly?guardCurrent(()=>setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,...(route.unitId?{unitId:route.unitId}:{})})):undefined} createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId} initialUnitLabel={route.unitLabel} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:active==='Camera Health'?'Camera Health':'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true,history.state))} show={show} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={!fleetOnly&&!dailyOnly&&session?.features?.fieldLocationVerification===true} ownerManagementEnabled={!fleetOnly&&!dailyOnly} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} registerEquipment={guardCurrent(name=>{setRegisterUnitName(name);navigate('Equipment');})}/>
+        :(active==='Fleet Dashboard'||active==='Camera Health'&&(!route.diagnostics||dailyOnly))?<ViewErrorBoundary key={active} fallback={(retry, reference) => <FleetDisplayRecovery retry={retry} reference={reference}/>}><FleetDashboard session={session!} navigate={navigate} openMhelpConnection={guardCurrent(()=>{navigate('Unit Tracker');setTrackerConnectionOpen(true);})} initialView={active==='Camera Health'?'fleet':'map'} entryRevision={fleetEntryRevision} openAdvancedDiagnostics={!fleetOnly&&!dailyOnly?guardCurrent(()=>setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,...(route.unitId?{unitId:route.unitId}:{})})):undefined} createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId} initialUnitLabel={route.unitLabel} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:active==='Camera Health'?'Camera Health':'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true,history.state))} show={show} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={!fleetOnly&&!dailyOnly&&session?.features?.fieldLocationVerification===true} ownerManagementEnabled={!fleetOnly&&!dailyOnly} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} registerEquipment={guardCurrent(name=>{setRegisterUnitName(name);navigate('Equipment');})}/></ViewErrorBoundary>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialConnectionOpen={trackerConnectionOpen} initialUnitId={route.unitId} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true))} openMap={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={guardCurrent(()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true))}/>

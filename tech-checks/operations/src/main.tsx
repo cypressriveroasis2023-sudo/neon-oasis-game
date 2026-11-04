@@ -15,10 +15,11 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Operations root is missing.');
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <ViewErrorBoundary fallback={retry => (
+    <ViewErrorBoundary fallback={(retry, reference) => (
       <main className="cos-fleet-message" role="alert">
         <h1>Couldn’t display COS Operations</h1>
         <p>Try opening the workspace again.</p>
+        <small>Display reference {reference}</small>
         <button type="button" onClick={retry}>Reopen workspace</button>
       </main>
     )}>
