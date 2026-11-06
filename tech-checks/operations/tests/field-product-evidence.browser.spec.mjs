@@ -8,6 +8,7 @@ test('Field products show device links, source times and partial coverage separa
  const f=fieldProductFixture();
  f.health.sweepCoverage={contract:'COS_CAMERA_SWEEP_COVERAGE_V1',source:'owned_saved_service_ports',observedAt:f.fresh,complete:false,eligible:166,scanned:166,published:166,held:18,heldReasons:[{reason:'identity_unverified',count:3},{reason:'monitoring_disabled',count:4},{reason:'ownership_unverified',count:1},{reason:'retired_or_not_in_use',count:5},{reason:'saved_endpoint_unavailable',count:5}]};
  const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections});
+ await app.locator('.cos-fleet-source-details > summary').click();
  const coverage=app.getByLabel('Avigilon sweep coverage');
  await expect(coverage).toContainText('Incomplete check · 18 held records');
  await coverage.locator('summary').click();await expect(coverage).toContainText('Saved endpoint unavailable: 5');
@@ -21,6 +22,7 @@ test('Field products show device links, source times and partial coverage separa
  await board.locator('.cos-command-row').filter({hasText:'Product 1006'}).click();
  await expect(detail).toContainText('Device link needed');await expect(detail).toContainText('No attributable source observation');
  await page.screenshot({path:info.outputPath('product-health-evidence-candidate.png'),fullPage:true});
+ await openFleetView(app,/Fleet health/);
  const accounting=app.locator('.cos-fleet-accounting');await accounting.locator(':scope > summary').click();
  const downloadPromise=page.waitForEvent('download');await app.getByRole('button',{name:'Export every Field Product ID and health evidence'}).click();
  const download=await downloadPromise,csv=await readFile(await download.path(),'utf8');
