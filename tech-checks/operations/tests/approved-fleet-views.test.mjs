@@ -34,9 +34,9 @@ test('a missing setup button stays absent; no permission is inferred by presenta
 test('the currently selected secondary view is visible in the collapsed summary',()=>{
  const html=render(true,4);assert.match(html,/<summary aria-label="More fleet tools" aria-current="page">/);assert.match(html,/<small>Data sources<\/small>/);
 });
-test('the complete original Fleet implementation is restored by the explicit wrapper reversal',()=>{
+test('the reviewed Fleet baseline is preserved by the explicit wrapper reversal',()=>{
  const old=originalFleetViewMarkup(readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'));
- assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'497804d708b885789ab0dce6ee7af7c7c7e0e58e');
+ assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'f991aad0693819c4d35605095e7e9092a3db0186');
 });
 test('wrapper contains no data source, clock, link rewriting or new routing',()=>{
  assert.doesNotMatch(source,/\bfetch\s*\(|\bapi\.|setInterval|setTimeout|Date\.|location\.|history\.|localStorage|sessionStorage|cloneElement|\.props\.onClick\s*\(/);

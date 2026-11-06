@@ -3,21 +3,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+// Baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
+// Includes the visibility-resume repair, verified by saved-camera-refresh-scheduling.
+// These remain exact source guards; behavioral/session/identity suites run separately.
 const expected={
-  "FleetDashboard.tsx": "497804d708b885789ab0dce6ee7af7c7c7e0e58e",
+  "FleetDashboard.tsx": "f991aad0693819c4d35605095e7e9092a3db0186",
   "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "32d829373e64b6a848dad85d24270aa83b404ebc",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
-  "fleetDashboardModel.ts": "10d9042e71f0fee6ad086b24af7befde9d0f2f75",
-  "fieldCameraHealth.ts": "4ceb9709701c961342d09ae7b39335051f59a725",
+  "fleetDashboardModel.ts": "0a7a25076bb63c8742af9fd6f8f49261c2e1ec3c",
+  "fieldCameraHealth.ts": "b524d935a9f92619e5e9617e19a5b04c5a924b33",
   "cameraEvidence.ts": "a2000d04cae3516e5a99f0f9024742ac4931b1c4",
-  "api.ts": "0b4af248fa22260a5cbea6997281fa15061c83bc",
-  "useCameraHealth.ts": "8b883c7a61fb9aacc1f46949bb3a46f71ceb5de5",
-  "refreshCadence.ts": "a5989a95272738fb309dce5b52e2f992e6d4e05e",
+  "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
+  "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
+  "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",
   "workspaceNavigation.ts": "b367196dda9a1dfe814d7871ee068f1599fabd47",
-  "App.tsx": "340003125f6376b5512524f5ad1e91acf4d7f8e5",
-  "fleetDashboard.css": "2264d502ee4f8f34989722630cef8b2d0712f08a",
+  "App.tsx": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
+  "fleetDashboard.css": "854c9d3d9e47c217d1ed7dc48c40108273e6fbc1",
   "fleetAppearance.css": "72d26de6af0f7be19268998515c953fa7d58a23f",
   "fleetSimpleCards.css": "289a23208e902651cd9f3afcf9ff7a7a9ccbc3c5",
   "fleetBoardLayout.css": "8c4962032a589287f75854b581dfc57f5d579b8f"
