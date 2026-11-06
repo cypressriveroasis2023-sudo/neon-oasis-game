@@ -1,0 +1,3 @@
+import { defineConfig } from '@playwright/test';
+// The fixture bundles current source in memory and intercepts every request. No build output or live services.
+export default defineConfig({ testDir: '.', testMatch: 'inhand-pilot-ui.browser.spec.mjs', fullyParallel: true, workers: 4, timeout: 20000, expect: { timeout: 5000 }, retries: 0, reporter: 'list', outputDir: '/tmp/cos-inhand-pilot-ui-results', use: { baseURL: 'http://127.0.0.1:4173', screenshot: 'only-on-failure' }, projects: [{ name: 'mobile-390', use: { browserName: 'chromium', viewport: { width: 390, height: 844 } } }, { name: 'desktop-1440', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } }] });
