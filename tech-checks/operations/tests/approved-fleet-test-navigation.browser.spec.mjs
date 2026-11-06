@@ -13,7 +13,10 @@ for(const it of [false,true])test((it?'IT':'Owner')+' test navigation uses visib
  }
  if(it){
   await expect(nav.getByRole('button',{name:/Needs setup/,includeHidden:true})).toHaveCount(0);
-  await expect(nav.locator('details.cos-approved-fleet-tools')).toHaveCount(0);
+  await expect(nav.locator('details.cos-approved-fleet-tools')).toHaveCount(1);
+  await nav.locator('summary[aria-label="More fleet tools"]').click();
+  await expect(nav.getByRole('button',{name:/Location verification/})).toBeVisible();
+  await expect(nav.getByRole('button',{name:/^Data sources$/})).toBeVisible();
  }else{
   const setup=await fleetViewButton(app,/Needs setup/);
   await expect(setup).toBeVisible();

@@ -48,8 +48,8 @@ test('a camera outage filter opens the exact existing unit and returns to the re
  await drawer.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(drawer).toHaveCount(0);await expect(row).toHaveCount(1);await expect(row).toHaveAttribute('data-unit-id',units[1].id);safe(state);
 });
 
-test('existing restricted IT view keeps its original direct Fleet tabs',async({page})=>{
- const {app,state}=await mountFleet(page,true);await expect(toggle(app)).toHaveCount(0);await expect(nav(app).locator('details')).toHaveCount(0);
+test('restricted IT Fleet tools retain permitted destinations without Owner setup',async({page})=>{
+ const {app,state}=await mountFleet(page,true);await expect(toggle(app)).toBeVisible();await fits(app);await toggle(app).click();
  await expect(nav(app).getByRole('button',{name:/Location verification/})).toBeVisible();await expect(nav(app).getByRole('button',{name:/Needs setup/})).toHaveCount(0);
  await expect(app.locator('.cos-approved-shell')).toHaveCount(0);safe(state);
 });
