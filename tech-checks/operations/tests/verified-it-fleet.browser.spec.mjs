@@ -47,7 +47,22 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });
 for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
-test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
+test('Owner retains full navigation and location history',async({page})=>{
+ const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();
+ await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
+ await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);
+ await frame.getByRole('button',{name:'Close unit details'}).click();
+ const mobile=frame.getByRole('navigation',{name:'Mobile Operations navigation',exact:true});
+ const phone=await mobile.isVisible();const nav=phone?mobile:frame.getByRole('navigation',{name:'COS Operations',exact:true});
+ await nav.getByRole('button',{name:'More',exact:true}).click();
+ const menu=frame.getByRole('dialog',{name:'Operations navigation',exact:true});
+ const tools=phone?menu:frame.locator('main');
+ await expect(tools.getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();
+ if(phone){await menu.getByRole('button',{name:/Close menu/}).click();await expect(menu).toHaveCount(0);}
+ await expect(nav.getByRole('button',{name:'Team',exact:true})).toBeVisible();
+ expect(calls.every(c=>c.method==='GET')).toBe(true);
+});
 
 for(const role of ['it','owner'])test(role+' fullscreen fallback fills host and restores its original frame',async({page})=>{
  await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
