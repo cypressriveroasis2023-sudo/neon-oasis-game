@@ -1,3 +1,4 @@
+import {trackerFieldRanges,projectFieldTracker} from './fieldsReader.ts';
 import {createPublisherHandler,PublisherServiceError} from './index.ts';
 import {UNIT_TRACKER_WORKBOOK,trackerRanges,projectTracker,assertPublishRequests} from './model.ts';
 import {parseSheetsAccount,readSheetsJson} from '../cos-operations-pages/googleSheets.ts';
@@ -36,12 +37,14 @@ return async(request:Request)=>{
   },
   read:async bindings=>{
    const metadata=await google('?fields='+encodeURIComponent('spreadsheetId,properties(title),sheets(properties('+PROPERTIES+'))'));
-   const query=new URLSearchParams({fields:'spreadsheetId,properties(title),sheets(properties('+PROPERTIES+'),data(startRow,startColumn,rowData(values(userEnteredValue,dataValidation,chipRuns,textFormatRuns))))'});
-   for(const range of trackerRanges(metadata,bindings))query.append('ranges',range);
-   return projectTracker(metadata,await google('?'+query));
+   const query=new URLSearchParams({fields:'spreadsheetId,properties(title),sheets(properties('+PROPERTIES+'),data(startRow,startColumn,rowData(values(userEnteredValue,dataValidation,chipRuns,textFormatRuns,note))))'});
+   const extended=bindings.some(b=>b.fields);
+   for(const range of extended?trackerFieldRanges(metadata,bindings):trackerRanges(metadata,bindings))query.append('ranges',range);
+   const grid=await google('?'+query);
+   return extended?projectFieldTracker(metadata,grid,bindings):projectTracker(metadata,grid);
   },
-  write:async requests=>{
-   assertPublishRequests(requests);
+  write:async(requests,extended)=>{
+   assertPublishRequests(requests,extended);
    const v=await google(':batchUpdate?fields=spreadsheetId,replies',{requests,includeSpreadsheetInResponse:false});
    if(v.spreadsheetId!==UNIT_TRACKER_WORKBOOK||!Array.isArray(v.replies)||v.replies.length!==requests.length)throw Error('Unverified publisher result');
   }
