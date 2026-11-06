@@ -223,13 +223,18 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
 test('TV uses the Field Map background and retains pins when optional feeds fail',async({page})=>{
  const {state,frame}=await setup(page);
  state.settings={sections:['map'],revision:1,updatedAt:time};
- state.fleetFailures={'/api/camera-health/summary-v3':503,'/api/routers':503};
  await page.clock.fastForward(60000);
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
+ const completedSummary=await frame.locator('.tv-fleet-summary').textContent();
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 online');
+ // Establish a completed snapshot before testing retention on failed refresh.
+ state.fleetFailures={'/api/camera-health/summary-v3':503,'/api/routers':503};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health: Connection unavailable');
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Routers: Connection unavailable');
- await expect(frame.locator('.tv-fleet-summary')).toContainText('1 unverified');
+ await expect(frame.locator('.tv-fleet-summary')).toHaveText(completedSummary);
  await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/tile\.openstreetmap\.org\//);
  expect(state.writes).toEqual([]);
 });
@@ -380,21 +385,31 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  state.fleetFailures['/api/camera-health/summary-v3']=503;
  await page.clock.runFor(CAMERA_AUTO_REFRESH_MS);
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health');
- await expect(frame.locator('.tv-fleet-record')).toHaveCount(0);
- // The accepted equipment census survives a failed refresh; it is not zero inventory.
+ await expect(frame.locator('.tv-fleet-record[data-product-id="1002"]')).toBeVisible();
+ await expect(frame.locator('.tv-fleet-record')).toHaveCount(1);
+ // Both accepted placement and health survive a failed refresh with a warning.
  state.settings={sections:['map'],revision:3,updatedAt:time};
  await page.clock.runFor(60000);
- await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('— offline');await expect(summary).toContainText('6 unverified');
+ await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');await expect(summary).toContainText('4 unverified');
  state.productConnections=fieldProductConnectionFixture(state.fieldMapExtras.uploadInventory,new Date(Date.parse(time)+18*60000).toISOString());
  state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));
  // Keep the real network's bounded timeout on real time at the scheduled
  // recovery boundary; a 15-minute virtual jump can otherwise outrun I/O.
  const firstFleetRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
  const scheduledRecovery=firstFleetRead+2*CAMERA_AUTO_REFRESH_MS;
+ // Settle the intervening router read before advancing its request timeout.
+ const routerBoundary=firstFleetRead+15*60000;
+ const untilRouter=routerBoundary-await page.evaluate(()=>Date.now());
+ if(untilRouter>0){
+  const routerRead=page.waitForResponse(response=>{try{return response.request().postDataJSON()?.path==='/api/routers';}catch{return false;}});
+  await page.clock.runFor(untilRouter);
+  await (await routerRead).finished();
+ }
  const untilRecovery=scheduledRecovery-await page.evaluate(()=>Date.now());
  expect(untilRecovery).toBeGreaterThan(1000);
  await page.clock.runFor(untilRecovery-1000);
  await page.clock.resume();
+ await expect(frame.locator('.tv-fleet-warning')).toHaveCount(0);
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');
  const recoveredAt=await page.evaluate(()=>Date.now());
  expect(recoveredAt).toBeGreaterThanOrEqual(scheduledRecovery-1000);
