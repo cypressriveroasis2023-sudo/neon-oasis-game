@@ -36,7 +36,7 @@ test('the currently selected secondary view is visible in the collapsed summary'
 });
 test('the reviewed Fleet baseline is preserved by the explicit wrapper reversal',()=>{
  const old=originalFleetViewMarkup(readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'));
- assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'f991aad0693819c4d35605095e7e9092a3db0186');
+ assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'b7d186d2ab557b2ff25578ef25303afa4d046282');
 });
 test('wrapper contains no data source, clock, link rewriting or new routing',()=>{
  assert.doesNotMatch(source,/\bfetch\s*\(|\bapi\.|setInterval|setTimeout|Date\.|location\.|history\.|localStorage|sessionStorage|cloneElement|\.props\.onClick\s*\(/);

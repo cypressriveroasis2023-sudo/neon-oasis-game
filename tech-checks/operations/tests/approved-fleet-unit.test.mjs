@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 // Baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
-// Includes the visibility-resume repair, verified by saved-camera-refresh-scheduling.
+// Includes visibility resume and the receipt-only inventory guard, verified by
+// saved-camera-refresh-scheduling and source-equipment-pins browser cases.
 // These remain exact source guards; behavioral/session/identity suites run separately.
 const expected={
-  "FleetDashboard.tsx": "f991aad0693819c4d35605095e7e9092a3db0186",
+  "FleetDashboard.tsx": "b7d186d2ab557b2ff25578ef25303afa4d046282",
   "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "32d829373e64b6a848dad85d24270aa83b404ebc",
