@@ -205,6 +205,9 @@ for(const [technician,identityOptions,subject] of [
   await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:/Needs setup/})).toHaveCount(0);
   if(view==='Camera Health'){
     await choose(frame,'Camera Health');
+    await expect(frame.locator('.cos-equipment-card')).toBeVisible();
+    await expect(frame.locator('.cos-equipment-card')).toContainText('Helios 001');
+    await frame.locator('.cos-equipment-comparison > summary').click();
     await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
     await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(0);
     await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);
@@ -226,14 +229,14 @@ test('desktop IT can switch map to health and retain Back Forward and reload',as
   const {frame,state}=await mount(page,options());
   await readyFleet(frame);
   await choose(frame,'Camera Health');
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card')).toBeVisible();
   await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health');
   await frame.locator('body').evaluate(()=>history.back());
   await readyFleet(frame);
   await frame.locator('body').evaluate(()=>history.forward());
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card')).toBeVisible();
   await frame.locator('body').evaluate(()=>location.reload());
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card')).toBeVisible();
   await assertReadBoundary(page,state);
 });
 

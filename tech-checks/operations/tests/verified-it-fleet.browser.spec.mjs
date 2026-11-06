@@ -38,7 +38,7 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
  await frame.getByRole('button',{name:'Close unit details'}).click();await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
- await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.cos-equipment-card')).toBeVisible();await frame.locator('.cos-equipment-comparison > summary').click();await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
  const routerReads=calls.filter(c=>c.path==='/api/routers').length;
  expect(routerReads).toBeGreaterThan(0);
@@ -115,7 +115,7 @@ test('IT entry uses touch activation and daily views without paused Tech Checks'
  try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
   await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
   await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Camera Health',exact:true}).tap();
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card')).toBeVisible();
   await page.getByRole('button',{name:'Return to IT Tech Checks'}).tap();await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(entry).toBeFocused();
  }finally{await context.close();}
 });
