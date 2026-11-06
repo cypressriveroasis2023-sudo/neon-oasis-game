@@ -41,7 +41,9 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(dashboard).toContainText('Current reviewed equipment inventory is unavailable');
   await frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Camera status & troubleshooting'}).click();
   await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
-  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-grid')).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card').filter({hasText:gps.unitNumber})).toBeVisible();
+  await expect(frame.locator('.cos-equipment-card').filter({hasText:address.unitNumber})).toBeVisible();
   await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:'Fleet health',exact:true})).toHaveAttribute('aria-current','page');
   await openWorkspace(frame,'Units On Hand');
   const inventory=frame.getByRole('region',{name:'Units On Hand',exact:true});

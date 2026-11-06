@@ -27,6 +27,7 @@ for(const it of [false,true])for(const width of [320,390,430])test(`${it?'IT':'O
   await openFleetView(app,new RegExp('^'+name));
   await anchored();
   if(name==='Fleet health'){
+   await app.locator('.cos-equipment-comparison > summary').click();
    const table=app.locator('.cos-fleet-health-table table');
    const rect=await table.boundingBox();
    expect(rect.x+rect.width).toBeLessThanOrEqual(width);
