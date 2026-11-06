@@ -24,7 +24,7 @@ const sharedReadPaths = new Set([
 ]);
 const pendingReads = new Map<string, Promise<ApiResponse>>();
 const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();
-type FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
+type FleetReads={revision:number;health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};
 const pendingFleetSnapshots=new Map<string,FleetReads>();
 let fleetRevision=0,privateSessionRevision=0;
 let durableFleetEnabled=false,durableFleetStatus:any=null;
@@ -211,21 +211,21 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
       const generation=++fleetRevision,privateRevision=privateSessionRevision;
       const current=()=>generation===fleetRevision&&privateRevision===privateSessionRevision&&lastVerifiedSession?.token===session.token&&lastVerifiedSession?.role===session.role;
       const previous=fleetSnapshots.get(key);if(previous)onSaved?.(previous.value);
-      const publish=(value:FleetSnapshot)=>{if(!current())return;fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));};
+      const publish=(value:FleetSnapshot)=>{if(!current())return;fleetSnapshots.set(key,{value:{...value,readRevision:generation},at:Date.parse(value.readAt)});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));};
       const paired=import('./durableFleetClient').then(({durableFleetRead})=>durableFleetRead({
         read:async refresh=>(await sendRequest<any>(refresh?'POST':'GET',refresh?'/api/fleet-saved-board/refresh':'/api/fleet-saved-board',session.token,refresh?{}:undefined)).data,
         current,status:value=>{if(current())publishDurableStatus(value);},publish,
         failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}
-      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});return value;});
+      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});
       const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);
-      const reads={paired,health,fieldMap,connectionMap:fieldMap};
+      const reads={revision:generation,paired,health,fieldMap,connectionMap:fieldMap};
       for(const part of [paired,health,fieldMap])void part.catch(()=>{});
       pendingFleetSnapshots.set(key,reads);void paired.finally(()=>{if(pendingFleetSnapshots.get(key)===reads)pendingFleetSnapshots.delete(key);}).catch(()=>{});
       return reads;
     }
     const saved=fleetSnapshots.get(key);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
-    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     // Only the newly authorized actor may see the dated complete saved pair.
     // This callback does not renew the cache or any observation timestamps.
     if(saved)onSaved?.(saved.value);
@@ -303,8 +303,8 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
         productConnectionsDiagnostic:result.state==='ready'&&!accepted?{stage:'connection_envelope',code:'validation_rejected'}:result.diagnostic};
     });
     void connectionMap.catch(()=>{});
-    const read: FleetReads={health,fieldMap,connectionMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
-      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
+    const read: FleetReads={revision,health,fieldMap,connectionMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{
+      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt,readRevision:revision};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
     }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};
     // Publish only into this generation's successful pair. A failed pair,
     // refresh, write, hide, account/role/mode change cannot be revived by proof.
@@ -329,8 +329,18 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     void Promise.allSettled([health,fieldMap]).then(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);});
     pendingFleetSnapshots.set(key,read);return read;
 }
+async function readFleetConnectionMap(force=false,expectedSourceSha?:string){
+ let read=await readFleet(force),map=await read.connectionMap;
+ if(map.productConnectionsDiagnostic?.code==='inventory_changed'
+   ||expectedSourceSha&&map.uploadInventory?.sourceSha256!==expectedSourceSha){
+  // Preserve the existing single authority reload; this does not re-probe.
+  clearSharedReads();read=await readFleet(true);map=await read.connectionMap;
+ }
+ return {map,revision:read.revision};
+}
 export const api = {
   usesDurableFleetBoard,
+  fleetReadRevision:()=>fleetRevision,
   adoptProductConnections:(receipt:unknown)=>{
     if(!lastVerifiedSession)return false;const mode=new URLSearchParams(location.search).get('mode'),key=JSON.stringify([lastVerifiedSession.token,lastVerifiedSession.role,mode]),saved=fleetSnapshots.get(key),upload=(saved?.value.fieldMap as any)?.uploadInventory;
     if(!saved||!upload||!readExactProductConnections(receipt,upload.sourceSha256,upload.records.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId),Date.now()))return false;
@@ -341,14 +351,8 @@ export const api = {
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
   fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,
-  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{
-    const first=await (await readFleet(force)).connectionMap;
-    if((first as any).productConnectionsDiagnostic?.code!=='inventory_changed'
-      &&(!expectedSourceSha||(first as any).uploadInventory?.sourceSha256===expectedSourceSha))return first;
-    // The protected connection read observed a newer census than the map.
-    // Invalidate that generation and reload authority once, never re-probe.
-    clearSharedReads();return (await readFleet(true)).connectionMap;
-  },
+  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>(await readFleetConnectionMap(force,expectedSourceSha)).map,
+  fleetConnectionMapRead:readFleetConnectionMap,
   fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);

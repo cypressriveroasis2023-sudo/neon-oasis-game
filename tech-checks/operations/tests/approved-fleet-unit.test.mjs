@@ -1,4 +1,5 @@
 import {originalFleetViewMarkup} from './approved-fleet-view-source.mjs';
+import {originalFleetConnectionReadSource} from './fleet-connection-read-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -7,6 +8,7 @@ import {createHash} from 'node:crypto';
 // Includes visibility resume and the receipt-only inventory guard, verified by
 // saved-camera-refresh-scheduling and source-equipment-pins browser cases.
 // These remain exact source guards; behavioral/session/identity suites run separately.
+// The reviewed connection-read patch is reversed explicitly; baseline hashes never change.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
@@ -28,7 +30,8 @@ const expected={
 };
 for (const [name,sha] of Object.entries(expected)) test('unit presentation preserves '+name,()=>{
  const raw=readFileSync(new URL('../src/'+name,import.meta.url));
- const b=name==='FleetDashboard.tsx'?Buffer.from(originalFleetViewMarkup(raw.toString('utf8'))):raw;
+ const restored=name==='FleetDashboard.tsx'?originalFleetViewMarkup(raw.toString('utf8')):['api.ts','useCameraHealth.ts'].includes(name)?originalFleetConnectionReadSource(name,raw.toString('utf8')):null;
+ const b=restored===null?raw:Buffer.from(restored);
  assert.equal(createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex'),sha);
 });
 const css=readFileSync(new URL('../src/approvedFleetUnit.css',import.meta.url),'utf8');

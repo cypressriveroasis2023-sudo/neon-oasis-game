@@ -740,6 +740,32 @@ async function startProof(f,force=false,map=proofMap()){
  return {pending,index:index+2};
 }
 const proofFixture=()=>{const f=fixture({proof:true});f.advance(Date.parse('2026-10-28T16:00:00Z'));return f;};
+test('paired and independent proof attempts share a revision without dating cache hits as new reads',async()=>{
+ const f=proofFixture(),first=await startProof(f),independent=f.api.fleetConnectionMapRead();await flush();
+ f.answer(first.index,exactReceipt(f));const [saved,read]=await Promise.all([first.pending,independent]);
+ assert.equal(read.revision,saved.readRevision);assert.equal(read.map,saved.fieldMap);
+ const count=f.requests.length,cached=await f.api.fleetConnectionMapRead();
+ assert.equal(cached.revision,read.revision);assert.equal(cached.map,read.map);assert.equal(f.requests.length,count);
+ const second=await startProof(f,true),peer=f.api.fleetConnectionMapRead();await flush();
+ f.answer(second.index,{diagnostic:{stage:'saved_checks',code:'source_unavailable'}},503);
+ const [failed,attempt]=await Promise.all([second.pending,peer]);
+ assert.equal(failed.readStartedAt,saved.readStartedAt,'both requests use the same fixed clock');
+ assert.ok(failed.readRevision>saved.readRevision);assert.equal(attempt.revision,failed.readRevision);
+ assert.equal(attempt.map.productConnectionsState,'error');assert.equal(f.requests.length,count+3);
+});
+test('independent failed proof retains attempt identity after provider rejection and still honors invalidation',async()=>{
+ for(const invalidate of [false,true]){
+  const f=proofFixture(),pair=f.api.fleet(),failed=assert.rejects(pair,status(503)),read=f.api.fleetConnectionMapRead();
+  const rejected=invalidate?assert.rejects(read,status(409)):null;
+  await flush();const revision=f.api.fleetReadRevision();f.answer(0,{},503);f.answer(1,proofMap());await flush();
+  f.advance(PROOF_PRESENTATION_BUDGET_MS);await failed;
+  if(invalidate)f.window.dispatchEvent(new Event('cos-private-data-invalidated'));
+  f.answer(2,{diagnostic:{stage:'saved_checks',code:'source_unavailable'}},503);
+  if(rejected)await rejected;
+  else{const attempt=await read;assert.equal(attempt.revision,revision);assert.equal(attempt.map.productConnectionsState,'error');assert.equal(attempt.map.productConnectionsDiagnostic.code,'source_unavailable');}
+  assert.equal(f.invalidations.includes('cos-fleet-snapshot-updated'),false);
+ }
+});
 test('existing proof failure carries only allowlisted diagnostics, including late completion; success clears them',async()=>{
  for(const late of [false,true])for(const malicious of [false,true]){
   const f=proofFixture(),{pending,index}=await startProof(f);if(late){f.advance(PROOF_PRESENTATION_BUDGET_MS);await pending;}

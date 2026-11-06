@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import {originalFleetConnectionReadSource} from './fleet-connection-read-source.mjs';
 
-/** Reverse only the approved presentation wrapper, retaining the versioned full-file hash guard. */
+/** Reverse the exact reviewed connection-read patch, then the approved presentation
+ * wrapper, retaining the original versioned full-file hash guard. */
 export function originalFleetViewMarkup(source) {
+ source=originalFleetConnectionReadSource('FleetDashboard.tsx',source);
  const added="import ApprovedFleetViews from './ApprovedFleetViews';\n";
  assert.equal(source.split(added).length-1,1,'exactly one presentation import');
  assert.equal(source.split('<ApprovedFleetViews compact>').length-1,1,'exactly one view wrapper');

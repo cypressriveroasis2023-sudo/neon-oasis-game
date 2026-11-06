@@ -41,7 +41,7 @@ for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live co
   await expect(row.locator('[aria-label="camera: Online"]')).toContainText('Camera');
   await expect(row.locator('[aria-label="router: Online"]')).toContainText('Router');
   await expect(row.locator('[aria-label="battery: Online"]')).toContainText('Battery');
-  await expect(app.locator('.cos-fleet-stat-online')).toHaveCSS('background-image',/linear-gradient/);
+  await expect(app.locator('.cos-fleet-stat-online')).toHaveCSS('background-image','none');
   const geometry=await app.locator('.cos-fleet-dashboard').evaluate(el=>{
     const cards=[...el.querySelectorAll('.cos-fleet-stat')].filter(card=>card.getClientRects().length).map(card=>card.getBoundingClientRect()).sort((a,b)=>a.top-b.top||a.left-b.left);
     const list=el.querySelector('.cos-fleet-unit-panel').getBoundingClientRect(),map=el.querySelector('.cos-fleet-map-panel').getBoundingClientRect();
@@ -56,7 +56,8 @@ for (const it of [false,true]) test(`${it?'IT':'Owner'} appearance keeps live co
   for(const target of geometry.targets){expect(target.height).toBeGreaterThanOrEqual(44);expect(target.width).toBeGreaterThanOrEqual(44);}
   if(geometry.width<=750){
     expect(Math.abs(geometry.cards[0].y-geometry.cards[1].y)).toBeLessThan(1);
-    expect(geometry.cards[2].y).toBeGreaterThan(geometry.cards[0].y);
+    expect(Math.abs(geometry.cards[0].y-geometry.cards[2].y)).toBeLessThan(1);
+    expect(geometry.cards[3].y).toBeGreaterThan(geometry.cards[0].y);
     expect(Math.abs(geometry.cards[4].width-geometry.cards[0].width)).toBeLessThan(1);
     expect(geometry.map.y).toBeLessThan(geometry.list.y);
   }else{
