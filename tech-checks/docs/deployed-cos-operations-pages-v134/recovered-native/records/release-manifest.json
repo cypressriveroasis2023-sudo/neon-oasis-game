@@ -1,0 +1,169 @@
+{
+  "productionMutations": false,
+  "native": {
+    "baseline": "24e2dc78a8b8d08f72daf3fcd5aaa3861519482c",
+    "version": 133,
+    "old": {
+      "serve": "324ac3c0b82a207b074dafec48fe5b55c88c39cf033179ac9889a2008954e158",
+      "runtime": "457d49f4296f67cf0123ff68b7f8270c60704db7612d2101559e3602029d04c5",
+      "config": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+    },
+    "files": [
+      {
+        "name": "cos-operations-pages/serve.ts",
+        "sha256": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12"
+      },
+      {
+        "name": "cos-operations-pages/productTcpRuntime.ts",
+        "sha256": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db"
+      },
+      {
+        "name": "cos-operations-pages/deno.json",
+        "sha256": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+      }
+    ],
+    "outsideRouteUnchanged": true,
+    "cpuHelperUnchanged": true,
+    "originalRuntimeRebuildExact": true,
+    "configUnchanged": true,
+    "flagsUnchanged": true
+  },
+  "branches": [
+    {
+      "name": "native-source",
+      "base": "24e2dc78a8b8d08f72daf3fcd5aaa3861519482c",
+      "head": "3bb41252b1374fb38143e4d3ec2943f0cb3b4bf7",
+      "patchSha256": "58d40ee2b2ab18c32afdcc8cf3dba7acf1efc9426145e8f6011f4db90c3c1e02",
+      "files": [
+        {
+          "path": "review/product-resource-attribution.md",
+          "sha256": "c8ff9e9968fcc5f908749c76e3ed916dfee73184f8db295490bd93fa70903693"
+        },
+        {
+          "path": "tech-checks/operations/dist/assets/index-BjCVL36y.js",
+          "sha256": "7b7e5accdd73dbc31ed8841c8a733f79132b71d50fed953477adab5a72c84a32"
+        },
+        {
+          "path": "tech-checks/operations/dist/index.html",
+          "sha256": "a528d5587eccb798d67a6ab2ac1ae563ceee3b1ec891d9ab2fd57061b6c2c403"
+        },
+        {
+          "path": "tech-checks/operations/scripts/attribution-v133-proof.mjs",
+          "sha256": "bdd1fd74ded96c486362765611ae856cbebd5804dfbacbbf89a7afaa76c3d81d"
+        },
+        {
+          "path": "tech-checks/operations/scripts/prepare-attribution-v133.mjs",
+          "sha256": "0f78fd1dd085c9ea2821be2233a83681523b7df422c11763a2c5f67fe52e5fbc"
+        },
+        {
+          "path": "tech-checks/operations/src/exactProductConnection.ts",
+          "sha256": "78b0f6317083a075218f6d40b6fcc16968f47c9f4e6d2903adaad317ae4e521d"
+        },
+        {
+          "path": "tech-checks/operations/tests/api-inflight-reads.test.mjs",
+          "sha256": "4ee52096dcbc27631593667825256b02e5e8ae91392e269afefc41029480239d"
+        },
+        {
+          "path": "tech-checks/operations/tests/exact-product-connection.test.mjs",
+          "sha256": "a3c6924d794b755706d7f6e049e09a83cfbf34354367b7f94ea799bc90796309"
+        },
+        {
+          "path": "tech-checks/operations/tests/field-product-evidence.test.mjs",
+          "sha256": "4f13ddab885e73f2d5284340aab47a2b4c145fd89e924d612406f5f4a6a686e9"
+        },
+        {
+          "path": "tech-checks/operations/tests/fixtures/mhelp-field-health-fixtures.mjs",
+          "sha256": "c1c8c7bbc2f474af42ea1099a67a15a7db29e306e1e19025fc5d06fe62019a88"
+        },
+        {
+          "path": "tech-checks/operations/tests/mhelp-2027-connection-census.test.mjs",
+          "sha256": "dccad05407af0043cc3349efdfdac84e79146a2f86d01efcac958b4ca9f9290a"
+        },
+        {
+          "path": "tech-checks/operations/tests/mhelp-field-health.test.mjs",
+          "sha256": "2086de2bcb7f07b9546827af641cc23934df827d96160b116bf05a098157183f"
+        },
+        {
+          "path": "tech-checks/operations/tests/owner-census-fleet-snapshot.test.mjs",
+          "sha256": "bf7b1ffeec4639b54bedfabbfeb069c7f7305c26d4d78010d34d7e7b023aa214"
+        },
+        {
+          "path": "tech-checks/operations/tests/owner-identity-crosswalk.test.mjs",
+          "sha256": "772e69ea6993a0885f0b977678f40dd2729a0e62e98f19327c51837037a11a29"
+        },
+        {
+          "path": "tech-checks/operations/tests/product-resource-membership.test.mjs",
+          "sha256": "b171ffc991bf1720f90e6b129f2ca668625b794e8d3ed4e5f10e2fe50aab6c77"
+        },
+        {
+          "path": "tech-checks/operations/tests/product-tcp-integration.test.mjs",
+          "sha256": "582e5728260079f6c03a8a71111358a1aa6b902f5effec358063adc3f06406b6"
+        },
+        {
+          "path": "tech-checks/operations/tests/saved-camera-refresh-scheduling.test.mjs",
+          "sha256": "b243eeafb30514fee1d09587ae58ffc22437bef23e118796a09912303f2353d3"
+        },
+        {
+          "path": "tech-checks/operations/tests/tv-field-census.test.mjs",
+          "sha256": "437a9c57c3a42cd3d2040e33018074588c8a3a173dc6a32ccdc18ad876c99ab0"
+        },
+        {
+          "path": "tech-checks/supabase/functions/cos-operations-pages/index.ts",
+          "sha256": "9f873dbd93a1488f5b455c8444f52309e2d8170b7b39f89a3fc5efae9d22e11e"
+        },
+        {
+          "path": "tech-checks/supabase/functions/cos-operations-pages/productResourceMembership.ts",
+          "sha256": "4df461274e5f3e6da8109f50b7f61cc4aa8d9a1af666a56fc9281af22404449b"
+        }
+      ]
+    },
+    {
+      "name": "main-integration",
+      "base": "45c9a12708575d21a329766937258898bc301b2e",
+      "head": "7f7756a3e0320f758ae9e26f38bb8b27580825ff",
+      "patchSha256": "f1734e73df0f6f25af95df0d5cef4397baa60f6f0fbf79adf8691f55fe85cfb5",
+      "files": [
+        {
+          "path": "tech-checks/operations/dist/assets/index-BjCVL36y.js",
+          "sha256": "7b7e5accdd73dbc31ed8841c8a733f79132b71d50fed953477adab5a72c84a32"
+        },
+        {
+          "path": "tech-checks/operations/dist/index.html",
+          "sha256": "a528d5587eccb798d67a6ab2ac1ae563ceee3b1ec891d9ab2fd57061b6c2c403"
+        },
+        {
+          "path": "tech-checks/operations/src/exactProductConnection.ts",
+          "sha256": "78b0f6317083a075218f6d40b6fcc16968f47c9f4e6d2903adaad317ae4e521d"
+        },
+        {
+          "path": "tech-checks/operations/tests/api-inflight-reads.test.mjs",
+          "sha256": "4ee52096dcbc27631593667825256b02e5e8ae91392e269afefc41029480239d"
+        },
+        {
+          "path": "tech-checks/operations/tests/exact-product-connection.test.mjs",
+          "sha256": "a3c6924d794b755706d7f6e049e09a83cfbf34354367b7f94ea799bc90796309"
+        },
+        {
+          "path": "tech-checks/operations/tests/field-product-evidence.test.mjs",
+          "sha256": "4f13ddab885e73f2d5284340aab47a2b4c145fd89e924d612406f5f4a6a686e9"
+        },
+        {
+          "path": "tech-checks/operations/tests/fixtures/mhelp-field-health-fixtures.mjs",
+          "sha256": "c1c8c7bbc2f474af42ea1099a67a15a7db29e306e1e19025fc5d06fe62019a88"
+        },
+        {
+          "path": "tech-checks/operations/tests/mhelp-2027-connection-census.test.mjs",
+          "sha256": "4cd4397290d6eae7d81bafe61742bdeafc4945df746d1526e5ab1ba96f1cac75"
+        },
+        {
+          "path": "tech-checks/operations/tests/mhelp-field-health.test.mjs",
+          "sha256": "e9727fa7f3a85363146165d6098a703e241c3c9eb19189a80d1295a8c34cdbc2"
+        },
+        {
+          "path": "tech-checks/operations/tests/tv-field-census.test.mjs",
+          "sha256": "437a9c57c3a42cd3d2040e33018074588c8a3a173dc6a32ccdc18ad876c99ab0"
+        }
+      ]
+    }
+  ]
+}
