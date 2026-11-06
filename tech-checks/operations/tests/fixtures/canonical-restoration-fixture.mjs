@@ -22,6 +22,17 @@ export async function restorationFixture({beforeInstall,beforeApply,database}={}
    insert into public.user_profiles values('${actor}','${org}',true,'owner');
    insert into public.roles values('${actor}','${org}','owner');
    insert into public.user_roles values('${actor}','${actor}');`);
+  await db.exec(`
+   alter table public.equipment_units add column model_id uuid,add column updated_at timestamptz,add column gps_accuracy_m float8,add column gps_source text,add column gps_recorded_by uuid;
+   alter table app_private.vision_tracker_locations add column coordinate_source text,add column source_name text,add column source_verified_at timestamptz,add column imported_at timestamptz,add column reviewed_estimate_epoch uuid;
+   alter table app_private.cos_archived_representations add column id uuid default gen_random_uuid(),add column organization_id uuid,add column reviewed_before jsonb;
+   create table app_private.cos_archived_representation_revocations(representation_id uuid);
+   create table public.equipment_models(id uuid primary key,name text,category text);
+   create table public.equipment_assignments(equipment_unit_id uuid,status text);
+   create table public.audit_events(entity_id uuid,entity_type text,event_type text);
+  `);
+  const archive=file('db/cos-archived-representations.sql');
+  await db.exec(archive.slice(archive.indexOf('create function app_private.cos_archive_native_before('),archive.indexOf('-- Invoker-only administrative import:')));
   // Real repository Owner directory/role assertion, no permissive Owner stub.
   const owner=file('db/owner_identity_crosswalk.sql');
   const a=owner.indexOf('create function app_private.cos_owner_identity_assert_actor('),z=owner.indexOf('create function app_private.cos_owner_identity_snapshot_value(');
@@ -75,7 +86,7 @@ export async function restorationFixture({beforeInstall,beforeApply,database}={}
    [extra.actor??actor,extra.org??org,extra.request??request,action,JSON.stringify(extra.expected??expected),digest,extra.confirmation??(action==='commit'?confirmation:null)])).rows[0].v;
   const stored=async()=>(await db.query("select cos_mhelp_placement_private.scoped_records($1) v",[base])).rows[0].v;
   const protectedTables=['equipment_units','vision_vigilant_devices','vision_vigilant_unit_matches'].map(t=>'public.'+t)
-   .concat(['vision_tracker_locations','cos_geocode_sources','cos_archived_representations','cos_owner_identity_claims','cos_owner_identity_resources','cos_owner_identity_revocations','cos_owner_identity_source_events'].map(t=>'app_private.'+t),'public.equipment_unit_location_history','cos_mhelp_placement_private.links','cos_mhelp_placement_private.upload_batches');
+   .concat(['vision_tracker_locations','cos_geocode_sources','cos_archived_representations','cos_archived_representation_revocations','cos_owner_identity_claims','cos_owner_identity_resources','cos_owner_identity_revocations','cos_owner_identity_source_events'].map(t=>'app_private.'+t),'public.equipment_unit_location_history','cos_mhelp_placement_private.links','cos_mhelp_placement_private.upload_batches');
   const preserved=async()=>{const out={};for(const table of protectedTables)out[table]=(await db.query(`select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]') v from ${table} t`)).rows[0].v;return out;};
   return {db,call,stored,preserved,targets,request,expected,confirmation,rows,historical,base,installed};
  }catch(e){await db.close();delete e.query;throw e;}

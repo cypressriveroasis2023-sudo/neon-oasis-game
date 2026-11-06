@@ -40,7 +40,8 @@ begin
  lock table cos_mhelp_placement_private.scoped_control in share row exclusive mode nowait;
  lock table cos_mhelp_placement_private.upload_batches,cos_mhelp_placement_private.scoped_batches,
   public.equipment_units,app_private.vision_tracker_locations,public.equipment_unit_location_history,
-  app_private.cos_geocode_sources,app_private.cos_archived_representations,app_private.cos_owner_identity_claims,
+  app_private.cos_geocode_sources,app_private.cos_archived_representations,
+  app_private.cos_archived_representation_revocations,public.equipment_models,public.equipment_assignments,public.audit_events,app_private.cos_owner_identity_claims,
   cos_mhelp_placement_private.links,public.vision_vigilant_devices,public.vision_vigilant_unit_matches,
   app_private.cos_owner_identity_resources,app_private.cos_owner_identity_revocations,
   app_private.cos_owner_identity_source_events,public.user_profiles,public.user_roles,public.roles
@@ -69,6 +70,33 @@ language sql stable set search_path='' as $$
   'revocations',(select coalesce(jsonb_agg(to_jsonb(x) order by to_jsonb(x)::text),'[]') from app_private.cos_owner_identity_revocations x),
   'events',(select coalesce(jsonb_agg(to_jsonb(x) order by to_jsonb(x)::text),'[]') from app_private.cos_owner_identity_source_events x)))
 $$;
+
+-- Reuse the existing archive validator; never activate the archived endpoint.
+-- The original upload guard remains unchanged and must still match exactly.
+create function cos_binding_restoration_private.alias_current(b jsonb) returns boolean
+language plpgsql stable set search_path='' as $$
+declare a app_private.cos_archived_representations; n integer:=0;
+begin
+ if b->>'matchMethod'='owner_confirmed_alias' and (
+  b->'reviewEvidence'->>'contract' is distinct from 'COS_OWNER_CONFIRMED_ALIAS_V1'
+  or b->'reviewEvidence'->>'productId' is distinct from b->>'productId'
+  or b->'reviewEvidence'->>'sourceLabel' is distinct from b->>'fullLabel'
+  or b->'reviewEvidence'->>'trackerId' is distinct from b->>'trackerId'
+  or b->'reviewEvidence'->>'nativeUnitId' is distinct from b->>'nativeUnitId'
+  or coalesce(b->'reviewEvidence'->'approval'->>'messageId','')=''
+  or coalesce(b->'reviewEvidence'->'approval'->>'ownerQuote','')=''
+ ) then return false;end if;
+ for a in select * from app_private.cos_archived_representations x
+  where (b->>'trackerId')::uuid in(x.archived_tracker_id,x.canonical_tracker_id)
+   or (b->>'nativeUnitId')::uuid in(x.archived_native_id,x.canonical_native_id) loop
+  n:=n+1;
+  if b->>'matchMethod' is distinct from 'archived_alias'
+   or a.canonical_tracker_id::text is distinct from b->>'trackerId'
+   or a.canonical_native_id::text is distinct from b->>'nativeUnitId'
+   or app_private.cos_archive_valid(a) is distinct from true then return false;end if;
+ end loop;
+ return case when b->>'matchMethod'='archived_alias' then n=1 else n=0 end;
+end$$;
 
 create function cos_binding_restoration_private.snapshot() returns jsonb
 language plpgsql stable set search_path='' as $$
@@ -124,7 +152,7 @@ begin
   end loop;
   b:=proof;
   if source_count=0 or b->>'productId' is distinct from target.product_id or b->>'fullLabel' is distinct from target.label
-   or b->>'matchMethod' is distinct from 'exact_family_unit' or coalesce(b->>'canonicalKey','')=''
+   or coalesce(b->>'matchMethod','') not in('exact_family_unit','owner_confirmed_alias','archived_alias') or coalesce(b->>'canonicalKey','')=''
    or jsonb_typeof(b->'reviewEvidence') is distinct from 'object' or b->'reviewEvidence'='{}'::jsonb
    or coalesce(b->>'evidenceSha256','')!~'^[a-f0-9]{64}$' or coalesce(b->>'representationEvidenceSha256','')!~'^[a-f0-9]{64}$'
    or coalesce(b->>'expectedGuard','')!~'^[a-f0-9]{64}$'
@@ -160,8 +188,7 @@ begin
     or entity->>'status' in('retired','deleted') or entity->>'retired_at' is not null then raise exception 'Native identity changed';end if;
   end if;
   if exists(select 1 from app_private.cos_owner_identity_claims c where to_jsonb(c)->'product_association'->>'productId'=target.product_id and c.native_unit_id::text is distinct from b->>'nativeUnitId') then raise exception 'Competing Owner Product ID claim';end if;
-  if exists(select 1 from app_private.cos_archived_representations a where (b->>'trackerId')::uuid in(a.archived_tracker_id,a.canonical_tracker_id) or (b->>'nativeUnitId')::uuid in(a.archived_native_id,a.canonical_native_id))
-  then raise exception 'Archived identity needs a separate review';end if;
+  if not cos_binding_restoration_private.alias_current(b) then raise exception 'Alias or archive evidence changed';end if;
   if exists(select 1 from cos_mhelp_placement_private.links l where l.equipment_id=target.product_id
     and (l.tracker_id::text is distinct from b->>'trackerId' or l.native_unit_id::text is distinct from b->>'nativeUnitId' or l.full_label is distinct from target.label))
   then raise exception 'Existing link disagrees';end if;
@@ -204,7 +231,7 @@ begin
    or cos_mhelp_placement_private.scoped_records(s.snapshot->>'sourceSha256') is distinct from s.snapshot->'afterRecords'
    or cos_binding_restoration_private.camera_digest() is distinct from s.snapshot->>'cameraSha256'
    or cos_binding_restoration_private.digest((select coalesce(jsonb_agg(to_jsonb(l) order by to_jsonb(l)::text),'[]') from cos_mhelp_placement_private.links l)) is distinct from s.snapshot->>'linksSha256'
-   or exists(select 1 from jsonb_array_elements(s.snapshot->'items')i where i->'binding'->>'expectedGuard' is distinct from cos_mhelp_placement_private.upload_binding_guard((i->'binding'->>'trackerId')::uuid,(i->'binding'->>'nativeUnitId')::uuid))
+   or exists(select 1 from jsonb_array_elements(s.snapshot->'items')i where not cos_binding_restoration_private.alias_current(i->'binding') or i->'binding'->>'expectedGuard' is distinct from cos_mhelp_placement_private.upload_binding_guard((i->'binding'->>'trackerId')::uuid,(i->'binding'->>'nativeUnitId')::uuid))
   then raise exception 'Applied restoration changed; inspect original receipt' using errcode='40001';end if;
   return done.receipt||jsonb_build_object('replayed',true);
  end if;
@@ -236,21 +263,18 @@ end$$;
 -- Preserve the exact baseline projection except the seven audited binding slots.
 create function cos_binding_restoration_private.project(base jsonb) returns jsonb
 language sql stable set search_path='' as $$
- with recursive chain as(
-  select b.id,b.previous_id,0 depth from cos_mhelp_placement_private.scoped_control c
-   join cos_mhelp_placement_private.scoped_batches b on b.id=c.active_id and b.base_sha256=c.base_sha256 where c.base_sha256=base->>'sourceSha256'
-  union all select b.id,b.previous_id,c.depth+1 from chain c join cos_mhelp_placement_private.scoped_batches b on b.id=c.previous_id
-   where b.base_sha256=base->>'sourceSha256' and c.depth<1000
- ),active as(select s.snapshot from chain c join cos_binding_restoration_private.stages s on s.id=c.id
+ with active as(select s.snapshot from cos_binding_restoration_private.stages s
   join cos_binding_restoration_private.receipts r on r.id=s.id),
- rows as(select jsonb_agg(case when i is not null and r->'binding'='null'::jsonb and r->>'unitNumber'=i->'before'->>'unitNumber' then
-  jsonb_set(r,'{binding}',((i->'binding')-'reviewEvidence')||jsonb_build_object('guardCurrent',camera_current and i->'binding'->>'expectedGuard'=cos_mhelp_placement_private.upload_binding_guard((i->'binding'->>'trackerId')::uuid,(i->'binding'->>'nativeUnitId')::uuid))) else r end order by ord) value
+ rows as(select jsonb_agg(case when i is not null and (r->'binding'='null'::jsonb or ((r->'binding')-array['reviewEvidence','guardCurrent'])=((i->'binding')-'reviewEvidence')) and r->>'unitNumber'=i->'before'->>'unitNumber' then
+  jsonb_set(r,'{binding}',((i->'binding')-'reviewEvidence')||jsonb_build_object('guardCurrent',cos_binding_restoration_private.alias_current(i->'binding') and camera_current and i->'binding'->>'expectedGuard'=cos_mhelp_placement_private.upload_binding_guard((i->'binding'->>'trackerId')::uuid,(i->'binding'->>'nativeUnitId')::uuid))) else r end order by ord) value
   from jsonb_array_elements(base->'records') with ordinality e(r,ord)
-  left join (select distinct i,snapshot->>'cameraSha256'=cos_binding_restoration_private.camera_digest()
-    and snapshot->>'linksSha256'=cos_binding_restoration_private.digest((select coalesce(jsonb_agg(to_jsonb(l) order by to_jsonb(l)::text),'[]') from cos_mhelp_placement_private.links l)) camera_current
+  left join (select jsonb_build_object('productId',i->>'productId','binding',i->'binding','before',jsonb_build_object('unitNumber',i->'binding'->>'fullLabel')) i,
+    bool_and(snapshot->>'cameraSha256'=cos_binding_restoration_private.camera_digest()
+    and snapshot->>'linksSha256'=cos_binding_restoration_private.digest((select coalesce(jsonb_agg(to_jsonb(l) order by to_jsonb(l)::text),'[]') from cos_mhelp_placement_private.links l))) camera_current
    from active cross join lateral jsonb_array_elements(snapshot->'items')i
    where exists(select 1 from jsonb_array_elements(cos_mhelp_placement_private.scoped_records(base->>'sourceSha256'))current_row
-    where current_row->>'productId'=i->>'productId' and current_row->'binding'=i->'binding')) restored on i->>'productId'=r->>'productId')
+    where current_row->>'productId'=i->>'productId' and current_row->'binding'=i->'binding')
+   group by i->>'productId',i->'binding') restored on i->>'productId'=r->>'productId')
  select jsonb_set(base,'{records}',coalesce(rows.value,'[]'::jsonb)) from rows
 $$;
 create function cos_binding_restoration_private.retain_holds(old jsonb,new_row jsonb) returns jsonb

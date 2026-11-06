@@ -43,7 +43,7 @@ jobs:
       - name: Real PostgreSQL role, atomicity and persistence proofs
         env:
           COS_RESTORATION_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_restoration_test_ci
-        run: node --test --test-concurrency=1 tests/canonical-binding-restoration.test.mjs
+        run: node --test --test-concurrency=1 tests/canonical-binding-restoration.test.mjs tests/canonical-binding-alias.test.mjs
       - name: Independent PostgreSQL sessions
         env:
           COS_RESTORATION_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_restoration_test_ci
