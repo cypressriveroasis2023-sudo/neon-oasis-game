@@ -29,9 +29,15 @@ for(const it of [false,true])test(`every Fleet tab has the compact COS theme for
   if(view!=='map'){await expect(board.locator('.cos-fleet-tab-summary')).not.toHaveAttribute('open','');await board.locator('.cos-fleet-tab-summary>summary').click();await expect(board.locator('.cos-fleet-stat-field')).toBeVisible();}
  }
 });
-test('a failed health refresh keeps equipment and shows unavailable health totals',async({page})=>{
- const {app,state}=await mountFleet(page);state.fail=true;await app.getByRole('button',{name:'Refresh data'}).click();
- await expect(app.getByRole('alert').filter({hasText:'Health refresh unavailable'})).toBeVisible();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('—');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
+test('a failed health refresh keeps equipment, completed totals and the original read time',async({page})=>{
+ const {app,state}=await mountFleet(page),savedLabel=app.locator('.cos-fleet-heading > div:last-child > small'),refresh=app.getByRole('button',{name:'Refresh data'});
+ await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');await expect(refresh).toBeEnabled();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
+ const originalReading=await savedLabel.innerText();await page.clock.setFixedTime(new Date(now+2*60000));state.fail=true;await refresh.click();
+ const warning=app.getByRole('alert').filter({hasText:'A supporting source could not be refreshed'});await expect(warning).toBeVisible();
+ await expect(warning.getByText('Last completed results remain displayed with their original check times. The next successful update will replace them.',{exact:true})).toBeVisible();
+ await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
+ await expect(savedLabel).toHaveText(originalReading);await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
 });
 test('pending checks disable repeat taps and closing the card discards a late result',async({page})=>{
  const {app}=await mountFleet(page,false,{health});let release,received;const gate=new Promise(r=>release=r),started=new Promise(r=>received=r);let checks=0;

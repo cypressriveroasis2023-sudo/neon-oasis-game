@@ -51,20 +51,21 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} explicit menu and repeated
   await expect(menu).toHaveCount(0);await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
  };
  for(let repeat=0;repeat<2;repeat++){
-  await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
-  await open();await enter('Camera Health');await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await open();await enter('Camera Health');await expect(app.locator('.cos-equipment-grid')).toBeVisible();
+  await open();await enter('Camera Health');await expect(app.locator('.cos-equipment-grid')).toBeVisible();
   await open();await enter('Fleet Dashboard');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
   await open();await enter('Fleet Dashboard');await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
  }
  // A fresh source selection performs its own unitless onSelectUnit transition and must remain open.
  await open();await app.getByRole('button',{name:'Close equipment details'}).click();await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
+ // The Fleet view uses visible equipment cards; its comparison table is collapsed.
  // Use the iframe's real history entries, created by normal workspace navigation.
  const frameDocument=app.locator('html');
  const expectWorkspace=async(hash,view)=>{
   await expect.poll(()=>frameDocument.evaluate(()=>window.location.hash)).toBe(hash);
   await expect(app.getByRole('dialog',{name:'Ranger 901 source equipment details'})).toHaveCount(0);
-  await expect(app.locator(view==='map'?'.cos-fleet-map-canvas':'.cos-fleet-table-wrap')).toBeVisible();
-  await expect(app.locator(view==='map'?'.cos-fleet-table-wrap':'.cos-fleet-map-canvas')).toHaveCount(0);
+  await expect(app.locator(view==='map'?'.cos-fleet-map-canvas':'.cos-equipment-grid')).toBeVisible();
+  await expect(app.locator(view==='map'?'.cos-equipment-grid':'.cos-fleet-map-canvas')).toHaveCount(0);
  };
  await open();await enter('Camera Health');await expectWorkspace('#camera-health','fleet');
  await open();await frameDocument.evaluate(()=>window.history.back());await expectWorkspace('#fleet-dashboard','map');

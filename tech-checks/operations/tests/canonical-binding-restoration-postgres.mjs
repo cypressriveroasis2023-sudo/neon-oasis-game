@@ -11,6 +11,9 @@ try{
  const stage=await f.call('stage');
  for(const lock of [
   'lock table public.equipment_units in row exclusive mode',
+  'lock table app_private.cos_archived_representation_revocations in row exclusive mode',
+  'lock table public.equipment_assignments in row exclusive mode',
+  'lock table public.audit_events in row exclusive mode',
   'lock table public.vision_vigilant_devices in row exclusive mode',
   'lock table cos_mhelp_placement_private.scoped_control in row exclusive mode',
   'select * from cos_mhelp_placement_private.upload_control for update',

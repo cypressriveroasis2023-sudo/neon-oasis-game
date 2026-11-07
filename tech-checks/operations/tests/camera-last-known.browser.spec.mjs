@@ -44,21 +44,30 @@ async function mount(page,{failed=false}={}){
 }
 function assertReadOnly(state){expect(state.calls.length).toBeGreaterThan(0);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session']);expect(state.errors).toEqual([]);}
 
-test('last-known evidence stays visible on list and drawer without restoring current green after failure or expiry',async({page},testInfo)=>{
+test('failed refresh retains the completed reading; a completed stale read exposes last-known evidence',async({page},testInfo)=>{
  const {app,card,state,originalTime}=await mount(page);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(card.locator('.camera-last-known')).toHaveCount(0);
  state.failed=true;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect(app.locator('.cos-fleet-message').filter({hasText:'Synthetic saved camera read unavailable'})).toBeVisible();
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
- const history=card.locator('.camera-last-known');await expect(history).toContainText('Last known CAMERA RECORDS ONLINE');await expect(history).toContainText(originalTime);await expect(history).toContainText('current status unverified');
- await expect(card.locator('.cos-signal-online')).toHaveCount(0);
- // Suspend automatic reads only after the failure settled; advance the
- // observation clock past expiry without racing request timeout timers.
+ // A failed refresh cannot erase or redate the last completed reading (PR #357).
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ await expect(card.locator('.camera-last-known')).toHaveCount(0);
  await app.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
  const callsBeforeAging=state.calls.length;
- await page.clock.runFor(21*60000);await expect(history).toContainText('Stale saved evidence');await expect(history).toContainText(originalTime);await expect(history).toHaveCSS('white-space','normal');
+ await page.clock.runFor(21*60000);
  expect(state.calls.length).toBe(callsBeforeAging);
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ // Only a successful new saved read advances the classification clock. The
+ // provider's unchanged observation is now stale, so it must not become green.
+ state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');
+ const history=card.locator('.camera-last-known');
+ await expect(history).toContainText('Last known CAMERA RECORDS ONLINE');await expect(history).toContainText(originalTime);
+ await expect(history).toContainText('Stale saved evidence');await expect(history).toContainText('current status unverified');await expect(history).toHaveCSS('white-space','normal');
+ await expect(card.locator('.cos-signal-online')).toHaveCount(0);
  await expect(app.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);await expect(app.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);
  await card.screenshot({path:testInfo.outputPath('last-known-stale-unit-card.png')});await page.screenshot({path:testInfo.outputPath('last-known-stale-list.png'),fullPage:true});
  await card.click();const drawer=app.getByRole('dialog',{name:unitNumber+' unit intelligence'}),camera=drawer.getByRole('region',{name:'Selected unit camera health',exact:true});

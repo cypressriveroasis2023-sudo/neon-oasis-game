@@ -9,6 +9,12 @@ export const restorationDependencies=Object.freeze([
  'app_private.cos_owner_identity_assert_actor(uuid,uuid,boolean)',
  'app_private.appdeploy_assume_actor(uuid,uuid)',
  'app_private.has_permission(uuid,text)',
+ 'app_private.cos_archive_valid(app_private.cos_archived_representations)',
+ 'app_private.cos_archive_before(uuid,uuid,uuid,uuid)',
+ 'app_private.cos_archive_native_before(uuid)',
+ 'app_private.cos_archive_tracker_before(uuid)',
+ 'app_private.cos_archive_source_identities(jsonb)',
+ 'app_private.cos_archive_family_base(text)',
 ]);
 const quote=s=>"'"+s.replaceAll("'","''")+"'";
 const sha=s=>createHash('sha256').update(s).digest('hex');
