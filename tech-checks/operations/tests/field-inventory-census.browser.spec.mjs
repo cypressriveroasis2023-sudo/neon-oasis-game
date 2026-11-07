@@ -18,10 +18,11 @@ for(const it of [false,true])test((it?'IT':'Owner')+' retains every recorded Fie
   await page.clock.resume();
   await expect.poll(healthReads).toBe(before+1);
  }else await app.locator('.cos-fleet-refresh').click();
- await expect(app.getByText('A supporting source could not be refreshed',{exact:true})).toBeVisible();
- await app.getByText('Refresh details',{exact:true}).click();
- await expect(app.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
- await expect(list).toBeVisible();await expect(list.locator('[data-product-id]')).toHaveCount(7);await expect(app.getByRole('alert')).toContainText('Last completed results remain displayed');
+ const incomplete=app.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'});
+ await expect(incomplete).toBeVisible();await incomplete.locator('summary').click();
+ await expect(incomplete).toContainText('Synthetic saved camera read unavailable');
+ await expect(incomplete).toContainText('Saved equipment remains visible');
+ await expect(list).toBeVisible();await expect(list.locator('[data-product-id]')).toHaveCount(7);
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  for(const id of ['1001','1002','1003','1004','1005','1006','1007'])await expect(list.locator('[data-product-id]').filter({hasText:'Product '+id})).toContainText('Product ');
  expect(state.field).toEqual(f.field);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
