@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {originalVisionBriefingSource} from './vision-briefing-source.mjs';
 
 const manifest=JSON.parse(readFileSync(new URL('./it-saved-readings-preservation.json',import.meta.url),'utf8'));
 assert.equal(manifest.contract,'COS_IT_SAVED_READINGS_PRESERVATION_V1');
@@ -10,6 +11,7 @@ const blob=source=>{const bytes=Buffer.from(source);return createHash('sha1').up
 /** Reverse only the declared IT cache/control follow-up before existing immutable
  * source guards run. Candidate bytes, exact replacement counts and old bytes are checked. */
 export function originalItSavedReadingSource(name,source){
+ source=originalVisionBriefingSource(name,source);
  const item=manifest.files.find(entry=>entry.path===name);
  assert.ok(item,'No declared IT saved-reading change for '+name);
  assert.equal(blob(source),item.candidateBlob,name+': exact reviewed IT follow-up');

