@@ -40,7 +40,9 @@
     "nativeHandlerTests": "25 passed",
     "recordedBuilderDryRun": "8 of 8 file hashes passed",
     "importClosure": "7 code modules; unchanged graph; only external import jose",
-    "startupParity": "one registered handler, same environment reads, missing bearer returns 401 with zero network calls"
+    "startupParity": "one registered handler, same environment reads, missing bearer returns 401 with zero network calls",
+    "recordedBuilderTests": "10 passed",
+    "publishedReadback": "All eight candidate files at 802747c4d6e8947769c7a277954dc30b60b05ada independently matched expectedAfter."
   },
-  "deployment": "Pending; this file records the verified source candidate. The post-deployment record will identify the accepted version and readback."
+  "deployment": "Not deployed by this release attempt: the final live precondition check detected concurrent ACTIVE v155. That release already contains the exact IT identity-field patch. Preserve v155 and its additional reviewed temporary preview origins. See verification-v155.json."
 }

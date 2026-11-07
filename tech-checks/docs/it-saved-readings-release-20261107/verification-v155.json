@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-11-07T07:39:15Z",
+  "outcome": "CONCURRENT_RELEASE_ALREADY_CONTAINS_FIX",
+  "attemptedDeploy": false,
+  "preparedSourceCommit": "802747c4d6e8947769c7a277954dc30b60b05ada",
+  "preparedSourceDir": "tech-checks/docs/it-saved-readings-release-20261107/source",
+  "live": {
+    "projectRef": "tughscoxralhofrckvxy",
+    "slug": "cos-operations-pages",
+    "version": 155,
+    "status": "ACTIVE",
+    "archiveSha256": "9065cf46375d02eb339504dd4d559a95e9e8312eb472b57b1223076f21921121",
+    "verifyJwt": false,
+    "sourceCommit": "9a3941d7a1c316a314f8cb00fcedadc0f44f31ae",
+    "sourceDir": "tech-checks/docs/vision-native-preview-20261107/source",
+    "serveGitBlob": "055638db216f173f07febb813b2bac037d5a9e08",
+    "serveSha256": "85e2808f253dc667e169ae1542f0b6b69e0edb740a6c8148f4f80b4124243edc"
+  },
+  "checks": {
+    "identityField": "Exact verified IT productionTechnicianUserId:context.actorId response is present.",
+    "runtimeDifferenceFromPreparedCandidate": "Only the two reviewed preview-origin Set edits remain after the IT field; reversing those edits reproduces our candidate byte for byte.",
+    "dependencies": "Seven remaining file blobs match the prepared candidate.",
+    "authentication": "Existing authentication, role/organization checks, feature flags, session/cache behavior, preview saved-GET policy and expiry preserved.",
+    "previewExpiresAt": "2026-11-09T23:59:59Z",
+    "liveUnauthenticatedSession": "Browser displayed the expected Sign in to Tech Check to continue error. HTTP status was not independently observed.",
+    "liveOwnerReopen": "Authenticated Owner production Fleet reopened and displayed OPERATIONS CONNECTED and saved health.",
+    "liveITReopen": "Pending an authenticated IT sign-in. Owner verification does not prove the IT-specific behavior."
+  },
+  "validation": {
+    "nativeTestsPassed": 25,
+    "builderTestsPassed": 10,
+    "candidateFileHashesMatched": 8,
+    "publishedCandidateReadback": "Exact content hashes matched for all eight files."
+  },
+  "action": "Kept the concurrently deployed v155 unchanged; deploying the separate v154-based candidate would remove the added preview origins."
+}

@@ -15,3 +15,7 @@ The original wrapper is preserved in `../fleet-provenance-repair-20261104/deploy
 All 25 exact native handler tests passed at merged main `f27daa5eb8d5b88ac30792e0ca1f4a1a0ed6851d`. The recorded builder's dry run verified all eight source and candidate hashes. Import closure and entrypoint startup checks confirmed the same module graph, environment reads, single handler registration and unauthenticated rejection with no network calls.
 
 These checks do not by themselves establish authenticated IT browser behavior in production. Deployment metadata, wrapper readback and live browser verification are recorded separately after release. No inventory, Field/Shop, IP, provider-binding, schema or schedule mutation is part of this source package.
+
+## Live release observed
+
+The final precondition check detected a concurrent deployment before this attempt wrote to Supabase. Native v155 is ACTIVE and already includes the exact IT actor-field fix, together with reviewed temporary preview origins from PR #362. This attempt therefore did not deploy or roll back anything. `verification-v155.json` records the independent source comparison, deployment metadata and live Owner/unauthenticated checks. Authenticated IT reopen verification remains pending.
