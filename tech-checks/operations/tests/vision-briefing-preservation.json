@@ -1,0 +1,21 @@
+{
+  "contract": "COS_VISION_BRIEFING_PRESERVATION_V1",
+  "base": "f58b97c89b2f024ad146ebe867935aeb72b24a01",
+  "path": "FleetDashboard.tsx",
+  "baselineBlob": "9dbafecb1a18ee5d2d84f5083fd5124ecb18c2b4",
+  "candidateBlob": "b65a6f4ab0abc4374406518d17fcadf0a5abfa8d",
+  "replacements": [
+    {
+      "from": "",
+      "to": "import FleetVisionBriefing from './FleetVisionBriefing';\n"
+    },
+    {
+      "from": "'cos-fleet-dashboard cos-fleet-board'",
+      "to": "'cos-fleet-dashboard cos-fleet-board cos-vision-command'"
+    },
+    {
+      "from": "",
+      "to": "  {view==='map'&&<FleetVisionBriefing data={boardData} readingAt={savedReading?.checkedAt??null} retained={Boolean(cameras.error||mapError||Object.keys(sourceErrors).length)} onMap={()=>document.querySelector('.cos-fleet-map-panel')?.scrollIntoView({block:'start'})} onHealth={()=>tab('fleet')} onOpen={product=>{if(product.linked?.unitId)open(product.linked.unitId);else if(product.linked?.recordId)openSource(product.linked.recordId);else if(mhelpAddresses&&[...mhelpAddresses.pins,...mhelpAddresses.reviews].some(item=>item.productId===product.productId))openMhelpAddress(product.productId);else show('Product '+product.productId+' has no verified COS unit or saved address to open. Review Data sources.');}}/>}\n"
+    }
+  ]
+}
