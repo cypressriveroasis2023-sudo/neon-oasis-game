@@ -35,9 +35,9 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  // observation should become Unverified; it is not a failed-read retention case.
  state.fail=true;state.productConnections=null;
  if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
- await expect(app.getByRole('alert')).toBeVisible();
- await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
- // A failed refresh retains the completed snapshot and its visible warning.
+ const incomplete=app.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'});await expect(incomplete).toBeVisible();
+ const connection=app.locator('.cos-fleet-status-strip').filter({hasText:'Connection source needs review'});await expect(connection).toBeVisible();await connection.locator('summary').click();await expect(connection).toContainText('Connection source');
+ // A failed refresh retains the completed snapshot with compact diagnostic rows.
  await expect(marker('1001')).toHaveAttribute('data-health','online');
  await expect(marker('1002')).toHaveAttribute('data-health','offline');
  expect(state.calls.every(r=>r.method==='GET')).toBeTruthy();

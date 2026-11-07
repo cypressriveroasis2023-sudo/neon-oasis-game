@@ -53,7 +53,7 @@ for(const it of [false,true])test(`a slow power read does not block camera refre
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
  if(it)await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toHaveCount(0);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failVrm=true;state.releaseVrm();
- await expect(app.getByRole('alert')).toContainText('Synthetic saved power read unavailable');
+ const incomplete=app.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'});await expect(incomplete).toBeVisible();await incomplete.locator('summary').click();await expect(incomplete).toContainText('Synthetic saved power read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
  if(it)await nextScheduledFleetRead(page,app,state);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(state.errors).toEqual([]);
