@@ -51,7 +51,7 @@ for(const dense of [false,true])for(const it of [false,true])test(`${dense?'shar
 for(const it of [false,true])test(`a slow power read does not block camera refresh ${it?'IT':'Owner'}`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{holdVrm:true,advancingClock:it});
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
- if(it)await nextScheduledFleetRead(page,app,state);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ if(it)await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toHaveCount(0);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failVrm=true;state.releaseVrm();
  await expect(app.getByRole('alert')).toContainText('Synthetic saved power read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
