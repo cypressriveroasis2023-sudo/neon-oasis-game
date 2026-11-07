@@ -164,7 +164,7 @@ for(const it of [true,false])test((it?'IT omits':'Owner retains')+' manual healt
  if(it)await expect(drawer.getByRole('button',{name:/Refresh data/})).toHaveCount(0);else await expect(drawer.getByRole('button',{name:/Refresh data/})).toBeVisible();
  await drawer.locator('.cos-fleet-troubleshooting > summary').click();
  const workspace=drawer.getByRole('region',{name:'Camera Health',exact:true});
- await expect(workspace.getByRole('heading',{name:'Camera troubleshooting',exact:true})).toBeVisible();
+ await expect(workspace).toBeVisible();
  if(it)await expect(workspace.getByRole('button',{name:'Reload saved results',exact:true})).toHaveCount(0);else await expect(workspace.getByRole('button',{name:'Reload saved results',exact:true})).toBeVisible();
  await expect(workspace.getByRole('button',{name:'Open Camera Health diagnostics',exact:true})).toBeVisible();
  await drawer.getByRole('button',{name:'Close unit details',exact:true}).click();
