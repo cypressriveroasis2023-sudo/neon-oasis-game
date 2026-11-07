@@ -31,9 +31,12 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  await expect(marker('1001')).toHaveAttribute('data-health','online');await expect(marker('1002')).toHaveAttribute('data-health','offline');
  await expect(app.locator('.cos-status-group-ring,.cos-map-group')).toHaveCount(0);
  for(const id of ['1001','1002']){await marker(id).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
- state.fail=true;
+ // Fail both independent saved-read sources. A successfully returned old TCP
+ // observation should become Unverified; it is not a failed-read retention case.
+ state.fail=true;state.productConnections=null;
  if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(app.getByRole('alert')).toBeVisible();
+ await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
  // A failed refresh retains the completed snapshot and its visible warning.
  await expect(marker('1001')).toHaveAttribute('data-health','online');
  await expect(marker('1002')).toHaveAttribute('data-health','offline');
