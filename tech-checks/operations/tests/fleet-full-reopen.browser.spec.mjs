@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mountFleet,now} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {openFleetView} from './fleet-view-navigation-helper.mjs';
+import {completedBoard} from '../durable-board/project.ts';
 const owner='00000000-0000-4000-8000-000000000001';
 const reads=state=>state.calls.filter(c=>['/api/camera-health/summary-v3','/api/field-map','/api/product-connections','/api/routers','/api/vrm-fleet'].includes(c.path));
 const technician='00000000-0000-4000-8000-000000000010';
@@ -214,5 +215,36 @@ test('a presentation-only saved Shop projection error cannot blank the Fleet',as
  await expect(app.getByText(/Fleet details could not display|Fleet couldn’t display/)).toHaveCount(0);
  await expect(board.getByRole('region',{name:'Equipment family totals'})).toBeVisible();
  await expect(board.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();
+ expect(state.errors).toEqual([]);
+});
+
+
+test('durable Fleet open is read-only until the 10-minute cadence',async({page})=>{
+ const f=fieldProductFixture(),features={durableFleetBoard:false};
+ const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,features,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:owner});
+ await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ const first=completedBoard(f.health,f.field,f.connections,null,f.now);
+ let value={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-open',payload:first},refresh:{state:'completed'},history:[]};
+ const calls=[];
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()!=='POST')return route.fallback();
+  const req=route.request().postDataJSON();
+  if(!req.path.startsWith('/api/fleet-saved-board'))return route.fallback();
+  calls.push(req);
+  return route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:value});
+ });
+ await app.locator('body').evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('cos-saved-fleet-presentation-v1:'))localStorage.removeItem(key);});
+ features.durableFleetBoard=true;state.calls.length=0;await page.reload();
+ const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ await expect.poll(()=>calls.some(c=>c.path==='/api/fleet-saved-board'&&c.method==='GET')).toBe(true);
+ expect(calls.some(c=>c.method==='POST')).toBe(false);
+ expect(reads(state)).toHaveLength(0);
+ await page.clock.fastForward(9*60000);
+ expect(calls.some(c=>c.method==='POST')).toBe(false);
+ expect(reads(state)).toHaveLength(0);
+ await page.clock.fastForward(2*60000);
+ await expect.poll(()=>calls.some(c=>c.path==='/api/fleet-saved-board/refresh'&&c.method==='POST')).toBe(true);
+ expect(reads(state)).toHaveLength(0);
  expect(state.errors).toEqual([]);
 });

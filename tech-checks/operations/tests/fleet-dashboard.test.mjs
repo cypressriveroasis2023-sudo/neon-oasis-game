@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {fleetVrmReadAllowed,fleetDashboardRows,filterFleetDashboard,fleetDashboardSummary,initialFleetFilters,discoveryNeedsSetup,fleetDashboardCsv} from '../src/fleetDashboardModel.ts';
 import {fieldCameraHealth} from '../src/fieldCameraHealth.ts';
 import {resource,snapshot,now,fresh,withStatus,port} from './fixtures/camera-evidence-fixtures.mjs';
+import {savedFleetBoard} from '../durable-board/runtime.mjs';
 const unit=(n,name,model,placement='FIELD')=>({id:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,unitNumber:name,modelName:model,placement,currentLocationType:placement.toLowerCase(),status:placement==='FIELD'?'field':'available',address:'123 Synthetic Road, Houston, TX 77001',customer:'Fixture Customer',site:'Fixture Site'});
 const units=[unit(1,'Helios 1','Helios'),unit(2,'Spotter 1','Spotter'),unit(3,'Spotter 2','Spotter'),unit(4,'Sniper 44','Snipers','SHOP'),unit(5,'Recon II 2','Recon II')];
 const raw=snapshot([resource(1,'Helios 1'),withStatus(resource(2,'Spotter 1'),'offline'),resource(3,'Spotter 2',{evidence:{...resource(3).evidence,observedAt:'2026-10-01T00:00:00Z'}}),resource(4,'Sniper 44',{scope:'shop'}),resource(5,'Recon II 2',{type:'detector',batteryEvidence:{source:'Reconeyez',percent:75,percentObservedAt:fresh,status:'normal',statusObservedAt:fresh}})]);
@@ -80,4 +81,11 @@ test('a shop Sniper with a confirmed port outage keeps its own OFFLINE record bu
  const summary=fleetDashboardSummary(rows);
  assert.equal(summary.offline,1,'only the installed unit is a Field outage; the bench unit must not be counted');
  assert.equal(summary.online+summary.offline+summary.unknown,1,'health counts cover operational placement only');
+});
+
+test('opening the durable Fleet is a read-only restore, not a refresh trigger',async()=>{
+ const calls=[];
+ const rpc=async name=>{calls.push(name);return name==='cos_fleet_board_read'?{contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{payload:{contract:'COS_SAVED_FLEET_BOARD_V1'}}}:null;};
+ const value=await savedFleetBoard({rpc,read:async()=>{throw Error('open must not touch live sources');},waitUntil:()=>{throw Error('open must not schedule a batch');},project:()=>{throw Error('open must not project a batch');}});
+ assert.equal(value.contract,'COS_DURABLE_FLEET_RESPONSE_V1');assert.deepEqual(calls,['cos_fleet_board_read']);
 });

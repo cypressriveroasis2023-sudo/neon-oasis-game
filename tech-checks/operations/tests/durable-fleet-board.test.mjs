@@ -18,7 +18,7 @@ test('the server uses the existing exact Product-ID classifier and rejects parti
 });
 test('refresh returns the stored board while a bounded background batch runs; failure does not publish',async()=>{
  const calls=[],tasks=[];let release;const gate=new Promise(r=>release=r);const rpc=async(name,args)=>{calls.push(name);return name.endsWith('begin')?{id:'run'}:name.endsWith('read')?{latest:{payload:{old:true}}}:true;};
- const response=await savedFleetBoard({rpc,read:async()=>{await gate;throw Error('private raw error');},waitUntil:p=>tasks.push(p),project:()=>{throw Error('must not project failed reads');}});
+ const response=await savedFleetBoard({rpc,force:true,read:async()=>{await gate;throw Error('private raw error');},waitUntil:p=>tasks.push(p),project:()=>{throw Error('must not project failed reads');}});
  assert.equal(response.latest.payload.old,true);assert.equal(calls.includes('cos_fleet_board_finish'),false);release();await tasks[0];assert.equal(calls.at(-1),'cos_fleet_board_fail');
 });
 test('database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure',async()=>{
@@ -38,4 +38,10 @@ test('database persists whole batches, denies browser roles, fences overlap and 
  await db.exec("reset role;update cos_fleet_board_private.runs set started_at=started_at-interval '61 seconds';set role service_role;");
  const c=(await db.query('select public.cos_fleet_board_begin(true) lease')).rows[0].lease;await db.query('select public.cos_fleet_board_finish($1,$2::jsonb)',[c.id,JSON.stringify({...payload,counts:{online:8,offline:0}})]);
  const old=(await db.query('select public.cos_fleet_board_history($1) record',[a.id])).rows[0].record;assert.equal(old.counts.online,7);assert.equal(old.units[0].status,'online');assert.equal((await db.query('select payload from cos_fleet_board_private.runs where id=$1',[a.id])).rows[0].payload,null);await db.close();
+});
+
+test('ordinary saved-board read never claims a refresh lease or touches live sources',async()=>{
+ const calls=[];const rpc=async(name)=>{calls.push(name);return name.endsWith('read')?{latest:{payload:{old:true}},refresh:{state:'completed'}}:{id:'unexpected'};};
+ const value=await savedFleetBoard({rpc,read:async()=>{throw Error('open must not read live sources');},waitUntil:()=>{throw Error('open must not schedule work');},project:()=>{throw Error('open must not project');}});
+ assert.equal(value.latest.payload.old,true);assert.deepEqual(calls,['cos_fleet_board_read']);
 });

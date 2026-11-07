@@ -1,6 +1,6 @@
 /** Called only after the existing fleet account authorization. */
 export async function savedFleetBoard({rpc,read,force=false,waitUntil,now=Date.now,project,abort}){
- const lease=await rpc('cos_fleet_board_begin',{p_force:force});
+ const lease=force?await rpc('cos_fleet_board_begin',{p_force:true}):null;
  if(lease?.id){
   const work=(async()=>{
    try{
