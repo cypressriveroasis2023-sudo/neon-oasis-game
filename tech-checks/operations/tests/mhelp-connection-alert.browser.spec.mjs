@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet,field} from './fleet-dashboard-fixtures.mjs';
+import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 const failure={contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:'2026-10-01T00:00:00Z',errorCode:'source_read_unavailable',reliability:{contract:'COS_MHELP_RELIABILITY_STATUS_V1',auth:{state:'reconnect_required'},inventory:{paused:false}}};
 test('Owner sees a source failure, can open reconnect, and no source write is started',async({page})=>{
  const {app,state}=await mountFleet(page,false,{field:{...field,mhelpPlacementSync:failure}});
@@ -10,9 +11,9 @@ test('Owner sees a source failure, can open reconnect, and no source write is st
  expect(state.calls.every(call=>call.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
 });
 test('IT sees an Owner handoff, and a later successful refresh clears the failure',async({page})=>{
- const {app,state}=await mountFleet(page,true,{field:{...field,mhelpPlacementSync:failure}});
+ const {app,state}=await mountFleet(page,true,{field:{...field,mhelpPlacementSync:failure},advancingClock:true});
  const alert=app.getByRole('alert',{name:'mHelpDesk connection needs attention'});await expect(alert).toBeVisible();await expect(alert.getByText('Ask a COS Owner to reconnect mHelpDesk.')).toBeVisible();await expect(alert.getByRole('button')).toHaveCount(0);
- state.field.mhelpPlacementSync={...failure,errorCode:null,reliability:{...failure.reliability,auth:{state:'verified'}}};await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(alert).toHaveCount(0);expect(state.errors).toEqual([]);
+ state.field.mhelpPlacementSync={...failure,errorCode:null,reliability:{...failure.reliability,auth:{state:'verified'}}};await nextScheduledFleetRead(page,app,state);await expect(alert).toHaveCount(0);expect(state.errors).toEqual([]);
 });
 
 test('generic source failure retains inventory and offers no reconnect on mobile',async({page})=>{

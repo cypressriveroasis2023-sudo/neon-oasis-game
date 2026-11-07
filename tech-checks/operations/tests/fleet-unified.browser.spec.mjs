@@ -2,6 +2,7 @@ import {openWorkspace} from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,units,field,fresh} from './fleet-dashboard-fixtures.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
+import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 
 for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible direct Fleet Dashboard entry and one operational map`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:it?'#fleet-dashboard':'#today'});
@@ -17,11 +18,11 @@ for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible dir
 });
 
 for(const alias of ['field-map','field-view'])for(const it of [false,true])test(`${alias} redirects for ${it?'IT':'Owner'} and preserves a selected unit`,async({page})=>{
- const {app,state}=await mountFleet(page,it,{hash:'#'+alias+'?unit='+units[0].id});
+ const {app,state}=await mountFleet(page,it,{hash:'#'+alias+'?unit='+units[0].id,advancingClock:it});
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
  expect(await app.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+units[0].id);
  await app.getByRole('button',{name:'Close unit details',exact:true}).click();
- await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect(app.getByRole('dialog')).toHaveCount(0);
  expect(state.errors).toEqual([]);
 });

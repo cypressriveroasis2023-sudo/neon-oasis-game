@@ -6,8 +6,8 @@ import {readVrmFleetConfig} from '../../supabase/functions/cos-operations-pages/
 import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 // Private display data, never authority for a write or a new connection result.
-// The caller obtains readingKey only AFTER /api/session verifies the Owner,
-// role, exact account, mode and feature permissions. No tokens are persisted.
+// The caller obtains readingKey only AFTER /api/session verifies the Owner or IT
+// actor, role, exact account, mode and feature permissions. No tokens are persisted.
 const PREFIX='cos-saved-fleet-presentation-v1:';
 const MAX_BYTES=4_000_000;
 export type SavedFleetPresentation={

@@ -1,4 +1,5 @@
 import {readFileSync,writeFileSync} from 'node:fs';
+import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
@@ -10,6 +11,7 @@ const mode=process.argv[2];assert.ok(['original','apply','check'].includes(mode)
 for(const item of manifest){
  assert.match(item.path,/^[a-z0-9-]+\.browser\.spec\.mjs$/);
  const path=resolve(root,item.path);let source=readFileSync(path,'utf8');
+ if(item.path==='mhelp-live-inventory.browser.spec.mjs'&&mode!=='original'&&hash(source)!==item.originalBlob&&hash(source)!==item.candidateBlob)source=originalItSavedReadingSource(item.path,source);
  if(mode==='original'){assert.equal(hash(source),item.originalBlob,item.path);continue;}
  if(mode==='apply'&&hash(source)===item.originalBlob){
   for(const edit of item.replacements){assert.equal(source.split(edit.from).length-1,edit.count,item.path);source=source.replaceAll(edit.from,edit.to);}

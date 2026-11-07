@@ -1,3 +1,4 @@
+import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -6,6 +7,7 @@ const read=name=>readFileSync(new URL(name,import.meta.url),'utf8');
 const manifest=JSON.parse(read('./fleet-view-navigation-preservation.json'));
 for(const item of manifest)test('original source reconstructs after declared navigation/presentation changes: '+item.path,()=>{
   let source=read('./'+item.path);
+  if(['it-daily-mode.browser.spec.mjs','mhelp-live-inventory.browser.spec.mjs'].includes(item.path))source=originalItSavedReadingSource(item.path,source);
   assert.ok(source.startsWith(item.addedImport));source=source.slice(item.addedImport.length);
   for(const replacement of item.replacements){
     assert.equal(source.split(replacement.to).length-1,replacement.count);
