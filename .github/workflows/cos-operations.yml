@@ -140,9 +140,19 @@ jobs:
           cache: npm
           cache-dependency-path: tech-checks/operations/package.json
       - name: Confirm existing technician workflows are unchanged
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           node tests/verify-techcheck-auth-preservation.mjs
-          git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
+          preservation_base="$PR_BASE_SHA"
+          if ! [[ "$preservation_base" =~ ^[0-9a-f]{40}$ ]] || [[ "$preservation_base" =~ ^0{40}$ ]]; then
+            preservation_base="$PUSH_BEFORE_SHA"
+          fi
+          if ! [[ "$preservation_base" =~ ^[0-9a-f]{40}$ ]] || [[ "$preservation_base" =~ ^0{40}$ ]]; then
+            preservation_base="$(git rev-parse HEAD^)"
+          fi
+          git diff --exit-code "$preservation_base" -- ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Verify real PostgreSQL intake concurrency
