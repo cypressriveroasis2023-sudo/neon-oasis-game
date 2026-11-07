@@ -23,7 +23,7 @@ for(const it of [false,true])test((it?'IT':'Owner')+' retains every recorded Fie
  await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('—');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('—');
  await app.getByText('Update status',{exact:true}).click();
- await expect(app.getByText('Latest update incomplete',{exact:true})).toBeVisible();
+ await expect(app.getByText('Latest health update incomplete',{exact:true})).toBeVisible();
  await expect(app.getByText('Old health counts are not used as current Fleet totals.',{exact:true})).toBeVisible();
  await app.getByText('Technical details',{exact:true}).click();
  await expect(app.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
@@ -179,7 +179,7 @@ test('TCP source failure retains completed connection proof without losing or mo
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('1');
  await app.getByText('Update status',{exact:true}).click();
- await expect(app.getByText('Latest update incomplete',{exact:true})).toBeVisible();
+ await expect(app.getByText('Latest health update incomplete',{exact:true})).toBeVisible();
  await expect(app.locator('.cos-fleet-refresh')).toBeEnabled();
  expect(await app.locator('.cos-field-product-cards [data-product-id] details').allTextContents()).toEqual(completedEvidence);
  expect(state.field).toEqual(before);
@@ -199,7 +199,7 @@ test('TCP source failure retains completed evidence and the same Product IDs',as
  await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('7');
  await expect(app.locator('.cos-fleet-stat-shop strong')).toHaveText('1');
  await app.getByText('Update status',{exact:true}).click();
- await expect(app.getByText('Latest update incomplete',{exact:true})).toBeVisible();
+ await expect(app.getByText('Latest health update incomplete',{exact:true})).toBeVisible();
  await expect(app.locator('.cos-fleet-refresh')).toBeEnabled();
  expect(await app.locator('.cos-field-product-cards [data-product-id] details').allTextContents()).toEqual(completedEvidence);
  const list=app.getByRole('region',{name:'Fleet units in view'});
