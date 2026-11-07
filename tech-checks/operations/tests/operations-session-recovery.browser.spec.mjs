@@ -1,8 +1,9 @@
 import {test,expect} from '@playwright/test';
 import {resource,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+import {advanceToScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 
 // Synthetic same-origin parent and saved read responses only. Never read real tokens,
-// contact a provider, mutate records, or replay a write. The hosted clock stays paused.
+// contact a provider, mutate records, or replay a write. Tests advance only the synthetic clock.
 const origin='http://127.0.0.1:4173';
 const owner={authorized:true,legacyOwner:true,role:'Owner',name:'Synthetic Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,vrmRead:true,fleetPlacementEdit:false,fieldLocationVerification:false}};
 const unitId='90000000-0000-4000-8000-000000000001';
@@ -39,13 +40,13 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
  if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();}
- else {await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
+ else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
  return {app,state,initialSessions:state.sessionReads};
 }
 const refresh=app=>app.getByRole('button',{name:'↻ Refresh data',exact:true});
 const privateView=app=>app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
 async function reasons(app){return app.locator('body').evaluate(()=>window.recoveryInvalidations.map(event=>event.reason));}
-async function renewal(page,app){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');await refresh(app).click();await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
+async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click();await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
 async function blocked(app){await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');await expect(app.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);}
 function readOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);}
 
@@ -70,7 +71,7 @@ for(const status of [401,403])test('true source '+status+' stays blocked without
  await page.screenshot({path:testInfo.outputPath('owner-source-'+status+'-reload-required.png')});
 });
 test('IT without a server-verified actor ID requires reload after token change',async({page})=>{
- const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
+ const {app,state,initialSessions}=await mount(page,{it:true});await renewal(page,app,true);await blocked(app);expect(state.sessionReads).toBe(initialSessions);readOnly(state);
 });
 for(const trigger of ['host-hide','pagehide','untyped-security-event','second-token-transition'])test(trigger+' during verification discards its late successful response',async({page})=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred(),replacementGate=deferred();state.sessionGate=gate;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);

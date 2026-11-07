@@ -67,6 +67,28 @@
           "count": 1
         }
       ]
+    },
+    {
+      "path": "mhelp-live-inventory.browser.spec.mjs",
+      "baselineBlob": "e01e74347d23f811280f978c7be2bd0d5f85a29c",
+      "candidateBlob": "e4a96b9b97ed669b3f6deea0e82da1c06bfad8ff",
+      "replacements": [
+        {
+          "from": "",
+          "to": "import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';\n",
+          "count": 1
+        },
+        {
+          "from": " const {app,state}=await mountFleet(page,it,{field:value});",
+          "to": " const {app,state}=await mountFleet(page,it,{field:value,advancingClock:it});",
+          "count": 1
+        },
+        {
+          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "count": 1
+        }
+      ]
     }
   ]
 }

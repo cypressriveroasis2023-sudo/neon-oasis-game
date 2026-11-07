@@ -42,7 +42,7 @@ test('Data sources omit both manual refresh and fallback retry when no callback 
   assert.match(owner,uploadInventory?/>↻ Refresh saved evidence<\//:/>Retry saved data<\//);
  }
 });
-for(const name of ['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs'])test('IT follow-up reverses exactly to protected source: '+name,()=>{
+for(const name of ['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs','mhelp-live-inventory.browser.spec.mjs'])test('IT follow-up reverses exactly to protected source: '+name,()=>{
  const directory=name.endsWith('.browser.spec.mjs')?'./':'../src/';
  originalItSavedReadingSource(name,readFileSync(new URL(directory+name,import.meta.url),'utf8'));
 });

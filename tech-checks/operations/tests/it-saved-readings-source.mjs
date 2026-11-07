@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 
 const manifest=JSON.parse(readFileSync(new URL('./it-saved-readings-preservation.json',import.meta.url),'utf8'));
 assert.equal(manifest.contract,'COS_IT_SAVED_READINGS_PRESERVATION_V1');
-assert.deepEqual(manifest.files.map(item=>item.path),['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs']);
+assert.deepEqual(manifest.files.map(item=>item.path),['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs','mhelp-live-inventory.browser.spec.mjs']);
 const blob=source=>{const bytes=Buffer.from(source);return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');};
 
 /** Reverse only the declared IT cache/control follow-up before existing immutable
