@@ -8,6 +8,7 @@ import {fieldProductFollowUp} from './fieldProductFollowUp';
 
 export const PROVIDER_REPORTED='Provider-reported, not direct-connection verified. ';
 export const DIRECT_SOURCE_GAP='No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ';
+export const CURRENT_SOURCE_CONFLICT='Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ';
 export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
 export type FieldProduct={productId:string;unitNumber:string;state:FieldProductHealth;reason:string;unitId:string|null;recordId:string|null;evidence?:FieldProductEvidence};
@@ -31,15 +32,18 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   const label=typeof product.unitNumber==='string'&&product.unitNumber.trim()?product.unitNumber:'Product '+product.productId;
   const exact=connections?.get(product.productId);
   const support=Boolean(row?.support)||isSupportEquipment({id:product.recordId,unitNumber:label,modelName:typeof product.category==='string'?product.category:undefined});
-  // Connection does not depend on provider/channel acceptance, but still
-  // respects current Product-ID ownership, placement, support and holds.
-  const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length<=1
-   &&(!record?binding?.state!=='linked':record.kind!=='identity_review'&&record.placement==='field'
-     &&record.active&&record.lifecycle==='active'
-     &&record.productIds.length===1&&record.productIds[0]===product.productId)
-   &&(record?.kind!=='unit'||Boolean(row&&row.placement==='field'&&!row.retired&&record.productIds.length===1
-     &&record.productIds[0]===product.productId&&binding?.state==='linked'&&binding.unitIds?.includes(record.unitId))));
+  const exactResourceVerified=Boolean(record?.kind==='unit'&&row?.camera.association&&exact?.resourceId
+    &&row.camera.association.deviceIds.includes(String(exact.resourceId)));
+  // A unique tracker IP is not enough to assign a saved endpoint to a Product ID.
+  // Direct TCP can override Fleet health only when that exact resource belongs to
+  // the reviewed Product-ID -> COS unit -> device association.
+  const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length===1
+   &&record?.kind==='unit'&&row&&exactResourceVerified&&record.placement==='field'
+   &&record.active&&record.lifecycle==='active'&&record.productIds.length===1
+   &&record.productIds[0]===product.productId&&row.placement==='field'&&!row.retired
+   &&binding?.state==='linked'&&Array.isArray(binding.unitIds)&&binding.unitIds.includes(record.unitId));
   const directSourceUnavailable=exactConnectionReceipt!==undefined&&!connections;
+  const reviewedProvider=Boolean(record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState));
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
@@ -60,7 +64,6 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    // one exists, and the provider's own reported status otherwise, labelled as
    // such. Provider status is admitted ONLY on a reviewed device association,
    // never from a name match, and never over a completed direct check.
-   const reviewedProvider=record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState);
    if(reviewedProvider){
     state=row!.cameraState==='online'?'online':'offline';
     reason=PROVIDER_REPORTED+(directSourceUnavailable?DIRECT_SOURCE_GAP:'No direct connection result: '+exact!.reason+' ')+unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
@@ -68,8 +71,13 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
     state='unverified';reason=directSourceUnavailable?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.':exact!.reason;
    }
   }else if(exactAllowed&&exact){
-   state=exact.status==='online'?'online':'offline';
-   reason=exact.reason;
+   if(reviewedProvider&&row!.cameraState!==exact.status){
+    state='unverified';
+    reason=CURRENT_SOURCE_CONFLICT+'Direct: '+exact.reason+' Provider: '+unitHealthLabel(row!.camera)+'.';
+   }else{
+    state=exact.status==='online'?'online':'offline';
+    reason=exact.reason;
+   }
   }else if(!record){
    state='review';reason=related.length?'Multiple COS representations claim this Product ID.':'No current COS roster representation is available for this Product ID.';
   }else if(record.kind!=='unit'){
