@@ -7,3 +7,11 @@ alter function public.cos_mhelp_placement_snapshot(uuid,uuid)
 
 alter function public.cos_fleet_board_read()
   set statement_timeout = '30s';
+
+-- The producer stages and commits the complete source bundle atomically. Those
+-- JSONB writes can also exceed the ordinary request timeout at full fleet size.
+alter function public.cos_fleet_board_stage(uuid,jsonb)
+  set statement_timeout = '30s';
+
+alter function public.cos_fleet_board_finish(uuid,jsonb)
+  set statement_timeout = '30s';
