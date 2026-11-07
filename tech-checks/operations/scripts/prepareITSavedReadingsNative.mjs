@@ -36,18 +36,22 @@ export function prepareITSavedReadingsNative(sourceFiles,previewOrigins){
     {before:'const COS_PREVIEW_ORIGIN="'+previousOrigin+'";',after:'const COS_PREVIEW_ORIGINS=new Set('+JSON.stringify(origins)+');'},
     {before:'previewOrigin=origin===COS_PREVIEW_ORIGIN,',after:'previewOrigin=COS_PREVIEW_ORIGINS.has(origin),'},
   ];
-  const durableEdit={before:'function fleetFeatures(){return{durableFleetBoard:false,',after:'function fleetFeatures(){return{durableFleetBoard:!0,'};
+  const durableEdits=[
+  {before:'function fleetFeatures(){return{durableFleetBoard:false,',after:'function fleetFeatures(){return{durableFleetBoard:!0,'},
+  {before:'features:{durableFleetBoard:false,unitTracker:!!context.actorId,',after:'features:{durableFleetBoard:!!context.actorId,unitTracker:!!context.actorId,'},
+];
   let candidate=identityFiles['serve.ts'];
   for(const edit of corsEdits)candidate=once(candidate,edit.before,edit.after);
-  candidate=once(candidate,durableEdit.before,durableEdit.after);
-  let reversed=once(candidate,durableEdit.after,durableEdit.before);
+  for(const edit of durableEdits)candidate=once(candidate,edit.before,edit.after);
+  let reversed=candidate;
+  for(const edit of [...durableEdits].reverse())reversed=once(reversed,edit.after,edit.before);
   for(const edit of [...corsEdits].reverse())reversed=once(reversed,edit.after,edit.before);
   if(reversed!==identityFiles['serve.ts'])throw Error('Native preview/durable preservation failed.');
   const identityEdits=actorPatch.edits.map(edit=>({before:edit.needle,after:edit.replacement}));
   for(const edit of [...identityEdits].reverse())reversed=once(reversed,edit.after,edit.before);
   if(reversed!==sourceFiles['serve.ts'])throw Error('Native source preservation failed.');
   const files={...identityFiles,'serve.ts':candidate};
-  return {files,manifest:{baselineVersion:baseline.version,baselineArchiveSha256:baseline.archiveSha256,baselineSourceCommit:baseline.sourceCommit,identityRecipe:'.github/function-patches/cos-operations-pages/it-saved-fleet-actor-v154.json',identityServeSha256:actorPatch.expectedAfter['serve.ts'],previewOrigins:origins,previewExpiresAt:'2026-11-09T23:59:59Z',verifyJwt:false,durableFleetBoard:true,edits:[...identityEdits,...corsEdits,durableEdit],sourceHashes:Object.fromEntries(Object.entries(files).map(([name,content])=>[name,sha256(content)]))}};
+  return {files,manifest:{baselineVersion:baseline.version,baselineArchiveSha256:baseline.archiveSha256,baselineSourceCommit:baseline.sourceCommit,identityRecipe:'.github/function-patches/cos-operations-pages/it-saved-fleet-actor-v154.json',identityServeSha256:actorPatch.expectedAfter['serve.ts'],previewOrigins:origins,previewExpiresAt:'2026-11-09T23:59:59Z',verifyJwt:false,durableFleetBoard:true,edits:[...identityEdits,...corsEdits,...durableEdits],sourceHashes:Object.fromEntries(Object.entries(files).map(([name,content])=>[name,sha256(content)]))}};
 }
 
 export function assertNativeSavedReadingsDeployment(deployed){

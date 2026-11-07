@@ -1,8 +1,8 @@
 # Exact native preview artifact
 
-This directory contains the hash-verified v154 native source plus PR361’s additive verified IT actor field, two literal CORS edits, and the reviewed durable Fleet feature gate. The temporary exact-origin set contains the existing preview, the current PR361 reliability preview, and the VISION frontend preview. The original expiry, saved-GET allowlist, custom authentication, capabilities, and production origins remain unchanged.
+This directory contains the hash-verified v154 native source plus PR361’s additive verified IT actor field, two literal CORS edits, and two reviewed durable Fleet session feature gates, for verified IT and authorized Owner accounts. The temporary exact-origin set contains the existing preview, the current PR361 reliability preview, and the VISION frontend preview. The original expiry, saved-GET allowlist, custom authentication, capabilities, and production origins remain unchanged.
 
-`manifest.json` records the source hashes, four reversible edits, exact preview origins, expiry, durable-board gate, and associated frontend commits. `baseline-v154.json` records the existing immutable wrapper/config and their hashes. All seven dependency files are byte-identical to the recorded v154 source; only `serve.ts` differs.
+`manifest.json` records the source hashes, five reversible edits, exact preview origins, expiry, durable-board gate, and associated frontend commits. `baseline-v154.json` records the existing immutable wrapper/config and their hashes. All seven dependency files are byte-identical to the recorded v154 source; only `serve.ts` differs.
 
 The actual composed source passed 31 offline identity, authentication, preservation, CORS, mutation-denial, and expiry checks. Those tests used only synthetic transport. The exact-origin command was:
 

@@ -54,13 +54,16 @@ test('native patch reverses to every original byte and preserves all seven depen
  assert.throws(()=>prepareITSavedReadingsNative({...original,'serve.ts':original['serve.ts']+' '},[preview]));
 });
 
-test('actual native IT response adds only the already-verified actor identity',async()=>{
+test('actual native IT session keeps verified actor identity and enables the durable board without other changes',async()=>{
  const before=boot(baselineCode),after=boot(candidateCode);
  for(const who of [identities.teddy,identities.victor]){
   const old=fixture(before,who,{origin:'https://cos-vision-integration-preview.pages.dev'}),next=fixture(after,who);
   const oldResponse=await old.request(),response=await next.request();assert.equal(response.status,200);
   const body=await response.json();assert.equal(body.productionTechnicianUserId,who.actor);
-  const {productionTechnicianUserId,...rest}=body;assert.deepEqual(rest,await oldResponse.json());
+  const {productionTechnicianUserId,...rest}=body;const oldBody=await oldResponse.json();
+  assert.equal(oldBody.features.durableFleetBoard,false);
+  assert.equal(rest.features.durableFleetBoard,true);
+  assert.deepEqual({...rest,features:{...rest.features,durableFleetBoard:false}},oldBody);
   assert.deepEqual(next.calls,old.calls);assert.ok(next.calls.every(url=>!/\/rpc\//.test(url)));
  }
 });
