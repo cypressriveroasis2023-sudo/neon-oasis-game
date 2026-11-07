@@ -38,7 +38,7 @@
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-    "savedFleetBoard.mjs": "3a5f26b42e10bda89a3703cafc03f931f588c54be14c75ad2df245806784f368",
+    "savedFleetBoard.mjs": "42c498fac538fdf3448c53086ea364777de8b66bdbb57a95cb9d1f188126ea95",
     "serve.ts": "c05464ed84cd7798ab351ca43ce54d6116c25a457021d4d0a20f0e0bbd264a7f",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
@@ -50,9 +50,9 @@
   "reliabilityCommit": "f58b97c89b2f024ad146ebe867935aeb72b24a01",
   "reliabilityOrigin": "https://f1d53177.cos-vision-integration-preview.pages.dev",
   "packaging": "Existing two-file immutable-import wrapper; source commit must be pinned before deployment.",
-  "status": "PREPARED_FLEET_COUNT_TRUST_GUARD",
+  "status": "PREPARED_FLEET_DIRECT_CONNECTION_TRUST",
   "durableFleetBoard": true,
-  "durableFleetBehavior": "Opening remains read-only. Current completed boards may conservatively replace older definitive boards with Unverified states. TCP status is admitted only on exact reviewed resource membership; a TCP/provider contradiction is Unverified, never a confirmed outage.",
+  "durableFleetBehavior": "Opening remains read-only. Online/Offline Fleet counts require a completed exact Product-ID TCP result bound to the reviewed resource identity. Provider status is diagnostic only when TCP is Unknown. TCP/provider contradictions are Unverified, never outages. Newer complete bundles may replace stale definitive boards with conservative Unverified states.",
   "currentLivePrecondition": {
     "version": 155,
     "status": "ACTIVE",

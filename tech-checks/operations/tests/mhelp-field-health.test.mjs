@@ -40,31 +40,27 @@ test('all 287 Field Product IDs reconcile without importing the 714 Shop records
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.total,287);assert.equal(view.items.length,287);assert.equal(view.counts.unlinked,281);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),287);
 });
 
-test('obsolete IP-only contract and failed source keep inventory and support, and certify only reviewed provider health',()=>{
+test('an explicit failed or obsolete direct source cannot promote provider status into Fleet health',()=>{
  const f=fieldProductFixture();
  for(const receipt of [null,{...f.connections,contract:'COS_EXACT_PRODUCT_CONNECTIONS_V1'}]){
- const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
- assert.equal(view.total,7);assert.equal(view.items.filter(i=>i.state==='support').length,1);
- // A rejected or obsolete connection source cannot certify connectivity itself.
- // It does not erase the provider's own reported health on a reviewed
- // association, which is shown labelled, with the source failure still raised.
- assert.equal(view.items[0].state,'online');
- assert.equal(view.items[1].state,'offline');
- assert.match(view.items[0].reason,/Provider-reported, not direct-connection verified/);
- assert.equal(view.items[0].evidence.followUp.category,'source_unavailable');
- // Everything without a reviewed association stays Unknown.
- assert.equal(view.items[2].state,'unverified');
- assert.equal(view.items[4].state,'unverified');
- assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
+  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+  assert.equal(view.total,7);assert.equal(view.items.filter(i=>i.state==='support').length,1);
+  assert.equal(view.items[0].state,'unverified');
+  assert.equal(view.items[1].state,'unverified');
+  assert.match(view.items[0].reason,/exact Product-ID TCP source is unavailable/);
+  assert.equal(view.items[0].evidence.followUp.category,'source_unavailable');
+  assert.equal(view.items[2].state,'unverified');
+  assert.equal(view.items[4].state,'unverified');
+  assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
  }
 });
 
-test('TCP status cannot override a different reviewed resource and TCP/provider conflicts become Unverified',()=>{
+test('TCP status requires the reviewed exact resource and TCP/provider conflicts become Unverified',()=>{
  const f=fieldProductFixture();
  const wrong=structuredClone(f.connections);wrong.items.find(i=>i.productId==='1001').resourceId='999999';
  let view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,wrong);
- assert.equal(view.items.find(i=>i.productId==='1001').state,'online');
+ let product=view.items.find(i=>i.productId==='1001');assert.equal(product.state,'unverified');assert.match(product.reason,/not bound to the reviewed exact Product-ID resource identity/);
  const conflict=structuredClone(f.connections);const item=conflict.items.find(i=>i.productId==='1001');item.status='offline';item.resourceId='1';
  view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,conflict);
- const product=view.items.find(i=>i.productId==='1001');assert.equal(product.state,'unverified');assert.match(product.reason,/Connection conflict/);
+ product=view.items.find(i=>i.productId==='1001');assert.equal(product.state,'unverified');assert.match(product.reason,/Connection conflict/);
 });

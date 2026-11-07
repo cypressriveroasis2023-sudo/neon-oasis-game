@@ -54,21 +54,12 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
    state='support';reason='Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.';
-  }else if(exactConnectionReceipt!==undefined&&!connections||exact?.status==='unknown'&&connections){
-   // No direct connection result is available for this Product ID. The
-   // safeguard added 2026-10-26/27 was right that a guess must never be
-   // inherited here, but it failed closed onto nothing at all, and the direct
-   // source is unavailable almost always, so the whole fleet read Unknown.
-   // Owner intent (James Martin) is two separate signals: a direct check where
-   // one exists, and the provider's own reported status otherwise, labelled as
-   // such. Provider status is admitted ONLY on a reviewed device association,
-   // never from a name match, and never over a completed direct check.
-   if(reviewedProviderState){
-    state=reviewedProviderState;
-    reason=PROVIDER_REPORTED+(directSourceUnavailable?DIRECT_SOURCE_GAP:'No direct connection result: '+exact!.reason+' ')+unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
-   }else{
-    state='unverified';reason=directSourceUnavailable?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.':exact!.reason;
-   }
+  }else if(exactConnectionReceipt!==undefined&&(!connections||exact?.status==='unknown')){
+   state='unverified';
+   reason=directSourceUnavailable
+    ?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.'
+    :(exact?.reason||'No completed exact Product-ID TCP/service-port result is available.')
+      +(reviewedProviderState?' Reviewed provider status is '+reviewedProviderState.toUpperCase()+' but does not set Fleet health.':'');
   }else if(exactAllowed&&exact){
    if(reviewedProviderState&&reviewedProviderState!==exact.status){
     state='unverified';
@@ -77,6 +68,10 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
     state=exact.status==='online'?'online':'offline';
     reason=exact.reason;
    }
+  }else if(exactConnectionReceipt!==undefined&&exact&&exact.status!=='unknown'){
+   state='unverified';
+   reason='The TCP result is not bound to the reviewed exact Product-ID resource identity, so it cannot set Fleet health.'
+    +(reviewedProviderState?' Reviewed provider status is '+reviewedProviderState.toUpperCase()+' and remains diagnostic only.':'');
   }else if(!record){
    state='review';reason=related.length?'Multiple COS representations claim this Product ID.':'No current COS roster representation is available for this Product ID.';
   }else if(record.kind!=='unit'){
