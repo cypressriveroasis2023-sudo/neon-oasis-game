@@ -1,0 +1,59 @@
+name: Build COS Fleet recovery candidate once
+on:
+  push:
+    branches:
+      - fix/fleet-render-recovery-20261107
+    paths:
+      - '.github/workflows/cos-fleet-recovery-build-once.yml'
+permissions:
+  contents: write
+concurrency:
+  group: cos-fleet-recovery-review-asset-build
+  cancel-in-progress: false
+jobs:
+  build-reviewed-assets:
+    if: github.repository == 'cypressriveroasis2023-sudo/neon-oasis-game' && github.ref_name == 'fix/fleet-render-recovery-20261107'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: Install existing pinned dependencies
+        working-directory: tech-checks/operations
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck exact review source
+        working-directory: tech-checks/operations
+        run: npm run typecheck
+      - name: Verify saved Fleet recovery and source mismatch guard
+        working-directory: tech-checks/operations
+        run: node --import tsx --test tests/fleet-render-recovery.test.mjs
+      - name: Build existing COS Operations app
+        working-directory: tech-checks/operations
+        run: npm run build
+      - name: Commit only generated static bundle to review branch
+        run: |
+          set -eu
+          if [ "$(git rev-parse HEAD)" != "${{ github.sha }}" ]; then
+            echo "::error::Checkout is not the expected reviewed source."
+            exit 1
+          fi
+          git fetch origin fix/fleet-render-recovery-20261107
+          if [ "$(git rev-parse origin/fix/fleet-render-recovery-20261107)" != "$(git rev-parse HEAD)" ]; then
+            echo "::error::Review branch advanced; do not publish stale built assets."
+            exit 1
+          fi
+          git add tech-checks/operations/dist
+          if git diff --cached --quiet; then
+            echo "::error::No regenerated static assets to publish."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Build exact Fleet recovery review assets"
+          git push origin HEAD:refs/heads/fix/fleet-render-recovery-20261107
