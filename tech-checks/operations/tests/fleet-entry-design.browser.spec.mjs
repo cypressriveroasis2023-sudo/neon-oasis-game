@@ -18,7 +18,8 @@ for(const it of [false,true])test(`Fleet opens first with compact summary design
   const mapTab=await nav.getByRole('button',{name:/Map/}).boundingBox(),fleetTab=await nav.getByRole('button',{name:/Fleet health/}).boundingBox();
   expect(Math.abs(mapTab.y-fleetTab.y)).toBeLessThan(3);
  }
- await expect(board.locator('.cos-fleet-refresh')).toHaveCSS('color','rgb(18, 26, 38)');
+ if(it)await expect(board.locator('.cos-fleet-refresh')).toHaveCount(0);
+ else await expect(board.locator('.cos-fleet-refresh')).toHaveCSS('color','rgb(18, 26, 38)');
  await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online')).toHaveCSS('color','rgb(43, 255, 53)');
  await page.screenshot({path:testInfo.outputPath('fleet-dashboard-default.png'),fullPage:true});
  await board.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();

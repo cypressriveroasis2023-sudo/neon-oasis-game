@@ -3,11 +3,21 @@ import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 for(const it of [false,true])test((it?'IT':'Owner')+' retains every recorded Field product when saved camera health fails',async({page})=>{
- const f=fieldProductFixture(),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections});
+ const f=fieldProductFixture(),{app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:it});
  const list=app.getByRole('region',{name:'Fleet units in view'});
  await expect(list).toBeVisible();await expect(list.locator('[data-product-id]')).toHaveCount(7);await expect(list).not.toContainText('Product 1008');
  await expect(list.locator('[data-product-id]').filter({hasText:'Product 1006'})).toContainText('Product ');
- state.fail=true;await app.locator('.cos-fleet-refresh').click();
+ state.fail=true;
+ if(it){
+  await expect(app.locator('.cos-fleet-refresh')).toHaveCount(0);
+  const healthReads=()=>state.calls.filter(call=>call.path==='/api/camera-health/summary-v3').length,before=healthReads();
+  const current=await app.locator('body').evaluate(()=>Date.now());
+  await page.clock.pauseAt(new Date(current+1000));
+  await page.clock.setSystemTime(new Date(current+10*60000));
+  for(let tick=0;tick<61&&healthReads()===before;tick++)await page.clock.runFor(1000);
+  await page.clock.resume();
+  await expect.poll(healthReads).toBe(before+1);
+ }else await app.locator('.cos-fleet-refresh').click();
  await expect(app.getByText('A supporting source could not be refreshed',{exact:true})).toBeVisible();
  await app.getByText('Refresh details',{exact:true}).click();
  await expect(app.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
