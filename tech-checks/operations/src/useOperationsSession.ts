@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {api} from './api';
 import {createOperationsSessionRecovery, guardSessionCallback, type SessionRecoveryState} from './operationsSessionRecovery';
+import {browserFleetStorage,clearFleetPresentations,suspendFleetPresentationAccess,resumeFleetPresentationAccess} from './savedFleetPresentation';
 
 export function useOperationsSession(onInvalidated: (reason?: unknown) => void) {
   const [state, setState] = useState<SessionRecoveryState>({session:null, checking:true, error:'', reloadRequired:false, generation:0});
@@ -8,10 +9,22 @@ export function useOperationsSession(onInvalidated: (reason?: unknown) => void) 
   const clearView = useRef(onInvalidated);
   clearView.current = onInvalidated;
   useEffect(() => {
+    let leavingDocument=false;
     const current = createOperationsSessionRecovery({
       read: async () => (await api.get('/api/session')).data,
       mode: () => new URLSearchParams(location.search).get('mode') || '',
-      changed: setState,
+      changed: next => {
+        // Recovery has already compared the server's actor, role, mode and
+        // complete feature fingerprint. Release before mounting the new view.
+        if(next.session?.authorized===true&&!next.checking&&!next.reloadRequired)resumeFleetPresentationAccess();
+        else {
+          suspendFleetPresentationAccess();
+          // A normal reload may keep scoped bytes for a fresh server check in
+          // the next document; it must never revive this hidden document.
+          if(next.session?.authorized===false||next.reloadRequired&&!leavingDocument)clearFleetPresentations(browserFleetStorage());
+        }
+        setState(next);
+      },
     });
     controller.current = current;
     const invalidate = (event: Event) => {
@@ -19,7 +32,7 @@ export function useOperationsSession(onInvalidated: (reason?: unknown) => void) 
       current.invalidate(reason);
       clearView.current(reason);
     };
-    const leave = () => { current.invalidate('security-hide'); clearView.current('security-hide'); };
+    const leave = () => { leavingDocument=true; current.invalidate('security-hide'); clearView.current('security-hide'); };
     // A bfcache restore retains the terminal security-hide controller. Start a
     // fresh document and normal parent/server verification; never revive it.
     const restore = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };

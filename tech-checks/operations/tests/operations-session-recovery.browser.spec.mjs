@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {resource,snapshot,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
 import {advanceToScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 
 // Synthetic same-origin parent and saved read responses only. Never read real tokens,
 // contact a provider, mutate records, or replay a write. Tests advance only the synthetic clock.
@@ -11,9 +12,10 @@ const unit={id:unitId,unitNumber:'Helios 1',modelName:'Helios',status:'field',cu
 const health=snapshot([resource('9001','Helios 1')]);
 const field={items:[unit],inventoryItems:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:0,missingGps:0},generatedAt:fresh};
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
-async function mount(page,{it=false,locationWrites=false,tv=false}={}){
+async function mount(page,{it=false,locationWrites=false,tv=false,fullFleet=false}={}){
+ const completed=fullFleet?fieldProductFixture():null;
  const session={...structuredClone(owner),features:{...owner.features,fieldLocationVerification:locationWrites}};
- const state={session:it?{...session,legacyOwner:false,role:'IT',productionOwnerUserId:null}:session,calls:[],errors:[],sessionGate:null,healthGate:null,routerStatus:200,sessionStatus:200,sessionReads:0};
+ const state={session:it?{...session,legacyOwner:false,role:'IT',productionOwnerUserId:null}:session,calls:[],errors:[],sessionGate:null,healthGate:null,routerStatus:200,sessionStatus:200,sessionReads:0,failFleetReads:false};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.addInitScript(()=>{window.recoveryInvalidations=[];window.recoveryHides=0;window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')window.recoveryHides++;});window.addEventListener('cos-private-data-invalidated',event=>window.recoveryInvalidations.push({reason:event.detail?.reason||'untyped',at:Date.now()}));});
  await page.clock.install({time:new Date(now-60000)});await page.clock.pauseAt(new Date(now));
@@ -35,12 +37,14 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
   if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
-  const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
+  if(state.failFleetReads&&['/api/field-map','/api/camera-health/summary-v3','/api/product-connections'].includes(body.path))return route.fulfill({status:503,headers,json:{error:'Synthetic saved Fleet source unavailable'}});
+  const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?(completed?.health||health):body.path==='/api/field-map'?(completed?.field||field):body.path==='/api/product-connections'&&completed?completed.connections:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
  if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();}
- else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
+ else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText(fullFleet?'7':'1');}
+ if(fullFleet)await expect.poll(()=>savedPresentation(app)).not.toBeNull();
  return {app,state,initialSessions:state.sessionReads};
 }
 const refresh=app=>app.getByRole('button',{name:'↻ Refresh data',exact:true});
@@ -49,6 +53,63 @@ async function reasons(app){return app.locator('body').evaluate(()=>window.recov
 async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click();await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
 async function blocked(app){await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');await expect(app.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);}
 function readOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);}
+async function savedPresentation(app){return app.locator('body').evaluate(()=>{
+ const key=Object.keys(localStorage).find(value=>value.startsWith('cos-saved-fleet-presentation-v1:'));
+ return key?localStorage.getItem(key):null;
+});}
+
+for(const trigger of ['token renewal','parent timeout'])test('full saved Fleet survives '+trigger+' only after the same Owner is verified',async({page})=>{
+ const {app,state,initialSessions}=await mount(page,{fullFleet:true}),gate=deferred();
+ const saved=await savedPresentation(app),counts=await app.locator('.cos-equipment-totals strong,.cos-equipment-totals b').allTextContents();
+ state.sessionGate=gate;state.failFleetReads=true;
+ if(trigger==='token renewal')await renewal(page,app);
+ else {await page.evaluate(()=>window.dropNextHandshake=true);await refresh(app).click();await page.clock.runFor(10000);await expect.poll(()=>reasons(app)).toContain('parent-timeout');await page.clock.runFor(1);}
+ await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
+ await expect(privateView(app)).toHaveCount(0);
+ expect(await savedPresentation(app)).toBe(saved);
+ const readCount=state.calls.length;
+ gate.resolve();await expect(privateView(app)).toBeVisible();
+ await expect(app.getByText(/Last completed reading/)).toBeVisible();
+ await expect(app.locator('.cos-equipment-totals strong,.cos-equipment-totals b')).toHaveText(counts);
+ await expect(app.getByRole('button',{name:'Open Helios 1 Product 1001',exact:true})).toBeVisible();
+ await expect(app.locator('.cos-fleet-map-panel')).toBeVisible();
+ expect(await savedPresentation(app)).toBe(saved);
+ expect(state.calls.length).toBe(readCount);
+ // A normal reload must keep bytes too, but verify the new document's account.
+ state.calls.length=0;await page.reload();
+ await expect(privateView(app)).toBeVisible();
+ await expect(app.locator('.cos-equipment-totals strong,.cos-equipment-totals b')).toHaveText(counts);
+ expect(await savedPresentation(app)).toBe(saved);
+ expect(state.calls.map(call=>call.path)).toEqual(['/api/session']);
+ readOnly(state);
+});
+
+for(const boundary of ['actor','permissions','role','mode','missing identity','unauthorized','verification denied','untyped invalidation','logout','hide during verification'])test('full saved Fleet is erased after '+boundary,async({page})=>{
+ const {app,state}=await mount(page,{fullFleet:true}),gate=deferred();
+ expect(await savedPresentation(app)).not.toBeNull();state.sessionGate=gate;
+ if(boundary==='actor')state.session.productionOwnerUserId='22222222-2222-4222-8222-222222222222';
+ if(boundary==='permissions')state.session.features.vrmRead=false;
+ if(boundary==='role')state.session.role='IT';
+ if(boundary==='mode')await app.locator('body').evaluate(()=>history.replaceState(null,'','?mode=fleet#fleet-dashboard'));
+ if(boundary==='missing identity')delete state.session.productionOwnerUserId;
+ if(boundary==='unauthorized')state.session.authorized=false;
+ if(boundary==='verification denied')state.sessionStatus=403;
+ if(['untyped invalidation','logout'].includes(boundary))await app.locator('body').evaluate((_,kind)=>dispatchEvent(kind==='logout'?new CustomEvent('cos-private-data-invalidated',{detail:{reason:'authentication-denied'}}):new Event('cos-private-data-invalidated')),boundary);
+ else if(boundary==='mode')await refresh(app).click();
+ else {await renewal(page,app);if(boundary==='hide during verification')await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));}
+ gate.resolve();await blocked(app);await expect.poll(()=>savedPresentation(app)).toBeNull();
+ await page.clock.runFor(1500);expect(await savedPresentation(app)).toBeNull();readOnly(state);
+});
+
+test('full saved Fleet stays quarantined through a temporary verification outage',async({page})=>{
+ const {app,state}=await mount(page,{fullFleet:true});const saved=await savedPresentation(app);
+ state.sessionStatus=503;state.failFleetReads=true;await renewal(page,app);
+ await expect(app.getByText('Connection interrupted. COS will reconnect automatically. Keep this window open.')).toBeVisible();
+ await expect(privateView(app)).toHaveCount(0);expect(await savedPresentation(app)).toBe(saved);
+ state.sessionStatus=200;await page.clock.runFor(30000);
+ await expect(privateView(app)).toBeVisible();await expect(app.getByText(/Last completed reading/)).toBeVisible();
+ expect(await savedPresentation(app)).toBe(saved);readOnly(state);
+});
 
 test('same Owner token renewal clears private views and restores camera, map and supporting-source refresh',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred();state.sessionGate=gate;
