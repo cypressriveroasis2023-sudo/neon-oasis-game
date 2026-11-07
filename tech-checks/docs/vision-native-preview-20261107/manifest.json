@@ -1,0 +1,62 @@
+{
+  "baselineVersion": 154,
+  "baselineArchiveSha256": "254594ed3300a84e9d5b1bc58afffb5ff1698d04fd3bf5c4c2d01d1018bb6d31",
+  "baselineSourceCommit": "baf1418c6884e90cb9e9dd457b2f91dd7aafa8c0",
+  "identityRecipe": ".github/function-patches/cos-operations-pages/it-saved-fleet-actor-v154.json",
+  "identityServeSha256": "d7d4d637eddab89a70afe452d0f1a8f668265320397215dd25c5be319709137e",
+  "previewOrigins": [
+    "https://a5f54cfd.cos-vision-integration-preview.pages.dev",
+    "https://f1d53177.cos-vision-integration-preview.pages.dev",
+    "https://9321842b.cos-vision-integration-preview.pages.dev"
+  ],
+  "previewExpiresAt": "2026-11-09T23:59:59Z",
+  "verifyJwt": false,
+  "edits": [
+    {
+      "before": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,provisioningNeeded:null,reason:null});",
+      "after": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,productionTechnicianUserId:context.actorId,provisioningNeeded:null,reason:null});"
+    },
+    {
+      "before": "const COS_PREVIEW_ORIGIN=\"https://a5f54cfd.cos-vision-integration-preview.pages.dev\";",
+      "after": "const COS_PREVIEW_ORIGINS=new Set([\"https://a5f54cfd.cos-vision-integration-preview.pages.dev\",\"https://f1d53177.cos-vision-integration-preview.pages.dev\",\"https://9321842b.cos-vision-integration-preview.pages.dev\"]);"
+    },
+    {
+      "before": "previewOrigin=origin===COS_PREVIEW_ORIGIN,",
+      "after": "previewOrigin=COS_PREVIEW_ORIGINS.has(origin),"
+    },
+    {
+      "before": "function fleetFeatures(){return{durableFleetBoard:false,",
+      "after": "function fleetFeatures(){return{durableFleetBoard:!0,"
+    },
+    {
+      "before": "features:{durableFleetBoard:false,unitTracker:!!context.actorId,",
+      "after": "features:{durableFleetBoard:!!context.actorId,unitTracker:!!context.actorId,"
+    }
+  ],
+  "sourceHashes": {
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+    "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+    "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+    "savedFleetBoard.mjs": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
+    "serve.ts": "c05464ed84cd7798ab351ca43ce54d6116c25a457021d4d0a20f0e0bbd264a7f",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+  },
+  "preparedAtUtc": "2026-11-07T07:29:04.237Z",
+  "frontendCommit": "5bdd6d11ca0ebaca36d8ddf77654e97b6fa88f8b",
+  "frontendDeployment": "9321842b-6fcb-4386-babe-c3c2bc047da5",
+  "frontendOrigin": "https://9321842b.cos-vision-integration-preview.pages.dev",
+  "reliabilityCommit": "f58b97c89b2f024ad146ebe867935aeb72b24a01",
+  "reliabilityOrigin": "https://f1d53177.cos-vision-integration-preview.pages.dev",
+  "packaging": "Existing two-file immutable-import wrapper; source commit must be pinned before deployment.",
+  "status": "PREPARED_DURABLE_FLEET",
+  "durableFleetBoard": true,
+  "durableFleetBehavior": "Owner and verified IT session features enable the already-installed durable Fleet board. Each non-forced read returns the last completed server board immediately; the existing database lease schedules the next batch only at the ten-minute next_at boundary. Owner-only manual refresh remains unchanged.",
+  "currentLivePrecondition": {
+    "version": 155,
+    "status": "ACTIVE",
+    "archiveSha256": "9065cf46375d02eb339504dd4d559a95e9e8312eb472b57b1223076f21921121",
+    "entrypointSha256": "cd88d112b80b46d240500abc6cbed7b1b91bb275a4d4c219c31275e1de7b99d8"
+  }
+}

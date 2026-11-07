@@ -15,12 +15,17 @@ test('reopening restores server counts, retains failures, replaces one completed
   return route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:data});
  });
  await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
+ // Reproduce the real large-fleet phone case: compact counts survive locally
+ // while the full presentation is absent. The server board must restore the
+ // complete Fleet instead of blanking the cards to dashes.
+ await app.locator('body').evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('cos-saved-fleet-presentation-v1:'))localStorage.removeItem(key);});
  features.durableFleetBoard=true;
  const before=state.calls.length;await page.reload();
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
  const online=board.locator('.cos-equipment-total-helios .cos-total-status-online b');
  const offline=board.locator('.cos-equipment-total-helios .cos-total-status-offline b');
  await expect(online).toHaveText('1');await expect(board.getByRole('region',{name:'Saved fleet updates'})).toContainText('Closing the app keeps this record');
+ expect(calls.some(c=>c.path==='/api/fleet-saved-board'&&c.method==='GET')).toBe(true);
  await page.clock.fastForward(25*60000);await expect(online).toHaveText('1');
  expect(state.calls.slice(before).filter(c=>['/api/field-map','/api/camera-health/summary-v3','/api/product-connections'].includes(c.path))).toHaveLength(0);
  value={...value,refresh:{state:'failed',error:'source_read_failed'}};
