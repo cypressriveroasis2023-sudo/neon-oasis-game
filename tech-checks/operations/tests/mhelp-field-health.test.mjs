@@ -66,7 +66,7 @@ test('direct TCP cannot override a different verified provider state',()=>{
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
  assert.equal(view.items.find(p=>p.productId==='1001').state,'unverified');
  assert.equal(view.items.find(p=>p.productId==='1002').state,'unverified');
- assert.match(view.items.find(p=>p.productId==='1001').reason,/sources disagree/i);
+ assert.match(view.items.find(p=>p.productId==='1001').reason,/status disagree/i);
 });
 test('matching exact resource and provider evidence remains definitive',()=>{
  const f=fieldProductFixture(),receipt=structuredClone(f.connections);
