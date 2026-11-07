@@ -65,11 +65,14 @@ test('actual native IT response adds only the already-verified actor identity',a
  }
 });
 
-test('Owner session and all existing features remain byte-for-byte equivalent',async()=>{
+test('Owner session changes only the durable Fleet feature gate',async()=>{
  const origin='https://cos-vision-integration-preview.pages.dev';
  const a=await fixture(boot(baselineCode),identities.owner,{origin}).request();
  const b=await fixture(boot(candidateCode),identities.owner,{origin}).request();
- assert.equal(b.status,a.status);assert.equal(await b.text(),await a.text());
+ assert.equal(b.status,a.status);const before=await a.json(),after=await b.json();
+ assert.equal(before.features.durableFleetBoard,false);assert.equal(after.features.durableFleetBoard,true);
+ const beforeFeatures={...before.features},afterFeatures={...after.features};delete beforeFeatures.durableFleetBoard;delete afterFeatures.durableFleetBoard;
+ assert.deepEqual(afterFeatures,beforeFeatures);delete before.features;delete after.features;assert.deepEqual(after,before);
 });
 
 test('native authentication still denies invalid, inactive, Service and revoked-role identities',async()=>{

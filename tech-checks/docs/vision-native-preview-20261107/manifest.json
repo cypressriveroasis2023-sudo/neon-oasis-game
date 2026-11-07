@@ -31,7 +31,7 @@
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
     "savedFleetBoard.mjs": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
-    "serve.ts": "85e2808f253dc667e169ae1542f0b6b69e0edb740a6c8148f4f80b4124243edc",
+    "serve.ts": "4dab143d4ee86edcd991f87c7cdd22047dc04390a0bf19e695bc589395e983b5",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
   },
@@ -42,5 +42,7 @@
   "reliabilityCommit": "f58b97c89b2f024ad146ebe867935aeb72b24a01",
   "reliabilityOrigin": "https://f1d53177.cos-vision-integration-preview.pages.dev",
   "packaging": "Existing two-file immutable-import wrapper; source commit must be pinned before deployment.",
-  "status": "PREPARED"
+  "status": "PREPARED_DURABLE_FLEET",
+  "durableFleetBoard": true,
+  "durableFleetBehavior": "Opening returns the last completed server board immediately. The existing database lease starts a non-forced background batch only when its 10-minute next_at is due; forced/manual refresh may queue immediately."
 }
