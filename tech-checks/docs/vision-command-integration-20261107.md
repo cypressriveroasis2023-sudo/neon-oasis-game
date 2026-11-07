@@ -34,6 +34,6 @@ A release must retain the two-file immutable-import deployment pattern, verify i
 
 ## Release boundary
 
-Cloudflare preview uses the existing `cos-vision-integration-preview` Pages project and its existing committed static build. Production remains tied to main. The exact VISION preview URL, commit, native artifact, and final test totals are recorded after publication and readback.
+Cloudflare preview uses the existing `cos-vision-integration-preview` Pages project and its existing committed static build. Production remains tied to main. The deployed VISION preview is https://9321842b.cos-vision-integration-preview.pages.dev/ at frontend commit `5bdd6d11ca0ebaca36d8ddf77654e97b6fa88f8b`, deployment `9321842b-6fcb-4386-babe-c3c2bc047da5` (Cloudflare deploy succeeded). The reliability preview is https://f1d53177.cos-vision-integration-preview.pages.dev/ at exact PR361 head. The prepared native artifact and hashes are under `vision-native-preview-20261107/`. The composed native suite passes against these exact two origins, alongside the unchanged original preview origin. Native deployment/readback and signed-in verification are recorded separately.
 
 Real authenticated Owner/IT reopen and account isolation in the deployed preview remain the integration gate. Synthetic tests do not count as that live verification. No broad main merge, inventory repair, provider scan, credential change, or operational schedule change is part of this visual integration.

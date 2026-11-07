@@ -9,8 +9,9 @@ import {nativeSavedReadingsBaseline as baseline,prepareITSavedReadingsNative,sha
 
 const sourceDir=new URL('../../docs/fleet-provenance-repair-20261104/source/',import.meta.url);
 const original=Object.fromEntries(Object.keys(baseline.sha256).map(name=>[name,readFileSync(new URL(name,sourceDir),'utf8')]));
-const preview='https://c2570a42.cos-vision-integration-preview.pages.dev';
-const packet=prepareITSavedReadingsNative(original,[preview]);
+const previews=(process.env.COS_NATIVE_PREVIEW_ORIGINS||'https://c2570a42.cos-vision-integration-preview.pages.dev').split(',');
+const preview=previews[0];
+const packet=prepareITSavedReadingsNative(original,previews);
 const organization='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const identities={
  owner:{legacy:'e4abc521-1ef3-45a6-9829-b87faff78210',actor:'3f073784-96e7-43d8-b9e0-33ab31c3c8b1',department:'owner',role:'owner',name:'Fixture Owner'},
