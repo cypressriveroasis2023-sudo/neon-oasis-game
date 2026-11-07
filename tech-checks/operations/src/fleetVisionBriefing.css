@@ -1,0 +1,65 @@
+/* The VISION briefing uses the existing Fleet data and navigation. */
+#root#root .cos-fleet-board.cos-fleet-dashboard.cos-vision-command{--cos-vision-bg:#0a111d;--fleet-bg:#0a111d;background:#0a111d;border-color:#2c4160}
+#root#root .cos-fleet-board.cos-fleet-dashboard.cos-vision-command .cos-fleet-tabs{background:#101c2e;border-bottom-color:#314564}
+#root#root .cos-fleet-board.cos-fleet-dashboard.cos-vision-command .cos-fleet-tabs>button[aria-current=page]{background:#205cab!important;border-color:#6098df!important;color:#fff}
+#root#root .cos-fleet-board.cos-fleet-dashboard.cos-vision-command .cos-fleet-eyebrow{color:#8abaff}
+#root#root .cos-fleet-board .cos-vision-brief{display:grid;grid-template-columns:minmax(240px,.9fr) minmax(0,1.1fr);gap:24px;margin:0 0 22px;padding:25px;border:1px solid #344d73;border-radius:16px;background:radial-gradient(ellipse at 0 0,#17457555,transparent 65%),#0c1727;color:#f4f7fc;position:relative;overflow:hidden}
+#root#root .cos-fleet-board .cos-vision-brief-kicker{display:flex;align-items:center;gap:9px;color:#9bc7ff;font-size:10px;letter-spacing:.18em;font-weight:750}
+#root#root .cos-fleet-board .cos-vision-brief-kicker>span{font-size:18px;color:#62aaff;line-height:1}
+#root#root .cos-fleet-board .cos-vision-brief-kicker i{height:12px;width:1px;background:#607b9e;margin:0 3px}
+#root#root .cos-fleet-board .cos-vision-brief h2{margin:13px 0 9px;font-size:clamp(21px,2.1vw,29px);font-weight:650;letter-spacing:-.7px;line-height:1.2;color:#fff}
+#root#root .cos-fleet-board .cos-vision-brief-lead>p{margin:0;max-width:440px;color:#b9c7da;font-size:12px;line-height:1.7}
+#root#root .cos-fleet-board .cos-vision-reading{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:18px;color:#c1cfe0;font-size:10px}
+#root#root .cos-fleet-board .cos-vision-reading>span{width:6px;height:6px;background:#78b6ff;border-radius:50%;box-shadow:0 0 0 4px #4f8bd922}
+#root#root .cos-fleet-board .cos-vision-reading>.cos-vision-reading-retained{background:#efbe66;box-shadow:0 0 0 4px #efbe661a}
+#root#root .cos-fleet-board .cos-vision-reading strong{font-size:10px;font-weight:650}
+#root#root .cos-fleet-board .cos-vision-reading small{flex-basis:100%;padding-left:14px;color:#94a8c2;font-size:10px}
+#root#root .cos-fleet-board .cos-vision-priorities{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-self:stretch}
+#root#root .cos-fleet-board .cos-vision-priority{position:relative;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;gap:8px;padding:17px 14px;text-align:left;border:1px solid #354968!important;border-radius:12px!important;background:#14233a!important;color:#e4edfa;min-width:0;cursor:pointer;transition:border-color .15s,background .15s}
+#root#root .cos-fleet-board .cos-vision-priority:hover:not(:disabled),#root#root .cos-fleet-board .cos-vision-priority[aria-expanded=true]{border-color:#75b1ff!important;background:#1b3151!important}
+#root#root .cos-fleet-board .cos-vision-priority>span{font-size:11px;line-height:1.4;font-weight:650;max-width:90%;color:#d6e3f7}
+#root#root .cos-fleet-board .cos-vision-priority>strong{font-size:clamp(30px,3vw,43px);font-variant-numeric:tabular-nums;font-weight:600;line-height:1.2;letter-spacing:-1.2px}
+#root#root .cos-fleet-board .cos-vision-priority>small{font-size:10px;line-height:1.5;font-weight:400;color:#adbed5}
+#root#root .cos-fleet-board .cos-vision-priority>b{position:absolute;top:12px;right:11px;font-size:13px;color:#8fb6ea}
+#root#root .cos-fleet-board .cos-vision-priority-offline>strong{color:#ff8e98}
+#root#root .cos-fleet-board .cos-vision-priority-unverified>strong{color:#e9c880}
+#root#root .cos-fleet-board .cos-vision-priority-location>strong{color:#95c7ff}
+#root#root .cos-fleet-board .cos-vision-priority:disabled{opacity:.65;cursor:default}
+#root#root .cos-fleet-board .cos-vision-attention{grid-column:1/-1;border-top:1px solid #314664;padding-top:21px;min-width:0}
+#root#root .cos-fleet-board .cos-vision-attention>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0;background:transparent;border:0;margin-bottom:15px}
+#root#root .cos-fleet-board .cos-vision-attention>header>div{min-width:0}
+#root#root .cos-fleet-board .cos-vision-attention>header>button{flex-shrink:0}
+#root#root .cos-fleet-board .cos-vision-attention h3{margin:0 0 6px;font-size:17px;color:#f5f8ff}
+#root#root .cos-fleet-board .cos-vision-attention header p{margin:0;color:#aebdd0;font-size:11px;line-height:1.6}
+#root#root .cos-fleet-board .cos-vision-attention header button,#root#root .cos-fleet-board .cos-vision-attention footer button{background:#1b2d47!important;border:1px solid #3e5675!important;border-radius:8px!important;color:#dfecff;font-size:11px;min-height:40px;padding:8px 13px;white-space:nowrap}
+#root#root .cos-fleet-board .cos-vision-attention-search{display:flex;flex-direction:column;gap:7px;color:#afc0d7;font-size:10px;margin-bottom:12px;max-width:500px}
+#root#root .cos-fleet-board .cos-vision-attention-search input{min-height:44px;border:1px solid #4b6382;border-radius:8px;background:#0a1525;color:#f1f6ff;font-size:12px;padding:10px 12px;width:100%;box-sizing:border-box}
+#root#root .cos-fleet-board .cos-vision-attention-rows{border:1px solid #2e4463;border-radius:10px;overflow:hidden}
+#root#root .cos-fleet-board .cos-vision-attention-row{display:grid;grid-template-columns:8px minmax(0,1fr) minmax(0,1.2fr) 16px;align-items:center;gap:16px;padding:14px 17px;width:100%;text-align:left;border:0!important;border-radius:0!important;border-bottom:1px solid #2b405d!important;background:#101f33!important;color:#dce8fa;min-height:76px;box-shadow:none}
+#root#root .cos-fleet-board .cos-vision-attention-row:last-child{border-bottom:0!important}
+#root#root .cos-fleet-board .cos-vision-attention-row:hover{background:#1a304d!important}
+#root#root .cos-fleet-board .cos-vision-attention-row strong{display:block;font-size:12px;font-weight:650;overflow-wrap:anywhere}
+#root#root .cos-fleet-board .cos-vision-attention-row small{display:block;margin-top:5px;color:#a8bdd7;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+#root#root .cos-fleet-board .cos-vision-attention-evidence strong{font-size:11px;color:#c9d9ee}
+#root#root .cos-fleet-board .cos-vision-attention-evidence>small:last-child{color:#8fa7c7;font-size:9px}
+#root#root .cos-fleet-board .cos-vision-attention-dot{width:7px;height:7px;border-radius:50%;background:#b9c8dc}
+#root#root .cos-fleet-board .cos-vision-attention-dot-offline{background:#ff7b89}
+#root#root .cos-fleet-board .cos-vision-attention-dot-online{background:#57daaa}
+#root#root .cos-fleet-board .cos-vision-attention footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:15px;padding:0;border:0;background:none}
+#root#root .cos-fleet-board .cos-vision-attention footer>span{margin-right:auto;max-width:380px;color:#93aac7;font-size:10px;line-height:1.6}
+#root#root .cos-fleet-board .cos-vision-brief-empty{grid-column:1/-1;padding:12px 0;margin:0;color:#a7bdd7;font-size:12px;line-height:1.7}
+#root#root .cos-fleet-board .cos-vision-attention-rows>.cos-vision-brief-empty{padding:22px}
+#root#root .cos-fleet-board .cos-vision-attention-more{color:#afc0d7;font-size:11px}
+#root#root .cos-fleet-board .cos-vision-brief :is(button,input):focus-visible{outline:2px solid #9dcaff;outline-offset:3px}
+#root#root .cos-fleet-board .cos-vision-attention-row:focus-visible{outline-offset:-3px}
+@media(max-width:1100px){#root#root .cos-fleet-board .cos-vision-brief{grid-template-columns:1fr;padding:21px;gap:19px}#root#root .cos-fleet-board .cos-vision-brief-lead>p{max-width:none}#root#root .cos-fleet-board .cos-vision-reading{margin-top:12px}#root#root .cos-fleet-board .cos-vision-reading small{flex-basis:auto;padding-left:0}}
+@media(max-width:600px){#root#root .cos-fleet-board .cos-vision-brief{padding:17px 14px;gap:17px;border-radius:13px;margin-bottom:17px}#root#root .cos-fleet-board .cos-vision-brief h2{font-size:23px;max-width:270px}#root#root .cos-fleet-board .cos-vision-brief-lead>p{font-size:11px}#root#root .cos-fleet-board .cos-vision-priorities{gap:6px}#root#root .cos-fleet-board .cos-vision-priority{padding:12px 9px;gap:6px;min-height:130px}#root#root .cos-fleet-board .cos-vision-priority>span{font-size:10px;max-width:none;padding-right:5px}#root#root .cos-fleet-board .cos-vision-priority>strong{font-size:30px}#root#root .cos-fleet-board .cos-vision-priority>small{font-size:9px}#root#root .cos-fleet-board .cos-vision-priority>b{display:none}#root#root .cos-fleet-board .cos-vision-attention-row{grid-template-columns:7px minmax(0,1fr) 12px;gap:10px;padding:13px}#root#root .cos-fleet-board .cos-vision-attention-evidence{grid-column:2;grid-row:2}#root#root .cos-fleet-board .cos-vision-attention-row>span:last-child{grid-column:3;grid-row:1/3}#root#root .cos-fleet-board .cos-vision-attention footer{flex-wrap:wrap;justify-content:flex-start}#root#root .cos-fleet-board .cos-vision-attention footer>span{flex-basis:100%}}
+@media(prefers-reduced-motion:reduce){#root#root .cos-fleet-board .cos-vision-priority{transition:none}}
+/* TV keeps its existing large-type layout, rotation, status colors and auth. */
+#root#root .operations-shell .tech-check-tv{--tv-bg:#09121f;--tv-muted:#adbed4;background:#09121f;color:#f5f8fc}
+#root#root .operations-shell .tech-check-tv-header{border-bottom-color:#344d70}
+#root#root .operations-shell .tech-check-tv-brand h1 span{color:#9bc7ff}
+#root#root .operations-shell .tech-check-tv-totals>div{background:#13243a;border-color:#344d70}
+#root#root .operations-shell .tech-check-tv-lane>h3{background:#182c45;border-left-color:#70aaff}
+#root#root .operations-shell .tech-check-tv-card:not(.tv-complete):not(.tv-scheduled),#root#root .operations-shell .tech-check-tv-readiness>article{background:#112137;border-top-color:#354d6d;border-right-color:#354d6d;border-bottom-color:#354d6d}
+#root#root .operations-shell .tech-check-tv-footer{border-top-color:#344d70}
