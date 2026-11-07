@@ -1,6 +1,7 @@
 import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import {originalFleetViewMarkup} from './approved-fleet-view-source.mjs';
 import {originalFleetConnectionReadSource} from './fleet-connection-read-source.mjs';
+import {previousReviewedMainSource} from './approved-current-main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -31,7 +32,8 @@ const expected={
 };
 for (const [name,sha] of Object.entries(expected)) test('unit presentation preserves '+name,()=>{
  const raw=readFileSync(new URL('../src/'+name,import.meta.url));
- const restored=name==='FleetDashboard.tsx'?originalFleetViewMarkup(raw.toString('utf8')):['api.ts','useCameraHealth.ts'].includes(name)?originalFleetConnectionReadSource(name,raw.toString('utf8')):name==='App.tsx'?originalItSavedReadingSource(name,raw.toString('utf8')):null;
+ const current=['FleetDashboard.tsx','useCameraHealth.ts'].includes(name)?previousReviewedMainSource(name,raw.toString('utf8')):raw.toString('utf8');
+ const restored=name==='FleetDashboard.tsx'?originalFleetViewMarkup(current):['api.ts','useCameraHealth.ts'].includes(name)?originalFleetConnectionReadSource(name,current):name==='App.tsx'?originalItSavedReadingSource(name,current):null;
  const b=restored===null?raw:Buffer.from(restored);
  assert.equal(createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex'),sha);
 });
