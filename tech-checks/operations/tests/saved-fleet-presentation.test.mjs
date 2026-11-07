@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFleetPresentation,saveFleetPresentation,clearFleetPresentations,fleetDisplaySaveTime} from '../src/savedFleetPresentation.ts';
+import {readFleetPresentation,saveFleetPresentation,clearFleetPresentations,fleetDisplaySaveTime,suspendFleetPresentationAccess,resumeFleetPresentationAccess} from '../src/savedFleetPresentation.ts';
 import {fleetReadingKey,saveFleetReading,readFleetReading} from '../src/savedFleetReading.ts';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 const session={authorized:true,legacyOwner:true,role:'Owner',productionOwnerUserId:'00000000-0000-4000-8000-000000000001',features:{fleetAccess:true,vrmRead:true}};
@@ -63,4 +63,16 @@ test('local display clock normalization never renews old readings or accepts lar
  assert.equal(fleetDisplaySaveTime(1000,NaN),null);assert.equal(fleetDisplaySaveTime(-1,1000),null);
  const f=fixture();f.presentation.fieldMap.productConnections.items[0].checkedAt=new Date(f.now+1).toISOString();
  assert.equal(saveFleetPresentation(f.storage,key,f.presentation,f.now),false);
+});
+test('suspended account verification cannot read or overwrite retained presentation bytes',()=>{
+ const f=fixture();assert.equal(saveFleetPresentation(f.storage,key,f.presentation,f.now),true);
+ const before=[...f.values.entries()];
+ try{
+  suspendFleetPresentationAccess();
+  assert.equal(readFleetPresentation(f.storage,key,f.now+60000),null);
+  assert.equal(saveFleetPresentation(f.storage,key,{...f.presentation,checkedAt:f.now+60000},f.now+60000),false);
+  assert.deepEqual([...f.values.entries()],before);
+ }finally{resumeFleetPresentationAccess();}
+ assert.deepEqual(readFleetPresentation(f.storage,key,f.now+60000),{...f.presentation,contract:'COS_SAVED_FLEET_PRESENTATION_V1',scope:key});
+ assert.equal(readFleetPresentation(f.storage,fleetReadingKey({...session,productionOwnerUserId:'00000000-0000-4000-8000-000000000002'},''),f.now+60000),null);
 });

@@ -10,6 +10,12 @@ import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSaf
 // actor, role, exact account, mode and feature permissions. No tokens are persisted.
 const PREFIX='cos-saved-fleet-presentation-v1:';
 const MAX_BYTES=4_000_000;
+// A renewed bearer is not proof of the same account. Quarantine persisted
+// display data while /api/session revalidates the Owner, without destroying it.
+// The session hook alone releases this gate after server authorization succeeds.
+let accessSuspended=false;
+export function suspendFleetPresentationAccess(){accessSuspended=true;}
+export function resumeFleetPresentationAccess(){accessSuspended=false;}
 export type SavedFleetPresentation={
  contract:'COS_SAVED_FLEET_PRESENTATION_V1';scope:string;checkedAt:number;
  fieldMap:ReturnType<typeof checkedFieldMap>;health:Health|null;
@@ -41,11 +47,11 @@ function validate(value:unknown,key:string,now:number):SavedFleetPresentation|nu
  }catch{return null;}
 }
 export function readFleetPresentation(storage:Storage|null,key:string|null,now=Date.now()):SavedFleetPresentation|null{
- if(!storage||!key)return null;
+ if(accessSuspended||!storage||!key)return null;
  try{const raw=storage.getItem(PREFIX+key);if(!raw||raw.length>MAX_BYTES)return null;return validate(JSON.parse(raw),key,now);}catch{return null;}
 }
 export function saveFleetPresentation(storage:Storage|null,key:string|null,value:Omit<SavedFleetPresentation,'contract'|'scope'>,now=Date.now()):boolean{
- if(!storage||!key)return false;
+ if(accessSuspended||!storage||!key)return false;
  try{
   const next={...value,contract:'COS_SAVED_FLEET_PRESENTATION_V1' as const,scope:key};
   if(!validate(next,key,now))return false;
@@ -62,4 +68,10 @@ export function clearFleetPresentations(storage:Storage|null){
  if(!storage)return;
  try{for(let i=storage.length-1;i>=0;i--){const key=storage.key(i);if(key?.startsWith(PREFIX))storage.removeItem(key);}}catch{/* Storage can be unavailable. */}
 }
-if(typeof window!=='undefined')window.addEventListener('cos-private-data-invalidated',()=>clearFleetPresentations(browserFleetStorage()));
+if(typeof window!=='undefined')window.addEventListener('cos-private-data-invalidated',event=>{
+ suspendFleetPresentationAccess();
+ const reason=(event as CustomEvent<{reason?:unknown}>).detail?.reason;
+ // Hard or unknown boundaries still erase immediately. The recovery controller
+ // also erases on changed identity/permissions or rejected verification.
+ if(reason!=='token-renewed'&&reason!=='parent-timeout')clearFleetPresentations(browserFleetStorage());
+});
