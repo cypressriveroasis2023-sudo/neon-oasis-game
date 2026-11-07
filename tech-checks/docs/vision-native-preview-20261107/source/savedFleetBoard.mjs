@@ -817,7 +817,7 @@ function fieldProductFollowUp(state, reason, exactUnknownReason, directSourceUna
 
 // src/mhelpFieldHealth.ts
 var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
-var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
+var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";\nvar CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
 var fieldHealthLabels = { online: "Online", offline: "Offline", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
 function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
   const authority = readMhelpInventoryAuthority(value, now);
@@ -834,8 +834,10 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     const label = typeof product2.unitNumber === "string" && product2.unitNumber.trim() ? product2.unitNumber : "Product " + product2.productId;
     const exact = connections?.get(product2.productId);
     const support = Boolean(row?.support) || isSupportEquipment({ id: product2.recordId, unitNumber: label, modelName: typeof product2.category === "string" ? product2.category : void 0 });
-    const exactAllowed = Boolean(exact && exact.status !== "unknown" && !support && related.length <= 1 && (!record2 ? binding?.state !== "linked" : record2.kind !== "identity_review" && record2.placement === "field" && record2.active && record2.lifecycle === "active" && record2.productIds.length === 1 && record2.productIds[0] === product2.productId) && (record2?.kind !== "unit" || Boolean(row && row.placement === "field" && !row.retired && record2.productIds.length === 1 && record2.productIds[0] === product2.productId && binding?.state === "linked" && binding.unitIds?.includes(record2.unitId))));
+    const exactResourceVerified = Boolean(record2?.kind === "unit" && row?.camera.association && exact?.resourceId && row.camera.association.deviceIds.includes(String(exact.resourceId)));
+    const exactAllowed = Boolean(exact && exact.status !== "unknown" && !support && related.length === 1 && record2?.kind === "unit" && row && exactResourceVerified && record2.placement === "field" && record2.active && record2.lifecycle === "active" && record2.productIds.length === 1 && record2.productIds[0] === product2.productId && row.placement === "field" && !row.retired && binding?.state === "linked" && Array.isArray(binding.unitIds) && binding.unitIds.includes(record2.unitId));
     const directSourceUnavailable = exactConnectionReceipt !== void 0 && !connections;
+    const reviewedProvider = Boolean(record2?.kind === "unit" && row && row.camera.association && ["online", "offline"].includes(row.cameraState));
     let state, reason;
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
@@ -862,8 +864,13 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
         reason = directSourceUnavailable ? "The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown." : exact.reason;
       }
     } else if (exactAllowed && exact) {
-      state = exact.status === "online" ? "online" : "offline";
-      reason = exact.reason;
+      if (reviewedProvider && row.cameraState !== exact.status) {
+        state = "unverified";
+        reason = CURRENT_SOURCE_CONFLICT + "Direct: " + exact.reason + " Provider: " + unitHealthLabel(row.camera) + ".";
+      } else {
+        state = exact.status === "online" ? "online" : "offline";
+        reason = exact.reason;
+      }
     } else if (!record2) {
       state = "review";
       reason = related.length ? "Multiple COS representations claim this Product ID." : "No current COS roster representation is available for this Product ID.";
@@ -1055,16 +1062,7 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
-  const prior = previous?.fleet;
-  const priorItems = Array.isArray(previous?.units) ? previous.units : [];
-  const canonical = (value) => JSON.stringify(value, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]])) : v);
-  const binding = (m, id) => {
-    const r = m?.uploadInventory?.records?.find((p) => p.productId === id);
-    return canonical([r?.placement, r?.uploadLifecycle, r?.binding]);
-  };
-  const lost = board.items.filter((p) => p.status === "unverified" && priorItems.some((old) => old.productId === p.productId && ["online", "offline"].includes(old.status)) && binding(pair.fieldMap, p.productId) === binding(prior?.fieldMap, p.productId));
-  if (lost.length) throw Object.assign(Error("checks_incomplete"), { products: lost.map((p) => p.productId) });
-  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
+  // A current Unknown / Unverified classification is a complete result and may replace stale red/green.\n  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
 }
 export {
   completedBoard,
