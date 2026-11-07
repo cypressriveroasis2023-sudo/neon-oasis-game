@@ -817,7 +817,8 @@ function fieldProductFollowUp(state, reason, exactUnknownReason, directSourceUna
 
 // src/mhelpFieldHealth.ts
 var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
-var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";\nvar CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
+var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
+var CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
 var fieldHealthLabels = { online: "Online", offline: "Offline", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
 function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
   const authority = readMhelpInventoryAuthority(value, now);
