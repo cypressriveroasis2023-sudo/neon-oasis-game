@@ -1,0 +1,72 @@
+{
+  "contract": "COS_IT_SAVED_READINGS_PRESERVATION_V1",
+  "base": "709322abd63ba0cf11fab1ccedd339c3e33fd3cc",
+  "files": [
+    {
+      "path": "App.tsx",
+      "baselineBlob": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
+      "candidateBlob": "f21420e6e353f32b79085350b5b39c9f5eceea07",
+      "replacements": [
+        {
+          "from": "",
+          "to": "manualRefreshEnabled={session?.role!=='IT'} ",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "FleetDashboard.tsx",
+      "baselineBlob": "3c6a26ac7d6ea53d767a4405800d3b14ab21ce87",
+      "candidateBlob": "9dbafecb1a18ee5d2d84f5083fd5124ecb18c2b4",
+      "replacements": [
+        {
+          "from": "",
+          "to": " const manualHealthRefreshEnabled=session.role!=='IT';\n",
+          "count": 1
+        },
+        {
+          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "count": 1
+        },
+        {
+          "from": "Refresh data to try again.",
+          "to": "{manualHealthRefreshEnabled?'Refresh data to try again.':'Saved results are read automatically every 10 minutes while visible.'}",
+          "count": 1
+        },
+        {
+          "from": "Refresh data to retry; equipment remains in inventory.",
+          "to": "{manualHealthRefreshEnabled?'Refresh data to retry; equipment remains in inventory.':'Equipment remains in inventory. Saved results are read automatically every 10 minutes while visible.'}",
+          "count": 1
+        },
+        {
+          "from": "refresh",
+          "to": "manualHealthRefreshEnabled?refresh:undefined",
+          "count": 1
+        },
+        {
+          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "count": 1
+        },
+        {
+          "from": "",
+          "to": "manualRefreshEnabled={manualHealthRefreshEnabled} ",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "it-daily-mode.browser.spec.mjs",
+      "baselineBlob": "23dee1874cf523f76d8f869f14e444c8930fecb6",
+      "candidateBlob": "30566c2f5e51ff34d9d95bb8195d84f85de472c1",
+      "replacements": [
+        {
+          "from": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  state.fail[sourcePaths.cameras]=true;\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
+          "to": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);await page.clock.install();\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  await expect(frame.getByRole('button',{name:/Refresh data/})).toHaveCount(0);\n  const readCount=()=>state.calls.filter(call=>call.path===sourcePaths.cameras).length;\n  const scheduledRead=async()=>{\n    const before=readCount(),current=await frame.locator('body').evaluate(()=>Date.now());\n    await page.clock.pauseAt(new Date(current+1000));\n    await page.clock.setSystemTime(new Date(current+10*60000));\n    for(let tick=0;tick<61&&readCount()===before;tick++)await page.clock.runFor(1000);\n    await page.clock.resume();await expect.poll(readCount).toBe(before+1);\n  };\n  state.fail[sourcePaths.cameras]=true;\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]').filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

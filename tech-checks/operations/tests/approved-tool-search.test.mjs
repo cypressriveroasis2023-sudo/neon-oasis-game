@@ -1,3 +1,4 @@
+import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -54,7 +55,7 @@ test('the separate mobile More button uses the approved selection style',()=>{
 });
 test('reviewed App baseline preserves the Owner mobile More highlight class',()=>{
  // Baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
- const restored=source('App.tsx').replace("className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'cos-approved-selected':''}","className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}");
+ const restored=originalItSavedReadingSource('App.tsx',source('App.tsx')).replace("className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'cos-approved-selected':''}","className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}");
  const bytes=Buffer.from(restored);
  assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex'),'05cc472f4472fe61449bd08e9388b57836a3a4e1');
 });

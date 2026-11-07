@@ -1,3 +1,4 @@
+import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -10,6 +11,7 @@ const blob=source=>{const bytes=Buffer.from(source);return createHash('sha1').up
 /** Reverse only the reviewed connection-read patch before the immutable source
  * guards run. Exact candidate, replacement counts and prior source all remain checked. */
 export function originalFleetConnectionReadSource(name,source){
+ if(name==='FleetDashboard.tsx')source=originalItSavedReadingSource(name,source);
  const item=manifest.files.find(entry=>entry.path===name);
  assert.ok(item,'No declared connection-read change for '+name);
  assert.equal(blob(source),item.candidateBlob,name+': exact reviewed runtime candidate');

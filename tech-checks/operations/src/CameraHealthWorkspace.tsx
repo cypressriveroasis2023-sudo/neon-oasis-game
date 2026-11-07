@@ -14,8 +14,8 @@ import {cameraOverview} from './cameraHealthCounts';
 import {cameraFieldProducts} from './cameraFieldProducts';
 import {productConnectionUnitDetail} from './productConnectionFleetRows';
 export { validateCameraHealth } from './fieldCameraHealth';
-type Props={powerReadEnabled?:boolean;embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
-export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
+type Props={manualRefreshEnabled?:boolean;powerReadEnabled?:boolean;embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
+export default function CameraHealthWorkspace({manualRefreshEnabled=true,powerReadEnabled=true,embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
   const {data:health,error,loading,refresh,now,fleet,cameraHistory}=useCameraHealth();
   const units=(fleet?((fleet.fieldMap as any).inventoryItems||fleet.fieldMap.items):null) as FieldHealthUnit[]|null;
   const unitError=error;const loadUnits=()=>refresh();
@@ -28,11 +28,11 @@ export default function CameraHealthWorkspace({powerReadEnabled=true,embedded=fa
   const rows=initialUnitId?detail?.rows||[]:health?.rows||[];
   const group=selected&&health?cameraOverview(health,now,units||[]).groups.find(group=>group.unitIdentity?.unitId===selected.id):undefined;
   return <section className={'panel module camera-health-native'+(embedded?' cos-fleet-camera-troubleshooting':'')} aria-label='Camera Health'>
-    <div className='panelhead'><div>{embedded?<h3>Camera troubleshooting</h3>:<><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></>}</div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Fleet Dashboard</button>}<button disabled={loading} onClick={()=>{void refresh(true);}}>{loading?'Reading saved results…':'Reload saved results'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
+    <div className='panelhead'><div>{embedded?<h3>Camera troubleshooting</h3>:<><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></>}</div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Fleet Dashboard</button>}{manualRefreshEnabled&&<button disabled={loading} onClick={()=>{void refresh(true);}}>{loading?'Reading saved results…':'Reload saved results'}</button>}<button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
     {error&&<div className='operations-error' role='alert'>{error} {health?'Last completed results remain displayed with their original check times.':'Current camera state cannot be verified.'}</div>}
 
     {initialUnitId&&<section className='camera-unit-detail' aria-label='Selected field unit Camera Health'>
-      {!units?<p role={unitError?'alert':'status'}>{unitError?'The selected field unit could not be verified. Reload saved results to retry.':'Verifying the selected field unit…'}</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
+      {!units?<p role={unitError?'alert':'status'}>{unitError?(manualRefreshEnabled?'The selected field unit could not be verified. Reload saved results to retry.':'The selected field unit could not be verified. Saved results are read automatically every 10 minutes while visible.'):'Verifying the selected field unit…'}</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
         {!embedded&&<><h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
         <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p></>}
         {!embedded&&<LastKnownCameraStatus observation={lastKnownCamera(cameraHistory,selected,units||[],detail)} now={now}/>}

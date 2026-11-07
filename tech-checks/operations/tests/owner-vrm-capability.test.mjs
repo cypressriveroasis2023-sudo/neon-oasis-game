@@ -45,7 +45,11 @@ test('both exact verified IT identities retain saved Victron read and no refresh
   for (const who of [identities.teddy, identities.victor]) {
     const f = bridge(who);
     const session = await (await f.request('/api/session')).json();
+    assert.equal(session.authorized, true);
+    assert.equal(session.legacyOwner, false);
     assert.equal(session.role, 'IT');
+    assert.equal(session.productionTechnicianUserId, who.actor);
+    assert.equal(session.productionOwnerUserId, null);
     assert.equal(session.features.vrmRead, true);
     assert.equal(session.features.fieldLocationVerification, false);
     assert.equal((await f.request('/api/vrm-fleet')).status, 200);
@@ -60,7 +64,7 @@ test('unlinked Owner, Service, inactive and revoked-role accounts gain no access
   assert.equal(session.authorized, false);
   assert.equal(session.features.vrmRead, false);
   assert.equal((await unlinked.request('/api/vrm-fleet')).status, 403);
-  for (const f of [bridge(identities.service), bridge(identities.owner, { active: false }), bridge(identities.owner, { roleActive: false })]) {
+  for (const f of [bridge(identities.service), bridge(identities.owner, { active: false }), bridge(identities.owner, { roleActive: false }), bridge(identities.teddy, { active: false }), bridge(identities.teddy, { roleActive: false })]) {
     assert.equal((await f.request('/api/session')).status, 403);
     assert.equal((await f.request('/api/vrm-fleet')).status, 403);
   }

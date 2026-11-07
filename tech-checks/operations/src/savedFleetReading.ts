@@ -21,7 +21,18 @@ function validReading(value: SavedFleetReading | null, now: number): value is Sa
 
 export function fleetReadingKey(session: OperationsSession, mode: string) {
   const owner = ownerSessionFingerprint(session, mode);
-  return owner ? 'cos-saved-fleet-reading-v1:' + owner : null;
+  if (owner) return 'cos-saved-fleet-reading-v1:' + owner;
+  // IT's identifier is supplied only by the authenticated /api/session response.
+  // Older backends without that verified identity must leave the display uncached.
+  if (!session || session.authorized !== true || session.legacyOwner !== false || session.role !== 'IT' ||
+      typeof session.productionTechnicianUserId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.productionTechnicianUserId)) return null;
+  const features = session.features;
+  if (!features || typeof features !== 'object' || Array.isArray(features)) return null;
+  const keys = Object.keys(features).sort();
+  if (!keys.length || keys.some(key => typeof features[key] !== 'boolean')) return null;
+  return 'cos-saved-fleet-reading-v1:' + JSON.stringify([session.productionTechnicianUserId,
+    session.legacyOwner, session.role, mode, keys.map(key => [key, features[key]])]);
 }
 
 export function readFleetReading(storage: Storage | null, key: string | null, now = Date.now()) {

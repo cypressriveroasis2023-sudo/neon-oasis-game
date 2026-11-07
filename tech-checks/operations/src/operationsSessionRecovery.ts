@@ -19,7 +19,7 @@ const transientReasons = new Set(['token-renewed', 'parent-timeout']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Only the server's verified Owner identity can establish same-actor recovery.
-// IT's current session DTO has no stable actor ID; names and token claims cannot substitute.
+// IT's display-cache identity does not enable Owner-only session recovery.
 export function ownerSessionFingerprint(session: OperationsSession | null, mode: string): string | null {
   if (!session || session.authorized !== true || session.legacyOwner !== true || session.role !== 'Owner' ||
       typeof session.productionOwnerUserId !== 'string' || !uuid.test(session.productionOwnerUserId)) return null;

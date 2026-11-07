@@ -298,15 +298,25 @@ test('an old camera read cannot recreate a private iframe after account exit',as
 });
 
 test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{
-  await desktop(page);
+  await desktop(page);await page.clock.install();
   const {frame,state}=await mount(page,options());
   await readyFleet(frame);
+  await expect(frame.getByRole('button',{name:/Refresh data/})).toHaveCount(0);
+  const readCount=()=>state.calls.filter(call=>call.path===sourcePaths.cameras).length;
+  const scheduledRead=async()=>{
+    const before=readCount(),current=await frame.locator('body').evaluate(()=>Date.now());
+    await page.clock.pauseAt(new Date(current+1000));
+    await page.clock.setSystemTime(new Date(current+10*60000));
+    for(let tick=0;tick<61&&readCount()===before;tick++)await page.clock.runFor(1000);
+    await page.clock.resume();await expect.poll(readCount).toBe(before+1);
+  };
   state.fail[sourcePaths.cameras]=true;
-  await frame.getByRole('button',{name:/Refresh data/}).first().click();
+  await scheduledRead();
   await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('source');
   await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();
   delete state.fail[sourcePaths.cameras];
-  await frame.getByRole('button',{name:/Refresh data/}).first().click();
+  await scheduledRead();
+  await expect(frame.locator('.cos-fleet-message[role="alert"]').filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();
   await assertReadBoundary(page,state);
 });

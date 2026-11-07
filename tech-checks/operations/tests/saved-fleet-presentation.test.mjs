@@ -11,6 +11,17 @@ test('full presentation round trip preserves unit details and ORIGINAL check tim
  const saved=readFleetPresentation(f.storage,key,f.now+3600000);
  assert.equal(saved.checkedAt,f.now);assert.deepEqual(saved.fieldMap,f.presentation.fieldMap);assert.deepEqual(saved.health,f.health);
 });
+test('verified IT reopens the completed presentation with original observations and keeps it after an invalid refresh',()=>{
+ const f=fixture(),it={authorized:true,legacyOwner:false,role:'IT',productionTechnicianUserId:'00000000-0000-4000-8000-000000000003',features:{fleetAccess:true,vrmRead:true}};
+ const itKey=fleetReadingKey(it,'fleet');assert.ok(itKey);
+ assert.equal(saveFleetPresentation(f.storage,itKey,f.presentation,f.now),true);
+ const reopened=readFleetPresentation(f.storage,fleetReadingKey(structuredClone(it),'fleet'),f.now+3600000);
+ assert.equal(reopened.checkedAt,f.now);assert.deepEqual(reopened.fieldMap,f.presentation.fieldMap);assert.deepEqual(reopened.health,f.health);
+ assert.equal(saveFleetPresentation(f.storage,itKey,{...f.presentation,checkedAt:f.now+3600000,fieldMap:{...f.presentation.fieldMap,productConnectionsState:'rejected'}},f.now+3600000),false);
+ assert.deepEqual(readFleetPresentation(f.storage,itKey,f.now+3600000),reopened);
+ for(const other of [fleetReadingKey({...it,productionTechnicianUserId:'00000000-0000-4000-8000-000000000004'},'fleet'),fleetReadingKey({...it,productionTechnicianUserId:undefined},'fleet'),fleetReadingKey(it,'staff'),key])assert.equal(readFleetPresentation(f.storage,other,f.now+3600000),null);
+ clearFleetPresentations(f.storage);assert.equal(readFleetPresentation(f.storage,itKey,f.now+3600000),null);
+});
 test('other account, mode, permissions and unauthenticated readers cannot restore private details',()=>{
  const f=fixture();saveFleetPresentation(f.storage,key,f.presentation,f.now);
  for(const other of [null,fleetReadingKey({...session,authorized:false},''),fleetReadingKey({...session,productionOwnerUserId:'00000000-0000-4000-8000-000000000002'},''),fleetReadingKey(session,'fleet'),fleetReadingKey({...session,features:{fleetAccess:true,vrmRead:false}},'')])assert.equal(readFleetPresentation(f.storage,other,f.now),null);
