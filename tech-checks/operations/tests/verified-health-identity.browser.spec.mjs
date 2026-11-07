@@ -74,6 +74,17 @@ async function navigate(page,hash){await page.frames().find(frame=>frame.parentF
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
 function pollingReads(state){return Object.fromEntries(['health','map','routers','power'].map((key,index)=>[key,state.requests.filter(request=>request.path===['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/vrm-fleet'][index]).length]));}
+async function savedIdentityTimes(frame){
+ await listUnit(frame,labels.owner).click();
+ const observation=frame.getByRole('region',{name:'Selected unit camera health'}).locator(':scope > small').filter({hasText:'record observation:'});
+ await expect(observation).toBeVisible();await expect(observation).toContainText('record observation:');
+ const source=(await observation.innerText()).split('record observation: ')[1];
+ const evidence=frame.locator('.cos-fleet-installation-evidence');await evidence.locator(':scope > summary').click();
+ const reading=evidence.locator('.cos-fleet-detail-note').filter({hasText:'Saved health snapshot read:'});
+ await expect(reading).toBeVisible();const accepted=await reading.innerText();
+ await frame.getByRole('button',{name:'Close unit details',exact:true}).click();
+ return {accepted,source};
+}
 async function settlePollingMinute(page,frame,state,baseline,minute){
  // Stop at each real scheduling boundary. A multi-minute runFor can run the
  // camera/supporting source tick and its 10-second auth timeout before the parent's
@@ -169,13 +180,27 @@ for(const mutation of ['partial resource set','extra resource in source group','
  await noOverflow(frame);noWrites(state);
 });
 
-for(const failure of ['summary failure','expired authorization'])test(failure+' clears previously green identity evidence',async({page})=>{
- const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
- if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
+test('summary failure retains the dated completed identity reading with an explicit warning',async({page})=>{
+ const {frame,state}=await mount(page,{pausedClock:true});await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ const before=await savedIdentityTimes(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect(frame.locator('.cos-fleet-stats')).not.toContainText('…');const counts=await frame.locator('.cos-fleet-stats button strong').allTextContents();
+ const savedLabel=frame.locator('.cos-fleet-heading > div:last-child > small');await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');const label=await savedLabel.innerText();
+ await page.clock.runFor(60000);state.summaryError=503;
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'Your session changed. Reload COS Operations to verify your account and permissions.'}).first()).toBeVisible();
+ const warning=frame.getByRole('alert').filter({hasText:'Last completed results remain displayed with their original check times.'});
+ await expect(warning).toBeVisible();await expect(warning.getByText('Last completed results remain displayed with their original check times. The next successful update will replace them.',{exact:true})).toBeVisible();
+ await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved summary unavailable',{exact:true})).toBeVisible();
+ await expect(savedLabel).toHaveText(label);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(counts);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ expect(await savedIdentityTimes(frame)).toEqual(before);expect(state.rows.map(row=>row.evidence.observedAt)).toEqual(ownerIds.map(()=>fresh));
+ noWrites(state);
+});
+
+test('expired authorization clears previously green identity evidence',async({page})=>{
+ const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+ await page.evaluate(()=>{window.fixtureAuth=false;});await frame.getByRole('button',{name:/Refresh data/}).click();
+ await expect(frame.getByRole('alert').filter({hasText:'Your session changed. Reload COS Operations to verify your account and permissions.'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}else{await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);}
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);
  noWrites(state);
 });
 
@@ -191,14 +216,23 @@ test('ten-minute camera saved-data polling preserves the 20-minute source expiry
  };
  try{
   await expand(frame);await expect(frame.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await sample('expanded');
-  const baseline=pollingReads(state);
-  for(let minute=1;minute<=16;minute++){
+  const originalTimes=await savedIdentityTimes(frame),baseline=pollingReads(state);let lastCompleted=originalTimes;
+  const savedLabel=frame.locator('.cos-fleet-heading > div:last-child > small');await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');const label=await savedLabel.innerText();
+  for(let minute=1;minute<=20;minute++){
    await settlePollingMinute(page,frame,state,baseline,minute);
    await sample('settled minute '+minute);
-   if(minute===3)await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+   await expect(savedLabel).toHaveText(label);
+   if([3,16,19].includes(minute))await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
+   if([10,16,20].includes(minute)){
+    const times=await savedIdentityTimes(frame);expect(times.source).toBe(originalTimes.source);
+    if(minute===16)expect(times.accepted).toBe(lastCompleted.accepted);else{expect(times.accepted).not.toBe(lastCompleted.accepted);lastCompleted=times;}
+   }
   }
-  // Saved observations begin five minutes old and remain unchanged by reads:
-  // after sixteen elapsed minutes they must be gray despite a saved-data reload.
+  // The minute-10 reading evaluates unchanged observations at age 15 minutes.
+  // It remains displayed until minute 20 completes; that read rejects the now
+  // 25-minute-old evidence without renewing its original observation time.
+  expect(state.requests.filter(request=>request.path==='/api/camera-health/summary-v3').map(request=>request.at)).toEqual([0,10,20].map(minute=>Date.parse(now)+minute*60000));
+  expect(state.rows.map(row=>row.evidence.observedAt)).toEqual(ownerIds.map(()=>fresh));
   await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
   await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved camera health refreshes every 10 minutes');
   noWrites(state);

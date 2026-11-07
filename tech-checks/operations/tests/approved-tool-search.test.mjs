@@ -1,3 +1,4 @@
+import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -52,8 +53,9 @@ test('the More search has no operational reader, storage, timer, or HTML injecti
 test('the separate mobile More button uses the approved selection style',()=>{
  assert.match(source('App.tsx'),/className=\{!fleetOnly&&!dailyOnly&&\(menu\|\|selectedArea==='Operations'\)\?'cos-approved-selected':''\}/);
 });
-test('App differs only by the Owner mobile More highlight class',()=>{
- const restored=source('App.tsx').replace("className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'cos-approved-selected':''}","className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}");
+test('reviewed App baseline preserves the Owner mobile More highlight class',()=>{
+ // Baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
+ const restored=originalItSavedReadingSource('App.tsx',source('App.tsx')).replace("className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'cos-approved-selected':''}","className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}");
  const bytes=Buffer.from(restored);
- assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex'),'c0a9de4091a114c5ed4c1c47b507eed7ef8db1b0');
+ assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex'),'05cc472f4472fe61449bd08e9388b57836a3a4e1');
 });

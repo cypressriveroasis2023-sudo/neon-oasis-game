@@ -1,0 +1,57 @@
+{
+  "description": "Add the already-verified native IT actor ID to the existing successful GET /api/session IT response. Exactly one additive DTO field; authentication, Owner responses, capabilities and every unrelated route remain byte-identical.",
+  "authorization": "Preparation and offline verification only. This manifest does not authorize deployment or release. Preserve the separate PR359 and PR361 release gates and review the current native artifact before any deployment.",
+  "releaseStatus": "PREPARATION_ONLY",
+  "slug": "cos-operations-pages",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceRecord": "tech-checks/docs/fleet-provenance-repair-20261104/deployment-v154.json",
+  "sourceDir": "tech-checks/docs/fleet-provenance-repair-20261104/source",
+  "sourceCommit": "baf1418c6884e90cb9e9dd457b2f91dd7aafa8c0",
+  "deployedFileNames": {
+    "deno.json": "cos-operations-pages/deno.json",
+    "productCheckSource.ts": "cos-operations-pages/productCheckSource.ts",
+    "productTcpRuntime.ts": "cos-operations-pages/productTcpRuntime.ts",
+    "productVerifyNow.ts": "cos-operations-pages/productVerifyNow.ts",
+    "savedFleetBoard.mjs": "cos-operations-pages/savedFleetBoard.mjs",
+    "serve.ts": "cos-operations-pages/serve.ts",
+    "trackerEndpointProducer.mjs": "cos-operations-pages/trackerEndpointProducer.mjs",
+    "trackerEndpointRead.mjs": "cos-operations-pages/trackerEndpointRead.mjs"
+  },
+  "entrypointPath": "cos-operations-pages/serve.ts",
+  "importMapPath": "cos-operations-pages/deno.json",
+  "verifyJwt": false,
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 154,
+    "ezbr_sha256": "254594ed3300a84e9d5b1bc58afffb5ff1698d04fd3bf5c4c2d01d1018bb6d31"
+  },
+  "edits": [
+    {
+      "file": "serve.ts",
+      "needle": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,provisioningNeeded:null,reason:null});",
+      "replacement": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,productionTechnicianUserId:context.actorId,provisioningNeeded:null,reason:null});",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+    "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+    "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+    "savedFleetBoard.mjs": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
+    "serve.ts": "27119046dacb47d3098e193fb1ae17cf808ff630a19c72588dc507988ae1543f",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+  },
+  "expectedAfter": {
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+    "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+    "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+    "savedFleetBoard.mjs": "f266295e6b139c4b215ce8c8a3db3b2b09ad0b48aef690a31c0e28b0d689fbdc",
+    "serve.ts": "d7d4d637eddab89a70afe452d0f1a8f668265320397215dd25c5be319709137e",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+  },
+  "packagingNote": "Production v154 uses a local immutable remote-import wrapper. This recipe prepares all eight recorded dependency files locally. Its runtime behavior and byte delta are verified offline; the changed packaging, served readback and authenticated IT reopen behavior still require separate release verification. No deployment workflow choice is added."
+}

@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
+import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 for(const it of [false,true])test(`dense Fleet switches between grouped and individually selectable pins ${it?'IT':'Owner'}`,async({page},info)=>{
  const f=statusPinsFixture();
  f.field.mhelpAddressMap.items.forEach((pin,i)=>{if(i<21)Object.assign(pin,{status:'matched',reason:null,matchedAddress:'123 EXAMPLE RD, HOUSTON, TX, 77064',latitude:30,longitude:-96});});
@@ -48,13 +49,13 @@ for(const dense of [false,true])for(const it of [false,true])test(`${dense?'shar
  await page.mouse.move(0,0);await app.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath(dense?'individual-shared-address.png':'individual-nearby-sites.png')});
 });
 for(const it of [false,true])test(`a slow power read does not block camera refresh ${it?'IT':'Owner'}`,async({page})=>{
- const {app,state}=await mountFleet(page,it,{holdVrm:true});
+ const {app,state}=await mountFleet(page,it,{holdVrm:true,advancingClock:it});
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
- await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ if(it)await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toHaveCount(0);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failVrm=true;state.releaseVrm();
  await expect(app.getByRole('alert')).toContainText('Synthetic saved power read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
- await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ if(it)await nextScheduledFleetRead(page,app,state);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(state.errors).toEqual([]);
 });
 for(const size of [{width:844,height:390},{width:932,height:430}])test(`touch landscape ${size.width} keeps groups clear and selectable`,async({browser},info)=>{

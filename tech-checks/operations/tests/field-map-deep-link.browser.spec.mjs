@@ -256,7 +256,7 @@ test('failed map refresh retains last good units and labels stale map data',asyn
  const {frame,state}=await mount(page,'Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);state.mapFailure=true;
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('saved equipment remains visible');
+ await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Last completed results remain displayed');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Ranger 022');
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
@@ -268,9 +268,9 @@ test('hardware-suffixed field pin shows its number and unit cards keep dark high
  const {frame}=await mount(page,'Spotter211HDC2S',units);
  await expect(frame.locator('.cos-pin-unit-number')).toHaveText('211');
  const card=frame.locator('.cos-fleet-unit-row').first();
- await expect(card).toHaveCSS('background-color','rgb(32, 59, 86)');
- await expect(card.locator('strong')).toHaveCSS('color','rgb(245, 247, 250)');
- await expect(card.locator('small').first()).toHaveCSS('color','rgb(194, 200, 209)');
+ await expect(card).toHaveCSS('background-color','rgb(23, 33, 46)');
+ await expect(card.locator('strong')).toHaveCSS('color','rgb(242, 245, 250)');
+ await expect(card.locator('small').first()).toHaveCSS('color','rgb(166, 178, 195)');
  const contrast=await card.evaluate(el=>{
   const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
   const background=luminance(getComputedStyle(el).backgroundColor);

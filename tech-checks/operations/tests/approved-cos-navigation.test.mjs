@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {approvedPrimaryAreas,approvedArea,approvedWorkspaceLabel,approvedToolGroups,visibleApprovedTools} from '../src/approvedCosNavigation.ts';
 const source=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8');
 const sha=value=>createHash('sha256').update(value).digest('hex');
+// Protected baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
 const app=source('App.tsx');
 
 test('Owner navigation has exactly five unique original destinations',()=>{
@@ -51,7 +52,7 @@ test('presentation metadata and primary buttons do not read or write operational
 test('native readers and Fleet/Board mounts have no added props or remount keys',()=>{
  const fleet=app.split('\n').find(x=>x.includes('<FleetDashboard session='));
  const board=app.split('\n').find(x=>x.includes('<DailyBoard api='));
- assert.equal(sha(fleet),"4c2dc9792c9cb492d5ee6ebf072bdcf9e8ca349de5f910d1fbe3f4f98f5ad0ee");
+ assert.equal(sha(fleet),"1cd46ebcc23761421cb39bad170b0e07ecf6999ecdb8e4e27c1cfe9cc523cf12");
  assert.equal(sha(board),"2060863c57ccd4f109fbaf828d1e5fcf15be2db635d7caba62698ffb88297285");
 });
 const preserved=[
@@ -59,7 +60,7 @@ const preserved=[
     "ownerTaskWorkflow",
     "function OwnerTasksWorkspace(",
     "function OwnerApp()",
-    "a9c2fa21704d30bda18614908d4e89e558fff5b9d5f12d81beb992c4f006024d"
+    "8f84aee2187c3f970e7cb5fd7657850e3274c5392c951d6e4d87396275201f33"
   ],
   [
     "sessionAndTv",

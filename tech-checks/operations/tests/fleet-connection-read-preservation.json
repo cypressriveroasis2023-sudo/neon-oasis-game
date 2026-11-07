@@ -1,0 +1,108 @@
+{
+  "contract": "COS_FLEET_CONNECTION_READ_PRESERVATION_V1",
+  "baselineCommit": "1712082037e48172bced340a7102c0df98dcfa87",
+  "scope": "Separate the latest connection-read diagnostic from retained completed evidence; preserve existing source and session guards.",
+  "files": [
+    {
+      "path": "api.ts",
+      "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
+      "candidateBlob": "839f3594d44b63836b8a4fa325f3fb99cc0ee4d4",
+      "replacements": [
+        {
+          "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
+          "to": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={revision:number;health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
+          "count": 1
+        },
+        {
+          "from": "      const previous=fleetSnapshots.get(key);if(previous)onSaved?.(previous.value);\n      const publish=(value:FleetSnapshot)=>{if(!current())return;fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));};\n      const paired=import('./durableFleetClient').then(({durableFleetRead})=>durableFleetRead({\n",
+          "to": "      const previous=fleetSnapshots.get(key);if(previous)onSaved?.(previous.value);\n      const publish=(value:FleetSnapshot)=>{if(!current())return;fleetSnapshots.set(key,{value:{...value,readRevision:generation},at:Date.parse(value.readAt)});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));};\n      const paired=import('./durableFleetClient').then(({durableFleetRead})=>durableFleetRead({\n",
+          "count": 1
+        },
+        {
+          "from": "        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}\n      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});return value;});\n      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);\n      const reads={paired,health,fieldMap,connectionMap:fieldMap};\n      for(const part of [paired,health,fieldMap])void part.catch(()=>{});\n",
+          "to": "        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}\n      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});\n      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);\n      const reads={revision:generation,paired,health,fieldMap,connectionMap:fieldMap};\n      for(const part of [paired,health,fieldMap])void part.catch(()=>{});\n",
+          "count": 1
+        },
+        {
+          "from": "    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();\n    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};\n    // Only the newly authorized actor may see the dated complete saved pair.\n",
+          "to": "    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();\n    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};\n    // Only the newly authorized actor may see the dated complete saved pair.\n",
+          "count": 1
+        },
+        {
+          "from": "    void connectionMap.catch(()=>{});\n    const read: FleetReads={health,fieldMap,connectionMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{\n      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;\n    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};\n",
+          "to": "    void connectionMap.catch(()=>{});\n    const read: FleetReads={revision,health,fieldMap,connectionMap,paired:Promise.all([health,fieldMap]).then(([health,map])=>{\n      current();const value={...reconcileFleetSnapshot(health,map),readStartedAt:requestedAt,readRevision:revision};fleetSnapshots.set(key,{value,at:requestedAt});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;\n    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;})};\n",
+          "count": 1
+        },
+        {
+          "from": "}\nexport const api = {\n  usesDurableFleetBoard,\n  adoptProductConnections:(receipt:unknown)=>{\n",
+          "to": "}\nasync function readFleetConnectionMap(force=false,expectedSourceSha?:string){\n let read=await readFleet(force),map=await read.connectionMap;\n if(map.productConnectionsDiagnostic?.code==='inventory_changed'\n   ||expectedSourceSha&&map.uploadInventory?.sourceSha256!==expectedSourceSha){\n  // Preserve the existing single authority reload; this does not re-probe.\n  clearSharedReads();read=await readFleet(true);map=await read.connectionMap;\n }\n return {map,revision:read.revision};\n}\nexport const api = {\n  usesDurableFleetBoard,\n  fleetReadRevision:()=>fleetRevision,\n  adoptProductConnections:(receipt:unknown)=>{\n",
+          "count": 1
+        },
+        {
+          "from": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{\n    const first=await (await readFleet(force)).connectionMap;\n    if((first as any).productConnectionsDiagnostic?.code!=='inventory_changed'\n      &&(!expectedSourceSha||(first as any).uploadInventory?.sourceSha256===expectedSourceSha))return first;\n    // The protected connection read observed a newer census than the map.\n    // Invalidate that generation and reload authority once, never re-probe.\n    clearSharedReads();return (await readFleet(true)).connectionMap;\n  },\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
+          "to": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>(await readFleetConnectionMap(force,expectedSourceSha)).map,\n  fleetConnectionMapRead:readFleetConnectionMap,\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "useCameraHealth.ts",
+      "baselineBlob": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
+      "candidateBlob": "a4b40675c0ca1154a6c3bc3590bb808cfcd3e37f",
+      "replacements": [
+        {
+          "from": "import {retainCompletedSnapshot} from './snapshotRetention';\nimport {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\n",
+          "to": "import {retainCompletedSnapshot,type FleetConnectionRead} from './snapshotRetention';\nimport {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\n",
+          "count": 1
+        },
+        {
+          "from": "  const revision=useRef(0),running=useRef(false),lastAttemptAt=useRef(restored?.readAt??0),historyRevision=useRef(0);\n  const [refreshMap,setRefreshMap]=useState<FleetSnapshot['fieldMap']|null>(null);\n  const completed=useRef<FleetSnapshot|null>(restored?.fleet||null);\n",
+          "to": "  const revision=useRef(0),running=useRef(false),lastAttemptAt=useRef(restored?.readAt??0),historyRevision=useRef(0);\n  const [refreshMap,setRefreshMap]=useState<FleetConnectionRead|null>(null);\n  const completed=useRef<FleetSnapshot|null>(restored?.fleet||null);\n",
+          "count": 1
+        },
+        {
+          "from": "      if(typeof next.readStartedAt==='number'&&Number.isFinite(next.readStartedAt)&&next.readStartedAt<=Date.now())lastAttemptAt.current=next.readStartedAt;\n      setRefreshMap(next.fieldMap);\n      if(retainCompletedSnapshot(completed.current,next)){\n",
+          "to": "      if(typeof next.readStartedAt==='number'&&Number.isFinite(next.readStartedAt)&&next.readStartedAt<=Date.now())lastAttemptAt.current=next.readStartedAt;\n      setRefreshMap({map:next.fieldMap,revision:next.readRevision??0});\n      if(retainCompletedSnapshot(completed.current,next)){\n",
+          "count": 1
+        },
+        {
+          "from": "  useEffect(()=>{const clear=()=>{revision.current++;historyRevision.current++;running.current=false;completed.current=null;setRefreshMap(null);setFleet(null);setCameraHistory(new Map());setLoading(false);setError('Your fleet session changed. Reload to verify the current account.');};const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){historyRevision.current++;setCameraHistory(new Map());}};const changed=()=>{void refresh();};const failed=()=>setError('The shared camera and placement refresh failed. Reload saved results to verify current status.');window.addEventListener('cos-private-data-invalidated',clear);window.addEventListener('message',hidden);window.addEventListener('cos-fleet-snapshot-updated',changed);window.addEventListener('cos-fleet-snapshot-failed',failed);return()=>{window.removeEventListener('cos-private-data-invalidated',clear);window.removeEventListener('message',hidden);window.removeEventListener('cos-fleet-snapshot-updated',changed);window.removeEventListener('cos-fleet-snapshot-failed',failed);};},[refresh]);\n  return {data:fleet?.health||null,fleet,refreshMap,error,loading,now,refresh,updateClock,cameraHistory};\n}\n",
+          "to": "  useEffect(()=>{const clear=()=>{revision.current++;historyRevision.current++;running.current=false;completed.current=null;setRefreshMap(null);setFleet(null);setCameraHistory(new Map());setLoading(false);setError('Your fleet session changed. Reload to verify the current account.');};const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'){historyRevision.current++;setCameraHistory(new Map());}};const changed=()=>{void refresh();};const failed=()=>setError('The shared camera and placement refresh failed. Reload saved results to verify current status.');window.addEventListener('cos-private-data-invalidated',clear);window.addEventListener('message',hidden);window.addEventListener('cos-fleet-snapshot-updated',changed);window.addEventListener('cos-fleet-snapshot-failed',failed);return()=>{window.removeEventListener('cos-private-data-invalidated',clear);window.removeEventListener('message',hidden);window.removeEventListener('cos-fleet-snapshot-updated',changed);window.removeEventListener('cos-fleet-snapshot-failed',failed);};},[refresh]);\n  return {data:fleet?.health||null,fleet,refreshMap:refreshMap?.map||null,connectionRead:refreshMap,error,loading,now,refresh,updateClock,cameraHistory};\n}\n",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "FleetDashboard.tsx",
+      "baselineBlob": "9807340a2e4f93e8f7ddf3098672b578f9b5a2e7",
+      "candidateBlob": "3c6a26ac7d6ea53d767a4405800d3b14ab21ce87",
+      "replacements": [
+        {
+          "from": "import {fleetReadingKey,readFleetReading,saveFleetReading} from './savedFleetReading';\nimport {retainCompletedConnectionMap} from './snapshotRetention';\nimport ViewErrorBoundary from './ViewErrorBoundary';\n",
+          "to": "import {fleetReadingKey,readFleetReading,saveFleetReading} from './savedFleetReading';\nimport {retainCompletedConnectionMap,newerFleetConnectionRead,latestFleetConnectionRead,type FleetConnectionRead} from './snapshotRetention';\nimport ViewErrorBoundary from './ViewErrorBoundary';\n",
+          "count": 1
+        },
+        {
+          "from": " const cameras=useCameraHealth(false,initialCamera.current),[mapSnapshot,setMapSnapshot]=useState<ReturnType<typeof checkedFieldMap>|null>(()=>initialPresentation?.fieldMap||null),[mapError,setMapError]=useState('');\n const [restoredPresentation,setRestoredPresentation]=useState(Boolean(initialPresentation));\n",
+          "to": " const cameras=useCameraHealth(false,initialCamera.current),[mapSnapshot,setMapSnapshot]=useState<ReturnType<typeof checkedFieldMap>|null>(()=>initialPresentation?.fieldMap||null),[mapError,setMapError]=useState('');\n const [mapAttempt,setMapAttempt]=useState<FleetConnectionRead|null>(null);\n const [restoredPresentation,setRestoredPresentation]=useState(Boolean(initialPresentation));\n",
+          "count": 1
+        },
+        {
+          "from": " },[session]);\n const readMap=useCallback(async(force=false)=>{lastMapRead.current=Date.now();const request=++mapRevision.current;try{const map=await api.fleetConnectionMap(force);if(valid.current&&request===mapRevision.current){const received={...map,clientReadAt:Date.now()} as typeof map;setMapSnapshot(previous=>retainCompletedConnectionMap(previous,received)?previous:received);setMapError('');}}catch(e){if(valid.current&&request===mapRevision.current)setMapError(e instanceof Error?e.message:'Placement data unavailable');}},[]);\n useEffect(()=>{valid.current=true;let active=true;queueMicrotask(()=>{if(active&&!initialPresentation){void sources();void readMap();}});const tick=()=>{setClock(new Date());if(automaticRefreshDue(lastSourceRead.current,Date.now(),document.hidden))void sources();if(automaticRefreshDue(lastMapRead.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void readMap();};const timer=window.setInterval(tick,60000);document.addEventListener('visibilitychange',tick);const clear=()=>{valid.current=false;revision.current++;mapRevision.current++;running.current=false;setRouters(null);setVrm(null);setMapSnapshot(null);setSavedShop([]);setSelectedMhelpProductId('');setSelected('');setSelectedSourceId('');setSourceLoading(false);setSourceErrors({session:'Your session changed. Reload COS Operations.'});};window.addEventListener('cos-private-data-invalidated',clear);return()=>{active=false;valid.current=false;revision.current++;mapRevision.current++;running.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',clear);};},[sources,readMap]);\n const [savedShop,setSavedShop]=useState<any[]>([]);\n",
+          "to": " },[session]);\n const readMap=useCallback(async(force=false)=>{lastMapRead.current=Date.now();const request=++mapRevision.current;try{const attempt=await api.fleetConnectionMapRead(force);if(valid.current&&request===mapRevision.current){const received={...attempt.map,clientReadAt:Date.now()};setMapAttempt(previous=>newerFleetConnectionRead(previous,attempt));setMapSnapshot(previous=>retainCompletedConnectionMap(previous,received)?previous:received);setMapError('');}}catch(e){if(valid.current&&request===mapRevision.current)setMapError(e instanceof Error?e.message:'Placement data unavailable');}},[]);\n useEffect(()=>{valid.current=true;let active=true;queueMicrotask(()=>{if(active&&!initialPresentation){void sources();void readMap();}});const tick=()=>{setClock(new Date());if(automaticRefreshDue(lastSourceRead.current,Date.now(),document.hidden))void sources();if(automaticRefreshDue(lastMapRead.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS))void readMap();};const timer=window.setInterval(tick,60000);document.addEventListener('visibilitychange',tick);const clear=()=>{valid.current=false;revision.current++;mapRevision.current++;running.current=false;setRouters(null);setVrm(null);setMapSnapshot(null);setMapAttempt(null);setSavedShop([]);setSelectedMhelpProductId('');setSelected('');setSelectedSourceId('');setSourceLoading(false);setSourceErrors({session:'Your session changed. Reload COS Operations.'});};window.addEventListener('cos-private-data-invalidated',clear);return()=>{active=false;valid.current=false;revision.current++;mapRevision.current++;running.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',clear);};},[sources,readMap]);\n const [savedShop,setSavedShop]=useState<any[]>([]);\n",
+          "count": 1
+        },
+        {
+          "from": " useEffect(()=>{const clear=()=>setVerifiedConnections(null);window.addEventListener('cos-private-data-invalidated',clear);return()=>window.removeEventListener('cos-private-data-invalidated',clear);},[]);\n const connectionRead=(cameras.refreshMap as any)?.productConnectionsState==='pending'?cameras.refreshMap:mapSnapshot||cameras.refreshMap||cameras.fleet?.fieldMap;\n const baseMapSource=preferredFleetMap(cameras.fleet?.fieldMap,mapSnapshot);\n // Classify a completed read once. Wall-clock ticks update the header only.\n",
+          "to": " useEffect(()=>{const clear=()=>setVerifiedConnections(null);window.addEventListener('cos-private-data-invalidated',clear);return()=>window.removeEventListener('cos-private-data-invalidated',clear);},[]);\n const baseMapSource=preferredFleetMap(cameras.fleet?.fieldMap,mapSnapshot);\n const connectionRead=latestFleetConnectionRead(baseMapSource,cameras.connectionRead,mapAttempt)?.map||baseMapSource;\n // Classify a completed read once. Wall-clock ticks update the header only.\n",
+          "count": 1
+        },
+        {
+          "from": " const connectionMapRef=useRef(map);connectionMapRef.current=map;\n const verificationReadback=async(connections?:unknown,stillCurrent=()=>true)=>{const session=api.captureSession(),current=()=>valid.current&&session()&&stillCurrent();const currentMap=connectionMapRef.current;const next=await fleetConnectionReadback(connections,currentMap,{readReceipt:async()=>(await api.get('/api/product-connections')).data,readMap:sha=>api.fleetConnectionMap(true,sha),current});if(next.map!==currentMap)setMapSnapshot(previous=>preferredFleetMap(previous,next.map));verifiedReadAt.current=Date.now();setVerifiedConnections(next.connections);api.adoptProductConnections(next.connections);if(usesDurableFleetBoard()){await api.post('/api/fleet-saved-board/refresh',{});void cameras.refresh();}};\n const refresh=()=>{void cameras.refresh(true);void sources();void readMap(true);};\n",
+          "to": " const connectionMapRef=useRef(map);connectionMapRef.current=map;\n const verificationReadback=async(connections?:unknown,stillCurrent=()=>true)=>{\n  const session=api.captureSession(),current=()=>valid.current&&session()&&stillCurrent(),localMapRevision=mapRevision.current;\n  let readRevision=api.fleetReadRevision();const currentMap=connectionMapRef.current;\n  const next=await fleetConnectionReadback(connections,currentMap,{readReceipt:async()=>(await api.get('/api/product-connections')).data,readMap:async sha=>{const read=await api.fleetConnectionMapRead(true,sha);readRevision=read.revision;return read.map;},current});\n  if(next.map!==currentMap)setMapSnapshot(previous=>preferredFleetMap(previous,next.map));\n  verifiedReadAt.current=Date.now();setVerifiedConnections(next.connections);api.adoptProductConnections(next.connections);\n  // This verified receipt supersedes only attempts already started with it.\n  // A later refresh keeps its own revision and cannot be cleared by this result.\n  if(mapRevision.current===localMapRevision)mapRevision.current++;\n  setMapAttempt(previous=>newerFleetConnectionRead(previous,{map:{...next.map,productConnections:next.connections,productConnectionsState:'ready'},revision:readRevision,verified:true}));\n  if(usesDurableFleetBoard()){await api.post('/api/fleet-saved-board/refresh',{});void cameras.refresh();}\n };\n const refresh=()=>{void cameras.refresh(true);void sources();void readMap(true);};\n",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,7 @@ type Props={
  onShop:()=>void;
  onMap:()=>void;
  onImport?:()=>void;
- onRefresh:()=>void;
+ onRefresh?:()=>void;
 };
 type StatusFilter='all'|FleetCommandStatus;
 type FamilyFilter='all'|'star4live'|'avigilon'|'reconeyez'|'victron'|'support'|'walle'|'other';
@@ -65,7 +65,7 @@ export default function FleetCommandCenter({
  const selected=entries.find(p=>p.productId===selectedId);
  if(!data)return <p className="cos-command-source-warning" role="status">
   Complete, verified mHelpDesk Product-ID source is currently unavailable. No inventory or provider totals are being estimated.
-  <button type="button" onClick={onRefresh}>Retry saved data</button>
+  {onRefresh&&<button type="button" onClick={onRefresh}>Retry saved data</button>}
  </p>;
  const filter=(next:FamilyFilter,state:StatusFilter='all')=>{
   setFamily(next);setStatus(state);setLimit(35);setSelectedId('');setFocus('all');
@@ -77,7 +77,7 @@ export default function FleetCommandCenter({
  return <section className="cos-fleet-command" aria-label="Complete mHelpDesk Fleet command center">
   <header className="cos-command-head">
    <div><h2>Fleet command center</h2><p>All {data.field} Field Product IDs · camera, power and placement shown separately</p></div>
-   <button type="button" onClick={onRefresh}>↻ Refresh saved evidence</button>
+   {onRefresh&&<button type="button" onClick={onRefresh}>↻ Refresh saved evidence</button>}
   </header>
   {data.sourceStale&&<p role="status" className="cos-command-source-warning">mHelpDesk source refresh is delayed. These are the last validated assignments, not a live provider read.</p>}
   {!data.healthVerified&&<p role="status" className="cos-command-source-warning">Camera Health is incomplete or its latest read failed. Camera-capable units are Unverified, not automatically Offline.</p>}

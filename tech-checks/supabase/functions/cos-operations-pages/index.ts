@@ -606,8 +606,11 @@ export function createOperationsHandler(options) {
       }
 
       if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
+      // This is the same verified native actor exposed by the technician session;
+      // private saved displays may use it without inferring identity from a name or token.
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,
+        productionTechnicianUserId:context.actorId,
         features:fleetFeatures(), productionOwnerUserId:null, provisioningNeeded:null, reason:null,
       });
       if (method === 'GET' && path === '/api/session') return json({

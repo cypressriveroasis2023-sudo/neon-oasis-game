@@ -1,8 +1,9 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {statusPinsFixture} from './fixtures/fleet-status-pins-fixture.mjs';
+import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 for(const it of [false,true])test(`Fleet status pin colors, mixed selection and failed reads ${it?'IT':'Owner'}`,async({page},testInfo)=>{
- const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,it,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
+ const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,it,{field:fixture.field,health:fixture.health,productConnections:fixture.connections,advancingClock:it});
  await expect(app.locator('.cos-fleet-map-panel')).toHaveAttribute('aria-busy','false');
  await expect.poll(()=>app.locator('.cos-mhelp-address-marker').first().evaluate(n=>n.getBoundingClientRect().width)).toBe(44);
  await expect(app.locator('.cos-fleet-map-canvas')).not.toHaveClass(/leaflet-zoom-anim/);
@@ -26,15 +27,37 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  await app.locator('.cos-fleet-map-panel').screenshot({path:testInfo.outputPath('status-pins.png')});
  state.field.mhelpAddressMap.items[1].latitude=state.field.mhelpAddressMap.items[0].latitude;
  state.field.mhelpAddressMap.items[1].longitude=state.field.mhelpAddressMap.items[0].longitude;
- await app.getByRole('button',{name:/Refresh data/}).click();
+ if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(marker('1001')).toHaveAttribute('data-health','online');await expect(marker('1002')).toHaveAttribute('data-health','offline');
  await expect(app.locator('.cos-status-group-ring,.cos-map-group')).toHaveCount(0);
  for(const id of ['1001','1002']){await marker(id).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
- state.fail=true;
- await app.getByRole('button',{name:/Refresh data/}).click();
+ // Fail both independent saved-read sources. A successfully returned old TCP
+ // observation should become Unverified; it is not a failed-read retention case.
+ state.fail=true;state.productConnections=null;
+ if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(app.getByRole('alert')).toBeVisible();
- await expect(app.locator('.cos-mhelp-address-marker[data-health="online"]')).toHaveCount(0);
+ await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
+ // A failed refresh retains the completed snapshot and its visible warning.
+ await expect(marker('1001')).toHaveAttribute('data-health','online');
+ await expect(marker('1002')).toHaveAttribute('data-health','offline');
  expect(state.calls.every(r=>r.method==='GET')).toBeTruthy();
+ expect(state.errors).toEqual([]);
+});
+
+
+test('a completed stale IT TCP read replaces colored pins with Unknown',async({page})=>{
+ const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,true,{field:fixture.field,health:fixture.health,productConnections:fixture.connections,advancingClock:true});
+ const marker=id=>app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["${id}"]']`);
+ await expect(marker('1001')).toHaveAttribute('data-health','online');
+ await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ await nextScheduledFleetRead(page,app,state);
+ await expect(marker('1001')).toHaveAttribute('data-health','online');
+ await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ // This source still completes successfully with its original observation time.
+ await nextScheduledFleetRead(page,app,state);
+ await expect(marker('1001')).toHaveAttribute('data-health','unknown');
+ await expect(marker('1002')).toHaveAttribute('data-health','unknown');
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);
 });
 
@@ -42,13 +65,13 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
 test('Offline Fleet filter hides unrelated saved address pins without dropping the red unit',async({page})=>{
  const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(7);
- await app.getByLabel('Field inventory status').selectOption('offline');
+ await app.locator('.cos-fleet-stat-offline').click();
  const markers=app.locator('.cos-mhelp-address-marker');
  await expect(markers).toHaveCount(1);
  await expect(markers.first()).toHaveAttribute('data-mhelp-product-id','1002');
  await expect(markers.first()).toHaveAttribute('data-health','offline');
  await expect(app.locator('.cos-compact-group-marker')).toHaveCount(0);
- await app.getByLabel('Field inventory status').selectOption('all');
+ await app.locator('.cos-fleet-stat-field').click();
  await expect(markers).toHaveCount(7);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
  expect(state.errors).toEqual([]);

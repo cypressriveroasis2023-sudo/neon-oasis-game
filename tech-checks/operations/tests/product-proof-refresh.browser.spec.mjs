@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 
 for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact checks while pending and adopts late proof`,async({page})=>{
  const f=fieldProductFixture();
@@ -8,7 +9,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} refresh keeps saved exact 
  const online=app.locator('.cos-fleet-stat-online strong');
  await expect(online).toHaveText('1');
  let release;state.proofGate=new Promise(resolve=>{release=resolve;});
- await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ if(it)await nextScheduledFleetRead(page,app,state,'/api/product-connections');else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect.poll(()=>state.calls.filter(r=>r.path==='/api/product-connections').length).toBe(2);
  await page.clock.runFor(6600);
  await expect(app.getByRole('status').filter({hasText:'Connection source is still loading'})).toBeVisible();

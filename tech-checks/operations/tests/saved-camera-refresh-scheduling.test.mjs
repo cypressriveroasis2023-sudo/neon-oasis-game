@@ -94,6 +94,12 @@ test('hidden tabs pause reads and repeated visibility events resume only one sha
  await f.visible(true);await f.visible(true);await f.visible(true);assert.equal(f.requests.length,4);assert.equal(hook.loading,true);f.answerPair(2);await flush();assert.equal(hook.fleet.readStartedAt,start+20*60000);await f.advance(60000);assert.equal(f.requests.length,4);
 });
 
+test('unmount removes the visibility resume reader and its interval',async()=>{
+ const {f,hook}=await boot();await f.visible(false);hook.unmount();
+ await f.advance(20*60000);await f.visible(true);await f.visible(true);
+ assert.equal(f.requests.length,2,'a departed view must not restart saved-data reads');
+});
+
 test('a session change clears the hook and rejects late old-session bodies',async()=>{
  const f=fixture(),hook=f.mount();await flush();const body=deferred();f.requests[0].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
  f.state.token='synthetic-session-b';const current=f.api.get('/api/jobs');await flush();assert.equal(hook.fleet,null);assert.equal(hook.loading,false);assert.match(hook.error,/session changed/);f.answer(2,{items:[]});await current;

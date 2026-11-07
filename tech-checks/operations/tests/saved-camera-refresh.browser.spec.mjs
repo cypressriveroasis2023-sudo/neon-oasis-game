@@ -16,7 +16,8 @@ async function mount(page){
  const state={calls:[],errors:[],failed:false,mapCustomer:'Synthetic customer',gate:deferred()};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.addInitScript(()=>{window.savedRefreshInvalidations=[];window.addEventListener('cos-private-data-invalidated',()=>window.savedRefreshInvalidations.push(Date.now()));});
- await page.clock.install({time:new Date(start)});await page.clock.pauseAt(new Date(start));
+ // Install before the fixed target so transport latency cannot make pauseAt travel backwards.
+ await page.clock.install({time:new Date(start-60000)});await page.clock.pauseAt(new Date(start));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/saved-camera-refresh-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-saved-refresh-only'},location.origin)})</script>`});
@@ -48,6 +49,10 @@ async function mount(page){
  return {app,state};
 }
 function counts(state){const count=path=>state.calls.filter(call=>call.path===path).length;return {health:count(summaryPath),map:count(mapPath),routers:count('/api/routers'),power:count('/api/vrm-fleet')};}
+async function advanceSourceRead(page,ms){
+ const completed=Promise.all(['/api/routers','/api/vrm-fleet'].map(path=>page.waitForResponse(response=>response.request().method()==='POST'&&response.request().postDataJSON()?.path===path).then(async response=>{expect(await response.finished()).toBeNull();})));
+ await page.clock.runFor(ms);await completed;
+}
 async function visible(app,value){await app.locator('body').evaluate((_,isVisible)=>{Object.defineProperty(document,'hidden',{configurable:true,value:!isVisible});document.dispatchEvent(new Event('visibilitychange'));},value);}
 function assertReadOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path).filter(path=>path!=='/api/product-connections'))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session','/api/vrm-fleet']);expect(state.errors).toEqual([]);}
 
@@ -61,8 +66,10 @@ test('ten-minute saved reads evaluate expiry only at completed updates without v
  await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:1,power:1});
  expect(state.calls.filter(call=>call.path===summaryPath).map(call=>call.at)).toEqual([start,start+600000]);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- await page.clock.runFor(9*60000);
- expect(counts(state)).toEqual({health:2,map:2,routers:2,power:2});
+ await advanceSourceRead(page,5*60000);
+ await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:2,power:2});
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await page.clock.runFor(4*60000);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('0');
  assertReadOnly(state);
@@ -80,10 +87,11 @@ test('hidden tabs pause saved reads and visibility resumes one coalesced pair',a
 test('returning to Fleet keeps the cached pair original refresh deadline',async({page})=>{
  const {app,state}=await mount(page);
  const savedHealth=app.locator('.cos-fleet-heading > div > small'),originalRead=await savedHealth.innerText();
- // Use the static directory while Fleet is unmounted. An unrelated workspace's
+ // Use the static Tech Check directory while Fleet is unmounted. Phone More
+ // is a dialog over Fleet, so it does not exercise unmount/reentry. An unrelated workspace's
  // authenticated polling must not run through this synthetic clock jump.
- await openWorkspace(app,'Operations');
- await expect(app.getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();
+ await openWorkspace(app,'Tech Check');
+ await expect(app.getByRole('region',{name:'Tech Check workspaces',exact:true})).toBeVisible();
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
  await page.clock.runFor(537000); // Nine minutes from the original saved pair.
  expect(await app.locator('body').evaluate(()=>Date.now())).toBe(start+540000);
@@ -117,7 +125,10 @@ test('a failed saved read waits ten minutes to retry and manual reload remains i
  await page.clock.runFor(597000);await expect.poll(()=>counts(state).health).toBe(2);
  await expect(app.locator('.cos-fleet-message[role=alert]')).toContainText('Synthetic saved camera read unavailable');
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
- await page.clock.runFor(540000);await visible(app,true);expect(counts(state).health).toBe(2);
+ // Settle the fifteen-minute source reads before advancing their timeout clock.
+ await advanceSourceRead(page,300000);await expect.poll(()=>counts(state)).toEqual({health:2,map:2,routers:2,power:2});
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await page.clock.runFor(240000);await visible(app,true);expect(counts(state).health).toBe(2);
  await page.clock.runFor(60000);await expect.poll(()=>counts(state).health).toBe(3);
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
@@ -137,7 +148,7 @@ test('failed health keeps its slow map shared through manual refresh and Fleet r
  await expect.poll(()=>counts(state).routers).toBe(3);
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(counts(state).health).toBe(2);expect(counts(state).map).toBe(2);
- await openWorkspace(app,'Operations');
+ await openWorkspace(app,'Tech Check');
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
  await openWorkspace(app,'Field Map');
  await expect.poll(()=>counts(state).routers).toBe(4);
@@ -169,7 +180,7 @@ test('automatic partial failure adopts newer placement without asserting success
 });
 
 test('expired-cache remount renders dated inventory while the fresh pair waits',async({page})=>{
- const {app,state}=await mount(page);await openWorkspace(app,'Operations');
+ const {app,state}=await mount(page);await openWorkspace(app,'Tech Check');
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(0);
  await page.clock.runFor(957000);state.gate=deferred();
  await openWorkspace(app,'Field Map');
