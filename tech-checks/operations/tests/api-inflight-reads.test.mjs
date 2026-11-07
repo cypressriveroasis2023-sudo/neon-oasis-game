@@ -438,6 +438,22 @@ test('read-only Product-ID evidence is requested only after a complete reviewed 
  assert.equal(held.optionalProductReads.length,0,'incomplete source census cannot trigger a Product-ID read');
 });
 
+test('optional Product-ID proof waits for provider Health to settle before starting mHelp-backed proof',async()=>{
+ const f=fixture(),pending=f.api.fleet();await flush();
+ assert.deepEqual(f.requests.map(x=>x.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
+ const reviewed={...fleetMap,uploadInventory:{
+  contract:'COS_MHELP_UPLOAD_INVENTORY_V1',
+  countBasis:'mhelp_product_records_not_unique_physical_units',
+  sourceSha256:'b'.repeat(64),summary:{totalRecords:2,fieldRecords:1},
+  records:[{productId:'2001',placement:'FIELD'},{productId:'2002',placement:'SHOP'}]
+ }};
+ f.answer(1,reviewed);await flush();
+ assert.equal(f.optionalProductReads.length,0,'Field Map completion alone must not overlap Product-ID proof with pending provider Health');
+ f.answer(0,fleetHealth);await pending;
+ assert.equal(f.optionalProductReads.length,1,'proof starts after provider Health settles');
+ assert.deepEqual(f.optionalProductReads[0].envelope,{path:'/api/product-connections',method:'GET',body:null});
+});
+
 for(const failedSource of ['health','fieldMap'])for(const peerFails of [false,true])test(`${failedSource} failure is prompt but retains the shared fleet barrier until its peer ${peerFails?'fails':'succeeds'}`,async()=>{
  const f=fixture(),first=f.api.fleet();let pairedError;
  const failed=first.catch(error=>{pairedError=error;});
