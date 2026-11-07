@@ -23,6 +23,10 @@
     {
       "before": "previewOrigin=origin===COS_PREVIEW_ORIGIN,",
       "after": "previewOrigin=COS_PREVIEW_ORIGINS.has(origin),"
+    },
+    {
+      "before": "function fleetFeatures(){return{durableFleetBoard:false,",
+      "after": "function fleetFeatures(){return{durableFleetBoard:!0,"
     }
   ],
   "sourceHashes": {
@@ -44,5 +48,11 @@
   "packaging": "Existing two-file immutable-import wrapper; source commit must be pinned before deployment.",
   "status": "PREPARED_DURABLE_FLEET",
   "durableFleetBoard": true,
-  "durableFleetBehavior": "Opening returns the last completed server board immediately. The existing database lease starts a non-forced background batch only when its 10-minute next_at is due; forced/manual refresh may queue immediately."
+  "durableFleetBehavior": "Opening returns the last completed server board immediately. The existing database lease starts a non-forced background batch only when its 10-minute next_at is due; forced/manual refresh may queue immediately.",
+  "currentLivePrecondition": {
+    "version": 155,
+    "status": "ACTIVE",
+    "archiveSha256": "9065cf46375d02eb339504dd4d559a95e9e8312eb472b57b1223076f21921121",
+    "entrypointSha256": "cd88d112b80b46d240500abc6cbed7b1b91bb275a4d4c219c31275e1de7b99d8"
+  }
 }
