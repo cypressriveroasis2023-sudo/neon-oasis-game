@@ -1,0 +1,1432 @@
+{
+  "manifest_version": 1,
+  "status": "LOCAL_SOURCE_PROPOSAL_NOT_INSTALLED_EXPOSURE_ACCEPTANCE_PENDING",
+  "base_commit": "6ffebbf19fc4969626e5bf5dab7c4e088b7099ee",
+  "correction_branch": "fix/recon-receipt-correction-20261014",
+  "request_sha256": "a2f73d1222f50cf40e285ab067789d49a80fb45b7a1d89daadb6eb5de1c25b2e",
+  "scope": "Exact new v2 function signatures only; no historical migration, credential authority, owner, membership, schema, role or SECURITY DEFINER change.",
+  "counts": {
+    "caller_apis": 9,
+    "input_only_helpers": 20,
+    "service_callable_functions": 29,
+    "trigger_runtime_routines_without_service_execute": 2,
+    "total_new_signatures": 31
+  },
+  "exposure": {
+    "schema": "public",
+    "ordinary_service_callable_signatures": 29,
+    "statement": "This is a 29-function proposed callable surface, not a nine-function exposed surface. Twenty helpers need nested invoker EXECUTE in the unchanged graph and remain directly callable where public is Data API exposed.",
+    "acceptance": "Explicit acceptance of the twenty callable helpers is pending; otherwise a separately authorized no-new-authority refactor is required.",
+    "gates": "Combined, real-runtime and production gates HOLD. No live owner, role membership, default privilege, exposed-schema or effective-grant capture is claimed."
+  },
+  "ownership_expectations": {
+    "new_function": "Owned by installer current_user on first CREATE FUNCTION; CREATE OR REPLACE preserves an existing owner. No hardcoded live owner is assumed or changed.",
+    "capture_required": [
+      "pg_proc.proowner",
+      "pg_proc.proacl or acldefault(f,proowner)",
+      "pg_proc.prosecdef",
+      "pg_default_acl",
+      "pg_roles superuser/inherit attributes",
+      "pg_auth_members and effective role privileges"
+    ],
+    "administrative_caveat": "Function owners can regrant privileges and superusers bypass ordinary ACL checks. The proposal does not create a privilege boundary against owner/superuser administrative authority."
+  },
+  "execute_policies": {
+    "callable_service_execute": {
+      "security_definer": false,
+      "service_role_effective_execute": true,
+      "anon_effective_execute": false,
+      "authenticated_effective_execute": false,
+      "nonowner_service_role_effective_execute_grant_option": false,
+      "allowed_raw_execute_grant_option_grantees": [
+        "per-function owner"
+      ],
+      "allowed_direct_acl_execute_grantees": [
+        "per-function owner",
+        "service_role"
+      ],
+      "unexpected_non_superuser_effective_execute": "Reject installation unless the role is the per-function owner or service_role; includes inherited privilege from either allowed grantee.",
+      "default_privilege_handling": "Revoke PUBLIC/anon/authenticated on exact signatures, grant service_role without adding a grant option, then fail closed on any remaining unexpected direct/default EXECUTE grantee, nonowner raw EXECUTE grant option or nonowner service effective EXECUTE WITH GRANT OPTION. Existing grant options are not silently repaired; no custom role or membership repairs.",
+      "schema_and_table_permissions": "Function EXECUTE is separate from schema USAGE and invoker table privileges; no expansion of either is proposed."
+    },
+    "trigger_no_service_execute": {
+      "security_definer": false,
+      "service_role_effective_execute": false,
+      "anon_effective_execute": false,
+      "authenticated_effective_execute": false,
+      "nonowner_service_role_effective_execute_grant_option": false,
+      "allowed_raw_execute_grant_option_grantees": [
+        "per-function owner"
+      ],
+      "allowed_direct_acl_execute_grantees": [
+        "per-function owner"
+      ],
+      "unexpected_non_superuser_effective_execute": "Reject installation unless the role is the per-function owner; service_role is explicitly checked false even if it is an owner, superuser or inheritor.",
+      "default_privilege_handling": "Revoke PUBLIC/anon/authenticated and explicitly revoke service_role EXECUTE; fail closed if defaults, ownership or inheritance still provide forbidden effective access, a nonowner raw EXECUTE grant option or nonowner service effective EXECUTE WITH GRANT OPTION. No grant-option repair or owner/membership changes.",
+      "runtime_semantics": "Trigger creation checks installer function EXECUTE. Already-installed trigger firing does not require the DML caller to have function EXECUTE; trigger routines are not ordinary callable RPCs."
+    }
+  },
+  "preserved_existing_authority": {
+    "signature": "public.save_reconeyez_credentials(text,text)",
+    "included_in_new_manifest": false,
+    "owner_acl_security": "Existing owner, ACL and SECURITY DEFINER mode must remain exactly unchanged; not included in the new-function grant or preflight lists."
+  },
+  "validation_requirements": {
+    "owner": "v2_tests",
+    "location": "tech-checks/operations/tests/recon-owned-metadata-v2-sql.test.mjs C29 and helper-removal cases",
+    "required": [
+      "all 31 exact signatures match manifest; all new functions SECURITY INVOKER",
+      "all 29 callable signatures service execute true and anon/authenticated false",
+      "both triggers service execute false; normal APIs and guard enforcement still work",
+      "each of twenty helper revocations independently breaks an intended API with 42501 in synthetic fixture",
+      "default/custom and inherited privilege variants fail closed without modifying owners or memberships",
+      "preexisting/default/inherited nonowner EXECUTE WITH GRANT OPTION fails closed without repairing delegation authority",
+      "existing credential routine owner/ACL/security preserved"
+    ],
+    "execution_status": "Not executed by the manifest author. Synthetic in-process evidence must identify the exact correction bytes; no real-runtime or production conclusion is implied."
+  },
+  "callable_functions": [
+    {
+      "name": "recon_begin_attempt_v2",
+      "identity_signature": "public.recon_begin_attempt_v2(uuid,text)",
+      "declaration": "public.recon_begin_attempt_v2(p_request_id uuid,p_kind text)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 279
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_adapter",
+          "path": "tech-checks/supabase/functions/_shared/reconOwnedMetadataV2.ts",
+          "line": 168,
+          "caller": "beginReconAttempt",
+          "consumers": [
+            "reconeyez-connect connect/sync/test_webhook",
+            "camera-provider-reconcile Recon path"
+          ]
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_recover_begin_v2",
+      "identity_signature": "public.recon_recover_begin_v2(uuid,text)",
+      "declaration": "public.recon_recover_begin_v2(p_request_id uuid,p_kind text)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 711
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_adapter",
+          "path": "tech-checks/supabase/functions/_shared/reconOwnedMetadataV2.ts",
+          "line": 178,
+          "caller": "beginReconAttempt",
+          "condition": "uncertain or malformed BEGIN acknowledgement; existing stored request only"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_attempt_result_v2",
+      "identity_signature": "public.recon_attempt_result_v2(uuid)",
+      "declaration": "public.recon_attempt_result_v2(p_attempt_id uuid)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 315
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_adapter",
+          "path": "tech-checks/supabase/functions/_shared/reconOwnedMetadataV2.ts",
+          "line": 186,
+          "caller": "lookupReconAttempt",
+          "consumers": [
+            "receiver acknowledgement lookup",
+            "ambiguous owner-mutation recovery"
+          ]
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_fail_attempt_v2",
+      "identity_signature": "public.recon_fail_attempt_v2(uuid,text)",
+      "declaration": "public.recon_fail_attempt_v2(p_attempt_id uuid,p_reason_code text)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 329
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_adapter",
+          "path": "tech-checks/supabase/functions/_shared/reconOwnedMetadataV2.ts",
+          "line": 224,
+          "caller": "failReconAttempt via recoverReconMutation",
+          "consumers": [
+            "reconeyez-connect",
+            "camera-provider-reconcile Recon path"
+          ]
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_finish_inventory_v2",
+      "identity_signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+      "declaration": "public.recon_finish_inventory_v2(p_attempt_id uuid,p_devices jsonb,p_identity_inventory jsonb,p_inventory_count integer,p_skipped_non_detectors integer,p_username text DEFAULT NULL,p_password text DEFAULT NULL)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 554
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            706
+          ]
+        },
+        {
+          "kind": "edge_consumer",
+          "path": "tech-checks/supabase/functions/reconeyez-connect/inventorySync.ts",
+          "line": 47,
+          "caller": "syncReconInventory via recoverReconMutation",
+          "condition": "existing integration connect or sync"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_finish_reconcile_v2",
+      "identity_signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+      "declaration": "public.recon_finish_reconcile_v2(p_attempt_id uuid,p_identity_inventory jsonb,p_inventory_count integer,p_detector_count integer,p_diagnostics jsonb,p_server_host text,p_server_port integer)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 636
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_consumer",
+          "path": "tech-checks/supabase/functions/camera-provider-reconcile/index.ts",
+          "line": 380,
+          "caller": "Recon reconciliation via recoverReconMutation"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_create_inventory_v2",
+      "identity_signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+      "declaration": "public.recon_create_inventory_v2(p_request_id uuid,p_observed_at text,p_expires_at text,p_retain_until text,p_devices jsonb,p_identity_inventory jsonb,p_inventory_count integer,p_skipped_non_detectors integer,p_username text,p_password text)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 675
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "edge_consumer",
+          "path": "tech-checks/supabase/functions/reconeyez-connect/inventorySync.ts",
+          "line": 47,
+          "caller": "syncReconInventory via recoverReconMutation",
+          "condition": "initial absent-row connect only"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_record_webhook_receipt_v2",
+      "identity_signature": "public.recon_record_webhook_receipt_v2(bigint)",
+      "declaration": "public.recon_record_webhook_receipt_v2(p_event_id bigint)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+        "line": 141
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "required_coordinated_consumer",
+          "caller": "authenticated ordinary Recon webhook receipt finalizer",
+          "source_in_this_candidate": false,
+          "note": "No TypeScript invocation exists in base candidate 6ffebbf19fc4969626e5bf5dab7c4e088b7099ee; coordinated consumer acceptance remains a release gate."
+        },
+        {
+          "kind": "synthetic_test",
+          "path": "tech-checks/operations/tests/recon-owned-metadata-v2-sql.test.mjs",
+          "line": 35,
+          "caller": "receipt"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_finish_receiver_ack_v2",
+      "identity_signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+      "declaration": "public.recon_finish_receiver_ack_v2(p_attempt_id uuid, p_event_id bigint)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+        "line": 255
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "required_coordinated_consumer",
+          "caller": "authenticated correlated IntegrationTest webhook acknowledgement finalizer",
+          "source_in_this_candidate": false,
+          "note": "No TypeScript invocation exists in base candidate 6ffebbf19fc4969626e5bf5dab7c4e088b7099ee; connector polls RESULT and cannot author acknowledgement success."
+        },
+        {
+          "kind": "synthetic_test",
+          "path": "tech-checks/operations/tests/recon-owned-metadata-v2-sql.test.mjs",
+          "line": 36,
+          "caller": "ack"
+        }
+      ],
+      "category": "caller_api",
+      "execute_policy": "callable_service_execute"
+    },
+    {
+      "name": "recon_v2_time",
+      "identity_signature": "public.recon_v2_time(timestamptz)",
+      "declaration": "public.recon_v2_time(p_time timestamptz)",
+      "returns": "text",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 7
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            285,
+            290,
+            304
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            343
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            627
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            666
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            343,
+            344
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_record_webhook_receipt_v2(bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            177
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_timestamp",
+      "identity_signature": "public.recon_v2_timestamp(text)",
+      "declaration": "public.recon_v2_timestamp(p_time text)",
+      "returns": "timestamptz",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 11
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_attempt_result_v2(uuid)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            324
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            300
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            696,
+            697,
+            698
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            339
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            569,
+            597,
+            605,
+            623,
+            624,
+            631
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            650,
+            662,
+            663,
+            670
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_owned_integration_guard_v2()",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            259,
+            266
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_recover_begin_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            719
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_result(text,jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            72
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            157,
+            158,
+            172
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_enrich_identity(jsonb,text,jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            469,
+            485
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_validate_identity(jsonb,text,integer,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            381
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_validate_diagnostics",
+      "identity_signature": "public.recon_v2_validate_diagnostics(jsonb,text,integer,integer)",
+      "declaration": "public.recon_v2_validate_diagnostics(p_diagnostics jsonb,p_observed_at text,p_inventory_count integer,p_detector_count integer)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 20
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            655
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_keys",
+      "identity_signature": "public.recon_v2_keys(jsonb,text[])",
+      "declaration": "public.recon_v2_keys(p_value jsonb,p_keys text[])",
+      "returns": "boolean",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 53
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_result(text,jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            63,
+            66,
+            70
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            140,
+            146,
+            160,
+            168
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_validate_diagnostics(jsonb,text,integer,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            24,
+            35
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_check_result",
+      "identity_signature": "public.recon_v2_check_result(text,jsonb)",
+      "declaration": "public.recon_v2_check_result(p_kind text,p_result jsonb)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 58
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            622
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            660
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            175
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_integer",
+      "identity_signature": "public.recon_v2_integer(jsonb,numeric)",
+      "declaration": "public.recon_v2_integer(p_value jsonb,p_max numeric DEFAULT 9007199254740991)",
+      "returns": "boolean",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 75
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_result(text,jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            64,
+            67,
+            71
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            142,
+            143,
+            150,
+            151,
+            162,
+            169
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_validate_diagnostics(jsonb,text,integer,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            29,
+            39
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_canonical",
+      "identity_signature": "public.recon_v2_canonical(jsonb)",
+      "declaration": "public.recon_v2_canonical(p_value jsonb)",
+      "returns": "text",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 82
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_canonical(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            89,
+            90
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            177,
+            180
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_digest(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            98
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_reserve_terminal(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            134
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_validate_diagnostics(jsonb,text,integer,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            27
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_digest",
+      "identity_signature": "public.recon_v2_digest(jsonb)",
+      "declaration": "public.recon_v2_digest(p_value jsonb)",
+      "returns": "text",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 96
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            683
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            344
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            564
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            645,
+            659
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            312
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_safe_error",
+      "identity_signature": "public.recon_v2_safe_error(text)",
+      "declaration": "public.recon_v2_safe_error(p_reason text)",
+      "returns": "text",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 100
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            338
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_check_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            173
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_config",
+      "identity_signature": "public.recon_v2_config(jsonb)",
+      "declaration": "public.recon_v2_config(p_integration jsonb)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 116
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            305
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            700
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_config_matches(jsonb,jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            124
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_config_matches",
+      "identity_signature": "public.recon_v2_config_matches(jsonb,jsonb)",
+      "declaration": "public.recon_v2_config_matches(p_record jsonb,p_integration jsonb)",
+      "returns": "boolean",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 121
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_attempt_result_v2(uuid)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            325
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            340
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            570
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            651
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            333
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_reserve_terminal",
+      "identity_signature": "public.recon_v2_reserve_terminal(jsonb)",
+      "declaration": "public.recon_v2_reserve_terminal(p_record jsonb)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 126
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            306
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            701
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_check_state",
+      "identity_signature": "public.recon_v2_check_state(jsonb)",
+      "declaration": "public.recon_v2_check_state(p_state jsonb)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 136
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            308
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            703
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            346
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            629
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            668
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_v2_state(jsonb)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            191
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            351
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_state",
+      "identity_signature": "public.recon_v2_state(jsonb)",
+      "declaration": "public.recon_v2_state(p_metadata jsonb)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 185
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_attempt_result_v2(uuid)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            321
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_begin_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            292
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            690
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            335
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            562
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            643
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_owned_integration_guard_v2()",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            252
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_recover_begin_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            718
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            295
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_current",
+      "identity_signature": "public.recon_v2_current(jsonb,jsonb,bigint)",
+      "declaration": "public.recon_v2_current(p_record jsonb,p_state jsonb,p_revision bigint)",
+      "returns": "boolean",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 193
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_attempt_result_v2(uuid)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            323
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            694
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            337
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            567
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            648
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_finish_response",
+      "identity_signature": "public.recon_v2_finish_response(jsonb,text,boolean)",
+      "declaration": "public.recon_v2_finish_response(p_record jsonb,p_outcome text,p_current boolean)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 198
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_attempt_result_v2(uuid)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            323
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            694
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            337,
+            357
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            567,
+            633
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            648,
+            672
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_receiver_ack_v2(uuid, bigint)",
+          "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+          "lines": [
+            325,
+            361
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_superseded",
+      "identity_signature": "public.recon_v2_superseded(jsonb,text)",
+      "declaration": "public.recon_v2_superseded(p_record jsonb,p_reason text)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 204
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_fail_attempt_v2(uuid,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            340,
+            342
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_validate_identity",
+      "identity_signature": "public.recon_v2_validate_identity(jsonb,text,integer,integer)",
+      "declaration": "public.recon_v2_validate_identity(p_identity_inventory jsonb,p_observed_at text,p_inventory_count integer,p_detector_count integer)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 360
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            681
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            572
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            654
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_validate_devices",
+      "identity_signature": "public.recon_v2_validate_devices(jsonb)",
+      "declaration": "public.recon_v2_validate_devices(p_devices jsonb)",
+      "returns": "void",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 410
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_create_inventory_v2(uuid,text,text,text,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            680
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            571
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    },
+    {
+      "name": "recon_v2_enrich_identity",
+      "identity_signature": "public.recon_v2_enrich_identity(jsonb,text,jsonb)",
+      "declaration": "public.recon_v2_enrich_identity(p_identity_inventory jsonb,p_observed_at text,integration_metadata jsonb)",
+      "returns": "jsonb",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 452
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_inventory_v2(uuid,jsonb,jsonb,integer,integer,text,text)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            574
+          ]
+        },
+        {
+          "kind": "sql_function",
+          "signature": "public.recon_finish_reconcile_v2(uuid,jsonb,integer,integer,jsonb,text,integer)",
+          "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+          "lines": [
+            658
+          ]
+        }
+      ],
+      "category": "input_only_helper",
+      "execute_policy": "callable_service_execute",
+      "effects": "input-only validation, formatting, hashing or response construction; no table or Vault access"
+    }
+  ],
+  "trigger_functions": [
+    {
+      "name": "recon_owned_integration_guard_v2",
+      "identity_signature": "public.recon_owned_integration_guard_v2()",
+      "declaration": "public.recon_owned_integration_guard_v2()",
+      "returns": "trigger",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql",
+        "line": 210
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "installed_trigger",
+          "table": "public.camera_integrations",
+          "trigger": "recon_owned_integration_guard_v2",
+          "creation_requires": "installer TRIGGER privilege and function EXECUTE; service DML invocation does not require service function EXECUTE"
+        }
+      ],
+      "category": "trigger_runtime_routine",
+      "execute_policy": "trigger_no_service_execute"
+    },
+    {
+      "name": "recon_v2_audit_evidence_guard",
+      "identity_signature": "public.recon_v2_audit_evidence_guard()",
+      "declaration": "public.recon_v2_audit_evidence_guard()",
+      "returns": "trigger",
+      "source": {
+        "path": "tech-checks/database-maintenance/reconeyez-receipt-v2.sql",
+        "line": 26
+      },
+      "security": "SECURITY INVOKER",
+      "owner_expectation": "installer_at_first_creation_existing_owner_preserved_on_replace",
+      "direct_callers": [
+        {
+          "kind": "installed_trigger",
+          "table": "public.camera_integration_events",
+          "trigger": "recon_v2_audit_evidence_guard",
+          "creation_requires": "installer TRIGGER privilege and function EXECUTE; service DML invocation does not require service function EXECUTE"
+        }
+      ],
+      "category": "trigger_runtime_routine",
+      "execute_policy": "trigger_no_service_execute"
+    }
+  ],
+  "source_sql_sha256": {
+    "tech-checks/database-maintenance/reconeyez-owned-metadata-v2.sql": "2e5d6370c21c7cafed7cbb8872523abda95244ac4faf03891d4f71db0cf8f4d1",
+    "tech-checks/database-maintenance/reconeyez-receipt-v2.sql": "020332ac7dc12e408c124fa2645d0299c12b013726578d5280f9fb3eccb39875"
+  }
+}
