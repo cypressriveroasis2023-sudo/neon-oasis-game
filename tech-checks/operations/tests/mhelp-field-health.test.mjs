@@ -58,3 +58,13 @@ test('obsolete IP-only contract and failed source keep inventory and support, an
  assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
  }
 });
+
+test('TCP status cannot override a different reviewed resource and TCP/provider conflicts become Unverified',()=>{
+ const f=fieldProductFixture();
+ const wrong=structuredClone(f.connections);wrong.items.find(i=>i.productId==='1001').resourceId='999999';
+ let view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,wrong);
+ assert.equal(view.items.find(i=>i.productId==='1001').state,'online');
+ const conflict=structuredClone(f.connections);const item=conflict.items.find(i=>i.productId==='1001');item.status='offline';item.resourceId='1';
+ view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,conflict);
+ const product=view.items.find(i=>i.productId==='1001');assert.equal(product.state,'unverified');assert.match(product.reason,/Connection conflict/);
+});

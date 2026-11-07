@@ -9,9 +9,10 @@ test('the server uses the existing exact Product-ID classifier and rejects parti
  const missing=structuredClone(f.connections);missing.items.find(p=>p.productId==='1001').status='unknown';missing.items.find(p=>p.productId==='1001').checkedAt=null;missing.items.find(p=>p.productId==='1001').resourceId=null;
  // Remove the independent provider response too: neither source is definitive.
  const health=structuredClone(f.health);health.rows[0].evidence.observedAt='2026-01-01T00:00:00Z';
- assert.throws(()=>completedBoard(health,map,missing,first,f.now),/checks_incomplete/);
+ const conservative=completedBoard(health,map,missing,first,f.now);
+ assert.equal(conservative.units.find(p=>p.productId==='1001').status,'unverified');
  const databaseOrder=JSON.parse(JSON.stringify(first,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).reverse().map(k=>[k,v[k]])):v));
- assert.throws(()=>completedBoard(health,map,missing,databaseOrder,f.now),/checks_incomplete/);
+ assert.equal(completedBoard(health,map,missing,databaseOrder,f.now).units.find(p=>p.productId==='1001').status,'unverified');
  const negative=structuredClone(f.connections);negative.items.find(p=>p.productId==='1001').status='offline';
  assert.equal(completedBoard(f.health,map,negative,first,f.now).counts.offline,2);
  assert.throws(()=>completedBoard(f.health,map,{...f.connections,sourceSha256:'b'.repeat(64)},first,f.now),/connection_source_incomplete/);
