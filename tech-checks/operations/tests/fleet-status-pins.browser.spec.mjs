@@ -45,6 +45,23 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
 });
 
 
+test('a completed stale IT TCP read replaces colored pins with Unknown',async({page})=>{
+ const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,true,{field:fixture.field,health:fixture.health,productConnections:fixture.connections,advancingClock:true});
+ const marker=id=>app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["${id}"]']`);
+ await expect(marker('1001')).toHaveAttribute('data-health','online');
+ await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ await nextScheduledFleetRead(page,app,state);
+ await expect(marker('1001')).toHaveAttribute('data-health','online');
+ await expect(marker('1002')).toHaveAttribute('data-health','offline');
+ // This source still completes successfully with its original observation time.
+ await nextScheduledFleetRead(page,app,state);
+ await expect(marker('1001')).toHaveAttribute('data-health','unknown');
+ await expect(marker('1002')).toHaveAttribute('data-health','unknown');
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ expect(state.errors).toEqual([]);
+});
+
+
 test('Offline Fleet filter hides unrelated saved address pins without dropping the red unit',async({page})=>{
  const fixture=statusPinsFixture();const {app,state}=await mountFleet(page,false,{field:fixture.field,health:fixture.health,productConnections:fixture.connections});
  await expect(app.locator('.cos-mhelp-address-marker')).toHaveCount(7);

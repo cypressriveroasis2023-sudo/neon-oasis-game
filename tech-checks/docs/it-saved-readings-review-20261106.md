@@ -12,7 +12,7 @@ IT manual saved-health refresh controls are omitted from the Fleet heading, unit
 
 ## Native integration requirement
 
-**The additive verified IT DTO field must be incorporated into the separately reviewed current native package before IT durable caching works. Do not deploy this repository's `index.ts` blindly.** The source file is used for focused handler tests; the production native package has its own integration and review boundary. No native deployment package, auth/RLS policy, secret, permission, producer schedule or deployment configuration is changed here. A frontend paired with an older backend safely reads saved results without durable IT restoration.
+**The additive verified IT DTO field must be incorporated into the separately reviewed current native package before IT durable caching works. Do not deploy this repository's `index.ts` blindly.** The source file is used for focused handler tests; the production native package has its own integration and review boundary. The [November 7 native preparation](it-saved-readings-native-review-20261107.md) supplies an exact recorded-v154 patch recipe and offline execution tests. It does not deploy that recipe or change auth/RLS policy, secrets, permissions, producer schedules or deployment configuration. A frontend paired with an older backend safely reads saved results without durable IT restoration.
 
 ## Validation
 
@@ -22,11 +22,11 @@ IT manual saved-health refresh controls are omitted from the Fleet heading, unit
 - Existing source-preservation baselines are retained. Explicit reversal entries cover only this follow-up's changes to `App.tsx`, `FleetDashboard.tsx` and the affected IT browser regression, with exact candidate hashes and replacement counts.
 - Added browser cases cover IT cold reopening, original counts and observation times, the next ten-minute saved read, failed-read retention, account isolation, IT control removal and Owner parity. The existing IT daily-mode failure case now waits for scheduled reads instead of clicking the removed button.
 
-Browser execution remains **unverified locally**. The selected Playwright test command stalled before test output and was stopped after a bounded attempt. A direct launch failed with:
+The initial November 6 browser attempt was **unverified locally**: the selected Playwright command stalled before test output and was stopped after a bounded attempt. A direct launch then reported:
 
 ```text
 browserType.launch: Executable doesn't exist at
 /root/.cache/ms-playwright/chromium_headless_shell-1161/chrome-linux/headless_shell
 ```
 
-No browser download route was retried. Existing PR browser CI must run the new and affected cases before this candidate is treated as browser-verified. All added fixtures use synthetic data; no production probes or operational writes were made.
+The November 7 follow-up resolved local execution using the repository's pinned Playwright browser and Node 22.23.4, matching GitHub's Node version. Current verification results and the remaining release boundary are recorded in the [native preparation review](it-saved-readings-native-review-20261107.md). All browser and native-handler fixtures use in-memory synthetic records; no authenticated production probes or operational writes were made.
