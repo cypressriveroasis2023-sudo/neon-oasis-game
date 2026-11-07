@@ -20,7 +20,7 @@ export function fieldProductConnectionFixture(upload,observedAt=fresh,states={'1
   items:upload.records.filter(r=>r.placement==='FIELD').map(p=>{
    const status=states[p.productId]||'unknown';
    return {productId:p.productId,status,basis:'tcp_service_port',
-    checkedAt:status==='unknown'?null:observedAt,resourceId:status==='unknown'?null:String(9000+Number(p.productId)),
+    checkedAt:status==='unknown'?null:observedAt,resourceId:status==='unknown'?null:({'1001':'1','1002':'2','1003':'3'}[p.productId]||String(9000+Number(p.productId))),
     reason:status==='unknown'?'No fresh completed synthetic TCP check.':'Completed synthetic saved TCP/service-port check; video not verified.'};
   })};
 }

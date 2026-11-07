@@ -53,7 +53,11 @@ for(const it of [false,true])test(`a slow power read does not block camera refre
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
  if(it)await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toHaveCount(0);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  state.failVrm=true;state.releaseVrm();
- await expect(app.getByRole('alert')).toContainText('Synthetic saved power read unavailable');
+ await app.getByText('Update status',{exact:true}).click();
+ await expect(app.getByText('Supporting source update incomplete',{exact:true})).toBeVisible();
+ await expect(app.getByText('Camera health remains current; only the supporting source shown below could not be refreshed.',{exact:true})).toBeVisible();
+ await app.getByText('Technical details',{exact:true}).click();
+ await expect(app.getByText(/Synthetic saved power read unavailable/)).toBeVisible();
  await expect(app.locator('.cos-fleet-stat-online strong')).not.toHaveText('—');
  if(it)await nextScheduledFleetRead(page,app,state);else await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  expect(state.errors).toEqual([]);

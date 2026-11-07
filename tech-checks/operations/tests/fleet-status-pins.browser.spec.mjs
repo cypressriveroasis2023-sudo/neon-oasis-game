@@ -35,9 +35,14 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  // observation should become Unverified; it is not a failed-read retention case.
  state.fail=true;state.productConnections=null;
  if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
- await expect(app.getByRole('alert')).toBeVisible();
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('—');
+ await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('—');
+ await app.getByText('Update status',{exact:true}).click();
+ await expect(app.getByText('Latest health update incomplete',{exact:true})).toBeVisible();
  await expect(app.getByRole('status').filter({hasText:'Connection source could not be read'})).toBeVisible();
- // A failed refresh retains the completed snapshot and its visible warning.
+ // Historical per-unit observations remain inspectable with their original
+ // evidence while the live aggregate is deliberately withheld.
  await expect(marker('1001')).toHaveAttribute('data-health','online');
  await expect(marker('1002')).toHaveAttribute('data-health','offline');
  expect(state.calls.every(r=>r.method==='GET')).toBeTruthy();
