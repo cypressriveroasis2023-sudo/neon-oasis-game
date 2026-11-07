@@ -26,7 +26,9 @@ test('reopening restores server counts, retains failures, replaces one completed
  const offline=board.locator('.cos-equipment-total-helios .cos-total-status-offline b');
  await expect(online).toHaveText('1');await expect(board.getByRole('region',{name:'Saved fleet updates'})).toContainText('Closing the app keeps this record');
  expect(calls.some(c=>c.path==='/api/fleet-saved-board'&&c.method==='GET')).toBe(true);
- await page.clock.fastForward(25*60000);await expect(online).toHaveText('1');
+ expect(calls.some(c=>c.method==='POST')).toBe(false);
+ await page.clock.fastForward(9*60000);await expect(online).toHaveText('1');expect(calls.some(c=>c.method==='POST')).toBe(false);
+ await page.clock.fastForward(2*60000);await expect(online).toHaveText('1');await expect.poll(()=>calls.some(c=>c.path==='/api/fleet-saved-board/refresh'&&c.method==='POST')).toBe(true);
  expect(state.calls.slice(before).filter(c=>['/api/field-map','/api/camera-health/summary-v3','/api/product-connections'].includes(c.path))).toHaveLength(0);
  value={...value,refresh:{state:'failed',error:'source_read_failed'}};
  await board.getByRole('button',{name:/Refresh data/}).click();await expect(board.getByRole('region',{name:'Saved fleet updates'})).toContainText('Update incomplete');await expect(online).toHaveText('1');
