@@ -141,3 +141,17 @@ export function buildFleetCommandCenter(
     healthVerified:provider.healthVerified,items,counts,panels,
     addressCoverage:validAddresses?{located:validAddresses.pins.length,missing:validAddresses.unlocated}:null};
 }
+
+/** A conflicting saved source must never take down the entire Fleet view or
+ * produce invented status totals. Unexpected programming errors still throw. */
+const expectedFleetSourceConflicts=new Set([
+ 'The Field source and provider Product IDs differ.',
+ 'Field inventory violates unique Product-ID accounting.',
+ 'Fleet accounting does not reconcile.',
+ 'Field provider totals do not reconcile to mHelp Product IDs.',
+]);
+export function guardFleetCommandRead<T>(read:()=>T):{data:T|null;sourceMismatch:boolean}{
+ try{return {data:read(),sourceMismatch:false};}
+ catch(error){if(!(error instanceof Error)||!expectedFleetSourceConflicts.has(error.message))throw error;
+  return {data:null,sourceMismatch:true};}
+}

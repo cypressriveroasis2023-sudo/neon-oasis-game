@@ -1,4 +1,6 @@
 import SavedFleetReadingView from './SavedFleetReadingView';
+import SavedFleetEmergencyRoster from './SavedFleetEmergencyRoster';
+import {browserFleetStorage} from './savedFleetPresentation';
 import {fleetReadingKey,readFleetReading} from './savedFleetReading';
 import ViewErrorBoundary from './ViewErrorBoundary';
 import { savedFleetStatus } from './api';
@@ -188,10 +190,10 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
 }
 function FleetDisplayRecovery({retry, reference, session}: {retry: () => void; reference: string; session: Record<string,any>}) {
   const key = fleetReadingKey(session,new URLSearchParams(location.search).get('mode')||'');
-  const saved = readFleetReading(window.localStorage,key);
-  if(saved)return <><SavedFleetReadingView reading={saved} refresh={retry}/><p role="status">Fleet details could not display. The completed reading remains available. Reference {reference}.</p></>;
-
-  const board = savedFleetStatus()?.latest?.payload;
+  const saved = readFleetReading(browserFleetStorage(),key);
+  const durableStatus = savedFleetStatus();
+  const board = durableStatus?.latest?.payload;
+  if(saved)return <><SavedFleetReadingView reading={saved} refresh={retry}/><p role="status">Fleet details could not display. The completed reading remains available. Reference {reference}.</p><SavedFleetEmergencyRoster response={durableStatus}/></>;
   const counts = board?.contract === 'COS_SAVED_FLEET_BOARD_V1' ? board.counts : null;
   const checkedAt = board?.fleet?.readAt;
   return <section className="cos-fleet-message" role="alert" aria-label="Fleet display recovery">
@@ -202,6 +204,7 @@ function FleetDisplayRecovery({retry, reference, session}: {retry: () => void; r
       </p>}
     <p>Display reference {reference}</p>
     <button type="button" onClick={retry}>Reopen Fleet</button>
+    <SavedFleetEmergencyRoster response={durableStatus}/>
   </section>;
 }
 
