@@ -202,3 +202,17 @@ test('a different verified IT actor cannot restore another actor completed dashb
  await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).not.toHaveText('1');
  assertSavedReadsOnly(state);
 });
+
+
+test('a presentation-only saved Shop projection error cannot blank the Fleet',async({page})=>{
+ const f=fieldProductFixture(),field=structuredClone(f.field);
+ field.manualPlacementOverrides={contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[{unitId:'invalid-old-board-shape'}]};
+ const {app,state}=await mountFleet(page,false,{field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
+ const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ await expect(board).toBeVisible();
+ await expect(board.getByText('Saved Fleet details recovered in safe mode',{exact:true})).toBeVisible();
+ await expect(app.getByText(/Fleet details could not display|Fleet couldn’t display/)).toHaveCount(0);
+ await expect(board.getByRole('region',{name:'Equipment family totals'})).toBeVisible();
+ await expect(board.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();
+ expect(state.errors).toEqual([]);
+});
