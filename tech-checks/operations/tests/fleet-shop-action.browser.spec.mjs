@@ -8,8 +8,8 @@ for(const it of [false,true])test(`direct Shop action works after a failed healt
  const {app,state}=await mountFleet(page,it,{features:{fleetPlacementEdit:true},advancingClock:it}),movement=await routePlacement(page);
  const savedLabel=app.locator('.cos-fleet-heading > div:last-child > small'),refresh=app.getByRole('button',{name:'Refresh data'});
  await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');if(it)await expect(refresh).toHaveCount(0);else await expect(refresh).toBeEnabled();
- state.fail=true;if(it)await nextScheduledFleetRead(page,app,state);else await refresh.click();const warning=app.getByRole('alert').filter({hasText:'A supporting source could not be refreshed'});
- await expect(warning).toBeVisible();await expect(warning.getByText('Last completed results remain displayed with their original check times. The next successful update will replace them.',{exact:true})).toBeVisible();
+ state.fail=true;if(it)await nextScheduledFleetRead(page,app,state);else await refresh.click();const warning=app.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'});
+ await expect(warning).toBeVisible();await expect(warning).toContainText('Saved equipment remains visible. The next successful update replaces it.');
  await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();const card=app.getByRole('dialog',{name:'Helios 1 unit intelligence'}),placement=card.getByRole('region',{name:'Unit placement'});
  expect(movement.calls).toHaveLength(0);await placement.getByRole('button',{name:'Move to Shop / ROOT',exact:true}).click();await expect(placement.getByRole('button',{name:'Confirm move to Shop / ROOT'})).toBeDisabled();

@@ -856,7 +856,6 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
       state = "support";
       reason = "Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.";
     } else if (exactConnectionReceipt !== void 0 && !connections || exact?.status === "unknown" && connections) {
-      const reviewedProvider = record2?.kind === "unit" && row && row.camera.association && ["online", "offline"].includes(row.cameraState);
       if (reviewedProvider) {
         state = row.cameraState === "online" ? "online" : "offline";
         reason = PROVIDER_REPORTED + (directSourceUnavailable ? DIRECT_SOURCE_GAP : "No direct connection result: " + exact.reason + " ") + unitHealthLabel(row.camera) + ". " + row.camera.reason;
@@ -1063,7 +1062,7 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
-  // A current Unknown / Unverified classification is a complete result and may replace stale red/green.\n  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
+  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
 }
 export {
   completedBoard,

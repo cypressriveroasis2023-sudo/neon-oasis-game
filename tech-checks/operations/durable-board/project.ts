@@ -13,5 +13,8 @@ export function completedBoard(health:any,map:any,connections:any,previous:any,a
  prepareImmutableIdentityEnvelope(pair.health);
  const board=cameraFieldProducts(pair.fieldMap,pair.health,at,true);
  if(!board||!board.healthVerified)throw Error('inventory_source_incomplete');
- // Unknown / Unverified is a valid current result for an unrun, stale,\n // technical-error, target-mismatch or source-conflict observation. Publish\n // that current state once the complete source bundle has been reconciled.\n return {contract:'COS_SAVED_FLEET_BOARD_V1',fleet:pair,counts:board.counts,units:board.items.map(p=>({productId:p.productId,unitNumber:p.unitNumber,status:p.status,checkedAt:p.linked?.evidence?.observedAt||null,reason:p.linked?.evidence?.reason||p.linked?.reviewReason||null})),inventory:{total:board.total,field:board.field,shop:board.shop}};
+ // Unknown / Unverified is a valid current result for an unrun, stale,
+ // technical-error, target-mismatch or source-conflict observation. Publish
+ // that current state once the complete source bundle has been reconciled.
+ return {contract:'COS_SAVED_FLEET_BOARD_V1',fleet:pair,counts:board.counts,units:board.items.map(p=>({productId:p.productId,unitNumber:p.unitNumber,status:p.status,checkedAt:p.linked?.evidence?.observedAt||null,reason:p.linked?.evidence?.reason||p.linked?.reviewReason||null})),inventory:{total:board.total,field:board.field,shop:board.shop}};
 }
