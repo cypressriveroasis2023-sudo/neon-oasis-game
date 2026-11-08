@@ -6,6 +6,7 @@ import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
 for(const it of [false,true])test(`VISION uses exact Field products and opens existing evidence for ${it?'IT':'Owner'}`,async({page},info)=>{
  const f=statusPinsFixture();
  const {app,state}=await mountFleet(page,it,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
+ await app.locator('.cos-fleet-vision-toggle > summary').click();
  const brief=app.getByRole('region',{name:'VISION Field briefing',exact:true});
  await expect(brief.getByRole('heading',{name:'A clear view of what needs you.'})).toBeVisible();
  await expect(brief.locator('.cos-vision-priority-offline strong')).toHaveText('1');
@@ -42,6 +43,7 @@ for(const it of [false,true])test(`VISION uses exact Field products and opens ex
 test('VISION preserves original observation time when the next IT saved read fails',async({page})=>{
  const f=statusPinsFixture();
  const {app,state}=await mountFleet(page,true,{field:f.field,health:f.health,productConnections:f.connections,advancingClock:true,skipInitialFieldCount:true,productionTechnicianUserId:'00000000-0000-4000-8000-000000000010'});
+ await app.locator('.cos-fleet-vision-toggle > summary').click();
  const brief=app.getByRole('region',{name:'VISION Field briefing'});
  await brief.getByRole('button',{name:/Recorded offline/}).click();
  const observation=brief.locator('.cos-vision-attention-evidence>small:last-child');
@@ -58,6 +60,7 @@ test('VISION preserves original observation time when the next IT saved read fai
 test('VISION does not invent counts without a verified Field source',async({page})=>{
  const f=statusPinsFixture();delete f.field.uploadInventory;
  const {app,state}=await mountFleet(page,true,{field:f.field,health:f.health,skipInitialFieldCount:true,failHealth:true});
+ await app.locator('.cos-fleet-vision-toggle > summary').click();
  const brief=app.getByRole('region',{name:'VISION Field briefing'});
  await expect(brief.locator('.cos-vision-priority strong')).toHaveText(['—','—','—']);
  for(const button of await brief.locator('.cos-vision-priority').all())await expect(button).toBeDisabled();

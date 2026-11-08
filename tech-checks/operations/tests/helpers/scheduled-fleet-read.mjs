@@ -5,7 +5,9 @@ import {expect} from '@playwright/test';
 export async function advanceToScheduledFleetRead(page,app,observed){
  await expect(app.getByRole('button',{name:/Refresh data|Reading data|Reload saved results|Reading saved results|Refresh saved evidence|Retry saved data/})).toHaveCount(0);
  const current=await app.locator('body').evaluate(()=>Date.now());
- await page.clock.pauseAt(new Date(current+1000));
+ // Leave CI scheduling headroom between reading Date.now() and pausing.
+ // One minute is below the ten-minute read interval and avoids pausing in the past.
+ await page.clock.pauseAt(new Date(current+60000));
  await page.clock.setSystemTime(new Date(current+10*60000));
  for(let tick=0;tick<61&&!await observed();tick++)await page.clock.runFor(1000);
  await page.clock.resume();

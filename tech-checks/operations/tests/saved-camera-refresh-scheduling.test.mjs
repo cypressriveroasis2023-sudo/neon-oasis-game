@@ -42,7 +42,7 @@ function fixture({autoReply=true}={}){
  function mount(){
   const values=[],refs=[],effects=[],cleanups=[],historyUpdates=[];let holdHistory=false;
   const react={useCallback:fn=>fn,useRef(value){const ref={current:value};refs.push(ref);return ref;},useState(value){const index=values.length;values.push(value);return [value,next=>{if(index===4&&holdHistory&&typeof next==='function'){historyUpdates.push(next);return;}values[index]=typeof next==='function'?next(values[index]):next;}];},useEffect:fn=>effects.push(fn)};
-  const exports={};vm.runInNewContext(hookSource,{exports,window,document,location,Error,Date:ClockDate,require:name=>name==='react'?react:name==='./api'?{api}:modules[name]},{filename:'useCameraHealth.ts'});
+  const exports={};vm.runInNewContext(hookSource,{exports,window,document,location,Error,Date:ClockDate,require:name=>name==='react'?react:name==='./api'?{api,usesDurableFleetBoard:api.usesDurableFleetBoard}:modules[name]},{filename:'useCameraHealth.ts'});
   const hook=exports.useCameraHealth();effects.forEach(fn=>cleanups.push(fn()));
   return {refresh:hook.refresh,deferHistory(){holdHistory=true;},flushHistory(){holdHistory=false;while(historyUpdates.length)values[4]=historyUpdates.shift()(values[4]);},get fleet(){return values[0];},get error(){return values[1];},get loading(){return values[2];},get now(){return values[3];},get cameraHistory(){return values[4];},get lastAttemptAt(){return refs[2].current;},unmount(){cleanups.forEach(fn=>fn?.());}};
  }
