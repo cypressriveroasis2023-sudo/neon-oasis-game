@@ -142,7 +142,16 @@ jobs:
       - name: Confirm existing technician workflows are unchanged
         run: |
           node tests/verify-techcheck-auth-preservation.mjs
-          git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
+          git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js
+          # One explicitly reviewed main migration is present beyond the older
+          # Tech Check baseline. Require EXACTLY that one migration difference.
+          reviewed_migration='tech-checks/supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql'
+          test "$(git diff --name-only f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../supabase/migrations)" = "$reviewed_migration"
+          # Compare both committed object and on-disk bytes to the reviewed blob;
+          # any new/modified migration or content drift still fails CI closed.
+          reviewed_blob='be212be3ca031febc644d6d2a23816b9e7a12d91'
+          test "$(git rev-parse HEAD:$reviewed_migration)" = "$reviewed_blob"
+          test "$(git hash-object ../supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql)" = "$reviewed_blob"
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Verify real PostgreSQL intake concurrency

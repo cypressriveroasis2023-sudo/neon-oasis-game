@@ -8,6 +8,7 @@ import ts from 'typescript';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {originalFleetViewMarkup} from './approved-fleet-view-source.mjs';
+import {previousReviewedMainSource} from './approved-current-main-source.mjs';
 
 const source=readFileSync(new URL('../src/ApprovedFleetViews.tsx',import.meta.url),'utf8');
 const require=createRequire(import.meta.url),exports={};
@@ -35,7 +36,7 @@ test('the currently selected secondary view is visible in the collapsed summary'
  const html=render(true,4);assert.match(html,/<summary aria-label="More fleet tools" aria-current="page">/);assert.match(html,/<small>Data sources<\/small>/);
 });
 test('the reviewed Fleet baseline is preserved by the explicit runtime and wrapper reversals',()=>{
- const old=originalFleetViewMarkup(readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'));
+ const old=originalFleetViewMarkup(previousReviewedMainSource('FleetDashboard.tsx',readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8')));
  assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'8d711a97853b5f646d892f5552a792656623a9f8');
 });
 test('wrapper contains no data source, clock, link rewriting or new routing',()=>{
