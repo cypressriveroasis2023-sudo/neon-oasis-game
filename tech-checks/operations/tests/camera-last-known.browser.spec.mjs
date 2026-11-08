@@ -48,7 +48,9 @@ test('failed refresh retains the completed reading; a completed stale read expos
  const {app,card,state,originalTime}=await mount(page);
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(card.locator('.camera-last-known')).toHaveCount(0);
  state.failed=true;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
- await expect(app.locator('.cos-fleet-message').filter({hasText:'Synthetic saved camera read unavailable'})).toBeVisible();
+ const warning=app.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved camera read unavailable'});
+ await expect(warning).toBeVisible();await warning.locator(':scope > summary').click();
+ await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
  await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
  // A failed refresh cannot erase or redate the last completed reading (PR #357).
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
@@ -57,7 +59,10 @@ test('failed refresh retains the completed reading; a completed stale read expos
  const callsBeforeAging=state.calls.length;
  await page.clock.runFor(21*60000);
  expect(state.calls.length).toBe(callsBeforeAging);
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');
+ // The saved observation is retained, but after twenty minutes its old green
+ // headline must no longer be presented as a current total.
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('—');
+ await expect(app.locator('.cos-fleet-camera-total')).toContainText('stale online/offline totals are hidden');
  // Only a successful new saved read advances the classification clock. The
  // provider's unchanged observation is now stale, so it must not become green.
  state.failed=false;await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();

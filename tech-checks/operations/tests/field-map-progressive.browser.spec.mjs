@@ -77,14 +77,14 @@ test('initial field failure preserves the basemap and retry fills the same canva
  const {frame,state}=await mount(page);const canvas=frame.locator('.cos-fleet-map-canvas');
  await expect(canvas).toHaveClass(/leaflet-container/);await canvas.evaluate(node=>node.dataset.persistentMap='yes');
  state.fail=true;state.release();
- await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');
+ await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic field read unavailable'})).toContainText('Synthetic field read unavailable');
  await expect(canvas).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-stats strong')).toHaveText(['—','—','—','—','—','—','—']);
  state.fail=false;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  state.fail=true;await frame.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
- await expect(frame.getByRole('alert')).toContainText('Synthetic field read unavailable');
+ await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic field read unavailable'})).toContainText('Synthetic field read unavailable');
  await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  expect(state.errors).toEqual([]);
 });

@@ -343,7 +343,9 @@ jobs:
             tech-checks/operations/test-results
             tech-checks/operations/playwright-report
           if-no-files-found: ignore
-      - run: npm run test:browser
+      - name: Verify the complete browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser
       - name: Browser test artifacts
         if: always()
         uses: actions/upload-artifact@v4

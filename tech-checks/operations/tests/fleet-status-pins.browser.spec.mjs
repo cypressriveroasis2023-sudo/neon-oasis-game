@@ -9,7 +9,15 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  await expect(app.locator('.cos-fleet-map-canvas')).not.toHaveClass(/leaflet-zoom-anim/);
  await app.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await app.locator('.leaflet-control-zoom-in').click(); // Separate nearby sites before checking individual artwork.
+ await expect(app.locator('.cos-fleet-map-canvas')).not.toHaveClass(/leaflet-zoom-anim/);
  const marker=id=>app.locator(`.cos-mhelp-address-marker[data-mhelp-product-ids='["${id}"]']`);
+ // Use the visible map control rather than timing-dependent drag inertia.
+ const openPin=async id=>{
+  await app.getByRole('button',{name:'Fit pins',exact:true}).click();
+  const canvas=app.locator('.cos-fleet-map-canvas');await expect(canvas).not.toHaveClass(/leaflet-zoom-anim/);await canvas.scrollIntoViewIfNeeded();
+  await expect.poll(async()=>{const box=await canvas.boundingBox(),pin=await marker(id).boundingBox();return Boolean(box&&pin&&pin.x+pin.width/2>box.x&&pin.x+pin.width/2<box.x+box.width&&pin.y+pin.height/2>box.y&&pin.y+pin.height/2<box.y+box.height);}).toBe(true);
+  await marker(id).click();
+ };
  for(const [id,status,color] of [['1001','online','rgb(43, 255, 53)'],['1002','offline','rgb(255, 39, 52)'],['1003','unknown','rgb(148, 163, 184)'],['1004','support','rgb(21, 168, 255)'],['1005','unknown','rgb(148, 163, 184)'],['1006','unknown','rgb(148, 163, 184)'],['1007','unknown','rgb(148, 163, 184)']]){
   await expect(marker(id)).toHaveAttribute('data-health',status);
   await expect(marker(id).locator('.cos-unit-pin-drop circle')).toHaveCSS('fill',color);
@@ -18,10 +26,7 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  await expect(marker('1001').locator('.cos-unit-pin-drop')).toHaveCSS('width','28px');
  await expect(marker('1001').locator('.cos-unit-pin-drop circle')).toHaveAttribute('r','13');
  await expect(app.locator('.cos-dashboard-marker .cos-status-pin-art circle')).toHaveCount(0); // Unique Product-ID address replaces its duplicate map reference.
- const canvas=await app.locator('.cos-fleet-map-canvas').boundingBox(),pin=await marker('1001').boundingBox();
- const from={x:canvas.x+canvas.width*.7,y:canvas.y+canvas.height*.5};
- await page.mouse.move(from.x,from.y);await page.mouse.down();await page.mouse.move(from.x+canvas.x+canvas.width/2-pin.x-pin.width/2,from.y+canvas.y+canvas.height/2-pin.y-pin.height/2,{steps:10});await page.mouse.up();
- await marker('1001').click();
+ await openPin('1001');
  await expect(app.getByRole('dialog')).toBeVisible();
  await page.keyboard.press('Escape');
  await app.locator('.cos-fleet-map-panel').screenshot({path:testInfo.outputPath('status-pins.png')});
@@ -30,7 +35,7 @@ for(const it of [false,true])test(`Fleet status pin colors, mixed selection and 
  if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:/Refresh data/}).click();
  await expect(marker('1001')).toHaveAttribute('data-health','online');await expect(marker('1002')).toHaveAttribute('data-health','offline');
  await expect(app.locator('.cos-status-group-ring,.cos-map-group')).toHaveCount(0);
- for(const id of ['1001','1002']){await marker(id).click();await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
+ for(const id of ['1001','1002']){await openPin(id);await expect(app.getByRole('dialog')).toContainText('Product '+id);await page.keyboard.press('Escape');}
  // Fail both independent saved-read sources. A successfully returned old TCP
  // observation should become Unverified; it is not a failed-read retention case.
  state.fail=true;state.productConnections=null;

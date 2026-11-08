@@ -57,7 +57,7 @@ test('map-only fullscreen restores the dashboard and outer host on button, Escap
  expect(state.errors).toEqual([]);
 });
 test('a failed field read retains a basemap and fullscreen always has an exit',async({page})=>{
- const {frame}=await mount(page,{fail:true});await expect(frame.getByRole('alert').first()).toBeVisible();
+ const {frame}=await mount(page,{fail:true});const warning=frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic load failed'});await expect(warning.locator('summary')).toBeVisible();await warning.locator('summary').click();await expect(warning.getByText('Synthetic load failed',{exact:true})).toBeVisible();
  await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true})).toBeVisible();
  await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-fleet-map-expanded')).toHaveCount(0);
 });
