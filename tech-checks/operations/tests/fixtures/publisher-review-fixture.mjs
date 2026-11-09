@@ -6,8 +6,8 @@ const cell=s=>({entered:{stringValue:s},validation:null,rich:false});
 const baseline=['Spotter 023.1','FIELD','Synthetic Builder','Synthetic Job'].map(cell);
 const observation={equipmentId:'123',state:'confirmed',customerId:'4',serviceLocationId:null,placement:'SHOP',customerLabel:'Cameras Onsite LLC',siteLabel:'SHOP'};
 const intended=['Spotter 023.1','SHOP','Cameras Onsite LLC','SHOP'].map(cell);
-export async function fixture(){
- const db=new PGlite();await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
+export async function fixture(database){
+ const db=database??new PGlite();if(!database)await db.exec('create role anon;create role authenticated;create role service_role;');await db.exec(schema);
  for(const file of ['20261012173408_cos_mhelp_placement_sync.sql','20261012184453_cos_sheets_placement_publisher.sql'])await db.exec(await readFile(new URL('../../db/'+file,import.meta.url),'utf8'));
  await db.query(`insert into app_private.vision_tracker_locations values($1,$2,'Spotter 023.1','spotter0231','SPOTTERS','FIELD','Synthetic Builder','Synthetic Job','Historical address',30,-95)`,[tracker,ORG]);
  await db.query(`insert into app_private.cos_geocode_sources values($1,'tracker',$1,'123','mhelpdesk_product_import',$2,'Spotter 023.1','Spotter 023.1',true)`,[tracker,revision]);
