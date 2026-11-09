@@ -42,7 +42,7 @@ export function createPublisherHandler(options:{authenticate:(req:Request)=>Prom
    for(const r of plan.results)if(r.state==='held'&&r.reason==='source_unverified'&&refresh.has(r.equipmentId))r.reason='source_refresh_requested';
    phase='finish';const done=await options.rpc('cos_sheets_placement_finish',{p_lease_id:lease,p_results:plan.results});
    if(done?.committed!==true)throw Error('Lost publisher lease');
-   return reply({state:'current',...done});
+   return reply({state:'current',...done,heldReasons:plan.results.reduce((counts:Row,r:Row)=>{if(r.state==='held')counts[r.reason]=(counts[r.reason]||0)+1;return counts;},Object.create(null))});
   }catch(cause){
    if(lease)try{await options.rpc('cos_sheets_placement_fail',{p_lease_id:lease});}catch{}
    const known=['Wrong tracker workbook','Tracker layout changed','Incomplete tracker read','Tracker changed during read','Unexpected tracker range','Unexpected tracker cells','Malformed tracker cell','Tracker headers changed','Invalid publisher bindings'];

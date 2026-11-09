@@ -25,7 +25,7 @@ export function compareInventoryEquipment(review:unknown,baseline:unknown){
   samples:review.items.slice(0,4).map((r:Row)=>({productId:r.equipmentId,name:r.name,model:typeof r.model==='string'?r.model.slice(0,180):null,equipmentTypeId:r.equipmentTypeId,customerId:r.customerId,serviceLocationId:r.serviceLocationId})),
   inventoryWrites:0};
 }
-export function createInventoryComparisonHandler(options:{authenticate:(req:Request)=>Promise<boolean>;readEquipment:()=>Promise<any>;readBaseline:()=>Promise<any>;readSource?:(review:Row,baseline:Row)=>Promise<any>;writeSource?:(action:'stage'|'run',source:Row,baseline:Row)=>Promise<any>;status?:()=>Promise<any>;acquireRead?:()=>Promise<Row>;releaseRead?:(lease:string)=>Promise<unknown>;recordFailure?:(code:'inventory_source_unavailable'|'source_rate_limited')=>Promise<unknown>}){
+export function createInventoryComparisonHandler(options:{authenticate:(req:Request)=>Promise<boolean>;readEquipment:()=>Promise<any>;readBaseline:()=>Promise<any>;readSource?:(review:Row,baseline:Row)=>Promise<any>;writeSource?:(action:'stage'|'run',source:Row,baseline:Row)=>Promise<any>;publishAfterCommit?:(req:Request,receipt:Row)=>Promise<Row>;status?:()=>Promise<any>;acquireRead?:()=>Promise<Row>;releaseRead?:(lease:string)=>Promise<unknown>;recordFailure?:(code:'inventory_source_unavailable'|'source_rate_limited')=>Promise<unknown>}){
  return async(req:Request)=>{
   const reply=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   if(req.method!=='POST'||new URL(req.url).search||req.headers.has('origin'))return reply({error:'Scheduled request required'},405);
@@ -45,7 +45,19 @@ export function createInventoryComparisonHandler(options:{authenticate:(req:Requ
    failureStage='comparison';const comparison=compareInventoryEquipment(review,baseline);if(action==='compare')return reply(comparison);
    failureStage='resources';if(!options.readSource)throw Error();const source=await options.readSource(review,baseline);const old=new Map<string,Row>(baseline.records.map((r:Row)=>[r.productId,r]));
    const addresses=source.records.filter((r:Row)=>['street','city','state','zip'].some(k=>r.sourceAddress[k]!==old.get(r.productId)?.sourceAddress?.[k]));
-   if(action==='stage'||action==='run'){failureStage='write';if(!options.writeSource)throw Error();return reply(await options.writeSource(action,source,baseline));}
+   if(action==='stage'||action==='run'){
+    failureStage='write';if(!options.writeSource)throw Error();
+    const receipt=await options.writeSource(action,source,baseline);
+    // Publish only after the complete mHelp source has been committed and
+    // activated. A publisher failure must not undo or misreport that import.
+    if(action==='run'&&object(receipt)&&receipt.state==='current'&&receipt.sourceActivated===true&&options.publishAfterCommit){
+     let trackerPublish:Row;
+     try{trackerPublish=await options.publishAfterCommit(req,receipt);}
+     catch{trackerPublish={state:'failed'};}
+     return reply({...receipt,trackerPublish});
+    }
+    return reply(receipt);
+   }
    return reply({...comparison,sourcePreview:{readAt:source.readAt,complete:source.complete,summary:source.summary,sourceReads:source.sourceReads,addressDifferences:addresses.length,addressDifferenceProductIds:addresses.map((r:Row)=>r.productId)}});
   }catch(cause){const limited=(cause as Row)?.status===429||cause instanceof Error&&/^source_http_429_/.test(cause.message);if(action==='run'&&options.recordFailure)await options.recordFailure(limited?'source_rate_limited':'inventory_source_unavailable').catch(()=>{});const allowed=['Equipment customer unavailable','Customer identity unavailable','Equipment service identity unavailable','Service membership unavailable','Service portal unavailable','Equipment category needs review','Equipment changed during source read','Shop identities unavailable','Unsafe source field','Incomplete equipment categories','Invalid equipment category','Incomplete service inventory','Incomplete service page','Duplicate service identity','Unsupported inventory cache path','Invalid inventory cache response','Invalid cached customer identity','Invalid cached categories','Incomplete cached service page','Invalid cached service membership','Inventory cache unavailable','Invalid resource observation','Inventory cache save is unconfirmed','Resource observation unavailable'];return reply({error:'Complete mHelpDesk inventory comparison unavailable',inventoryWrites:0,failureStage,...(cause instanceof MhelpPartnerReadDeadlineError?{reason:'equipment_pass_deadline_exceeded'}:{}),...(cause instanceof InventoryCacheMembershipError?{cacheMembership:cause.diagnostic}:{}),...(cause instanceof Error&&(allowed.includes(cause.message)||/^source_http_[1-5][0-9]{2}_(customers|service_locations|equipment_categories)$/.test(cause.message))?{reason:cause.message}:{})},503);}
   finally{if(readLease&&options.releaseRead)await options.releaseRead(readLease).catch(()=>{});}
