@@ -30,7 +30,7 @@ test('manual refresh keeps the complete restored dashboard when newer reads fail
  const {app,state}=await setup(page);await page.reload();state.fail=true;state.productConnections=null;
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
  await board.getByRole('button',{name:/Refresh data/}).click();
- await expect(board.getByRole('alert').filter({hasText:'Last completed results remain displayed'})).toBeVisible();
+ await expect(board.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'})).toBeVisible();
  await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
  await expect(board.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();await expect(board.locator('.cos-fleet-map-panel')).toBeVisible();
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
@@ -44,7 +44,7 @@ test('counts-only old release cache cannot hide the dashboard during migration',
  expect(reads(state).length).toBeGreaterThan(0);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 test('provider outage still restores full connection-based cards without another open-time read',async({page})=>{
- const {app,state}=await setup(page,{failHealth:true});state.calls.length=0;await page.reload();
+ const {app,state}=await setup(page);state.fail=true;state.calls.length=0;await page.reload();
  await expect(app.getByText(/Last completed reading/)).toBeVisible();await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
  await expect(app.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();expect(reads(state)).toHaveLength(0);expect(state.errors).toEqual([]);
 });
@@ -58,7 +58,7 @@ test('timer reads saved results at cadence, never probes; successful newer resul
  Object.assign(state.productConnections.items.find(i=>i.productId==='1001'),{status:'offline',reason:'Completed newer saved test.'});
  for(let tick=0;tick<61&&reads(state).length===0;tick++)await page.clock.runFor(1000);
  await page.clock.resume();
- await expect(app.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('1');
+ await expect(app.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('1');
  expect(reads(state).length).toBeGreaterThan(0);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 test('session invalidation removes full cached details and prevents restoring them',async({page})=>{
@@ -132,7 +132,7 @@ test('IT saved data updates after ten minutes and keeps new observation times',a
  for(const item of state.productConnections.items)if(item.checkedAt)item.checkedAt=stamp;
  Object.assign(state.productConnections.items.find(item=>item.productId==='1001'),{status:'offline',reason:'Completed newer synthetic TCP observation.'});
  await page.clock.runFor(60000);await page.clock.resume();
- await expect(app.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('1');
+ await expect(app.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('1');
  await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('0');
  await expect.poll(async()=> (await savedPresentation(app)).checkedAt).toBeGreaterThan(saved.checkedAt);
  expect((await savedPresentation(app)).connections.items.find(item=>item.productId==='1001').checkedAt).toBe(stamp);
@@ -150,7 +150,7 @@ test('IT failed scheduled refresh retains completed counts and observation times
  await page.clock.pauseAt(new Date(current+1000));await page.clock.setSystemTime(new Date(current+10*60000));
  for(let tick=0;tick<61&&reads(state).length===0;tick++)await page.clock.runFor(1000);
  await page.clock.resume();
- await expect(app.getByRole('alert').filter({hasText:'Last completed results remain displayed'})).toBeVisible();
+ await expect(app.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'})).toBeVisible();
  await expect(app.locator('.cos-equipment-totals strong,.cos-equipment-totals b')).toHaveText(counts);
  expect(await savedPresentation(app)).toEqual(original);
  await expect(manualRefreshButtons(app)).toHaveCount(0);assertSavedReadsOnly(state);
@@ -198,7 +198,7 @@ test('a different verified IT actor cannot restore another actor completed dashb
  state.sessionActorId='00000000-0000-4000-8000-000000000011';state.fail=true;state.productConnections=null;state.calls.length=0;
  await page.reload();
  await expect.poll(()=>state.calls.some(call=>call.path==='/api/camera-health/summary-v3')).toBe(true);
- await expect(app.getByRole('alert').filter({hasText:'Synthetic saved camera read unavailable'})).toBeVisible();
+ await expect(app.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved camera read unavailable'})).toBeVisible();
  await expect(app.getByText(/Last completed reading/)).toHaveCount(0);
  await expect(app.locator('.cos-equipment-total-helios .cos-total-status-online b')).not.toHaveText('1');
  assertSavedReadsOnly(state);
@@ -211,7 +211,7 @@ test('a presentation-only saved Shop projection error cannot blank the Fleet',as
  const {app,state}=await mountFleet(page,false,{field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
  await expect(board).toBeVisible();
- await expect(board.getByText('Saved Fleet details recovered in safe mode',{exact:true})).toBeVisible();
+ await expect(board.getByText('Some saved details are in safe mode',{exact:true})).toBeVisible();
  await expect(app.getByText(/Fleet details could not display|Fleet couldn’t display/)).toHaveCount(0);
  await expect(board.getByRole('region',{name:'Equipment family totals'})).toBeVisible();
  await expect(board.getByPlaceholder('Find a unit, customer or address…')).toBeVisible();

@@ -3,17 +3,16 @@ import {PGlite} from '@electric-sql/pglite';import {readFileSync} from 'node:fs'
 import {completedBoard} from '../durable-board/project.ts';
 import {savedFleetBoard} from '../durable-board/runtime.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
-test('the server uses the existing exact Product-ID classifier and rejects partial replacement',()=>{
+test('the server publishes current Unknown instead of retaining stale red or green',()=>{
  const f=fieldProductFixture(),map={...f.field};const first=completedBoard(f.health,map,f.connections,null,f.now);
  assert.equal(first.counts.online,1);assert.equal(first.counts.offline,1);
  const missing=structuredClone(f.connections);missing.items.find(p=>p.productId==='1001').status='unknown';missing.items.find(p=>p.productId==='1001').checkedAt=null;missing.items.find(p=>p.productId==='1001').resourceId=null;
- // Remove the independent provider response too: neither source is definitive.
- const health=structuredClone(f.health);health.rows[0].evidence.observedAt='2026-01-01T00:00:00Z';
- assert.throws(()=>completedBoard(health,map,missing,first,f.now),/checks_incomplete/);
- const databaseOrder=JSON.parse(JSON.stringify(first,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).reverse().map(k=>[k,v[k]])):v));
- assert.throws(()=>completedBoard(health,map,missing,databaseOrder,f.now),/checks_incomplete/);
- const negative=structuredClone(f.connections);negative.items.find(p=>p.productId==='1001').status='offline';
- assert.equal(completedBoard(f.health,map,negative,first,f.now).counts.offline,2);
+ const staleHealth=structuredClone(f.health);staleHealth.rows[0].evidence.observedAt='2026-01-01T00:00:00Z';
+ const next=completedBoard(staleHealth,map,missing,first,f.now);
+ assert.equal(next.counts.online,0);assert.ok(next.counts.unverified>=1);
+ const conflict=structuredClone(f.connections);Object.assign(conflict.items.find(p=>p.productId==='1001'),{status:'offline',checkedAt:f.fresh,resourceId:'1'});
+ const conflictBoard=completedBoard(f.health,map,conflict,first,f.now);
+ assert.equal(conflictBoard.units.find(p=>p.productId==='1001').status,'unverified');
  assert.throws(()=>completedBoard(f.health,map,{...f.connections,sourceSha256:'b'.repeat(64)},first,f.now),/connection_source_incomplete/);
 });
 test('refresh returns the stored board while a bounded background batch runs; failure does not publish',async()=>{

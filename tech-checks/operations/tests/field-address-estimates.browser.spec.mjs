@@ -59,17 +59,17 @@ test('failed imported lookup refresh retains labeled last-good estimates and rec
  await frame.getByRole('button',{name:/Refresh data/}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);
  await frame.locator('.cos-fleet-unit-row').filter({hasText:'Sniper 901'}).click();await revealInstallationEvidence(frame);await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('Geocodio');
  const before=state.reads;state.mapFailure=true;await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Last completed results remain displayed with their original check times.');await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Imported address lookup results are unavailable');
+ await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Imported address lookup results are unavailable'})).toContainText('Saved equipment remains visible.');await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Imported address lookup results are unavailable'})).toContainText('Imported address lookup results are unavailable');
  await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(4);
  await page.clock.runFor(1000);expect(state.reads).toBe(before+1);
  state.mapFailure=false;state.units[0].locationImportedGeocode={...state.units[0].locationImportedGeocode,latitude:30.2,longitude:-95.2};
- await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-message[role="alert"]').filter({hasText:'Imported address lookup results are unavailable'})).toHaveCount(0);await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30.2, -95.2');
+ await frame.getByRole('button',{name:/Refresh data/}).click();await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Imported address lookup results are unavailable'}).filter({hasText:'Imported address lookup results are unavailable'})).toHaveCount(0);await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30.2, -95.2');
  state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001'};await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);expect(state.writes).toHaveLength(0);
 });
 test('initial imported lookup failure is visibly unavailable and explicit retry restores eligible points',async({page})=>{
  const {frame,state}=await mount(page);await expect.poll(()=>estimatedCount(frame)).toBe(2);state.mapFailure=true;await page.reload();
- await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('saved equipment remains visible');await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('Imported address lookup results are unavailable');
+ await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Imported address lookup results are unavailable'})).toContainText('Saved equipment remains visible');await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Imported address lookup results are unavailable'})).toContainText('Imported address lookup results are unavailable');
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
  const before=state.reads;await page.clock.runFor(1000);expect(state.reads).toBe(before);
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);expect(state.writes).toHaveLength(0);

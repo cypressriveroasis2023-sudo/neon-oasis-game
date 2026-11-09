@@ -305,18 +305,18 @@ test('an unavailable Camera Health read never proves units healthy or changes pl
   const readCount=()=>state.calls.filter(call=>call.path===sourcePaths.cameras).length;
   const scheduledRead=async()=>{
     const before=readCount(),current=await frame.locator('body').evaluate(()=>Date.now());
-    await page.clock.pauseAt(new Date(current+1000));
+    await page.clock.pauseAt(new Date(current+60000));
     await page.clock.setSystemTime(new Date(current+10*60000));
     for(let tick=0;tick<61&&readCount()===before;tick++)await page.clock.runFor(1000);
     await page.clock.resume();await expect.poll(readCount).toBe(before+1);
   };
   state.fail[sourcePaths.cameras]=true;
   await scheduledRead();
-  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('source');
+  await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic source unavailable'})).toContainText('source');
   await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();
   delete state.fail[sourcePaths.cameras];
   await scheduledRead();
-  await expect(frame.locator('.cos-fleet-message[role="alert"]').filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);
+  await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic source unavailable'}).filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();
   await assertReadBoundary(page,state);
 });

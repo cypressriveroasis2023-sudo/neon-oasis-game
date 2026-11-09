@@ -67,7 +67,7 @@ test('reported 284-product census remains 74 online, 2 offline, 125 unknown and 
  assert.equal(tv.board.total,1001);assert.equal(tv.board.shop,717);
 });
 
-test('TV outage population honors current Product-ID TCP proof even when native provider status disagrees',()=>{
+test('TV excludes conflicting or unlinked TCP proof and accepts matching reviewed outages',()=>{
  const f=fieldProductFixture();
  const tracker={contract:VERIFIED_TRACKER_IP_CONTRACT,workbookId:TRACKER_IP_WORKBOOK,
   expectedMhelpSourceSha256:f.upload.sourceSha256,verifiedAt:f.fresh,
@@ -75,31 +75,37 @@ test('TV outage population honors current Product-ID TCP proof even when native 
     publicIp:p.productId==='1001'?'8.8.8.8':p.productId==='1005'?'9.9.9.9':null}))};
  const endpoint=(deviceId,ip)=>({deviceId,publicIp:ip,expectedPorts:[80],monitoringEnabled:true,connectionRevision:3,
   portStatus:{80:{online:false,attempted:true},_connection:{ip,revision:3,status:'offline',reachable:false,checkedAt:f.fresh,consecutiveFailures:1,confirmedOutage:false}}});
- const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(55,'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now,new Map([['1001',['55']]]));
- assert.ok(receipt);
- const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
- // Product 1001 has BOTH a direct Product-ID TCP proof (offline) and a
- // disagreeing provider status (online). The direct proof wins: that is the
- // safeguard this test exists to protect and it is unchanged.
- // Product 1002 has a provider Offline observation and no valid Product-ID TCP
- // check at all. The Oct 26-27 change made that case report UNKNOWN, which
- // suppressed every provider-reported outage across the fleet. A provider
- // offline on a reviewed association is now surfaced as an outage, labelled
- // "Provider-reported, not direct-connection verified", rather than hidden.
+ for(const resourceId of ['1','55']){
+  const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(Number(resourceId),'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now,new Map([['1001',[resourceId]]]));
+  assert.ok(receipt);
+  const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
+  // Exact resource 1 conflicts with its reviewed provider. Resource 55 is not
+  // associated with this unit. Neither may fabricate a verified TCP outage.
+  assert.equal(tv.board.items.find(p=>p.productId==='1001').status,resourceId==='1'?'unverified':'online');
+  if(resourceId==='1')assert.match(tv.board.items.find(p=>p.productId==='1001').reason,/status disagree/i);
+  else {
+   assert.match(tv.board.items.find(p=>p.productId==='1001').reason,/^CAMERA RECORDS ONLINE\./);
+   assert.equal(tv.board.items.find(p=>p.productId==='1001').linked.evidence.basis,'camera');
+  }
+  assert.equal(tv.board.counts.offline,1);
+  assert.equal(tv.board.items.find(p=>p.productId==='1002').status,'offline');
+  assert.match(tv.board.items.find(p=>p.productId==='1002').reason,/^Provider-reported, not direct-connection verified\. /);
+  const outages=tvCensusOutages(tv.board,tv.rows.map(row=>({unit:row.unit,health:row.camera})));
+  assert.deepEqual(outages.map(v=>v.productId),['1002']);
+  assert.equal(outages[0].health.basis,'camera');
+  assert.equal(tv.board.items.find(p=>p.productId==='1005').status,'unverified');
+ }
+ // Agreement on the exact reviewed resource still produces a real TCP-based
+ // outage, while the independent provider-only outage keeps its own label.
+ const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(1,'8.8.8.8')],f.now,new Map([['1001',['1']]]));
+ const health=structuredClone(f.health);health.rows[0].evidence.status='offline';
+ const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,health,null,null,f.now);
  assert.equal(tv.board.counts.offline,2);
- assert.equal(tv.board.items.find(p=>p.productId==='1002').status,'offline');
- assert.match(tv.board.items.find(p=>p.productId==='1002').reason,/^Provider-reported, not direct-connection verified\. /);
- const physical=tv.rows.map(row=>({unit:row.unit,health:row.camera}));
- const outages=tvCensusOutages(tv.board,physical);
+ const outages=tvCensusOutages(tv.board,tv.rows.map(row=>({unit:row.unit,health:row.camera})));
  assert.deepEqual(outages.map(v=>v.productId),['1001','1002']);
- assert.equal(outages[0].health.state,'offline');
- assert.equal(outages[0].health.basis,'connection');
- // The provider-reported outage is labelled by basis so the wallboard never
- // presents it as a verified connection result.
+ assert.equal(outages[0].health.state,'offline');assert.equal(outages[0].health.basis,'connection');
  assert.equal(outages[1].health.basis,'camera');
- const sourceOnly=tv.board.items.filter(p=>p.status==='offline'&&!outages.some(o=>o.productId===p.productId));
- assert.deepEqual(sourceOnly,[]);
- assert.equal(tv.board.items.find(p=>p.productId==='1005').status,'unverified');
+ assert.deepEqual(tv.board.items.filter(p=>p.status==='offline'&&!outages.some(o=>o.productId===p.productId)),[]);
 });
  
 test('TV native rows fall back to labelled provider colors when the exact receipt is Unknown',()=>{

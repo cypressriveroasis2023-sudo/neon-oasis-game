@@ -1,3 +1,4 @@
+import {beforeFleetCountTrustSource} from './fleet-count-trust-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -8,6 +9,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
+import {previousReviewedMainSource} from './approved-current-main-source.mjs';
 
 const empty=()=>null;
 function component(name,mocks={}){
@@ -44,5 +46,5 @@ test('Data sources omit both manual refresh and fallback retry when no callback 
 });
 for(const name of ['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs','mhelp-live-inventory.browser.spec.mjs'])test('IT follow-up reverses exactly to protected source: '+name,()=>{
  const directory=name.endsWith('.browser.spec.mjs')?'./':'../src/';
- originalItSavedReadingSource(name,readFileSync(new URL(directory+name,import.meta.url),'utf8'));
+ originalItSavedReadingSource(name,previousReviewedMainSource(name,beforeFleetCountTrustSource(name,readFileSync(new URL(directory+name,import.meta.url),'utf8'))));
 });

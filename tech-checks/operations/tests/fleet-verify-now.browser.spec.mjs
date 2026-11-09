@@ -8,7 +8,7 @@ for(const it of [false,true])test(`Verify now confirms saved Helios status for $
  await page.route('**/functions/v1/cos-operations-pages',async route=>{
   if(route.request().method()==='OPTIONS')return route.fallback();const req=route.request().postDataJSON();if(req.path!=='/api/product-connections/verify')return route.fallback();
   posts.push(req);await gate;
-  const item=state.productConnections.items.find(i=>i.productId==='1001');Object.assign(item,{status:'online',checkedAt:fresh,resourceId:'10001',reason:'Fresh completed saved TCP/service-port response.'});
+  const item=state.productConnections.items.find(i=>i.productId==='1001');Object.assign(item,{status:'online',checkedAt:fresh,resourceId:'1',reason:'Fresh completed saved TCP/service-port response.'});
   await route.fulfill({headers:{'access-control-allow-origin':'http://127.0.0.1:4173'},json:{contract:'COS_VERIFY_PRODUCTS_NOW_V1',connections:state.productConnections,items:[{productId:'1001',status:'online',checkedAt:fresh,reason:item.reason}]}});
  });
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
@@ -27,11 +27,13 @@ for(const it of [false,true])test(`Verify now confirms saved Helios status for $
  await expect(board.locator('.cos-helios-count-equation')).toContainText('1 inventory = 1 Field + 0 Shop');
  await list.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('verify-now-saved-result.png'),fullPage:true});
  // A full reload destroys the manual overlay and every browser cache. The
- // normal saved GET must recover the verified result without another POST.
- // Keep provider health failing through the cold reload. TCP is independent.
+ // Without a saved authorized board, a cold reload cannot reuse the previous
+ // resource association when its identity source is unavailable. No false
+ // online/offline result or automatic verification request is allowed.
  const beforeReload=state.calls.length;await page.reload();
- await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
- await expect(board.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('1');
  expect(state.calls.slice(beforeReload).some(c=>c.path==='/api/product-connections')).toBe(true);
  expect(posts).toHaveLength(1);
  expect(state.errors).toEqual([]);
@@ -55,7 +57,7 @@ test('failed verification unlocks immediately and keeps prior counts without a f
  expect(state.calls.slice(before).filter(c=>['/api/field-map','/api/camera-health/summary-v3'].includes(c.path))).toHaveLength(0);
 });
 
-test('40 mixed units retain 26 Online and 14 Offline after a cold reload with failed provider health',async({page})=>{
+test('40 unlinked products stay Unverified after TCP results and a cold reload with failed provider health',async({page})=>{
  const f=fieldProductFixture(),families=['Spotter','Ranger','Helios','Sniper','CAM-V'];
  const template=f.roster.items.find(r=>r.kind==='source_equipment');
  const records=Array.from({length:40},(_,i)=>({productId:String(1001+i),recordId:'mhelp_product:'+String(1001+i),unitNumber:families[i%5]+' '+String(1+Math.floor(i/5)),category:families[i%5],placement:'FIELD',uploadLifecycle:'UNFLAGGED',binding:{state:'unlinked',unitIds:[],candidateUnitIds:[],placementHeld:false}}));
@@ -72,12 +74,15 @@ test('40 mixed units retain 26 Online and 14 Offline after a cold reload with fa
  });
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});await board.locator('.cos-equipment-total-cameras .cos-total-status-unverified').click();
  const list=board.getByRole('region',{name:'Camera units unverified Field units'});await list.getByRole('button',{name:'Verify all 40 now',exact:true}).click();
- await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-online b')).toHaveText('26');
- await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-offline b')).toHaveText('14');
+ // Counts remain unchanged for unlinked products, so they cannot signal batch completion.
+ await expect.poll(()=>posts).toBe(10);
+ await expect(list.getByRole('button',{name:'Verify all 40 now',exact:true})).toBeEnabled();
+ await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-online b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-offline b')).toHaveText('0');
  state.fail=true;await page.reload();
- await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-online b')).toHaveText('26');
- await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-offline b')).toHaveText('14');
- await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-unverified b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-online b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-offline b')).toHaveText('0');
+ await expect(board.locator('.cos-equipment-total-cameras .cos-total-status-unverified b')).toHaveText('40');
  expect(posts).toBe(10);expect(state.errors).toEqual([]);
 });
 
@@ -91,7 +96,7 @@ test('saved connection reads wait for the ten-minute cadence and never trigger p
  await expect(board.locator('.cos-equipment-total-helios .cos-total-status-online b')).toHaveText('1');
  expect(state.calls.filter(c=>c.path==='/api/product-connections')).toHaveLength(reads);
  await page.clock.fastForward(8*60*1000+60000);
- await expect(board.locator('.cos-equipment-total-helios .cos-total-status-offline b')).toHaveText('1');
+ await expect(board.locator('.cos-equipment-total-helios .cos-total-status-unverified b')).toHaveText('1');
  expect(state.calls.filter(c=>c.path==='/api/product-connections').length).toBeGreaterThan(reads);
  // Timer activity is a saved-data GET, not a browser-initiated camera probe.
  expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);

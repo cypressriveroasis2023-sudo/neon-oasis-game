@@ -156,3 +156,19 @@
 #root#root .cos-shop-action label{display:block;font-size:13px;margin:12px 0}
 #root#root .cos-shop-action input{display:block;box-sizing:border-box;min-height:44px;width:100%;margin-top:6px;background:#0b1624;color:#eef4fc;border:1px solid #526f8d;border-radius:8px;padding:10px;font-size:14px}
 #root#root .cos-shop-action [role=alert]{padding:10px;background:#321e2c;border-left:3px solid #ff5577}
+
+#root#root .cos-fleet-status-strip{margin:8px 0;border:1px solid #30485f;border-radius:9px;background:#121f2f;color:#c9d6e8}
+#root#root .cos-fleet-status-strip>summary{display:flex;align-items:center;gap:10px;min-height:42px;padding:9px 12px;cursor:pointer;font-size:12px}
+#root#root .cos-fleet-status-strip>summary strong{color:#f2f6fb}
+#root#root .cos-fleet-status-strip>summary span{color:#aebed0}
+#root#root .cos-fleet-status-strip>summary b{margin-left:auto;color:#f3c35a;font-size:11px}
+#root#root .cos-fleet-status-strip>p,#root#root .cos-fleet-status-detail{padding:0 12px 10px;font-size:11px;line-height:1.5;color:#aebed0}
+#root#root .cos-fleet-status-detail>details{margin-top:8px}
+#root#root .cos-fleet-vision-toggle{margin:10px 0 14px;border:1px solid #30485f;border-radius:9px;background:#0f1d2e}
+#root#root .cos-fleet-vision-toggle>summary{min-height:44px;padding:12px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#d7e7ff}
+#root#root .cos-fleet-vision-toggle[open]>summary{border-bottom:1px solid #30485f}
+#root#root .cos-fleet-vision-toggle .cos-vision-brief{margin:0;border:0;border-radius:0}
+@media(max-width:750px){
+ #root#root .cos-fleet-status-strip>summary{flex-wrap:wrap;gap:4px 8px}
+ #root#root .cos-fleet-status-strip>summary b{margin-left:0;flex-basis:100%}
+}

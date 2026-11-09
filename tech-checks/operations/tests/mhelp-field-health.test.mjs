@@ -58,3 +58,21 @@ test('obsolete IP-only contract and failed source keep inventory and support, an
  assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
  }
 });
+
+test('direct TCP cannot override a different verified provider state',()=>{
+ const f=fieldProductFixture(),receipt=structuredClone(f.connections);
+ Object.assign(receipt.items.find(p=>p.productId==='1001'),{status:'offline',checkedAt:f.fresh,resourceId:'1',reason:'Completed direct check had no response.'});
+ Object.assign(receipt.items.find(p=>p.productId==='1002'),{status:'online',checkedAt:f.fresh,resourceId:'2',reason:'Completed direct check responded.'});
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.equal(view.items.find(p=>p.productId==='1001').state,'unverified');
+ assert.equal(view.items.find(p=>p.productId==='1002').state,'unverified');
+ assert.match(view.items.find(p=>p.productId==='1001').reason,/status disagree/i);
+});
+test('matching exact resource and provider evidence remains definitive',()=>{
+ const f=fieldProductFixture(),receipt=structuredClone(f.connections);
+ Object.assign(receipt.items.find(p=>p.productId==='1001'),{status:'online',checkedAt:f.fresh,resourceId:'1'});
+ Object.assign(receipt.items.find(p=>p.productId==='1002'),{status:'offline',checkedAt:f.fresh,resourceId:'2'});
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ assert.equal(view.items.find(p=>p.productId==='1001').state,'online');
+ assert.equal(view.items.find(p=>p.productId==='1002').state,'offline');
+});

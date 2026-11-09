@@ -32,12 +32,16 @@ test('reopening restores server counts, retains failures, replaces one completed
  expect(state.calls.slice(before).filter(c=>['/api/field-map','/api/camera-health/summary-v3','/api/product-connections'].includes(c.path))).toHaveLength(0);
  value={...value,refresh:{state:'failed',error:'source_read_failed'}};
  await board.getByRole('button',{name:/Refresh data/}).click();await expect(board.getByRole('region',{name:'Saved fleet updates'})).toContainText('Update incomplete');await expect(online).toHaveText('1');
- const stamp=new Date(f.now+25*60000).toISOString();const map=structuredClone(f.field),receipt=structuredClone(f.connections);map.uploadInventory.receivedAt=stamp;map.generatedAt=stamp;receipt.trackerVerifiedAt=stamp;
+ // The replacement is a later real observation, not a future-dated board.
+ await page.clock.fastForward(14*60000);
+ const completedAt=await app.locator('body').evaluate(()=>Date.now());
+ const stamp=new Date(completedAt).toISOString();const map=structuredClone(f.field),receipt=structuredClone(f.connections);map.uploadInventory.receivedAt=stamp;map.generatedAt=stamp;receipt.trackerVerifiedAt=stamp;
  for(const p of receipt.items)if(p.checkedAt)p.checkedAt=stamp;
  receipt.items.find(p=>p.productId==='1001').status='offline';
- const next=completedBoard(f.health,map,receipt,first,f.now+25*60000);value={...value,latest:{id:'completed-2',payload:next},refresh:{state:'completed'}};
+ const next=completedBoard(f.health,map,receipt,first,completedAt);value={...value,latest:{id:'completed-2',payload:next},refresh:{state:'completed'}};
  await expect(board.getByRole('button',{name:/Refresh data/})).toBeEnabled();await board.getByRole('button',{name:/Refresh data/}).click();await expect(offline).toHaveText('1');await expect(online).toHaveText('0');
  await page.reload();await expect(offline).toHaveText('1');await expect(online).toHaveText('0');
+ await board.getByRole('region',{name:'Saved fleet updates'}).locator(':scope > summary').click();
  await board.getByText('Update history',{exact:true}).click();await board.getByRole('button',{name:'View units',exact:true}).click();await expect(board.getByRole('region',{name:'Saved unit statuses'})).toContainText('Helios 1');
  await app.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));await expect(board.getByRole('region',{name:'Saved fleet updates'})).toHaveCount(0);
  expect(calls.some(c=>c.method==='POST')).toBe(true);expect(state.errors).toEqual([]);

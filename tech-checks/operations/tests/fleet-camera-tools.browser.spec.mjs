@@ -34,9 +34,9 @@ test('a failed health refresh keeps equipment, completed totals and the original
  await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');await expect(refresh).toBeEnabled();
  await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
  const originalReading=await savedLabel.innerText();await page.clock.setFixedTime(new Date(now+2*60000));state.fail=true;await refresh.click();
- const warning=app.getByRole('alert').filter({hasText:'A supporting source could not be refreshed'});await expect(warning).toBeVisible();
- await expect(warning.getByText('Last completed results remain displayed with their original check times. The next successful update will replace them.',{exact:true})).toBeVisible();
- await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
+ const warning=app.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved camera read unavailable'});await expect(warning.locator('summary')).toBeVisible();await warning.locator('summary').click();
+ await expect(warning.getByText('Saved equipment remains visible. The next successful update replaces it.',{exact:true})).toBeVisible();
+ await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
  await expect(savedLabel).toHaveText(originalReading);await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('1');await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('3');
 });
 test('pending checks disable repeat taps and closing the card discards a late result',async({page})=>{

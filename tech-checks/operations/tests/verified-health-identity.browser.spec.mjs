@@ -186,9 +186,9 @@ test('summary failure retains the dated completed identity reading with an expli
  const savedLabel=frame.locator('.cos-fleet-heading > div:last-child > small');await expect(savedLabel).toBeVisible();await expect(savedLabel).toContainText('Saved health ');const label=await savedLabel.innerText();
  await page.clock.runFor(60000);state.summaryError=503;
  await frame.getByRole('button',{name:/Refresh data/}).click();
- const warning=frame.getByRole('alert').filter({hasText:'Last completed results remain displayed with their original check times.'});
- await expect(warning).toBeVisible();await expect(warning.getByText('Last completed results remain displayed with their original check times. The next successful update will replace them.',{exact:true})).toBeVisible();
- await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved summary unavailable',{exact:true})).toBeVisible();
+ const warning=frame.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved summary unavailable'});
+ await expect(warning.locator('summary')).toBeVisible();await warning.locator('summary').click();
+ await expect(warning.getByText('Saved equipment remains visible. The next successful update replaces it.',{exact:true})).toBeVisible();await expect(warning.getByText('Synthetic saved summary unavailable',{exact:true})).toBeVisible();
  await expect(savedLabel).toHaveText(label);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(counts);
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
  expect(await savedIdentityTimes(frame)).toEqual(before);expect(state.rows.map(row=>row.evidence.observedAt)).toEqual(ownerIds.map(()=>fresh));
