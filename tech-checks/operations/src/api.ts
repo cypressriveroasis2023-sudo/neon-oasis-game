@@ -278,7 +278,14 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
         &&fieldIds.length>0&&new Set(fieldIds).size===fieldIds.length
         &&fieldIds.every((id:unknown)=>typeof id==='string'&&/^[1-9][0-9]{0,14}$/.test(id));
       if(!sourceReady)return map;
-      proofCompletion=productConnections(upload.sourceSha256,fieldIds);
+      // Product-ID proof repeats the expensive mHelp placement path. Keep Map
+      // and Health independent, but do not pile the optional proof onto those
+      // reads while provider Health is still running. The presentation budget
+      // below still lets Field Map return pending without waiting for Health.
+      proofCompletion=health.then(()=>null,()=>null).then(()=>{
+        current();
+        return productConnections(upload.sourceSha256,fieldIds);
+      });
       let timer=0;
       const budget=new Promise<null>(resolve=>{timer=window.setTimeout(()=>resolve(null),PROOF_PRESENTATION_BUDGET_MS);});
       const result=await Promise.race([proofCompletion,budget]).finally(()=>window.clearTimeout(timer));
