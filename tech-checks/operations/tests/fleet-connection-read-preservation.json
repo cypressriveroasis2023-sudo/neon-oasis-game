@@ -1,12 +1,12 @@
 {
   "contract": "COS_FLEET_CONNECTION_READ_PRESERVATION_V1",
   "baselineCommit": "1712082037e48172bced340a7102c0df98dcfa87",
-  "scope": "Separate the latest connection-read diagnostic from retained completed evidence; preserve existing source and session guards.",
+  "scope": "Separate the latest connection-read diagnostic from retained completed evidence; preserve existing source and session guards; serialize the optional mHelp-backed Product-ID proof behind provider Health to reduce Fleet refresh database contention.",
   "files": [
     {
       "path": "api.ts",
       "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
-      "candidateBlob": "839f3594d44b63836b8a4fa325f3fb99cc0ee4d4",
+      "candidateBlob": "1114275296c4b59b85207fadd7da9e1b8d30ab4b",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -41,6 +41,11 @@
         {
           "from": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{\n    const first=await (await readFleet(force)).connectionMap;\n    if((first as any).productConnectionsDiagnostic?.code!=='inventory_changed'\n      &&(!expectedSourceSha||(first as any).uploadInventory?.sourceSha256===expectedSourceSha))return first;\n    // The protected connection read observed a newer census than the map.\n    // Invalidate that generation and reload authority once, never re-probe.\n    clearSharedReads();return (await readFleet(true)).connectionMap;\n  },\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
           "to": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>(await readFleetConnectionMap(force,expectedSourceSha)).map,\n  fleetConnectionMapRead:readFleetConnectionMap,\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
+          "count": 1
+        },
+        {
+          "from": "      proofCompletion=productConnections(upload.sourceSha256,fieldIds);\n",
+          "to": "      // Product-ID proof repeats the expensive mHelp placement path. Keep Map\n      // and Health independent, but do not pile the optional proof onto those\n      // reads while provider Health is still running. The presentation budget\n      // below still lets Field Map return pending without waiting for Health.\n      proofCompletion=health.then(()=>null,()=>null).then(()=>{\n        current();\n        return productConnections(upload.sourceSha256,fieldIds);\n      });\n",
           "count": 1
         }
       ]
