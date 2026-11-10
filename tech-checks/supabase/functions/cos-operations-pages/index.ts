@@ -663,19 +663,26 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
  };
  // The batch parses and projects the whole fleet. It runs in its own worker
  // so the map read and client polls cannot spend the same CPU allowance.
+ // A hand-off reports exactly one of three outcomes. Only 202 means a worker
+ // claimed the run. A 4xx is returned before any claim, so the worker
+ // definitely did not start. Anything else (no response, timeout, 5xx) may
+ // have been delivered, and the database claim then decides who owns the run.
  const dispatchTo=slug=>async run=>{
-  const response=await internal(slug,{path:'/api/fleet-saved-board/produce',method:'POST',body:{run}},AbortSignal.timeout(8000));
-  await response.body?.cancel();
-  return response.status===202;
+  let response;
+  try{response=await internal(slug,{path:'/api/fleet-saved-board/produce',method:'POST',body:{run}},AbortSignal.timeout(8000));}
+  catch{return 'uncertain';}
+  await response.body?.cancel().catch(()=>{});
+  return response.status===202?'accepted':response.status>=400&&response.status<500?'rejected':'uncertain';
  };
- const dispatch=dispatchTo('cos-fleet-board-producer');
- // A queued follow-up always starts as a new request, here if necessary.
- const redispatch=async run=>await dispatch(run).catch(()=>false)||dispatchTo('cos-operations-pages')(run);
+ const targets=[dispatchTo('cos-fleet-board-producer')];
+ // A queued follow-up starts as a new request, on this function if necessary.
+ const followTargets=[...targets,dispatchTo('cos-operations-pages')];
  if(produce){
-  // Worker entry: run exactly the batch whose lease is active.
-  const current=await rpc('cos_fleet_board_status',{});
-  if(current?.refresh?.id!==body.run||current.refresh.state!=='running')return json({error:'Saved board batch is not active'},409);
-  EdgeRuntime.waitUntil(runFleetBatch({run:body.run,rpc,read,project:completedBoard,redispatch,abort:()=>batchController.abort()}));
+  // Worker entry. The claim is atomic: it succeeds for one producer only, and
+  // only while this exact run holds the active lease.
+  const producer=crypto.randomUUID();
+  if(await rpc('cos_fleet_board_claim',{p_run:body.run,p_producer:producer})!==true)return json({error:'Saved board batch is not available'},409);
+  EdgeRuntime.waitUntil(runFleetBatch({run:body.run,producer,rpc,read,project:completedBoard,followTargets,abort:()=>batchController.abort()}));
   return json({accepted:true},202);
  }
  const payloadText=async id=>{
@@ -683,7 +690,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
   if(!response.ok){await response.body?.cancel();throw Error('saved_board_unavailable');}
   return response.text();
  };
- const saved=await savedFleetBoard({rpc,payloadText,read,force,dispatch,redispatch,abort:()=>batchController.abort(),project:completedBoard,waitUntil:task=>EdgeRuntime.waitUntil(task)});
+ const saved=await savedFleetBoard({rpc,payloadText,read,force,targets,followTargets,abort:()=>batchController.abort(),project:completedBoard,waitUntil:task=>EdgeRuntime.waitUntil(task)});
  return new Response(saved,{status:200,headers:cors});
 }
 

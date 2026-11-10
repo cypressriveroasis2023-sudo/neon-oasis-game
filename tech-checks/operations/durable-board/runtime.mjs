@@ -56,12 +56,14 @@ export async function savedFleetResponse({rpc,payloadText}){
  throw Error('saved_board_unavailable');
 }
 
-/** One background batch for an already claimed lease. Never throws. */
-export async function produceFleetBoard({run,rpc,read,now=Date.now,project,abort}){
+/** One background batch for a lease this producer has claimed. Every write
+ * carries the producer token, so only the claimant can record, commit or fail
+ * the run. Never throws. */
+export async function produceFleetBoard({run,producer=null,rpc,read,now=Date.now,project,abort}){
  const started=now(),deadline=started+FLEET_BATCH_BUDGET_MS;
  const diagnostics={version:1,budgetMs:FLEET_BATCH_BUDGET_MS,steps:[]};
  let current='start';
- const mark=()=>rpc('cos_fleet_board_progress',{p_run:run,p_diagnostics:{...diagnostics,reached:current,elapsedMs:whole(now()-started)}}).catch(()=>{});
+ const mark=()=>rpc('cos_fleet_board_progress',{p_run:run,p_producer:producer,p_diagnostics:{...diagnostics,reached:current,elapsedMs:whole(now()-started)}}).catch(()=>{});
  const step=async(name,work,describe)=>{
   current=name;const at=now();
   try{const value=await work();diagnostics.steps.push({step:name,ok:true,ms:whole(now()-at),...(describe?describe(value):{})});return value;}
@@ -81,54 +83,101 @@ export async function produceFleetBoard({run,rpc,read,now=Date.now,project,abort
   const value=await step('project',async()=>project(values.health,values.map,values.connections,null,capturedAt));
   await step('commit',async()=>{
    if(now()>=deadline)throw Object.assign(Error('commit_unconfirmed'),{detail:{kind:'batch_deadline'}});
-   if(!await rpc('cos_fleet_board_finish',{p_run:run,p_payload:value,p_diagnostics:{...diagnostics,reached:'commit',elapsedMs:whole(now()-started)}}))throw Object.assign(Error('commit_unconfirmed'),{detail:{kind:'lease_lost'}});
+   if(!await rpc('cos_fleet_board_finish',{p_run:run,p_producer:producer,p_payload:value,p_diagnostics:{...diagnostics,reached:'commit',elapsedMs:whole(now()-started)}}))throw Object.assign(Error('commit_unconfirmed'),{detail:{kind:'lease_lost'}});
   });
   return true;
  }catch(cause){
   abort?.();
   const code=['checks_incomplete','connection_source_incomplete','inventory_source_incomplete'].includes(cause?.message)?cause.message:'source_read_failed';
-  await rpc('cos_fleet_board_fail',{p_run:run,p_code:code,p_products:Array.isArray(cause?.products)?cause.products.slice(0,1000):[],p_diagnostics:{...diagnostics,reached:current,failedStep:current,elapsedMs:whole(now()-started)}}).catch(()=>{});
+  await rpc('cos_fleet_board_fail',{p_run:run,p_producer:producer,p_code:code,p_products:Array.isArray(cause?.products)?cause.products.slice(0,1000):[],p_diagnostics:{...diagnostics,reached:current,failedStep:current,elapsedMs:whole(now()-started)}}).catch(()=>{});
   return false;
  }
 }
 
-/** A refresh requested while a batch was running is recorded as queued.
- * Start that single follow-up once the batch has ended and the 60-second
- * spacing has passed, always as a new request. Never throws. */
-export async function continueQueuedFleetBoard({rpc,dispatch,startedAt,now=Date.now,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const newToken=()=>globalThis.crypto.randomUUID();
+// After a hand-off whose delivery is unknown, give a worker that did start
+// time to record its claim before this request tries to claim the run.
+export const UNCERTAIN_DELIVERY_GRACE_MS=4000;
+const dispatchFailure=(kind,attempts)=>({version:1,steps:[{step:'dispatch',ok:false,kind,attempts}],reached:'dispatch',failedStep:'dispatch'});
+
+/** Start one claimed lease exactly once.
+ *
+ * Each target returns 'accepted' (a worker claimed the run), 'rejected' (it
+ * definitely did not start) or 'uncertain' (the request may have been
+ * delivered). A thrown target is uncertain. Whatever the targets report, the
+ * database claim decides ownership: only one producer token can ever be
+ * attached to a run, so a late or duplicate producer stops before reading a
+ * source and cannot fail or publish the run.
+ *
+ * Resolves to 'handed', 'owned_elsewhere', 'ran_here' or 'failed'; a lease is
+ * never left unowned. Never throws. */
+export async function startFleetBatch({run,rpc,read,now=Date.now,project,abort,targets=[],followTargets=[],inline=false,sleep=pause,token=newToken}){
+ let producer=null,uncertain=false,attempts=0;
  try{
-  if(!dispatch)return false;
-  if((await rpc('cos_fleet_board_status',{}))?.refresh?.state!=='queued')return false;
-  const wait=Math.min(61000,61000-(now()-startedAt));
+  for(const target of targets){
+   if(!target)continue;
+   let outcome;try{outcome=await target(run);}catch{outcome='uncertain';}
+   attempts++;
+   if(outcome==='accepted')return 'handed';
+   if(outcome!=='rejected')uncertain=true;
+  }
+  if(uncertain)await sleep(UNCERTAIN_DELIVERY_GRACE_MS);
+  const mine=token();
+  if(await rpc('cos_fleet_board_claim',{p_run:run,p_producer:mine})!==true)return 'owned_elsewhere';
+  producer=mine;
+  if(inline){await runFleetBatch({run,producer,rpc,read,now,project,abort,followTargets,sleep,token});return 'ran_here';}
+  await rpc('cos_fleet_board_fail',{p_run:run,p_producer:producer,p_code:'source_read_failed',p_products:[],p_diagnostics:dispatchFailure(uncertain?'delivery_uncertain':'delivery_rejected',attempts)});
+  return 'failed';
+ }catch{
+  // Could not confirm ownership (for example the database was unreachable).
+  // Release the lease if this request owns it or nobody does; the database
+  // ignores this for a run another producer has claimed.
+  await rpc('cos_fleet_board_fail',{p_run:run,p_producer:producer,p_code:'source_read_failed',p_products:[],p_diagnostics:dispatchFailure('dispatch_error',attempts)}).catch(()=>{});
+  return 'failed';
+ }
+}
+
+/** A refresh that arrives while a batch is running, or inside the 60-second
+ * spacing after one, is recorded as queued. Start that single follow-up once
+ * the spacing has passed. Any number of requests may call this; the database
+ * grants the follow-up lease to one of them. Never throws. */
+export async function continueQueuedFleetBoard({rpc,read,project,abort,targets=[],inline=false,startedAt,now=Date.now,sleep=pause,token=newToken}){
+ try{
+  if(!inline&&!targets.some(Boolean))return false;
+  const status=await rpc('cos_fleet_board_status',{});
+  if(status?.refresh?.state!=='queued')return false;
+  const recorded=Date.parse(status.refresh.startedAt);
+  const since=Number.isFinite(recorded)?recorded:startedAt??now();
+  const wait=Math.min(61000,61000-(now()-since));
   if(wait>0)await sleep(wait);
-  const lease=await rpc('cos_fleet_board_begin',{p_force:false});
+  let lease=null;
+  for(let attempt=0;attempt<3&&!lease?.id;attempt++){
+   if(attempt){await sleep(2000);if((await rpc('cos_fleet_board_status',{}))?.refresh?.state!=='queued')return false;}
+   lease=await rpc('cos_fleet_board_begin',{p_force:false});
+  }
   if(!lease?.id)return false;
-  if(await dispatch(lease.id)===true)return true;
-  await rpc('cos_fleet_board_fail',{p_run:lease.id,p_code:'source_read_failed',p_products:[],p_diagnostics:{version:1,steps:[],reached:'dispatch',failedStep:'dispatch'}}).catch(()=>{});
-  return false;
+  const outcome=await startFleetBatch({run:lease.id,rpc,read,now,project,abort,targets,followTargets:targets,inline,sleep,token});
+  return outcome!=='failed';
  }catch{return false;}
 }
 
-/** One claimed batch, then its queued follow-up if one was requested. */
-export async function runFleetBatch({run,rpc,read,now=Date.now,project,abort,redispatch,sleep}){
+/** One claimed batch, then its queued follow-up if one was requested. The
+ * follow-up always starts as a new request: this worker has spent its budget. */
+export async function runFleetBatch({run,producer=null,rpc,read,now=Date.now,project,abort,followTargets=[],sleep=pause,token=newToken}){
  const startedAt=now();
- const ok=await produceFleetBoard({run,rpc,read,now,project,abort});
- await continueQueuedFleetBoard({rpc,dispatch:redispatch,startedAt,now,sleep});
+ const ok=await produceFleetBoard({run,producer,rpc,read,now,project,abort});
+ await continueQueuedFleetBoard({rpc,targets:followTargets,inline:false,startedAt,now,sleep,token});
  return ok;
 }
 
-/** Refresh claims the lease, then hands the batch to `dispatch` (a dedicated
- * worker when available) or runs it here. The response is always the stored
- * board; a failed or running batch never replaces or re-dates it. */
-export async function savedFleetBoard({rpc,payloadText,read,force=false,waitUntil,now=Date.now,project,abort,dispatch,redispatch,sleep}){
+/** Refresh claims the lease and starts it once: on a dedicated worker when one
+ * accepts it, otherwise here. If the request was queued instead, this request
+ * makes sure the queued refresh is processed. The response is always the
+ * stored board; a failed or running batch never replaces or re-dates it. */
+export async function savedFleetBoard({rpc,payloadText,read,force=false,waitUntil,now=Date.now,project,abort,targets=[],followTargets=[],sleep=pause,token=newToken}){
  const lease=force?await rpc('cos_fleet_board_begin',{p_force:true}):null;
- if(lease?.id){
-  const work=(async()=>{
-   let handed=false;
-   if(dispatch){try{handed=await dispatch(lease.id)===true;}catch{handed=false;}}
-   if(!handed)await runFleetBatch({run:lease.id,rpc,read,now,project,abort,redispatch,sleep});
-  })();
-  waitUntil(work);
- }
+ if(lease?.id)waitUntil(startFleetBatch({run:lease.id,rpc,read,now,project,abort,targets,followTargets,inline:true,sleep,token}));
+ else if(force)waitUntil(continueQueuedFleetBoard({rpc,read,project,abort,targets:followTargets,inline:true,now,sleep,token}));
  return savedFleetResponse({rpc,payloadText});
 }

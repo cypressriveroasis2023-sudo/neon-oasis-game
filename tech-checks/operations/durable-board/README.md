@@ -37,6 +37,22 @@ Production runs between November 3 and November 9 showed four causes of failed o
 
 A refresh requested during a running batch was recorded as queued but never started. The batch now starts that one follow-up, as a new request, once the 60-second spacing has passed.
 
+### One producer per run
+
+A batch is owned by exactly one producer. Before reading any source a producer attaches a random token with `cos_fleet_board_claim`, a single conditional update that succeeds once per run and only while that run holds the active lease. Progress, publish and failure writes for a claimed run are accepted only with that token, so a duplicate or late producer stops before reading a source and can neither fail nor replace the claimant's result. An unclaimed run can still be failed, which releases a lease whose hand-off did not start.
+
+A hand-off has three outcomes:
+
+- `accepted` (HTTP 202): the worker claimed the run. The refresh request does no batch work.
+- `rejected` (any 4xx): returned before a claim, so the worker did not start. The refresh request claims the run and runs it at once. A follow-up that cannot run in its spent worker is claimed and failed at once with `delivery_rejected`.
+- `uncertain` (no response, timeout, 5xx): the request may have been delivered. The caller waits four seconds and then asks for the claim. If a worker started, the claim is refused and the caller touches nothing. If none did, the caller owns the run and runs it, or for a follow-up fails it with `delivery_uncertain`.
+
+If ownership cannot be confirmed because the database is unreachable, the caller attempts a release that only takes effect for an unclaimed run (`dispatch_error`). No path leaves a lease unowned until expiry except a producer that is stopped mid-batch, which is reported as `worker_interrupted` with the last step it reached.
+
+### Queued refreshes
+
+A refresh is queued in two cases: it arrives while a batch is running, or it arrives inside the 60-second spacing after one has ended. In the first case the producer starts the follow-up after its batch. In the second there is no producer, so the request that was queued waits out the spacing and starts it. Both use an unforced `cos_fleet_board_begin`, which grants the follow-up lease once however many requests ask. Opening or polling in the queued state starts nothing.
+
 Each run stores bounded diagnostics in `runs.diagnostics`: step name, duration, attempt count, HTTP status and the source's own stage/code. No rows, addresses, IPs, identities, tokens or message text are stored. `refresh.diagnostics` and `history[].diagnostics` return them to the already authorized Owner/IT read.
 
 A failed, interrupted or running batch never changes `latest.id`, `latest.completedAt` or the stored payload. Opening and polling claim no lease and read no live source.

@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';import {readFileSync} from 'node:fs';
 import {completedBoard} from '../durable-board/project.ts';
-import {savedFleetBoard,savedFleetResponse,produceFleetBoard,forgetSavedFleetPayload,FLEET_BATCH_BUDGET_MS} from '../durable-board/runtime.mjs';
+import {savedFleetBoard,savedFleetResponse,produceFleetBoard,startFleetBatch,continueQueuedFleetBoard,forgetSavedFleetPayload,FLEET_BATCH_BUDGET_MS,UNCERTAIN_DELIVERY_GRACE_MS} from '../durable-board/runtime.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('the server publishes current Unknown instead of retaining stale red or green',()=>{
  const f=fieldProductFixture(),map={...f.field};const first=completedBoard(f.health,map,f.connections,null,f.now);
@@ -21,7 +21,8 @@ test('refresh returns the stored board while a bounded background batch runs; fa
  const calls=[],tasks=[];let release;const gate=new Promise(r=>release=r);const rpc=async(name,args)=>{calls.push([name,args]);return name.endsWith('begin')?{id:'run'}:name.endsWith('status')?stored():true;};
  const response=JSON.parse(await savedFleetBoard({rpc,payloadText:async()=>'{"old":true}',force:true,read:async()=>{await gate;throw Error('private raw error');},waitUntil:p=>tasks.push(p),project:()=>{throw Error('must not project failed reads');}}));
  assert.equal(response.latest.payload.old,true);assert.equal(response.latest.completedAt,'2026-11-09T01:37:00Z');assert.equal(calls.some(c=>c[0]==='cos_fleet_board_finish'),false);release();await tasks[0];
- const [name,args]=calls.at(-1);assert.equal(name,'cos_fleet_board_fail');assert.equal(args.p_code,'source_read_failed');
+ assert.deepEqual(calls.map(c=>c[0]).slice(0,3).sort(),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_status']);
+ const [name,args]=calls.find(c=>c[0]==='cos_fleet_board_fail');assert.equal(args.p_code,'source_read_failed');assert.equal(args.p_producer,calls.find(c=>c[0]==='cos_fleet_board_claim')[1].p_producer);assert.match(args.p_producer,/^[a-f0-9-]{36}$/);
  assert.equal(args.p_diagnostics.failedStep,'map');assert.deepEqual(args.p_diagnostics.steps.map(x=>[x.step,x.ok,x.kind]),[['map',false,'error']]);assert.doesNotMatch(JSON.stringify(args),/private raw error/);
 });
 test('database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure',async()=>{
@@ -71,13 +72,13 @@ const batch=(overrides={})=>{
  const calls=[],reads=[];let clock=1000;
  const rpc=async(name,args)=>{calls.push([name,structuredClone(args)]);return overrides.rpc?.(name,args)??true;};
  const read=async(path,limits)=>{reads.push([path,limits]);clock+=overrides.readMs??10;const value=await overrides.read?.(path,limits);if(value!==undefined)return value;return {value:{path},attempts:1};};
- return {calls,reads,run:()=>produceFleetBoard({run:'run',rpc,read,now:()=>clock,project:overrides.project??((health,map,connections,previous,at)=>({contract:'COS_SAVED_FLEET_BOARD_V1',health,map,connections,previous,at})),abort:()=>calls.push(['abort'])})};
+ return {calls,reads,run:()=>produceFleetBoard({run:'run',producer:'token-a',rpc,read,now:()=>clock,project:overrides.project??((health,map,connections,previous,at)=>({contract:'COS_SAVED_FLEET_BOARD_V1',health,map,connections,previous,at})),abort:()=>calls.push(['abort'])})};
 };
 test('a completed batch reads the three sources in order, records progress and commits once',async()=>{
  const b=batch();assert.equal(await b.run(),true);
  assert.deepEqual(b.reads.map(r=>r[0]),['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
  assert.deepEqual(b.calls.map(c=>c[0]),['cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_finish']);
- const finish=b.calls.at(-1)[1];assert.equal(finish.p_payload.previous,null);assert.equal(finish.p_payload.map.path,'/api/fleet-map-source');assert.equal(finish.p_payload.health.path,'/api/camera-health/summary-v3');
+ const finish=b.calls.at(-1)[1];assert.equal(finish.p_payload.previous,null);assert.ok(b.calls.every(c=>c[1].p_producer==='token-a'),'every write carries the claimant token');assert.equal(finish.p_payload.map.path,'/api/fleet-map-source');assert.equal(finish.p_payload.health.path,'/api/camera-health/summary-v3');
  assert.deepEqual(finish.p_diagnostics.steps.map(s=>[s.step,s.ok]),[['map',true],['connections',true],['health',true],['project',true]]);
  assert.deepEqual(b.calls[1][1].p_diagnostics.reached,'connections');
  // Every read is bounded by the batch deadline minus the commit reserve.
@@ -103,21 +104,13 @@ test('a batch that runs out of time stops before the lease expires instead of be
  assert.deepEqual(b.reads.map(r=>r[0]),['/api/fleet-map-source','/api/product-connections']);
  const args=b.calls.at(-1)[1];assert.equal(b.calls.at(-1)[0],'cos_fleet_board_fail');assert.equal(args.p_diagnostics.failedStep,'health');assert.equal(args.p_diagnostics.steps.at(-1).kind,'batch_deadline');assert.equal(b.calls.some(c=>c[0]==='cos_fleet_board_finish'),false);
 });
-test('refresh hands the batch to the dedicated worker and runs it here only when that is unavailable',async()=>{
- for(const [label,dispatch,inline] of [['accepted',async()=>true,false],['declined',async()=>false,true],['unreachable',async()=>{throw Error('offline');},true],['none',undefined,true]]){
-  forgetSavedFleetPayload();const calls=[],tasks=[],sources=[];
-  const rpc=async name=>{calls.push(name);return name.endsWith('begin')?{id:'run'}:name.endsWith('status')?stored():true;};
-  await savedFleetBoard({rpc,payloadText:async()=>'{"old":true}',force:true,dispatch,read:async path=>{sources.push(path);return {value:{},attempts:1};},waitUntil:p=>tasks.push(p),project:()=>({contract:'COS_SAVED_FLEET_BOARD_V1'})});
-  await Promise.all(tasks);assert.equal(tasks.length,1,label);assert.equal(sources.length,inline?3:0,label);assert.equal(calls.includes('cos_fleet_board_finish'),inline,label);
- }
-});
 test('database keeps diagnostics, a 180-second lease, payload-free status and the stored board through failure and interruption',async()=>{
  const db=new PGlite();await db.exec('create role service_role bypassrls;create role anon;create role authenticated;');
  for(const file of ['fleet-durable-board-install.sql','fleet-board-staging.sql','fleet-board-reliability-20261109.sql'])await db.exec(readFileSync(new URL('../db/'+file,import.meta.url),'utf8'));
  for(const call of ['cos_fleet_board_status()',"cos_fleet_board_payload('00000000-0000-0000-0000-000000000000')","cos_fleet_board_progress('00000000-0000-0000-0000-000000000000','{}')"])for(const role of ['anon','authenticated'])await assert.rejects(()=>db.exec('set role '+role+';select public.'+call+';'),label=>{return true;});
  await db.exec('reset role;set role service_role;');
  const one=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
- const age=seconds=>db.exec("reset role;update cos_fleet_board_private.runs set started_at=started_at-interval '"+seconds+" seconds';set role service_role;");
+ const age=seconds=>db.exec("reset role;update cos_fleet_board_private.runs set started_at=started_at-interval '"+seconds+" seconds';update cos_fleet_board_private.control set next_at=next_at-interval '"+seconds+" seconds';set role service_role;");
  const payload={contract:'COS_SAVED_FLEET_BOARD_V1',fleet:{readAt:'2026-11-09T19:37:00Z',fieldMap:{sharedFleetView:true}},counts:{online:7,offline:1},units:[{productId:'1001',status:'online'}]};
  const a=await one('select public.cos_fleet_board_begin(true)');
  // A run older than the previous 120-second lease can still commit inside 180 seconds.
@@ -150,17 +143,132 @@ test('database keeps diagnostics, a 180-second lease, payload-free status and th
  assert.equal(await one('select public.cos_fleet_board_finish($1,$2::jsonb)',[d.id,JSON.stringify({...payload,counts:{online:8,offline:0}})]),true);
  assert.equal(await one('select public.cos_fleet_board_payload($1)',[live.id]),null);assert.equal((await one('select public.cos_fleet_board_payload($1)',[d.id])).counts.online,8);
  assert.equal((await one('select public.cos_fleet_board_status()')).latest.id,d.id);
+ // Producer claim: one token per run, and only the claimant can record, publish or fail it.
+ await age(61);const g=await one('select public.cos_fleet_board_begin(true)');const A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[d.id,A]),false,'a finished run cannot be claimed');assert.equal(await one('select public.cos_fleet_board_claim($1,null)',[g.id]),false);
+ assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[g.id,A]),true);assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[g.id,B]),false);assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[g.id,A]),false,'a claim is taken once, even by the same token');
+ assert.equal((await one('select public.cos_fleet_board_status()')).refresh.claimed,true);
+ for(const other of [B,null]){
+  assert.equal(await one("select public.cos_fleet_board_fail($1,'source_read_failed','[]','{}'::jsonb,$2)",[g.id,other]),false);
+  assert.equal(await one('select public.cos_fleet_board_progress($1,$2::jsonb,$3)',[g.id,JSON.stringify({reached:'intruder'}),other]),false);
+  assert.equal(await one('select public.cos_fleet_board_finish($1,$2::jsonb,null,$3)',[g.id,JSON.stringify({...payload,counts:{online:0,offline:99}}),other]),false);
+ }
+ const held=await one('select public.cos_fleet_board_status()');assert.equal(held.refresh.state,'running','a duplicate producer cannot stop the claimant');assert.equal(held.latest.id,d.id);
+ assert.equal(await one('select public.cos_fleet_board_begin(true)'),null,'and cannot release its lease');
+ assert.equal(await one('select public.cos_fleet_board_progress($1,$2::jsonb,$3)',[g.id,JSON.stringify({reached:'map'}),A]),true);
+ assert.equal(await one('select public.cos_fleet_board_finish($1,$2::jsonb,$3::jsonb,$4)',[g.id,JSON.stringify({...payload,counts:{online:9,offline:0}}),JSON.stringify({reached:'commit'}),A]),true);
+ assert.equal((await one('select public.cos_fleet_board_payload($1)',[g.id])).counts.online,9);
+ // The overlapping request above left one follow-up owed; a lease whose hand-off definitely failed is released at once.
+ assert.equal((await one('select public.cos_fleet_board_status()')).refresh.state,'queued');
+ assert.equal(await one('select public.cos_fleet_board_begin(false)'),null);await age(61);
+ const h=await one('select public.cos_fleet_board_begin(false)');assert.ok(h.id);assert.equal((await one('select public.cos_fleet_board_status()')).refresh.claimed,false);
+ assert.equal(await one("select public.cos_fleet_board_fail($1,'source_read_failed','[]',$2::jsonb)",[h.id,JSON.stringify({failedStep:'dispatch'})]),true);
+ const released=await one('select public.cos_fleet_board_status()');assert.equal(released.refresh.state,'failed');assert.equal(released.refresh.diagnostics.failedStep,'dispatch');assert.equal(released.latest.id,g.id);
+ assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[h.id,A]),false,'a released run cannot be claimed afterwards');
+ // A refresh that arrives after a quick batch has already ended is queued, and is granted once the spacing has passed.
+ await age(61);const quick=await one('select public.cos_fleet_board_begin(true)');assert.equal(await one('select public.cos_fleet_board_claim($1,$2)',[quick.id,A]),true);
+ assert.equal(await one('select public.cos_fleet_board_finish($1,$2::jsonb,null,$3)',[quick.id,JSON.stringify(payload),A]),true);assert.equal((await one('select public.cos_fleet_board_status()')).refresh.state,'completed');
+ assert.equal(await one('select public.cos_fleet_board_begin(true)'),null);assert.equal((await one('select public.cos_fleet_board_status()')).refresh.state,'queued');
+ assert.equal(await one('select public.cos_fleet_board_begin(false)'),null,'not before the 60-second spacing');
+ await age(61);const late=await one('select public.cos_fleet_board_begin(false)');assert.ok(late.id,'the queued refresh is granted, not stranded');
+ assert.equal((await one('select public.cos_fleet_board_status()')).refresh.state,'running');assert.equal(await one('select public.cos_fleet_board_begin(false)'),null,'and only once');
+ await one("select public.cos_fleet_board_fail($1,'source_read_failed')",[late.id]);
  // Callers that still pass the original arguments keep working.
  await age(61);const e=await one('select public.cos_fleet_board_begin(true)');await one("select public.cos_fleet_board_fail($1,'checks_incomplete')",[e.id]);assert.equal((await one('select public.cos_fleet_board_read()')).refresh.error,'checks_incomplete');
  await db.close();
 });
-test('a queued follow-up starts only when one is owed, after the spacing, and a refused hand-off is recorded',async()=>{
- const {continueQueuedFleetBoard}=await import('../durable-board/runtime.mjs');
- const scene=(state,dispatch,lease={id:'next'})=>{const calls=[],waits=[];return {calls,waits,run:()=>continueQueuedFleetBoard({rpc:async(name,args)=>{calls.push([name,args]);return name.endsWith('status')?stored('old',state):name.endsWith('begin')?lease:true;},dispatch:dispatch&&(async id=>{calls.push(['dispatch',id]);return dispatch(id);}),startedAt:0,now:()=>20000,sleep:async ms=>{waits.push(ms);}})};};
- for(const state of ['completed','failed','running']){const s=scene(state,async()=>true);assert.equal(await s.run(),false);assert.deepEqual(s.calls.map(c=>c[0]),['cos_fleet_board_status']);}
- const none=scene('queued',null);assert.equal(await none.run(),false);assert.deepEqual(none.calls,[]);
- const owed=scene('queued',async()=>true);assert.equal(await owed.run(),true);assert.deepEqual(owed.waits,[41000]);assert.deepEqual(owed.calls.map(c=>c[0]),['cos_fleet_board_status','cos_fleet_board_begin','dispatch']);assert.deepEqual(owed.calls[1][1],{p_force:false});
- const early=scene('queued',async()=>true,null);assert.equal(await early.run(),false);assert.equal(early.calls.some(c=>c[0]==='dispatch'),false);
- const refused=scene('queued',async()=>false);assert.equal(await refused.run(),false);assert.equal(refused.calls.at(-1)[0],'cos_fleet_board_fail');assert.equal(refused.calls.at(-1)[1].p_diagnostics.failedStep,'dispatch');
- const broken=scene('queued',async()=>{throw Error('offline');});assert.equal(await broken.run(),false);
+
+// One shared in-memory lease with the same ownership rules as the database:
+// a single conditional claim, and writes accepted only from the claimant.
+const ledger=(state='completed')=>{
+ const runs={run:{state:'running',producer:null}},calls=[],sources=[],waits=[];let tokens=0,queued=state==='queued';
+ const rpc=async(name,args={})=>{
+  calls.push([name,structuredClone(args)]);const r=runs[args.p_run];
+  if(name==='cos_fleet_board_claim'){if(!r||r.state!=='running'||r.producer)return false;r.producer=args.p_producer;return true;}
+  if(name==='cos_fleet_board_progress')return !!r&&r.state==='running'&&r.producer===(args.p_producer??null);
+  if(name==='cos_fleet_board_finish'){if(!r||r.state!=='running'||r.producer!==(args.p_producer??null))return false;r.state='completed';return true;}
+  if(name==='cos_fleet_board_fail'){if(!r||r.state!=='running'||(r.producer&&r.producer!==(args.p_producer??null)))return false;r.state='failed';r.failure=args.p_diagnostics;return true;}
+  if(name==='cos_fleet_board_status'){const shown=queued?'queued':state==='queued'?'completed':state;return {...stored('old',shown),refresh:{id:'old',state:shown,startedAt:new Date(0).toISOString()}};}
+  if(name==='cos_fleet_board_begin'){if(args.p_force)return {id:'run'};if(!queued)return null;queued=false;runs.next={state:'running',producer:null};return {id:'next'};}
+  throw Error('unexpected '+name);
+ };
+ const common={rpc,read:async path=>{sources.push(path);return {value:{},attempts:1};},project:()=>({contract:'COS_SAVED_FLEET_BOARD_V1'}),now:()=>20000,sleep:async ms=>{waits.push(ms);},token:()=>'token-'+(++tokens),abort:()=>{}};
+ return {runs,calls,sources,waits,rpc,common,names:()=>calls.map(c=>c[0])};
+};
+test('two producers for one run: exactly one claims it, reads the sources and publishes',async()=>{
+ const l=ledger();const results=await Promise.all([startFleetBatch({...l.common,run:'run',inline:true}),startFleetBatch({...l.common,run:'run',inline:true})]);
+ assert.deepEqual(results.sort(),['owned_elsewhere','ran_here']);assert.equal(l.sources.length,3);assert.equal(l.runs.run.state,'completed');
+ assert.equal(l.calls.filter(c=>c[0]==='cos_fleet_board_finish').length,1);assert.equal(l.calls.some(c=>c[0]==='cos_fleet_board_fail'),false);
+});
+test('uncertain delivery where the worker did start: this request waits, loses the claim and touches nothing',async()=>{
+ const l=ledger();
+ // The worker claimed the run but its acknowledgment never arrived.
+ const lost=async run=>{await l.rpc('cos_fleet_board_claim',{p_run:run,p_producer:'worker'});throw Error('acknowledgment timed out');};
+ assert.equal(await startFleetBatch({...l.common,run:'run',targets:[lost],inline:true}),'owned_elsewhere');
+ assert.deepEqual(l.waits,[UNCERTAIN_DELIVERY_GRACE_MS]);assert.deepEqual(l.sources,[]);assert.equal(l.runs.run.producer,'worker');assert.equal(l.runs.run.state,'running');
+ assert.equal(l.calls.some(c=>/fail|finish|progress/.test(c[0])),false,'the healthy worker is never failed or overwritten by the fallback');
+ // Even a deliberately failing duplicate cannot stop or replace the claimant.
+ assert.equal(await l.rpc('cos_fleet_board_fail',{p_run:'run',p_code:'source_read_failed',p_producer:'token-9'}),false);assert.equal(await l.rpc('cos_fleet_board_fail',{p_run:'run',p_code:'source_read_failed'}),false);
+ assert.equal(await l.rpc('cos_fleet_board_finish',{p_run:'run',p_producer:'token-9',p_payload:{}}),false);assert.equal(l.runs.run.state,'running');
+ assert.equal(await l.rpc('cos_fleet_board_finish',{p_run:'run',p_producer:'worker',p_payload:{}}),true);
+});
+test('uncertain delivery where the worker never started: this request claims the run after the grace and completes it',async()=>{
+ for(const target of [async()=>'uncertain',async()=>{throw Error('connection reset');}]){
+  const l=ledger();assert.equal(await startFleetBatch({...l.common,run:'run',targets:[target],inline:true}),'ran_here');
+  assert.deepEqual(l.waits,[UNCERTAIN_DELIVERY_GRACE_MS]);assert.equal(l.sources.length,3);assert.equal(l.runs.run.state,'completed');assert.equal(l.runs.run.producer,'token-1');
+ }
+});
+test('a worker that claims late, after the fallback took the run, is refused and the fallback result stands',async()=>{
+ const l=ledger();assert.equal(await startFleetBatch({...l.common,run:'run',targets:[async()=>'uncertain'],inline:true}),'ran_here');
+ assert.equal(await l.rpc('cos_fleet_board_claim',{p_run:'run',p_producer:'late-worker'}),false);assert.equal(l.runs.run.producer,'token-1');assert.equal(l.runs.run.state,'completed');
+});
+test('definite rejection: no grace; the run starts here at once, or is failed at once when it cannot run here',async()=>{
+ const here=ledger();assert.equal(await startFleetBatch({...here.common,run:'run',targets:[async()=>'rejected'],inline:true}),'ran_here');assert.deepEqual(here.waits,[]);assert.equal(here.runs.run.state,'completed');
+ const accepted=ledger();assert.equal(await startFleetBatch({...accepted.common,run:'run',targets:[async()=>'rejected',async()=>'accepted'],inline:true}),'handed');assert.deepEqual(accepted.names(),[]);assert.deepEqual(accepted.sources,[]);
+ const away=ledger();assert.equal(await startFleetBatch({...away.common,run:'run',targets:[async()=>'rejected',async()=>'rejected'],inline:false}),'failed');
+ assert.deepEqual(away.waits,[]);assert.deepEqual(away.names(),['cos_fleet_board_claim','cos_fleet_board_fail']);assert.equal(away.runs.run.state,'failed','the lease is released immediately, not at expiry');
+ assert.deepEqual(away.runs.run.failure,{version:1,steps:[{step:'dispatch',ok:false,kind:'delivery_rejected',attempts:2}],reached:'dispatch',failedStep:'dispatch'});
+});
+test('uncertain delivery that cannot run here: failed only if nobody claimed it, recorded as uncertain',async()=>{
+ const idle=ledger();assert.equal(await startFleetBatch({...idle.common,run:'run',targets:[async()=>{throw Error('offline');}],inline:false}),'failed');
+ assert.deepEqual(idle.waits,[UNCERTAIN_DELIVERY_GRACE_MS]);assert.equal(idle.runs.run.state,'failed');assert.equal(idle.runs.run.failure.steps[0].kind,'delivery_uncertain');
+ const taken=ledger();const lost=async run=>{await taken.rpc('cos_fleet_board_claim',{p_run:run,p_producer:'worker'});return 'uncertain';};
+ assert.equal(await startFleetBatch({...taken.common,run:'run',targets:[lost],inline:false}),'owned_elsewhere');assert.equal(taken.runs.run.state,'running');assert.equal(taken.calls.some(c=>c[0]==='cos_fleet_board_fail'),false);
+});
+test('an error while confirming ownership releases an unclaimed lease instead of leaving it to expire',async()=>{
+ const l=ledger();const rpc=async(name,args)=>{if(name==='cos_fleet_board_claim'){l.calls.push([name,args]);throw Error('database unreachable');}return l.rpc(name,args);};
+ assert.equal(await startFleetBatch({...l.common,rpc,run:'run',targets:[async()=>'rejected'],inline:true}),'failed');
+ assert.equal(l.runs.run.state,'failed');assert.equal(l.runs.run.failure.steps[0].kind,'dispatch_error');assert.deepEqual(l.sources,[]);
+ // If a worker does hold the run, the same release attempt changes nothing.
+ const held=ledger();await held.rpc('cos_fleet_board_claim',{p_run:'run',p_producer:'worker'});const broken=async(name,args)=>{if(name==='cos_fleet_board_claim')throw Error('database unreachable');return held.rpc(name,args);};
+ assert.equal(await startFleetBatch({...held.common,rpc:broken,run:'run',inline:true}),'failed');assert.equal(held.runs.run.state,'running');assert.equal(held.runs.run.producer,'worker');
+ // Nothing here may throw into the request, whatever fails.
+ assert.equal(await startFleetBatch({run:'run',rpc:async()=>{throw Error('down');},targets:[async()=>{throw Error('down');}],sleep:async()=>{},inline:true}),'failed');
+});
+test('refresh request: accepted hand-off does no work here; otherwise the claimed batch runs here',async()=>{
+ for(const [label,target,inline] of [['accepted',async()=>'accepted',false],['rejected',async()=>'rejected',true],['uncertain',async()=>'uncertain',true],['thrown',async()=>{throw Error('offline');},true],['none',null,true]]){
+  forgetSavedFleetPayload();const l=ledger(),tasks=[];
+  await savedFleetBoard({...l.common,payloadText:async()=>'{"old":true}',force:true,targets:[target],waitUntil:p=>tasks.push(p)});
+  await Promise.all(tasks);assert.equal(tasks.length,1,label);assert.equal(l.sources.length,inline?3:0,label);assert.equal(l.runs.run.state,inline?'completed':'running',label);
+ }
+});
+test('a queued follow-up starts only when one is owed, after the spacing, and is never left unowned',async()=>{
+ for(const state of ['completed','failed','running']){const l=ledger(state);assert.equal(await continueQueuedFleetBoard({...l.common,targets:[async()=>'accepted']}),false);assert.deepEqual(l.names(),['cos_fleet_board_status']);}
+ const none=ledger('queued');assert.equal(await continueQueuedFleetBoard({...none.common,targets:[],inline:false}),false);assert.deepEqual(none.calls,[]);
+ const owed=ledger('queued'),handed=[];assert.equal(await continueQueuedFleetBoard({...owed.common,targets:[async id=>{handed.push(id);return 'accepted';}]}),true);
+ assert.deepEqual(owed.waits,[41000]);assert.deepEqual(owed.names(),['cos_fleet_board_status','cos_fleet_board_begin']);assert.deepEqual(owed.calls[1][1],{p_force:false});assert.deepEqual(handed,['next']);
+ const refused=ledger('queued');assert.equal(await continueQueuedFleetBoard({...refused.common,targets:[async()=>'rejected']}),false);assert.equal(refused.runs.next.state,'failed');assert.equal(refused.runs.next.failure.steps[0].kind,'delivery_rejected');
+ const broken=ledger('queued');assert.equal(await continueQueuedFleetBoard({...broken.common,targets:[async()=>{throw Error('offline');}]}),false);assert.equal(broken.runs.next.state,'failed');assert.equal(broken.runs.next.failure.steps[0].kind,'delivery_uncertain');
+});
+test('a refresh queued after the previous batch already ended is still processed by the request that queued it',async()=>{
+ // No batch is running, so no producer will pick this up: the queued request must.
+ forgetSavedFleetPayload();const l=ledger('queued'),tasks=[];let begins=0;
+ const rpc=async(name,args)=>{if(name==='cos_fleet_board_begin'&&args.p_force){l.calls.push([name,args]);return null;}if(name==='cos_fleet_board_begin'&&++begins===1){l.calls.push([name,args]);return null;}return l.rpc(name,args);};
+ const response=JSON.parse(await savedFleetBoard({...l.common,rpc,payloadText:async()=>'{"old":true}',force:true,targets:[],followTargets:[async()=>'rejected'],waitUntil:p=>tasks.push(p)}));
+ assert.equal(response.refresh.state,'queued');assert.equal(response.latest.payload.old,true);assert.equal(tasks.length,1);await Promise.all(tasks);
+ // Waited out the spacing, retried once while the lease was not yet due, then ran the follow-up here.
+ assert.deepEqual(l.waits,[41000,2000]);assert.deepEqual(l.calls.filter(c=>c[0]==='cos_fleet_board_begin').map(c=>c[1].p_force),[true,false,false]);
+ assert.equal(l.runs.next.state,'completed');assert.equal(l.runs.next.producer,'token-1');assert.equal(l.sources.length,3);
+ // An ordinary open in the same state starts nothing.
+ forgetSavedFleetPayload();const open=ledger('queued'),none=[];await savedFleetBoard({...open.common,payloadText:async()=>'{"old":true}',waitUntil:p=>none.push(p)});assert.equal(none.length,0);assert.deepEqual(open.names(),['cos_fleet_board_status']);
 });
