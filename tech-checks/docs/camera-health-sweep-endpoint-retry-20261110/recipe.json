@@ -5,7 +5,7 @@
  "baselineVersion": 96,
  "baselineFile": "camera-health-sweep/index.ts",
  "baselineSha256": "23fc5a6328479b3baf9fd4c114b3c4755ac8295347d0a97988c1422b60d59262",
- "resultSha256": "4a427389b26998c5f4ecaf4b70342797d84f37a746ebb130571af56b6443c952",
+ "resultSha256": "d86b345a090c593e581f666ae0a814d7ae800b288b733812101bcf186344d3b8",
  "edits": [
   {
    "name": "reader-refusal",
@@ -59,7 +59,7 @@
    "name": "evidence-diagnostics",
    "occurrences": 1,
    "before": "    diagnostics: () => ({ ...diagnostic }),\n",
-   "after": "    diagnostics: () => ({ ...diagnostic, blocked }),\n"
+   "after": "    diagnostics: () => ({ ...diagnostic, blocked }),\n    // False once a block is latched: a ticket admitted earlier no longer\n    // stands for a current authority.\n    current: (ticket) => Boolean(ticket) && !blocked,\n"
   },
   {
    "name": "binding-signature",
@@ -120,6 +120,12 @@
    "occurrences": 1,
    "before": "      const endpointEvidence = endpointSourceEnabled ? scheduledEndpointFromExistingCron(db, req, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3)) : scheduledTrackerEndpointRuntime(",
    "after": "      const endpointAuthorityBlocked = isShardCall && (body.endpoint_authority === \"refused\" || body.endpoint_authority === \"unavailable\") ? body.endpoint_authority : null;\n      const endpointEvidence = endpointSourceEnabled ? scheduledEndpointFromExistingCron(db, req, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3), endpointAuthorityBlocked) : scheduledTrackerEndpointRuntime("
+  },
+  {
+   "name": "collector-write-fence",
+   "occurrences": 1,
+   "before": "        try {\n          const saved = await request((signal) => db.rpc(\"publish_camera_connection_v1\", {",
+   "after": "        // Final write fence. The ticket was admitted before the probe; if\n        // the authority has been refused or lost while the probe was in\n        // flight, nothing is written and the previous result is kept.\n        if (evidence?.current?.(tickets[i]) === false) return held(\"endpoint_authority_unverified\");\n        try {\n          const saved = await request((signal) => db.rpc(\"publish_camera_connection_v1\", {"
   }
  ]
 }

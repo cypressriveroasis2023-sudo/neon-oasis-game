@@ -20,8 +20,8 @@ const baselinePath=process.env.COS_SWEEP_V96_SOURCE;
 const available=!!baselinePath&&existsSync(baselinePath);
 const sha=text=>createHash('sha256').update(text).digest('hex');
 const baseline=available?readFileSync(baselinePath,'utf8'):'';
-let patched=baseline;
-if(available)for(const edit of recipe.edits){assert.equal(patched.split(edit.before).length-1,edit.occurrences,edit.name);patched=patched.split(edit.before).join(edit.after);}
+let patched=baseline,unfenced=baseline;
+if(available)for(const edit of recipe.edits){assert.equal(patched.split(edit.before).length-1,edit.occurrences,edit.name);patched=patched.split(edit.before).join(edit.after);if(edit.name!=='collector-write-fence')unfenced=unfenced.split(edit.before).join(edit.after);}
 const skip=available?false:'set COS_SWEEP_V96_SOURCE to the exact deployed v96 index.ts';
 
 const H='a'.repeat(64),T='b'.repeat(64),SWEEP='https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-health-sweep';
@@ -32,18 +32,21 @@ const temporary=()=>label('read_unavailable',true);
 /** Load a complete bundle (deployed or patched) with only its platform edges replaced. */
 function load(text,{upstream,shardReply}={}){
  const program=text.replace(/^import [^\n]*\n/gm,'').replace(/^export \{[^}]*\};?\s*$/gm,'').replace(/^export /gm,'');
- const state={clock:Date.parse('2026-11-10T21:15:00Z'),upstream:0,shards:[],published:null,handler:null};
+ const state={clock:Date.parse('2026-11-10T21:15:00Z'),upstream:0,shards:[],published:null,handler:null,rpcs:[],tables:{}};
  class Clock extends Date{constructor(...a){a.length?super(...a):super(state.clock);}static now(){return state.clock;}}
- const source=()=>Response.json({contract:'COS_SCHEDULED_TRACKER_ENDPOINT_SOURCE_V1',complete:true,sourceSha256:H,trackerSha256:T,observedAt:state.clock,products:[{productId:'11'}]});
+ const source=()=>Response.json({contract:'COS_SCHEDULED_TRACKER_ENDPOINT_SOURCE_V1',complete:true,sourceSha256:H,trackerSha256:T,observedAt:state.clock,products:[{productId:'11',placement:'FIELD',lifecycle:'UNFLAGGED',support:false,holds:[],reviewReasons:[],ip:'8.8.8.8'}]});
  const answer=value=>{const p=Promise.resolve(value);const chain=new Proxy(function(){},{get(_,k){if(k==='then')return p.then.bind(p);if(k==='catch')return p.catch.bind(p);if(k==='finally')return p.finally.bind(p);return()=>chain;},apply(){return chain;}});return chain;};
  const rpc=(name,args)=>{
+  state.rpcs.push(name);
+  if(name==='publish_camera_connection_v1')return {data:{ok:true},error:null};
+  if(name==='cos_tracker_endpoint_commit_v1')return {data:{committed:true},error:null};
   if(name==='verify_camera_health_cron_secret')return {data:args.candidate==='synthetic',error:null};
   if(name==='cos_tracker_endpoint_source_v1')return {data:state.published,error:null};
   if(name==='cos_tracker_endpoint_claims_v1')return {data:{complete:true,observedAt:state.clock,devices:[{id:1,product_id:'11',connection_revision:1,public_ip:'8.8.8.8',expected_ports:[80],activation_state:'active',monitoring_enabled:true,device_name:'Cam 1',unit_key:'u1',organization:'COS'}],claims:[]},error:null};
-  if(name==='cos_tracker_endpoint_publish_v1'){state.published={...args.p_source,generation:(BigInt(args.p_expected)+1n).toString()};return {data:true,error:null};}
+  if(name==='cos_tracker_endpoint_publish_v1'){state.published={...args.p_source,assignmentEpoch:'c'.repeat(64),collisionEpoch:'d'.repeat(64),generation:(BigInt(args.p_expected)+1n).toString()};return {data:true,error:null};}
   return {data:null,error:null};
  };
- const db={rpc:(n,a)=>answer(rpc(n,a)),from:()=>answer({data:[],error:null,count:0})};
+ const db={rpc:(n,a)=>answer(rpc(n,a)),from:table=>answer({data:state.tables[table]||[],error:null,count:0})};
  const fetch=async(url,init={})=>{
   url=String(url);
   if(url.endsWith('/endpoint-source')){state.upstream++;state.clock+=40;const reply=await upstream(state.upstream,{source,state});return reply;}
@@ -56,7 +59,7 @@ function load(text,{upstream,shardReply}={}){
  };
  const context=vm.createContext({console:{log(){},warn(){},error(){},info(){}},setTimeout,clearTimeout,setInterval,clearInterval,AbortController,AbortSignal,Response,Request,Headers,TextEncoder,TextDecoder,ReadableStream,crypto,URL,URLSearchParams,structuredClone,queueMicrotask,Promise,JSON,Math,Date:Clock,
   fetch,createClient:()=>db,Deno:{env:{get:n=>n==='SUPABASE_URL'?'https://goqrnolcvqnirjmzaeyk.supabase.co':'synthetic'},serve:h=>{state.handler=h;},connect:()=>Promise.reject(new Error('connection refused'))}});
- vm.runInContext(program+'\n;globalThis.__sweep={scheduledEndpointFromExistingCron,createScheduledEndpointEvidence,scheduledNativeSourceReader,setProduce:f=>{produce=f;}};',context,{filename:'camera-health-sweep.js'});
+ vm.runInContext(program+'\n;globalThis.__sweep={scheduledEndpointFromExistingCron,createScheduledEndpointEvidence,scheduledNativeSourceReader,collectScheduledDirect,setProduce:f=>{produce=f;}};',context,{filename:'camera-health-sweep.js'});
  const request=()=>new Request(SWEEP,{method:'POST',headers:{'content-type':'application/json','x-camera-cron-secret':'synthetic'},body:'{}'});
  return {state,db,api:context.__sweep,source,
   cycle:async()=>{const before=state.upstream,from=state.shards.length;const response=await state.handler(request());return {status:response.status,body:await response.json(),calls:state.upstream-before,shards:state.shards.slice(from)};},
@@ -68,7 +71,7 @@ const settle=()=>new Promise(resolve=>setTimeout(resolve,20));
 
 test('the recipe applies to exactly the deployed v96 source and produces the recorded result',{skip},()=>{
  assert.equal(recipe.baselineVersion,96);assert.equal(sha(baseline),recipe.baselineSha256,'COS_SWEEP_V96_SOURCE is not the exact deployed v96 file');assert.equal(sha(patched),recipe.resultSha256);
- for(const edit of recipe.edits)assert.ok(/scheduledSourceRefusal|native_source_|ScheduledEndpointEvidence|ScheduledSourceBinding|scheduledEndpointFromExistingCron|endpointAuthority|endpoint_authority|readAuthority|refreshing|diagnostics|fetchSource|nativeSnapshot|begin\(candidate\)|noteShardAuthority|Endpoint authority blocked/.test(edit.before+edit.after),edit.name);
+ for(const edit of recipe.edits)assert.ok(/scheduledSourceRefusal|native_source_|ScheduledEndpointEvidence|ScheduledSourceBinding|scheduledEndpointFromExistingCron|endpointAuthority|endpoint_authority|readAuthority|refreshing|diagnostics|fetchSource|nativeSnapshot|begin\(candidate\)|noteShardAuthority|Endpoint authority blocked|publish_camera_connection_v1/.test(edit.before+edit.after),edit.name);
 });
 test('freshness, identity and hold guards are untouched',{skip},()=>{
  const count=(text,needle)=>text.split(needle).length-1;
@@ -152,6 +155,41 @@ test('a refusal is not undone by a read that was already in flight and then succ
  again[1].reject(Object.assign(Error('Native source refused'),{code:'native_source_refused_inventory_incomplete'}));await settle();
  second.finish(held,{startedAt:w.state.clock,at:w.state.clock+5,ports:{80:{online:true}}},true);w.advance(10);await settle();
  assert.deepEqual(results,['Endpoint authority blocked']);assert.equal(again.length,2);assert.equal(second.diagnostics().blocked,'refused');
+});
+// ---- real factory, reader, producer and collector ---------------------------
+const fleet={equipment_master:[{canonical_family:'Sniper',unit_tag:'58',source_label:'Sniper 58',tracker_state:'field_or_unknown'}],
+ camera_devices:[{id:1,unit_key:'Sniper 58',device_name:'Cam 1',source:'2026_unit_tracker',mhelp_product_id:'11',public_ip:'8.8.8.8',expected_ports:[80],connection_revision:1,monitoring_profile:'sniper',monitoring_enabled:true,activation_state:'active',organization:'COS',last_health_checked_at:null}],camera_health_current:[]};
+const collectWithHeldProbe=async(text,{refuseDuringProbe})=>{
+ let stale=false;const w=load(text,{upstream:(n,{source})=>stale?refused():source()});Object.assign(w.state.tables,fleet);
+ const authority=w.factory(null,90_000);assert.equal(await authority.prepare(),true);
+ // The saved source is still inside its 26-second window, so the ticket is admitted from it.
+ w.advance(21_000);if(refuseDuringProbe)stale=true;
+ let release,probing;const started=new Promise(resolve=>probing=resolve),held=new Promise(resolve=>release=resolve);
+ const probe=async()=>{probing();await held;return {online:true,latency_ms:5,error:null};};
+ const run=w.api.collectScheduledDirect(w.db,probe,{startedAt:w.state.clock,deadlineMs:60_000,endpointEvidence:authority});
+ await started;const during=authority.diagnostics();
+ // The probe is in flight; let the background refresh finish before it completes.
+ for(let i=0;i<50&&refuseDuringProbe&&authority.diagnostics().blocked!=='refused';i++)await settle();
+ const blockedBeforeWrite=authority.diagnostics().blocked;
+ release();const outcome=await run;
+ return {during,blockedBeforeWrite,results:outcome.results,writes:w.state.rpcs.filter(n=>n==='publish_camera_connection_v1').length,receipts:w.state.rpcs.filter(n=>n==='cos_tracker_endpoint_commit_v1').length,diagnostics:authority.diagnostics()};
+};
+test('collector, healthy: the real producer admits the device, health is written and the receipt is committed',{skip},async()=>{
+ const r=await collectWithHeldProbe(patched,{refuseDuringProbe:false});
+ assert.equal(r.during.started,1,'a ticket was admitted before the probe');assert.equal(r.writes,1);assert.equal(r.receipts,1);
+ assert.equal(r.results.length,1);assert.equal(r.results[0].published,true);assert.equal(r.results[0].status,'online');assert.equal(r.diagnostics.responded,1);assert.equal(r.diagnostics.blocked,null);
+});
+test('collector, without the write fence: a refusal during the probe still lets health be written (the reported race)',{skip},async()=>{
+ const r=await collectWithHeldProbe(unfenced,{refuseDuringProbe:true});
+ assert.equal(r.during.started,1);assert.equal(r.blockedBeforeWrite,'refused');
+ assert.equal(r.writes,1,'health was written while the authority was refused');assert.equal(r.results[0].published,true);assert.equal(r.receipts,0,'only the later receipt was stopped');
+});
+test('collector, with the write fence: a refusal during an in-flight probe prevents the health write',{skip},async()=>{
+ const r=await collectWithHeldProbe(patched,{refuseDuringProbe:true});
+ assert.equal(r.during.started,1,'the ticket was admitted from the valid saved source');assert.equal(r.blockedBeforeWrite,'refused','the refusal was latched while the probe was held');
+ assert.equal(r.writes,0,'no health write');assert.equal(r.receipts,0,'no receipt');
+ assert.equal(JSON.stringify(r.results.map(x=>[x.status,x.reason,x.published])),JSON.stringify([['unknown','endpoint_authority_unverified',false]]));
+ assert.equal(r.diagnostics.responded,0);assert.equal(r.diagnostics.blocked,'refused');
 });
 test('two consecutive temporary failures stop further reads; one failure followed by success does not',{skip},async()=>{
  const failing=load(patched,{upstream:()=>temporary()}),a=failing.factory(null,600_000);
