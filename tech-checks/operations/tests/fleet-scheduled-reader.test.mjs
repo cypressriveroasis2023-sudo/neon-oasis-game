@@ -41,5 +41,27 @@ test('scheduled routes reject missing secret, browser origin and invalid methods
 test('authenticated failure is a source error, never an Offline reading',async()=>{
  const handler=createScheduledNativeEndpointSourceRuntime({enabled:true,getEnv:n=>n==='SUPABASE_URL'?'https://tughscoxralhofrckvxy.supabase.co':'synthetic',fetch:async url=>String(url).endsWith('camera-mhelp-readiness')?Response.json({authenticated:true}):new Response('',{status:503})});
  const response=await handler(new Request('https://example.test/endpoint-source',{method:'POST',headers:{'content-type':'application/json','x-camera-cron-secret':'synthetic'},body:'{"action":"read"}'}));
- assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Scheduled endpoint source unavailable'});
+ assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Scheduled endpoint source unavailable',code:'read_unavailable',retryable:true});
+});
+
+// The scheduled caller must be able to tell an inventory that cannot become
+// acceptable by asking again from a read that merely failed this time.
+const scheduledRead=async baseline=>{
+ const handler=createScheduledNativeEndpointSourceRuntime({enabled:true,now:()=>now,getEnv:n=>n==='SUPABASE_URL'?'https://tughscoxralhofrckvxy.supabase.co':'synthetic',fetch:async url=>String(url).endsWith('camera-mhelp-readiness')?Response.json({authenticated:true}):typeof baseline==='function'?baseline():Response.json(baseline)});
+ const response=await handler(new Request('https://example.test/endpoint-source',{method:'POST',headers:{'content-type':'application/json','x-camera-cron-secret':'synthetic'},body:'{"action":"read"}'}));
+ return {status:response.status,body:await response.json()};
+};
+test('a stale or incomplete accepted inventory is labelled as a refusal that retrying cannot change',async()=>{
+ const stale=fixture();stale.source.apiSync.lastSuccessAt=new Date(now-2700001).toISOString();
+ assert.deepEqual(await scheduledRead(stale.source),{status:503,body:{error:'Scheduled endpoint source unavailable',code:'inventory_not_current',retryable:false}});
+ for(const mutate of [s=>{s.complete=false;},s=>{s.reviewed=false;},s=>{s.apiSync.enabled=false;},s=>{s.records=[];},s=>{delete s.apiSync.lastSuccessAt;}]){const f=fixture();mutate(f.source);const r=await scheduledRead(f.source);assert.equal(r.status,503);assert.equal(r.body.code,'inventory_not_current');assert.equal(r.body.retryable,false);}
+ const partial=fixture();partial.source.trackerEndpointMembership.records.pop();
+ assert.deepEqual(await scheduledRead(partial.source),{status:503,body:{error:'Scheduled endpoint source unavailable',code:'inventory_incomplete',retryable:false}});
+ // Exactly at the 45-minute limit is still current: the freshness rule itself is unchanged.
+ const edge=fixture();edge.source.apiSync.lastSuccessAt=new Date(now-2700000).toISOString();const atLimit=await scheduledRead(edge.source);assert.notEqual(atLimit.body.code,'inventory_not_current');
+});
+test('a baseline read that fails, times out or is unreadable stays a temporary failure',async()=>{
+ for(const failing of [()=>new Response('',{status:500}),()=>new Response('',{status:503}),()=>{throw new DOMException('timed out','TimeoutError');},()=>new Response('{"contract":',{status:200,headers:{'content-type':'application/json'}})]){
+  assert.deepEqual(await scheduledRead(failing),{status:503,body:{error:'Scheduled endpoint source unavailable',code:'read_unavailable',retryable:true}});
+ }
 });
