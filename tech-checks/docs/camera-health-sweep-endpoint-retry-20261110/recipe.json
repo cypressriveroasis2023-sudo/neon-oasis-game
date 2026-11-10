@@ -5,7 +5,7 @@
  "baselineVersion": 96,
  "baselineFile": "camera-health-sweep/index.ts",
  "baselineSha256": "23fc5a6328479b3baf9fd4c114b3c4755ac8295347d0a97988c1422b60d59262",
- "resultSha256": "a3c91c32db892eb005b5d02411f9347c51c15744cd4086dc20ad318de0a5f188",
+ "resultSha256": "4a427389b26998c5f4ecaf4b70342797d84f37a746ebb130571af56b6443c952",
  "edits": [
   {
    "name": "reader-refusal",
@@ -17,7 +17,7 @@
    "name": "reader-refusal-helper",
    "occurrences": 1,
    "before": "function scheduledNativeSourceReader({ cronSecret, fetch: fetcher = fetch }) {\n",
-   "after": "// Reads only the small label on a 503. The source's own freshness and\n// completeness checks decide the label; nothing here re-derives them.\nvar SCHEDULED_SOURCE_REFUSALS = [\"inventory_not_current\", \"inventory_incomplete\"];\nasync function scheduledSourceRefusal(response) {\n  if (response?.status !== 503) return null;\n  try {\n    const text = await response.clone().text();\n    if (text.length > 512) return null;\n    const value = JSON.parse(text);\n    return value && value.retryable === false && SCHEDULED_SOURCE_REFUSALS.includes(value.code) ? value.code : null;\n  } catch {\n    return null;\n  }\n}\nfunction scheduledNativeSourceReader({ cronSecret, fetch: fetcher = fetch }) {\n"
+   "after": "// Reads only the small label on a 503. The source's own freshness and\n// completeness checks decide the label; nothing here re-derives them.\nvar SCHEDULED_SOURCE_REFUSALS = [\"inventory_not_current\", \"inventory_incomplete\"];\nasync function scheduledSourceRefusal(response) {\n  if (response?.status !== 503) return null;\n  // The label is bounded before it is read: a declared length above the\n  // limit is not read at all, and the stream is abandoned at the limit.\n  const declared = response.headers?.get(\"content-length\");\n  if (declared !== null && declared !== void 0 && !(/^[0-9]{1,4}$/.test(declared) && Number(declared) <= 512)) return null;\n  let reader = null;\n  try {\n    reader = response.clone().body?.getReader() || null;\n    if (!reader) return null;\n    const decoder = new TextDecoder(\"utf-8\", { fatal: true });\n    let bytes = 0, text = \"\";\n    for (;;) {\n      const part = await reader.read();\n      if (part.done) break;\n      bytes += part.value.length;\n      if (bytes > 512) return null;\n      text += decoder.decode(part.value, { stream: true });\n    }\n    const value = JSON.parse(text + decoder.decode());\n    return value && value.retryable === false && SCHEDULED_SOURCE_REFUSALS.includes(value.code) ? value.code : null;\n  } catch {\n    return null;\n  } finally {\n    void reader?.cancel().catch(() => {});\n  }\n}\nfunction scheduledNativeSourceReader({ cronSecret, fetch: fetcher = fetch }) {\n"
   },
   {
    "name": "safe-codes",
@@ -29,19 +29,31 @@
    "name": "evidence-signature",
    "occurrences": 1,
    "before": "function createScheduledEndpointEvidence({ readAuthority, commitIfCurrent, signal, deadline, now = Date.now }) {\n  const controller = new AbortController(), pending = /* @__PURE__ */ new Set();\n  const diagnostic = { preparation: \"pending\", failure: null, started: 0, responded: 0, no_response: 0, unknown: 0 };\n  let ready = null, refreshing = null, verifying = null, closed = false;\n",
-   "after": "function createScheduledEndpointEvidence({ readAuthority, commitIfCurrent, signal, deadline, now = Date.now, blocked: blockedAtStart = null }) {\n  const controller = new AbortController(), pending = /* @__PURE__ */ new Set();\n  const diagnostic = { preparation: \"pending\", failure: null, started: 0, responded: 0, no_response: 0, unknown: 0, authority_reads: 0 };\n  let ready = null, refreshing = null, verifying = null, closed = false;\n  // Once set, no further authority read is made by this invocation.\n  //  \"refused\":     the source declined a stale or incomplete inventory.\n  //  \"unavailable\": two consecutive reads failed for a temporary reason, or\n  //                 the caller's own preparation already failed.\n  // Either way every device is held as unverified, exactly as it is today\n  // when no current authority is available, and prior results are kept.\n  let blocked = blockedAtStart === \"refused\" || blockedAtStart === \"unavailable\" ? blockedAtStart : null, consecutiveFailures = 0;\n  if (blocked) {\n    diagnostic.preparation = blocked;\n    diagnostic.failure = blocked === \"refused\" ? \"authority_refused_by_caller\" : \"authority_unavailable_by_caller\";\n  }\n  const failed = (code) => {\n    consecutiveFailures++;\n    if (/^native_source_refused_/.test(code || \"\")) blocked = \"refused\";\n    else if (consecutiveFailures >= 2) blocked = \"unavailable\";\n  };\n"
+   "after": "function createScheduledEndpointEvidence({ readAuthority, commitIfCurrent, signal, deadline, now = Date.now, blocked: blockedAtStart = null }) {\n  const controller = new AbortController(), pending = /* @__PURE__ */ new Set();\n  const diagnostic = { preparation: \"pending\", failure: null, started: 0, responded: 0, no_response: 0, unknown: 0, authority_reads: 0 };\n  let ready = null, refreshing = null, verifying = null, closed = false;\n  // Once set, no further authority read is made by this invocation.\n  //  \"refused\":     the source declined a stale or incomplete inventory.\n  //  \"unavailable\": two consecutive reads failed for a temporary reason, or\n  //                 the caller's own preparation already failed.\n  // Either way every device is held as unverified, exactly as it is today\n  // when no current authority is available, and prior results are kept.\n  let blocked = blockedAtStart === \"refused\" || blockedAtStart === \"unavailable\" ? blockedAtStart : null, consecutiveFailures = 0;\n  if (blocked) {\n    diagnostic.preparation = blocked;\n    diagnostic.failure = blocked === \"refused\" ? \"authority_refused_by_caller\" : \"authority_unavailable_by_caller\";\n  }\n  const failed = (code) => {\n    consecutiveFailures++;\n    if (/^native_source_refused_/.test(code || \"\")) blocked = \"refused\";\n    else if (consecutiveFailures >= 2 && !blocked) blocked = \"unavailable\";\n    // A block is authoritative: the authority held so far is dropped, and\n    // no read that was already in flight may put one back.\n    if (blocked) ready = null;\n  };\n"
   },
   {
    "name": "evidence-refresh-gate",
    "occurrences": 1,
    "before": "    if (closed || controller.signal.aborted || now() >= deadline) return Promise.resolve(null);\n    if (refreshing) return refreshing;\n    refreshing = Promise.resolve().then(() => readAuthority(controller.signal)).then((value) => {\n      if (!closed && !controller.signal.aborted && Number.isFinite(value?.readAt) && value.readAt <= now() && now() - value.readAt <= 26e3) ready = value;\n      else ready = null;\n      diagnostic.preparation = ready ? \"ready\" : \"unavailable\";\n      return ready;\n    }, (error) => {\n      ready = null;\n      diagnostic.preparation = diagnostic.preparation === \"deadline\" ? \"deadline\" : \"unavailable\";\n",
-   "after": "    if (blocked || closed || controller.signal.aborted || now() >= deadline) return Promise.resolve(null);\n    if (refreshing) return refreshing;\n    diagnostic.authority_reads++;\n    refreshing = Promise.resolve().then(() => readAuthority(controller.signal)).then((value) => {\n      if (!closed && !controller.signal.aborted && Number.isFinite(value?.readAt) && value.readAt <= now() && now() - value.readAt <= 26e3) ready = value;\n      else ready = null;\n      if (ready) consecutiveFailures = 0;\n      else failed(null);\n      diagnostic.preparation = ready ? \"ready\" : blocked === \"refused\" ? \"refused\" : \"unavailable\";\n      return ready;\n    }, (error) => {\n      ready = null;\n      failed(error?.code);\n      diagnostic.preparation = blocked === \"refused\" ? \"refused\" : diagnostic.preparation === \"deadline\" ? \"deadline\" : \"unavailable\";\n"
+   "after": "    if (blocked || closed || controller.signal.aborted || now() >= deadline) return Promise.resolve(null);\n    if (refreshing) return refreshing;\n    diagnostic.authority_reads++;\n    refreshing = Promise.resolve().then(() => readAuthority(controller.signal)).then((value) => {\n      if (blocked) {\n        // Another request latched a block while this read was in flight.\n        ready = null;\n        diagnostic.preparation = blocked;\n        return null;\n      }\n      if (!closed && !controller.signal.aborted && Number.isFinite(value?.readAt) && value.readAt <= now() && now() - value.readAt <= 26e3) ready = value;\n      else ready = null;\n      if (ready) consecutiveFailures = 0;\n      else failed(null);\n      diagnostic.preparation = ready ? \"ready\" : blocked === \"refused\" ? \"refused\" : \"unavailable\";\n      return ready;\n    }, (error) => {\n      ready = null;\n      failed(error?.code);\n      diagnostic.preparation = blocked === \"refused\" ? \"refused\" : diagnostic.preparation === \"deadline\" ? \"deadline\" : \"unavailable\";\n"
   },
   {
    "name": "evidence-verify-gate",
    "occurrences": 1,
    "before": "    if (next.startedAt < after || controller.signal.aborted) throw Error(\"Cancelled or invalid observation\");\n    next.promise = Promise.resolve().then(() => readAuthority(controller.signal)).finally(() => {\n",
-   "after": "    if (next.startedAt < after || controller.signal.aborted) throw Error(\"Cancelled or invalid observation\");\n    if (blocked) throw Error(\"Endpoint authority blocked\");\n    diagnostic.authority_reads++;\n    next.promise = Promise.resolve().then(() => readAuthority(controller.signal)).then((value) => {\n      consecutiveFailures = 0;\n      return value;\n    }, (error) => {\n      failed(error?.code);\n      if (blocked) ready = null;\n      throw error;\n    }).finally(() => {\n"
+   "after": "    if (next.startedAt < after || controller.signal.aborted) throw Error(\"Cancelled or invalid observation\");\n    if (blocked) throw Error(\"Endpoint authority blocked\");\n    diagnostic.authority_reads++;\n    next.promise = Promise.resolve().then(() => readAuthority(controller.signal)).then((value) => {\n      if (blocked) throw Error(\"Endpoint authority blocked\");\n      consecutiveFailures = 0;\n      return value;\n    }, (error) => {\n      failed(error?.code);\n      if (blocked) diagnostic.preparation = blocked;\n      throw error;\n    }).finally(() => {\n"
+  },
+  {
+   "name": "evidence-begin-gate",
+   "occurrences": 1,
+   "before": "    async begin(candidate) {\n      if (closed || controller.signal.aborted || now() + 2500 >= deadline) return null;\n",
+   "after": "    async begin(candidate) {\n      if (blocked || closed || controller.signal.aborted || now() + 2500 >= deadline) return null;\n"
+  },
+  {
+   "name": "evidence-ticket-gate",
+   "occurrences": 1,
+   "before": "        if (s.aborted || controller.signal.aborted) throw Error(\"Cancelled\");\n        if (reads++ === 0) return first;\n        const value = await verifyAfter(recheckAfter);\n        if (!controller.signal.aborted) ready = value;\n        return value;\n",
+   "after": "        if (s.aborted || controller.signal.aborted) throw Error(\"Cancelled\");\n        // A ticket issued before a block cannot be completed after it.\n        if (blocked) throw Error(\"Endpoint authority blocked\");\n        if (reads++ === 0) return first;\n        const value = await verifyAfter(recheckAfter);\n        if (blocked) throw Error(\"Endpoint authority blocked\");\n        if (!controller.signal.aborted) ready = value;\n        return value;\n"
   },
   {
    "name": "evidence-diagnostics",
@@ -68,6 +80,12 @@
    "after": "function scheduledEndpointFromExistingCron(db, request, deadline, blocked = null) {"
   },
   {
+   "name": "factory-cache",
+   "occurrences": 1,
+   "before": "  let nativeSnapshot = null, nativeFlight = null;\n  const readNative = async (s) => {\n    const age = nativeSnapshot ? Date.now() - nativeSnapshot.observedAt : Infinity;\n    if (nativeSnapshot && age >= 0 && age <= 20e3) return nativeSnapshot;\n    if (nativeFlight) return nativeFlight;\n    nativeFlight = nativeRead(s).then((value) => {\n      nativeSnapshot = value;\n      return value;\n    }).catch((error) => {\n      const fallbackAge = nativeSnapshot ? Date.now() - nativeSnapshot.observedAt : Infinity;\n",
+   "after": "  let nativeSnapshot = null, nativeFlight = null, nativeRefusal = null;\n  const readNative = async (s) => {\n    // A refusal is authoritative for the rest of this invocation. Neither a\n    // cached snapshot nor a read already in flight may answer after it, and\n    // the source is not asked again.\n    if (nativeRefusal) throw nativeRefusal;\n    const age = nativeSnapshot ? Date.now() - nativeSnapshot.observedAt : Infinity;\n    if (nativeSnapshot && age >= 0 && age <= 20e3) return nativeSnapshot;\n    if (nativeFlight) return nativeFlight;\n    nativeFlight = nativeRead(s).then((value) => {\n      if (nativeRefusal) throw nativeRefusal;\n      nativeSnapshot = value;\n      return value;\n    }).catch((error) => {\n      if (/^native_source_refused_/.test(error?.code || \"\")) {\n        nativeRefusal = nativeRefusal || error;\n        nativeSnapshot = null;\n      }\n      if (nativeRefusal) throw nativeRefusal;\n      const fallbackAge = nativeSnapshot ? Date.now() - nativeSnapshot.observedAt : Infinity;\n"
+  },
+  {
    "name": "factory-binding",
    "occurrences": 1,
    "before": "  return createScheduledSourceBinding({ rpc, readNative, signal: request.signal, deadline, ioTimeoutMs: 30000 });",
@@ -77,13 +95,25 @@
    "name": "parent-prepare",
    "occurrences": 1,
    "before": "      if (!isShardCall && body.fanout !== false) {\n        if (endpointSourceEnabled) {\n          const sharedAuthority = scheduledEndpointFromExistingCron(db, req, requestStarted + 95e3);\n          try {\n            await sharedAuthority.prepare();\n          } catch {\n            return json({ error: \"Endpoint authority preparation failed\" }, 503);\n          }\n        }\n",
-   "after": "      if (!isShardCall && body.fanout !== false) {\n        // prepare() resolves false on failure; it does not throw. When it\n        // fails the shards still run, because router, provider and Star4Live\n        // monitoring do not depend on it, but they are told not to read the\n        // endpoint authority again in this cycle. The next scheduled cycle\n        // starts clean and asks once.\n        let endpointAuthorityDirective = null;\n        if (endpointSourceEnabled) {\n          const sharedAuthority = scheduledEndpointFromExistingCron(db, req, requestStarted + 95e3);\n          let prepared = false;\n          try {\n            prepared = await sharedAuthority.prepare() === true;\n          } catch {\n            prepared = false;\n          }\n          if (!prepared) {\n            endpointAuthorityDirective = sharedAuthority.diagnostics().blocked === \"refused\" ? \"refused\" : \"unavailable\";\n            endpointDiagnostic = sharedAuthority.diagnostics();\n          }\n        }\n"
+   "after": "      if (!isShardCall && body.fanout !== false) {\n        // prepare() resolves false on failure; it does not throw. When it\n        // fails the shards still run, because router, provider and Star4Live\n        // monitoring do not depend on it, but they are told not to read the\n        // endpoint authority again in this cycle. The next scheduled cycle\n        // starts clean and asks once.\n        let endpointAuthorityDirective = null;\n        // A shard reports a refusal it met itself. Shards that start or are\n        // retried after that are told not to ask again.\n        const noteShardAuthority = (result) => {\n          if (result?.endpoint_authority === \"refused\") endpointAuthorityDirective = \"refused\";\n        };\n        if (endpointSourceEnabled) {\n          const sharedAuthority = scheduledEndpointFromExistingCron(db, req, requestStarted + 95e3);\n          let prepared = false;\n          try {\n            prepared = await sharedAuthority.prepare() === true;\n          } catch {\n            prepared = false;\n          }\n          if (!prepared) {\n            endpointAuthorityDirective = sharedAuthority.diagnostics().blocked === \"refused\" ? \"refused\" : \"unavailable\";\n            endpointDiagnostic = sharedAuthority.diagnostics();\n          }\n        }\n"
   },
   {
    "name": "shard-request",
    "occurrences": 1,
    "before": "                body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount }),",
    "after": "                body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, ...endpointAuthorityDirective ? { endpoint_authority: endpointAuthorityDirective } : {} }),"
+  },
+  {
+   "name": "shard-result",
+   "occurrences": 1,
+   "before": "              const result = await response.json().catch(() => ({}));\n              if (response.ok && result.shard?.index === index && result.shard?.count === shardCount) return { index, ok: true, result };\n",
+   "after": "              const result = await response.json().catch(() => ({}));\n              noteShardAuthority(result);\n              if (response.ok && result.shard?.index === index && result.shard?.count === shardCount) return { index, ok: true, result };\n"
+  },
+  {
+   "name": "shard-report-failure",
+   "occurrences": 1,
+   "before": "      if (camera.error || shardCount === 1 && !coverageRecorded) return json({ error: camera.error || \"Sweep coverage could not be recorded\", coverage, coverage_recorded: coverageRecorded, routers_checked: routerResults.length, router_results: routerResults }, 503);\n      endpointDiagnostic = endpointEvidence?.diagnostics?.() || null;\n      return json({\n        checked: results.length,\n",
+   "after": "      if (camera.error || shardCount === 1 && !coverageRecorded) return json({ error: camera.error || \"Sweep coverage could not be recorded\", coverage, coverage_recorded: coverageRecorded, routers_checked: routerResults.length, router_results: routerResults, endpoint_authority: endpointEvidence?.diagnostics?.()?.blocked || null }, 503);\n      endpointDiagnostic = endpointEvidence?.diagnostics?.() || null;\n      return json({\n        endpoint_authority: endpointDiagnostic?.blocked || null,\n        checked: results.length,\n"
   },
   {
    "name": "shard-directive",

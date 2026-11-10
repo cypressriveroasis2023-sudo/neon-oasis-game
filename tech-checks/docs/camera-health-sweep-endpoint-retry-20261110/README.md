@@ -27,18 +27,27 @@ Two files, both small.
 1. Reader: a labelled refusal is thrown as `native_source_refused_<code>` and never retried. Unlabelled 502/503/504 keep the one quick retry.
 2. Authority object: a refusal blocks further reads for the rest of the invocation. Two consecutive failed reads for any other reason do the same. A blocked authority issues no tickets, so each device is held as `endpoint_authority_unverified` exactly as today, and prior results stay.
 3. Parent: uses the `prepare()` result. On failure the fan-out still runs, because router, provider and Star4Live monitoring do not depend on the authority, but each shard is told `endpoint_authority: "refused" | "unavailable"` and makes no authority read.
-4. Shards accept only those two values. The directive can stop reads; it cannot supply or vouch for an authority.
+4. Shards accept only those two values, and only on a shard call. The directive can stop reads; it cannot supply or vouch for an authority.
+5. A refusal is authoritative over everything held. The saved-snapshot fallback no longer answers for a source that is refusing (the snapshot is dropped and the refusal is latched for the invocation), a read that was already in flight cannot restore the authority after a refusal, no ticket is issued after it, and a ticket issued before it cannot complete its re-check.
+6. Each shard reports what its own authority concluded (`endpoint_authority` in its reply). When a shard reports `refused`, the parent sends that directive to every shard call it has not yet made, including retries.
+7. The 503 label is bounded before it is read: a declared length over 512 bytes (or not a plain number) is not read at all, and an undeclared body is abandoned once 512 bytes have arrived.
 
 Nothing is remembered between scheduled cycles. The next cycle asks once and resumes as soon as the inventory is current.
 
 ## Upstream calls per cycle
 
+The limit depends on when the refusal is first seen. All figures are endpoint-source calls for one scheduled cycle and are measured by the tests on the real handler.
+
 | Situation | v96 | Draft |
 |---|---|---|
-| Inventory stale or incomplete | unbounded by design; 13+ observed | 1 |
-| Source failing for a temporary reason | same | 2 (one read, one quick retry) |
-| A shard called on its own, source failing | one read per wave, each retried | at most 4 |
+| Inventory stale when the parent prepares | 13+ observed | 1 (parent); no shard reads |
+| Parent's read fails for a temporary reason | same | 2 (one read, one quick retry); no shard reads |
+| Parent healthy, inventory turns stale before the shards read | 5, or 9 with shard retries | 3: parent 1, plus 1 from each of the two shards that run together; later shards and all retries are told and make none |
+| One invocation that was healthy and is then refused | one or more per device request | 1 more, then none |
+| A shard called on its own, source failing temporarily | one read per wave, each retried | at most 4 |
 | Healthy | parent 1, each shard on start and as its authority ages | unchanged |
+
+The 3 is not a hard ceiling of the design in every interleaving: a shard that has already started holds no directive, so the bound is the parent's read plus one refused read per shard already running when the first refusal is reported. With two shards running at a time that is 3.
 
 ## Not changed
 
@@ -51,9 +60,11 @@ The deployed v96 source is not stored in this repository. With the exact file:
     COS_SWEEP_V96_SOURCE=/path/to/camera-health-sweep/index.ts \
       node --test --test-force-exit tests/camera-sweep-endpoint-authority.test.mjs
 
-The test refuses any file whose SHA-256 is not `baselineSha256` in `recipe.json`, applies the recipe, checks `resultSha256`, and runs the reader and authority code lifted unchanged from the result. Without the file the tests are skipped. Server labels are covered in `tests/fleet-scheduled-reader.test.mjs`.
+The test refuses any file whose SHA-256 is not `baselineSha256` in `recipe.json`, applies the recipe, checks `resultSha256`, then loads the whole result and runs the real handler, the real authority factory (`scheduledEndpointFromExistingCron`, including its snapshot cache) and the real reader. Only the platform edges are replaced: the database client, outbound `fetch`, the TCP connect and the clock. Shard calls are routed back into the same handler, so the parent and its four shards all execute. Without the file the tests are skipped. Server labels are covered in `tests/fleet-scheduled-reader.test.mjs`.
 
-Limit of this draft: the parent/shard hand-off is exercised through a model with the handler's shape (parent prepare, four shards two at a time, per-device requests per wave) plus assertions on the patched handler text. The handler itself is not executed, because it needs the Deno runtime and both projects.
+Cases covered on the real code: stale from the start; temporary failure in the parent; healthy parent then refused shards, with and without shard retries; healthy throughout; the next cycle and recovery; a healthy preparation followed by 20 refusals; a refusal racing a read already in flight (both orders); body bounding. The same harness run on unmodified v96 shows the fault.
+
+Limits: the database, the network and TCP checks are stand-ins, so this does not exercise the Deno runtime, real timing or either project. One test replaces the device producer with a stand-in that uses its ticket the same way, to control the order of two overlapping reads.
 
 ## Order if this is ever deployed
 
