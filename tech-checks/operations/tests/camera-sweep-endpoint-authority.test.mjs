@@ -71,7 +71,7 @@ const settle=()=>new Promise(resolve=>setTimeout(resolve,20));
 
 test('the recipe applies to exactly the deployed v96 source and produces the recorded result',{skip},()=>{
  assert.equal(recipe.baselineVersion,96);assert.equal(sha(baseline),recipe.baselineSha256,'COS_SWEEP_V96_SOURCE is not the exact deployed v96 file');assert.equal(sha(patched),recipe.resultSha256);
- for(const edit of recipe.edits)assert.ok(/scheduledSourceRefusal|native_source_|ScheduledEndpointEvidence|ScheduledSourceBinding|scheduledEndpointFromExistingCron|endpointAuthority|endpoint_authority|readAuthority|refreshing|diagnostics|fetchSource|nativeSnapshot|begin\(candidate\)|noteShardAuthority|Endpoint authority blocked|publish_camera_connection_v1/.test(edit.before+edit.after),edit.name);
+ for(const edit of recipe.edits)assert.ok(/scheduledSourceRefusal|native_source_|ScheduledEndpointEvidence|ScheduledSourceBinding|scheduledEndpointFromExistingCron|endpointAuthority|endpoint_authority|readAuthority|refreshing|diagnostics|fetchSource|nativeSnapshot|begin\(candidate\)|noteShardAuthority|Endpoint authority blocked|publish_camera_connection_v1|nativeFailures/.test(edit.before+edit.after),edit.name);
 });
 test('freshness, identity and hold guards are untouched',{skip},()=>{
  const count=(text,needle)=>text.split(needle).length-1;
@@ -198,6 +198,15 @@ test('two consecutive temporary failures stop further reads; one failure followe
  let n=0;const blip=load(patched,{upstream:(c,{source})=>++n===1?temporary():source()}),b=blip.factory(null,600_000);
  assert.equal(await b.prepare(),true);assert.equal(b.diagnostics().blocked,null);assert.equal(blip.state.upstream,2);
 });
+test('temporary failures behind a healthy snapshot: five upstream calls, then none; the snapshot answers only inside its window',{skip},async()=>{
+ let failing=false;const w=load(patched,{upstream:(n,{source})=>failing?temporary():source()});const authority=w.factory(null,600_000);
+ assert.equal(await authority.prepare(),true);failing=true;w.advance(21_000);
+ for(let round=0;round<20;round++){await authority.begin(device).catch(()=>null);await new Promise(r=>setTimeout(r,round<2?320:20));}
+ assert.equal(w.state.upstream,5,'one healthy read, then two failed reads with one quick retry each');
+ // Past the 26-second window the saved snapshot no longer answers and the authority is blocked without another call.
+ w.advance(6_000);for(let round=0;round<10;round++){assert.equal(await authority.begin(device).catch(()=>null),null);await settle();}
+ assert.equal(w.state.upstream,5);assert.equal(authority.diagnostics().blocked,'unavailable');
+});
 test('a blocked directive makes the real factory read nothing at all',{skip},async()=>{
  for(const directive of ['refused','unavailable']){
   const w=load(patched,{upstream:(n,{source})=>source()}),a=w.factory(directive,600_000);
@@ -238,6 +247,13 @@ test('handler, healthy parent then stale, with every first-wave shard retried: s
  const c=await w.cycle();
  assert.equal(c.shards.length,6,'two shards were each called twice');assert.equal(c.calls,3,'the retried shards are told about the refusal and do not ask again');
  assert.deepEqual(c.shards.map(s=>[s.shard_index,s.endpoint_authority??null]).sort((a,b)=>String(a).localeCompare(String(b))),[[0,null],[0,'refused'],[1,null],[1,'refused'],[2,'refused'],[3,'refused']].sort((a,b)=>String(a).localeCompare(String(b))));
+});
+test('handler, healthy parent then stale, and every shard reply is lost: nine upstream calls, the stated worst case',{skip},async()=>{
+ // The parent can only pass on a refusal it has heard. If no shard reply arrives, each of the four
+ // shards asks once on its first call and once on its one retry: 1 + 4 x 2.
+ const w=load(patched,{upstream:(n,{source})=>n===1?source():refused(),shardReply:async()=>new Response('',{status:503})});
+ const c=await w.cycle();
+ assert.equal(c.shards.length,8);assert.equal(c.calls,9);assert.ok(c.shards.every(s=>(s.endpoint_authority??null)===null));
 });
 test('handler, healthy throughout: every shard reads its own authority and no directive is sent',{skip},async()=>{
  const w=load(patched,{upstream:(n,{source})=>source()}),c=await w.cycle();

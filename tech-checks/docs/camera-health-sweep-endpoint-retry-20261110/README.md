@@ -34,23 +34,28 @@ Two files, both small.
 8. Final write fence in the collector: immediately before `publish_camera_connection_v1`, the device's ticket must still stand for a current authority. If a refusal (or the two-failure limit) was latched while the TCP probe was in flight, nothing is written, the device is held as `endpoint_authority_unverified` and its previous result is kept. In v96 and in the earlier draft the health write happened first and only the later receipt was rejected.
 
 Remaining window: the fence is checked in the function, not in the database. A refusal that arrives after the check, while the write request itself is in flight, cannot stop that one write. Closing that would need the database write to carry the authority generation, which is a schema change and is not in this draft.
+9. Temporary failures behind the saved snapshot are counted. After two consecutive failed reads the source is not asked again in that invocation; the snapshot fallback keeps its 26-second limit and then the failure is reported, which blocks the authority.
+
+Admission and write are both guarded: no ticket is admitted once the authority is blocked (item 2), and no health is written for a ticket admitted earlier (item 8).
 
 Nothing is remembered between scheduled cycles. The next cycle asks once and resumes as soon as the inventory is current.
 
-## Upstream calls per cycle
+## Upstream calls, by scenario
 
-The limit depends on when the refusal is first seen. All figures are endpoint-source calls for one scheduled cycle and are measured by the tests on the real handler.
+There is no single limit. Each figure is endpoint-source calls for one scheduled cycle (parent plus four shards, two at a time, one retry each), measured by a test that runs the real handler or factory.
 
-| Situation | v96 | Draft |
+| Scenario | Draft | Why |
 |---|---|---|
-| Inventory stale when the parent prepares | 13+ observed | 1 (parent); no shard reads |
-| Parent's read fails for a temporary reason | same | 2 (one read, one quick retry); no shard reads |
-| Parent healthy, inventory turns stale before the shards read | 5, or 9 with shard retries | 3: parent 1, plus 1 from each of the two shards that run together; later shards and all retries are told and make none |
-| One invocation that was healthy and is then refused | one or more per device request | 1 more, then none |
-| A shard called on its own, source failing temporarily | one read per wave, each retried | at most 4 |
-| Healthy | parent 1, each shard on start and as its authority ages | unchanged |
+| Inventory stale when the parent prepares | 1 | parent asks once; every shard is told and reads nothing |
+| Parent's read fails for a temporary reason | 2 | one read and its quick retry; shards are told |
+| Healthy parent, then stale; shard replies arrive | 3 | parent 1, plus 1 from each of the two shards running together; later shards and retries are told |
+| Healthy parent, then stale; every shard reply is lost | 9 | the parent can only pass on a refusal it has heard: 1 + 4 shards x 2 attempts, one call each. Worst case for a refusal |
+| One invocation, healthy, then refused | 2 | the refusal is latched; no ticket is admitted and no health is written after it |
+| One invocation, healthy, then temporary failures | 5 | 1 healthy, then two failed reads with one quick retry each; after that the source is not asked again in that invocation. The saved snapshot answers only inside its unchanged 26-second window |
+| One invocation, failing temporarily from the start | 4 | two reads with one quick retry each |
+| Healthy throughout | 5 in the test | parent 1, each shard on start; each shard also re-reads as its authority ages, as in v96 |
 
-The 3 is not a hard ceiling of the design in every interleaving: a shard that has already started holds no directive, so the bound is the parent's read plus one refused read per shard already running when the first refusal is reported. With two shards running at a time that is 3.
+Not bounded by this draft: a cycle in which the source keeps answering successfully. That is normal operation and is unchanged.
 
 ## Not changed
 
