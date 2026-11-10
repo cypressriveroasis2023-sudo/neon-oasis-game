@@ -22,6 +22,25 @@
 --    60 seconds no longer blocks the next refresh and is reported failed.
 --    Leases requested without a token (the previous handler) are unaffected.
 -- Existing callers that pass only the original arguments keep working.
+-- Preflight. This file may be applied to the original install, over any
+-- earlier draft of itself, or twice. Every signature this file or a draft of
+-- it ever defined is removed first, because a function's return type or
+-- defaults cannot be changed in place. Only functions are dropped; no table,
+-- column or row is.
+drop function if exists public.cos_fleet_board_begin(boolean);
+drop function if exists public.cos_fleet_board_begin(boolean,uuid);
+drop function if exists public.cos_fleet_board_claim(uuid,uuid);
+drop function if exists public.cos_fleet_board_progress(uuid,jsonb);
+drop function if exists public.cos_fleet_board_progress(uuid,jsonb,uuid);
+drop function if exists public.cos_fleet_board_finish(uuid,jsonb);
+drop function if exists public.cos_fleet_board_finish(uuid,jsonb,jsonb);
+drop function if exists public.cos_fleet_board_finish(uuid,jsonb,jsonb,uuid);
+drop function if exists public.cos_fleet_board_fail(uuid,text,jsonb);
+drop function if exists public.cos_fleet_board_fail(uuid,text,jsonb,jsonb);
+drop function if exists public.cos_fleet_board_fail(uuid,text,jsonb,jsonb,uuid);
+drop function if exists public.cos_fleet_board_status();
+drop function if exists public.cos_fleet_board_payload(uuid);
+
 alter table cos_fleet_board_private.runs add column if not exists diagnostics jsonb;
 alter table cos_fleet_board_private.runs add column if not exists producer uuid;
 alter table cos_fleet_board_private.runs add column if not exists request uuid;
@@ -41,7 +60,6 @@ begin
  return jsonb_build_object('claimed',true,'leaseRemainingMs',greatest(0,floor(180000-extract(epoch from (clock_timestamp()-s))*1000))::int);
 end$$;
 
-drop function if exists public.cos_fleet_board_begin(boolean);
 create or replace function public.cos_fleet_board_begin(p_force boolean default false,p_request uuid default null) returns jsonb language plpgsql security invoker set search_path='' as $$
 declare c cos_fleet_board_private.control%rowtype;r uuid;
 begin
@@ -75,7 +93,6 @@ begin
  return found;
 end$$;
 
-drop function if exists public.cos_fleet_board_finish(uuid,jsonb);
 create or replace function public.cos_fleet_board_finish(p_run uuid,p_payload jsonb,p_diagnostics jsonb default null,p_producer uuid default null) returns boolean language plpgsql security invoker set search_path='' set statement_timeout='30s' as $$
 declare c cos_fleet_board_private.control%rowtype;
 begin
@@ -91,7 +108,6 @@ begin
  return true;
 end$$;
 
-drop function if exists public.cos_fleet_board_fail(uuid,text,jsonb);
 create or replace function public.cos_fleet_board_fail(p_run uuid,p_code text,p_products jsonb default '[]',p_diagnostics jsonb default null,p_producer uuid default null) returns boolean language plpgsql security invoker set search_path='' as $$
 begin
  if current_user<>'service_role' then raise exception 'Backend only';end if;

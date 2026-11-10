@@ -58,9 +58,20 @@ A database call can take effect and still fail to answer. Two calls matter:
 
 As a last resort, a token-requested lease that nobody claims within 60 seconds stops blocking the next refresh, is reported `worker_interrupted`, and can no longer be claimed. Leases requested without a token, as the previous handler does, keep the full 180 seconds.
 
+### Unreadable replies
+
+The transport returns an empty object for an HTTP 200 whose body is missing or cut off, so a reply counts only when it has the exact shape the database returns:
+
+- lease: literal `null` (no lease) or an object with a run id;
+- claim: `{claimed:false}`, or `{claimed:true}` with a non-negative `leaseRemainingMs`;
+- publish: literal `true` (published) or literal `false` (refused);
+- status: an object with the `COS_DURABLE_FLEET_RESPONSE_V1` contract.
+
+Anything else is unknown. An unknown lease or claim reply is asked again with the same token, exactly like a lost reply. An unknown publish reply is recorded as `commit_unreadable`, and the failure write that follows is refused if the board was published. An unknown status is read again and is never served as an empty board.
+
 ### Deadlines
 
-The lease runs from the moment the database grants it. The claim returns `leaseRemainingMs` by the database clock, and the producer measures everything from that: source reads end 35 seconds before the lease does, and the publish request is limited to 30 seconds or the remaining lease less 3 seconds, whichever is shorter. Time spent on hand-off, grace or claim retries is therefore not counted twice. A publish that is cut off is recorded as `commit_timeout`; the failure write that follows is refused by the database if the board was in fact published. `cos_fleet_board_fail` takes the same lock as `cos_fleet_board_finish` first, so the two cannot interleave.
+The lease runs from the moment the database grants it. The claim returns `leaseRemainingMs` by the database clock. The producer counts that remainder from the moment it sent the claim, not from when the reply arrived, so the whole round trip is deducted and a slow reply can only shorten the working time. Everything is measured from that: source reads end 35 seconds before the lease does, and the publish request is limited to 30 seconds or the remaining lease less 3 seconds, whichever is shorter. Time spent on hand-off, grace or claim retries is therefore not counted twice. A publish that is cut off is recorded as `commit_timeout`; the failure write that follows is refused by the database if the board was in fact published. `cos_fleet_board_fail` takes the same lock as `cos_fleet_board_finish` first, so the two cannot interleave.
 
 ### Queued refreshes
 
@@ -69,6 +80,8 @@ A refresh is queued in two cases: it arrives while a batch is running, or it arr
 Each run stores bounded diagnostics in `runs.diagnostics`: step name, duration, attempt count, HTTP status and the source's own stage/code. No rows, addresses, IPs, identities, tokens or message text are stored. `refresh.diagnostics` and `history[].diagnostics` return them to the already authorized Owner/IT read.
 
 A failed, interrupted or running batch never changes `latest.id`, `latest.completedAt` or the stored payload. Opening and polling claim no lease and read no live source.
+
+Preflight: confirm which `cos_fleet_board_*` functions and `runs` columns exist. The file drops every signature it or an earlier draft of it defined before recreating them, so it applies to the original install, over a single earlier draft, or twice; it drops functions only, never a table, column or row.
 
 Apply `db/fleet-board-reliability-20261109.sql` before deploying the handler. It is compatible with the previous handler, so the handler can be rolled back without reverting the database.
 

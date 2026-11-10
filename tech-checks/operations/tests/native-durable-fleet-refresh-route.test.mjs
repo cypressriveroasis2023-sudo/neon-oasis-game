@@ -20,11 +20,13 @@ const recordId='a2345678-1234-1234-1234-123456789abc',followId='b2345678-1234-12
 const organization='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 function fixture(who=owner,options={}){
  const data=fieldProductFixture(),calls=[],sources=[],tasks=[];
- const saved={contract:'COS_DURABLE_FLEET_READ_V1',latest:null,runs:[]};
+ const saved={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:null,runs:[]};
  const json=(body,status=200)=>Response.json(body,{status});
  class FixedDate extends Date{constructor(...args){super(...(args.length?args:[data.now]));}static now(){return data.now;}}
  const deny=()=>{throw Error('Unexpected network or signing in offline proof');};
  let handler;const hops=[],attempts={},claims={},lost={},requests={};
+ // HTTP 200 with a body that ends mid-value.
+ const cut=text=>new Response(text,{status:200,headers:{'Content-Type':'application/json'}});
  const context=vm.createContext({console,crypto:webcrypto,structuredClone,Date:FixedDate,TextEncoder,TextDecoder,URL,URLSearchParams,Request,Response,Headers,AbortController,AbortSignal,setTimeout:(fn,ms)=>setTimeout(fn,Math.min(ms,5)),clearTimeout,
   fetch:async(url,init)=>{
    assert.equal(init.method,'POST');assert.equal(init.headers.Authorization,'Bearer synthetic-token');
@@ -57,7 +59,7 @@ function fixture(who=owner,options={}){
   if(path==='/rest/v1/profiles')return json([{user_id:who.legacy,full_name:who.name,role:who.department,active:!options.inactive,archived_at:null}]);
   if(path==='/rest/v1/user_profiles')return json([{user_id:who.actor,display_name:who.name,department:who.department,active:true}]);
   if(path==='/rest/v1/user_roles')return json(options.revoked?[]:[{role_id:recordId,roles:{code:who.role,organization_id:organization}}]);
-  if(path==='/rest/v1/rpc/cos_fleet_board_status')return json(options.status?options.status(calls):saved);
+  if(path==='/rest/v1/rpc/cos_fleet_board_status'){if(options.truncated?.status&&!lost.status){lost.status=true;return cut('{"contract":"COS_DUR');}return json(options.status?options.status(calls):saved);}
   if(path==='/rest/v1/rpc/cos_fleet_board_payload')return new Response(options.payload??'null',{status:options.payloadStatus||200});
   if(path==='/rest/v1/rpc/cos_fleet_board_progress')return json(true);
   if(path==='/rest/v1/rpc/cos_fleet_board_claim'){
@@ -65,6 +67,8 @@ function fixture(who=owner,options={}){
    claims[body.p_run]=body.p_producer;
    // The claim took effect, but its reply never reached the handler.
    if(options.claimReplyLost&&!lost.claim){lost.claim=true;return json({message:'upstream reset'},502);}
+   // The claim took effect and the reply is a 200 whose body is cut off.
+   if(options.truncated?.claim&&!lost.claim){lost.claim=true;return cut('{"claimed":tr');}
    return json({claimed:true,leaseRemainingMs:options.leaseRemainingMs??176000});}
   if(path==='/rest/v1/rpc/cos_fleet_board_history')return json({items:[]});
   if(path==='/rest/v1/rpc/cos_fleet_board_begin'){
@@ -73,7 +77,9 @@ function fixture(who=owner,options={}){
    if(options.leaseBusy||(body.p_force&&options.forceRefused)||(body.p_force===false&&!options.followUp))return json(null);
    const id=requests[body.p_request]=body.p_force===false?followId:recordId;
    if(options.beginReplyLost&&!lost.begin){lost.begin=true;return json({message:'upstream reset'},502);}
+   if(options.truncated?.begin&&!lost.begin){lost.begin=true;return cut('{"id":"a23');}
    return json({id});}
+  if(path==='/rest/v1/rpc/cos_fleet_board_finish'&&options.truncated?.finish)return cut('tr');
   if(['/rest/v1/rpc/cos_fleet_board_stage','/rest/v1/rpc/cos_fleet_board_finish','/rest/v1/rpc/cos_fleet_board_fail'].includes(path))return json(true);
   throw Error('Unexpected synthetic route '+path);
  }});
@@ -232,4 +238,28 @@ test('queued follow-up lease granted but unanswered: recovered with the same tok
 test('the worker reads sources against the lease it was told remains, and bounds its publish request',async()=>{
  const f=fixture(owner,{leaseRemainingMs:150000}),r=await f.request();assert.equal(r.status,200);
  const finish=f.calls.find(c=>c.path.endsWith('finish'));assert.equal(finish.body.p_diagnostics.budgetMs,150000);assert.ok(finish.signal,'the publish request carries a time limit');
+});
+
+test('truncated 200 on the worker claim: not treated as refused; the worker keeps the run it won and no second producer starts',async()=>{
+ const f=fixture(owner,{producer:true,truncated:{claim:true},payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
+ const rpcs=f.calls.filter(c=>c.path.includes('/rpc/')),claims=rpcs.filter(c=>c.path.endsWith('claim')),worker=claims[0].body.p_producer;
+ assert.ok(claims.filter(c=>c.body.p_producer===worker).length>=2,'asked again with the same token');assert.equal(f.claims[recordId],worker);
+ assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ const finishes=rpcs.filter(c=>c.path.endsWith('finish'));assert.equal(finishes.length,1);assert.equal(finishes[0].body.p_producer,worker);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
+ const direct=fixture(it,{truncated:{claim:true},payload:JSON.stringify(board),status:done}),answer=await direct.request('/api/fleet-saved-board/produce','POST',{run:recordId});
+ assert.equal(answer.status,503,'an unreadable claim reply is never acknowledged as accepted or reported as refused');assert.equal(direct.calls.filter(c=>c.path.endsWith('finish')).length,1);
+});
+test('truncated 200 on the lease request: not treated as "no lease"; the same token recovers it and the batch runs once',async()=>{
+ const f=fixture(it,{producer:true,truncated:{begin:true},payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
+ const begins=f.calls.filter(c=>c.path.endsWith('begin'));assert.equal(begins.length,2);assert.equal(begins[0].body.p_request,begins[1].body.p_request);
+ assert.deepEqual(f.calls.filter(c=>c.path.endsWith('finish')).map(c=>c.body.p_run),[recordId]);assert.equal(f.sources.length,3);
+});
+test('truncated 200 on publish: not treated as success; recorded as unconfirmed',async()=>{
+ const f=fixture(owner,{truncated:{finish:true}}),r=await f.request();assert.equal(r.status,200);
+ const failed=f.calls.find(c=>c.path.endsWith('fail'));assert.ok(failed,'an unreadable publish reply must not pass as published');
+ assert.equal(failed.body.p_diagnostics.failedStep,'commit');assert.equal(failed.body.p_diagnostics.steps.at(-1).kind,'commit_unreadable');assert.equal(failed.body.p_producer,f.claims[recordId]);
+});
+test('truncated 200 on status: the stored board is still returned, never an empty record',async()=>{
+ const f=fixture(it,{truncated:{status:true},status:()=>status(),payload:JSON.stringify(board)}),r=await f.request('/api/fleet-saved-board','GET');
+ assert.equal(r.status,200);assert.equal(r.body.contract,'COS_DURABLE_FLEET_RESPONSE_V1');assert.deepEqual(r.body.latest.payload,board);assert.equal(f.tasks.length,0);
 });

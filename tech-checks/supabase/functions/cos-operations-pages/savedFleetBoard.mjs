@@ -19,6 +19,11 @@ function forgetSavedFleetPayload() {
   completed = null;
 }
 var safe = (value) => typeof value === "string" && SAFE.test(value) ? value : null;
+var UNKNOWN = Symbol("unknown");
+var RUN_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+var leaseAnswer = (value) => value === null ? null : value && typeof value === "object" && typeof value.id === "string" && RUN_ID.test(value.id) ? value : UNKNOWN;
+var claimAnswer = (value) => !value || typeof value !== "object" ? UNKNOWN : value.claimed === false ? false : value.claimed === true && Number.isFinite(value.leaseRemainingMs) && value.leaseRemainingMs >= 0 ? value.leaseRemainingMs : UNKNOWN;
+var statusAnswer = (value) => value && typeof value === "object" && value.contract === "COS_DURABLE_FLEET_RESPONSE_V1" && (value.latest === null || value.latest === void 0 || typeof value.latest === "object") ? value : UNKNOWN;
 var whole = (value) => Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
 function failureDetail(cause) {
   const d = cause?.detail, out = {};
@@ -34,8 +39,9 @@ function failureDetail(cause) {
 }
 async function savedFleetResponse({ rpc, payloadText }) {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const status = await rpc("cos_fleet_board_status", {});
-    const id = status?.latest?.id;
+    const status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    if (status === UNKNOWN) continue;
+    const id = status.latest?.id;
     if (!id) {
       return JSON.stringify(status);
     }
@@ -49,8 +55,8 @@ async function savedFleetResponse({ rpc, payloadText }) {
   }
   throw Error("saved_board_unavailable");
 }
-async function produceFleetBoard({ run, producer = null, leaseRemainingMs, rpc, read, now = Date.now, project, abort, timeoutSignal = (ms) => AbortSignal.timeout(ms) }) {
-  const started = now(), budget = Number.isFinite(leaseRemainingMs) ? Math.max(0, Math.min(FLEET_LEASE_MS, leaseRemainingMs)) : FLEET_BATCH_BUDGET_MS;
+async function produceFleetBoard({ run, producer = null, leaseEndAt, rpc, read, now = Date.now, project, abort, timeoutSignal = (ms) => AbortSignal.timeout(ms) }) {
+  const started = now(), budget = Number.isFinite(leaseEndAt) ? Math.max(0, Math.min(FLEET_LEASE_MS, leaseEndAt - started)) : FLEET_BATCH_BUDGET_MS;
   const leaseEnd = started + budget, deadline = leaseEnd - LEASE_MARGIN_MS;
   const diagnostics = { version: 1, budgetMs: whole(budget), steps: [] };
   let current = "start";
@@ -89,7 +95,8 @@ async function produceFleetBoard({ run, producer = null, leaseRemainingMs, rpc, 
       } catch (cause) {
         throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: cause?.name === "TimeoutError" || cause?.name === "AbortError" ? "commit_timeout" : "commit_error" } });
       }
-      if (!published) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "lease_lost" } });
+      if (published === false) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "lease_lost" } });
+      if (published !== true) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "commit_unreadable" } });
     });
     return true;
   } catch (cause) {
@@ -105,25 +112,36 @@ var newToken = () => globalThis.crypto.randomUUID();
 var UNCERTAIN_DELIVERY_GRACE_MS = 4e3;
 var dispatchFailure = (kind, attempts) => ({ version: 1, steps: [{ step: "dispatch", ok: false, kind, attempts }], reached: "dispatch", failedStep: "dispatch" });
 async function beginLease({ rpc, force, request, sleep }) {
-  let last;
+  let last = Error("lease_unconfirmed");
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return await rpc("cos_fleet_board_begin", { p_force: force, p_request: request });
+      const answer = leaseAnswer(await rpc("cos_fleet_board_begin", { p_force: force, p_request: request }));
+      if (answer !== UNKNOWN) return answer;
+      last = Error("lease_unconfirmed");
     } catch (cause) {
       last = cause;
-      if (attempt < 2) await sleep(1e3);
     }
+    if (attempt < 2) await sleep(1e3);
   }
   throw last;
 }
-async function claimFleetBatch({ rpc, run, producer, sleep = pause, attempts = 4 }) {
+async function claimOnce({ rpc, run, producer, now }) {
+  const sentAt = now();
+  let answer;
+  try {
+    answer = claimAnswer(await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer }));
+  } catch {
+    answer = UNKNOWN;
+  }
+  if (answer === UNKNOWN) return { claimed: null };
+  if (answer === false) return { claimed: false };
+  return { claimed: true, leaseEndAt: sentAt + answer };
+}
+async function claimFleetBatch({ rpc, run, producer, now = Date.now, sleep = pause, attempts = 4 }) {
   for (let attempt = 0; attempt < attempts; attempt++) {
-    try {
-      const answer = await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer });
-      return answer?.claimed === true ? { claimed: true, leaseRemainingMs: answer.leaseRemainingMs } : { claimed: false };
-    } catch {
-      if (attempt < attempts - 1) await sleep(1500);
-    }
+    const claim = await claimOnce({ rpc, run, producer, now });
+    if (claim.claimed !== null) return claim;
+    if (attempt < attempts - 1) await sleep(1500);
   }
   await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("claim_unconfirmed", attempts) }).catch(() => {
   });
@@ -146,11 +164,11 @@ async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort,
     }
     if (uncertain) await sleep(UNCERTAIN_DELIVERY_GRACE_MS);
     attempted = token();
-    const claim = await claimFleetBatch({ rpc, run, producer: attempted, sleep });
+    const claim = await claimFleetBatch({ rpc, run, producer: attempted, now, sleep });
     if (claim.claimed === null) return "failed";
     if (!claim.claimed) return "owned_elsewhere";
     if (inline) {
-      await runFleetBatch({ run, producer: attempted, leaseRemainingMs: claim.leaseRemainingMs, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
+      await runFleetBatch({ run, producer: attempted, leaseEndAt: claim.leaseEndAt, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
       return "ran_here";
     }
     await rpc("cos_fleet_board_fail", { p_run: run, p_producer: attempted, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure(uncertain ? "delivery_uncertain" : "delivery_rejected", attempts) });
@@ -163,20 +181,15 @@ async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort,
 }
 async function acceptFleetBatch({ run, rpc, read, now = Date.now, project, abort, followTargets = [], waitUntil, sleep = pause, token = newToken, timeoutSignal }) {
   const producer = token();
-  const work = (claim) => runFleetBatch({ run, producer, leaseRemainingMs: claim.leaseRemainingMs, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
-  let first;
-  try {
-    first = await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer });
-  } catch {
-    first = null;
-  }
-  if (first?.claimed === true) {
+  const work = (claim) => runFleetBatch({ run, producer, leaseEndAt: claim.leaseEndAt, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
+  const first = await claimOnce({ rpc, run, producer, now });
+  if (first.claimed === true) {
     waitUntil(work(first));
     return "accepted";
   }
-  if (first !== null) return "refused";
+  if (first.claimed === false) return "refused";
   waitUntil((async () => {
-    const claim = await claimFleetBatch({ rpc, run, producer, sleep });
+    const claim = await claimFleetBatch({ rpc, run, producer, now, sleep });
     if (claim.claimed === true) await work(claim);
   })());
   return "unknown";
@@ -184,8 +197,12 @@ async function acceptFleetBatch({ run, rpc, read, now = Date.now, project, abort
 async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [], inline = false, startedAt, now = Date.now, sleep = pause, token = newToken, timeoutSignal }) {
   try {
     if (!inline && !targets.some(Boolean)) return false;
-    const status = await rpc("cos_fleet_board_status", {});
-    if (status?.refresh?.state !== "queued") return false;
+    let status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    if (status === UNKNOWN) {
+      await sleep(1e3);
+      status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    }
+    if (status === UNKNOWN || status.refresh?.state !== "queued") return false;
     const recorded = Date.parse(status.refresh.startedAt);
     const since = Number.isFinite(recorded) ? recorded : startedAt ?? now();
     const wait = Math.min(61e3, 61e3 - (now() - since));
@@ -195,7 +212,8 @@ async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [
     for (let attempt = 0; attempt < 3 && !lease?.id; attempt++) {
       if (attempt) {
         await sleep(2e3);
-        if ((await rpc("cos_fleet_board_status", {}))?.refresh?.state !== "queued") return false;
+        const again = statusAnswer(await rpc("cos_fleet_board_status", {}));
+        if (again !== UNKNOWN && again.refresh?.state !== "queued") return false;
       }
       lease = await beginLease({ rpc, force: false, request, sleep });
     }
@@ -206,9 +224,9 @@ async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [
     return false;
   }
 }
-async function runFleetBatch({ run, producer = null, leaseRemainingMs, rpc, read, now = Date.now, project, abort, followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
+async function runFleetBatch({ run, producer = null, leaseEndAt, rpc, read, now = Date.now, project, abort, followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
   const startedAt = now();
-  const ok = await produceFleetBoard({ run, producer, leaseRemainingMs, rpc, read, now, project, abort, timeoutSignal });
+  const ok = await produceFleetBoard({ run, producer, leaseEndAt, rpc, read, now, project, abort, timeoutSignal });
   await continueQueuedFleetBoard({ rpc, targets: followTargets, inline: false, startedAt, now, sleep, token, timeoutSignal });
   return ok;
 }

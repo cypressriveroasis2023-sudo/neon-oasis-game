@@ -18,7 +18,7 @@ test('the server publishes current Unknown instead of retaining stale red or gre
 const stored=(id='old',state='completed')=>({contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id,completedAt:'2026-11-09T01:37:00Z'},refresh:{id,state},history:[]});
 test('refresh returns the stored board while a bounded background batch runs; failure does not publish',async()=>{
  forgetSavedFleetPayload();
- const calls=[],tasks=[];let release;const gate=new Promise(r=>release=r);const rpc=async(name,args)=>{calls.push([name,args]);return name.endsWith('begin')?{id:'run'}:name.endsWith('status')?stored():name.endsWith('claim')?{claimed:true,leaseRemainingMs:179000}:true;};
+ const calls=[],tasks=[];let release;const gate=new Promise(r=>release=r);const rpc=async(name,args)=>{calls.push([name,args]);return name.endsWith('begin')?{id:'aaaaaaaa-0000-4000-8000-000000000001'}:name.endsWith('status')?stored():name.endsWith('claim')?{claimed:true,leaseRemainingMs:179000}:true;};
  const response=JSON.parse(await savedFleetBoard({rpc,payloadText:async()=>'{"old":true}',force:true,read:async()=>{await gate;throw Error('private raw error');},waitUntil:p=>tasks.push(p),project:()=>{throw Error('must not project failed reads');}}));
  assert.equal(response.latest.payload.old,true);assert.equal(response.latest.completedAt,'2026-11-09T01:37:00Z');assert.equal(calls.some(c=>c[0]==='cos_fleet_board_finish'),false);release();await tasks[0];
  assert.deepEqual(calls.map(c=>c[0]).slice(0,3).sort(),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_status']);
@@ -72,7 +72,7 @@ const batch=(overrides={})=>{
  const calls=[],reads=[],bounds=[];let clock=1000;
  const rpc=async(name,args,signal)=>{calls.push([name,structuredClone(args)]);if(name.endsWith('finish'))assert.equal(signal,'bounded','the publish request must carry its time limit');return overrides.rpc?.(name,args)??true;};
  const read=async(path,limits)=>{reads.push([path,limits]);clock+=overrides.readMs??10;const value=await overrides.read?.(path,limits);if(value!==undefined)return value;return {value:{path},attempts:1};};
- return {calls,reads,bounds,run:()=>produceFleetBoard({run:'run',producer:'token-a',leaseRemainingMs:overrides.leaseRemainingMs,timeoutSignal:ms=>{bounds.push(ms);return 'bounded';},rpc,read,now:()=>clock,project:overrides.project??((health,map,connections,previous,at)=>({contract:'COS_SAVED_FLEET_BOARD_V1',health,map,connections,previous,at})),abort:()=>calls.push(['abort'])})};
+ return {calls,reads,bounds,run:()=>produceFleetBoard({run:'run',producer:'token-a',leaseEndAt:overrides.leaseRemainingMs===undefined?undefined:1000+overrides.leaseRemainingMs,timeoutSignal:ms=>{bounds.push(ms);return 'bounded';},rpc,read,now:()=>clock,project:overrides.project??((health,map,connections,previous,at)=>({contract:'COS_SAVED_FLEET_BOARD_V1',health,map,connections,previous,at})),abort:()=>calls.push(['abort'])})};
 };
 test('a completed batch reads the three sources in order, records progress and commits once',async()=>{
  const b=batch();assert.equal(await b.run(),true);
@@ -186,8 +186,9 @@ test('database keeps diagnostics, a 180-second lease, payload-free status and th
 // a single conditional claim, and writes accepted only from the claimant.
 const ledger=(state='completed')=>{
  const runs={run:{state:'running',producer:null}},calls=[],sources=[],waits=[];let tokens=0,queued=state==='queued';const lease=175000;
+ const ids={run:'aaaaaaaa-0000-4000-8000-000000000001',next:'aaaaaaaa-0000-4000-8000-000000000002'},key=id=>Object.keys(ids).find(k=>ids[k]===id)??id;
  const rpc=async(name,args={})=>{
-  calls.push([name,structuredClone(args)]);const r=runs[args.p_run];
+  calls.push([name,structuredClone(args)]);const r=runs[key(args.p_run)];
   if(name==='cos_fleet_board_claim'){if(!r||r.state!=='running'||(r.producer&&r.producer!==args.p_producer))return {claimed:false};r.producer=args.p_producer;return {claimed:true,leaseRemainingMs:lease};}
   if(name==='cos_fleet_board_progress')return !!r&&r.state==='running'&&r.producer===(args.p_producer??null);
   if(name==='cos_fleet_board_finish'){if(!r||r.state!=='running'||r.producer!==(args.p_producer??null))return false;r.state='completed';return true;}
@@ -195,12 +196,12 @@ const ledger=(state='completed')=>{
   if(name==='cos_fleet_board_status'){const shown=queued?'queued':state==='queued'?'completed':state;return {...stored('old',shown),refresh:{id:'old',state:shown,startedAt:new Date(0).toISOString()}};}
   if(name==='cos_fleet_board_begin'){
    assert.match(String(args.p_request),/^token-\d+$/,'every lease request carries a request token');
-   const again=Object.keys(runs).find(id=>runs[id].request===args.p_request);if(again)return {id:again,replayed:true};
-   if(args.p_force){runs.run.request=args.p_request;return {id:'run'};}if(!queued)return null;queued=false;runs.next={state:'running',producer:null,request:args.p_request};return {id:'next'};}
+   const again=Object.keys(runs).find(id=>runs[id].request===args.p_request);if(again)return {id:ids[again],replayed:true};
+   if(args.p_force){runs.run.request=args.p_request;return {id:ids.run};}if(!queued)return null;queued=false;runs.next={state:'running',producer:null,request:args.p_request};return {id:ids.next};}
   throw Error('unexpected '+name);
  };
  const common={rpc,read:async path=>{sources.push(path);return {value:{},attempts:1};},project:()=>({contract:'COS_SAVED_FLEET_BOARD_V1'}),now:()=>20000,sleep:async ms=>{waits.push(ms);},token:()=>'token-'+(++tokens),abort:()=>{}};
- return {runs,calls,sources,waits,rpc,common,names:()=>calls.map(c=>c[0])};
+ return {runs,calls,sources,waits,rpc,common,ids,names:()=>calls.map(c=>c[0])};
 };
 test('two producers for one run: exactly one claims it, reads the sources and publishes',async()=>{
  const l=ledger();const results=await Promise.all([startFleetBatch({...l.common,run:'run',inline:true}),startFleetBatch({...l.common,run:'run',inline:true})]);
@@ -263,7 +264,7 @@ test('a queued follow-up starts only when one is owed, after the spacing, and is
  for(const state of ['completed','failed','running']){const l=ledger(state);assert.equal(await continueQueuedFleetBoard({...l.common,targets:[async()=>'accepted']}),false);assert.deepEqual(l.names(),['cos_fleet_board_status']);}
  const none=ledger('queued');assert.equal(await continueQueuedFleetBoard({...none.common,targets:[],inline:false}),false);assert.deepEqual(none.calls,[]);
  const owed=ledger('queued'),handed=[];assert.equal(await continueQueuedFleetBoard({...owed.common,targets:[async id=>{handed.push(id);return 'accepted';}]}),true);
- assert.deepEqual(owed.waits,[41000]);assert.deepEqual(owed.names(),['cos_fleet_board_status','cos_fleet_board_begin']);assert.deepEqual(owed.calls[1][1],{p_force:false,p_request:'token-1'});assert.deepEqual(handed,['next']);
+ assert.deepEqual(owed.waits,[41000]);assert.deepEqual(owed.names(),['cos_fleet_board_status','cos_fleet_board_begin']);assert.deepEqual(owed.calls[1][1],{p_force:false,p_request:'token-1'});assert.deepEqual(handed,[owed.ids.next]);
  const refused=ledger('queued');assert.equal(await continueQueuedFleetBoard({...refused.common,targets:[async()=>'rejected']}),false);assert.equal(refused.runs.next.state,'failed');assert.equal(refused.runs.next.failure.steps[0].kind,'delivery_rejected');
  const broken=ledger('queued');assert.equal(await continueQueuedFleetBoard({...broken.common,targets:[async()=>{throw Error('offline');}]}),false);assert.equal(broken.runs.next.state,'failed');assert.equal(broken.runs.next.failure.steps[0].kind,'delivery_uncertain');
 });
@@ -292,7 +293,7 @@ test('claim committed and never confirmed: the run is released with the attempte
  assert.equal(l.runs.run.producer,'token-1','the claim did commit');assert.equal(l.runs.run.state,'failed','and the run was released by its claimant');
  const release=l.calls.find(c=>c[0]==='cos_fleet_board_fail');assert.equal(release[1].p_producer,'token-1');assert.equal(release[1].p_diagnostics.steps[0].kind,'claim_unconfirmed');assert.deepEqual(l.sources,[]);
  // Direct helper contract.
- const idle=ledger();assert.deepEqual(await claimFleetBatch({rpc:idle.rpc,run:'run',producer:'p',sleep:async()=>{}}),{claimed:true,leaseRemainingMs:175000});assert.deepEqual(await claimFleetBatch({rpc:idle.rpc,run:'run',producer:'q',sleep:async()=>{}}),{claimed:false});
+ const idle=ledger();assert.deepEqual(await claimFleetBatch({rpc:idle.rpc,run:'run',producer:'p',now:()=>20000,sleep:async()=>{}}),{claimed:true,leaseEndAt:195000});assert.deepEqual(await claimFleetBatch({rpc:idle.rpc,run:'run',producer:'q',sleep:async()=>{}}),{claimed:false});
  assert.deepEqual(await claimFleetBatch({rpc:async()=>{throw Error('down');},run:'run',producer:'p',sleep:async()=>{}}),{claimed:null});
 });
 test('worker entry: only a confirmed claim is accepted; an unanswered claim is reconciled by the worker that sent it',async()=>{
@@ -334,7 +335,7 @@ test('a publish request that is cut off is reported, and the failure cannot undo
  const [name,args]=cut.calls.at(-1);assert.equal(name,'cos_fleet_board_fail');assert.equal(args.p_producer,'token-a');assert.equal(args.p_diagnostics.failedStep,'commit');assert.equal(args.p_diagnostics.steps.at(-1).kind,'commit_timeout');
  // Ledger with database rules: the publish landed, its reply was lost, and the follow-up failure is refused.
  const l=ledger();await l.rpc('cos_fleet_board_claim',{p_run:'run',p_producer:'token-a'});
- assert.equal(await produceFleetBoard({...l.common,rpc:lostReplies(l,'cos_fleet_board_finish',1),run:'run',producer:'token-a',leaseRemainingMs:170000,timeoutSignal:()=>undefined}),false);
+ assert.equal(await produceFleetBoard({...l.common,rpc:lostReplies(l,'cos_fleet_board_finish',1),run:'run',producer:'token-a',leaseEndAt:190000,timeoutSignal:()=>undefined}),false);
  assert.equal(l.runs.run.state,'completed','the published board stands');
 });
 test('database: lost replies are recoverable and an unclaimed token-requested lease cannot block refresh',async()=>{
@@ -372,4 +373,96 @@ test('database: lost replies are recoverable and an unclaimed token-requested le
  await age(150);assert.equal((await one('select public.cos_fleet_board_status()')).refresh.state,'running');assert.equal((await one('select public.cos_fleet_board_read()')).refresh.state,'running');
  assert.equal(await one('select public.cos_fleet_board_begin(true)'),null);assert.equal(await one('select public.cos_fleet_board_finish($1,$2::jsonb)',[next.id,JSON.stringify(payload)]),true);
  await db.close();
+});
+
+// A database call that takes effect but whose 200 reply is unreadable; the transport hands back an empty object.
+const unreadableReplies=(l,name,count,junk={})=>{let left=count;return async(n,args,signal)=>{if(n===name&&left>0){left--;await l.rpc(n,args,signal);return typeof junk==='function'?junk():junk;}return l.rpc(n,args,signal);};};
+test('an unreadable claim reply is unknown, never a refusal: the same token asks again and keeps the run it won',async()=>{
+ for(const junk of [{}, {claimed:'true'}, {claimed:true}, {claimed:true,leaseRemainingMs:'9'}, {claimed:true,leaseRemainingMs:-1}, true, 'ok', null, undefined, []]){
+  const l=ledger();assert.equal(await startFleetBatch({...l.common,rpc:unreadableReplies(l,'cos_fleet_board_claim',1,junk),run:'run',inline:true}),'ran_here',JSON.stringify(junk));
+  const claims=l.calls.filter(c=>c[0]==='cos_fleet_board_claim');assert.equal(claims.length,2);assert.equal(claims[0][1].p_producer,claims[1][1].p_producer);
+  assert.equal(l.runs.run.state,'completed');assert.equal(l.runs.run.producer,'token-1');assert.equal(l.sources.length,3);
+ }
+ // Never readable: released by the token that holds it, not abandoned as "refused".
+ const dead=ledger();assert.equal(await startFleetBatch({...dead.common,rpc:unreadableReplies(dead,'cos_fleet_board_claim',99),run:'run',inline:true}),'failed');
+ assert.equal(dead.runs.run.state,'failed');assert.equal(dead.runs.run.failure.steps[0].kind,'claim_unconfirmed');assert.deepEqual(dead.sources,[]);
+ // Worker entry: unreadable is 'unknown' (503), reconciled in the background.
+ const w=ledger(),tasks=[];assert.equal(await acceptFleetBatch({...w.common,rpc:unreadableReplies(w,'cos_fleet_board_claim',1),run:'run',waitUntil:p=>tasks.push(p)}),'unknown');
+ await Promise.all(tasks);assert.equal(w.runs.run.state,'completed');assert.equal(w.runs.run.producer,'token-1');
+ // A literal false is still a definite refusal.
+ const taken=ledger();await taken.rpc('cos_fleet_board_claim',{p_run:'run',p_producer:'first'});assert.equal(await startFleetBatch({...taken.common,run:'run',inline:true}),'owned_elsewhere');assert.equal(taken.calls.filter(c=>c[0]==='cos_fleet_board_claim').length,2);
+});
+test('an unreadable lease reply is unknown, never "no lease": the same request token recovers the lease',async()=>{
+ for(const junk of [{}, {id:null}, {id:''}, {id:'latest'}, true, 'ok', undefined, []]){
+  forgetSavedFleetPayload();const f=ledger(),tasks=[];await savedFleetBoard({...f.common,rpc:unreadableReplies(f,'cos_fleet_board_begin',1,junk),payloadText:async()=>'{"old":true}',force:true,waitUntil:p=>tasks.push(p)});await Promise.all(tasks);
+  const begins=f.calls.filter(c=>c[0]==='cos_fleet_board_begin');assert.equal(begins.length,2,JSON.stringify(junk));assert.equal(begins[0][1].p_request,begins[1][1].p_request);assert.equal(f.runs.run.state,'completed');assert.equal(f.sources.length,3);
+ }
+ const q=ledger('queued');assert.equal(await continueQueuedFleetBoard({...q.common,rpc:unreadableReplies(q,'cos_fleet_board_begin',1),inline:true}),true);
+ assert.deepEqual(Object.keys(q.runs).sort(),['next','run']);assert.equal(q.runs.next.state,'completed');assert.ok(q.runs.next.producer);
+ // A literal null is still a definite "no lease" and is not retried.
+ forgetSavedFleetPayload();const busy=ledger('running'),calls=[];await savedFleetBoard({...busy.common,rpc:async(n,a)=>{calls.push(n);return n.endsWith('begin')?null:busy.rpc(n,a);},payloadText:async()=>'{"old":true}',force:true,waitUntil:()=>{}});assert.equal(calls.filter(n=>n.endsWith('begin')).length,1);
+ // Never readable: the request fails visibly.
+ forgetSavedFleetPayload();const down=ledger();await assert.rejects(()=>savedFleetBoard({...down.common,rpc:async(n,a)=>n.endsWith('begin')?{}:down.rpc(n,a),payloadText:async()=>'{}',force:true,waitUntil:()=>{throw Error('nothing may be scheduled');}}),/lease_unconfirmed/);
+});
+test('only a literal true confirms publication; anything else is recorded as unconfirmed',async()=>{
+ for(const [reply,kind] of [[{},'commit_unreadable'],['true','commit_unreadable'],[1,'commit_unreadable'],[null,'commit_unreadable'],[undefined,'commit_unreadable'],[{ok:true},'commit_unreadable'],[false,'lease_lost']]){
+  const calls=[];const rpc=async(name,args)=>{calls.push([name,args]);return name==='cos_fleet_board_finish'?reply:true;};
+  assert.equal(await produceFleetBoard({run:'run',producer:'p',rpc,read:async()=>({value:{},attempts:1}),now:()=>1000,project:()=>({contract:'COS_SAVED_FLEET_BOARD_V1'}),timeoutSignal:()=>undefined}),false,JSON.stringify(reply));
+  const [name,args]=calls.at(-1);assert.equal(name,'cos_fleet_board_fail');assert.equal(args.p_diagnostics.failedStep,'commit');assert.equal(args.p_diagnostics.steps.at(-1).kind,kind);
+ }
+ // If that unreadable reply followed a real publish, the board stands and the failure write is refused.
+ const l=ledger();await l.rpc('cos_fleet_board_claim',{p_run:'run',p_producer:'p'});
+ assert.equal(await produceFleetBoard({...l.common,rpc:unreadableReplies(l,'cos_fleet_board_finish',1),run:'run',producer:'p',leaseEndAt:190000,timeoutSignal:()=>undefined}),false);assert.equal(l.runs.run.state,'completed');
+});
+test('an unreadable status is never served as an empty board and never read as "nothing owed"',async()=>{
+ forgetSavedFleetPayload();let reads=0;
+ const value=JSON.parse(await savedFleetResponse({rpc:async()=>++reads===1?{}:stored('one'),payloadText:async()=>'{"board":"one"}'}));assert.equal(value.latest.payload.board,'one');assert.equal(reads,2);
+ forgetSavedFleetPayload();for(const junk of [{}, {contract:'OTHER',latest:null}, null, 'ok', {contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:'x'}])await assert.rejects(()=>savedFleetResponse({rpc:async()=>junk,payloadText:async()=>'{}'}),/saved_board_unavailable/);
+ const q=ledger('queued');let first=true;assert.equal(await continueQueuedFleetBoard({...q.common,rpc:async(n,a)=>{if(n.endsWith('status')&&first){first=false;return {};}return q.rpc(n,a);},inline:true}),true);assert.equal(q.runs.next.state,'completed');
+});
+test('a slow claim reply cannot push work or the publish request past the real lease',async()=>{
+ // Database: 100 s of lease remained when it handled the claim. The reply took 12 s to arrive.
+ let clock=50000;const sent=clock;const rpc=async(name)=>{if(name==='cos_fleet_board_claim'){clock+=12000;return {claimed:true,leaseRemainingMs:100000};}return true;};
+ const claim=await claimFleetBatch({rpc,run:'run',producer:'p',now:()=>clock,sleep:async()=>{}});
+ // The real lease ends no later than 100 s after the database handled the request, which was no earlier than when it was sent.
+ const realLeaseEnd=sent+100000;assert.equal(claim.leaseEndAt,realLeaseEnd);assert.equal(claim.leaseEndAt-clock,88000,'the 12-second round trip is deducted');
+ const reads=[],bounds=[],at=[];
+ const ok=await produceFleetBoard({run:'run',producer:'p',leaseEndAt:claim.leaseEndAt,rpc:async(name)=>{if(name==='cos_fleet_board_finish')at.push(clock);return true;},read:async(path,limits)=>{reads.push(limits);clock+=17000;return {value:{},attempts:1};},now:()=>clock,project:()=>({contract:'COS_SAVED_FLEET_BOARD_V1'}),timeoutSignal:ms=>{bounds.push(ms);return undefined;}});
+ assert.equal(ok,true);for(const limits of reads)assert.equal(limits.until,realLeaseEnd-COMMIT_RESERVE_MS);
+ assert.equal(bounds.length,1);assert.ok(at[0]+bounds[0]<=realLeaseEnd-3000,'the publish request ends before the real lease does');assert.ok(bounds[0]<=COMMIT_REQUEST_MAX_MS);
+ // Without the deduction the worker would have believed the lease ended 12 seconds later than it does.
+ assert.equal((sent+12000+100000)-realLeaseEnd,12000);
+ // A reply so slow that the lease is spent leaves nothing to do, and nothing is published.
+ clock=0;const late=await claimFleetBatch({rpc:async()=>{clock+=170000;return {claimed:true,leaseRemainingMs:160000};},run:'run',producer:'p',now:()=>clock,sleep:async()=>{}});
+ const calls=[];assert.equal(await produceFleetBoard({run:'run',producer:'p',leaseEndAt:late.leaseEndAt,rpc:async(name,args)=>{calls.push([name,args]);return true;},read:async()=>{throw Error('no source may be read');},now:()=>clock,project:()=>({}),timeoutSignal:()=>undefined}),false);
+ assert.deepEqual(calls.map(c=>c[0]),['cos_fleet_board_fail']);assert.equal(calls[0][1].p_diagnostics.steps[0].kind,'batch_deadline');
+});
+test('database: this migration applies to the original install, over each earlier draft, and twice, keeping every record',async()=>{
+ const {execFileSync}=await import('node:child_process');
+ const current=readFileSync(new URL('../db/fleet-board-reliability-20261109.sql',import.meta.url),'utf8');
+ const draft=sha=>execFileSync('git',['show',sha+':tech-checks/operations/db/fleet-board-reliability-20261109.sql'],{encoding:'utf8',maxBuffer:1e7});
+ const expected=['cos_fleet_board_begin(p_force boolean, p_request uuid)','cos_fleet_board_claim(p_run uuid, p_producer uuid)','cos_fleet_board_fail(p_run uuid, p_code text, p_products jsonb, p_diagnostics jsonb, p_producer uuid)','cos_fleet_board_finish(p_run uuid, p_payload jsonb, p_diagnostics jsonb, p_producer uuid)','cos_fleet_board_history(p_run uuid)','cos_fleet_board_payload(p_run uuid)','cos_fleet_board_progress(p_run uuid, p_diagnostics jsonb, p_producer uuid)','cos_fleet_board_read()','cos_fleet_board_stage(p_run uuid, p_sources jsonb)','cos_fleet_board_status()'];
+ const payload={contract:'COS_SAVED_FLEET_BOARD_V1',fleet:{fieldMap:{sharedFleetView:true}},counts:{online:4},units:[{productId:'1001',status:'online'}]};
+ for(const [label,drafts] of [['original install',[]],['cb980ca draft',['cb980cab46c8bbe1fc8ac5e149465ac70fa6c4dd']],['bb322a5 draft',['bb322a5131e623ef6e680eefde7134ae37c9320d']],['6454b61 draft',['6454b6136b20239b881f9ddf359a41e0ceff3435']]]){
+  // Drafts were never applied on top of one another (bb322a5 over cb980ca fails on its own); each is tested as the only prior state.
+  const db=new PGlite();await db.exec('create role service_role bypassrls;create role anon;create role authenticated;');
+  for(const file of ['fleet-durable-board-install.sql','fleet-board-staging.sql'])await db.exec(readFileSync(new URL('../db/'+file,import.meta.url),'utf8'));
+  // Existing production-shaped records: one completed board and one failed run, written by the original functions.
+  await db.exec('set role service_role;');const one=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
+  const a=await one('select public.cos_fleet_board_begin(true)');await one('select public.cos_fleet_board_finish($1,$2::jsonb)',[a.id,JSON.stringify(payload)]);
+  await db.exec("reset role;update cos_fleet_board_private.runs set started_at=started_at-interval '61 seconds';set role service_role;");
+  const b=await one('select public.cos_fleet_board_begin(true)');await one("select public.cos_fleet_board_fail($1,'source_read_failed','[]')",[b.id]);
+  const before=(await db.query('select id,state,error_code,started_at,finished_at,payload,counts,units from cos_fleet_board_private.runs order by started_at')).rows;
+  await db.exec('reset role;');
+  for(const sha of drafts)await db.exec(draft(sha));
+  await db.exec(current);await db.exec(current);
+  const functions=(await db.query("select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' as f from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'cos_fleet_board_%' order by 1")).rows.map(r=>r.f);
+  assert.deepEqual(functions,expected,label);
+  assert.deepEqual((await db.query('select id,state,error_code,started_at,finished_at,payload,counts,units from cos_fleet_board_private.runs order by started_at')).rows,before,label+': existing runs unchanged');
+  await db.exec('set role service_role;');
+  const status=await one('select public.cos_fleet_board_status()');assert.equal(status.latest.id,a.id,label);assert.deepEqual(await one('select public.cos_fleet_board_payload($1)',[a.id]),payload,label);
+  assert.equal((await one('select public.cos_fleet_board_claim($1,$2)',[a.id,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'])).claimed,false,label);
+  for(const role of ['anon','authenticated'])await assert.rejects(()=>db.exec('reset role;set role '+role+';select public.cos_fleet_board_status();'));
+  await db.close();
+ }
 });
