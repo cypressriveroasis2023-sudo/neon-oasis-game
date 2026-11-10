@@ -1,27 +1,240 @@
 // durable-board/runtime.mjs
-async function savedFleetBoard({ rpc, read, force = false, waitUntil, now = Date.now, project, abort }) {
-  const lease = force ? await rpc("cos_fleet_board_begin", { p_force: true }) : null;
-  if (lease?.id) {
-    const work = (async () => {
-      try {
-        const before = await rpc("cos_fleet_board_read", {});
-        const map = await read("/api/fleet-map-source");
-        const connections = await read("/api/product-connections");
-        const health = await read("/api/camera-health/summary-v3");
-        const capturedAt = now();
-        if (!await rpc("cos_fleet_board_stage", { p_run: lease.id, p_sources: { health, map, connections, capturedAt } })) throw Error("staging_unconfirmed");
-        const value = project(health, map, connections, before?.latest?.payload, capturedAt);
-        if (!await rpc("cos_fleet_board_finish", { p_run: lease.id, p_payload: value })) throw Error("commit_unconfirmed");
-      } catch (cause) {
-        abort?.();
-        const code = ["checks_incomplete", "connection_source_incomplete", "inventory_source_incomplete"].includes(cause?.message) ? cause.message : "source_read_failed";
-        await rpc("cos_fleet_board_fail", { p_run: lease.id, p_code: code, p_products: Array.isArray(cause?.products) ? cause.products.slice(0, 1e3) : [] }).catch(() => {
-        });
-      }
-    })();
-    waitUntil(work);
+var FLEET_LEASE_MS = 18e4;
+var FLEET_BATCH_BUDGET_MS = 165e3;
+var COMMIT_RESERVE_MS = 35e3;
+var COMMIT_REQUEST_MAX_MS = 3e4;
+var LEASE_MARGIN_MS = 3e3;
+var COMMIT_MIN_MS = 5e3;
+var PAYLOAD_MARK = '"@@COS_SAVED_FLEET_BOARD_PAYLOAD@@"';
+var SAFE = /^[a-z0-9_]{1,48}$/;
+var SOURCES = [
+  // The map and connection endpoints both assemble the mHelp inventory.
+  // Reads stay sequential so they do not compete on the same database.
+  ["map", "/api/fleet-map-source", 7e4],
+  ["connections", "/api/product-connections", 45e3],
+  ["health", "/api/camera-health/summary-v3", 35e3]
+];
+var completed = null;
+function forgetSavedFleetPayload() {
+  completed = null;
+}
+var safe = (value) => typeof value === "string" && SAFE.test(value) ? value : null;
+var UNKNOWN = Symbol("unknown");
+var RUN_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+var leaseAnswer = (value) => value === null ? null : value && typeof value === "object" && typeof value.id === "string" && RUN_ID.test(value.id) ? value : UNKNOWN;
+var claimAnswer = (value) => !value || typeof value !== "object" ? UNKNOWN : value.claimed === false ? false : value.claimed === true && Number.isFinite(value.leaseRemainingMs) && value.leaseRemainingMs >= 0 ? value.leaseRemainingMs : UNKNOWN;
+var statusAnswer = (value) => value && typeof value === "object" && value.contract === "COS_DURABLE_FLEET_RESPONSE_V1" && (value.latest === null || value.latest === void 0 || typeof value.latest === "object") ? value : UNKNOWN;
+var whole = (value) => Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
+function failureDetail(cause) {
+  const d = cause?.detail, out = {};
+  if (d && typeof d === "object") {
+    if (safe(d.kind)) out.kind = d.kind;
+    if (Number.isInteger(d.status) && d.status >= 100 && d.status < 600) out.status = d.status;
+    if (Number.isInteger(d.attempts) && d.attempts >= 0 && d.attempts < 10) out.attempts = d.attempts;
+    if (safe(d.stage)) out.stage = d.stage;
+    if (safe(d.code)) out.code = d.code;
   }
-  return rpc("cos_fleet_board_read", {});
+  if (!out.kind) out.kind = safe(cause?.message) || "error";
+  return out;
+}
+async function savedFleetResponse({ rpc, payloadText }) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    if (status === UNKNOWN) continue;
+    const id = status.latest?.id;
+    if (!id) {
+      return JSON.stringify(status);
+    }
+    if (completed?.id !== id) {
+      const text4 = String(await payloadText(id) ?? "").trim();
+      if (!text4.startsWith("{") || !text4.endsWith("}")) continue;
+      completed = { id, text: text4 };
+    }
+    const text3 = completed.text;
+    return JSON.stringify({ ...status, latest: { ...status.latest, payload: "@@COS_SAVED_FLEET_BOARD_PAYLOAD@@" } }).replace(PAYLOAD_MARK, () => text3);
+  }
+  throw Error("saved_board_unavailable");
+}
+async function produceFleetBoard({ run, producer = null, leaseEndAt, rpc, read, now = Date.now, project, abort, timeoutSignal = (ms) => AbortSignal.timeout(ms) }) {
+  const started = now(), budget = Number.isFinite(leaseEndAt) ? Math.max(0, Math.min(FLEET_LEASE_MS, leaseEndAt - started)) : FLEET_BATCH_BUDGET_MS;
+  const leaseEnd = started + budget, deadline = leaseEnd - LEASE_MARGIN_MS;
+  const diagnostics = { version: 1, budgetMs: whole(budget), steps: [] };
+  let current = "start";
+  const mark = () => rpc("cos_fleet_board_progress", { p_run: run, p_producer: producer, p_diagnostics: { ...diagnostics, reached: current, elapsedMs: whole(now() - started) } }).catch(() => {
+  });
+  const step = async (name, work, describe) => {
+    current = name;
+    const at = now();
+    try {
+      const value = await work();
+      diagnostics.steps.push({ step: name, ok: true, ms: whole(now() - at), ...describe ? describe(value) : {} });
+      return value;
+    } catch (cause) {
+      diagnostics.steps.push({ step: name, ok: false, ms: whole(now() - at), ...failureDetail(cause) });
+      throw cause;
+    }
+  };
+  try {
+    const values = {};
+    for (const [name, path, attemptMs] of SOURCES) {
+      const receipt = await step(name, () => {
+        if (now() >= leaseEnd - COMMIT_RESERVE_MS) throw Object.assign(Error("source_read_failed"), { detail: { kind: "batch_deadline", attempts: 0 } });
+        return read(path, { attemptMs, until: leaseEnd - COMMIT_RESERVE_MS });
+      }, (value2) => ({ attempts: whole(value2?.attempts) ?? 1 }));
+      values[name] = receipt?.value;
+      await mark();
+    }
+    const capturedAt = now();
+    const value = await step("project", async () => project(values.health, values.map, values.connections, null, capturedAt));
+    await step("commit", async () => {
+      const remaining = deadline - now();
+      if (remaining < COMMIT_MIN_MS) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "batch_deadline" } });
+      let published;
+      try {
+        published = await rpc("cos_fleet_board_finish", { p_run: run, p_producer: producer, p_payload: value, p_diagnostics: { ...diagnostics, reached: "commit", elapsedMs: whole(now() - started) } }, timeoutSignal(Math.min(COMMIT_REQUEST_MAX_MS, remaining)));
+      } catch (cause) {
+        throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: cause?.name === "TimeoutError" || cause?.name === "AbortError" ? "commit_timeout" : "commit_error" } });
+      }
+      if (published === false) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "lease_lost" } });
+      if (published !== true) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "commit_unreadable" } });
+    });
+    return true;
+  } catch (cause) {
+    abort?.();
+    const code = ["checks_incomplete", "connection_source_incomplete", "inventory_source_incomplete"].includes(cause?.message) ? cause.message : "source_read_failed";
+    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: code, p_products: Array.isArray(cause?.products) ? cause.products.slice(0, 1e3) : [], p_diagnostics: { ...diagnostics, reached: current, failedStep: current, elapsedMs: whole(now() - started) } }).catch(() => {
+    });
+    return false;
+  }
+}
+var pause = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
+var newToken = () => globalThis.crypto.randomUUID();
+var UNCERTAIN_DELIVERY_GRACE_MS = 4e3;
+var dispatchFailure = (kind, attempts) => ({ version: 1, steps: [{ step: "dispatch", ok: false, kind, attempts }], reached: "dispatch", failedStep: "dispatch" });
+async function beginLease({ rpc, force, request, sleep }) {
+  let last = Error("lease_unconfirmed");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const answer = leaseAnswer(await rpc("cos_fleet_board_begin", { p_force: force, p_request: request }));
+      if (answer !== UNKNOWN) return answer;
+      last = Error("lease_unconfirmed");
+    } catch (cause) {
+      last = cause;
+    }
+    if (attempt < 2) await sleep(1e3);
+  }
+  throw last;
+}
+async function claimOnce({ rpc, run, producer, now }) {
+  const sentAt = now();
+  let answer;
+  try {
+    answer = claimAnswer(await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer }));
+  } catch {
+    answer = UNKNOWN;
+  }
+  if (answer === UNKNOWN) return { claimed: null };
+  if (answer === false) return { claimed: false };
+  return { claimed: true, leaseEndAt: sentAt + answer };
+}
+async function claimFleetBatch({ rpc, run, producer, now = Date.now, sleep = pause, attempts = 4 }) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const claim = await claimOnce({ rpc, run, producer, now });
+    if (claim.claimed !== null) return claim;
+    if (attempt < attempts - 1) await sleep(1500);
+  }
+  await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("claim_unconfirmed", attempts) }).catch(() => {
+  });
+  return { claimed: null };
+}
+async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort, targets = [], followTargets = [], inline = false, sleep = pause, token = newToken, timeoutSignal }) {
+  let attempted = null, uncertain = false, attempts = 0;
+  try {
+    for (const target of targets) {
+      if (!target) continue;
+      let outcome;
+      try {
+        outcome = await target(run);
+      } catch {
+        outcome = "uncertain";
+      }
+      attempts++;
+      if (outcome === "accepted") return "handed";
+      if (outcome !== "rejected") uncertain = true;
+    }
+    if (uncertain) await sleep(UNCERTAIN_DELIVERY_GRACE_MS);
+    attempted = token();
+    const claim = await claimFleetBatch({ rpc, run, producer: attempted, now, sleep });
+    if (claim.claimed === null) return "failed";
+    if (!claim.claimed) return "owned_elsewhere";
+    if (inline) {
+      await runFleetBatch({ run, producer: attempted, leaseEndAt: claim.leaseEndAt, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
+      return "ran_here";
+    }
+    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: attempted, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure(uncertain ? "delivery_uncertain" : "delivery_rejected", attempts) });
+    return "failed";
+  } catch {
+    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: attempted, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("dispatch_error", attempts) }).catch(() => {
+    });
+    return "failed";
+  }
+}
+async function acceptFleetBatch({ run, rpc, read, now = Date.now, project, abort, followTargets = [], waitUntil, sleep = pause, token = newToken, timeoutSignal }) {
+  const producer = token();
+  const work = (claim) => runFleetBatch({ run, producer, leaseEndAt: claim.leaseEndAt, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
+  const first = await claimOnce({ rpc, run, producer, now });
+  if (first.claimed === true) {
+    waitUntil(work(first));
+    return "accepted";
+  }
+  if (first.claimed === false) return "refused";
+  waitUntil((async () => {
+    const claim = await claimFleetBatch({ rpc, run, producer, now, sleep });
+    if (claim.claimed === true) await work(claim);
+  })());
+  return "unknown";
+}
+async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [], inline = false, startedAt, now = Date.now, sleep = pause, token = newToken, timeoutSignal }) {
+  try {
+    if (!inline && !targets.some(Boolean)) return false;
+    let status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    if (status === UNKNOWN) {
+      await sleep(1e3);
+      status = statusAnswer(await rpc("cos_fleet_board_status", {}));
+    }
+    if (status === UNKNOWN || status.refresh?.state !== "queued") return false;
+    const recorded = Date.parse(status.refresh.startedAt);
+    const since = Number.isFinite(recorded) ? recorded : startedAt ?? now();
+    const wait = Math.min(61e3, 61e3 - (now() - since));
+    if (wait > 0) await sleep(wait);
+    const request = token();
+    let lease = null;
+    for (let attempt = 0; attempt < 3 && !lease?.id; attempt++) {
+      if (attempt) {
+        await sleep(2e3);
+        const again = statusAnswer(await rpc("cos_fleet_board_status", {}));
+        if (again !== UNKNOWN && again.refresh?.state !== "queued") return false;
+      }
+      lease = await beginLease({ rpc, force: false, request, sleep });
+    }
+    if (!lease?.id) return false;
+    const outcome = await startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets: targets, inline, sleep, token, timeoutSignal });
+    return outcome !== "failed";
+  } catch {
+    return false;
+  }
+}
+async function runFleetBatch({ run, producer = null, leaseEndAt, rpc, read, now = Date.now, project, abort, followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
+  const startedAt = now();
+  const ok = await produceFleetBoard({ run, producer, leaseEndAt, rpc, read, now, project, abort, timeoutSignal });
+  await continueQueuedFleetBoard({ rpc, targets: followTargets, inline: false, startedAt, now, sleep, token, timeoutSignal });
+  return ok;
+}
+async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUntil, now = Date.now, project, abort, targets = [], followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
+  const lease = force ? await beginLease({ rpc, force: true, request: token(), sleep }) : null;
+  if (lease?.id) waitUntil(startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets, inline: true, sleep, token, timeoutSignal }));
+  else if (force) waitUntil(continueQueuedFleetBoard({ rpc, read, project, abort, targets: followTargets, inline: true, now, sleep, token, timeoutSignal }));
+  return savedFleetResponse({ rpc, payloadText });
 }
 
 // src/cameraEvidence.ts
@@ -1065,6 +1278,19 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
 }
 export {
+  COMMIT_REQUEST_MAX_MS,
+  COMMIT_RESERVE_MS,
+  FLEET_BATCH_BUDGET_MS,
+  FLEET_LEASE_MS,
+  UNCERTAIN_DELIVERY_GRACE_MS,
+  acceptFleetBatch,
+  claimFleetBatch,
   completedBoard,
-  savedFleetBoard
+  continueQueuedFleetBoard,
+  forgetSavedFleetPayload,
+  produceFleetBoard,
+  runFleetBatch,
+  savedFleetBoard,
+  savedFleetResponse,
+  startFleetBatch
 };
