@@ -85,7 +85,7 @@ test('a shop Sniper with a confirmed port outage keeps its own OFFLINE record bu
 
 test('opening the durable Fleet is a read-only restore, not a refresh trigger',async()=>{
  const calls=[];
- const rpc=async name=>{calls.push(name);return name==='cos_fleet_board_read'?{contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{payload:{contract:'COS_SAVED_FLEET_BOARD_V1'}}}:null;};
- const value=await savedFleetBoard({rpc,read:async()=>{throw Error('open must not touch live sources');},waitUntil:()=>{throw Error('open must not schedule a batch');},project:()=>{throw Error('open must not project a batch');}});
- assert.equal(value.contract,'COS_DURABLE_FLEET_RESPONSE_V1');assert.deepEqual(calls,['cos_fleet_board_read']);
+ const rpc=async name=>{calls.push(name);return name==='cos_fleet_board_status'?{contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'restore-only',completedAt:'2026-11-09T01:37:00Z'}}:null;};
+ const value=JSON.parse(await savedFleetBoard({rpc,payloadText:async id=>{calls.push('payload:'+id);return '{"contract":"COS_SAVED_FLEET_BOARD_V1"}';},read:async()=>{throw Error('open must not touch live sources');},waitUntil:()=>{throw Error('open must not schedule a batch');},project:()=>{throw Error('open must not project a batch');}}));
+ assert.equal(value.contract,'COS_DURABLE_FLEET_RESPONSE_V1');assert.equal(value.latest.payload.contract,'COS_SAVED_FLEET_BOARD_V1');assert.equal(value.latest.completedAt,'2026-11-09T01:37:00Z');assert.deepEqual(calls,['cos_fleet_board_status','payload:restore-only']);
 });

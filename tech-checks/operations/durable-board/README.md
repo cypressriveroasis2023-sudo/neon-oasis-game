@@ -25,3 +25,26 @@ Production follow-up: the first real batch was stopped by the Edge CPU limit bef
 Apply `db/fleet-board-staging.sql` after the main install. Staged inputs are private, never returned by the board API, cleared on successful publication, and expired after one hour on subsequent runs. They support diagnosis/recovery of an interrupted worker. Source observations retain their original capture time.
 
 The internal `/api/fleet-map-source` route reads the shared committed map projection for either approved role. It excludes Owner pending geocode previews. Completed publication requires the shared-view marker in SQL, preventing older workers from publishing a role-private map. Normal Owner map tools keep their existing projection and authorization.
+
+## Reliability update, 2026-11-09
+
+Production runs between November 3 and November 9 showed four causes of failed or interrupted batches:
+
+- `/api/product-connections` had a 26-second request budget and needed 22 to 26 seconds, so it returned 503 under ordinary load. A saved-board batch read now sends `X-COS-Fleet-Batch: 1` and is given 40 seconds; browser requests keep 26. Each source is retried up to three times inside the batch budget.
+- While a batch was pending, every open client re-read the whole stored board (about 9 MB) every few seconds through `cos_fleet_board_read`. `cos_fleet_board_status` now returns the same record without the payload, and `cos_fleet_board_payload` is read once per worker for each completed board, because a completed payload never changes.
+- The batch shared one worker CPU allowance with its own map read and with polls, and was stopped by the platform. Refresh now hands the claimed lease to `/api/fleet-saved-board/produce` on the `cos-fleet-board-producer` function, which runs the same recorded handler. If that function is unavailable the batch runs in the refresh request as before.
+- The lease was 120 seconds and a successful batch needed about 109, of which roughly 44 were the staging and commit uploads. The lease is 180 seconds, the batch stops itself at 165, and the full source bundle is no longer staged.
+
+A refresh requested during a running batch was recorded as queued but never started. The batch now starts that one follow-up, as a new request, once the 60-second spacing has passed.
+
+Each run stores bounded diagnostics in `runs.diagnostics`: step name, duration, attempt count, HTTP status and the source's own stage/code. No rows, addresses, IPs, identities, tokens or message text are stored. `refresh.diagnostics` and `history[].diagnostics` return them to the already authorized Owner/IT read.
+
+A failed, interrupted or running batch never changes `latest.id`, `latest.completedAt` or the stored payload. Opening and polling claim no lease and read no live source.
+
+Apply `db/fleet-board-reliability-20261109.sql` before deploying the handler. It is compatible with the previous handler, so the handler can be rolled back without reverting the database.
+
+Rebuild the packaged module with:
+
+    node -e "import('esbuild').then(({buildSync})=>buildSync({entryPoints:['durable-board/index.ts'],bundle:true,platform:'neutral',format:'esm',resolveExtensions:['.ts','.mjs','.js','.tsx','.json'],outfile:'../supabase/functions/cos-operations-pages/savedFleetBoard.mjs'}))"
+
+then copy it to `docs/vision-native-preview-20261107/source/` and update both hashes in that manifest.

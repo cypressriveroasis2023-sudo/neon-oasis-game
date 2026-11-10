@@ -1,4 +1,4 @@
-import {savedFleetBoard,completedBoard} from './savedFleetBoard.mjs';
+import {savedFleetBoard,runFleetBatch,completedBoard} from './savedFleetBoard.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -490,7 +490,7 @@ export function createOperationsHandler(options) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     try {
       if (!['GET', 'POST'].includes(request.method)) fail('Method not supported.', 405);
-      let path = new URL(request.url).pathname.replace(/^.*\/cos-operations-(?:pages|bridge)(?=\/|$)/, '').replace(/\/$/, '');
+      let path = new URL(request.url).pathname.replace(/^.*\/cos-(?:operations-(?:pages|bridge)|fleet-board-producer)(?=\/|$)/, '').replace(/\/$/, '');
       let method = request.method, body = null;
       const context = await authenticate(request);
       if (!path && request.method === 'POST') {
@@ -626,24 +626,65 @@ const commonFleetMapRead = method === "GET" && path === "/api/fleet-map-source";
       if (commonFleetMapRead) path = "/api/field-map";
 const savedHistoryMatch=/^\/api\/fleet-saved-board\/history\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.exec(path);
 if(method==='GET'&&savedHistoryMatch)return json(await rpc('cos_fleet_board_history',{p_run:savedHistoryMatch[1]}));
-if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"){
- const force=path.endsWith('/refresh');
- if(method!==(force?'POST':'GET'))return json({error:'Unsupported saved board action'},405);
- if(body&&Object.keys(body).length)return json({error:'Empty saved board request required'},400);
+if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||path==="/api/fleet-saved-board/produce"){
+ const force=path.endsWith('/refresh'),produce=path.endsWith('/produce');
+ if(method!==(force||produce?'POST':'GET'))return json({error:'Unsupported saved board action'},405);
+ if(produce){if(!body||Object.keys(body).length!==1||typeof body.run!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.run))return json({error:'Exact saved board batch required'},400);}
+ else if(body&&Object.keys(body).length)return json({error:'Empty saved board request required'},400);
  const origin=request.headers.get('Origin'),batchController=new AbortController();
- const read=async source=>{
-  const deadline=Date.now()+85000;
-  for(let attempt=0;attempt<2;attempt++){
-   const response=await fetch(Deno.env.get('SUPABASE_URL')+'/functions/v1/cos-operations-pages',{
-    method:'POST',headers:{Authorization:context.authorization,'Content-Type':'application/json',...(origin?{Origin:origin}:{})},
-    body:JSON.stringify({path:source,method:'GET',body:null}),cache:'no-store',redirect:'error',signal:AbortSignal.any([batchController.signal,AbortSignal.timeout(Math.max(1,deadline-Date.now()))])
-   });
-   if(response.ok)return response.json();
-   if(response.status<500||attempt===1)throw Error('source_read_failed');
-   await response.body?.cancel();
+ // Same caller authorization on every internal hop; no service credential leaves this handler.
+ const internal=(slug,payload,signal,extra={})=>fetch(Deno.env.get('SUPABASE_URL')+'/functions/v1/'+slug,{
+  method:'POST',headers:{Authorization:context.authorization,'Content-Type':'application/json',...(origin?{Origin:origin}:{}),...extra},
+  body:JSON.stringify(payload),cache:'no-store',redirect:'error',signal
+ });
+ // Bounded source read. Only categories (kind, HTTP status, attempt count and
+ // the source's own stage/code) are kept for diagnostics, never a body.
+ const read=async(source,{attemptMs,until})=>{
+  let last={kind:'batch_deadline',attempts:0};
+  for(let attempt=1;attempt<=3;attempt++){
+   let remaining=until-Date.now();
+   if(remaining<2000)break;
+   if(attempt>1){await new Promise(resolve=>setTimeout(resolve,Math.min(1500,remaining-1000)));remaining=until-Date.now();}
+   let response;
+   try{
+    response=await internal('cos-operations-pages',{path:source,method:'GET',body:null},AbortSignal.any([batchController.signal,AbortSignal.timeout(Math.max(1,Math.min(attemptMs,remaining)))]),{'X-COS-Fleet-Batch':'1'});
+    if(response.ok)return {value:await response.json(),attempts:attempt};
+   }catch(cause){
+    last={kind:batchController.signal.aborted?'cancelled':cause?.name==='TimeoutError'?'timeout':response?'incomplete_response':'network',attempts:attempt};
+    if(batchController.signal.aborted)break;
+    continue;
+   }
+   let diagnostic=null;
+   try{diagnostic=(await response.json())?.diagnostic;}catch{}
+   last={kind:'http',status:response.status,attempts:attempt,stage:diagnostic?.stage,code:diagnostic?.code};
+   if(response.status<500)break;
   }
+  throw Object.assign(Error('source_read_failed'),{detail:last});
  };
- return json(await savedFleetBoard({rpc,read,force,abort:()=>batchController.abort(),project:completedBoard,waitUntil:task=>EdgeRuntime.waitUntil(task)}));
+ // The batch parses and projects the whole fleet. It runs in its own worker
+ // so the map read and client polls cannot spend the same CPU allowance.
+ const dispatchTo=slug=>async run=>{
+  const response=await internal(slug,{path:'/api/fleet-saved-board/produce',method:'POST',body:{run}},AbortSignal.timeout(8000));
+  await response.body?.cancel();
+  return response.status===202;
+ };
+ const dispatch=dispatchTo('cos-fleet-board-producer');
+ // A queued follow-up always starts as a new request, here if necessary.
+ const redispatch=async run=>await dispatch(run).catch(()=>false)||dispatchTo('cos-operations-pages')(run);
+ if(produce){
+  // Worker entry: run exactly the batch whose lease is active.
+  const current=await rpc('cos_fleet_board_status',{});
+  if(current?.refresh?.id!==body.run||current.refresh.state!=='running')return json({error:'Saved board batch is not active'},409);
+  EdgeRuntime.waitUntil(runFleetBatch({run:body.run,rpc,read,project:completedBoard,redispatch,abort:()=>batchController.abort()}));
+  return json({accepted:true},202);
+ }
+ const payloadText=async id=>{
+  const response=await requestFetch(platformUrl+'/rest/v1/rpc/cos_fleet_board_payload',{method:'POST',headers:platformHeaders(),body:JSON.stringify({p_run:id})});
+  if(!response.ok){await response.body?.cancel();throw Error('saved_board_unavailable');}
+  return response.text();
+ };
+ const saved=await savedFleetBoard({rpc,payloadText,read,force,dispatch,redispatch,abort:()=>batchController.abort(),project:completedBoard,waitUntil:task=>EdgeRuntime.waitUntil(task)});
+ return new Response(saved,{status:200,headers:cors});
 }
 
       if (path === '/api/product-connections') {
