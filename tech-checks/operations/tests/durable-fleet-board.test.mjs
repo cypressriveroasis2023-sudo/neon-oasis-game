@@ -23,7 +23,7 @@ test('refresh returns the stored board while a bounded background batch runs; fa
  assert.equal(response.latest.payload.old,true);assert.equal(response.latest.completedAt,'2026-11-09T01:37:00Z');assert.equal(calls.some(c=>c[0]==='cos_fleet_board_finish'),false);release();await tasks[0];
  assert.deepEqual(calls.map(c=>c[0]).slice(0,3).sort(),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_status']);
  const [name,args]=calls.find(c=>c[0]==='cos_fleet_board_fail');assert.equal(args.p_code,'source_read_failed');assert.equal(args.p_producer,calls.find(c=>c[0]==='cos_fleet_board_claim')[1].p_producer);assert.match(args.p_producer,/^[a-f0-9-]{36}$/);
- assert.equal(args.p_diagnostics.failedStep,'map');assert.deepEqual(args.p_diagnostics.steps.map(x=>[x.step,x.ok,x.kind]),[['map',false,'error']]);assert.doesNotMatch(JSON.stringify(args),/private raw error/);
+ assert.equal(args.p_diagnostics.failedStep,'connections');assert.deepEqual(args.p_diagnostics.steps.map(x=>[x.step,x.ok,x.kind]),[['connections',false,'error']]);assert.doesNotMatch(JSON.stringify(args),/private raw error/);
 });
 test('database persists whole batches, denies browser roles, fences overlap and keeps the last board after failure',async()=>{
  const db=new PGlite();await db.exec('create role service_role bypassrls;create role anon;create role authenticated;');await db.exec(readFileSync(new URL('../db/fleet-durable-board-install.sql',import.meta.url),'utf8'));await db.exec(readFileSync(new URL('../db/fleet-board-staging.sql',import.meta.url),'utf8'));await db.exec(readFileSync(new URL('../db/fleet-board-reliability-20261109.sql',import.meta.url),'utf8'));
@@ -76,18 +76,18 @@ const batch=(overrides={})=>{
 };
 test('a completed batch reads the three sources in order, records progress and commits once',async()=>{
  const b=batch();assert.equal(await b.run(),true);
- assert.deepEqual(b.reads.map(r=>r[0]),['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ assert.deepEqual(b.reads.map(r=>r[0]),['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  assert.deepEqual(b.calls.map(c=>c[0]),['cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_finish']);
- const finish=b.calls.at(-1)[1];assert.equal(finish.p_payload.previous,null);assert.ok(b.calls.every(c=>c[1].p_producer==='token-a'),'every write carries the claimant token');assert.equal(finish.p_payload.map.path,'/api/fleet-map-source');assert.equal(finish.p_payload.health.path,'/api/camera-health/summary-v3');
- assert.deepEqual(finish.p_diagnostics.steps.map(s=>[s.step,s.ok]),[['map',true],['connections',true],['health',true],['project',true]]);
- assert.deepEqual(b.calls[1][1].p_diagnostics.reached,'connections');
+ const finish=b.calls.at(-1)[1];assert.equal(finish.p_payload.previous,null);assert.ok(b.calls.every(c=>c[1].p_producer==='token-a'),'every write carries the claimant token');assert.equal(finish.p_payload.map.path,'/api/fleet-map-source');assert.equal(finish.p_payload.connections.path,'/api/product-connections');assert.equal(finish.p_payload.health.path,'/api/camera-health/summary-v3');
+ assert.deepEqual(finish.p_diagnostics.steps.map(s=>[s.step,s.ok]),[['connections',true],['map',true],['health',true],['project',true]]);
+ assert.deepEqual(b.calls[0][1].p_diagnostics.reached,'connections');assert.deepEqual(b.calls[1][1].p_diagnostics.reached,'map');
  // Every read is bounded by the batch deadline minus the commit reserve.
  for(const [,limits] of b.reads){assert.ok(limits.attemptMs<=70000);assert.equal(limits.until,1000+FLEET_BATCH_BUDGET_MS-COMMIT_RESERVE_MS);}
  assert.deepEqual(b.bounds,[COMMIT_REQUEST_MAX_MS]);
 });
 test('a failing source is named with bounded categories and nothing is committed',async()=>{
  const b=batch({read:async path=>{if(path==='/api/product-connections')throw Object.assign(Error('source_read_failed'),{detail:{kind:'http',status:503,attempts:3,stage:'tracker_source',code:'timeout',secret:'10.1.2.3',message:'raw private text'}});}});
- assert.equal(await b.run(),false);assert.deepEqual(b.reads.map(r=>r[0]),['/api/fleet-map-source','/api/product-connections']);
+ assert.equal(await b.run(),false);assert.deepEqual(b.reads.map(r=>r[0]),['/api/product-connections'],'a declined connections read ends the batch before the map and health reads');
  assert.equal(b.calls.some(c=>c[0]==='cos_fleet_board_finish'),false);assert.ok(b.calls.some(c=>c[0]==='abort'));
  const [name,args]=b.calls.at(-1);assert.equal(name,'cos_fleet_board_fail');assert.equal(args.p_code,'source_read_failed');assert.equal(args.p_diagnostics.failedStep,'connections');
  assert.deepEqual(args.p_diagnostics.steps.at(-1),{step:'connections',ok:false,ms:10,kind:'http',status:503,attempts:3,stage:'tracker_source',code:'timeout'});
@@ -102,7 +102,7 @@ test('projection holds keep their existing codes; an unconfirmed commit is recor
 test('a batch that runs out of time stops before the lease expires instead of being interrupted',async()=>{
  const b=batch({readMs:80000});assert.equal(await b.run(),false);
  // map and connections each took 80 seconds; health may not start inside the commit reserve.
- assert.deepEqual(b.reads.map(r=>r[0]),['/api/fleet-map-source','/api/product-connections']);
+ assert.deepEqual(b.reads.map(r=>r[0]),['/api/product-connections','/api/fleet-map-source']);
  const args=b.calls.at(-1)[1];assert.equal(b.calls.at(-1)[0],'cos_fleet_board_fail');assert.equal(args.p_diagnostics.failedStep,'health');assert.equal(args.p_diagnostics.steps.at(-1).kind,'batch_deadline');assert.equal(b.calls.some(c=>c[0]==='cos_fleet_board_finish'),false);
 });
 test('database keeps diagnostics, a 180-second lease, payload-free status and the stored board through failure and interruption',async()=>{

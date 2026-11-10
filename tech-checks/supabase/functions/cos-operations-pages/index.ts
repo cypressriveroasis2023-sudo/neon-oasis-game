@@ -658,6 +658,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
    try{diagnostic=(await response.json())?.diagnostic;}catch{}
    last={kind:'http',status:response.status,attempts:attempt,stage:diagnostic?.stage,code:diagnostic?.code};
    if(response.status<500)break;
+   // The source read everything, passed its consistency checks and declined
+   // the evidence. Repeating that inside this batch only repeats the reads.
+   if(diagnostic?.retryable===false)break;
   }
   throw Object.assign(Error('source_read_failed'),{detail:last});
  };
