@@ -5,7 +5,7 @@ import FleetCardIcon from './FleetCardIcon';
 import FleetVerifyNow from './FleetVerifyNow';
 const titles={cameras:'Camera units',helios:'Helios',stands:'Stands'};
 type Status='all'|'online'|'offline'|'unverified';
-export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified,healthCurrent=true}:{upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:(connections?:unknown)=>Promise<unknown>;healthCurrent?:boolean}){
+export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified,healthCurrent=true,readingNote=''}:{readingNote?:string;upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:(connections?:unknown)=>Promise<unknown>;healthCurrent?:boolean}){
  const totals=fleetEquipmentTotals(upload,data,now);
  const [selection,setSelection]=useState<{group:EquipmentGroup;status:Status}|null>(null);
  const [verificationBusy,setVerificationBusy]=useState(false);
@@ -23,7 +23,7 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
     <footer><small>{key==='stands'?'Power & support · 0 cameras':key==='helios'?'Victron power inside Helios cards':'Helios included in camera totals'}</small><button disabled={!total} onClick={()=>onView(key,'field')}>View {key==='cameras'?'cameras':key} →</button></footer>
    </article>;
   })}</div>
-  <p className='cos-equipment-totals-note'>{healthCurrent?'Totals include Field + Shop. Online, Offline and Unverified count Field units only.':'Inventory remains visible from the saved board. Health counts stay hidden until a fresh completed board is available.'} Helios is included in camera totals; stands stay outside camera outages.</p>
+  <p className='cos-equipment-totals-note'>{readingNote&&<strong>{readingNote} </strong>}{healthCurrent?'Totals include Field + Shop. Online, Offline and Unverified count Field units only.':'Inventory remains visible from the saved board. Health counts stay hidden until a fresh completed board is available.'} Helios is included in camera totals; stands stay outside camera outages.</p>
   {selection&&current&&<section className='cos-equipment-status-list' aria-label={titles[selection.group]+' '+selection.status+' Field units'}>
    <div><h3>{titles[selection.group]} · {selection.status==='unverified'?'Unverified':selection.status==='online'?'Online':selection.status==='offline'?'Offline':'All'} · {products.length} Field units</h3><button onClick={()=>setSelection(null)} aria-label='Close status list'>×</button></div>
    {selection.status==='unverified'&&onVerified&&<FleetVerifyNow disabled={verificationBusy} onBusyChange={setVerificationBusy} key={selection.group} products={products} onComplete={onVerified} label={products.length?'Verify all '+products.length+' now':'No units left to verify'}/>}
