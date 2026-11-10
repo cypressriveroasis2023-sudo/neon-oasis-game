@@ -49,6 +49,19 @@ A hand-off has three outcomes:
 
 If ownership cannot be confirmed because the database is unreachable, the caller attempts a release that only takes effect for an unclaimed run (`dispatch_error`). No path leaves a lease unowned until expiry except a producer that is stopped mid-batch, which is reported as `worker_interrupted` with the last step it reached.
 
+### Lost replies
+
+A database call can take effect and still fail to answer. Two calls matter:
+
+- **Claim.** The token is chosen before the claim is sent and kept. `cos_fleet_board_claim` confirms the same token again, so the caller asks up to four times. If it is never answered, the caller releases the run with that token, which frees it whether that token holds it or nobody does and is ignored if another producer does. On the worker entry, an unanswered claim returns 503 (never 202) while the worker reconciles in the background and runs the batch if its claim did commit.
+- **Lease.** Every `cos_fleet_board_begin` carries a request token. Asking again with the same token returns the lease that request was already granted (`replayed: true`) and creates nothing, for forced and queued requests alike.
+
+As a last resort, a token-requested lease that nobody claims within 60 seconds stops blocking the next refresh, is reported `worker_interrupted`, and can no longer be claimed. Leases requested without a token, as the previous handler does, keep the full 180 seconds.
+
+### Deadlines
+
+The lease runs from the moment the database grants it. The claim returns `leaseRemainingMs` by the database clock, and the producer measures everything from that: source reads end 35 seconds before the lease does, and the publish request is limited to 30 seconds or the remaining lease less 3 seconds, whichever is shorter. Time spent on hand-off, grace or claim retries is therefore not counted twice. A publish that is cut off is recorded as `commit_timeout`; the failure write that follows is refused by the database if the board was in fact published. `cos_fleet_board_fail` takes the same lock as `cos_fleet_board_finish` first, so the two cannot interleave.
+
 ### Queued refreshes
 
 A refresh is queued in two cases: it arrives while a batch is running, or it arrives inside the 60-second spacing after one has ended. In the first case the producer starts the follow-up after its batch. In the second there is no producer, so the request that was queued waits out the spacing and starts it. Both use an unforced `cos_fleet_board_begin`, which grants the follow-up lease once however many requests ask. Opening or polling in the queued state starts nothing.

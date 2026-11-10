@@ -1,6 +1,10 @@
 // durable-board/runtime.mjs
+var FLEET_LEASE_MS = 18e4;
 var FLEET_BATCH_BUDGET_MS = 165e3;
-var COMMIT_RESERVE_MS = 25e3;
+var COMMIT_RESERVE_MS = 35e3;
+var COMMIT_REQUEST_MAX_MS = 3e4;
+var LEASE_MARGIN_MS = 3e3;
+var COMMIT_MIN_MS = 5e3;
 var PAYLOAD_MARK = '"@@COS_SAVED_FLEET_BOARD_PAYLOAD@@"';
 var SAFE = /^[a-z0-9_]{1,48}$/;
 var SOURCES = [
@@ -45,9 +49,10 @@ async function savedFleetResponse({ rpc, payloadText }) {
   }
   throw Error("saved_board_unavailable");
 }
-async function produceFleetBoard({ run, producer = null, rpc, read, now = Date.now, project, abort }) {
-  const started = now(), deadline = started + FLEET_BATCH_BUDGET_MS;
-  const diagnostics = { version: 1, budgetMs: FLEET_BATCH_BUDGET_MS, steps: [] };
+async function produceFleetBoard({ run, producer = null, leaseRemainingMs, rpc, read, now = Date.now, project, abort, timeoutSignal = (ms) => AbortSignal.timeout(ms) }) {
+  const started = now(), budget = Number.isFinite(leaseRemainingMs) ? Math.max(0, Math.min(FLEET_LEASE_MS, leaseRemainingMs)) : FLEET_BATCH_BUDGET_MS;
+  const leaseEnd = started + budget, deadline = leaseEnd - LEASE_MARGIN_MS;
+  const diagnostics = { version: 1, budgetMs: whole(budget), steps: [] };
   let current = "start";
   const mark = () => rpc("cos_fleet_board_progress", { p_run: run, p_producer: producer, p_diagnostics: { ...diagnostics, reached: current, elapsedMs: whole(now() - started) } }).catch(() => {
   });
@@ -67,8 +72,8 @@ async function produceFleetBoard({ run, producer = null, rpc, read, now = Date.n
     const values = {};
     for (const [name, path, attemptMs] of SOURCES) {
       const receipt = await step(name, () => {
-        if (now() >= deadline - COMMIT_RESERVE_MS) throw Object.assign(Error("source_read_failed"), { detail: { kind: "batch_deadline", attempts: 0 } });
-        return read(path, { attemptMs, until: deadline - COMMIT_RESERVE_MS });
+        if (now() >= leaseEnd - COMMIT_RESERVE_MS) throw Object.assign(Error("source_read_failed"), { detail: { kind: "batch_deadline", attempts: 0 } });
+        return read(path, { attemptMs, until: leaseEnd - COMMIT_RESERVE_MS });
       }, (value2) => ({ attempts: whole(value2?.attempts) ?? 1 }));
       values[name] = receipt?.value;
       await mark();
@@ -76,8 +81,15 @@ async function produceFleetBoard({ run, producer = null, rpc, read, now = Date.n
     const capturedAt = now();
     const value = await step("project", async () => project(values.health, values.map, values.connections, null, capturedAt));
     await step("commit", async () => {
-      if (now() >= deadline) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "batch_deadline" } });
-      if (!await rpc("cos_fleet_board_finish", { p_run: run, p_producer: producer, p_payload: value, p_diagnostics: { ...diagnostics, reached: "commit", elapsedMs: whole(now() - started) } })) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "lease_lost" } });
+      const remaining = deadline - now();
+      if (remaining < COMMIT_MIN_MS) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "batch_deadline" } });
+      let published;
+      try {
+        published = await rpc("cos_fleet_board_finish", { p_run: run, p_producer: producer, p_payload: value, p_diagnostics: { ...diagnostics, reached: "commit", elapsedMs: whole(now() - started) } }, timeoutSignal(Math.min(COMMIT_REQUEST_MAX_MS, remaining)));
+      } catch (cause) {
+        throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: cause?.name === "TimeoutError" || cause?.name === "AbortError" ? "commit_timeout" : "commit_error" } });
+      }
+      if (!published) throw Object.assign(Error("commit_unconfirmed"), { detail: { kind: "lease_lost" } });
     });
     return true;
   } catch (cause) {
@@ -92,8 +104,33 @@ var pause = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
 var newToken = () => globalThis.crypto.randomUUID();
 var UNCERTAIN_DELIVERY_GRACE_MS = 4e3;
 var dispatchFailure = (kind, attempts) => ({ version: 1, steps: [{ step: "dispatch", ok: false, kind, attempts }], reached: "dispatch", failedStep: "dispatch" });
-async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort, targets = [], followTargets = [], inline = false, sleep = pause, token = newToken }) {
-  let producer = null, uncertain = false, attempts = 0;
+async function beginLease({ rpc, force, request, sleep }) {
+  let last;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await rpc("cos_fleet_board_begin", { p_force: force, p_request: request });
+    } catch (cause) {
+      last = cause;
+      if (attempt < 2) await sleep(1e3);
+    }
+  }
+  throw last;
+}
+async function claimFleetBatch({ rpc, run, producer, sleep = pause, attempts = 4 }) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const answer = await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer });
+      return answer?.claimed === true ? { claimed: true, leaseRemainingMs: answer.leaseRemainingMs } : { claimed: false };
+    } catch {
+      if (attempt < attempts - 1) await sleep(1500);
+    }
+  }
+  await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("claim_unconfirmed", attempts) }).catch(() => {
+  });
+  return { claimed: null };
+}
+async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort, targets = [], followTargets = [], inline = false, sleep = pause, token = newToken, timeoutSignal }) {
+  let attempted = null, uncertain = false, attempts = 0;
   try {
     for (const target of targets) {
       if (!target) continue;
@@ -108,22 +145,43 @@ async function startFleetBatch({ run, rpc, read, now = Date.now, project, abort,
       if (outcome !== "rejected") uncertain = true;
     }
     if (uncertain) await sleep(UNCERTAIN_DELIVERY_GRACE_MS);
-    const mine = token();
-    if (await rpc("cos_fleet_board_claim", { p_run: run, p_producer: mine }) !== true) return "owned_elsewhere";
-    producer = mine;
+    attempted = token();
+    const claim = await claimFleetBatch({ rpc, run, producer: attempted, sleep });
+    if (claim.claimed === null) return "failed";
+    if (!claim.claimed) return "owned_elsewhere";
     if (inline) {
-      await runFleetBatch({ run, producer, rpc, read, now, project, abort, followTargets, sleep, token });
+      await runFleetBatch({ run, producer: attempted, leaseRemainingMs: claim.leaseRemainingMs, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
       return "ran_here";
     }
-    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure(uncertain ? "delivery_uncertain" : "delivery_rejected", attempts) });
+    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: attempted, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure(uncertain ? "delivery_uncertain" : "delivery_rejected", attempts) });
     return "failed";
   } catch {
-    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: producer, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("dispatch_error", attempts) }).catch(() => {
+    await rpc("cos_fleet_board_fail", { p_run: run, p_producer: attempted, p_code: "source_read_failed", p_products: [], p_diagnostics: dispatchFailure("dispatch_error", attempts) }).catch(() => {
     });
     return "failed";
   }
 }
-async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [], inline = false, startedAt, now = Date.now, sleep = pause, token = newToken }) {
+async function acceptFleetBatch({ run, rpc, read, now = Date.now, project, abort, followTargets = [], waitUntil, sleep = pause, token = newToken, timeoutSignal }) {
+  const producer = token();
+  const work = (claim) => runFleetBatch({ run, producer, leaseRemainingMs: claim.leaseRemainingMs, rpc, read, now, project, abort, followTargets, sleep, token, timeoutSignal });
+  let first;
+  try {
+    first = await rpc("cos_fleet_board_claim", { p_run: run, p_producer: producer });
+  } catch {
+    first = null;
+  }
+  if (first?.claimed === true) {
+    waitUntil(work(first));
+    return "accepted";
+  }
+  if (first !== null) return "refused";
+  waitUntil((async () => {
+    const claim = await claimFleetBatch({ rpc, run, producer, sleep });
+    if (claim.claimed === true) await work(claim);
+  })());
+  return "unknown";
+}
+async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [], inline = false, startedAt, now = Date.now, sleep = pause, token = newToken, timeoutSignal }) {
   try {
     if (!inline && !targets.some(Boolean)) return false;
     const status = await rpc("cos_fleet_board_status", {});
@@ -132,31 +190,32 @@ async function continueQueuedFleetBoard({ rpc, read, project, abort, targets = [
     const since = Number.isFinite(recorded) ? recorded : startedAt ?? now();
     const wait = Math.min(61e3, 61e3 - (now() - since));
     if (wait > 0) await sleep(wait);
+    const request = token();
     let lease = null;
     for (let attempt = 0; attempt < 3 && !lease?.id; attempt++) {
       if (attempt) {
         await sleep(2e3);
         if ((await rpc("cos_fleet_board_status", {}))?.refresh?.state !== "queued") return false;
       }
-      lease = await rpc("cos_fleet_board_begin", { p_force: false });
+      lease = await beginLease({ rpc, force: false, request, sleep });
     }
     if (!lease?.id) return false;
-    const outcome = await startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets: targets, inline, sleep, token });
+    const outcome = await startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets: targets, inline, sleep, token, timeoutSignal });
     return outcome !== "failed";
   } catch {
     return false;
   }
 }
-async function runFleetBatch({ run, producer = null, rpc, read, now = Date.now, project, abort, followTargets = [], sleep = pause, token = newToken }) {
+async function runFleetBatch({ run, producer = null, leaseRemainingMs, rpc, read, now = Date.now, project, abort, followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
   const startedAt = now();
-  const ok = await produceFleetBoard({ run, producer, rpc, read, now, project, abort });
-  await continueQueuedFleetBoard({ rpc, targets: followTargets, inline: false, startedAt, now, sleep, token });
+  const ok = await produceFleetBoard({ run, producer, leaseRemainingMs, rpc, read, now, project, abort, timeoutSignal });
+  await continueQueuedFleetBoard({ rpc, targets: followTargets, inline: false, startedAt, now, sleep, token, timeoutSignal });
   return ok;
 }
-async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUntil, now = Date.now, project, abort, targets = [], followTargets = [], sleep = pause, token = newToken }) {
-  const lease = force ? await rpc("cos_fleet_board_begin", { p_force: true }) : null;
-  if (lease?.id) waitUntil(startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets, inline: true, sleep, token }));
-  else if (force) waitUntil(continueQueuedFleetBoard({ rpc, read, project, abort, targets: followTargets, inline: true, now, sleep, token }));
+async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUntil, now = Date.now, project, abort, targets = [], followTargets = [], sleep = pause, token = newToken, timeoutSignal }) {
+  const lease = force ? await beginLease({ rpc, force: true, request: token(), sleep }) : null;
+  if (lease?.id) waitUntil(startFleetBatch({ run: lease.id, rpc, read, now, project, abort, targets, followTargets, inline: true, sleep, token, timeoutSignal }));
+  else if (force) waitUntil(continueQueuedFleetBoard({ rpc, read, project, abort, targets: followTargets, inline: true, now, sleep, token, timeoutSignal }));
   return savedFleetResponse({ rpc, payloadText });
 }
 
@@ -1201,8 +1260,13 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
 }
 export {
+  COMMIT_REQUEST_MAX_MS,
+  COMMIT_RESERVE_MS,
   FLEET_BATCH_BUDGET_MS,
+  FLEET_LEASE_MS,
   UNCERTAIN_DELIVERY_GRACE_MS,
+  acceptFleetBatch,
+  claimFleetBatch,
   completedBoard,
   continueQueuedFleetBoard,
   forgetSavedFleetPayload,

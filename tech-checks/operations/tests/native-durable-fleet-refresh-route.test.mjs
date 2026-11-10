@@ -24,7 +24,7 @@ function fixture(who=owner,options={}){
  const json=(body,status=200)=>Response.json(body,{status});
  class FixedDate extends Date{constructor(...args){super(...(args.length?args:[data.now]));}static now(){return data.now;}}
  const deny=()=>{throw Error('Unexpected network or signing in offline proof');};
- let handler;const hops=[],attempts={},claims={};
+ let handler;const hops=[],attempts={},claims={},lost={},requests={};
  const context=vm.createContext({console,crypto:webcrypto,structuredClone,Date:FixedDate,TextEncoder,TextDecoder,URL,URLSearchParams,Request,Response,Headers,AbortController,AbortSignal,setTimeout:(fn,ms)=>setTimeout(fn,Math.min(ms,5)),clearTimeout,
   fetch:async(url,init)=>{
    assert.equal(init.method,'POST');assert.equal(init.headers.Authorization,'Bearer synthetic-token');
@@ -52,7 +52,7 @@ function fixture(who=owner,options={}){
   },require:name=>{assert.equal(name,'jose');return {importPKCS8:deny,SignJWT:class{constructor(){deny();}}};},Deno:{env:{get:name=>name==='SUPABASE_URL'?'https://platform.example':undefined},serve:()=>{}},EdgeRuntime:{waitUntil:task=>tasks.push(task)}});
  vm.runInContext(code,context,{timeout:5000});
  handler=context.__nativeFactory({platformUrl:'https://platform.example',serviceKey:'synthetic-key',fetch:async(url,init={})=>{
-  const path=new URL(url).pathname,body=init.body?JSON.parse(init.body):null;calls.push({path,method:init.method||'GET',body});
+  const path=new URL(url).pathname,body=init.body?JSON.parse(init.body):null;calls.push({path,method:init.method||'GET',body,signal:init.signal||null});
   if(path==='/auth/v1/user')return json({id:who.legacy},options.invalidToken?401:200);
   if(path==='/rest/v1/profiles')return json([{user_id:who.legacy,full_name:who.name,role:who.department,active:!options.inactive,archived_at:null}]);
   if(path==='/rest/v1/user_profiles')return json([{user_id:who.actor,display_name:who.name,department:who.department,active:true}]);
@@ -60,9 +60,20 @@ function fixture(who=owner,options={}){
   if(path==='/rest/v1/rpc/cos_fleet_board_status')return json(options.status?options.status(calls):saved);
   if(path==='/rest/v1/rpc/cos_fleet_board_payload')return new Response(options.payload??'null',{status:options.payloadStatus||200});
   if(path==='/rest/v1/rpc/cos_fleet_board_progress')return json(true);
-  if(path==='/rest/v1/rpc/cos_fleet_board_claim'){if(options.claim===false||claims[body.p_run])return json(false);claims[body.p_run]=body.p_producer;return json(true);}
+  if(path==='/rest/v1/rpc/cos_fleet_board_claim'){
+   if(options.claim===false||(claims[body.p_run]&&claims[body.p_run]!==body.p_producer))return json({claimed:false});
+   claims[body.p_run]=body.p_producer;
+   // The claim took effect, but its reply never reached the handler.
+   if(options.claimReplyLost&&!lost.claim){lost.claim=true;return json({message:'upstream reset'},502);}
+   return json({claimed:true,leaseRemainingMs:options.leaseRemainingMs??176000});}
   if(path==='/rest/v1/rpc/cos_fleet_board_history')return json({items:[]});
-  if(path==='/rest/v1/rpc/cos_fleet_board_begin')return json(options.leaseBusy||(body.p_force&&options.forceRefused)||(body.p_force===false&&!options.followUp)?null:{id:body.p_force===false?followId:recordId});
+  if(path==='/rest/v1/rpc/cos_fleet_board_begin'){
+   assert.match(body.p_request,/^[a-f0-9-]{36}$/,'every lease request carries a request token');
+   if(requests[body.p_request])return json({id:requests[body.p_request],replayed:true});
+   if(options.leaseBusy||(body.p_force&&options.forceRefused)||(body.p_force===false&&!options.followUp))return json(null);
+   const id=requests[body.p_request]=body.p_force===false?followId:recordId;
+   if(options.beginReplyLost&&!lost.begin){lost.begin=true;return json({message:'upstream reset'},502);}
+   return json({id});}
   if(['/rest/v1/rpc/cos_fleet_board_stage','/rest/v1/rpc/cos_fleet_board_finish','/rest/v1/rpc/cos_fleet_board_fail'].includes(path))return json(true);
   throw Error('Unexpected synthetic route '+path);
  }});
@@ -78,7 +89,7 @@ test('recorded refresh dispatch is outside GET-only routing and hash matches',()
 });
 for(const [label,who] of [['Owner',owner],['IT one',it],['IT two',secondIt]])test(label+' POST refresh reaches lease and completes all three sources',async()=>{
  const f=fixture(who),r=await f.request();assert.equal(r.status,200,JSON.stringify(r.body));assert.deepEqual(r.body,f.saved);assert.equal(f.tasks.length,1);assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
- const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const names=rpcs.map(c=>c.path.split('/').at(-1));assert.equal(names[0],'cos_fleet_board_begin');assert.deepEqual(names.filter(n=>!n.endsWith('status')),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_finish']);assert.ok(!names.includes('cos_fleet_board_read')&&!names.includes('cos_fleet_board_stage'));assert.deepEqual(rpcs[0].body,{p_force:true});
+ const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const names=rpcs.map(c=>c.path.split('/').at(-1));assert.equal(names[0],'cos_fleet_board_begin');assert.deepEqual(names.filter(n=>!n.endsWith('status')),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_finish']);assert.ok(!names.includes('cos_fleet_board_read')&&!names.includes('cos_fleet_board_stage'));assert.equal(rpcs[0].body.p_force,true);assert.match(rpcs[0].body.p_request,/^[a-f0-9-]{36}$/);
  const finish=rpcs.find(c=>c.path.endsWith('finish'));assert.equal(finish.body.p_run,recordId);assert.match(finish.body.p_producer,/^[a-f0-9-]{36}$/);assert.equal(finish.body.p_producer,f.claims[recordId]);assert.ok(rpcs.filter(c=>c.path.endsWith('progress')).every(c=>c.body.p_producer===f.claims[recordId]));assert.equal(finish.body.p_payload.contract,'COS_SAVED_FLEET_BOARD_V1');assert.deepEqual(finish.body.p_diagnostics.steps.map(x=>[x.step,x.ok,x.attempts]),[['map',true,1],['connections',true,1],['health',true,1],['project',true,undefined]]);
  // No dedicated worker in this fixture: one declined hand-off, then the batch runs here.
  assert.deepEqual(f.hops,['https://platform.example/functions/v1/cos-fleet-board-producer']);
@@ -196,4 +207,29 @@ test('IT can reach the worker entry end to end and Service cannot',async()=>{
  const f=fixture(it,{producer:true,payload:JSON.stringify(board),status:done}),r=await f.request('/api/fleet-saved-board/produce','POST',{run:recordId});assert.equal(r.status,202,JSON.stringify(r.body));assert.deepEqual(r.body,{accepted:true});
  assert.equal(f.sources.length,3);assert.equal(f.calls.filter(c=>c.path.endsWith('finish')).length,1);
  const again=await f.request('/api/fleet-saved-board/produce','POST',{run:recordId});assert.equal(again.status,409,'the same run cannot be started twice');assert.equal(f.sources.length,3);
+});
+
+test('worker claim committed but unanswered: the worker reports 503, keeps the run and completes it; the refresh request adds no second producer',async()=>{
+ const f=fixture(owner,{producer:true,claimReplyLost:true,payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
+ const rpcs=f.calls.filter(c=>c.path.includes('/rpc/')),claims=rpcs.filter(c=>c.path.endsWith('claim'));
+ const worker=claims[0].body.p_producer;assert.ok(claims.filter(c=>c.body.p_producer===worker).length>=2,'the worker asked again with the token it kept');
+ assert.equal(f.claims[recordId],worker);assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ const finishes=rpcs.filter(c=>c.path.endsWith('finish'));assert.equal(finishes.length,1);assert.equal(finishes[0].body.p_producer,worker);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
+ const direct=fixture(it,{claimReplyLost:true,payload:JSON.stringify(board),status:done}),answer=await direct.request('/api/fleet-saved-board/produce','POST',{run:recordId});
+ assert.equal(answer.status,503,'an unconfirmed claim is never acknowledged as accepted');assert.equal(direct.calls.filter(c=>c.path.endsWith('finish')).length,1,'yet the batch it owns is completed');
+});
+test('refresh lease granted but unanswered: the same request token recovers the lease and the batch runs once',async()=>{
+ const f=fixture(it,{producer:true,beginReplyLost:true,payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
+ const begins=f.calls.filter(c=>c.path.endsWith('begin'));assert.equal(begins.length,2);assert.equal(begins[0].body.p_request,begins[1].body.p_request);
+ assert.deepEqual(f.calls.filter(c=>c.path.endsWith('finish')).map(c=>c.body.p_run),[recordId]);assert.equal(f.sources.length,3);
+});
+test('queued follow-up lease granted but unanswered: recovered with the same token and given a producer',async()=>{
+ const f=fixture(owner,{producer:true,followUp:true,forceRefused:true,beginReplyLost:true,payload:JSON.stringify(board),status:calls=>{const begun=calls.filter(c=>c.path.endsWith('begin')&&c.body.p_force===false).length,ended=calls.some(c=>c.path.endsWith('finish'));return status(ended?'completed':begun?'running':'queued',followId);}});
+ const r=await f.request();assert.equal(r.status,200);
+ const follow=f.calls.filter(c=>c.path.endsWith('begin')&&c.body.p_force===false);assert.equal(follow.length,2);assert.equal(follow[0].body.p_request,follow[1].body.p_request);
+ assert.ok(f.claims[followId],'the recovered lease has a producer');assert.deepEqual(f.calls.filter(c=>c.path.endsWith('finish')).map(c=>c.body.p_run),[followId]);assert.equal(f.sources.length,3);
+});
+test('the worker reads sources against the lease it was told remains, and bounds its publish request',async()=>{
+ const f=fixture(owner,{leaseRemainingMs:150000}),r=await f.request();assert.equal(r.status,200);
+ const finish=f.calls.find(c=>c.path.endsWith('finish'));assert.equal(finish.body.p_diagnostics.budgetMs,150000);assert.ok(finish.signal,'the publish request carries a time limit');
 });

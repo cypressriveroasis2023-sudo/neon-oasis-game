@@ -1,4 +1,4 @@
-import {savedFleetBoard,runFleetBatch,completedBoard} from './savedFleetBoard.mjs';
+import {savedFleetBoard,acceptFleetBatch,completedBoard} from './savedFleetBoard.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -679,11 +679,13 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
  const followTargets=[...targets,dispatchTo('cos-operations-pages')];
  if(produce){
   // Worker entry. The claim is atomic: it succeeds for one producer only, and
-  // only while this exact run holds the active lease.
-  const producer=crypto.randomUUID();
-  if(await rpc('cos_fleet_board_claim',{p_run:body.run,p_producer:producer})!==true)return json({error:'Saved board batch is not available'},409);
-  EdgeRuntime.waitUntil(runFleetBatch({run:body.run,producer,rpc,read,project:completedBoard,followTargets,abort:()=>batchController.abort()}));
-  return json({accepted:true},202);
+  // only while this exact run holds the active lease. 202 is returned only
+  // when this worker holds the run. If the claim was sent but not answered
+  // the worker keeps its token, reconciles in the background and reports 503.
+  const outcome=await acceptFleetBatch({run:body.run,rpc,read,project:completedBoard,followTargets,abort:()=>batchController.abort(),waitUntil:task=>EdgeRuntime.waitUntil(task)});
+  if(outcome==='accepted')return json({accepted:true},202);
+  if(outcome==='refused')return json({error:'Saved board batch is not available'},409);
+  return json({error:'Saved board batch claim is unconfirmed'},503);
  }
  const payloadText=async id=>{
   const response=await requestFetch(platformUrl+'/rest/v1/rpc/cos_fleet_board_payload',{method:'POST',headers:platformHeaders(),body:JSON.stringify({p_run:id})});
