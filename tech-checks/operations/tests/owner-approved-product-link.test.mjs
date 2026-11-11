@@ -89,7 +89,8 @@ test('a saved binding always outranks an approval for the same A#',()=>{
 });
 test('malformed, duplicated or oversized approval lists are rejected outright',()=>{
  const u=units(),good=links();
- for(const bad of [{},'x',[{...good[0],extra:1}],[{...good[0],productId:'abc'}],[{...good[0],unitId:'nope'}],[{...good[0],mhelpLabel:''}],[{...good[0],cosLabel:'<b>'}],[good[0],{...good[1],productId:good[0].productId}],[good[0],{...good[1],unitId:good[0].unitId}],[{...good[0],approvalId:undefined}],Array.from({length:501},(_,i)=>({...good[0],productId:String(1000+i),unitId:id(2000+i)}))])
+ for(const notList of [{},'x'])assert.equal(run(records(u),notList,u).snapshot.ownerApprovedLinks.state,'unavailable');   // not a list at all: unavailable, never 'no approvals'
+ for(const bad of [[{...good[0],extra:1}],[{...good[0],productId:'abc'}],[{...good[0],unitId:'nope'}],[{...good[0],mhelpLabel:''}],[{...good[0],cosLabel:'<b>'}],[good[0],{...good[1],productId:good[0].productId}],[good[0],{...good[1],unitId:good[0].unitId}],[{...good[0],approvalId:undefined}],Array.from({length:501},(_,i)=>({...good[0],productId:String(1000+i),unitId:id(2000+i)}))])
   assert.throws(()=>run(records(u),bad,u),/Invalid Owner-approved Product links/);
 });
 
@@ -126,7 +127,8 @@ test('an unreadable or malformed approvals source is reported as unavailable, ne
   const good={contract:'COS_OWNER_PRODUCT_LINKS_V1',links:links()},calls=[];
   assert.deepEqual(await read(async(name,payload)=>{calls.push([name,payload]);return good;},'org'),links());assert.deepEqual(calls,[['cos_owner_product_links_active_v1',{p_organization_id:'org'}]]);
   assert.deepEqual(await read(async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[]}),'org'),[]);
-  for(const bad of [async()=>{throw Error('404');},async()=>null,async()=>({contract:'OTHER',links:links()}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[{...links()[0],productId:'x'}]}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:'x'})])assert.deepEqual(await read(bad,'org'),{unavailable:true});
+  for(const bad of [async()=>{throw Error('404');},async()=>null,async()=>({contract:'OTHER',links:links()}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[{...links()[0],productId:'x'}]}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:'x'}),
+   async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1'}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:null}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:undefined}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:{}}),async()=>undefined,async()=>[]])assert.deepEqual(await read(bad,'org'),{unavailable:true});
  }
  const u=units();
  for(const project of [projectMhelpUploadPlacement,shipped.projectMhelpUploadPlacement]){
@@ -134,6 +136,23 @@ test('an unreadable or malformed approvals source is reported as unavailable, ne
   assert.deepEqual(JSON.parse(JSON.stringify(out.snapshot.ownerApprovedLinks)),{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:'unavailable',approvals:0,applied:0});
   assert.equal(r['2232677'].binding.state,'unlinked');assert.deepEqual(r['2232677'].binding.unitIds,[]);        // no identity is invented
   assert.equal(r['2232677'].binding.reason,'Product ID identity label changed; confirm before linking');
+ }
+});
+test('a correct-looking answer with a missing or null list can never produce a saved board: reader -> map -> board save path',async()=>{
+ const f=fieldProductFixture();
+ for(const [read,project] of [[readOwnerApprovedProductLinks,projectMhelpUploadPlacement],[shipped.readOwnerApprovedProductLinks,shipped.projectMhelpUploadPlacement]]){
+  for(const answer of [{contract:'COS_OWNER_PRODUCT_LINKS_V1'},{contract:'COS_OWNER_PRODUCT_LINKS_V1',links:null},{contract:'COS_OWNER_PRODUCT_LINKS_V1',links:undefined},null,undefined]){
+   const got=await read(async()=>answer,'org'),u=units(),out=project(map(u),upload(records(u)),[],undefined,now,{ownerApprovedLinks:got});
+   assert.equal(out.snapshot.ownerApprovedLinks?.state,'unavailable',JSON.stringify(answer));                       // the marker is always present and never 'ready'
+   assert.throws(()=>completedBoard(f.health,{...f.field,ownerApprovedLinks:JSON.parse(JSON.stringify(out.snapshot.ownerApprovedLinks))},f.connections,null,f.now),/owner_link_source_unavailable/);
+  }
+  // Even if a caller hands the projection a bare null, a marker object or junk instead of a list, it is unavailable, not "no approvals".
+  for(const raw of [null,{unavailable:true},{},'x',0,false]){const u=units(),out=project(map(u),upload(records(u)),[],undefined,now,{ownerApprovedLinks:raw});
+   assert.equal(out.snapshot.ownerApprovedLinks.state,'unavailable',String(raw));assert.equal(by(out)['2232677'].binding.state,'unlinked');
+   assert.throws(()=>completedBoard(f.health,{...f.field,ownerApprovedLinks:JSON.parse(JSON.stringify(out.snapshot.ownerApprovedLinks))},f.connections,null,f.now),/owner_link_source_unavailable/);}
+  // A real empty list is the only way to say "no approvals", and it saves normally.
+  const u=units(),ready=project(map(u),upload(records(u)),[],undefined,now,{ownerApprovedLinks:await read(async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[]}),'org')});
+  assert.equal(ready.snapshot.ownerApprovedLinks.state,'ready');assert.ok(completedBoard(f.health,{...f.field,ownerApprovedLinks:JSON.parse(JSON.stringify(ready.snapshot.ownerApprovedLinks))},f.connections,null,f.now).counts);
  }
 });
 test('a board is never saved from a map whose approvals source was unavailable; the last completed board stays',()=>{

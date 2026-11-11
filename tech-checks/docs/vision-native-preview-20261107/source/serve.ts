@@ -2832,7 +2832,7 @@ var CosMhelpLiveInventoryRelease = (() => {
   async function readOwnerApprovedProductLinks(read, organizationId) {
     try {
       const value = await read("cos_owner_product_links_active_v1", { p_organization_id: organizationId });
-      if (!object(value) || value.contract !== "COS_OWNER_PRODUCT_LINKS_V1") return { unavailable: true };
+      if (!object(value) || value.contract !== "COS_OWNER_PRODUCT_LINKS_V1" || !Array.isArray(value.links)) return { unavailable: true };
       approvedLinks(value.links);
       return value.links;
     } catch {
@@ -2854,7 +2854,7 @@ var CosMhelpLiveInventoryRelease = (() => {
       const key = r.customer.trim().replace(/\s+/g, " ").toLowerCase();
       customerIds.set(key, /* @__PURE__ */ new Set([...customerIds.get(key) || [], r.customerId]));
     }
-    const linksUnavailable = object(options.ownerApprovedLinks) && options.ownerApprovedLinks.unavailable === true;
+    const linksUnavailable = options.ownerApprovedLinks !== void 0 && !Array.isArray(options.ownerApprovedLinks);
     const links = linksUnavailable ? /* @__PURE__ */ new Map() : approvedLinks(options.ownerApprovedLinks);
     const claimed = /* @__PURE__ */ new Set();
     if (links.size) for (const other of [...receipt2.records, ...live ? receipt2.apiMissingRecords : []]) {

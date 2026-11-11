@@ -127,7 +127,8 @@ export type OwnerApprovedLinksUnavailable={unavailable:true};
 export async function readOwnerApprovedProductLinks(read:(name:string,payload:Row)=>Promise<unknown>,organizationId:string):Promise<unknown[]|OwnerApprovedLinksUnavailable>{
  try{
   const value=await read('cos_owner_product_links_active_v1',{p_organization_id:organizationId});
-  if(!object(value)||value.contract!=='COS_OWNER_PRODUCT_LINKS_V1')return {unavailable:true};
+  // The list itself must be present: a right-looking answer with no list is not "no approvals".
+  if(!object(value)||value.contract!=='COS_OWNER_PRODUCT_LINKS_V1'||!Array.isArray(value.links))return {unavailable:true};
   approvedLinks(value.links);return value.links;
  }catch{return {unavailable:true};}
 }
@@ -137,7 +138,7 @@ const inactiveStatus=new Set(['retired','decommissioned','deleted','stolen']);
 const approvalAnswers=new Set(['Product ID identity label changed; confirm before linking','Prior reviewed scoped identity or assignment requires Owner installation review']);
 /** Call after the API placement/location projections and before the finalizer.
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
-export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;ownerApprovedLinks?:unknown[]|OwnerApprovedLinksUnavailable}={}):{snapshot:Row;authorities:Row[]}{
+export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;ownerApprovedLinks?:unknown[]|OwnerApprovedLinksUnavailable|null}={}):{snapshot:Row;authorities:Row[]}{
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
@@ -147,7 +148,9 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
  const concernKey=(value:unknown)=>{let key=concernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);concernKeys.set(value,key);}return key;};
  const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
  for(const r of receipt.records){const key=r.customer.trim().replace(/\s+/g,' ').toLowerCase();customerIds.set(key,new Set([...(customerIds.get(key)||[]),r.customerId]));}
- const linksUnavailable=object(options.ownerApprovedLinks)&&(options.ownerApprovedLinks as Row).unavailable===true;
+ // Asked for approvals but did not receive an actual list (null, an unavailable marker,
+ // anything else): unavailable. Only an absent option means the caller never asked.
+ const linksUnavailable=options.ownerApprovedLinks!==undefined&&!Array.isArray(options.ownerApprovedLinks);
  const links=linksUnavailable?new Map<string,OwnerApprovedProductLink>():approvedLinks(options.ownerApprovedLinks);
  // Every COS record any saved binding, possible alias or absent Product ID already
  // points at. An approved link can never claim one of these.
