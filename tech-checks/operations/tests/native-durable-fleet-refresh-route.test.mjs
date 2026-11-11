@@ -82,6 +82,7 @@ function fixture(who=owner,options={}){
    return json({id});}
   if(path==='/rest/v1/rpc/cos_fleet_board_finish'&&options.truncated?.finish)return cut('tr');
   if(['/rest/v1/rpc/cos_fleet_board_stage','/rest/v1/rpc/cos_fleet_board_finish','/rest/v1/rpc/cos_fleet_board_fail'].includes(path))return json(true);
+  if(path.startsWith('/rest/v1/rpc/')&&options.rpc?.[path.slice(13)])return options.rpc[path.slice(13)](body,json);
   throw Error('Unexpected synthetic route '+path);
  }});
  return {calls,sources,tasks,saved,hops,claims,request:async(path='/api/fleet-saved-board/refresh',method='POST',body={})=>{
@@ -291,3 +292,41 @@ test('the connections source labels a decline only after its reads and both cons
  // The response status and message are unchanged; only the diagnostic gained a stage and a retry hint.
  assert.ok(block.includes("return json({error:'Saved connection source could not be verified.',diagnostic},status);"));
 });
+
+// ---- manual equipment record route (real handler, synthetic database) ----
+{
+ const P='1713914',A='10000000-0000-4000-8000-000000000001',blank={displayName:null,placement:null,customer:null,siteName:null,address:null,deviceLink:null,note:null};
+ const unsaved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:0,auditId:null,recordedAt:null,recordedBy:null,recordedByName:null,record:blank,proof:'a'.repeat(64)};
+ const savedBy=actor=>({contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:1,auditId:A,recordedAt:'2026-11-11T17:00:00Z',recordedBy:actor,record:{...blank,placement:'FIELD',siteName:'Buda'},proof:'b'.repeat(64)});
+ const save={expected:{productId:P,revision:0,auditId:null,proof:'a'.repeat(64)},reason:'Installed today',requestId:A,changes:{placement:'FIELD',siteName:'Buda'}};
+ const database=who=>({cos_manual_equipment_v1:(body,json)=>body.p_action==='history'?json({contract:'COS_MANUAL_EQUIPMENT_HISTORY_V1',productId:P,items:[{auditId:A,revision:1,actorId:who.actor,recordedAt:'2026-11-11T17:00:00Z',reason:'Installed today',changes:save.changes,before:blank,after:savedBy(who.actor).record}]}):body.p_action==='save'?json({...savedBy(who.actor),saved:true,requestId:body.p_request_id,replayed:false,current:true}):json(body.__after?savedBy(who.actor):unsaved)});
+ const manual=f=>f.calls.filter(c=>c.path==='/rest/v1/rpc/cos_manual_equipment_v1');
+ for(const who of [owner,it])test('manual equipment record: '+who.name+' can read, save and see the history, acting as themselves',async()=>{
+  let stored=false;const db=database(who),rpc={cos_manual_equipment_v1:(body,json)=>{if(body.p_action==='save'){stored=true;return db.cos_manual_equipment_v1(body,json);}return db.cos_manual_equipment_v1({...body,__after:stored},json);}};
+  const f=fixture(who,{rpc});
+  const read=await f.request('/api/fleet/products/'+P+'/manual-record','GET',null);assert.equal(read.status,200);assert.deepEqual(read.body,unsaved);
+  const saved=await f.request('/api/fleet/products/'+P+'/manual-record','POST',save);assert.equal(saved.status,200);assert.equal(saved.body.saved,true);assert.equal(saved.body.record.placement,'FIELD');assert.equal(saved.body.recordedBy,who.actor);
+  const history=await f.request('/api/fleet/products/'+P+'/manual-record/history','GET',null);assert.equal(history.status,200);assert.equal(history.body.items[0].actorId,who.actor);assert.equal(history.body.items[0].reason,'Installed today');
+  const sent=manual(f);assert.deepEqual(sent.map(c=>c.body.p_action),['read','save','read','history']);
+  for(const c of sent){assert.equal(c.body.p_actor_user_id,who.actor);assert.equal(c.body.p_organization_id,organization);assert.equal(c.body.p_product_id,P);}
+  assert.deepEqual(sent[1].body.p_changes,save.changes);assert.equal(sent[1].body.p_reason,'Installed today');assert.equal(f.tasks.length,0);assert.deepEqual(f.sources,[]);
+ });
+ test('manual equipment record: a Service technician is refused before any database call',async()=>{
+  const f=fixture(service,{rpc:database(service)});
+  for(const [path,method,body] of [['/manual-record','GET',null],['/manual-record','POST',save],['/manual-record/history','GET',null]]){const r=await f.request('/api/fleet/products/'+P+path,method,body);assert.equal(r.status,403,path+' '+method);}
+  assert.equal(manual(f).length,0);
+ });
+ test('manual equipment record: a stale screen is answered 409 and a database outage 503, with nothing reported as saved',async()=>{
+  const conflict=fixture(it,{rpc:{cos_manual_equipment_v1:(body,json)=>body.p_action==='save'?json({code:'PT409',message:'This record was changed by someone else. Reload it and try again.'},409):json(unsaved)}});
+  const c=await conflict.request('/api/fleet/products/'+P+'/manual-record','POST',save);assert.equal(c.status,409);assert.match(c.body.error,/changed by someone else/);assert.equal(c.body.saved,undefined);
+  const down=fixture(it,{rpc:{cos_manual_equipment_v1:(body,json)=>json({code:'57014',message:'canceling statement due to statement timeout'},500)}});
+  const d=await down.request('/api/fleet/products/'+P+'/manual-record','POST',save);assert.equal(d.status,503);assert.doesNotMatch(d.body.error,/statement|timeout/);
+ });
+ test('manual equipment record: malformed requests are refused without a database call',async()=>{
+  const f=fixture(owner,{rpc:database(owner)});
+  for(const body of [{...save,reason:''},{...save,changes:{}},{...save,changes:{placement:'UNKNOWN'}},{...save,changes:{owner:'x'}},{...save,requestId:'nope'},{...save,extra:true}]){const r=await f.request('/api/fleet/products/'+P+'/manual-record','POST',body);assert.equal(r.status,400,JSON.stringify(body));}
+  assert.equal(manual(f).length,0);
+  for(const path of ['/api/fleet/products/0/manual-record','/api/fleet/products/abc/manual-record','/api/fleet/products/'+P+'/manual-record/other']){const r=await f.request(path,'GET',null);assert.notEqual(r.status,200,path);}
+  assert.equal(manual(f).length,0);
+ });
+}
