@@ -38,6 +38,20 @@ export function checkedManualChanges(v:any):Partial<ManualEquipmentRecord>{
  }
  return Object.fromEntries(keys.map(k=>[k,v[k]])) as Partial<ManualEquipmentRecord>;
 }
+/** Calls the database function and turns its refusals into answers a person can act on. */
+export function createManualEquipmentRpc(options:{fetch:(url:string,init:Row)=>Promise<any>;url:string;headers:()=>Row}){
+ const unavailable='Manual equipment record is unavailable. Try again.';
+ return async(name:string,payload:Row)=>{
+  let response:any;try{response=await options.fetch(options.url+'/rest/v1/rpc/'+name,{method:'POST',headers:options.headers(),body:JSON.stringify(payload)});}catch{fail(unavailable);}
+  let data:any;try{data=await response.json();}catch{data={};}
+  if(response.ok)return data;
+  const message=typeof data?.message==='string'&&data.message.length<=300?data.message:'';
+  if(response.status===409||data?.code==='PT409')fail(message||'This record was changed by someone else. Reload it and try again.',409);
+  if(data?.code==='42501')fail('An active COS Owner or verified IT account is required.',403);
+  if(data?.code==='22023')fail(message||'Review the record and try again.',400);
+  fail(unavailable);
+ };
+}
 const conflict=(error:any)=>error?.code==='PT409'||error?.status===409;
 export function createManualEquipment(options:{rpc:(name:string,body:Row)=>Promise<any>;actorPayload:Row}){
  const call=async(body:Row)=>{try{return await options.rpc('cos_manual_equipment_v1',{...options.actorPayload,...body});}catch(error){

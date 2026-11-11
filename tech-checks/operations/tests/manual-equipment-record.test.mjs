@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createManualEquipment,checkedManualChanges,ManualEquipmentError} from '../../supabase/functions/cos-operations-pages/manualEquipment.ts';
+import {createManualEquipment,createManualEquipmentRpc,checkedManualChanges,ManualEquipmentError} from '../../supabase/functions/cos-operations-pages/manualEquipment.ts';
 
 const P='1713914',A='10000000-0000-4000-8000-000000000001',U='00000000-0000-4000-8000-000000000001',proof='a'.repeat(64);
 const blank={displayName:null,placement:null,customer:null,siteName:null,address:null,deviceLink:null,note:null};
@@ -51,4 +51,14 @@ test('history returns who, when, why, before and after',async()=>{
  assert.deepEqual(h.items,[item]);assert.equal(calls[0].args.p_action,'history');
  await refuses(make([{contract:'COS_MANUAL_EQUIPMENT_HISTORY_V1',productId:P,items:[{...item,actorId:'x'}]}]).run(P,'GET',undefined,'history'),503);
  await refuses(make([]).run(P,'POST',body,'history'),405);
+});
+test('database refusals become answers a person can act on',async()=>{
+ const rpc=(status,data,throws=false)=>createManualEquipmentRpc({url:'https://db.example',headers:()=>({apikey:'k'}),fetch:async(url,init)=>{if(throws)throw new Error('network');assert.equal(url,'https://db.example/rest/v1/rpc/cos_manual_equipment_v1');assert.equal(init.method,'POST');return {ok:status<300,status,json:async()=>data};}})('cos_manual_equipment_v1',{a:1});
+ assert.deepEqual(await rpc(200,{ok:1}),{ok:1});
+ await refuses(rpc(409,{code:'PT409',message:'This record was changed by someone else. Reload it and try again.'}),409,/changed by someone else/);
+ await refuses(rpc(400,{code:'PT409',message:'Save request was reused with different details'}),409,/reused/);
+ await refuses(rpc(403,{code:'42501',message:'Owner or IT placement access required'}),403,/Owner or verified IT/);
+ await refuses(rpc(400,{code:'22023',message:'Placement must be FIELD or SHOP'}),400,/FIELD or SHOP/);
+ await refuses(rpc(500,{code:'XX000',message:'relation app_private.secret does not exist'}),503,/unavailable/);
+ await refuses(rpc(504,null),503,/unavailable/);await refuses(rpc(200,null,true),503,/unavailable/);
 });

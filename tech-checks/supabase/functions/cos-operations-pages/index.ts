@@ -1,4 +1,5 @@
 import {savedFleetBoard,acceptFleetBatch,completedBoard} from './savedFleetBoard.mjs';
+import {createManualEquipment,createManualEquipmentRpc,ManualEquipmentError} from './manualEquipment.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -591,6 +592,13 @@ export function createOperationsHandler(options) {
       }
       // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
       const verifiedFleetIt = verifiedItFleet(context);
+      // Manual equipment record (Owner or IT): what a person recorded for one mHelp Product ID.
+      const manualRecord=/^\/api\/fleet\/products\/([1-9][0-9]{0,17})\/manual-record(\/history)?$/.exec(path);
+      if(manualRecord){
+        if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail('An active COS Owner or verified IT account is required.',403);
+        try{return json(await createManualEquipment({rpc:createManualEquipmentRpc({fetch:requestFetch,url:platformUrl,headers:platformHeaders}),actorPayload:{p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID}})(manualRecord[1],method,body,manualRecord[2]?'history':'record'));}
+        catch(error){if(error instanceof ManualEquipmentError)return json({error:error.message},error.status);throw error;}
+      }
       const shopPlacement=/^\/api\/fleet\/units\/([a-f0-9-]+)\/shop-placement$/i.exec(path);
       if(shopPlacement){
         if(!(context.legacyOwner&&context.actorId)&&!verifiedFleetIt)fail('An active COS Owner or verified IT account is required.',403);
