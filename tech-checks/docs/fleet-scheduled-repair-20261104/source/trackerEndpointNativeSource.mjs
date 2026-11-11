@@ -12,6 +12,8 @@ async function json(response,signal,max){
  try{for(;;){if(signal.aborted)throw Error('Cancelled');const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>max)throw Error('Read exceeds bound');text+=decoder.decode(r.value,{stream:true});}return JSON.parse(text+decoder.decode());}
  finally{void reader.cancel().catch(()=>{});}
 }
+// Exact messages thrown by baseline() below, and nothing else.
+const SCHEDULED_SOURCE_REFUSALS=Object.freeze({'Current complete inventory required':'inventory_not_current','Complete tracker membership required':'inventory_incomplete'});
 function baseline(value,now){
  if(value?.contract!=='COS_MHELP_API_V1'||value.origin!=='mhelpdesk_api'||value.complete!==true||value.reviewed!==true||!H.test(value.sourceSha256)||value.apiSync?.enabled!==true||!Number.isFinite(Date.parse(value.apiSync.lastSuccessAt))||Date.parse(value.apiSync.lastSuccessAt)>now||now-Date.parse(value.apiSync.lastSuccessAt)>2700000||!Array.isArray(value.records)||!value.records.length||value.records.length>10000)throw Error('Current complete inventory required');
  const proof=value.trackerEndpointMembership;
@@ -63,6 +65,14 @@ export function createScheduledNativeEndpointSourceRuntime({enabled=false,snapsh
    }
    const io=existingNativeProductSourceContext({source:{},googleSheets:{getServiceAccountJson:()=>getEnv('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion,fetch:fetcher},now});
    return reply(await readScheduledNativeEndpointSource({readBaseline,readTracker:io.tracker,signal,now}));
-  }catch(error){console.error('Scheduled endpoint source failure',error?.name,error?.message);return reply({error:'Scheduled endpoint source unavailable'},503);}
+  }catch(error){
+   console.error('Scheduled endpoint source failure',error?.name,error?.message);
+   // Same status and message as before. The label tells the scheduled caller
+   // whether asking again can help. Only the two inventory checks in
+   // baseline() are refusals: they cannot change until a new inventory is
+   // accepted. Everything else is a temporary read failure.
+   const refusal=error instanceof Error?SCHEDULED_SOURCE_REFUSALS[error.message]:undefined;
+   return reply({error:'Scheduled endpoint source unavailable',code:refusal||'read_unavailable',retryable:!refusal},503);
+  }
  };
 }
