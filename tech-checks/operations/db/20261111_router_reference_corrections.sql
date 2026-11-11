@@ -14,6 +14,7 @@ begin;
 
 create table public.camera_unit_router_corrections(
  id uuid primary key,
+ seq bigint generated always as identity unique,
  action text not null check(action in('correct','revert')),
  router_id bigint not null,
  unit_key text not null,
@@ -38,7 +39,11 @@ create table public.camera_unit_router_corrections(
 create unique index camera_unit_router_corrections_one_revert on public.camera_unit_router_corrections(reverts) where reverts is not null;
 create index camera_unit_router_corrections_router on public.camera_unit_router_corrections(router_id,recorded_at);
 alter table public.camera_unit_router_corrections enable row level security;
-revoke all on public.camera_unit_router_corrections from public,anon,authenticated;
+-- Production default privileges hand new public tables to service_role, and that
+-- role bypasses row-level security. Take everything back, then allow readback only:
+-- receipts are written solely by the two functions below, which run as their owner.
+revoke all on public.camera_unit_router_corrections from public,anon,authenticated,service_role;
+grant select on public.camera_unit_router_corrections to service_role;
 
 create function public.camera_unit_router_corrections_immutable() returns trigger language plpgsql as $$
 begin raise exception 'Router correction receipts are append-only' using errcode='PT409'; end$$;
@@ -65,14 +70,21 @@ begin
   or family(p_new_ip)<>4 or masklen(p_new_ip)<>32 then
   raise exception 'Router correction is incomplete' using errcode='PT409';
  end if;
+ -- Up to one minute ahead of this server's clock is tolerated as clock skew
+ -- between the reader and the database; anything later, or older than 24 hours, is refused.
  if p_observed_at>clock_timestamp()+interval '1 minute' or p_observed_at<clock_timestamp()-interval '24 hours' then
   raise exception 'Provider observation is not current; read the provider again' using errcode='PT409';
  end if;
  perform pg_advisory_xact_lock(hashtextextended('camera_unit_router_corrections',0));
  select * into seen from public.camera_unit_router_corrections where id=p_id;
  if found then
-  if seen.action='correct' and seen.router_id=p_router_id and seen.new_public_ip=p_new_ip and seen.old_public_ip is not distinct from p_expected_old_ip
-   and seen.router_serial=p_router_serial and seen.product_id=p_product_id and seen.observed_at=p_observed_at then
+  -- A repeat is accepted only when the whole reviewed payload is identical.
+  if seen.action='correct' and seen.router_id=p_router_id and seen.unit_key=p_unit_key
+   and seen.old_public_ip is not distinct from p_expected_old_ip and seen.new_public_ip=p_new_ip
+   and seen.router_serial=p_router_serial and seen.product_id=p_product_id and seen.cos_unit_id=p_cos_unit_id
+   and seen.provider=btrim(p_provider) and seen.source=btrim(p_source) and seen.reported_status=p_reported_status
+   and seen.observed_at=p_observed_at and seen.approved_by=btrim(p_approved_by)
+   and seen.approval_source=btrim(p_approval_source) and seen.reason=btrim(p_reason) then
    return jsonb_build_object('contract','COS_ROUTER_CORRECTION_V1','id',seen.id,'applied',false,'repeat',true);
   end if;
   raise exception 'Correction id was already used for a different change' using errcode='PT409';
@@ -117,13 +129,19 @@ begin
  perform pg_advisory_xact_lock(hashtextextended('camera_unit_router_corrections',0));
  select * into seen from public.camera_unit_router_corrections where id=p_id;
  if found then
-  if seen.action='revert' and seen.reverts=p_reverts then return jsonb_build_object('contract','COS_ROUTER_CORRECTION_V1','id',seen.id,'applied',false,'repeat',true); end if;
+  if seen.action='revert' and seen.reverts=p_reverts and seen.approved_by=btrim(p_approved_by)
+   and seen.approval_source=btrim(p_approval_source) and seen.reason=btrim(p_reason) then return jsonb_build_object('contract','COS_ROUTER_CORRECTION_V1','id',seen.id,'applied',false,'repeat',true); end if;
   raise exception 'Correction id was already used for a different change' using errcode='PT409';
  end if;
  select * into c from public.camera_unit_router_corrections where id=p_reverts and action='correct';
  if not found then raise exception 'No such correction to reverse' using errcode='PT409'; end if;
  if exists(select 1 from public.camera_unit_router_corrections where reverts=p_reverts) then
   raise exception 'That correction was already reversed' using errcode='PT409'; end if;
+ -- Only the latest correction still in effect for this router record can be
+ -- reversed. An address that merely matches an earlier correction is not enough.
+ if exists(select 1 from public.camera_unit_router_corrections l where l.router_id=c.router_id and l.action='correct' and l.seq>c.seq
+   and not exists(select 1 from public.camera_unit_router_corrections v where v.reverts=l.id)) then
+  raise exception 'A later correction is in effect for this router record; reverse that one first' using errcode='PT409'; end if;
  select * into r from public.camera_unit_routers where id=c.router_id for update;
  if not found or r.unit_key is distinct from c.unit_key or r.router_public_ip is distinct from c.new_public_ip or r.unit_ip is not null then
   raise exception 'Router record changed since the correction; review before reversing' using errcode='PT409'; end if;

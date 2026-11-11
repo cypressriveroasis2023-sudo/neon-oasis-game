@@ -1,5 +1,8 @@
 -- READ-ONLY precheck for 20261111_router_reference_corrections.sql (camera project).
--- Writes nothing. Returns one JSON value. The candidate list is what was under
+-- Writes nothing. Returns one JSON value. It covers schema compatibility and, per
+-- candidate, only these guards: record identity, unchanged old address, no unit IP,
+-- and new address not held elsewhere. It does NOT cover observation age, serial
+-- uniqueness, payload completeness, replay or reversal rules; the functions enforce those. The candidate list is what was under
 -- review on 2026-11-11; "wouldPass" is the guards' answer right now, not approval.
 set statement_timeout='8s';
 with want(c,t) as (values('id','bigint'),('unit_key','text'),('unit_ip','inet'),('router_public_ip','inet'),('reported_status','text'),

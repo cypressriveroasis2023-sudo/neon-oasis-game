@@ -37,7 +37,11 @@ let pre,cams0,others0;
 test.before(()=>{if(!canRun)return;
  dir=mkdtempSync(join(tmpdir(),'cos-routers-'));chmodSync(dir,0o777);port=56000+Math.floor(Math.random()*900);
  sh(`${bin}/initdb -D ${dir}/data -A trust -U postgres >/dev/null && ${bin}/pg_ctl -D ${dir}/data -o "-c listen_addresses='' -k ${dir} -p ${port}" -w -l ${dir}/log start >/dev/null`);
- psql(`create role anon; create role authenticated; create role service_role;
+ // Production-equivalent defaults: new public tables are granted to the API roles, and service_role bypasses RLS.
+ psql(`create role anon; create role authenticated; create role service_role bypassrls;
+  alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
+  alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;
+  alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;
   create table public.camera_unit_routers(id bigint primary key,unit_key text not null unique,router_name text not null default 'InHand Router',router_model text,unit_ip inet,router_public_ip inet,
    web_port integer,web_protocol text,reported_status text not null default 'unknown' check(reported_status in('online','offline','unknown')),reported_latency_ms integer,status_source text,
    status_observed_at timestamptz,current_status text constraint camera_unit_routers_current_status_check check(current_status is null or current_status in('online','offline','unknown')),
@@ -72,7 +76,14 @@ test('the install alters no existing object and only the service role may call i
  assert.equal(/alter\s+table\s+public\.camera_unit_routers\b|drop\s|create\s+trigger\s+\S+\s+(before|after)[^;]*on\s+public\.camera_unit_routers\b/i.test(sql),false);
  assert.equal(/camera_devices|sim|activation|placement|monitor/i.test(sql),false);
  for(const role of ['anon','authenticated']){fails(()=>correct({},role),/permission denied/);fails(()=>psql(`set role ${role}; select count(*) from public.camera_unit_router_corrections;`),/permission denied/);}
- fails(()=>psql(`set role service_role; insert into public.camera_unit_router_corrections(id,action,router_id,unit_key,prior_row,provider,source,reported_status,observed_at,approved_by,approval_source,reason) values('${id(99)}','correct',1,'x','{}','p','s','unknown',now(),'a','b','c');`),/permission denied|violates check/);
+ // A structurally valid receipt, written directly: refused for every API role, including the RLS-bypassing service role.
+ const direct=`insert into public.camera_unit_router_corrections(id,action,router_id,unit_key,prior_row,old_public_ip,new_public_ip,router_serial,product_id,cos_unit_id,provider,source,reported_status,observed_at,approved_by,approval_source,reason) values('${id(99)}','correct',182,'SOLARSPOTTER 053','{}','166.168.147.21','38.246.194.11','RF3152533023889','2300342','${UNIT}','InHand','direct','online',now(),'James Martin','direct','direct');`;
+ for(const role of ['anon','authenticated','service_role'])fails(()=>psql(`set role ${role}; ${direct}`),/permission denied for table camera_unit_router_corrections/);
+ assert.equal(psql(`select rolbypassrls from pg_roles where rolname='service_role';`),'t');
+ assert.equal(psql(`select string_agg(privilege_type,',' order by privilege_type) from information_schema.role_table_grants where table_name='camera_unit_router_corrections' and grantee in('anon','authenticated','service_role','PUBLIC');`),'SELECT');
+ assert.equal(psql(`set role service_role; select count(*) from public.camera_unit_router_corrections;`),'0');
+ // The same statement as the table owner is structurally valid — the refusal above is the privilege, not the shape.
+ assert.equal(psql(`begin; ${direct} select count(*) from public.camera_unit_router_corrections; rollback;`),'1');
  assert.equal(receipts(),0);
 });
 
@@ -121,6 +132,9 @@ test('repeating the same correction is harmless; reusing its id for something el
  const a=psql(`select observed_at from public.camera_unit_router_corrections where id='${id(1)}';`),before=hash('public.camera_unit_routers');
  assert.deepEqual(correct({observedAt:a}),{contract:'COS_ROUTER_CORRECTION_V1',id:id(1),applied:false,repeat:true});
  fails(()=>correct({observedAt:a,newIp:'38.246.194.12'}),/already used for a different change/);
+ // Every reviewed field is part of the replay comparison.
+ for(const change of [{unitId:'22222222-2222-4222-8222-222222222222'},{unitKey:'SOLARSPOTTER 054'},{routerId:79},{oldIp:'166.168.147.22'},{serial:'RF3152533023880'},{productId:'2300343'},{provider:'Other'},{source:'Another source'},{status:'offline'},{approvedBy:'Someone Else'},{approvalSource:'Another approval'},{reason:'Another reason'},{observedAt:'2026-11-11T23:00:00Z'}])
+  fails(()=>correct({observedAt:a,...change}),/already used for a different change/);
  fails(()=>correct({id:id(4),routerId:79,unitKey:'SPOTTER 185',oldIp:'166.203.205.83',newIp:'38.246.195.93',serial:'RF3152533023889',productId:'2257840'}),/serial is already recorded for another router record/);
  assert.equal(hash('public.camera_unit_routers'),before);assert.equal(receipts(),1);
 });
@@ -149,6 +163,9 @@ test('a reversal is a new receipt that restores the saved address without restor
  assert.deepEqual(revert(id(8),id(1)),{contract:'COS_ROUTER_CORRECTION_V1',id:id(8),applied:true,repeat:false});
  const now=row(182);assert.equal(now.router_public_ip,'166.168.147.21');assert.equal(now.current_status,'unknown');assert.equal(now.last_checked_at,null);assert.equal(now.last_online_at,null);assert.equal(now.reported_status,'unknown');
  assert.deepEqual(revert(id(8),id(1)),{contract:'COS_ROUTER_CORRECTION_V1',id:id(8),applied:false,repeat:true});
+ for(const [by,src,why] of [['Someone Else','Synthetic test approval','Wrong router'],['James Martin','Another approval','Wrong router'],['James Martin','Synthetic test approval','Another reason']])
+  fails(()=>psql(`set role service_role; select public.camera_unit_router_revert_v1('${id(8)}','${id(1)}',${q(by)},${q(src)},${q(why)});`),/already used for a different change/);
+ fails(()=>revert(id(8),id(5)),/already used for a different change/);
  fails(()=>revert(id(9),id(1)),/already reversed/);
  assert.equal(psql(`select action||':'||(reverts is not null) from public.camera_unit_router_corrections where id='${id(1)}';`),'correct:false');
  assert.equal(receipts(),4);
@@ -168,4 +185,23 @@ test('two corrections racing for one address: exactly one is applied',{skip},asy
  const [a,b]=await Promise.all([run(21,901,'RACE A','198.51.100.1','RACESERIAL0001'),run(22,902,'RACE B','198.51.100.2','RACESERIAL0002')]);
  assert.equal([a,b].filter(x=>x.code===0).length,1);assert.match([a,b].find(x=>x.code!==0).out,/Another router record already holds that address/);
  assert.equal(psql(`select count(*) from public.camera_unit_routers where router_public_ip='198.51.100.9';`),'1');
+});
+
+test('only the latest correction in effect can be reversed: A→B, B→C, C→B, then the first A→B is refused',{skip},()=>{
+ psql(`insert into public.camera_unit_routers(id,unit_key,router_public_ip) values(950,'CHAIN','203.0.113.1');`);
+ const step=(n,from,to)=>correct({id:id(n),routerId:950,unitKey:'CHAIN',oldIp:from,newIp:to,serial:'CHAINSERIAL0001',productId:'2999001'});
+ step(31,'203.0.113.1','203.0.113.2');step(32,'203.0.113.2','203.0.113.3');
+ fails(()=>revert(id(41),id(31)),/changed since the correction|later correction is in effect/);
+ step(33,'203.0.113.3','203.0.113.2');
+ // The address equals what the first correction set, but a later one is in effect.
+ const before=hash('public.camera_unit_routers'),n=receipts();
+ fails(()=>revert(id(41),id(31)),/later correction is in effect/);
+ fails(()=>revert(id(41),id(32)),/changed since the correction|later correction is in effect/);
+ assert.equal(hash('public.camera_unit_routers'),before);assert.equal(receipts(),n);
+ // Undoing in order works: latest first, each restoring what its own receipt saved.
+ assert.equal(revert(id(42),id(33)).applied,true);assert.equal(row(950).router_public_ip,'203.0.113.3');
+ fails(()=>revert(id(43),id(31)),/changed since the correction|later correction is in effect/);
+ assert.equal(revert(id(44),id(32)).applied,true);assert.equal(row(950).router_public_ip,'203.0.113.2');
+ assert.equal(revert(id(45),id(31)).applied,true);assert.equal(row(950).router_public_ip,'203.0.113.1');
+ assert.equal(hash('public.camera_devices'),cams0);
 });
