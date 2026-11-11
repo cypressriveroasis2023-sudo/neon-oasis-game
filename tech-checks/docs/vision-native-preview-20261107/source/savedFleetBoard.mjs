@@ -1061,6 +1061,7 @@ var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
 var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
 var CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
 var fieldHealthLabels = { online: "Online", offline: "Offline", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
+var DEVICE_LINK_NOT_REVIEWED = " Direct test at this unit\u2019s tracker address; the camera device link has not been reviewed.";
 function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
   const authority = readMhelpInventoryAuthority(value, now);
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
@@ -1068,6 +1069,8 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
   const counts = Object.fromEntries(Object.keys(fieldHealthLabels).map((key) => [key, 0]));
   const manualField = (product2) => product2.cosManualPlacementFrom === "SHOP";
   const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.filter((product2) => !manualField(product2)).map((product2) => product2.productId), now);
+  const endpointOwners = /* @__PURE__ */ new Map();
+  for (const item of connections?.values() || []) if (item.resourceId) endpointOwners.set(String(item.resourceId), (endpointOwners.get(String(item.resourceId)) || 0) + 1);
   const items = products.map((product2) => {
     const related = roster.items.filter((item) => item.productIds.includes(product2.productId));
     const record2 = related.length === 1 ? related[0] : null;
@@ -1078,9 +1081,10 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     const exact = connections?.get(product2.productId);
     const support = Boolean(row?.support) || isSupportEquipment({ id: product2.recordId, unitNumber: label, modelName: typeof product2.category === "string" ? product2.category : void 0 });
     const exactResourceVerified = Boolean(record2?.kind === "unit" && row?.camera.association && exact?.resourceId && row.camera.association.deviceIds.includes(String(exact.resourceId)));
-    const exactAllowed = Boolean(exact && exact.status !== "unknown" && !support && related.length === 1 && record2?.kind === "unit" && row && exactResourceVerified && record2.placement === "field" && record2.active && record2.lifecycle === "active" && record2.productIds.length === 1 && record2.productIds[0] === product2.productId && row.placement === "field" && !row.retired && binding?.state === "linked" && Array.isArray(binding.unitIds) && binding.unitIds.includes(record2.unitId));
-    const directSourceUnavailable = exactConnectionReceipt !== void 0 && !connections;
     const reviewedProvider = Boolean(record2?.kind === "unit" && row && row.camera.association && ["online", "offline"].includes(row.cameraState));
+    const exactEndpointUnique = Boolean(exact?.resourceId && endpointOwners.get(String(exact.resourceId)) === 1 && !reviewedProvider);
+    const exactAllowed = Boolean(exact && exact.status !== "unknown" && !support && related.length === 1 && record2?.kind === "unit" && row && (exactResourceVerified || exactEndpointUnique) && record2.placement === "field" && record2.active && record2.lifecycle === "active" && record2.productIds.length === 1 && record2.productIds[0] === product2.productId && row.placement === "field" && !row.retired && binding?.state === "linked" && Array.isArray(binding.unitIds) && binding.unitIds.includes(record2.unitId));
+    const directSourceUnavailable = exactConnectionReceipt !== void 0 && !connections;
     let state, reason;
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
@@ -1119,7 +1123,7 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
         reason = CURRENT_SOURCE_CONFLICT + "Direct: " + exact.reason + " Provider: " + unitHealthLabel(row.camera) + ".";
       } else {
         state = exact.status === "online" ? "online" : "offline";
-        reason = exact.reason;
+        reason = exact.reason + (exactResourceVerified ? "" : DEVICE_LINK_NOT_REVIEWED);
       }
     } else if (!record2) {
       state = "review";

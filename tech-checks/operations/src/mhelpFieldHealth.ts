@@ -13,6 +13,7 @@ export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'He
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
 export type FieldProduct={productId:string;unitNumber:string;state:FieldProductHealth;reason:string;unitId:string|null;recordId:string|null;evidence?:FieldProductEvidence};
 
+export const DEVICE_LINK_NOT_REVIEWED=' Direct test at this unit’s tracker address; the camera device link has not been reviewed.';
 /** One result per reviewed Field Product ID. Reuse the existing health result
  * only through the server-reviewed product/registry association, never a name,
  * IP, candidate identity or historical tracker join. This is a read-only view. */
@@ -27,6 +28,10 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
  // Product ID would otherwise discard every other unit's direct evidence.
  const manualField=(product:Record<string,any>)=>product.cosManualPlacementFrom==='SHOP';
  const connections=readExactProductConnections(exactConnectionReceipt,authority.sourceSha256,products.filter(product=>!manualField(product)).map(product=>product.productId),now);
+ // How many Field Product IDs each tested endpoint belongs to. A direct test
+ // can only be credited to a unit when its endpoint belongs to that unit alone.
+ const endpointOwners=new Map<string,number>();
+ for(const item of connections?.values()||[])if(item.resourceId)endpointOwners.set(String(item.resourceId),(endpointOwners.get(String(item.resourceId))||0)+1);
  const items:FieldProduct[]=products.map(product=>{
   const related=roster.items.filter(item=>item.productIds.includes(product.productId));
   const record=related.length===1?related[0]:null;
@@ -41,13 +46,22 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   // A unique tracker IP is not enough to assign a saved endpoint to a Product ID.
   // Direct TCP can override Fleet health only when that exact resource belongs to
   // the reviewed Product-ID -> COS unit -> device association.
+  // Owner decision 2026-11-11 (James Martin): a completed direct test at the
+  // 2027 tracker's address for this Product ID is counted when the Product ID is
+  // linked to exactly one active Field COS unit and that tested endpoint belongs
+  // to no other Product ID, even if the unit's camera device list has not been
+  // reviewed. It is labelled as such. Every other identity condition below still
+  // applies.
+  const reviewedProvider=Boolean(record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState));
+  // Never applied where a reviewed provider reading already gives this unit a status:
+  // this rule only gives a status to units that would otherwise have none.
+  const exactEndpointUnique=Boolean(exact?.resourceId&&endpointOwners.get(String(exact.resourceId))===1&&!reviewedProvider);
   const exactAllowed=Boolean(exact&&exact.status!=='unknown'&&!support&&related.length===1
-   &&record?.kind==='unit'&&row&&exactResourceVerified&&record.placement==='field'
+   &&record?.kind==='unit'&&row&&(exactResourceVerified||exactEndpointUnique)&&record.placement==='field'
    &&record.active&&record.lifecycle==='active'&&record.productIds.length===1
    &&record.productIds[0]===product.productId&&row.placement==='field'&&!row.retired
    &&binding?.state==='linked'&&Array.isArray(binding.unitIds)&&binding.unitIds.includes(record.unitId));
   const directSourceUnavailable=exactConnectionReceipt!==undefined&&!connections;
-  const reviewedProvider=Boolean(record?.kind==='unit'&&row&&row.camera.association&&['online','offline'].includes(row.cameraState));
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
@@ -85,7 +99,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
     reason=CURRENT_SOURCE_CONFLICT+'Direct: '+exact.reason+' Provider: '+unitHealthLabel(row!.camera)+'.';
    }else{
     state=exact.status==='online'?'online':'offline';
-    reason=exact.reason;
+    reason=exact.reason+(exactResourceVerified?'':DEVICE_LINK_NOT_REVIEWED);
    }
   }else if(!record){
    state='review';reason=related.length?'Multiple COS representations claim this Product ID.':'No current COS roster representation is available for this Product ID.';
