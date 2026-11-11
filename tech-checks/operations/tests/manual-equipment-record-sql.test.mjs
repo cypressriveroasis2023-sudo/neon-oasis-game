@@ -19,7 +19,7 @@ const OWNER='00000000-0000-4000-8000-000000000001',IT='00000000-0000-4000-8000-0
 let dir,port;
 const sh=command=>execFileSync(asRoot?'su':'sh',asRoot?['postgres','-s','/bin/sh','-c',command]:['-c',command],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
 const psql=(sql,{file=false}={})=>{const path=join(dir,'q-'+Math.random().toString(36).slice(2)+'.sql');if(file)copyFileSync(sql,path);else writeFileSync(path,sql);chmodSync(path,0o644);
- return sh(`${bin}/psql -X -q -t -A -v ON_ERROR_STOP=1 -h ${dir} -p ${port} -d postgres -f ${path} 2>&1`).trim();};
+ return sh(`${bin}/psql -X -q -t -A -v ON_ERROR_STOP=1 -U postgres -h ${dir} -p ${port} -d postgres -f ${path} 2>&1`).trim();};
 const call=(actor,product,action='read',extra={})=>{const j=v=>v===undefined||v===null?'null':`'${JSON.stringify(v).replaceAll("'","''")}'::jsonb`;
  return JSON.parse(psql(`set role service_role; select public.cos_manual_equipment_v1('${actor}','${ORG}',${product===null?'null':`'${product}'`},'${action}',${extra.requestId?`'${extra.requestId}'`:'null'},${extra.reason===undefined?'null':`'${String(extra.reason).replaceAll("'","''")}'`},${j(extra.expected)},${j(extra.changes)});`));};
 const fails=(fn,pattern)=>assert.throws(fn,error=>pattern.test(String(error.stdout||'')+String(error.stderr||'')+String(error.message)));
