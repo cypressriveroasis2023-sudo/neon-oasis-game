@@ -74,3 +74,29 @@ test('a completed board that can no longer be refreshed stays readable and is la
   await expect(board.locator('.cos-fleet-stat-online small'),pass).toContainText('not current');
  }
 });
+test('when no board can be read at all, the reading this browser saved is shown under its own time',async({page})=>{
+ const f=fieldProductFixture(),features={durableFleetBoard:true};
+ const {app}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,features,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:'00000000-0000-4000-8000-000000000009'});
+ const first=completedBoard(f.health,f.field,f.connections,null,f.now);
+ const value={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-1',payload:first},refresh:{state:'completed'},history:[]};
+ let down=false;
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()!=='POST')return route.fallback();const req=route.request().postDataJSON();
+  if(!req.path.startsWith('/api/fleet-saved-board'))return route.fallback();
+  const headers={'access-control-allow-origin':'http://127.0.0.1:4173'};
+  return down?route.fulfill({status:503,headers,json:{error:'Saved fleet board unavailable'}}):route.fulfill({headers,json:req.path.includes('/history/')?{completedAt:first.fleet.readAt,units:first.units}:value});
+ });
+ await page.reload();
+ const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ const stat=name=>board.locator('.cos-fleet-stat-'+name+' strong').first();
+ await expect(stat('online')).toHaveText('1');
+ const shown={};for(const name of ['online','offline','unknown'])shown[name]=await stat(name).textContent();
+ await expect.poll(()=>app.locator('body').evaluate(()=>Object.keys(localStorage).some(key=>key.startsWith('cos-saved-fleet-reading-v1:')))).toBe(true);
+ // The large saved presentation is absent (as on a phone) and the server board cannot be read.
+ down=true;await page.clock.fastForward(45*60000);
+ await app.locator('body').evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('cos-saved-fleet-presentation-v1:'))localStorage.removeItem(key);});
+ await page.reload();
+ await expect(board.locator('.cos-fleet-stat-online small')).toContainText(/Saved reading .*\d{1,2}:\d{2}.* · not current/);
+ for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText(shown[name]);
+ for(const name of ['field','shop','total'])await expect(stat(name),name).toHaveText(/^\d+$/);
+});
