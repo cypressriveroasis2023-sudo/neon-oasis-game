@@ -22,7 +22,11 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
  const products=(value as {records:Record<string,any>[]}).records.filter(item=>item.placement==='FIELD');
  const counts=Object.fromEntries(Object.keys(fieldHealthLabels).map(key=>[key,0])) as Record<FieldProductHealth,number>;
  // An absent or partial Product-ID IP receipt never weakens existing checks.
- const connections=readExactProductConnections(exactConnectionReceipt,authority.sourceSha256,products.map(product=>product.productId),now);
+ // A unit a person placed in the Field by hand has no saved connection check
+ // yet. It must not be demanded from the connection source: one missing
+ // Product ID would otherwise discard every other unit's direct evidence.
+ const manualField=(product:Record<string,any>)=>product.cosManualPlacementFrom==='SHOP';
+ const connections=readExactProductConnections(exactConnectionReceipt,authority.sourceSha256,products.filter(product=>!manualField(product)).map(product=>product.productId),now);
  const items:FieldProduct[]=products.map(product=>{
   const related=roster.items.filter(item=>item.productIds.includes(product.productId));
   const record=related.length===1?related[0]:null;
@@ -47,6 +51,10 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
+  }else if(manualField(product)&&!exact){
+   // Stands and other no-camera equipment stay support; nothing else gets a status it has not earned.
+   if(support){state='support';reason='Placed in the Field by hand in COS. Solar stand or support equipment with no camera channels; camera online/offline status does not apply.';}
+   else{state='unverified';reason='Placed in the Field by hand in COS. No connection check exists for this unit yet, so no online or offline status is claimed.';}
   }else if(record?.kind==='identity_review'||record&&record.placement!=='field'||binding?.state==='held'||binding?.placementHeld===true||binding?.candidateUnitIds?.length){
    state='review';reason=record?.reviewReason||'The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.';
   }else if(record&&(!record.active||record.lifecycle!=='active'||row?.retired)){
@@ -55,6 +63,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
    state='support';reason='Solar stand or support equipment with no camera channels. Camera online/offline status does not apply.';
+
   }else if(exactConnectionReceipt!==undefined&&!connections||exact?.status==='unknown'&&connections){
    // No direct connection result is available for this Product ID. The
    // safeguard added 2026-10-26/27 was right that a guess must never be

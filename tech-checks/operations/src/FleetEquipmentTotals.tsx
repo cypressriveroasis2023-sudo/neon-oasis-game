@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {fleetEquipmentTotals,type EquipmentGroup} from './fleetEquipmentTotalsModel';
 import type {FleetCommandCenterData,FleetCommandProduct} from './fleetCommandCenterModel';
 import FleetCardIcon from './FleetCardIcon';
+import FleetManualRecord from './FleetManualRecord';
 import FleetVerifyNow from './FleetVerifyNow';
 const titles={cameras:'Camera units',helios:'Helios',stands:'Stands'};
 type Status='all'|'online'|'offline'|'unverified';
@@ -27,7 +28,7 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
   {selection&&current&&<section className='cos-equipment-status-list' aria-label={titles[selection.group]+' '+selection.status+' Field units'}>
    <div><h3>{titles[selection.group]} · {selection.status==='unverified'?'Unverified':selection.status==='online'?'Online':selection.status==='offline'?'Offline':'All'} · {products.length} Field units</h3><button onClick={()=>setSelection(null)} aria-label='Close status list'>×</button></div>
    {selection.status==='unverified'&&onVerified&&<FleetVerifyNow disabled={verificationBusy} onBusyChange={setVerificationBusy} key={selection.group} products={products} onComplete={onVerified} label={products.length?'Verify all '+products.length+' now':'No units left to verify'}/>}
-   {products.length?<ul>{products.map(p=><li key={p.productId}><div><strong>{p.unitNumber}</strong><small>{p.customer||'Customer not supplied'} · Product {p.productId}</small><small>{p.address||'Address not supplied'}</small><small>{p.reason}</small></div>{p.status==='unverified'&&onVerified&&<FleetVerifyNow disabled={verificationBusy} onBusyChange={setVerificationBusy} products={[p]} onComplete={onVerified}/>}<button onClick={()=>onOpen(p)}>Open record →</button></li>)}</ul>:<p>{!data?'Validated health is unavailable.':'No Field units match this status.'}</p>}
+   {products.length?<ul>{products.map(p=><li key={p.productId}><div><strong>{p.unitNumber}</strong><small>{p.customer||'Customer not supplied'} · Product {p.productId}</small><small>{p.address||'Address not supplied'}</small><small>{p.reason}</small></div>{p.status==='unverified'&&onVerified&&<FleetVerifyNow disabled={verificationBusy} onBusyChange={setVerificationBusy} products={[p]} onComplete={onVerified}/>}<button onClick={()=>onOpen(p)}>Open record →</button><FleetManualRecord productId={p.productId} unitName={p.unitNumber}/></li>)}</ul>:<p>{!data?'Validated health is unavailable.':'No Field units match this status.'}</p>}
   </section>}
  </section>;
 }

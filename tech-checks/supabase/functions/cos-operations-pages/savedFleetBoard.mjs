@@ -625,7 +625,32 @@ function manualShopItems(value) {
   if (value?.contract !== "COS_FLEET_SHOP_OVERRIDES_V1" || !Array.isArray(value.items) || value.items.length > 1e4 || value.items.some((r) => !uuid2(r.unitId) || !uuid2(r.auditId) || typeof r.unitNumber !== "string" || !r.unitNumber.trim() || r.placement !== "SHOP" || !Number.isFinite(Date.parse(r.recordedAt))) || value.items.some((r) => r.sourceBindings !== void 0 && (!Array.isArray(r.sourceBindings) || r.sourceBindings.length > 1e4 || r.sourceBindings.some((b) => !/^(?:[1-9]\d*)$/.test(b.productId) || !/^(?:[a-f0-9]{64})$/.test(b.sourceSha256)))) || new Set(value.items.map((r) => r.unitId)).size !== value.items.length) throw Error("Manual Shop placement is unavailable.");
   return value.items;
 }
+function manualRecordPlacements(receipt) {
+  const out = /* @__PURE__ */ new Map();
+  if (!Array.isArray(receipt?.records)) return out;
+  if (receipt.records.length > 2e4 || receipt.records.some((r) => typeof r?.productId !== "string" || !/^[1-9][0-9]{0,17}$/.test(r.productId) || typeof r.auditId !== "string" || !r.record || typeof r.record !== "object" || !(r.record.placement === null || r.record.placement === "FIELD" || r.record.placement === "SHOP"))) throw Error("Manual equipment records are unavailable.");
+  for (const r of receipt.records) if (r.record.placement) out.set(r.productId, { placement: r.record.placement, auditId: r.auditId });
+  return out;
+}
+function manualRecordInventory(upload, receipt) {
+  const manual = manualRecordPlacements(receipt);
+  if (!upload?.records || !manual.size) return upload;
+  let toShop = 0, toField = 0;
+  const records = upload.records.map((r) => {
+    const m = manual.get(r.productId);
+    if (!m || r.placement === m.placement) return m ? { ...r, cosManualRecordAuditId: m.auditId } : r;
+    if (m.placement === "SHOP") toShop++;
+    else toField++;
+    return { ...r, placement: m.placement, cosManualRecordAuditId: m.auditId, cosManualPlacementFrom: r.placement };
+  });
+  if (!toShop && !toField) return { ...upload, records };
+  const summary = { ...upload.summary, fieldRecords: records.filter((r) => r.placement === "FIELD").length, shopRecords: records.filter((r) => r.placement === "SHOP").length, unflaggedFieldRecords: records.filter((r) => r.placement === "FIELD" && r.uploadLifecycle === "UNFLAGGED").length, unflaggedShopRecords: records.filter((r) => r.placement === "SHOP" && r.uploadLifecycle === "UNFLAGGED").length };
+  return { ...upload, records, summary, cosManualShopCount: (upload.cosManualShopCount || 0) + toShop, cosManualFieldCount: toField, cosManualRecordCount: toShop + toField, cosPlacementBasis: "Accepted mHelp inventory plus placements entered by hand in COS" };
+}
 function manualShopInventory(upload, receipt) {
+  return manualRecordInventory(manualShopMoves(upload, receipt), receipt);
+}
+function manualShopMoves(upload, receipt) {
   if (!upload?.records || !receipt) return upload;
   const moves = new Map(manualShopItems(receipt).map((r) => [r.unitId, r]));
   let count = 0;
@@ -1041,7 +1066,8 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
   const products = value.records.filter((item) => item.placement === "FIELD");
   const counts = Object.fromEntries(Object.keys(fieldHealthLabels).map((key) => [key, 0]));
-  const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.map((product2) => product2.productId), now);
+  const manualField = (product2) => product2.cosManualPlacementFrom === "SHOP";
+  const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.filter((product2) => !manualField(product2)).map((product2) => product2.productId), now);
   const items = products.map((product2) => {
     const related = roster.items.filter((item) => item.productIds.includes(product2.productId));
     const record2 = related.length === 1 ? related[0] : null;
@@ -1059,6 +1085,14 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
       reason = product2.uploadLifecycle === "MISSING" ? "Marked Missing in the reviewed mHelpDesk source." : "Marked Do Not Use in the reviewed mHelpDesk source.";
+    } else if (manualField(product2) && !exact) {
+      if (support) {
+        state = "support";
+        reason = "Placed in the Field by hand in COS. Solar stand or support equipment with no camera channels; camera online/offline status does not apply.";
+      } else {
+        state = "unverified";
+        reason = "Placed in the Field by hand in COS. No connection check exists for this unit yet, so no online or offline status is claimed.";
+      }
     } else if (record2?.kind === "identity_review" || record2 && record2.placement !== "field" || binding?.state === "held" || binding?.placementHeld === true || binding?.candidateUnitIds?.length) {
       state = "review";
       reason = record2?.reviewReason || "The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.";

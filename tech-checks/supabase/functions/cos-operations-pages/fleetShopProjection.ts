@@ -27,7 +27,26 @@ export function projectManualShop(snapshot:Row,receipt:any):Row{
  return {...snapshot,items,inventoryItems,...(fleetRoster?{fleetRoster}:{}),manualPlacementOverrides:{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:applied},summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,unitGps:items.filter((r:Row)=>r.hasUnitGps===true).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length},...(snapshot.placementSummary?{placementSummary:{...snapshot.placementSummary,fieldUnits:items.length,reviewUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&r.effectivePlacement?.state==='unknown').length,shopUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&(r.effectivePlacement?.state==='shop'||String(r.placement).toLowerCase()==='shop')).length}}:{})};
 }
 /** UI derivation only: preserve the accepted upload and its digests unchanged. */
-export function manualShopInventory(upload:any,receipt:any):any{
+/** Manual equipment records carried beside the shop moves (see manualEquipment.ts). */
+function manualRecordPlacements(receipt:any):Map<string,{placement:'FIELD'|'SHOP';auditId:string}>{
+ const out=new Map<string,{placement:'FIELD'|'SHOP';auditId:string}>();
+ if(!Array.isArray(receipt?.records))return out;
+ if(receipt.records.length>20000||receipt.records.some((r:any)=>typeof r?.productId!=='string'||! /^[1-9][0-9]{0,17}$/.test(r.productId)||typeof r.auditId!=='string'||!r.record||typeof r.record!=='object'||!(r.record.placement===null||r.record.placement==='FIELD'||r.record.placement==='SHOP')))throw Error('Manual equipment records are unavailable.');
+ for(const r of receipt.records)if(r.record.placement)out.set(r.productId,{placement:r.record.placement,auditId:r.auditId});
+ return out;
+}
+/** A person's Field / Shop entry for a Product ID always wins over the accepted mHelp placement. */
+function manualRecordInventory(upload:any,receipt:any):any{
+ const manual=manualRecordPlacements(receipt);
+ if(!upload?.records||!manual.size)return upload;
+ let toShop=0,toField=0;
+ const records=upload.records.map((r:Row)=>{const m=manual.get(r.productId);if(!m||r.placement===m.placement)return m?{...r,cosManualRecordAuditId:m.auditId}:r;if(m.placement==='SHOP')toShop++;else toField++;return {...r,placement:m.placement,cosManualRecordAuditId:m.auditId,cosManualPlacementFrom:r.placement};});
+ if(!toShop&&!toField)return {...upload,records};
+ const summary={...upload.summary,fieldRecords:records.filter((r:Row)=>r.placement==='FIELD').length,shopRecords:records.filter((r:Row)=>r.placement==='SHOP').length,unflaggedFieldRecords:records.filter((r:Row)=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED').length,unflaggedShopRecords:records.filter((r:Row)=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED').length};
+ return {...upload,records,summary,cosManualShopCount:(upload.cosManualShopCount||0)+toShop,cosManualFieldCount:toField,cosManualRecordCount:toShop+toField,cosPlacementBasis:'Accepted mHelp inventory plus placements entered by hand in COS'};
+}
+export function manualShopInventory(upload:any,receipt:any):any{return manualRecordInventory(manualShopMoves(upload,receipt),receipt);}
+function manualShopMoves(upload:any,receipt:any):any{
  if(!upload?.records||!receipt)return upload;
  const moves=new Map(manualShopItems(receipt).map(r=>[r.unitId,r]));
  let count=0;const records=upload.records.map((r:Row)=>{const m=[...moves.values()].find(m=>(m.sourceBindings||[]).some(b=>b.productId===r.productId&&(b.sourceSha256===upload.sourceSha256||upload.source==='mhelpdesk_api'&&b.sourceUnitNumber===r.unitNumber)))||(r.binding?.state==='linked'&&r.binding.unitIds?.length===1?moves.get(r.binding.unitIds[0]):null);if(!m||r.placement==='SHOP')return r;count++;return {...r,placement:'SHOP',cosManualShopAuditId:m.auditId};});

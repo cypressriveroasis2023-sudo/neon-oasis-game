@@ -29,6 +29,8 @@ function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:'00000000-0000-4000-8000-000000000999',roles:{code:'owner',organization_id:org}}]);
   if(name==='cos_fleet_shop_snapshot_v1')return response({contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]});
+  // Manual equipment records ride beside the shop moves (none in this fixture).
+  if(name==='cos_manual_equipment_set_v1')return response({contract:'COS_MANUAL_EQUIPMENT_SET_V1',items:[]});
   if(name==='cos_owner_identity_snapshot')return response({revision:sha('synthetic empty crosswalk'),claims:[],nativeEpochs:[]});
   if(name==='appdeploy_field_map_snapshot'){if(onSnapshot)await onSnapshot(calls.filter(c=>new URL(c.url).pathname.endsWith('/appdeploy_field_map_snapshot')).length);return response(rawSnapshot);}
   if(name==='equipment_units')return response([{id:native.id,organization_id:org,unit_number:native.unitNumber,status:'field'}]);
@@ -65,6 +67,9 @@ test('authenticated Owner field-map handler reads exactly three reviewed source 
  assert.equal(map.uploadInventory.payloadSha256,f.upload.payloadSha256);assert.deepEqual(map.inventoryItems.map(row=>row.id),[f.native.id]);assert.deepEqual(map.items.map(row=>[row.id,row.latitude,row.longitude]),[[f.native.id,f.native.latitude,f.native.longitude]]);
  const sourceRows=map.fleetRoster.items.filter(row=>row.kind==='source_equipment');assert.equal(sourceRows.length,3);assert(sourceRows.every(row=>row.unitId===null&&row.unit===null));
  const pins=await sourceEquipmentLocationPins(sourceRows,map.sourceEquipmentEstimates,map.uploadInventory);assert.equal(pins.length,3);assert(pins.every(pin=>pin.row===undefined));
+ // The same response carries the manual equipment records (none here), read once as the signed-in actor, without altering the accepted inventory.
+ assert.equal(map.manualEquipmentState,'ready');assert.deepEqual(map.manualPlacementOverrides.records,[]);
+ const manualReads=f.calls.filter(call=>new URL(call.url).pathname.endsWith('/rpc/cos_manual_equipment_set_v1'));assert.equal(manualReads.length,1);assert.equal(manualReads[0].body.p_actor_user_id,f.calls.find(call=>new URL(call.url).pathname.endsWith('/rpc/cos_fleet_shop_snapshot_v1')).body.p_actor_user_id);
  const baseline=fixture({receipts:'empty'}),baselineResponse=await baseline.run();assert.deepEqual(nativeState(map),nativeState(await baselineResponse.json()));assertReadOnlyTransport(baseline);
 });
 test('private native receipt permission failure is explicit and preserves the complete native map without fabricated source points',async()=>{
