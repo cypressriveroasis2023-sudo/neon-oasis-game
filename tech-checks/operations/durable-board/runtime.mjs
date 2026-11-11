@@ -21,8 +21,11 @@ const SAFE=/^[a-z0-9_]{1,48}$/;
 const SOURCES=[
  // The map and connection endpoints both assemble the mHelp inventory.
  // Reads stay sequential so they do not compete on the same database.
- ['map','/api/fleet-map-source',70000],
+ // Connections is read first: it is the source that declines stale or
+ // unverifiable evidence, and when it does the batch ends without having
+ // spent the map and health reads on a board that cannot be published.
  ['connections','/api/product-connections',45000],
+ ['map','/api/fleet-map-source',70000],
  ['health','/api/camera-health/summary-v3',35000],
 ];
 

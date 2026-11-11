@@ -50,6 +50,7 @@ function fixture(who=owner,options={}){
    if(options.sourceFails)return json({error:'synthetic unavailable'},404);
    attempts[body.path]=(attempts[body.path]||0)+1;
    if(options.unavailable?.[body.path]>=attempts[body.path])return json({error:'synthetic hold',diagnostic:{stage:'tracker_source',code:'timeout',note:'Never Stored 10.9.8.7'}},503);
+   if(options.declined?.[body.path]>=attempts[body.path])return json({error:'Saved connection source could not be verified.',diagnostic:'declinedDiagnostic' in options?options.declinedDiagnostic:{stage:'endpoint_evaluation',code:'evidence_declined',retryable:false}},503);
    const values={'/api/fleet-map-source':data.field,'/api/product-connections':data.connections,'/api/camera-health/summary-v3':data.health};assert.ok(Object.hasOwn(values,body.path));return json(values[body.path]);
   },require:name=>{assert.equal(name,'jose');return {importPKCS8:deny,SignJWT:class{constructor(){deny();}}};},Deno:{env:{get:name=>name==='SUPABASE_URL'?'https://platform.example':undefined},serve:()=>{}},EdgeRuntime:{waitUntil:task=>tasks.push(task)}});
  vm.runInContext(code,context,{timeout:5000});
@@ -94,9 +95,9 @@ test('recorded refresh dispatch is outside GET-only routing and hash matches',()
  const manifest=JSON.parse(readFileSync(new URL('../manifest.json',directory),'utf8'));assert.equal(createHash('sha256').update(source).digest('hex'),manifest.sourceHashes['serve.ts']);
 });
 for(const [label,who] of [['Owner',owner],['IT one',it],['IT two',secondIt]])test(label+' POST refresh reaches lease and completes all three sources',async()=>{
- const f=fixture(who),r=await f.request();assert.equal(r.status,200,JSON.stringify(r.body));assert.deepEqual(r.body,f.saved);assert.equal(f.tasks.length,1);assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ const f=fixture(who),r=await f.request();assert.equal(r.status,200,JSON.stringify(r.body));assert.deepEqual(r.body,f.saved);assert.equal(f.tasks.length,1);assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const names=rpcs.map(c=>c.path.split('/').at(-1));assert.equal(names[0],'cos_fleet_board_begin');assert.deepEqual(names.filter(n=>!n.endsWith('status')),['cos_fleet_board_begin','cos_fleet_board_claim','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_progress','cos_fleet_board_finish']);assert.ok(!names.includes('cos_fleet_board_read')&&!names.includes('cos_fleet_board_stage'));assert.equal(rpcs[0].body.p_force,true);assert.match(rpcs[0].body.p_request,/^[a-f0-9-]{36}$/);
- const finish=rpcs.find(c=>c.path.endsWith('finish'));assert.equal(finish.body.p_run,recordId);assert.match(finish.body.p_producer,/^[a-f0-9-]{36}$/);assert.equal(finish.body.p_producer,f.claims[recordId]);assert.ok(rpcs.filter(c=>c.path.endsWith('progress')).every(c=>c.body.p_producer===f.claims[recordId]));assert.equal(finish.body.p_payload.contract,'COS_SAVED_FLEET_BOARD_V1');assert.deepEqual(finish.body.p_diagnostics.steps.map(x=>[x.step,x.ok,x.attempts]),[['map',true,1],['connections',true,1],['health',true,1],['project',true,undefined]]);
+ const finish=rpcs.find(c=>c.path.endsWith('finish'));assert.equal(finish.body.p_run,recordId);assert.match(finish.body.p_producer,/^[a-f0-9-]{36}$/);assert.equal(finish.body.p_producer,f.claims[recordId]);assert.ok(rpcs.filter(c=>c.path.endsWith('progress')).every(c=>c.body.p_producer===f.claims[recordId]));assert.equal(finish.body.p_payload.contract,'COS_SAVED_FLEET_BOARD_V1');assert.deepEqual(finish.body.p_diagnostics.steps.map(x=>[x.step,x.ok,x.attempts]),[['connections',true,1],['map',true,1],['health',true,1],['project',true,undefined]]);
  // No dedicated worker in this fixture: one declined hand-off, then the batch runs here.
  assert.deepEqual(f.hops,['https://platform.example/functions/v1/cos-fleet-board-producer']);
 });
@@ -109,7 +110,7 @@ test('busy shared lease returns saved board without duplicate work',async()=>{
  assert.equal(f.tasks.length,1);assert.deepEqual(f.calls.filter(c=>c.path.includes('/rpc/')).map(c=>c.path.split('/').at(-1)),['cos_fleet_board_begin','cos_fleet_board_status','cos_fleet_board_status']);assert.deepEqual(f.hops,[]);
 });
 test('failed supporting read records failure without replacing completed board',async()=>{
- const f=fixture(owner,{sourceFails:true}),r=await f.request();assert.equal(r.status,200);assert.deepEqual(r.body,f.saved);assert.deepEqual(f.sources,['/api/fleet-map-source']);const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const failed=rpcs.find(c=>c.path.endsWith('fail'));assert.equal(failed.body.p_code,'source_read_failed');assert.equal(failed.body.p_producer,f.claims[recordId]);assert.equal(failed.body.p_diagnostics.failedStep,'map');assert.deepEqual(failed.body.p_diagnostics.steps,[{step:'map',ok:false,ms:0,kind:'http',status:404,attempts:1}]);assert.ok(rpcs.every(c=>!c.path.endsWith('stage')&&!c.path.endsWith('finish')));
+ const f=fixture(owner,{sourceFails:true}),r=await f.request();assert.equal(r.status,200);assert.deepEqual(r.body,f.saved);assert.deepEqual(f.sources,['/api/product-connections']);const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const failed=rpcs.find(c=>c.path.endsWith('fail'));assert.equal(failed.body.p_code,'source_read_failed');assert.equal(failed.body.p_producer,f.claims[recordId]);assert.equal(failed.body.p_diagnostics.failedStep,'connections');assert.deepEqual(failed.body.p_diagnostics.steps,[{step:'connections',ok:false,ms:0,kind:'http',status:404,attempts:1}]);assert.ok(rpcs.every(c=>!c.path.endsWith('stage')&&!c.path.endsWith('finish')));
 });
 for(const [name,who,options,status] of [['missing bearer',owner,{noBearer:true},401],['invalid bearer',owner,{invalidToken:true},401],['inactive owner',owner,{inactive:true},403],['revoked IT',it,{revoked:true},403],['Service',service,{},403],['foreign origin',owner,{origin:'https://unapproved.example'},403],['read-only preview',owner,{origin:'https://9321842b.cos-vision-integration-preview.pages.dev'},405]])test(name+' still cannot refresh',async()=>{
  const f=fixture(who,options),r=await f.request();assert.equal(r.status,status,JSON.stringify(r.body));assert.equal(f.tasks.length,0);assert.deepEqual(f.sources,[]);assert.ok(f.calls.every(c=>!c.path.includes('/rpc/')));
@@ -137,18 +138,18 @@ test('an unreadable stored board is an error, never an empty or re-dated board',
 });
 test('refresh hands the claimed batch to the dedicated worker, which reads, records and commits it',async()=>{
  const f=fixture(it,{producer:true,payload:JSON.stringify(board),status:calls=>status(calls.some(c=>c.path.endsWith('finish'))?'completed':'running')}),r=await f.request();assert.equal(r.status,200);
- assert.deepEqual(f.hops,['https://platform.example/functions/v1/cos-fleet-board-producer']);assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ assert.deepEqual(f.hops,['https://platform.example/functions/v1/cos-fleet-board-producer']);assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  assert.equal(f.tasks.length,2,'the refresh request hands off; only the worker request runs the batch');
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/')).map(c=>c.path.split('/').at(-1));assert.equal(rpcs.filter(n=>n==='cos_fleet_board_begin').length,1);assert.equal(rpcs.filter(n=>n==='cos_fleet_board_finish').length,1);assert.ok(!rpcs.includes('cos_fleet_board_fail'));
 });
 test('a temporarily unavailable source is retried inside the batch and the retry is recorded',async()=>{
  const f=fixture(owner,{unavailable:{'/api/product-connections':2}}),r=await f.request();assert.equal(r.status,200);
- assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/product-connections','/api/product-connections','/api/camera-health/summary-v3']);
- const finish=f.calls.find(c=>c.path.endsWith('finish'));assert.deepEqual(finish.body.p_diagnostics.steps.map(x=>[x.step,x.attempts]).slice(0,3),[['map',1],['connections',3],['health',1]]);
+ assert.deepEqual(f.sources,['/api/product-connections','/api/product-connections','/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
+ const finish=f.calls.find(c=>c.path.endsWith('finish'));assert.deepEqual(finish.body.p_diagnostics.steps.map(x=>[x.step,x.attempts]).slice(0,3),[['connections',3],['map',1],['health',1]]);
 });
 test('a source that stays unavailable is named in the failure with categories only',async()=>{
  const f=fixture(owner,{unavailable:{'/api/product-connections':9}}),r=await f.request();assert.equal(r.status,200);
- assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/product-connections','/api/product-connections']);
+ assert.deepEqual(f.sources,['/api/product-connections','/api/product-connections','/api/product-connections'],'a transient failure keeps all three attempts and never reaches the map read');
  const failed=f.calls.find(c=>c.path.endsWith('fail'));assert.equal(failed.body.p_code,'source_read_failed');assert.equal(failed.body.p_diagnostics.failedStep,'connections');
  assert.deepEqual(failed.body.p_diagnostics.steps.at(-1),{step:'connections',ok:false,ms:0,kind:'http',status:503,attempts:3,stage:'tracker_source',code:'timeout'});
  assert.doesNotMatch(JSON.stringify(failed.body),/10\.9\.8\.7|Never Stored|synthetic hold/);assert.ok(f.calls.every(c=>!c.path.endsWith('finish')));
@@ -172,14 +173,14 @@ const done=calls=>status(calls.some(c=>c.path.endsWith('finish')||c.path.endsWit
 test('lost acknowledgment: the worker that did start keeps the run and the refresh request starts no second producer',async()=>{
  const f=fixture(owner,{producer:'lostAck',payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
  assert.deepEqual(f.hops,['https://platform.example/functions/v1/cos-fleet-board-producer']);
- assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3'],'the sources are read once, by the worker');
+ assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3'],'the sources are read once, by the worker');
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));const claims=rpcs.filter(c=>c.path.endsWith('claim'));
  assert.equal(claims.length,2,'the worker claimed first; the fallback asked and was refused');assert.notEqual(claims[0].body.p_producer,claims[1].body.p_producer);
  const finishes=rpcs.filter(c=>c.path.endsWith('finish'));assert.equal(finishes.length,1);assert.equal(finishes[0].body.p_producer,claims[0].body.p_producer);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
 });
 for(const [label,producer,kind] of [['an unreachable worker (uncertain)','offline'],['a gateway error (uncertain)','gateway'],['a missing worker (definite)',false]])test(label+' leaves exactly one producer: the refresh request claims the run and completes it',async()=>{
  const f=fixture(it,{producer,payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
- assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/'));assert.equal(rpcs.filter(c=>c.path.endsWith('claim')).length,1);assert.equal(rpcs.filter(c=>c.path.endsWith('finish')).length,1);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
 });
 test('a follow-up already claimed by another producer is neither duplicated nor failed by this worker',async()=>{
@@ -219,7 +220,7 @@ test('worker claim committed but unanswered: the worker reports 503, keeps the r
  const f=fixture(owner,{producer:true,claimReplyLost:true,payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/')),claims=rpcs.filter(c=>c.path.endsWith('claim'));
  const worker=claims[0].body.p_producer;assert.ok(claims.filter(c=>c.body.p_producer===worker).length>=2,'the worker asked again with the token it kept');
- assert.equal(f.claims[recordId],worker);assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ assert.equal(f.claims[recordId],worker);assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  const finishes=rpcs.filter(c=>c.path.endsWith('finish'));assert.equal(finishes.length,1);assert.equal(finishes[0].body.p_producer,worker);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
  const direct=fixture(it,{claimReplyLost:true,payload:JSON.stringify(board),status:done}),answer=await direct.request('/api/fleet-saved-board/produce','POST',{run:recordId});
  assert.equal(answer.status,503,'an unconfirmed claim is never acknowledged as accepted');assert.equal(direct.calls.filter(c=>c.path.endsWith('finish')).length,1,'yet the batch it owns is completed');
@@ -244,7 +245,7 @@ test('truncated 200 on the worker claim: not treated as refused; the worker keep
  const f=fixture(owner,{producer:true,truncated:{claim:true},payload:JSON.stringify(board),status:done}),r=await f.request();assert.equal(r.status,200);
  const rpcs=f.calls.filter(c=>c.path.includes('/rpc/')),claims=rpcs.filter(c=>c.path.endsWith('claim')),worker=claims[0].body.p_producer;
  assert.ok(claims.filter(c=>c.body.p_producer===worker).length>=2,'asked again with the same token');assert.equal(f.claims[recordId],worker);
- assert.deepEqual(f.sources,['/api/fleet-map-source','/api/product-connections','/api/camera-health/summary-v3']);
+ assert.deepEqual(f.sources,['/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);
  const finishes=rpcs.filter(c=>c.path.endsWith('finish'));assert.equal(finishes.length,1);assert.equal(finishes[0].body.p_producer,worker);assert.ok(rpcs.every(c=>!c.path.endsWith('fail')));
  const direct=fixture(it,{truncated:{claim:true},payload:JSON.stringify(board),status:done}),answer=await direct.request('/api/fleet-saved-board/produce','POST',{run:recordId});
  assert.equal(answer.status,503,'an unreadable claim reply is never acknowledged as accepted or reported as refused');assert.equal(direct.calls.filter(c=>c.path.endsWith('finish')).length,1);
@@ -262,4 +263,31 @@ test('truncated 200 on publish: not treated as success; recorded as unconfirmed'
 test('truncated 200 on status: the stored board is still returned, never an empty record',async()=>{
  const f=fixture(it,{truncated:{status:true},status:()=>status(),payload:JSON.stringify(board)}),r=await f.request('/api/fleet-saved-board','GET');
  assert.equal(r.status,200);assert.equal(r.body.contract,'COS_DURABLE_FLEET_RESPONSE_V1');assert.deepEqual(r.body.latest.payload,board);assert.equal(f.tasks.length,0);
+});
+
+test('declined evidence is asked for once per batch: no repeat, no map or health read, failure recorded with its stage',async()=>{
+ const f=fixture(owner,{declined:{'/api/product-connections':9}}),r=await f.request();assert.equal(r.status,200);
+ assert.deepEqual(f.sources,['/api/product-connections']);
+ const failed=f.calls.find(c=>c.path.endsWith('fail'));assert.equal(failed.body.p_code,'source_read_failed');assert.equal(failed.body.p_diagnostics.failedStep,'connections');
+ assert.deepEqual(failed.body.p_diagnostics.steps,[{step:'connections',ok:false,ms:0,kind:'http',status:503,attempts:1,stage:'endpoint_evaluation',code:'evidence_declined'}]);assert.ok(f.calls.every(c=>!c.path.endsWith('finish')));
+});
+test('only an explicit non-retryable answer stops retries: transient, unlabelled and retryable failures keep all attempts',async()=>{
+ for(const diagnostic of [{stage:'inventory_changed',code:'source_unavailable',retryable:true},{stage:'tracker_source',code:'source_unavailable',retryable:true},{stage:'mhelp_census',code:'source_unavailable'},{stage:'endpoint_evaluation',code:'evidence_declined',retryable:'false'},{stage:'endpoint_evaluation',code:'evidence_declined',retryable:0},null]){
+  const f=fixture(owner,{declined:{'/api/product-connections':9},declinedDiagnostic:diagnostic});await f.request();assert.deepEqual(f.sources,['/api/product-connections','/api/product-connections','/api/product-connections'],JSON.stringify(diagnostic));
+ }
+ // An inventory that changed during the first read succeeds on the retry and the board is published.
+ const f=fixture(owner,{declined:{'/api/product-connections':1},declinedDiagnostic:{stage:'inventory_changed',code:'source_unavailable',retryable:true}});await f.request();
+ assert.deepEqual(f.sources,['/api/product-connections','/api/product-connections','/api/fleet-map-source','/api/camera-health/summary-v3']);assert.equal(f.calls.filter(c=>c.path.endsWith('finish')).length,1);
+});
+test('the connections source labels a decline only after its reads and both consistency checks, and labels read failures retryable',()=>{
+ const start=source.indexOf("if (path === '/api/product-connections')"),end=source.indexOf('if(censusOnce)',start),block=source.slice(start,end);assert.ok(start>0&&end>start);
+ // Both consistency checks are still in the reader this endpoint calls, unchanged.
+ const reader=readFileSync(new URL('../../docs/vision-native-preview-20261107/source/productCheckSource.ts',import.meta.url),'utf8');
+ assert.ok(reader.includes("if(signal.aborted||stable(source)!==stable(after))throw Error('inventory_changed');"));assert.ok(reader.includes("throw Error('saved_configuration_invalid');"));assert.equal(reader.split("io.receipt(signal)").length,3,'inventory is still read before and after');
+ // The decline flag is set in exactly one place: after the source read returned and evaluation produced nothing.
+ assert.equal(block.split('cosProductRefusal=').length,3);assert.ok(block.indexOf("if(!evaluated){cosProductRefusal='endpoint_evaluation';")>block.indexOf('readProductCheckSource('));
+ assert.ok(block.includes("['inventory_source','tracker_source','saved_device_source','saved_check_source','inventory_changed'].includes(error.message))diagnostic={stage:error.message,code:'source_unavailable',retryable:true}"));
+ assert.ok(block.includes("error.message==='saved_configuration_invalid')diagnostic={stage:'saved_configuration_invalid',code:'evidence_declined',retryable:false}"));
+ // The response status and message are unchanged; only the diagnostic gained a stage and a retry hint.
+ assert.ok(block.includes("return json({error:'Saved connection source could not be verified.',diagnostic},status);"));
 });

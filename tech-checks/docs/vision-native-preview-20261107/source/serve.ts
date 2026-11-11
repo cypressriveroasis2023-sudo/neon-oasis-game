@@ -3494,6 +3494,10 @@ if(path==='/api/product-tcp-proof'||path==='/api/product-tcp-preview'){
         // resource ID, sheet range or credential. No live device probes.
         if (method !== 'GET') fail16('Use GET for saved connection evidence.',405);
         let diagnostic={stage:'mhelp_census',code:'source_unavailable'};
+        // Set only when every source was read and both consistency checks passed,
+        // and the evidence itself was then declined. Asking again inside the same
+        // batch re-reads the same sources and is declined the same way.
+        let cosProductRefusal=null;
         const stageRead=async(stage,read)=>{try{return await read();}catch(cause){throw {connectionReadFailure:true,stage,cause};}};
         try{
         // Read the same persisted evidence as Verify now. Provider identity,
@@ -3514,7 +3518,7 @@ if(path==='/api/product-tcp-proof'||path==='/api/product-tcp-preview'){
           checks:s=>legacyAll('camera_health_current?select=camera_device_id,port_status&order=camera_device_id.asc',context.headers,s)
         },signal),cosProductBudgetMs);
         const evaluated=CosProductTcpDisabledStage.buildTrackerIpReachability(source.census,source.tracker,source.endpoints,Date.now());
-        if(!evaluated)fail16('Current exact Product-ID/endpoint evidence could not be verified.',503);
+        if(!evaluated){cosProductRefusal='endpoint_evaluation';fail16('Current exact Product-ID/endpoint evidence could not be verified.',503);}
         // Disabled unless a reviewed service-side saved-receipt adapter is installed.
         // Browser requests never publish authority or run endpoint checks.
         const withEndpointEvidence=async(base)=>{
@@ -3542,6 +3546,13 @@ if(path==='/api/product-tcp-proof'||path==='/api/product-tcp-preview'){
         }catch(error){
           const tagged=error?.connectionReadFailure===true&&['mhelp_census','endpoint_evaluation','tracker_census','saved_endpoints','saved_checks'].includes(error.stage);
           if(tagged)diagnostic={stage:error.stage,code:'source_unavailable'};
+          // Fixed stage names from readProductCheckSource. A source that could not
+          // be read, or an inventory that changed between the two reads, is
+          // transient and stays retryable. Saved configuration that fails its
+          // own validity check is declined until that configuration changes.
+          else if(cosProductRefusal)diagnostic={stage:cosProductRefusal,code:'evidence_declined',retryable:false};
+          else if(error instanceof Error&&['inventory_source','tracker_source','saved_device_source','saved_check_source','inventory_changed'].includes(error.message))diagnostic={stage:error.message,code:'source_unavailable',retryable:true};
+          else if(error instanceof Error&&error.message==='saved_configuration_invalid')diagnostic={stage:'saved_configuration_invalid',code:'evidence_declined',retryable:false};
           const cause=tagged?error.cause:error;
           const status=cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
           return json({error:'Saved connection source could not be verified.',diagnostic},status);
@@ -3578,6 +3589,9 @@ if(path==='/api/product-tcp-proof'||path==='/api/product-tcp-preview'){
    try{diagnostic=(await response.json())?.diagnostic;}catch{}
    last={kind:'http',status:response.status,attempts:attempt,stage:diagnostic?.stage,code:diagnostic?.code};
    if(response.status<500)break;
+   // The source read everything, passed its consistency checks and declined
+   // the evidence. Repeating that inside this batch only repeats the reads.
+   if(diagnostic?.retryable===false)break;
   }
   throw Object.assign(Error('source_read_failed'),{detail:last});
  };
