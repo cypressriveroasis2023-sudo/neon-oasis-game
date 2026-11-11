@@ -10,7 +10,7 @@ export function productHealthLabel(status:string,evidence?:Evidence){
 }
 export default function FieldProductEvidence({value,now}:{value?:Evidence;now:number}){
  if(!value)return <p>No current reading. Source evidence is unavailable.</p>;
- const association=value.association==='product_id_connection_unavailable'?'Product-ID connection evidence is unavailable.':value.association==='exact_product_id_tracker_endpoint'&&value.gap?'A verified connection result is not available for this Product ID.':value.association?'Reviewed device association: '+value.association.replaceAll('_',' ')+'.':'No reviewed provider-resource association.';
+ const association=value.association==='product_id_connection_unavailable'?'Product-ID connection evidence is unavailable.':value.association==='exact_product_id_tracker_endpoint'&&value.gap?'A verified connection result is not available for this Product ID.':value.association==='vcc_unit_name'?'VCC devices matched to this unit by its unit name. This is not a reviewed device link.':value.association?'Reviewed device association: '+value.association.replaceAll('_',' ')+'.':'No reviewed provider-resource association.';
  return <section aria-label='Product health evidence'>
   {value.gap&&<p><strong>{fieldEvidenceGapLabels[value.gap]}</strong></p>}
   {value.followUp&&<div role='note' aria-label='Next step for this product'>
@@ -19,6 +19,7 @@ export default function FieldProductEvidence({value,now}:{value?:Evidence;now:nu
    <p><strong>Next step:</strong> {value.followUp.nextStep}</p>
   </div>}
   <p>{association} Live video and recording are not verified by these connection observations. Power telemetry is shown separately.</p>
+  {value.cameras&&<p><strong>VCC cameras:</strong> {value.cameras.up} of {value.cameras.total} online{value.cameras.down.length?' · Offline: '+value.cameras.down.join('; '):''}.</p>}
   {value.observations.length>0?<ul>{value.observations.map((o,i)=><li key={o.resourceId+'-'+o.kind+'-'+i}>
    {o.source} · {o.kind} · resource {o.resourceId} · {o.fresh?'Current':'Stale / invalid time'} · reported {o.reportedStatus} · observed {cameraTime(o.observedAt,now)}
   </li>)}</ul>:<p>No attributable source observation is available for this Product ID.</p>}

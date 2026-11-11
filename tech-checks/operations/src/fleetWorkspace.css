@@ -174,6 +174,9 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status i{width:6px;height:6px;background:currentColor;border-radius:50%}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-online{color:#8ee6b4;border-color:#3b7558;background:#17372b}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-offline{color:#ffacb6;border-color:#96475a;background:#3a1f2b}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-issues{color:#ffe08a;border-color:#8f7421;background:#3a3113}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-issues{display:block;color:#ffe08a}
+#root#root .cos-fleet-board .cos-fleet-camera-issues{color:#ffe08a}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards details{border-top:1px solid #2c3a4d;padding:0 12px}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards summary{font-size:10px;min-height:44px;cursor:pointer}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details{border:1px solid #2d3a4c;border-radius:10px;margin:12px 0;padding:0 12px}
@@ -198,6 +201,8 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-refresh{color:#121a26!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-issues{color:#ffd24a!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses:has(.cos-total-status-issues){grid-template-columns:repeat(4,minmax(0,1fr))}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2!important}
 @media(max-width:750px){
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{width:100%!important;flex:initial!important}
@@ -228,3 +233,18 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list>.cos-verify-now{display:block;padding:12px 16px;border:1px solid #2b6659;border-radius:12px;background:#112b28}#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list .cos-verify-now>button{background:#134f40;color:#d9fff2;border:1px solid #2aa98f;min-height:44px;padding:10px 14px}#root#root .cos-fleet-board.cos-fleet-dashboard .cos-verify-now>button:disabled{opacity:.5;cursor:wait}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-helios{grid-template-rows:auto auto auto 1fr auto auto}#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-helios .cos-helios-count-equation{grid-column:1/-1;grid-row:5;margin:0 0 8px;line-height:1.5}#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-helios footer{grid-row:6}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards .cos-verify-now{margin:10px 12px}#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-card>.cos-verify-now{margin:0 18px 14px}
+
+/* Manual equipment record editor (Owner and IT). */
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-status-list li{flex-wrap:wrap}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record{flex:1 0 100%;border:1px solid #445974;border-radius:10px;padding:14px;background:#0f1722;display:block}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-title{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record h4{font-size:15px;margin:0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#b8c6d9}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record input,#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record select{min-height:44px;border-radius:8px;border:1px solid #445974;background:#141e2b;color:#fff;padding:8px 10px;font-size:15px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-actions button{min-height:44px}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-trail{font-size:12px;color:#b8c6d9;margin:6px 0 0}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-history ol{list-style:none;padding:0;margin:10px 0 0;max-height:260px;overflow:auto}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-history li{display:block;padding:8px 0;border-top:1px solid #2b3a4f}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-manual-record-history small{display:block}
