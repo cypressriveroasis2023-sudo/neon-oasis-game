@@ -77,3 +77,10 @@ Limits: the database, the network and TCP checks are stand-ins, so this does not
 ## Order if this is ever deployed
 
 Server label first (the v96 reader ignores the extra fields), then the sweep. An unlabelled server with the patched sweep is still bounded by the two-failure limit.
+
+## Deployed source (added 2026-11-11 for release)
+
+- `source/index.ts`: the recipe applied to v96 (SHA-256 `resultSha256` in `recipe.json`). This is the file the deployed function loads at a pinned commit.
+- `source/v96/index.ts`: the unchanged v96 source (SHA-256 `baselineSha256`), kept so the previous version can be redeployed the same way.
+
+Both were committed at the account holder's direction so the function can be deployed by pinned import like the other COS functions. Neither contains credentials; all secrets are read from the function's environment.
