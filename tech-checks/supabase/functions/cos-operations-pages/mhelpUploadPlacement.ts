@@ -101,9 +101,41 @@ function retainedLocation(row:Row,r:Row,b:Row,proof:Row|undefined,customerIds:Ma
  const service=row.mhelpLocation;if(service?.contract==='COS_MHELP_FLEET_LOCATIONS_V1'&&service.unitId===row.id&&service.unitNumber===row.unitNumber&&typeof service.address==='string'&&service.address.trim()&&normalized(service.address)!==normalized(proof.address))return null;
  return proof;
 }
+/** Owner-approved inventory links (owner decision 2026-11-11, James Martin).
+ * A fresh, recorded approval ties one exact mHelp Product ID (A#) to one
+ * existing COS record. It is inventory identity only: no tracker row, IP,
+ * camera device or health reading is read or changed. The link is re-proven on
+ * every mHelp load and is simply not applied when anything it rests on changed. */
+export type OwnerApprovedProductLink={approvalId:string;productId:string;unitId:string;mhelpLabel:string;cosLabel:string};
+/** Capital letters and trailing spaces are the only label differences allowed. */
+export const approvedLinkLabel=(value:string)=>value.replace(/\s+$/,'').toLowerCase();
+function approvedLinks(value:unknown):Map<string,OwnerApprovedProductLink>{
+ const links=new Map<string,OwnerApprovedProductLink>(),units=new Set<string>();
+ if(value==null)return links;
+ if(!Array.isArray(value)||value.length>500)throw Error('Invalid Owner-approved Product links');
+ for(const l of value){
+  if(!object(l)||Object.keys(l).sort().join(',')!=='approvalId,cosLabel,mhelpLabel,productId,unitId'||!uuid(l.approvalId)||!id(l.productId)||!uuid(l.unitId)
+   ||!safe(l.mhelpLabel,250)||!l.mhelpLabel||!safe(l.cosLabel,250)||!l.cosLabel||links.has(l.productId)||units.has(l.unitId))throw Error('Invalid Owner-approved Product links');
+  links.set(l.productId,l as OwnerApprovedProductLink);units.add(l.unitId);
+ }
+ return links;
+}
+/** Read used on every field-map build. Any failure or malformed answer means
+ * "no approved links", which is exactly today's behaviour; it can never break a load. */
+export async function readOwnerApprovedProductLinks(read:(name:string,payload:Row)=>Promise<unknown>,organizationId:string):Promise<unknown[]|null>{
+ try{
+  const value=await read('cos_owner_product_links_active_v1',{p_organization_id:organizationId});
+  if(!object(value)||value.contract!=='COS_OWNER_PRODUCT_LINKS_V1')return null;
+  approvedLinks(value.links);return value.links;
+ }catch{return null;}
+}
+const inactiveStatus=new Set(['retired','decommissioned','deleted','stolen']);
+/** The only saved notes an approval answers: both ask a person to confirm the
+ * link. Identity conflicts and every other hold are never answered by it. */
+const approvalAnswers=new Set(['Product ID identity label changed; confirm before linking','Prior reviewed scoped identity or assignment requires Owner installation review']);
 /** Call after the API placement/location projections and before the finalizer.
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
-export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>}={}):{snapshot:Row;authorities:Row[]}{
+export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;ownerApprovedLinks?:unknown}={}):{snapshot:Row;authorities:Row[]}{
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
@@ -113,9 +145,28 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
  const concernKey=(value:unknown)=>{let key=concernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);concernKeys.set(value,key);}return key;};
  const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
  for(const r of receipt.records){const key=r.customer.trim().replace(/\s+/g,' ').toLowerCase();customerIds.set(key,new Set([...(customerIds.get(key)||[]),r.customerId]));}
+ const links=approvedLinks(options.ownerApprovedLinks);
+ // Every COS record any saved binding, possible alias or absent Product ID already
+ // points at. An approved link can never claim one of these.
+ const claimed=new Set<string>();
+ if(links.size)for(const other of [...receipt.records,...(live?receipt.apiMissingRecords:[])]){
+  if(!object(other))continue;
+  for(const v of [other.binding?.trackerId,other.binding?.nativeUnitId,...(Array.isArray(other.binding?.representedUnitIds)?other.binding.representedUnitIds:[]),...(Array.isArray(other.possibleAliasUnitIds)?other.possibleAliasUnitIds:[])])if(typeof v==='string')claimed.add(v);
+ }
  const records=receipt.records.map((r:Row)=>{
   const observedAt=r.scopedAuthority?.receivedAt||receipt.receivedAt,cutoff=stamp(observedAt),evidenceSha256=r.scopedAuthority?.evidenceSha256||receipt.sourceSha256;
-  const b=r.binding;let state=!b&&r.possibleAliasUnitIds?.length?'held':'unlinked',reason=r.holdReason||'no_reviewed_inventory_binding',applied=false;const unitIds:string[]=[];
+  // An approved link is considered only for a record with no saved binding and
+  // no existing hold of any kind. Existing holds always win.
+  const link=r.binding==null&&!r.possibleAliasUnitIds?.length&&r.placementHeld!==true&&(!r.holdReason||approvalAnswers.has(r.holdReason))&&r.inventoryOnlyReason===undefined&&!r.scopedAuthority?links.get(r.productId):undefined;
+  const linkTarget=link?byId.get(link.unitId):undefined;
+  const linkBlock=!link?null:r.lifecycle!=='UNFLAGGED'?'approved_link_source_flagged'
+   :approvedLinkLabel(r.unitNumber)!==approvedLinkLabel(link.mhelpLabel)?'approved_link_label_changed'
+   :claimed.has(link.unitId)?'approved_link_identity_conflict'
+   :!linkTarget||linkTarget.unitNumber!==link.cosLabel?'approved_link_record_unavailable_or_renamed'
+   :linkTarget.activeInventoryEligible===false||inactiveStatus.has(String(linkTarget.status||'').toLowerCase())||linkTarget.retiredAt?'approved_link_record_inactive':null;
+  const b=link&&!linkBlock?{productId:r.productId,matchMethod:'owner_approved_product_id',approvalId:link.approvalId,trackerId:null,trackerLabel:null,nativeUnitId:link.unitId,nativeLabel:link.cosLabel,representedUnitIds:[link.unitId],guardCurrent:true}:r.binding;
+  let state=!b&&r.possibleAliasUnitIds?.length?'held':'unlinked',reason=linkBlock||r.holdReason||'no_reviewed_inventory_binding',applied=false;const unitIds:string[]=[];
+  if(linkBlock==='approved_link_identity_conflict')state='held';
   if(b){
    const expected=[{id:b.trackerId,label:b.trackerLabel},{id:b.nativeUnitId,label:b.nativeLabel}].filter(t=>t.id);
    const targets=expected.filter(t=>byId.has(t.id));
@@ -140,7 +191,7 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
    }
   }
   return {recordId:'mhelp_product:'+r.productId,productId:r.productId,unitNumber:r.displayUnitNumber||r.unitNumber,sourceUnitNumber:r.unitNumber,observedAt,category:r.category,placement:r.placement,uploadLifecycle:r.lifecycle,...(r.inventoryOnlyReason?{inventoryOnlyReason:r.inventoryOnlyReason}:{}),
-   customer:r.customer,sourceAddress:r.sourceAddress,binding:{state,unitIds,candidateUnitIds:[...new Set([...(r.possibleAliasUnitIds||[]),...(state==='held'&&b?[b.trackerId,b.nativeUnitId].filter(Boolean):[])])],placementHeld:r.placementHeld===true||reason==='newer_or_undated_source_assignment',matchMethod:b?.matchMethod||null,reason},overlayApplied:applied};
+   customer:r.customer,sourceAddress:r.sourceAddress,binding:{state,unitIds,candidateUnitIds:[...new Set([...(r.possibleAliasUnitIds||[]),...(state==='held'&&b?[b.trackerId,b.nativeUnitId].filter(Boolean):[])])],placementHeld:r.placementHeld===true||reason==='newer_or_undated_source_assignment',matchMethod:b?.matchMethod||null,reason,...(link&&!linkBlock?{approvalId:link.approvalId}:{})},overlayApplied:applied};
  });
  if(live)for(const removed of receipt.apiMissingRecords){
   if(!object(removed)||!id(removed.productId)||receipt.records.some((r:Row)=>r.productId===removed.productId))throw Error('Invalid absent Product-ID receipt');

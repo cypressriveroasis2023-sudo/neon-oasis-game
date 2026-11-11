@@ -39,7 +39,7 @@
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
     "savedFleetBoard.mjs": "f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a",
-    "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
+    "serve.ts": "3dbab7a1178637000777fce76ed430f0dc0dc36dc2b3e94614024975faaea072",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
   },
