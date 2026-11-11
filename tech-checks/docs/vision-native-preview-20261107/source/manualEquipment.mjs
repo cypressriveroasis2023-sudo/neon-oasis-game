@@ -89,11 +89,31 @@ function createManualEquipment(options) {
     return { ...value, saved: true, requestId: body.requestId, replayed: result.replayed === true, current: result.current !== false };
   };
 }
+function checkedManualEquipmentSet(v) {
+  if (v?.contract !== "COS_MANUAL_EQUIPMENT_SET_V1" || !Array.isArray(v.items) || v.items.length > 2e4) fail("Manual equipment records could not be verified.");
+  const items = v.items.map((r) => {
+    if (!productId(r?.productId) || !uuid(r.auditId) || !Number.isInteger(r.revision) || r.revision < 1 || typeof r.recordedAt !== "string" || !Number.isFinite(Date.parse(r.recordedAt))) fail("Manual equipment records could not be verified.");
+    return { productId: r.productId, auditId: r.auditId, revision: r.revision, recordedAt: r.recordedAt, recordedByName: personName(r.recordedByName), record: checkedRecord(r.record) };
+  });
+  if (new Set(items.map((r) => r.productId)).size !== items.length) fail("Manual equipment records could not be verified.");
+  return items;
+}
+async function attachManualEquipment(snapshot, read) {
+  const base = snapshot?.manualPlacementOverrides?.contract === "COS_FLEET_SHOP_OVERRIDES_V1" ? snapshot.manualPlacementOverrides : { contract: "COS_FLEET_SHOP_OVERRIDES_V1", items: [] };
+  try {
+    const records = checkedManualEquipmentSet(await read());
+    return { ...snapshot, manualPlacementOverrides: { ...base, records }, manualEquipmentState: "ready" };
+  } catch {
+    return { ...snapshot, manualPlacementOverrides: { ...base, records: [] }, manualEquipmentState: "unavailable" };
+  }
+}
 export {
   MANUAL_EQUIPMENT_FIELDS,
   ManualEquipmentError,
+  attachManualEquipment,
   checkedManualChanges,
   checkedManualEquipment,
+  checkedManualEquipmentSet,
   createManualEquipment,
   createManualEquipmentRpc
 };

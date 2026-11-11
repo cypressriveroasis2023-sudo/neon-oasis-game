@@ -55,3 +55,15 @@ test('if someone else saved first, the edit is refused, nothing is overwritten, 
  await expect(editor.getByLabel('Note')).toHaveValue('Changed by someone else');await expect(editor.getByLabel('Placement')).toHaveValue('');await expect(editor.getByLabel('Placement')).toBeEnabled();
  expect(state.posts).toHaveLength(1);
 });
+test('a saved manual Shop entry moves the unit out of the Field totals on the Fleet screen',async({page})=>{
+ const count=async records=>{
+  const f=fieldProductFixture(),field={...f.field,manualPlacementOverrides:{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[],records:records(f)}};
+  const {app}=await mountFleet(page,false,{field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true});
+  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+  await expect(board.locator('.cos-fleet-stat-field strong').first()).toHaveText(/^\d+$/);
+  return {field:Number(await board.locator('.cos-fleet-stat-field strong').first().textContent()),shop:Number(await board.locator('.cos-fleet-stat-shop strong').first().textContent()),total:Number(await board.locator('.cos-fleet-stat-total strong').first().textContent())};
+ };
+ const before=await count(()=>[]);
+ const after=await count(f=>[{productId:f.field.uploadInventory.records.find(r=>r.placement==='FIELD').productId,auditId:'10000000-0000-4000-8000-000000000001',revision:1,recordedAt:'2026-11-11T17:00:00Z',recordedByName:'Teddy Hopper',record:{...blank,placement:'SHOP'}}]);
+ expect(after.field).toBe(before.field-1);expect(after.shop).toBe(before.shop+1);expect(after.total).toBe(before.total);
+});

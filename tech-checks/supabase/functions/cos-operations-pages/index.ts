@@ -1,5 +1,5 @@
 import {savedFleetBoard,acceptFleetBatch,completedBoard} from './savedFleetBoard.mjs';
-import {createManualEquipment,createManualEquipmentRpc,ManualEquipmentError} from './manualEquipment.mjs';
+import {createManualEquipment,createManualEquipmentRpc,ManualEquipmentError,attachManualEquipment} from './manualEquipment.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -1093,7 +1093,8 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           // a native GPS or camera association. This optional authenticated
           // read must not stop camera health, Fleet, Shop, or existing GPS pins.
           const addressMap=await withMhelpAddressMap(combined,mhelpReceipt?.upload,signal=>rpc('cos_mhelp_census_map_snapshot',actorPayload,signal),request.signal);
-          const withMhelpAddress=await projectManualShop(addressMap,await rpc('cos_fleet_shop_snapshot_v1',actorPayload,request.signal));
+          // Manual equipment records ride beside the shop moves; every reader applies both.
+          const withMhelpAddress=await attachManualEquipment(await projectManualShop(addressMap,await rpc('cos_fleet_shop_snapshot_v1',actorPayload,request.signal)),()=>createManualEquipmentRpc({fetch:requestFetch,url:platformUrl,headers:platformHeaders})('cos_manual_equipment_set_v1',actorPayload));
           // Only privately reviewed saved receipts are read through the existing
           // native actor/permission route. No new legacy credential or provider call.
           try{

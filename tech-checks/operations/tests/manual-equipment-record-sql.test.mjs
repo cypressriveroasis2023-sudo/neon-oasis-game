@@ -99,6 +99,16 @@ test('fields are validated, trimmed, and cleared with null',{skip},()=>{
  fails(()=>call(OWNER,'abc'),/Choose an mHelp Product ID/);fails(()=>call(OWNER,'0'),/Choose an mHelp Product ID/);fails(()=>call(OWNER,null),/Choose an mHelp Product ID/);
  assert.equal(call(OWNER,'2004').revision,2);
 });
+test('the set of current records lists the latest entry per Product ID, for Owner and IT only',{skip},()=>{
+ const set=JSON.parse(psql(`set role service_role; select public.cos_manual_equipment_set_v1('${IT}','${ORG}')`));
+ assert.equal(set.contract,'COS_MANUAL_EQUIPMENT_SET_V1');
+ const by=Object.fromEntries(set.items.map(r=>[r.productId,r]));
+ assert.equal(by['2001'].record.placement,'SHOP');assert.equal(by['2001'].revision,2);assert.equal(by['2001'].recordedByName,'Teddy Hopper');
+ assert.equal(by['2003'].record.placement,'FIELD');assert.equal(new Set(set.items.map(r=>r.productId)).size,set.items.length);
+ assert.ok(!('1713914' in by),'a Product ID nobody edited is not listed');
+ fails(()=>psql(`set role service_role; select public.cos_manual_equipment_set_v1('${SERVICE}','${ORG}')`),/Owner or IT placement access required/);
+ fails(()=>psql(`set role authenticated; select public.cos_manual_equipment_set_v1('${OWNER}','${ORG}')`),/permission denied/);
+});
 test('installing over an existing installation is refused',{skip},()=>{
  fails(()=>psql(migration,{file:true}),/already exist; review before replacing/);
 });

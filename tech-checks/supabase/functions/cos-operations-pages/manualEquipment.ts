@@ -80,3 +80,26 @@ export function createManualEquipment(options:{rpc:(name:string,body:Row)=>Promi
   return {...value,saved:true,requestId:body.requestId,replayed:result.replayed===true,current:result.current!==false};
  };
 }
+
+export type ManualEquipmentItem={productId:string;auditId:string;revision:number;recordedAt:string;recordedByName:string|null;record:ManualEquipmentRecord};
+/** The verified set of current manual records. Anything malformed refuses the whole set. */
+export function checkedManualEquipmentSet(v:any):ManualEquipmentItem[]{
+ if(v?.contract!=='COS_MANUAL_EQUIPMENT_SET_V1'||!Array.isArray(v.items)||v.items.length>20000)fail('Manual equipment records could not be verified.');
+ const items=v.items.map((r:any)=>{
+  if(!productId(r?.productId)||!uuid(r.auditId)||!Number.isInteger(r.revision)||r.revision<1||typeof r.recordedAt!=='string'||!Number.isFinite(Date.parse(r.recordedAt)))fail('Manual equipment records could not be verified.');
+  return {productId:r.productId,auditId:r.auditId,revision:r.revision,recordedAt:r.recordedAt,recordedByName:personName(r.recordedByName),record:checkedRecord(r.record)};
+ });
+ if(new Set(items.map((r:ManualEquipmentItem)=>r.productId)).size!==items.length)fail('Manual equipment records could not be verified.');
+ return items;
+}
+/**
+ * Put the manual records beside the accepted mHelp inventory in the field map.
+ * The inventory and its digests are not altered here; every reader applies the
+ * records through manualShopInventory, so a manual entry wins everywhere at once.
+ * If the records cannot be read the map says so instead of silently omitting them.
+ */
+export async function attachManualEquipment(snapshot:Row,read:()=>Promise<any>):Promise<Row>{
+ const base=snapshot?.manualPlacementOverrides?.contract==='COS_FLEET_SHOP_OVERRIDES_V1'?snapshot.manualPlacementOverrides:{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[]};
+ try{const records=checkedManualEquipmentSet(await read());return {...snapshot,manualPlacementOverrides:{...base,records},manualEquipmentState:'ready'};}
+ catch{return {...snapshot,manualPlacementOverrides:{...base,records:[]},manualEquipmentState:'unavailable'};}
+}

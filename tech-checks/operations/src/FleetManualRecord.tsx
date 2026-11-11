@@ -44,7 +44,7 @@ export default function FleetManualRecord({productId,unitName,onSaved}:{productI
    if((value as any).saved!==true)throw Error('The save could not be confirmed. Reload the record.');
    if(!alive.current)return;
    setSaved(value);setForm(value.record);setReason('');setHistory(null);attempt.current=null;
-   setDone('Saved'+(value.recordedByName?' by '+value.recordedByName:'')+(value.recordedAt?' · '+when(value.recordedAt):'')+'.');onSaved?.(value);
+   setDone('Saved'+(value.recordedByName?' by '+value.recordedByName:'')+(value.recordedAt?' · '+when(value.recordedAt):'')+'.'+('placement' in body.changes?' Field and Shop counts update at the next refresh, or press Refresh data.':''));onSaved?.(value);
   }catch(cause){if(alive.current){setStale(conflict(cause));setError(message(cause,'The save could not be confirmed. Reload the record before trying again.'));}}
   finally{pending.current=false;if(alive.current)setBusy(false);}
  }

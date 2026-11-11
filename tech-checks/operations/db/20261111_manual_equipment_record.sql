@@ -11,7 +11,7 @@
 -- A stale save is an application conflict (PT409), never SQLSTATE 40001:
 -- PostgREST retries 40001 without limit and each retry holds an API connection.
 begin;
-do $$begin if to_regclass('app_private.cos_manual_equipment_edits') is not null or to_regprocedure('public.cos_manual_equipment_v1(uuid,uuid,text,text,uuid,text,jsonb,jsonb)') is not null then raise exception 'Manual equipment objects already exist; review before replacing';end if;end $$;
+do $$begin if to_regclass('app_private.cos_manual_equipment_edits') is not null or to_regprocedure('public.cos_manual_equipment_v1(uuid,uuid,text,text,uuid,text,jsonb,jsonb)') is not null or to_regprocedure('public.cos_manual_equipment_set_v1(uuid,uuid)') is not null then raise exception 'Manual equipment objects already exist; review before replacing';end if;end $$;
 do $$begin if to_regprocedure('app_private.cos_fleet_shop_actor(uuid,uuid)') is null then raise exception 'Owner/IT actor check is missing; install the Fleet shop action first';end if;end $$;
 
 create table app_private.cos_manual_equipment_edits (
@@ -140,6 +140,20 @@ begin
   'proof', encode(sha256(convert_to(jsonb_build_array(p_organization_id, p_product_id, latest.revision, latest.id, latest.record_after)::text, 'UTF8')), 'hex'),
   'saved', true, 'requestId', latest.id, 'replayed', false, 'current', true, 'applied', applied);
 end $$;
+-- Every current manual record, for applying to placement and counts.
+create function public.cos_manual_equipment_set_v1(p_actor_user_id uuid, p_organization_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare items jsonb;
+begin
+ perform app_private.cos_fleet_shop_actor(p_actor_user_id, p_organization_id);
+ select coalesce(jsonb_agg(jsonb_build_object('productId', x.product_id, 'auditId', x.id, 'revision', x.revision, 'recordedAt', x.created_at,
+  'recordedByName', app_private.cos_manual_equipment_actor_name(x.actor_id, x.organization_id), 'record', x.record_after) order by x.product_id), '[]'::jsonb) into items
+ from (select distinct on (e.product_id) e.* from app_private.cos_manual_equipment_edits e where e.organization_id = p_organization_id order by e.product_id, e.revision desc) x
+ where x.record_after <> '{"displayName":null,"placement":null,"customer":null,"siteName":null,"address":null,"deviceLink":null,"note":null}'::jsonb;
+ return jsonb_build_object('contract', 'COS_MANUAL_EQUIPMENT_SET_V1', 'items', items);
+end $$;
+revoke all on function public.cos_manual_equipment_set_v1(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.cos_manual_equipment_set_v1(uuid, uuid) to service_role;
 revoke all on function public.cos_manual_equipment_v1(uuid, uuid, text, text, uuid, text, jsonb, jsonb) from public, anon, authenticated;
 grant execute on function public.cos_manual_equipment_v1(uuid, uuid, text, text, uuid, text, jsonb, jsonb) to service_role;
 commit;
