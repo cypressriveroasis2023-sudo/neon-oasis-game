@@ -100,3 +100,45 @@ test('when no board can be read at all, the reading this browser saved is shown 
  for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText(shown[name]);
  for(const name of ['field','shop','total'])await expect(stat(name),name).toHaveText(/^\d+$/);
 });
+for(const outcome of ['succeeds','fails'])test('reopening with only the compact saved reading shows it at once while the saved-board request is unresolved, then the request '+outcome,async({page})=>{
+ const f=fieldProductFixture(),features={durableFleetBoard:true};
+ const {app}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,features,skipInitialFieldCount:true,advancingClock:true,productionOwnerUserId:'00000000-0000-4000-8000-00000000000a'});
+ const first=completedBoard(f.health,f.field,f.connections,null,f.now);
+ const value={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-1',payload:first},refresh:{state:'completed'},history:[]};
+ let hold=null,release,pending=0;
+ await page.route('**/functions/v1/cos-operations-pages',async route=>{
+  if(route.request().method()!=='POST')return route.fallback();const req=route.request().postDataJSON();
+  if(!req.path.startsWith('/api/fleet-saved-board'))return route.fallback();
+  const headers={'access-control-allow-origin':'http://127.0.0.1:4173'};
+  if(hold){pending++;const result=await hold;if(result==='fails')return route.fulfill({status:503,headers,json:{error:'Saved fleet board unavailable'}});}
+  return route.fulfill({headers,json:req.path.includes('/history/')?{completedAt:first.fleet.readAt,units:first.units}:value});
+ });
+ await page.reload();
+ const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
+ const stat=name=>board.locator('.cos-fleet-stat-'+name+' strong').first();
+ await expect(stat('online')).toHaveText('1');
+ const shown={};for(const name of ['online','offline','unknown'])shown[name]=await stat(name).textContent();
+ await expect.poll(()=>app.locator('body').evaluate(()=>Object.keys(localStorage).some(key=>key.startsWith('cos-saved-fleet-reading-v1:')))).toBe(true);
+ // Reopen later with only the compact reading; the saved-board request does not answer yet.
+ hold=new Promise(resolve=>{release=resolve;});
+ await page.clock.fastForward(45*60000);
+ await app.locator('body').evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('cos-saved-fleet-presentation-v1:'))localStorage.removeItem(key);});
+ await page.reload();
+ await expect.poll(()=>pending).toBeGreaterThan(0);
+ const saved=async()=>{
+  for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText(shown[name]);
+  for(const name of ['field','shop','total'])await expect(stat(name),name).toHaveText(/^\d+$/);
+  for(const name of ['field','shop','total','online','offline','unknown'])await expect(board.locator('.cos-fleet-stat-'+name+' small'),name).toContainText(/Saved reading .*\d{1,2}:\d{2}.* at that time · not current/);
+  await expect(board.locator('.cos-fleet-stat-field small')).not.toContainText('Current reconciled placement');
+  await expect(board.locator('.cos-fleet-heading')).toContainText(/Saved reading .*\d{1,2}:\d{2}.* · not current/);
+  await expect(board.locator('.cos-fleet-heading')).not.toContainText('No successful saved health read');
+ };
+ await saved();await expect(board.locator('.cos-fleet-heading')).toContainText('loading saved health');
+ release(outcome);
+ if(outcome==='fails'){await expect(board.locator('.cos-fleet-heading')).not.toContainText('loading saved health');await saved();}
+ else{
+  // The server's completed board replaces the compact reading and is labelled with its own time.
+  await expect(board.locator('.cos-fleet-stat-online small')).toContainText(/Last completed reading .*\d{1,2}:\d{2}.* · not current/);
+  await expect(stat('online')).toHaveText(shown.online);await expect(board.locator('.cos-fleet-heading')).not.toContainText('No successful saved health read');
+ }
+});
