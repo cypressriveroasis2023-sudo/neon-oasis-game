@@ -4,8 +4,8 @@ import {createManualEquipment,createManualEquipmentRpc,checkedManualChanges,Manu
 
 const P='1713914',A='10000000-0000-4000-8000-000000000001',U='00000000-0000-4000-8000-000000000001',proof='a'.repeat(64);
 const blank={displayName:null,placement:null,customer:null,siteName:null,address:null,deviceLink:null,note:null};
-const unsaved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:0,auditId:null,recordedAt:null,recordedBy:null,record:blank,proof};
-const saved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:1,auditId:A,recordedAt:'2026-11-11T17:00:00Z',recordedBy:U,record:{...blank,placement:'FIELD'},proof:'b'.repeat(64)};
+const unsaved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:0,auditId:null,recordedAt:null,recordedBy:null,recordedByName:null,record:blank,proof};
+const saved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:1,auditId:A,recordedAt:'2026-11-11T17:00:00Z',recordedBy:U,recordedByName:'James Martin',record:{...blank,placement:'FIELD'},proof:'b'.repeat(64)};
 const body={expected:{productId:P,revision:0,auditId:null,proof},reason:'Installed today',requestId:A,changes:{placement:'FIELD'}};
 const make=answers=>{const calls=[];return {calls,run:createManualEquipment({actorPayload:{p_actor_user_id:U,p_organization_id:'org'},rpc:async(name,args)=>{calls.push({name,args});const next=answers.shift();if(next instanceof Error)throw next;return next;}})};};
 const refuses=async(promise,status,pattern)=>{await assert.rejects(promise,error=>error instanceof ManualEquipmentError&&error.status===status&&(!pattern||pattern.test(error.message)));};
@@ -46,7 +46,7 @@ test('an answer that is not a verified record is refused',async()=>{
   await refuses(make([bad]).run(P,'GET'),503,/could not be verified/);
 });
 test('history returns who, when, why, before and after',async()=>{
- const item={auditId:A,revision:1,actorId:U,recordedAt:'2026-11-11T17:00:00Z',reason:'Installed today',changes:{placement:'FIELD'},before:blank,after:{...blank,placement:'FIELD'}};
+ const item={auditId:A,revision:1,actorId:U,actorName:'James Martin',recordedAt:'2026-11-11T17:00:00Z',reason:'Installed today',changes:{placement:'FIELD'},before:blank,after:{...blank,placement:'FIELD'}};
  const {run,calls}=make([{contract:'COS_MANUAL_EQUIPMENT_HISTORY_V1',productId:P,items:[item]}]);const h=await run(P,'GET',undefined,'history');
  assert.deepEqual(h.items,[item]);assert.equal(calls[0].args.p_action,'history');
  await refuses(make([{contract:'COS_MANUAL_EQUIPMENT_HISTORY_V1',productId:P,items:[{...item,actorId:'x'}]}]).run(P,'GET',undefined,'history'),503);

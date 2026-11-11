@@ -62,6 +62,12 @@ begin
 end $$;
 revoke all on function app_private.cos_manual_equipment_field(text, jsonb) from public, anon, authenticated;
 
+-- The person's display name for the paper trail (null if the profile is gone).
+create function app_private.cos_manual_equipment_actor_name(p_actor uuid, p_org uuid) returns text
+language sql stable security definer set search_path = '' as $$
+ select left(up.display_name, 200) from public.user_profiles up where up.user_id = p_actor and up.organization_id = p_org limit 1 $$;
+revoke all on function app_private.cos_manual_equipment_actor_name(uuid, uuid) from public, anon, authenticated;
+
 create function public.cos_manual_equipment_v1(
  p_actor_user_id uuid, p_organization_id uuid, p_product_id text, p_action text default 'read',
  p_request_id uuid default null, p_reason text default null, p_expected jsonb default null, p_changes jsonb default null
@@ -78,7 +84,7 @@ begin
 
  if p_action = 'history' then
   return jsonb_build_object('contract', 'COS_MANUAL_EQUIPMENT_HISTORY_V1', 'productId', p_product_id, 'items', coalesce((
-   select jsonb_agg(jsonb_build_object('auditId', e.id, 'revision', e.revision, 'actorId', e.actor_id, 'recordedAt', e.created_at,
+   select jsonb_agg(jsonb_build_object('auditId', e.id, 'revision', e.revision, 'actorId', e.actor_id, 'actorName', app_private.cos_manual_equipment_actor_name(e.actor_id, e.organization_id), 'recordedAt', e.created_at,
     'reason', e.reason, 'changes', e.changes, 'before', e.record_before, 'after', e.record_after) order by e.revision desc)
    from (select * from app_private.cos_manual_equipment_edits where organization_id = p_organization_id and product_id = p_product_id order by revision desc limit 200) e), '[]'::jsonb));
  end if;
@@ -103,13 +109,13 @@ begin
  rec := coalesce(latest.record_after, blank);
  proof := encode(sha256(convert_to(jsonb_build_array(p_organization_id, p_product_id, coalesce(latest.revision, 0), latest.id, rec)::text, 'UTF8')), 'hex');
  result := jsonb_build_object('contract', 'COS_MANUAL_EQUIPMENT_V1', 'productId', p_product_id, 'revision', coalesce(latest.revision, 0),
-  'auditId', latest.id, 'recordedAt', latest.created_at, 'recordedBy', latest.actor_id, 'record', rec, 'proof', proof);
+  'auditId', latest.id, 'recordedAt', latest.created_at, 'recordedBy', latest.actor_id, 'recordedByName', app_private.cos_manual_equipment_actor_name(latest.actor_id, p_organization_id), 'record', rec, 'proof', proof);
  if p_action = 'read' then return result; end if;
 
  if prior.id is not null then
   -- The same request again: report what it saved, whatever has happened since.
   return jsonb_build_object('contract', 'COS_MANUAL_EQUIPMENT_V1', 'productId', p_product_id, 'revision', prior.revision, 'auditId', prior.id,
-   'recordedAt', prior.created_at, 'recordedBy', prior.actor_id, 'record', prior.record_after,
+   'recordedAt', prior.created_at, 'recordedBy', prior.actor_id, 'recordedByName', app_private.cos_manual_equipment_actor_name(prior.actor_id, p_organization_id), 'record', prior.record_after,
    'proof', encode(sha256(convert_to(jsonb_build_array(p_organization_id, p_product_id, prior.revision, prior.id, prior.record_after)::text, 'UTF8')), 'hex'),
    'saved', true, 'requestId', prior.id, 'replayed', true, 'current', prior.id = latest.id);
  end if;
@@ -130,7 +136,7 @@ begin
  values (p_request_id, p_organization_id, p_product_id, coalesce(latest.revision, 0) + 1, p_actor_user_id, btrim(p_reason), p_changes, rec, next_rec, p_expected)
  returning * into latest;
  return jsonb_build_object('contract', 'COS_MANUAL_EQUIPMENT_V1', 'productId', p_product_id, 'revision', latest.revision, 'auditId', latest.id,
-  'recordedAt', latest.created_at, 'recordedBy', latest.actor_id, 'record', latest.record_after,
+  'recordedAt', latest.created_at, 'recordedBy', latest.actor_id, 'recordedByName', app_private.cos_manual_equipment_actor_name(latest.actor_id, p_organization_id), 'record', latest.record_after,
   'proof', encode(sha256(convert_to(jsonb_build_array(p_organization_id, p_product_id, latest.revision, latest.id, latest.record_after)::text, 'UTF8')), 'hex'),
   'saved', true, 'requestId', latest.id, 'replayed', false, 'current', true, 'applied', applied);
 end $$;

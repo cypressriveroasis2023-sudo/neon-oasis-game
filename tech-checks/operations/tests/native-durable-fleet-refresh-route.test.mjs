@@ -296,7 +296,7 @@ test('the connections source labels a decline only after its reads and both cons
 // ---- manual equipment record route (real handler, synthetic database) ----
 {
  const P='1713914',A='10000000-0000-4000-8000-000000000001',blank={displayName:null,placement:null,customer:null,siteName:null,address:null,deviceLink:null,note:null};
- const unsaved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:0,auditId:null,recordedAt:null,recordedBy:null,record:blank,proof:'a'.repeat(64)};
+ const unsaved={contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:0,auditId:null,recordedAt:null,recordedBy:null,recordedByName:null,record:blank,proof:'a'.repeat(64)};
  const savedBy=actor=>({contract:'COS_MANUAL_EQUIPMENT_V1',productId:P,revision:1,auditId:A,recordedAt:'2026-11-11T17:00:00Z',recordedBy:actor,record:{...blank,placement:'FIELD',siteName:'Buda'},proof:'b'.repeat(64)});
  const save={expected:{productId:P,revision:0,auditId:null,proof:'a'.repeat(64)},reason:'Installed today',requestId:A,changes:{placement:'FIELD',siteName:'Buda'}};
  const database=who=>({cos_manual_equipment_v1:(body,json)=>body.p_action==='history'?json({contract:'COS_MANUAL_EQUIPMENT_HISTORY_V1',productId:P,items:[{auditId:A,revision:1,actorId:who.actor,recordedAt:'2026-11-11T17:00:00Z',reason:'Installed today',changes:save.changes,before:blank,after:savedBy(who.actor).record}]}):body.p_action==='save'?json({...savedBy(who.actor),saved:true,requestId:body.p_request_id,replayed:false,current:true}):json(body.__after?savedBy(who.actor):unsaved)});

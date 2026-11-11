@@ -11,6 +11,7 @@ const uuid = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{
 const exact = (v, keys) => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join(",") === [...keys].sort().join(",");
 const MANUAL_EQUIPMENT_FIELDS = { displayName: 120, placement: 5, customer: 200, siteName: 200, address: 400, deviceLink: 200, note: 1e3 };
 const FIELDS = Object.keys(MANUAL_EQUIPMENT_FIELDS);
+const personName = (v) => typeof v === "string" && v.trim() && v.length <= 200 ? v.trim() : null;
 const productId = (v) => typeof v === "string" && /^[1-9][0-9]{0,17}$/.test(v);
 function checkedRecord(v) {
   if (!exact(v, FIELDS) || FIELDS.some((k) => !(v[k] === null || typeof v[k] === "string" && v[k].length > 0 && v[k].length <= MANUAL_EQUIPMENT_FIELDS[k])) || !(v.placement === null || v.placement === "FIELD" || v.placement === "SHOP")) fail("Saved manual record could not be verified. Reload it before trying again.");
@@ -19,7 +20,7 @@ function checkedRecord(v) {
 function checkedManualEquipment(v, id) {
   const unsaved = v?.revision === 0;
   if (v?.contract !== "COS_MANUAL_EQUIPMENT_V1" || v.productId !== id || !Number.isInteger(v.revision) || v.revision < 0 || v.revision > 1e6 || typeof v.proof !== "string" || !/^[a-f0-9]{64}$/.test(v.proof) || (unsaved ? !(v.auditId === null && v.recordedAt == null && v.recordedBy == null) : !(uuid(v.auditId) && uuid(v.recordedBy) && typeof v.recordedAt === "string" && Number.isFinite(Date.parse(v.recordedAt))))) fail("Saved manual record could not be verified. Reload it before trying again.");
-  return { contract: v.contract, productId: id, revision: v.revision, auditId: v.auditId ?? null, recordedAt: v.recordedAt ?? null, recordedBy: v.recordedBy ?? null, record: checkedRecord(v.record), proof: v.proof };
+  return { contract: v.contract, productId: id, revision: v.revision, auditId: v.auditId ?? null, recordedAt: v.recordedAt ?? null, recordedBy: v.recordedBy ?? null, recordedByName: personName(v.recordedByName), record: checkedRecord(v.record), proof: v.proof };
 }
 function checkedManualChanges(v) {
   if (!v || typeof v !== "object" || Array.isArray(v)) fail("Choose at least one field to change.", 400);
@@ -73,7 +74,7 @@ function createManualEquipment(options) {
       if (method !== "GET") fail("History can only be read.", 405);
       const v = await call({ p_product_id: id, p_action: "history" });
       if (v?.contract !== "COS_MANUAL_EQUIPMENT_HISTORY_V1" || v.productId !== id || !Array.isArray(v.items) || v.items.length > 200 || v.items.some((r) => !uuid(r.auditId) || !uuid(r.actorId) || !Number.isInteger(r.revision) || !Number.isFinite(Date.parse(r.recordedAt)) || typeof r.reason !== "string")) fail("Saved history could not be verified.");
-      return { contract: v.contract, productId: id, items: v.items.map((r) => ({ auditId: r.auditId, revision: r.revision, actorId: r.actorId, recordedAt: r.recordedAt, reason: r.reason, changes: r.changes, before: checkedRecord(r.before), after: checkedRecord(r.after) })) };
+      return { contract: v.contract, productId: id, items: v.items.map((r) => ({ auditId: r.auditId, revision: r.revision, actorId: r.actorId, actorName: personName(r.actorName), recordedAt: r.recordedAt, reason: r.reason, changes: r.changes, before: checkedRecord(r.before), after: checkedRecord(r.after) })) };
     }
     if (method === "GET") return checkedManualEquipment(await call({ p_product_id: id, p_action: "read" }), id);
     if (method !== "POST") fail("Use the manual equipment record action.", 405);

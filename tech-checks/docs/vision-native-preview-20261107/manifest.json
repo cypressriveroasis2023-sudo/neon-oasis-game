@@ -35,7 +35,7 @@
   ],
   "sourceHashes": {
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "manualEquipment.mjs": "718ca0d7ab28244f5eddb97ef644464713e20856b54dd88339b146840a37ab8b",
+    "manualEquipment.mjs": "147fdf351d2e224cfe091a7ad9f2fa965ae001701d700518d2482a209d9c56cd",
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",

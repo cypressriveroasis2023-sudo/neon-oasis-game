@@ -33,6 +33,7 @@ test.before(()=>{if(!canRun)return;
   create schema auth; create schema app_private;
   create table auth.users(id uuid primary key); create table public.organizations(id uuid primary key);
   insert into public.organizations values('${ORG}'); insert into auth.users values('${OWNER}'),('${IT}'),('${SERVICE}');
+  create table public.user_profiles(user_id uuid, organization_id uuid, display_name text);insert into public.user_profiles values('${OWNER}','${ORG}','James Martin'),('${IT}','${ORG}','Teddy Hopper');
   create table public.allowed(user_id uuid primary key);insert into public.allowed values('${OWNER}'),('${IT}');
   create function app_private.cos_fleet_shop_actor(p_actor uuid,p_org uuid) returns void language plpgsql security definer set search_path='' as $$begin
    if p_org<>'${ORG}' or not exists(select 1 from public.allowed where user_id=p_actor) then raise exception 'Owner or IT placement access required' using errcode='42501';end if;end $$;`);
@@ -58,7 +59,7 @@ test('the paper trail records who, when, why, and the record before and after',{
  const h=call(OWNER,'2001','history');
  assert.equal(h.contract,'COS_MANUAL_EQUIPMENT_HISTORY_V1');assert.equal(h.items.length,2);
  const [latest,first]=h.items;
- assert.equal(latest.actorId,IT);assert.equal(latest.reason,'Returned to shop');assert.equal(latest.before.placement,'FIELD');assert.equal(latest.after.placement,'SHOP');assert.ok(Date.parse(latest.recordedAt));
+ assert.equal(latest.actorId,IT);assert.equal(latest.actorName,'Teddy Hopper');assert.equal(first.actorName,'James Martin');assert.equal(call(OWNER,'2001').recordedByName,'Teddy Hopper');assert.equal(latest.reason,'Returned to shop');assert.equal(latest.before.placement,'FIELD');assert.equal(latest.after.placement,'SHOP');assert.ok(Date.parse(latest.recordedAt));
  assert.equal(first.actorId,OWNER);assert.equal(first.reason,'Installed today');assert.equal(first.before.placement,null);assert.deepEqual(first.changes,{placement:'FIELD',siteName:'Bristol Friendswood'});
 });
 test('the paper trail cannot be edited, deleted or emptied',{skip},()=>{

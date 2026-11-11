@@ -10,8 +10,9 @@ const exact=(v:any,keys:string[])=>v&&typeof v==='object'&&!Array.isArray(v)&&Ob
 export const MANUAL_EQUIPMENT_FIELDS={displayName:120,placement:5,customer:200,siteName:200,address:400,deviceLink:200,note:1000} as const;
 export type ManualEquipmentField=keyof typeof MANUAL_EQUIPMENT_FIELDS;
 export type ManualEquipmentRecord={[K in ManualEquipmentField]:string|null};
-export type ManualEquipment={contract:'COS_MANUAL_EQUIPMENT_V1';productId:string;revision:number;auditId:string|null;recordedAt:string|null;recordedBy:string|null;record:ManualEquipmentRecord;proof:string};
+export type ManualEquipment={contract:'COS_MANUAL_EQUIPMENT_V1';productId:string;revision:number;auditId:string|null;recordedAt:string|null;recordedBy:string|null;recordedByName:string|null;record:ManualEquipmentRecord;proof:string};
 const FIELDS=Object.keys(MANUAL_EQUIPMENT_FIELDS) as ManualEquipmentField[];
+const personName=(v:unknown)=>typeof v==='string'&&v.trim()&&v.length<=200?v.trim():null;
 const productId=(v:unknown)=>typeof v==='string'&&/^[1-9][0-9]{0,17}$/.test(v);
 
 function checkedRecord(v:any):ManualEquipmentRecord{
@@ -22,7 +23,7 @@ export function checkedManualEquipment(v:any,id:string):ManualEquipment{
  const unsaved=v?.revision===0;
  if(v?.contract!=='COS_MANUAL_EQUIPMENT_V1'||v.productId!==id||!Number.isInteger(v.revision)||v.revision<0||v.revision>1_000_000||typeof v.proof!=='string'||!/^[a-f0-9]{64}$/.test(v.proof)
   ||(unsaved?!(v.auditId===null&&v.recordedAt==null&&v.recordedBy==null):!(uuid(v.auditId)&&uuid(v.recordedBy)&&typeof v.recordedAt==='string'&&Number.isFinite(Date.parse(v.recordedAt)))))fail('Saved manual record could not be verified. Reload it before trying again.');
- return {contract:v.contract,productId:id,revision:v.revision,auditId:v.auditId??null,recordedAt:v.recordedAt??null,recordedBy:v.recordedBy??null,record:checkedRecord(v.record),proof:v.proof};
+ return {contract:v.contract,productId:id,revision:v.revision,auditId:v.auditId??null,recordedAt:v.recordedAt??null,recordedBy:v.recordedBy??null,recordedByName:personName(v.recordedByName),record:checkedRecord(v.record),proof:v.proof};
 }
 /** The requested changes, checked before anything is sent to the database. */
 export function checkedManualChanges(v:any):Partial<ManualEquipmentRecord>{
@@ -63,7 +64,7 @@ export function createManualEquipment(options:{rpc:(name:string,body:Row)=>Promi
    if(method!=='GET')fail('History can only be read.',405);
    const v=await call({p_product_id:id,p_action:'history'});
    if(v?.contract!=='COS_MANUAL_EQUIPMENT_HISTORY_V1'||v.productId!==id||!Array.isArray(v.items)||v.items.length>200||v.items.some((r:any)=>!uuid(r.auditId)||!uuid(r.actorId)||!Number.isInteger(r.revision)||!Number.isFinite(Date.parse(r.recordedAt))||typeof r.reason!=='string'))fail('Saved history could not be verified.');
-   return {contract:v.contract,productId:id,items:v.items.map((r:any)=>({auditId:r.auditId,revision:r.revision,actorId:r.actorId,recordedAt:r.recordedAt,reason:r.reason,changes:r.changes,before:checkedRecord(r.before),after:checkedRecord(r.after)}))};
+   return {contract:v.contract,productId:id,items:v.items.map((r:any)=>({auditId:r.auditId,revision:r.revision,actorId:r.actorId,actorName:personName(r.actorName),recordedAt:r.recordedAt,reason:r.reason,changes:r.changes,before:checkedRecord(r.before),after:checkedRecord(r.after)}))};
   }
   if(method==='GET')return checkedManualEquipment(await call({p_product_id:id,p_action:'read'}),id);
   if(method!=='POST')fail('Use the manual equipment record action.',405);
