@@ -1066,7 +1066,8 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
   const products = value.records.filter((item) => item.placement === "FIELD");
   const counts = Object.fromEntries(Object.keys(fieldHealthLabels).map((key) => [key, 0]));
-  const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.map((product2) => product2.productId), now);
+  const manualField = (product2) => product2.cosManualPlacementFrom === "SHOP";
+  const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.filter((product2) => !manualField(product2)).map((product2) => product2.productId), now);
   const items = products.map((product2) => {
     const related = roster.items.filter((item) => item.productIds.includes(product2.productId));
     const record2 = related.length === 1 ? related[0] : null;
@@ -1084,6 +1085,14 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
       reason = product2.uploadLifecycle === "MISSING" ? "Marked Missing in the reviewed mHelpDesk source." : "Marked Do Not Use in the reviewed mHelpDesk source.";
+    } else if (manualField(product2) && !exact) {
+      if (support) {
+        state = "support";
+        reason = "Placed in the Field by hand in COS. Solar stand or support equipment with no camera channels; camera online/offline status does not apply.";
+      } else {
+        state = "unverified";
+        reason = "Placed in the Field by hand in COS. No connection check exists for this unit yet, so no online or offline status is claimed.";
+      }
     } else if (record2?.kind === "identity_review" || record2 && record2.placement !== "field" || binding?.state === "held" || binding?.placementHeld === true || binding?.candidateUnitIds?.length) {
       state = "review";
       reason = record2?.reviewReason || "The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.";

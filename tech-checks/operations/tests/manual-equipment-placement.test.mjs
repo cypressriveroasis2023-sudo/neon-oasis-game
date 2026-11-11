@@ -42,6 +42,14 @@ test('a manual Field entry adds the unit to Field as unverified; it never invent
  assert.equal(saved.inventory.field,base.inventory.field+1);assert.equal(saved.inventory.shop,base.inventory.shop-1);assert.equal(saved.inventory.total,base.inventory.total);
  const unit=saved.units.find(u=>u.productId===target.productId);assert.ok(unit,'it appears on the saved board');assert.ok(['unverified','not_applicable'].includes(unit.status),unit.status);
  assert.equal(saved.counts.online,base.counts.online);assert.equal(saved.counts.offline,base.counts.offline);
+ // Every other unit keeps exactly the status, check time and reason it had: adding one unit by hand must not disturb the direct evidence of the rest.
+ assert.deepEqual(saved.units.filter(u=>u.productId!==target.productId),base.units);
+ const map={...f.field,productConnections:f.connections,manualPlacementOverrides:receipt(...records)};
+ const live=cameraFieldProducts(map,f.health,f.now,true),plain=cameraFieldProducts({...f.field,productConnections:f.connections},f.health,f.now,true);
+ const direct=board=>board.items.filter(p=>p.productId!==target.productId).map(p=>[p.productId,p.status,p.linked?.evidence?.basis??null,p.linked?.evidence?.association??null]);
+ assert.deepEqual(direct(live),direct(plain),'direct connection evidence for the other units is untouched');
+ assert.ok(plain.items.some(p=>p.linked?.evidence?.association==='exact_product_id_tracker_endpoint'),'the fixture really has direct evidence to lose');
+ assert.match(live.items.find(p=>p.productId===target.productId).reason||'',/Placed in the Field by hand/);
 });
 test('manual wins in both directions at once, and the last entry for a Product ID is the one applied',()=>{
  const saved=board([item(field[0].productId,{placement:'SHOP'}),item(shop[0].productId,{placement:'FIELD'})]);
