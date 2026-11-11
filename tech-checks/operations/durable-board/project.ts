@@ -6,6 +6,10 @@ import {readExactProductConnections} from '../src/exactProductConnection';
 export function completedBoard(health:any,map:any,connections:any,previous:any,at=Date.now()){
  const upload=map?.uploadInventory,ids=upload?.records?.filter((r:any)=>r.placement==='FIELD').map((r:any)=>r.productId);
  if(!upload||!ids?.length||!readExactProductConnections(connections,upload.sourceSha256,ids,at))throw Error('connection_source_incomplete');
+ // Owner-approved inventory links are part of the inventory. If they could not be
+ // read, this map shows those units unlinked only because the source was missing.
+ // Refuse it: the last completed board stays, exactly as for any incomplete source.
+ if(map?.ownerApprovedLinks!==undefined&&map.ownerApprovedLinks?.state!=='ready')throw Error('owner_link_source_unavailable');
  prepareImmutableIdentityEnvelope(health);
  const reconciled=reconcileFleetSnapshot(health,{...map,productConnections:connections,productConnectionsState:'ready'},at);
  const {fleetFieldUnits,...storedHealth}=reconciled.health;

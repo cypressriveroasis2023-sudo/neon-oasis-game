@@ -45,6 +45,8 @@ function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=
    return response(result);
   }
   if(['camera_devices','vision_vigilant_unit_matches','vision_vigilant_devices','cos_fleet_placement_evidence_v1','cos_geocode_sources_map_projection','cos_archived_representation_projection','cos_source_recorded_coordinates_read_many'].includes(name))return response([]);
+  // Owner-approved Product links are read on every field-map build. This fixture has none.
+  if(name==='cos_owner_product_links_active_v1')return response({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[]});
   unexpected.push(url);throw Error('Unexpected synthetic transport: '+parsed.pathname);
  };
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport,mhelpPlacementEnabled:true});
