@@ -6,7 +6,7 @@
     {
       "path": "FleetDashboard.tsx",
       "baselineBlob": "27a6ad9858a1685ff449a232c4bee7286c5c710f",
-      "candidateBlob": "ffa32d9fe34ecf3457584552e170654841f15fee",
+      "candidateBlob": "6ec4f7a46e85db8467284fed2c732714ec0d6928",
       "replacements": [
         {
           "from": "\n  </div><details className='cos-fleet-advanced-filters'><summary>More filters</summary><div className='cos-fleet-filter-row'>   <label>PROVIDER<select aria-label='Fleet provider' value={filters.provider} onChange={e=>change('provider',e.target.value)}><option value='all'>All providers</option>{providers.map(p=><option key={p}>{p}</option>)}</select></label><button onClick={()=>setFilters({...initialFleetFilters})}>Reset filters</button><label className='cos-fleet-checkbox'><input type='checkbox' checked={filters.retired} onChange={e=>change('retired',e.target.checked)}/>Include inactive / retired</label><label>INSTALLATION STATUS<select aria-label='Installation status' value={filters.installationStatus||'all'} onChange={e=>change('installationStatus',e.target.value)}><option value='all'>All installation records</option><option value='field'>Field status</option><option value='installed'>Installed</option><option value='tracker'>Tracker field units</option><option value='assigned'>Assigned</option><option value='in_transit'>In transit</option><option value='returning'>Returning</option><option value='missing'>Location needs verification</option></select></label><label>NEARBY VERIFIED UNIT<select aria-label='Nearby unit center' value={filters.nearbyId||''} onChange={e=>change('nearbyId',e.target.value)}><option value=''>All field locations</option>{rows.filter(row=>row.placement==='field'&&row.locationVerified).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>RADIUS<select aria-label='Nearby radius miles' value={filters.radius||10} onChange={e=>change('radius',Number(e.target.value))}>{[5,10,25,50].map(value=><option key={value} value={value}>{value} miles</option>)}</select></label></div><small>Nearby distances use verified installation coordinates. Estimates and historical locations stay outside these distances.</small></details></div>);\n const wholeSourceHeadline=view==='map'?primaryFieldInventory:view==='sources'?Boolean(mhelpPhysical):fullInventoryHeadline;\n const healthScopeNote=wholeSourceHeadline?'Field camera units':'Field camera units \u00b7 Shop / root and inactive equipment excluded from outage counts';\n const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,online:boardData?.counts.online??savedReading?.online??'\u2014',offline:boardData?.counts.offline??savedReading?.offline??'\u2014',unknown:boardData?.counts.unverified??savedReading?.unverified??'\u2014'}:counts;\n const mapEquipmentList=<div className='cos-fleet-unit-list' aria-busy={editorBusy||loading}>{filtered.slice(0,limit).map(row=><button key={row.id} data-unit-id={row.id} disabled={editorBusy} className={'cos-fleet-unit-row'+(selected===row.id?' selected':'')} onClick={()=>open(row.id)}><span className='cos-fleet-unit-copy'><strong><i className={'cos-fleet-row-dot cos-signal-'+row.cameraState} aria-hidden='true'>\u25cf</i>{row.displayName||row.name}</strong><small>{row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied'}</small><small>{row.displayAddress?.label||'Installation address'}: {(row.displayAddress?.text??row.unit.address)||'Not supplied'}</small><small className='cos-fleet-card-location'>{row.placement==='shop'?(shopOnly(row)?'SHOP':'SHOP / ROOT'):row.placement.toUpperCase()} \u00b7 {row.locationVerified?'Verified location':locationTag(row.unit)}</small><FleetBatterySummary row={row} now={snapshotNow} compact/>{!shopOnly(row)&&<><small className='cos-fleet-card-evidence'>{unitHealthLabel(row.camera)}</small><LastKnownCameraStatus observation={lastKnown(row)} now={snapshotNow}/></>}</span><Signals row={row}/></button>)}{filteredSource.length>0&&<section className='cos-fleet-source-group' aria-label='Unlinked equipment in view'><h3>Unlinked equipment <b>{filteredSource.length}</b></h3><p>Recorded assignments without a verified COS health link. Accepted address estimates are labeled separately from health and verified installation locations.</p>{filteredSource.slice(0,limit).map(record=><FleetSourceEquipment key={record.id} record={record} now={snapshotNow} estimate={sourcePins.get(record.id)?.estimate} onSelect={sourcePins.has(record.id)?()=>openSource(record.id):undefined}/>)}</section>}{!filtered.length&&!filteredSource.length&&<p className='field-map-empty'>{!map&&!failed?'Loading saved inventory\u2026':'No units match. Change the filters or open the review queue.'}</p>}{Math.max(filtered.length,filteredSource.length)>limit&&<button onClick={()=>setLimit(v=>v+80)}>Show more equipment ({Math.max(0,filtered.length-limit)+Math.max(0,filteredSource.length-limit)})</button>}</div>;\n\n",
@@ -25,37 +25,47 @@
         },
         {
           "from": "const healthScopeNote=boardCurrent?(wholeSourceHeadline?'Field camera units':'Field camera units \u00b7 Shop / root and inactive equipment excluded from outage counts'):'Health update needed \u00b7 stale red/green totals are hidden';",
-          "to": "\n // A completed board stays readable after it stops being current. Its totals\n // are then shown under the board's own time and are never called current.\n const boardVisible=Number.isFinite(snapshotNow)&&Boolean(boardData),boardStale=boardVisible&&!boardCurrent;\n const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';\n const healthScopeNote=boardCurrent?(wholeSourceHeadline?'Field camera units':'Field camera units \u00b7 Shop / root and inactive equipment excluded from outage counts'):boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current':'Health update needed \u00b7 no completed reading to show';",
+          "to": "\n // A completed board stays readable after it stops being current. Its totals\n // are then shown under the board's own time and are never called current.\n // The native count path (no command-center board) is unchanged while current.\n const boardStale=!boardCurrent&&Number.isFinite(snapshotNow)&&Boolean(boardData),boardVisible=boardCurrent||boardStale;\n const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';\n // When nothing could be read at all, the compact reading this browser saved\n // from the last completed board is shown under its own saved time.\n const savedOnly=failed&&!map&&!boardData&&savedReading?savedReading:null,savedOnlyLabel=savedOnly?'Saved reading '+cameraTime(new Date(savedOnly.checkedAt).toISOString(),Date.now()):'';\n const healthScopeNote=savedOnly?savedOnlyLabel+' \u00b7 Field camera units at that time \u00b7 not current':boardCurrent?(wholeSourceHeadline?'Field camera units':'Field camera units \u00b7 Shop / root and inactive equipment excluded from outage counts'):boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current':'Health update needed \u00b7 no completed reading to show';",
           "count": 1
         },
         {
           "from": "boardCurrent?(wholeSourceHeadline?mhelpPhysical!.field:headlineCounts.field):'\u2014'",
-          "to": "boardVisible?(wholeSourceHeadline?mhelpPhysical!.field:headlineCounts.field):'\u2014'",
+          "to": "savedOnly?savedOnly.field:boardVisible?(wholeSourceHeadline?mhelpPhysical!.field:headlineCounts.field):'\u2014'",
           "count": 1
         },
         {
-          "from": "boardCurrent?(mhelpPhysical?.shop??'\u2014'):'\u2014'",
-          "to": "boardVisible?(mhelpPhysical?.shop??'\u2014'):'\u2014'",
+          "from": ":'Current reconciled placement'],",
+          "to": ":savedOnly?savedOnlyLabel+' \u00b7 Field equipment at that time \u00b7 not current':'Current reconciled placement'],",
           "count": 1
         },
         {
-          "from": "boardCurrent?(mhelpPhysical?.total??'\u2014'):'\u2014'",
-          "to": "boardVisible?(mhelpPhysical?.total??'\u2014'):'\u2014'",
+          "from": "boardCurrent?(mhelpPhysical?.shop??'\u2014'):'\u2014','shop','All mHelpDesk Shop equipment \u00b7 excluded from Field outages'",
+          "to": "savedOnly?savedOnly.shop:boardVisible?(mhelpPhysical?.shop??'\u2014'):'\u2014','shop',savedOnly?savedOnlyLabel+' \u00b7 Shop / root equipment at that time \u00b7 not current':'All mHelpDesk Shop equipment \u00b7 excluded from Field outages'",
+          "count": 1
+        },
+        {
+          "from": "boardCurrent?(mhelpPhysical?.total??'\u2014'):'\u2014','total','All mHelpDesk Field + Shop Product IDs'",
+          "to": "savedOnly?savedOnly.field+savedOnly.shop:boardVisible?(mhelpPhysical?.total??'\u2014'):'\u2014','total',savedOnly?savedOnlyLabel+' \u00b7 Field + Shop at that time \u00b7 not current':'All mHelpDesk Field + Shop Product IDs'",
           "count": 1
         },
         {
           "from": "!boardCurrent||failed?'\u2014':headlineCounts.online",
-          "to": "!boardVisible||failed?'\u2014':headlineCounts.online",
+          "to": "savedOnly?savedOnly.online:!boardVisible||failed?'\u2014':headlineCounts.online",
           "count": 1
         },
         {
           "from": "!boardCurrent||failed?'\u2014':headlineCounts.offline",
-          "to": "!boardVisible||failed?'\u2014':headlineCounts.offline",
+          "to": "savedOnly?savedOnly.offline:!boardVisible||failed?'\u2014':headlineCounts.offline",
           "count": 1
         },
         {
           "from": "boardCurrent?headlineCounts.unknown:'\u2014'",
-          "to": "boardVisible?headlineCounts.unknown:'\u2014'",
+          "to": "savedOnly?savedOnly.unverified:boardVisible?headlineCounts.unknown:'\u2014'",
+          "count": 1
+        },
+        {
+          "from": "<strong>{map&&!(recorded.error&&(quick==='verify'||quick==='field'&&!wholeSourceHeadline))?count:'\u2014'}</strong>",
+          "to": "<strong>{savedOnly&&quick!=='verify'?count:map&&!(recorded.error&&(quick==='verify'||quick==='field'&&!wholeSourceHeadline))?count:'\u2014'}</strong>",
           "count": 1
         },
         {
@@ -69,63 +79,13 @@
           "count": 1
         },
         {
-          "from": "cos-fleet-camera-total'>{!boardCurrent?'Current health update needed.",
-          "to": "cos-fleet-camera-total'>{boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current. A current health update is still needed.':!boardCurrent?'Current health update needed.",
-          "count": 1
-        },
-        {
-          "from": " const healthScopeNote=boardCurrent?(wholeSourceHeadline?",
-          "to": " const healthScopeNote=boardCurrent&&(boardVisible||!savedOnly)?(wholeSourceHeadline?",
-          "count": 1
-        },
-        {
-          "from": "boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current':'Health update needed \u00b7 no completed reading to show';",
-          "to": "boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current':savedOnly?'Saved reading '+savedOnlyTime+' \u00b7 not current':'Health update needed \u00b7 no completed reading to show';",
-          "count": 1
-        },
-        {
-          "from": " const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';",
-          "to": " const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';\n // With no board to show at all, the compact reading this browser saved from the last completed board is shown under its own time.\n const savedOnly=!boardVisible&&savedReading?savedReading:null,savedOnlyTime=savedOnly?cameraTime(new Date(savedOnly.checkedAt).toISOString(),Date.now()):'';",
-          "count": 1
-        },
-        {
-          "from": "boardVisible?(wholeSourceHeadline?mhelpPhysical!.field:headlineCounts.field):'\u2014'",
-          "to": "boardVisible?(wholeSourceHeadline?mhelpPhysical!.field:headlineCounts.field):savedOnly?savedOnly.field:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "boardVisible?(mhelpPhysical?.shop??'\u2014'):'\u2014'",
-          "to": "boardVisible?(mhelpPhysical?.shop??'\u2014'):savedOnly?savedOnly.shop:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "boardVisible?(mhelpPhysical?.total??'\u2014'):'\u2014'",
-          "to": "boardVisible?(mhelpPhysical?.total??'\u2014'):savedOnly?savedOnly.field+savedOnly.shop:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "!boardVisible||failed?'\u2014':headlineCounts.online",
-          "to": "boardVisible?(failed?'\u2014':headlineCounts.online):savedOnly?savedOnly.online:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "!boardVisible||failed?'\u2014':headlineCounts.offline",
-          "to": "boardVisible?(failed?'\u2014':headlineCounts.offline):savedOnly?savedOnly.offline:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "boardVisible?headlineCounts.unknown:'\u2014'",
-          "to": "boardVisible?headlineCounts.unknown:savedOnly?savedOnly.unverified:'\u2014'",
-          "count": 1
-        },
-        {
-          "from": "<strong>{map&&!(recorded.error&&(quick==='verify'||quick==='field'&&!wholeSourceHeadline))?count:'\u2014'}</strong>",
-          "to": "<strong>{(map||savedOnly&&quick!=='verify')&&!(recorded.error&&(quick==='verify'||quick==='field'&&!wholeSourceHeadline))?count:'\u2014'}</strong>",
-          "count": 1
-        },
-        {
           "from": "<p>Current health has not completed yet. Old red/green totals stay hidden until the next complete board.</p>",
           "to": "<p>Current health has not completed yet. {savedOnly?'The totals shown are this saved reading, from the time above. They are not current.':'Old red/green totals stay hidden until the next complete board.'}</p>",
+          "count": 1
+        },
+        {
+          "from": "cos-fleet-camera-total'>{!boardCurrent?'Current health update needed.",
+          "to": "cos-fleet-camera-total'>{boardStale?'Last completed reading '+boardReadingTime+' \u00b7 not current. A current health update is still needed.':!boardCurrent?'Current health update needed.",
           "count": 1
         }
       ]
