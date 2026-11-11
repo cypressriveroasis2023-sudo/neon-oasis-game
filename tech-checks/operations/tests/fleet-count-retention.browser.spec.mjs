@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet,now} from './fleet-dashboard-fixtures.mjs';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
-test('stale health counts hide after expiry and failed refresh, then return on a completed update',async({page})=>{
+test('expired health counts stay readable under their own time after a failed refresh, then are replaced by a completed update',async({page})=>{
  const f=fieldProductFixture();
  const {app,state}=await mountFleet(page,false,{field:f.field,health:f.health,productConnections:f.connections,skipInitialFieldCount:true,advancingClock:true});
  const board=app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
@@ -12,12 +12,14 @@ test('stale health counts hide after expiry and failed refresh, then return on a
  // Let the completed evidence expire, then explicitly prove the failed refresh.
  await expect(board.getByRole('button',{name:/Refresh data/})).toBeEnabled();
  state.fail=true;state.productConnections=null;
+ const offlineBefore=await offline.textContent();
  await page.clock.fastForward(25*60000);
- await expect(online).toHaveText('—');await expect(offline).toHaveText('—');
+ // The last completed counts stay readable, labelled with their own time and never as current.
+ const kept=async()=>{await expect(online).toHaveText('1');await expect(offline).toHaveText(offlineBefore);await expect(board.locator('.cos-equipment-totals-note')).toContainText(/Last completed reading .*\d{1,2}:\d{2}.* · not current\./);await expect(board.getByRole('status',{name:'Last completed reading'})).toContainText('not current');};
+ await kept();
  await board.getByRole('button',{name:/Refresh data/}).click();
  const warning=board.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved camera read unavailable'});await expect(warning.locator('summary')).toBeVisible();await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
- await expect(board.locator('.cos-equipment-totals-note')).toContainText('Health counts stay hidden until a fresh completed board is available.');
- await expect(online).toHaveText('—');await expect(offline).toHaveText('—');await expect(online.locator('..')).toBeDisabled();
+ await kept();
  await expect(board.getByRole('button',{name:/Refresh data/})).toBeEnabled();
  // A newly completed negative result is allowed to replace the saved count.
  state.fail=false;state.productConnections=structuredClone(f.connections);
@@ -28,7 +30,7 @@ test('stale health counts hide after expiry and failed refresh, then return on a
  const item=state.productConnections.items.find(i=>i.productId==='1001');item.status='offline';item.reason='Completed saved nonresponse.';
  await board.getByRole('button',{name:/Refresh data/}).click();
  await page.clock.fastForward(5000);
- await expect(online).toHaveText('—');await expect(offline).toHaveText('—');
+ await expect(online).toHaveText('1');await expect(offline).toHaveText(offlineBefore);
  release();await expect(offline).toHaveText('1');await expect(online).toHaveText('0');
  expect(originalTime).toContain('Saved health');expect(state.errors).toEqual([]);
  await app.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
