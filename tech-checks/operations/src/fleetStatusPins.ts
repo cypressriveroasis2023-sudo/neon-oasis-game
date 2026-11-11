@@ -22,6 +22,11 @@ export function fleetAddressHealth(products:FieldProduct[],rows:FleetDashboardRo
      &&p.evidence.basis==='connection'&&p.evidence.observations.length===1
      &&p.evidence.observations[0].fresh===true
      &&p.evidence.observations[0].currentState===p.state)state=p.state as ReticleState;
+   // VCC status matched by unit name (owner decision 2026-11-11) colors the
+   // camera layer only; it is no router or battery reading.
+   else if(layer==='camera'&&['online','offline'].includes(p.state)
+     &&p.evidence?.association==='vcc_unit_name'&&p.evidence.observations.length>0
+     &&p.evidence.observations.every(o=>o.fresh===true))state=p.state as ReticleState;
    else if(['online','offline','unverified'].includes(p.state)&&row&&row.placement==='field'&&!row.retired
     &&products.filter(x=>x.unitId===p.unitId).length===1
     &&(p.state==='unverified'?'unknown':p.state)===row.cameraState){

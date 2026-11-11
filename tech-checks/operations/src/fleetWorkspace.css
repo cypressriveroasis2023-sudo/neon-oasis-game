@@ -174,6 +174,9 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status i{width:6px;height:6px;background:currentColor;border-radius:50%}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-online{color:#8ee6b4;border-color:#3b7558;background:#17372b}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-offline{color:#ffacb6;border-color:#96475a;background:#3a1f2b}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-status-issues{color:#ffe08a;border-color:#8f7421;background:#3a3113}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-product-issues{display:block;color:#ffe08a}
+#root#root .cos-fleet-board .cos-fleet-camera-issues{color:#ffe08a}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards details{border-top:1px solid #2c3a4d;padding:0 12px}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-field-product-cards summary{font-size:10px;min-height:44px;cursor:pointer}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details{border:1px solid #2d3a4c;border-radius:10px;margin:12px 0;padding:0 12px}
@@ -198,6 +201,8 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-refresh{color:#121a26!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-issues{color:#ffd24a!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses:has(.cos-total-status-issues){grid-template-columns:repeat(4,minmax(0,1fr))}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2!important}
 @media(max-width:750px){
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{width:100%!important;flex:initial!important}

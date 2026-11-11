@@ -5,6 +5,8 @@ import type {FleetDashboardRow} from './fleetDashboardModel';
 import {fieldProductEvidence,type FieldProductEvidence} from './fieldProductEvidence';
 import {readExactProductConnections} from './exactProductConnection';
 import {fieldProductFollowUp} from './fieldProductFollowUp';
+import {cameraTimestamp,resourceKind,type CameraRow} from './cameraEvidence';
+import {vccUnitGroups,vccProductNameKey,vccSummary,VCC_REPORTED,type FieldProductCameras} from './vccUnitCameras';
 
 export const PROVIDER_REPORTED='Provider-reported, not direct-connection verified. ';
 export const DIRECT_SOURCE_GAP='No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ';
@@ -17,7 +19,7 @@ export const DEVICE_LINK_NOT_REVIEWED=' Direct test at this unit’s tracker add
 /** One result per reviewed Field Product ID. Reuse the existing health result
  * only through the server-reviewed product/registry association, never a name,
  * IP, candidate identity or historical tracker join. This is a read-only view. */
-export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:FleetDashboardRow[],now=Date.now(),exactConnectionReceipt:unknown=undefined){
+export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:FleetDashboardRow[],now=Date.now(),exactConnectionReceipt:unknown=undefined,health:{rows?:CameraRow[]}|null=null){
  const authority=readMhelpInventoryAuthority(value,now);
  if(!authority||!roster||!readRecordedRoster(roster).roster)return null;
  const products=(value as {records:Record<string,any>[]}).records.filter(item=>item.placement==='FIELD');
@@ -32,6 +34,11 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
  // can only be credited to a unit when its endpoint belongs to that unit alone.
  const endpointOwners=new Map<string,number>();
  for(const item of connections?.values()||[])if(item.resourceId)endpointOwners.set(String(item.resourceId),(endpointOwners.get(String(item.resourceId))||0)+1);
+ // VCC camera status by unit name (owner decision 2026-11-11). A name is usable
+ // only when exactly one mHelp record, Field or Shop, carries it.
+ const vccGroups=vccUnitGroups(health?.rows,now);
+ const nameOwners=new Map<string,number>();
+ if(vccGroups.size)for(const item of (value as {records:Record<string,any>[]}).records){const name=vccProductNameKey(item.unitNumber);if(name)nameOwners.set(name,(nameOwners.get(name)||0)+1);}
  const items:FieldProduct[]=products.map(product=>{
   const related=roster.items.filter(item=>item.productIds.includes(product.productId));
   const record=related.length===1?related[0]:null;
@@ -62,17 +69,17 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    &&record.productIds[0]===product.productId&&row.placement==='field'&&!row.retired
    &&binding?.state==='linked'&&Array.isArray(binding.unitIds)&&binding.unitIds.includes(record.unitId));
   const directSourceUnavailable=exactConnectionReceipt!==undefined&&!connections;
-  let state:FieldProductHealth,reason:string;
+  let state:FieldProductHealth,reason:string,vccBlocked=support||related.length>1;
   if(product.uploadLifecycle!=='UNFLAGGED'){
-   state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
+   vccBlocked=true;state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
   }else if(manualField(product)&&!exact){
    // Stands and other no-camera equipment stay support; nothing else gets a status it has not earned.
    if(support){state='support';reason='Placed in the Field by hand in COS. Solar stand or support equipment with no camera channels; camera online/offline status does not apply.';}
    else{state='unverified';reason='Placed in the Field by hand in COS. No connection check exists for this unit yet, so no online or offline status is claimed.';}
   }else if(record?.kind==='identity_review'||record&&record.placement!=='field'||binding?.state==='held'||binding?.placementHeld===true||binding?.candidateUnitIds?.length){
-   state='review';reason=record?.reviewReason||'The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.';
+   vccBlocked=true;state='review';reason=record?.reviewReason||'The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.';
   }else if(record&&(!record.active||record.lifecycle!=='active'||row?.retired)){
-   state='inactive';reason='The associated COS inventory is inactive. A successful connection does not reactivate it.';
+   vccBlocked=true;state='inactive';reason='The associated COS inventory is inactive. A successful connection does not reactivate it.';
   }else if(record?.kind==='unit'&&(!row||matches.length!==1||record.productIds.length!==1||binding?.state!=='linked'||!Array.isArray(binding.unitIds)||!binding.unitIds.includes(record.unitId)||row.placement!=='field')){
    state='review';reason='The complete, unique product-to-unit association could not be verified.';
   }else if(support){
@@ -95,7 +102,7 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    }
   }else if(exactAllowed&&exact){
    if(reviewedProvider&&row!.cameraState!==exact.status){
-    state='unverified';
+    vccBlocked=true;state='unverified';
     reason=CURRENT_SOURCE_CONFLICT+'Direct: '+exact.reason+' Provider: '+unitHealthLabel(row!.camera)+'.';
    }else{
     state=exact.status==='online'?'online':'offline';
@@ -111,12 +118,34 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    state=row!.cameraState==='online'?'online':row!.cameraState==='offline'?'offline':'unverified';
    reason=unitHealthLabel(row!.camera)+'. '+row!.camera.reason;
   }
+  // VCC by unit name. It gives a status only to a unit that has none, and it
+  // never overrides a held identity, an inactive record or a source conflict.
+  const vccName=vccBlocked?null:vccProductNameKey(product.unitNumber);
+  const vcc=vccName&&nameOwners.get(vccName)===1?vccGroups.get(vccName)||null:null;
+  // Every camera must have a current VCC reading; a partly read unit claims nothing.
+  const vccReady=vcc&&vcc.undecided===0&&vcc.total>0
+   // Devices already reviewed as another unit's can never be claimed by name.
+   &&!vcc.rows.some(member=>rows.some(other=>other.id!==record?.unitId&&other.camera.association?.deviceIds.includes(String(member.id))))?vcc:null;
+  let cameras:FieldProductCameras|undefined,vccDecided=false;
+  if(vccReady){
+   cameras={source:'VCC',link:'unit_name',total:vccReady.total,up:vccReady.up,down:vccReady.down,observedAt:vccReady.observedAt};
+   if(state==='unverified'||state==='unlinked'||state==='review'){
+    vccDecided=true;state=vccReady.up===0?'offline':'online';reason=VCC_REPORTED+vccSummary(vccReady);
+   }else if(state==='online'&&vccReady.down.length){
+    reason+=' '+VCC_REPORTED+vccSummary(vccReady);
+   }
+  }
   counts[state]++;
   const useExactEvidence=Boolean(exact&&(exactAllowed&&state===exact.status
     ||state==='unverified'&&exact.status==='unknown'));
   const evidence=fieldProductEvidence(state==='review'||record?.kind!=='unit'?null:row,state,now,useExactEvidence&&exact?exact:null,exactConnectionReceipt!==undefined&&!connections);
-  const followUp=fieldProductFollowUp(state,reason,exact?.status==='unknown'?exact.reason:undefined,directSourceUnavailable);
+  const followUp=vccDecided?null:fieldProductFollowUp(state,reason,exact?.status==='unknown'?exact.reason:undefined,directSourceUnavailable);
   if(followUp)evidence.followUp=followUp;
+  if(vccDecided&&vccReady){
+   evidence.gap=null;evidence.association='vcc_unit_name';evidence.basis=vccReady.rows.every(member=>resourceKind(member)==='recorders')?'recorder':'camera';evidence.observedAt=vccReady.observedAt;
+   evidence.observations=vccReady.rows.map(member=>{const status=String(member.evidence!.status);return {resourceId:String(member.id),source:'VCC',kind:member.evidence!.resource||'camera',observedAt:cameraTimestamp(member.evidence!.observedAt,now).at,fresh:true,reportedStatus:status,currentState:status};});
+  }
+  if(cameras&&(state==='online'||state==='offline'))evidence.cameras=cameras;
   return {productId:product.productId,unitNumber:label,state,reason,unitId:state!=='review'&&record?.kind==='unit'&&row?row.id:null,recordId:record?.kind!=='unit'?record?.id||null:null,evidence};
  });
  return {total:authority.field,counts,items,receivedAt:authority.receivedAt,sourceSha256:authority.sourceSha256};

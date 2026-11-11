@@ -15,6 +15,8 @@ export type FieldProductEvidence={
  video:'not_verified';
  observations:{resourceId:string;source:string;kind:string;observedAt:string|null;fresh:boolean;reportedStatus:string;currentState:string}[];
  followUp?:FieldProductFollowUp;
+ /** VCC per-camera detail for this unit, when the unit name matches exactly one VCC unit. */
+ cameras?:{source:'VCC';link:'unit_name';total:number;up:number;down:string[];observedAt:string|null};
 };
 /** Only the classifier's complete reviewed resource set supplies product health.
  * Never infer a device link from a product label, IP, address or provider family.

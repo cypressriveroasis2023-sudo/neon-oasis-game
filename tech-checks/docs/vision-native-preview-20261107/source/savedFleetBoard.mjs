@@ -411,7 +411,7 @@ var IT_DAILY_WORKSPACES = Object.freeze(["Fleet Dashboard", "Camera Health"]);
 var object2 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 var sha = (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
 var same = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && a.every((v) => typeof v === "string" && b.includes(v));
-var validGuard = (v) => object2(v) && typeof v.unitId === "string" && typeof v.unitNumber === "string" && v.unitNumber.trim() !== "" && sha(v.identityProof) && Array.isArray(v.deviceIds) && v.deviceIds.length > 0 && v.deviceIds.length <= 1e3 && new Set(v.deviceIds).size === v.deviceIds.length && v.deviceIds.every((id) => typeof id === "string" && /^[1-9]\d*$/.test(id)) && Array.isArray(v.unitKeys) && v.unitKeys.length > 0 && new Set(v.unitKeys).size === v.unitKeys.length && v.unitKeys.every((key) => typeof key === "string" && key.trim() !== "") && typeof v.checkedAt === "string" && typeof v.providerSyncAt === "string";
+var validGuard = (v) => object2(v) && typeof v.unitId === "string" && typeof v.unitNumber === "string" && v.unitNumber.trim() !== "" && sha(v.identityProof) && Array.isArray(v.deviceIds) && v.deviceIds.length > 0 && v.deviceIds.length <= 1e3 && new Set(v.deviceIds).size === v.deviceIds.length && v.deviceIds.every((id) => typeof id === "string" && /^[1-9]\d*$/.test(id)) && Array.isArray(v.unitKeys) && v.unitKeys.length > 0 && new Set(v.unitKeys).size === v.unitKeys.length && v.unitKeys.every((key2) => typeof key2 === "string" && key2.trim() !== "") && typeof v.checkedAt === "string" && typeof v.providerSyncAt === "string";
 function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()) {
   const authority = unit.fieldRecorderAuthority, binding = unit.importedInstallation, guards = health.fieldRecorderObservationGuards;
   if (identity.kind !== "native_provider" || health.fieldRecorderObservationVersion !== 1 || !Array.isArray(guards) || guards.length > 5 || guards.some((g) => !validGuard(g)) || !object2(authority) || authority.schemaVersion !== 1 || !object2(binding) || unit.readOnly !== false || unit.status !== "field" || unit.currentLocationType !== "field" || unit.importedPlacement !== "FIELD" || unit.placementSource === "owner" || unit.placementAuditId || binding.sourcePrecedence || binding.schemaVersion !== 1 || binding.sourceSystem !== "mhelpdesk_product_import" || binding.entityKind !== "equipment_unit" || binding.eligibility !== "FIELD" || binding.nativeUnitId !== unit.id || binding.unitNumber !== unit.unitNumber || identity.unitId !== unit.id || identity.unitNumber !== unit.unitNumber || !cameraTimestamp(authority.checkedAt, now).fresh) return null;
@@ -421,7 +421,7 @@ function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()
   if (!sync.fresh || !sync.at) return null;
   for (const proof of [authority, guard]) if (proof.unitId !== unit.id || proof.unitNumber !== unit.unitNumber || proof.identityProof !== identity.proof || !sha(proof.identityProof) || !same(proof.deviceIds, identity.deviceIds) || !same(proof.unitKeys, identity.unitKeys) || !cameraTimestamp(proof.checkedAt, now).fresh) return null;
   if (guards.some((g) => g !== guard && (g.deviceIds.some((v) => identity.deviceIds.includes(v)) || g.unitKeys.some((v) => identity.unitKeys.includes(v))))) return null;
-  for (const key of ["sourceRevision", "sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256", "eventId", "productId"]) if (typeof authority[key] !== "string" || authority[key] !== binding[key]) return null;
+  for (const key2 of ["sourceRevision", "sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256", "eventId", "productId"]) if (typeof authority[key2] !== "string" || authority[key2] !== binding[key2]) return null;
   if (!["sourceFileSha256", "sourceRowSha256", "addressSha256", "nativeGuardSha256"].every((k) => sha(binding[k])) || !same(rows.map((r) => String(r.id)), identity.deviceIds) || !same([...new Set(rows.map((r) => r.unit))], identity.unitKeys) || rows.some((r) => resourceKind(r) !== "recorders" || !providerRecord(r) || r.evidence?.source !== "Star4Live" || cameraTimestamp(r.evidence?.observedAt, now).at !== sync.at)) return null;
   const states = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).fresh && ["online", "offline"].includes(r.evidence?.status || "") ? r.evidence.status : "verifying");
   const state = combinedState(states), times = rows.map((r) => cameraTimestamp(r.evidence?.observedAt, now).at).filter((v) => Boolean(v)).sort();
@@ -432,12 +432,12 @@ function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()
 var cameraLabels = { online: "Camera records online", offline: "Camera outage observed", unknown: "Camera status unverified" };
 function validateCameraHealth(value) {
   const object5 = (v) => v && typeof v === "object" && !Array.isArray(v);
-  if (!object5(value) || ["totalDevices", "online", "offline", "review", "shopRoot", "healthRows", "fieldDevices"].some((key) => !Number.isSafeInteger(value[key]) || value[key] < 0) || !Array.isArray(value.rows) || value.rows.some((r) => !object5(r) || typeof r.id !== "string" && typeof r.id !== "number" || String(r.id).trim() === "" || typeof r.name !== "string" || typeof r.unit !== "string" || !["online", "offline", "review"].includes(r.status)) || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt))) throw new Error("Camera Health returned an incomplete summary.");
+  if (!object5(value) || ["totalDevices", "online", "offline", "review", "shopRoot", "healthRows", "fieldDevices"].some((key2) => !Number.isSafeInteger(value[key2]) || value[key2] < 0) || !Array.isArray(value.rows) || value.rows.some((r) => !object5(r) || typeof r.id !== "string" && typeof r.id !== "number" || String(r.id).trim() === "" || typeof r.name !== "string" || typeof r.unit !== "string" || !["online", "offline", "review"].includes(r.status)) || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt))) throw new Error("Camera Health returned an incomplete summary.");
   if (new Set(value.rows.map((row) => String(row.id))).size !== value.rows.length) throw new Error("Camera Health contains duplicate resource identities.");
   if (value.evidenceVersion === 2) {
     const inventory = value.inventory;
-    if (!object5(inventory) || !["allRecords", "activeFieldRecords", "activeShopRecords", "inactiveRecords", "unknownScopeRecords"].every((key) => Number.isSafeInteger(inventory[key]) && inventory[key] >= 0) || inventory.allRecords !== value.totalDevices || inventory.allRecords !== value.rows.length || inventory.activeFieldRecords !== value.fieldDevices || inventory.activeShopRecords !== value.shopRoot || inventory.allRecords !== inventory.activeFieldRecords + inventory.activeShopRecords + inventory.inactiveRecords + inventory.unknownScopeRecords) throw new Error("Camera Health inventory counts could not be reconciled.");
-    for (const [scope, key] of [["field", "activeFieldRecords"], ["shop", "activeShopRecords"], ["inactive", "inactiveRecords"], ["unknown", "unknownScopeRecords"]]) if (value.rows.filter((row) => row.scope === scope).length !== inventory[key]) throw new Error("Camera Health placement counts could not be reconciled.");
+    if (!object5(inventory) || !["allRecords", "activeFieldRecords", "activeShopRecords", "inactiveRecords", "unknownScopeRecords"].every((key2) => Number.isSafeInteger(inventory[key2]) && inventory[key2] >= 0) || inventory.allRecords !== value.totalDevices || inventory.allRecords !== value.rows.length || inventory.activeFieldRecords !== value.fieldDevices || inventory.activeShopRecords !== value.shopRoot || inventory.allRecords !== inventory.activeFieldRecords + inventory.activeShopRecords + inventory.inactiveRecords + inventory.unknownScopeRecords) throw new Error("Camera Health inventory counts could not be reconciled.");
+    for (const [scope, key2] of [["field", "activeFieldRecords"], ["shop", "activeShopRecords"], ["inactive", "inactiveRecords"], ["unknown", "unknownScopeRecords"]]) if (value.rows.filter((row) => row.scope === scope).length !== inventory[key2]) throw new Error("Camera Health placement counts could not be reconciled.");
     for (const row of value.rows) {
       if (typeof row.activationState !== "string" || !["field", "shop", "inactive", "unknown"].includes(row.scope)) throw new Error("Camera Health placement evidence is incomplete.");
       const battery = row.batteryEvidence;
@@ -472,11 +472,11 @@ function parseCanonicalCameraUnit(value) {
   return family + "|" + Number(base) + (tail.length ? "." + tail.join(".") : "");
 }
 function scopedFieldIdentity(unit) {
-  const key = canonicalCameraUnit(unit.unitNumber);
-  if (!key) return null;
-  const family = key.split("|")[0], model = plain(unit.modelName || "").replace(/[\s&]/g, "");
+  const key2 = canonicalCameraUnit(unit.unitNumber);
+  if (!key2) return null;
+  const family = key2.split("|")[0], model = plain(unit.modelName || "").replace(/[\s&]/g, "");
   const aliases = { HELIOS: ["HELIOS"], RANGER: ["RANGER", "RANGERS"], SOLARSPOTTER: ["SOLARSPOTTER", "SOLARSPOTTERS"], SPOTTER: ["SPOTTER", "SPOTTERS"], SSHYBRID: ["SSHYBRID", "SSHYBRIDS"], RECON: ["RECON", "RECONS"], RECON2: ["RECON2", "RECONII"], SNIPER: ["SNIPER", "SNIPERS"], SNIPER2: ["SNIPER2", "SNIPERS"], SNIPER4: ["SNIPER4", "SNIPERS"], CAMV: ["CAMV", "CAMVRSU"] };
-  return aliases[family]?.includes(model) ? key : null;
+  return aliases[family]?.includes(model) ? key2 : null;
 }
 function isSupportEquipment(unit) {
   const name = unit.unitNumber.trim().toUpperCase();
@@ -501,10 +501,10 @@ function fieldCameraHealth(unit, units, health, now = Date.now()) {
     const placement = fieldRecorder ? " Current Field installation and exact recorder identity are verified. Legacy provider folder/activation remains recorded separately; this observation does not move equipment." : classification2.scope === "unknown" ? " LOCATION REVIEW: saved placement is unresolved." : ["shop", "inactive"].includes(classification2.scope) ? " PLACEMENT CONFLICT: source inventory says " + classification2.scope.toUpperCase() + " while this record is in the field map. The source observation does not move equipment." : "";
     return { state: state2, reason: detail + freshness + placement, rows: rows2, unitKey: association.identity.unitKeys[0], checkedAt: observation.checkedAt, identity: "matched", classification: classification2, basis: observation.basis, observation, association: association.identity };
   }
-  const key = scopedFieldIdentity(unit);
-  if (!key) return unknown2("No verified equipment-to-resource association is available for this saved identifier. Review its identity; source status is not inferred from a similar name.");
-  if (units.filter((candidate) => canonicalCameraUnit(candidate.unitNumber) === key).length !== 1 || units.filter((candidate) => candidate.id === unit.id).length !== 1) return unknown2("More than one field record uses this unit identity.", "ambiguous");
-  const rows = health.rows.filter((row) => typeof row.unit === "string" && canonicalCameraUnit(row.unit) === key);
+  const key2 = scopedFieldIdentity(unit);
+  if (!key2) return unknown2("No verified equipment-to-resource association is available for this saved identifier. Review its identity; source status is not inferred from a similar name.");
+  if (units.filter((candidate) => canonicalCameraUnit(candidate.unitNumber) === key2).length !== 1 || units.filter((candidate) => candidate.id === unit.id).length !== 1) return unknown2("More than one field record uses this unit identity.", "ambiguous");
+  const rows = health.rows.filter((row) => typeof row.unit === "string" && canonicalCameraUnit(row.unit) === key2);
   if (!rows.length) return unknown2("No exact family and unit-number match in Camera Health.");
   const resourceConflict = legacyIdentityConflict(unit.id, rows, health);
   if (resourceConflict) return unknown2(resourceConflict, "ambiguous");
@@ -512,7 +512,7 @@ function fieldCameraHealth(unit, units, health, now = Date.now()) {
   const safeRows = health.evidenceVersion === 2 ? rows : rows.map((row) => ({ ...row, scope: "unknown", activationState: "", evidence: void 0, serviceEvidence: void 0 }));
   const classification = classifyCameraUnit(safeRows, now), active = safeRows.filter((row) => row.scope !== "inactive"), cameras = active.filter(cameraRecord);
   const states = cameras.map((row) => cameraState(row, now));
-  const direct = ["SNIPER", "SNIPER2", "SNIPER4", "CAMV"].includes(key.split("|")[0]);
+  const direct = ["SNIPER", "SNIPER2", "SNIPER4", "CAMV"].includes(key2.split("|")[0]);
   const connection = combinedState(safeRows.map((row) => savedConnectionObservation(row, now)));
   const operational = ["field", "unknown"].includes(classification.scope);
   const state = direct ? connection === "online" ? "online" : connection === "offline" ? "offline" : "unknown" : operational && states.includes("offline") ? "offline" : operational && states.length > 0 && states.every((s) => s === "online") ? "online" : "unknown";
@@ -575,8 +575,8 @@ function checkedFieldMap(value) {
     if (!object3(item) || !uuid(item.id) || seen.has(item.id) || typeof item.unitNumber !== "string" || typeof item.status !== "string") throw new Error("Field Map returned inconsistent unit records.");
     seen.add(item.id);
   }
-  for (const key of ["fieldUnits", "mappedUnits", "unitGps", "missingGps"]) {
-    if (!Number.isSafeInteger(value.summary[key]) || value.summary[key] < 0) throw new Error("Field Map summary is unavailable.");
+  for (const key2 of ["fieldUnits", "mappedUnits", "unitGps", "missingGps"]) {
+    if (!Number.isSafeInteger(value.summary[key2]) || value.summary[key2] < 0) throw new Error("Field Map summary is unavailable.");
   }
   if (value.summary.fieldUnits !== value.items.length) throw new Error("Field Map returned an incomplete unit list.");
   return value;
@@ -599,7 +599,7 @@ function reconcileFleetSnapshot(rawHealth, rawMap, now = Date.now()) {
   }
   const changes = /* @__PURE__ */ new Map();
   for (const unit of inventory) {
-    const placement = unit.activeInventoryEligible === false ? "inactive" : inventoryPlacement(unit), key = canonicalCameraUnit(unit.unitNumber);
+    const placement = unit.activeInventoryEligible === false ? "inactive" : inventoryPlacement(unit), key2 = canonicalCameraUnit(unit.unitNumber);
     if (placement === "unknown" || inventory.filter((r) => r.id === unit.id).length !== 1) continue;
     const association = resolveVerifiedUnitIdentity(unit, health, now);
     if (association.state === "verified") {
@@ -608,9 +608,9 @@ function reconcileFleetSnapshot(rawHealth, rawMap, now = Date.now()) {
         for (const row of rows2) if (row.scope !== "inactive") changes.set(String(row.id), placement);
       }
     }
-    if (!key || inventory.filter((r) => canonicalCameraUnit(r.unitNumber) === key).length !== 1) continue;
-    const placeholders = health.rows.filter((r) => r.trackerOnly && r.type === "tracker_unit" && canonicalCameraUnit(r.unit) === key);
-    if (placeholders.length === 1 && placeholders[0].scope !== "inactive" && health.rows.filter((r) => canonicalCameraUnit(r.unit) === key).every((r) => r.trackerOnly)) changes.set(String(placeholders[0].id), placement);
+    if (!key2 || inventory.filter((r) => canonicalCameraUnit(r.unitNumber) === key2).length !== 1) continue;
+    const placeholders = health.rows.filter((r) => r.trackerOnly && r.type === "tracker_unit" && canonicalCameraUnit(r.unit) === key2);
+    if (placeholders.length === 1 && placeholders[0].scope !== "inactive" && health.rows.filter((r) => canonicalCameraUnit(r.unit) === key2).every((r) => r.trackerOnly)) changes.set(String(placeholders[0].id), placement);
   }
   const rows = health.rows.map((r) => changes.has(String(r.id)) ? { ...r, scope: changes.get(String(r.id)) } : r);
   const count = (scope) => rows.filter((r) => r.scope === scope).length;
@@ -668,7 +668,7 @@ function manualShopMoves(upload, receipt) {
 // src/fleetDisplayAddress.ts
 function recordedAddressText(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value, part = (key) => typeof address[key] === "string" && address[key].length <= 600 ? address[key].trim() : "";
+  const address = value, part = (key2) => typeof address[key2] === "string" && address[key2].length <= 600 ? address[key2].trim() : "";
   return [part("street"), part("city"), [part("state"), part("zip")].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 }
 
@@ -695,7 +695,7 @@ function readRecordedRoster(value, inventory) {
     ids.add(r.id);
     if (r.unitId) unitIds.add(r.unitId);
   }
-  for (const key of ["totalRecords", "activeRecords", "field", "shop", "review", "excludedLifecycle", "sourceOnlyRecords", "linkedUnitRecords"]) if (!Number.isSafeInteger(v.summary[key]) || v.summary[key] < 0 || v.summary[key] > 1e4) return bad();
+  for (const key2 of ["totalRecords", "activeRecords", "field", "shop", "review", "excludedLifecycle", "sourceOnlyRecords", "linkedUnitRecords"]) if (!Number.isSafeInteger(v.summary[key2]) || v.summary[key2] < 0 || v.summary[key2] > 1e4) return bad();
   if (v.summary.totalRecords !== v.items.length || v.summary.activeRecords !== v.items.filter((r) => r.active).length || v.summary.field !== v.items.filter((r) => r.active && r.placement === "field").length || v.summary.shop !== v.items.filter((r) => r.active && r.placement === "shop").length) return bad();
   if (v.summary.review !== v.items.filter((r) => r.active && r.placement === "unknown").length || v.summary.excludedLifecycle !== v.items.filter((r) => !r.active).length || v.summary.sourceOnlyRecords !== v.items.filter((r) => r.kind !== "unit").length || v.summary.linkedUnitRecords !== v.items.filter((r) => r.kind === "unit").length) return bad();
   if (inventory && (inventory.length !== unitIds.size || new Set(inventory.map((row) => row.id)).size !== inventory.length || inventory.some((row) => !v.items.some((item) => item.kind === "unit" && item.unitId === row.id && item.unitNumber === row.unitNumber && item.placement === inventoryPlacement(row) && (typeof row.activeInventoryEligible !== "boolean" || item.active === row.activeInventoryEligible))))) return bad();
@@ -813,16 +813,16 @@ var combine = (states) => states.includes("offline") ? "offline" : states.length
 function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
   const power = vrm && Array.isArray(vrm.items) && Array.isArray(vrm.power) ? safeVrmPower(vrm.power, vrm.items, now) : [];
   return units.map((unit) => {
-    const key = canonicalCameraUnit(unit.unitNumber), family = key?.split("|")[0] || unit.modelName || "Other equipment", support = isSupportEquipment(unit), placement = inventoryPlacement(unit);
+    const key2 = canonicalCameraUnit(unit.unitNumber), family = key2?.split("|")[0] || unit.modelName || "Other equipment", support = isSupportEquipment(unit), placement = inventoryPlacement(unit);
     const camera = fieldCameraHealth(unit, units, health, now), linkedRouters = (routers || []).filter((r) => r.match === "exact_name" && r.candidateUnit?.id === unit.id);
     const routerStates = linkedRouters.map((r) => routerStatus(r, now)).map((s) => s === "reachable" ? "online" : s === "unreachable" ? "offline" : "unknown");
-    const matches = key?.startsWith("HELIOS|") ? power.filter((r) => canonicalCameraUnit(r.name) === key) : [];
-    const p = matches.length === 1 && vrm.items.filter((item) => canonicalCameraUnit(item.name) === key).length === 1 && units.filter((u) => canonicalCameraUnit(u.unitNumber) === key).length === 1 ? matches[0] : null;
-    const installation = p ? vrm.items.find((item) => item.installationId === p.installationId && canonicalCameraUnit(item.name) === key) : null;
+    const matches = key2?.startsWith("HELIOS|") ? power.filter((r) => canonicalCameraUnit(r.name) === key2) : [];
+    const p = matches.length === 1 && vrm.items.filter((item) => canonicalCameraUnit(item.name) === key2).length === 1 && units.filter((u) => canonicalCameraUnit(u.unitNumber) === key2).length === 1 ? matches[0] : null;
+    const installation = p ? vrm.items.find((item) => item.installationId === p.installationId && canonicalCameraUnit(item.name) === key2) : null;
     const vrmInstallation = installation ? { ...installation, embedUrl: installation.sharingEnabled !== false && installation.available !== false && validVrmEmbed(installation.embedUrl, installation.installationId) ? installation.embedUrl : null } : null;
     let batteryState = "not_available", batteryPercent = null, batteryReadings = [];
-    const batteryReadIssue = key?.startsWith("HELIOS|") ? p?.errorCode || vrm?.sync?.error || vrm?.sync?.state === "error" ? "Latest Victron read unavailable" : vrm?.sync?.state === "stale" ? "Victron sync is stale" : null : null;
-    if (key?.startsWith("HELIOS|")) {
+    const batteryReadIssue = key2?.startsWith("HELIOS|") ? p?.errorCode || vrm?.sync?.error || vrm?.sync?.state === "error" ? "Latest Victron read unavailable" : vrm?.sync?.state === "stale" ? "Victron sync is stale" : null : null;
+    if (key2?.startsWith("HELIOS|")) {
       batteryState = "unknown";
       batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => ({ source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: cameraTimestamp(m.observedAt, now).at, fresh: cameraTimestamp(m.observedAt, now).fresh }));
       if (p && !batteryReadIssue) {
@@ -830,7 +830,7 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
         batteryPercent = soc.length ? Math.min(...soc.map((m) => m.value)) : null;
         batteryState = recent.some((m) => m.unit === "state" && m.value > 0) || batteryPercent !== null && batteryPercent < 20 ? "offline" : batteryPercent !== null ? "online" : "unknown";
       }
-    } else if (key?.startsWith("RECON2|")) {
+    } else if (key2?.startsWith("RECON2|")) {
       const batteryRows = camera.identity === "matched" ? camera.rows.filter((r) => r.evidence?.source === "Reconeyez" && r.batteryEvidence) : [];
       const readings = batteryRows.map((r) => r.batteryEvidence).filter(Boolean);
       batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => ({ source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: cameraTimestamp(r.batteryEvidence.percentObservedAt, now).at, fresh: cameraTimestamp(r.batteryEvidence.percentObservedAt, now).fresh }));
@@ -1056,21 +1056,90 @@ function fieldProductFollowUp(state, reason, exactUnknownReason, directSourceUna
   };
 }
 
+// src/vccUnitCameras.ts
+var VCC_REPORTED = "VCC-reported, matched by unit name. ";
+var FAMILY = "(HELIOS|RANGER|SOLAR\\s*SPOTTER|SPOTTER)";
+var key = (family, tag) => {
+  const [base, ...tail] = tag.split(".");
+  return Number(base) === 0 ? null : family.toUpperCase().replace(/\s/g, "") + "|" + Number(base) + (tail.length ? "." + tail.join(".") : "");
+};
+function vccProductNameKey(value) {
+  if (typeof value !== "string" || value.length > 200) return null;
+  const match = new RegExp("^" + FAMILY + "\\s*[-#]?\\s*(\\d{1,6}(?:\\.\\d+)?)(?!\\d)(.*)$", "i").exec(value.trim());
+  if (!match || /^\s*\.\s*\d/.test(match[3])) return null;
+  return key(match[1], match[2]);
+}
+function vccGroupNameKey(value) {
+  if (typeof value !== "string" || value.length > 200) return null;
+  const match = new RegExp("^" + FAMILY + "(?:[\\s_]*NVR)?\\s*[-#]?\\s*(\\d{1,6}(?:\\.\\d+)?)$", "i").exec(value.trim());
+  return match ? key(match[1], match[2]) : null;
+}
+var vccRow = (row) => !row.trackerOnly && row.scope !== "inactive" && row.evidence?.kind === "provider" && row.evidence.source === "Star4Live" && providerRecord(row);
+function vccUnitGroups(rows, now = Date.now()) {
+  const byUnit = /* @__PURE__ */ new Map();
+  for (const row of rows || []) {
+    if (!vccRow(row) || typeof row.unit !== "string") continue;
+    const list = byUnit.get(row.unit);
+    if (list) list.push(row);
+    else byUnit.set(row.unit, [row]);
+  }
+  const result = /* @__PURE__ */ new Map();
+  for (const [unitKey, group] of byUnit) {
+    const name = vccGroupNameKey(unitKey);
+    if (!name) continue;
+    if (result.has(name)) {
+      result.set(name, null);
+      continue;
+    }
+    const cameras = group.filter((row) => resourceKind(row) === "cameras");
+    const members = cameras.length ? cameras : group.filter((row) => resourceKind(row) === "recorders");
+    if (!members.length) {
+      result.set(name, null);
+      continue;
+    }
+    const states = members.map((row) => providerState(row, now));
+    const times = members.map((row) => cameraTimestamp(row.evidence?.observedAt, now).at).filter((time) => Boolean(time)).sort();
+    result.set(name, {
+      key: name,
+      unitKey,
+      link: "unit_name",
+      total: members.length,
+      up: states.filter((state) => state === "online").length,
+      down: members.filter((_, index) => states[index] === "offline").map((row) => row.name).sort(),
+      undecided: states.filter((state) => state !== "online" && state !== "offline").length,
+      // The oldest member reading: the unit result is only as current as that.
+      observedAt: times[0] || null,
+      rows: members
+    });
+  }
+  return result;
+}
+var vccSummary = (cameras) => {
+  const noun = cameras.total === 1 ? "device" : "cameras";
+  return cameras.down.length === 0 ? cameras.total === 1 ? "The " + noun + " is online in VCC." : "All " + cameras.total + " " + noun + " are online in VCC." : cameras.up === 0 ? cameras.total === 1 ? "The " + noun + " is offline in VCC." : "All " + cameras.total + " " + noun + " are offline in VCC." : cameras.up + " of " + cameras.total + " " + noun + " online in VCC. Offline: " + cameras.down.join("; ") + ".";
+};
+
 // src/mhelpFieldHealth.ts
 var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
 var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
 var CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
 var fieldHealthLabels = { online: "Online", offline: "Offline", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
 var DEVICE_LINK_NOT_REVIEWED = " Direct test at this unit\u2019s tracker address; the camera device link has not been reviewed.";
-function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
+function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0, health = null) {
   const authority = readMhelpInventoryAuthority(value, now);
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
   const products = value.records.filter((item) => item.placement === "FIELD");
-  const counts = Object.fromEntries(Object.keys(fieldHealthLabels).map((key) => [key, 0]));
+  const counts = Object.fromEntries(Object.keys(fieldHealthLabels).map((key2) => [key2, 0]));
   const manualField = (product2) => product2.cosManualPlacementFrom === "SHOP";
   const connections = readExactProductConnections(exactConnectionReceipt, authority.sourceSha256, products.filter((product2) => !manualField(product2)).map((product2) => product2.productId), now);
   const endpointOwners = /* @__PURE__ */ new Map();
   for (const item of connections?.values() || []) if (item.resourceId) endpointOwners.set(String(item.resourceId), (endpointOwners.get(String(item.resourceId)) || 0) + 1);
+  const vccGroups = vccUnitGroups(health?.rows, now);
+  const nameOwners = /* @__PURE__ */ new Map();
+  if (vccGroups.size) for (const item of value.records) {
+    const name = vccProductNameKey(item.unitNumber);
+    if (name) nameOwners.set(name, (nameOwners.get(name) || 0) + 1);
+  }
   const items = products.map((product2) => {
     const related = roster.items.filter((item) => item.productIds.includes(product2.productId));
     const record2 = related.length === 1 ? related[0] : null;
@@ -1085,8 +1154,9 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     const exactEndpointUnique = Boolean(exact?.resourceId && endpointOwners.get(String(exact.resourceId)) === 1 && !reviewedProvider);
     const exactAllowed = Boolean(exact && exact.status !== "unknown" && !support && related.length === 1 && record2?.kind === "unit" && row && (exactResourceVerified || exactEndpointUnique) && record2.placement === "field" && record2.active && record2.lifecycle === "active" && record2.productIds.length === 1 && record2.productIds[0] === product2.productId && row.placement === "field" && !row.retired && binding?.state === "linked" && Array.isArray(binding.unitIds) && binding.unitIds.includes(record2.unitId));
     const directSourceUnavailable = exactConnectionReceipt !== void 0 && !connections;
-    let state, reason;
+    let state, reason, vccBlocked = support || related.length > 1;
     if (product2.uploadLifecycle !== "UNFLAGGED") {
+      vccBlocked = true;
       state = "inactive";
       reason = product2.uploadLifecycle === "MISSING" ? "Marked Missing in the reviewed mHelpDesk source." : "Marked Do Not Use in the reviewed mHelpDesk source.";
     } else if (manualField(product2) && !exact) {
@@ -1098,9 +1168,11 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
         reason = "Placed in the Field by hand in COS. No connection check exists for this unit yet, so no online or offline status is claimed.";
       }
     } else if (record2?.kind === "identity_review" || record2 && record2.placement !== "field" || binding?.state === "held" || binding?.placementHeld === true || binding?.candidateUnitIds?.length) {
+      vccBlocked = true;
       state = "review";
       reason = record2?.reviewReason || "The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.";
     } else if (record2 && (!record2.active || record2.lifecycle !== "active" || row?.retired)) {
+      vccBlocked = true;
       state = "inactive";
       reason = "The associated COS inventory is inactive. A successful connection does not reactivate it.";
     } else if (record2?.kind === "unit" && (!row || matches.length !== 1 || record2.productIds.length !== 1 || binding?.state !== "linked" || !Array.isArray(binding.unitIds) || !binding.unitIds.includes(record2.unitId) || row.placement !== "field")) {
@@ -1119,6 +1191,7 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
       }
     } else if (exactAllowed && exact) {
       if (reviewedProvider && row.cameraState !== exact.status) {
+        vccBlocked = true;
         state = "unverified";
         reason = CURRENT_SOURCE_CONFLICT + "Direct: " + exact.reason + " Provider: " + unitHealthLabel(row.camera) + ".";
       } else {
@@ -1138,11 +1211,36 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
       state = row.cameraState === "online" ? "online" : row.cameraState === "offline" ? "offline" : "unverified";
       reason = unitHealthLabel(row.camera) + ". " + row.camera.reason;
     }
+    const vccName = vccBlocked ? null : vccProductNameKey(product2.unitNumber);
+    const vcc = vccName && nameOwners.get(vccName) === 1 ? vccGroups.get(vccName) || null : null;
+    const vccReady = vcc && vcc.undecided === 0 && vcc.total > 0 && !vcc.rows.some((member) => rows.some((other) => other.id !== record2?.unitId && other.camera.association?.deviceIds.includes(String(member.id)))) ? vcc : null;
+    let cameras, vccDecided = false;
+    if (vccReady) {
+      cameras = { source: "VCC", link: "unit_name", total: vccReady.total, up: vccReady.up, down: vccReady.down, observedAt: vccReady.observedAt };
+      if (state === "unverified" || state === "unlinked" || state === "review") {
+        vccDecided = true;
+        state = vccReady.up === 0 ? "offline" : "online";
+        reason = VCC_REPORTED + vccSummary(vccReady);
+      } else if (state === "online" && vccReady.down.length) {
+        reason += " " + VCC_REPORTED + vccSummary(vccReady);
+      }
+    }
     counts[state]++;
     const useExactEvidence = Boolean(exact && (exactAllowed && state === exact.status || state === "unverified" && exact.status === "unknown"));
     const evidence = fieldProductEvidence(state === "review" || record2?.kind !== "unit" ? null : row, state, now, useExactEvidence && exact ? exact : null, exactConnectionReceipt !== void 0 && !connections);
-    const followUp = fieldProductFollowUp(state, reason, exact?.status === "unknown" ? exact.reason : void 0, directSourceUnavailable);
+    const followUp = vccDecided ? null : fieldProductFollowUp(state, reason, exact?.status === "unknown" ? exact.reason : void 0, directSourceUnavailable);
     if (followUp) evidence.followUp = followUp;
+    if (vccDecided && vccReady) {
+      evidence.gap = null;
+      evidence.association = "vcc_unit_name";
+      evidence.basis = vccReady.rows.every((member) => resourceKind(member) === "recorders") ? "recorder" : "camera";
+      evidence.observedAt = vccReady.observedAt;
+      evidence.observations = vccReady.rows.map((member) => {
+        const status = String(member.evidence.status);
+        return { resourceId: String(member.id), source: "VCC", kind: member.evidence.resource || "camera", observedAt: cameraTimestamp(member.evidence.observedAt, now).at, fresh: true, reportedStatus: status, currentState: status };
+      });
+    }
+    if (cameras && (state === "online" || state === "offline")) evidence.cameras = cameras;
     return { productId: product2.productId, unitNumber: label, state, reason, unitId: state !== "review" && record2?.kind === "unit" && row ? row.id : null, recordId: record2?.kind !== "unit" ? record2?.id || null : null, evidence };
   });
   return { total: authority.field, counts, items, receivedAt: authority.receivedAt, sourceSha256: authority.sourceSha256 };
@@ -1152,12 +1250,12 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
 var providerOrder = ["star4live", "avigilon", "reconeyez", "walle", "support", "other"];
 var clean = (value) => typeof value === "string" ? value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
 function mhelpProviderFamily(category, unitNumber) {
-  const key = clean(category) || clean(unitNumber);
-  if (/^(SOLARSTAND|SOLARPOLE|STAND|STANDS|SKID|SOLARSKID|SOLARPOLESKID)/.test(key)) return "support";
-  if (/^(SNIPER|CAMV|RSU|RADARSNIPER)/.test(key)) return "avigilon";
-  if (/^RECON/.test(key)) return "reconeyez";
-  if (/^WALLE/.test(key)) return "walle";
-  if (/^(SOLARSPOTTER|SPOTTER|RANGER|HELIOS)/.test(key)) return "star4live";
+  const key2 = clean(category) || clean(unitNumber);
+  if (/^(SOLARSTAND|SOLARPOLE|STAND|STANDS|SKID|SOLARSKID|SOLARPOLESKID)/.test(key2)) return "support";
+  if (/^(SNIPER|CAMV|RSU|RADARSNIPER)/.test(key2)) return "avigilon";
+  if (/^RECON/.test(key2)) return "reconeyez";
+  if (/^WALLE/.test(key2)) return "walle";
+  if (/^(SOLARSPOTTER|SPOTTER|RANGER|HELIOS)/.test(key2)) return "star4live";
   return "other";
 }
 function mhelpProviderFleet(upload, health, healthReadSucceeded, now = Date.now()) {
@@ -1235,14 +1333,14 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
     unmapped: validAddresses ? validAddresses.unlocated : 0
   };
   if (counts.online + counts.offline + counts.unverified + counts.support !== authority.field || authority.field + authority.shop !== authority.total) throw Error("Fleet accounting does not reconcile.");
-  const panels = ["star4live", "avigilon", "reconeyez"].map((key) => {
-    const group = provider.groups.find((g) => g.provider === key);
+  const panels = ["star4live", "avigilon", "reconeyez"].map((key2) => {
+    const group = provider.groups.find((g) => g.provider === key2);
     return {
-      key,
-      title: key === "star4live" ? "Star4Live" : key === "avigilon" ? "Avigilon" : "Recon / Recon II",
+      key: key2,
+      title: key2 === "star4live" ? "Star4Live" : key2 === "avigilon" ? "Avigilon" : "Recon / Recon II",
       count: group.count,
       counts: group.counts,
-      products: items.filter((p) => p.system === key),
+      products: items.filter((p) => p.system === key2),
       lastCheck: provider.healthVerified ? cameraCheckedAt : null,
       note: "Equipment-family classification; saved connectivity may include recorder or service-port evidence."
     };
@@ -1301,7 +1399,7 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
     const item = roster?.items.find((item2) => item2.unitId === row.id);
     return { ...row, retired: item ? !item.active : row.retired };
   });
-  const field = mhelpFieldHealth(upload, roster, rows, now, map.productConnections);
+  const field = mhelpFieldHealth(upload, roster, rows, now, map.productConnections, health);
   return buildFleetCommandCenter(upload, field, readSucceeded, rows, null, null, now, health.refreshedAt || null);
 }
 

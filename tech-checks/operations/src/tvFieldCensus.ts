@@ -14,7 +14,7 @@ export function tvFieldCensus(source:Record<string,any>|null,inventory:Dashboard
  const baseRows=fleetDashboardRows(inventory,health,routers?.items||null,null,now);
  const upload=source?manualShopInventory(source.uploadInventory,source.manualPlacementOverrides):null;
  const roster=source?readRecordedRoster(source.fleetRoster,inventory).roster:null;
- const products=mhelpFieldHealth(upload,roster,baseRows,now,source?.productConnections);
+ const products=mhelpFieldHealth(upload,roster,baseRows,now,source?.productConnections,health);
  const rows=productConnectionFleetRows(baseRows,products);
  return {rows,products,board:buildFleetCommandCenter(upload,products,Boolean(health),rows,addressMap,null,now,health?.refreshedAt||null)};
 }
