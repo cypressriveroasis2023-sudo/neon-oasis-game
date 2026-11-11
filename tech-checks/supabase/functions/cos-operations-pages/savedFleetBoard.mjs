@@ -1271,6 +1271,7 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
 function completedBoard(health, map, connections, previous, at = Date.now()) {
   const upload = map?.uploadInventory, ids = upload?.records?.filter((r) => r.placement === "FIELD").map((r) => r.productId);
   if (!upload || !ids?.length || !readExactProductConnections(connections, upload.sourceSha256, ids, at)) throw Error("connection_source_incomplete");
+  if (map?.ownerApprovedLinks !== void 0 && map.ownerApprovedLinks?.state !== "ready") throw Error("owner_link_source_unavailable");
   prepareImmutableIdentityEnvelope(health);
   const reconciled = reconcileFleetSnapshot(health, { ...map, productConnections: connections, productConnectionsState: "ready" }, at);
   const { fleetFieldUnits, ...storedHealth } = reconciled.health;

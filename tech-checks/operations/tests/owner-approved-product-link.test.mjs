@@ -35,7 +35,9 @@ test('every other unit is byte-for-byte what it was without any approved link, h
  assert.equal(a['2258987'].binding.state,'unlinked');assert.equal(a['2301876'].binding.state,'unlinked');
  for(const n of [3,4,5])assert.deepEqual(after.snapshot.inventoryItems.find(x=>x.id===id(n)),before.snapshot.inventoryItems.find(x=>x.id===id(n)));
  assert.equal(b['2232677'].binding.state,'unlinked');assert.equal(b['2221820'].binding.state,'unlinked');assert.equal(b['2232677'].binding.reason,'Product ID identity label changed; confirm before linking');
- assert.deepEqual(run(records(u),[],u).snapshot,before.snapshot);          // an empty approval list changes nothing at all
+ const empty=run(records(u),[],u).snapshot;assert.deepEqual(empty.ownerApprovedLinks,{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:'ready',approvals:0,applied:0});
+ assert.deepEqual({...empty,ownerApprovedLinks:undefined},{...before.snapshot,ownerApprovedLinks:undefined});   // an empty approval list changes nothing else
+ assert.deepEqual(after.snapshot.ownerApprovedLinks,{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:'ready',approvals:2,applied:2});assert.equal('ownerApprovedLinks' in before.snapshot,false);
 });
 test('the link is kept on the next mHelp load, including a capital-letter or trailing-space-only label difference',()=>{
  const u=units(),next=records(u).map(r=>r.productId==='2232677'?{...r,unitNumber:'SOLAR SPOTTER 012 ',customer:'New customer: New site',placement:'SHOP'}:r);
@@ -94,6 +96,14 @@ test('malformed, duplicated or oversized approval lists are rejected outright',(
 // The deployed function is a single bundled file. Run the same behaviour against
 // the bundled copy of this module, so the code that ships is the code that was tested.
 import {readFileSync} from 'node:fs';
+import {completedBoard} from '../durable-board/project.ts';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {projectEffectiveFleetPlacement} from '../../supabase/functions/cos-operations-pages/effectiveFleetPlacement.ts';
+import {projectCurrentTrackerPlacement,projectCombinedFleetRoster} from '../../supabase/functions/cos-operations-pages/combinedFleetRoster.ts';
+import {readRecordedRoster} from '../src/fleetRecordedRoster.ts';
+import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
+import {fleetDashboardRows} from '../src/fleetDashboardModel.ts';
+import {snapshot} from './fixtures/camera-evidence-fixtures.mjs';
 import {readOwnerApprovedProductLinks} from '../../supabase/functions/cos-operations-pages/mhelpUploadPlacement.ts';
 const bundle=readFileSync(new URL('../../docs/vision-native-preview-20261107/source/serve.ts',import.meta.url),'utf8');
 const from=bundle.indexOf('  // ../supabase/functions/cos-operations-pages/placementProjection.ts'),to=bundle.indexOf('  // ../supabase/functions/cos-operations-pages/effectiveFleetPlacement.ts');
@@ -111,12 +121,51 @@ test('the bundled copy that ships behaves identically to the tested module',asyn
  assert.throws(()=>shipped.projectMhelpUploadPlacement(map(units()),upload(records(u)),[],undefined,now,{ownerApprovedLinks:[{...links()[0],extra:1}]}),/Invalid Owner-approved Product links/);
  assert.ok(bundle.includes('ownerApprovedLinks:await readOwnerApprovedProductLinks(rpc,ORGANIZATION_ID)'));
 });
-test('reading approvals can never break a load: a missing function, an error or a malformed answer all mean no links',async()=>{
+test('an unreadable or malformed approvals source is reported as unavailable, never as "no approvals"',async()=>{
  for(const read of [readOwnerApprovedProductLinks,shipped.readOwnerApprovedProductLinks]){
   const good={contract:'COS_OWNER_PRODUCT_LINKS_V1',links:links()},calls=[];
   assert.deepEqual(await read(async(name,payload)=>{calls.push([name,payload]);return good;},'org'),links());assert.deepEqual(calls,[['cos_owner_product_links_active_v1',{p_organization_id:'org'}]]);
   assert.deepEqual(await read(async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[]}),'org'),[]);
-  for(const bad of [async()=>{throw Error('404');},async()=>null,async()=>({contract:'OTHER',links:links()}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[{...links()[0],productId:'x'}]}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:'x'})])assert.equal(await read(bad,'org'),null);
+  for(const bad of [async()=>{throw Error('404');},async()=>null,async()=>({contract:'OTHER',links:links()}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:[{...links()[0],productId:'x'}]}),async()=>({contract:'COS_OWNER_PRODUCT_LINKS_V1',links:'x'})])assert.deepEqual(await read(bad,'org'),{unavailable:true});
  }
- const u=units();assert.deepEqual(projectMhelpUploadPlacement(map(u),upload(records(u)),[],undefined,now,{ownerApprovedLinks:null}),projectMhelpUploadPlacement(map(u),upload(records(u)),[],undefined,now));
+ const u=units();
+ for(const project of [projectMhelpUploadPlacement,shipped.projectMhelpUploadPlacement]){
+  const out=project(map(units()),upload(records(u)),[],undefined,now,{ownerApprovedLinks:{unavailable:true}}),r=by(out);
+  assert.deepEqual(JSON.parse(JSON.stringify(out.snapshot.ownerApprovedLinks)),{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:'unavailable',approvals:0,applied:0});
+  assert.equal(r['2232677'].binding.state,'unlinked');assert.deepEqual(r['2232677'].binding.unitIds,[]);        // no identity is invented
+  assert.equal(r['2232677'].binding.reason,'Product ID identity label changed; confirm before linking');
+ }
+});
+test('a board is never saved from a map whose approvals source was unavailable; the last completed board stays',()=>{
+ const f=fieldProductFixture();
+ const ok=completedBoard(f.health,{...f.field,ownerApprovedLinks:{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:'ready',approvals:2,applied:2}},f.connections,null,f.now);
+ assert.deepEqual(ok.counts,completedBoard(f.health,f.field,f.connections,null,f.now).counts);                 // a ready source, or a map from before this change, saves as usual
+ for(const state of ['unavailable','other',undefined])assert.throws(()=>completedBoard(f.health,{...f.field,ownerApprovedLinks:{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state}},f.connections,null,f.now),/owner_link_source_unavailable/);
+ assert.throws(()=>completedBoard(f.health,{...f.field,ownerApprovedLinks:null},f.connections,null,f.now),/owner_link_source_unavailable/);
+ assert.ok(readFileSync(new URL('../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs',import.meta.url),'utf8').includes('owner_link_source_unavailable'));
+});
+const fleet=(recs,approved,u)=>{const applied=projectMhelpUploadPlacement(map(u),upload(recs),[],undefined,now,{ownerApprovedLinks:approved});
+ const effective=projectEffectiveFleetPlacement(projectCurrentTrackerPlacement(applied.snapshot,[]),[],{authorizedUploadPlacements:applied.authorities});return projectCombinedFleetRoster(effective,[]);};
+const freeze=v=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);Object.values(v).forEach(freeze);}return v;};
+test('actual Fleet behaviour: the approved A# and its COS record become one roster entry; no health is claimed; inputs are not modified',()=>{
+ const u=freeze(units()),recs=freeze(records(u)),approved=freeze(links());
+ const before=fleet(recs,[],u),after=fleet(recs,approved,u);                                                    // frozen inputs: any write to a native record would throw
+ const entry=(result,pid)=>result.fleetRoster.items.filter(i=>i.productIds.includes(pid));
+ for(const [pid,n] of [['2232677',1],['2221820',2]]){
+  assert.equal(entry(before,pid).length,1);assert.equal(entry(before,pid)[0].unitId,null);assert.equal(entry(before,pid)[0].kind,'source_equipment');        // before: a source-only record with no COS unit
+  assert.equal(before.fleetRoster.items.filter(i=>i.unitId===id(n)).length,1);                                   // and the COS record listed separately: the same unit counted twice
+  const [item]=entry(after,pid);assert.equal(entry(after,pid).length,1);assert.equal(item.kind,'unit');assert.equal(item.unitId,id(n));assert.deepEqual(item.productIds,[pid]);assert.equal(item.placement,'field');
+  assert.equal(after.fleetRoster.items.filter(i=>i.unitId===id(n)).length,1);
+ }
+ assert.equal(after.fleetRoster.items.length,before.fleetRoster.items.length-2);                                // two duplicates removed, nothing else
+ const rest=r=>r.fleetRoster.items.filter(i=>!['2232677','2221820'].some(p=>i.productIds.includes(p))&&![id(1),id(2)].includes(i.unitId));
+ assert.deepEqual(rest(after),rest(before));
+ // Health: the link gives the Field A# a COS unit to report on. It supplies no online/offline reading.
+ const roster=readRecordedRoster(after.fleetRoster,after.inventoryItems).roster,empty=Object.assign(snapshot([]),{identityVersion:1,unitIdentities:[],identityWarnings:[]});
+ const health=mhelpFieldHealth(after.uploadInventory,roster,fleetDashboardRows(after.inventoryItems,empty,[],null,now),now);
+ for(const pid of ['2232677','2221820']){const p=health.items.find(x=>x.productId===pid);assert.ok(!['online','offline'].includes(p.state),p.state);assert.notEqual(p.state,'review');}
+ assert.equal(health.counts.online,0);assert.equal(health.counts.offline,0);
+ // Revoking (the approvals list no longer carries it) reads back exactly as before the approval.
+ const revoked=fleet(recs,[approved[1]],u);assert.deepEqual(entry(revoked,'2232677'),entry(before,'2232677'));assert.equal(entry(revoked,'2221820')[0].unitId,id(2));
+ assert.deepEqual(fleet(recs,[],u),before);
 });

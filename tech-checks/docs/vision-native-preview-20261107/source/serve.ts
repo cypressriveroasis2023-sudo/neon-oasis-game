@@ -2832,11 +2832,11 @@ var CosMhelpLiveInventoryRelease = (() => {
   async function readOwnerApprovedProductLinks(read, organizationId) {
     try {
       const value = await read("cos_owner_product_links_active_v1", { p_organization_id: organizationId });
-      if (!object(value) || value.contract !== "COS_OWNER_PRODUCT_LINKS_V1") return null;
+      if (!object(value) || value.contract !== "COS_OWNER_PRODUCT_LINKS_V1") return { unavailable: true };
       approvedLinks(value.links);
       return value.links;
     } catch {
-      return null;
+      return { unavailable: true };
     }
   }
   function projectMhelpUploadPlacement(snapshot, value, audits, identity, now = Date.now(), options = {}) {const cosConcernKeys=new Map();const cosConcernKey=value=>{let key=cosConcernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);cosConcernKeys.set(value,key);}return key;};
@@ -2854,7 +2854,8 @@ var CosMhelpLiveInventoryRelease = (() => {
       const key = r.customer.trim().replace(/\s+/g, " ").toLowerCase();
       customerIds.set(key, /* @__PURE__ */ new Set([...customerIds.get(key) || [], r.customerId]));
     }
-    const links = approvedLinks(options.ownerApprovedLinks);
+    const linksUnavailable = object(options.ownerApprovedLinks) && options.ownerApprovedLinks.unavailable === true;
+    const links = linksUnavailable ? /* @__PURE__ */ new Map() : approvedLinks(options.ownerApprovedLinks);
     const claimed = /* @__PURE__ */ new Set();
     if (links.size) for (const other of [...receipt2.records, ...live ? receipt2.apiMissingRecords : []]) {
       if (!object(other)) continue;
@@ -2963,7 +2964,8 @@ var CosMhelpLiveInventoryRelease = (() => {
       records
     };
     const apiSync = receipt2.apiSync;
-    return { snapshot: { ...snapshot, inventoryItems, items, uploadInventory, ...apiSync?.enabled === true ? { mhelpPlacementSync: { ...snapshot.mhelpPlacementSync || {}, contract: "COS_MHELP_PLACEMENT_V1", inventoryEnabled: true, lastInventorySuccessAt: apiSync.lastSuccessAt || null, errorCode: apiSync.errorCode || snapshot.mhelpPlacementSync?.errorCode || null } } : {} }, authorities };
+    const ownerApprovedLinks = options.ownerApprovedLinks === void 0 ? {} : { ownerApprovedLinks: { contract: "COS_OWNER_PRODUCT_LINKS_STATE_V1", state: linksUnavailable ? "unavailable" : "ready", approvals: links.size, applied: count((r) => r.binding.matchMethod === "owner_approved_product_id" && r.binding.state === "linked") } };
+    return { snapshot: { ...snapshot, inventoryItems, items, uploadInventory, ...ownerApprovedLinks, ...apiSync?.enabled === true ? { mhelpPlacementSync: { ...snapshot.mhelpPlacementSync || {}, contract: "COS_MHELP_PLACEMENT_V1", inventoryEnabled: true, lastInventorySuccessAt: apiSync.lastSuccessAt || null, errorCode: apiSync.errorCode || snapshot.mhelpPlacementSync?.errorCode || null } } : {} }, authorities };
   }
 
   // ../supabase/functions/cos-operations-pages/effectiveFleetPlacement.ts

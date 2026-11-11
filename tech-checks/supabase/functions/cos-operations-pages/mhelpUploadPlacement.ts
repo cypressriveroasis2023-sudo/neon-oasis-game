@@ -120,14 +120,16 @@ function approvedLinks(value:unknown):Map<string,OwnerApprovedProductLink>{
  }
  return links;
 }
-/** Read used on every field-map build. Any failure or malformed answer means
- * "no approved links", which is exactly today's behaviour; it can never break a load. */
-export async function readOwnerApprovedProductLinks(read:(name:string,payload:Row)=>Promise<unknown>,organizationId:string):Promise<unknown[]|null>{
+export type OwnerApprovedLinksUnavailable={unavailable:true};
+/** Read used on every field-map build. A failed or malformed read is never
+ * treated as "there are no approvals": it is reported as unavailable, so the
+ * map says so and no new Fleet board is saved from it. No identity is invented. */
+export async function readOwnerApprovedProductLinks(read:(name:string,payload:Row)=>Promise<unknown>,organizationId:string):Promise<unknown[]|OwnerApprovedLinksUnavailable>{
  try{
   const value=await read('cos_owner_product_links_active_v1',{p_organization_id:organizationId});
-  if(!object(value)||value.contract!=='COS_OWNER_PRODUCT_LINKS_V1')return null;
+  if(!object(value)||value.contract!=='COS_OWNER_PRODUCT_LINKS_V1')return {unavailable:true};
   approvedLinks(value.links);return value.links;
- }catch{return null;}
+ }catch{return {unavailable:true};}
 }
 const inactiveStatus=new Set(['retired','decommissioned','deleted','stolen']);
 /** The only saved notes an approval answers: both ask a person to confirm the
@@ -135,7 +137,7 @@ const inactiveStatus=new Set(['retired','decommissioned','deleted','stolen']);
 const approvalAnswers=new Set(['Product ID identity label changed; confirm before linking','Prior reviewed scoped identity or assignment requires Owner installation review']);
 /** Call after the API placement/location projections and before the finalizer.
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
-export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;ownerApprovedLinks?:unknown}={}):{snapshot:Row;authorities:Row[]}{
+export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;ownerApprovedLinks?:unknown[]|OwnerApprovedLinksUnavailable}={}):{snapshot:Row;authorities:Row[]}{
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
@@ -145,7 +147,8 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
  const concernKey=(value:unknown)=>{let key=concernKeys.get(value);if(key===undefined){key=placementIdentityConcernKey(value);concernKeys.set(value,key);}return key;};
  const changes=new Map<string,Row>(),authorities:Row[]=[],customerIds=new Map<string,Set<string>>();
  for(const r of receipt.records){const key=r.customer.trim().replace(/\s+/g,' ').toLowerCase();customerIds.set(key,new Set([...(customerIds.get(key)||[]),r.customerId]));}
- const links=approvedLinks(options.ownerApprovedLinks);
+ const linksUnavailable=object(options.ownerApprovedLinks)&&(options.ownerApprovedLinks as Row).unavailable===true;
+ const links=linksUnavailable?new Map<string,OwnerApprovedProductLink>():approvedLinks(options.ownerApprovedLinks);
  // Every COS record any saved binding, possible alias or absent Product ID already
  // points at. An approved link can never claim one of these.
  const claimed=new Set<string>();
@@ -207,5 +210,8 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
   exportAsOf:null,trackerRecords:receipt.trackerRecords||[],trackerSource:receipt.trackerSource||null,countBasis:'mhelp_product_records_not_unique_physical_units',physicalDeduplication:'incomplete',
   summary:{totalRecords:records.length,fieldRecords:count(r=>r.placement==='FIELD'),shopRecords:count(r=>r.placement==='SHOP'),unflaggedFieldRecords:count(r=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED'),unflaggedShopRecords:count(r=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED'),doNotUseRecords:count(r=>r.uploadLifecycle==='DO_NOT_USE'),missingRecords:count(r=>r.uploadLifecycle==='MISSING'),linkedRecords:count(r=>r.binding.state==='linked'),unlinkedRecords:count(r=>r.binding.state==='unlinked'),heldRecords:count(r=>r.binding.state==='held'),appliedRecords:count(r=>r.overlayApplied)},records};
  const apiSync=receipt.apiSync;
- return {snapshot:{...snapshot,inventoryItems,items,uploadInventory,...(apiSync?.enabled===true?{mhelpPlacementSync:{...(snapshot.mhelpPlacementSync||{}),contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:apiSync.lastSuccessAt||null,errorCode:apiSync.errorCode||snapshot.mhelpPlacementSync?.errorCode||null}}:{})},authorities};
+ // Present only when the caller asked for approvals. 'unavailable' means the approvals
+ // could not be read: links are not applied AND the result must not be saved as a board.
+ const ownerApprovedLinks=options.ownerApprovedLinks===undefined?{}:{ownerApprovedLinks:{contract:'COS_OWNER_PRODUCT_LINKS_STATE_V1',state:linksUnavailable?'unavailable':'ready',approvals:links.size,applied:count(r=>r.binding.matchMethod==='owner_approved_product_id'&&r.binding.state==='linked')}};
+ return {snapshot:{...snapshot,inventoryItems,items,uploadInventory,...ownerApprovedLinks,...(apiSync?.enabled===true?{mhelpPlacementSync:{...(snapshot.mhelpPlacementSync||{}),contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:apiSync.lastSuccessAt||null,errorCode:apiSync.errorCode||snapshot.mhelpPlacementSync?.errorCode||null}}:{})},authorities};
 }
