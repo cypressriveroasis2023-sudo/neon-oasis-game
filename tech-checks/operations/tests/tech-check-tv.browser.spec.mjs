@@ -2,6 +2,7 @@ import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhel
 import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
+import {completedBoard} from '../durable-board/project.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -21,9 +22,9 @@ test.afterEach(async({page},testInfo)=>{
   await writeFile(path,JSON.stringify({reads:state.reads,pendingDaily:state.pendingDaily,dailyResults:state.dailyResults,fleetReads:state.fleetReads,writes:state.writes,frames},null,2));
   await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
 });
-async function setup(page, { many = false, pausedClock = false } = {}) {
+async function setup(page, { many = false, pausedClock = false, prepare = null } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
-  state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);
+  state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);if(prepare)prepare(state);
   await page.addInitScript(()=>{
     window.tvLifecycleEvents=[];
     addEventListener('cos-private-data-invalidated',event=>window.tvLifecycleEvents.push({type:'invalidated',reason:event.detail?.reason??'untyped',at:Date.now()}));
@@ -70,6 +71,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
       }finally{state.pendingDaily--;}
       return;
     }
+    if(path.startsWith('/api/fleet-saved-board')&&state.savedBoard){state.savedBoardReads=(state.savedBoardReads||0)+1;return route.fulfill({headers:cors,json:state.savedBoard});}
     if(['/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(path)){state.fleetRequests.push({path,method,at:await page.evaluate(()=>Date.now())});if(path==='/api/field-map'&&state.fieldGate)await state.fieldGate.promise;}
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
@@ -77,7 +79,7 @@ async function setup(page, { many = false, pausedClock = false } = {}) {
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
     if(path==='/api/product-connections'){state.proofReads=(state.proofReads||0)+1;if(state.proofGate)await state.proofGate.promise;}
     if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
-    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
+    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:state.features||{}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
   const frame=page.frameLocator('#cosOperationsFrame');
@@ -564,4 +566,15 @@ for(const mode of ['map','camera'])test('TV '+mode+' adopts late validated proof
  await page.clock.runFor(untilNext-1);expect(state.fleetRequests.filter(r=>r.path==='/api/field-map')).toHaveLength(1);
  await page.clock.runFor(1);await expect.poll(()=>state.fleetRequests.filter(r=>r.path==='/api/field-map').length).toBe(2);
  expect(state.writes).toEqual([]);
+});
+
+for(const age of ['current','12 hours old'])test('TV shows the saved Fleet board totals when the durable board is '+age,async({page})=>{
+ const initial=fieldProductFixture();
+ const at=age==='current'?time:new Date(Date.parse(time)-12*3600000).toISOString();
+ const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,at));
+ const board=completedBoard(f.health,f.field,f.connections,null,Date.parse(at));
+ const {state,frame}=await setup(page,{pausedClock:true,prepare:state=>{state.features={durableFleetBoard:true};state.savedBoard={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-1',payload:board},refresh:{state:age==='current'?'completed':'failed',error:'source_read_failed'},history:[]};}});
+ state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
+ const summary=frame.locator('.tv-fleet-summary');await expect(summary).toContainText(/unverified/);
+ await expect(summary).toContainText(board.counts.online+' online');await expect(summary).toContainText(board.counts.offline+' offline');await expect(summary).toContainText(board.counts.unverified+' unverified'); if(age==='current')await expect(summary).not.toContainText('not current');else await expect(summary).toContainText('last completed reading · not current');
 });
