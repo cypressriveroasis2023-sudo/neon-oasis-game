@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {resolveStarResources,starResourceStatus} from '../../supabase/functions/camera-provider-reconcile/star-resource-identity.js';
 import {unmappedResourceDiagnostics} from '../../supabase/functions/camera-provider-reconcile/unmapped-resource-diagnostics.js';
+import {starKnownSiteNames,starLiveOrganization,starPendingSiteName} from '../../supabase/functions/camera-provider-reconcile/star-live-location.js';
 
 const historical='2026-10-10T12:00:00.000Z';
 const local=(patch={})=>({id:901,device_serial:'synthetic-physical-alpha',external_device_id:'synthetic-external-beta',device_name:'Helios901 synthetic camera 3+4',device_type:'IPC',monitoring_profile:'helios',unit_key:'Helios901',activation_state:'active',organization:'Synthetic site',source:'vigilant_control_center',source_status:'online',source_last_seen_at:historical,last_online_at:historical,public_ip:'192.0.2.55',connection_revision:7,...patch});
@@ -33,7 +34,7 @@ async function producer(resources,locals=[local()],options={}){
    if(options.failInventory)throw new Error('Synthetic inventory unavailable');
    const list=options.inventory?options.inventory(body):resources;
    return {data:{resourceList:list,total:list.length}};
-  },unmappedResourceDiagnostics,resolveStarResources,starResourceStatus
+  },unmappedResourceDiagnostics,resolveStarResources,starResourceStatus,starKnownSiteNames,starLiveOrganization
  });
  try{return {rows,writes,integration,selections,result:await context.starInventory(db)}}catch(error){return {rows,writes,integration,selections,error}};
 }
@@ -167,4 +168,40 @@ test('resolved status metadata preserves raw resources and repeated consistent o
   assert.deepEqual(result.resourceStatuses,[{serial:'synthetic-unmapped',status:expected}]);
   assert.equal(result.unmatched[0],records[0]);assert.deepEqual(records,before);
  }
+});
+
+// Live location, through the real sync code with a stand-in provider.
+test('the sync moves Field/Shop and site with Star4Live\'s current organization, and nothing else about the camera',async()=>{
+ const cam=(id,serial,organization,oid)=>local({id,device_serial:serial,external_device_id:'ext-'+serial,device_name:'Cam '+serial,unit_key:'Unit'+id,organization,source_metadata:{organizationId:oid}});
+ const locals=[
+  cam(1,'s-returned','Harvey Cleary - SEC Energy Building 12','283838'), // back in the shop; COS still shows the customer
+  cam(2,'s-site-a1','Site A','500'),cam(3,'s-site-a2','Site A','500'),
+  cam(4,'s-sent-out','root','500'),                                      // sent out to Site A; COS still shows root
+  cam(5,'s-new-site','root','777'),                                      // at a site COS has never seen
+  cam(6,'s-no-org','Kept As Is',null),                                   // provider sends no organization for it
+ ];
+ const before=structuredClone(locals);
+ const r=await producer([
+  resource('s-returned',0,{deviceName:'Cam s-returned',organizationId:'283838'}),
+  resource('s-site-a1',1,{deviceName:'Cam s-site-a1',organizationId:'500'}),resource('s-site-a2',1,{deviceName:'Cam s-site-a2',organizationId:'500'}),
+  resource('s-sent-out',1,{deviceName:'Cam s-sent-out',organizationId:'500'}),
+  resource('s-new-site',0,{deviceName:'Cam s-new-site',organizationId:'777'}),
+  resource('s-no-org',1,{deviceName:'Cam s-no-org'}),
+ ],locals);
+ assert.ifError(r.error);
+ const org=id=>r.rows.find(row=>row.id===id).organization;
+ assert.equal(org(1),'root');assert.equal(org(2),'Site A');assert.equal(org(3),'Site A');assert.equal(org(4),'Site A');
+ assert.equal(org(5),starPendingSiteName('777'));assert.equal(org(6),'Kept As Is');
+ // Status is still exactly what the provider reported; an offline camera in root is recorded as offline, not hidden or changed.
+ assert.deepEqual(r.rows.map(row=>row.source_status),['offline','online','online','online','offline','online']);
+ // Identity, unit grouping, IP, activation and monitoring fields are untouched.
+ for(const [i,row] of r.rows.entries())for(const key of ['id','device_serial','external_device_id','device_name','unit_key','activation_state','monitoring_profile','public_ip','connection_revision'])assert.deepEqual(row[key],before[i][key],key);
+ // Only camera_devices rows were written, one write per camera.
+ assert.deepEqual([...new Set(r.writes.map(w=>w.table))],['camera_devices']);assert.equal(r.writes.length,6);
+ // A second identical sync changes no location.
+ const again=await producer([
+  resource('s-returned',0,{deviceName:'Cam s-returned',organizationId:'283838'}),resource('s-site-a1',1,{deviceName:'Cam s-site-a1',organizationId:'500'}),resource('s-site-a2',1,{deviceName:'Cam s-site-a2',organizationId:'500'}),
+  resource('s-sent-out',1,{deviceName:'Cam s-sent-out',organizationId:'500'}),resource('s-new-site',0,{deviceName:'Cam s-new-site',organizationId:'777'}),resource('s-no-org',1,{deviceName:'Cam s-no-org'}),
+ ],r.rows);
+ assert.ifError(again.error);assert.deepEqual(again.rows.map(row=>row.organization),r.rows.map(row=>row.organization));
 });
