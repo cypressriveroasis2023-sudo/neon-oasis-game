@@ -82,3 +82,28 @@ Each step: local tests, hosted checks, Vision review, read-only precheck, James'
   6. Then pause `cos-mhelp-inventory-sync` and `cos-sheets-placement-publish`.
 - **Install rules added today:** database healthy first; after any deploy a board run must complete
   or the deploy is rolled back immediately.
+
+## Update 2026-11-12 1:30 PM CT
+- Finding: the board's `connections` step calls `/api/product-connections`, which reads the tracker
+  **live from Google Sheets on every board build** (`read2027ProductIpsFromGoogle`). The stored
+  tracker "authority" in the camera project is not what the board uses, and the
+  `cos-sheets-placement-publish` job is not what keeps the board alive. Item 2 above is therefore
+  replaced by: under a freeze, `/api/product-connections` uses the COS-kept IP list.
+- Built (not installed) in `db/20261112_inventory_freeze.sql`, 8 local DB tests:
+  freeze record (Owner only, exact active reviewed census + totals, real read time), guard on
+  `upload_control`, the approved IP list stored with the freeze, `cos_inventory_ip_edit_v1`
+  (Owner or verified IT via `cos_owner_identity_assert_actor(...,false)`), and
+  `cos_inventory_freeze_state_v1` returning `{freeze, ipCensus, ipEdits}`.
+- Next (edge + bundle, with a bundled end-to-end test):
+  a. `POST /api/inventory-freeze` (Owner): read the active census and the tracker once from Google,
+     require `buildExactProductConnections` to accept the pair, show totals, then call
+     `cos_inventory_freeze_v1` with that tracker census as `ipCensus`.
+  b. Field-map route: read `cos_inventory_freeze_state_v1`; attach `frozen` to the upload
+     inventory only when it names the same fingerprint.
+  c. `/api/product-connections`: when frozen, use `state.ipCensus` instead of Google and attach
+     the same marker to the census; otherwise unchanged.
+  d. Board label; Owner/IT IP edit screen calling `cos_inventory_ip_edit_v1`.
+  e. Field/Shop and customer/site hand edits (replaces #379's open question).
+- Open point for Vision: an IP edit changes `publicIp` only. Seeded tracker holds
+  (`reviewReasons`, e.g. placement_mismatch) stay, so those A#s remain Unknown until a
+  placement edit path exists (step e).
