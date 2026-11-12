@@ -937,6 +937,7 @@ var EXACT_PRODUCT_CONNECTION_CONTRACT = "COS_EXACT_PRODUCT_CONNECTIONS_V2";
 var ID = /^[1-9][0-9]{0,14}$/;
 var HASH = /^[a-f0-9]{64}$/;
 var SOURCE_FRESH_MS = 30 * 60 * 1e3;
+var FROZEN_SOURCE_MAX_MS = 3650 * 24 * 60 * 60 * 1e3;
 var object4 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 var safeTime = (v, now, windowMs) => {
   if (typeof v !== "string") return null;
@@ -953,7 +954,7 @@ var unknown = (productId, reason) => ({
 });
 var deviceId = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? String(v) : typeof v === "string" && ID.test(v) ? v : null;
 function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now()) {
-  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS) || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
+  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !safeTime(value.trackerVerifiedAt, now, safeTime(value.inventoryFrozenAt, now, FROZEN_SOURCE_MAX_MS) ? FROZEN_SOURCE_MAX_MS : SOURCE_FRESH_MS) || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
   const expected = new Set(expectedFieldIds);
   if (expected.size !== expectedFieldIds.length) return null;
   const result = /* @__PURE__ */ new Map(), seen = /* @__PURE__ */ new Set();

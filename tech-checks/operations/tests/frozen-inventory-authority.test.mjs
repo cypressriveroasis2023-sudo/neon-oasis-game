@@ -72,8 +72,24 @@ test('a frozen census lets the connection source build again, and only the inven
  assert.deepEqual(built.items,fresh.items);
  assert.equal(run(census(old,{...frozen,sourceSha256:'b'.repeat(64)})),null,'freeze of another census: declined');
  // Every other source rule still applies to a frozen census.
- const staleTracker=tracker();staleTracker.verifiedAt=new Date(t-31*60*1000).toISOString();
- assert.equal(run(census(old,frozen),staleTracker),null,'a stale tracker read is still declined');
+ // The IP list is a COS-kept copy under a freeze: its age is reported, not enforced...
+ const agedTracker=tracker();agedTracker.verifiedAt=new Date(t-2*24*60*60*1000).toISOString();
+ assert.equal(run(census(cur),agedTracker),null,'without a freeze, an old IP list is still declined');
+ const kept=run(census(old,frozen),agedTracker);assert.notEqual(kept,null,'frozen: an old IP list tied to the same census is accepted');
+ assert.equal(kept.trackerVerifiedAt,agedTracker.verifiedAt,'its real age is reported, never refreshed');
+ assert.equal(kept.inventoryFrozenAt,frozen.acceptedAt);assert.equal('inventoryFrozenAt' in fresh,false);
+ assert.deepEqual(kept.items,fresh.items,'health results are unchanged by the freeze');
+ // ...but a future-dated list, or one for another census or with different A#s, is still declined.
+ const future=tracker();future.verifiedAt=new Date(t+60*60*1000).toISOString();
+ assert.equal(run(census(old,frozen),future),null);
+ const fewer=tracker();fewer.records=fewer.records.slice(1);
+ assert.equal(run(census(old,frozen),fewer),null,'an IP list missing an A# is still declined');
+ // The screen-side reader accepts the frozen envelope and still rejects an unfrozen stale one.
+ const {readExactProductConnections}=await import('../src/exactProductConnection.ts');
+ const fieldIds=['1001','1002','1003'];
+ assert.notEqual(readExactProductConnections(kept,sha,fieldIds,t),null);
+ const {inventoryFrozenAt,...unfrozen}=kept;assert.equal(readExactProductConnections(unfrozen,sha,fieldIds,t),null);
+ assert.equal(readExactProductConnections({...kept,inventoryFrozenAt:new Date(t+60000).toISOString()},sha,fieldIds,t),null);
  const otherTracker=tracker();otherTracker.expectedMhelpSourceSha256='c'.repeat(64);
  assert.equal(run(census(old,frozen),otherTracker),null,'a tracker read for a different census is still declined');
 });
