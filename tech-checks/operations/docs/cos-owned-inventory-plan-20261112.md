@@ -56,3 +56,29 @@ Each step: local tests, hosted checks, Vision review, read-only precheck, James'
 - Repair of `address_automation_sync_v1` (re-reads all history per source; retried every minute
   and exhausted the disk budget overnight). Stays paused.
 - Pruning of 288+ stored mHelp batches and `cron.job_run_details`.
+
+## Progress and findings, 2026-11-12 1:00 PM CT
+- **Production:** #383 rolled back 12:22 PM (both functions pinned `b5b1882`, bundle hashes equal to the
+  pre-install versions). Boards complete again from 12:26 PM. Bridge: `cos-mhelp-inventory-sync` every
+  30 min (`5,35`), tracker publish unchanged. Address automation still paused; its sync step was run
+  once by hand at 12:02 PM for the then-active source.
+- **Built on this branch (not deployed):**
+  - a census named by a matching freeze is not stale (`mhelpInventoryAuthority.ts`);
+  - under a freeze the IP census age is reported, not enforced, and the envelope carries
+    `inventoryFrozenAt` (`exactProductConnection.ts`); every other census rule still applies;
+  - packaged board and reviewed frontend rebuilt; local tests pass.
+- **Still to build, in order:**
+  1. Tech Check SQL: freeze record (fingerprint, real read time, acceptor) with Owner-only
+     freeze/unfreeze, and the marker delivered on the census in BOTH routes that read it
+     (field map and Product-ID connections). Route RPCs are `service_role`-only, security definer,
+     and take the actor id — follow `cos_mhelp_placement_snapshot`.
+  2. Camera project SQL: `cos_tracker_endpoint_read_v1` drops receipts past `expiresAt`, so with the
+     tracker publish off the IP list would empty out. Under a freeze the last complete generation
+     must be kept as the COS-owned list (no expiry), and manual IP edits become new audited
+     receipts in that generation's shape.
+  3. Edge code + bundled `serve.ts` for 1–2, with a test that runs the bundled route end to end.
+  4. Board label "Inventory frozen – mHelp as of <real date>".
+  5. Owner/IT edit screens (Field/Shop, customer/site, IP) with append-only receipts.
+  6. Then pause `cos-mhelp-inventory-sync` and `cos-sheets-placement-publish`.
+- **Install rules added today:** database healthy first; after any deploy a board run must complete
+  or the deploy is rolled back immediately.
