@@ -44,6 +44,10 @@ alter table public.camera_unit_router_corrections enable row level security;
 -- receipts are written solely by the two functions below, which run as their owner.
 revoke all on public.camera_unit_router_corrections from public,anon,authenticated,service_role;
 grant select on public.camera_unit_router_corrections to service_role;
+-- The identity sequence orders receipts, and that order decides which correction
+-- may be reversed. Default privileges would let the API roles move it (setval)
+-- even with table writes revoked, so take the sequence back as well.
+revoke all on sequence public.camera_unit_router_corrections_seq_seq from public,anon,authenticated,service_role;
 
 create function public.camera_unit_router_corrections_immutable() returns trigger language plpgsql as $$
 begin raise exception 'Router correction receipts are append-only' using errcode='PT409'; end$$;

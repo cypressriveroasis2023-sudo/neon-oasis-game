@@ -32,6 +32,8 @@ field, no A# link, no history table and no change trigger. Today its writers are
 8. Only the latest correction still in effect for a router record can be reversed.
 9. `service_role` can read receipts but cannot insert, update, delete or truncate them directly,
    even though production default privileges would otherwise grant that and it bypasses RLS.
+10. No API role can read or move the receipt identity sequence (`setval`, `nextval`, `currval`);
+    receipt order decides which correction may be reversed.
 
 ## What a correction changes
 Only the named router row: `router_public_ip`; `reported_status`, `status_source`,

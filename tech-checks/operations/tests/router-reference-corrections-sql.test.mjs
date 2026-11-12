@@ -82,6 +82,12 @@ test('the install alters no existing object and only the service role may call i
  assert.equal(psql(`select rolbypassrls from pg_roles where rolname='service_role';`),'t');
  assert.equal(psql(`select string_agg(privilege_type,',' order by privilege_type) from information_schema.role_table_grants where table_name='camera_unit_router_corrections' and grantee in('anon','authenticated','service_role','PUBLIC');`),'SELECT');
  assert.equal(psql(`set role service_role; select count(*) from public.camera_unit_router_corrections;`),'0');
+ // The receipt order decides which correction may be reversed, so no API role may read or move its sequence.
+ const seqName='public.camera_unit_router_corrections_seq_seq';
+ assert.equal(psql(`select pg_get_serial_sequence('public.camera_unit_router_corrections','seq');`),seqName);
+ for(const role of ['anon','authenticated','service_role'])for(const stmt of [`select setval('${seqName}',1,false)`,`select setval('${seqName}',9999)`,`select nextval('${seqName}')`,`select currval('${seqName}')`,`select last_value from ${seqName}`])
+  fails(()=>psql(`set role ${role}; ${stmt};`),/permission denied for sequence camera_unit_router_corrections_seq_seq/);
+ assert.equal(psql(`select count(*) from information_schema.role_usage_grants where object_name='camera_unit_router_corrections_seq_seq' and grantee in('anon','authenticated','service_role','PUBLIC');`),'0');
  // The same statement as the table owner is structurally valid — the refusal above is the privilege, not the shape.
  assert.equal(psql(`begin; ${direct} select count(*) from public.camera_unit_router_corrections; rollback;`),'1');
  assert.equal(receipts(),0);
@@ -114,6 +120,8 @@ test('a correction keeps the whole prior row, changes only the address fields an
  const out=correct();assert.deepEqual(out,{contract:'COS_ROUTER_CORRECTION_V1',id:id(1),applied:true,repeat:false});
  const now=row(182),r=JSON.parse(psql(`select to_jsonb(c) from public.camera_unit_router_corrections c where id='${id(1)}';`));
  assert.deepEqual(r.prior_row,prior);assert.equal(r.old_public_ip,'166.168.147.21');assert.equal(r.new_public_ip,'38.246.194.11');
+ // The security-definer function still draws from the locked sequence (the owner's rolled-back insert above used one value).
+ assert.ok(Number.isInteger(r.seq)&&r.seq>=1);assert.equal(psql(`select max(seq) from public.camera_unit_router_corrections;`),String(r.seq));
  assert.equal(r.router_serial,'RF3152533023889');assert.equal(r.product_id,'2300342');assert.equal(r.cos_unit_id,UNIT);assert.equal(r.provider,'InHand');assert.equal(r.approved_by,'James Martin');
  assert.equal(now.router_public_ip,'38.246.194.11');assert.equal(now.current_status,'unknown');assert.equal(now.last_checked_at,null);assert.equal(now.last_online_at,null);assert.equal(now.reported_latency_ms,null);
  assert.equal(now.reported_status,'online');assert.equal(now.status_source,'InHand Device Manager live read');assert.equal(now.status_observed_at,r.observed_at);
@@ -133,7 +141,7 @@ test('repeating the same correction is harmless; reusing its id for something el
  assert.deepEqual(correct({observedAt:a}),{contract:'COS_ROUTER_CORRECTION_V1',id:id(1),applied:false,repeat:true});
  fails(()=>correct({observedAt:a,newIp:'38.246.194.12'}),/already used for a different change/);
  // Every reviewed field is part of the replay comparison.
- for(const change of [{unitId:'22222222-2222-4222-8222-222222222222'},{unitKey:'SOLARSPOTTER 054'},{routerId:79},{oldIp:'166.168.147.22'},{serial:'RF3152533023880'},{productId:'2300343'},{provider:'Other'},{source:'Another source'},{status:'offline'},{approvedBy:'Someone Else'},{approvalSource:'Another approval'},{reason:'Another reason'},{observedAt:'2026-11-11T23:00:00Z'}])
+ for(const change of [{unitId:'22222222-2222-4222-8222-222222222222'},{unitKey:'SOLARSPOTTER 054'},{routerId:79},{oldIp:'166.168.147.22'},{serial:'RF3152533023880'},{productId:'2300343'},{provider:'Other'},{source:'Another source'},{status:'offline'},{approvedBy:'Someone Else'},{approvalSource:'Another approval'},{reason:'Another reason'},{observedAt:new Date(Date.now()-60*60*1000).toISOString()}])
   fails(()=>correct({observedAt:a,...change}),/already used for a different change/);
  fails(()=>correct({id:id(4),routerId:79,unitKey:'SPOTTER 185',oldIp:'166.203.205.83',newIp:'38.246.195.93',serial:'RF3152533023889',productId:'2257840'}),/serial is already recorded for another router record/);
  assert.equal(hash('public.camera_unit_routers'),before);assert.equal(receipts(),1);
