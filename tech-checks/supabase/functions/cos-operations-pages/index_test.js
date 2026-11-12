@@ -14,6 +14,15 @@ const technicians = {
 const orgId = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
+// Star4Live camera rows as the camera project returns them: four cameras on one
+// field unit with one down, a unit online in root, and a retired COS record.
+const starCamera = (over={}) => ({id:over.id??1,device_name:'SS006_1',unit_key:'SOLARSPOTTER 006',organization:'ERock - Hyperion',vigilant_status:'Online',activation_state:'active',source_last_seen_at:'2026-11-12T22:18:00Z',public_ip:'38.246.194.14',star_organization_id:'2104174',...over});
+const starCameras = (scenario={}) => scenario.starCameras || [
+  starCamera({id:1}), starCamera({id:2,device_name:'SS006_2'}), starCamera({id:3,device_name:'SS006_3'}),
+  starCamera({id:4,device_name:'SS006_4',vigilant_status:'Offline'}),
+  starCamera({id:5,device_name:'SS058_1',unit_key:'SOLARSPOTTER 058',organization:'root',star_organization_id:'283838'}),
+  starCamera({id:6,device_name:'SS006_4 (old, not in VCC)',organization:'Blazer Bldg SW - Hartwood At Windstone',vigilant_status:'Offline',activation_state:'deactivated'}),
+];
 function transport(scenario, calls) {
   const technician = technicians[scenario.userId];
   const mappedActor = technician?.actorId || actorId;
@@ -24,6 +33,11 @@ function transport(scenario, calls) {
     if (url.includes('/rest/v1/user_profiles?')) return json([{user_id:mappedActor,display_name:scenario.platformName || technician?.name || 'Owner',active:!scenario.actorInactive,department:scenario.actorDepartment || technician?.department || 'owner'}]);
     if (url.includes('/rest/v1/user_roles?')) return json(scenario.roleRevoked ? [] : [{role_id:recordId,roles:{code:scenario.wrongRole ? 'owner' : technician?.roleCode || 'owner',organization_id:scenario.wrongRoleOrg ? recordId : orgId}}]);
     if (url.includes('/rest/v1/visit_assignments?')) return json(scenario.outsideOrg ? [] : [{visit_id:recordId,user_id:scenario.otherAssignee ? actorId : mappedActor,assignment_role:'technician',status:'assigned',assigned_at:'2026-10-04T10:00:00Z',job_visits:{id:recordId,job_id:recordId,visit_number:1,visit_type:'IT_PREP',department:technician?.department || 'it',status:'scheduled',dispatch_status:'ready',scheduled_start:'2026-10-04T15:00:00Z',scheduled_end:'2026-10-04T16:00:00Z',jobs:{job_number:'COS 001',title:'Assigned Job',job_type:'DELIVERY',customers:{name:'Customer'},sites:{name:'Site'}}}}]);
+    if (url.includes('/rest/v1/camera_devices?')) return json(url.includes('offset=0') ? starCameras(scenario) : []);
+    if (url.includes('/rest/v1/camera_integrations?')) {
+      if (scenario.starFeedUnreadable) return json({message:'unavailable'},500);
+      return json(url.includes('offset=0') ? [{provider:'vigilant',enabled:scenario.starFeedDisabled!==true,last_sync_at:scenario.starSyncedAt||new Date(Date.now()-5*60*1000).toISOString(),last_sync_status:scenario.starSyncStatus||'ok'}] : []);
+    }
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
     if (url.includes('/rest/v1/rpc/')) {
       if (scenario.rpcDenied) return json({message:'Native department or workflow guard rejected the request'},400);
@@ -127,6 +141,14 @@ const cases = [
  ['native GPS contract permitted', '/api/field-map/'+recordId+'/gps', 'POST', {latitude:30.123456,longitude:-97.123456,accuracyM:0,source:'manual',note:'Verified'}, 200],
  ['wall clock schedule contract permitted', '/api/jobs/'+recordId+'/schedule', 'POST', {start:'2026-10-04T10:00',end:'2026-10-04T11:00',technician:'Tech'}, 200],
  ['native task create contract permitted', '/api/owner-tasks', 'POST', {title:'Review',assignedDepartment:'it',priority:'medium',dueAt:'2026-10-04T15:00:00Z'}, 201],
+ ['star unit status read available','/api/unit-camera-status','GET',{},200],
+ ['star unit status available to verified IT','/api/unit-camera-status','GET',{},200,{userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['star unit status denied to service technician','/api/unit-camera-status','GET',{},403,{userId:'78e54fbd-c2db-4d18-8e3d-a9740adcf285'}],
+ ['star unit status rejects a body','/api/unit-camera-status','GET',{placement:'field'},400],
+ ['star unit status rejects a write','/api/unit-camera-status','POST',{},405],
+ ['stale star sync reads unknown','/api/unit-camera-status','GET',{},200,{starSyncedAt:'2026-01-01T00:00:00Z'}],
+ ['failed star sync reads unknown','/api/unit-camera-status','GET',{},200,{starSyncStatus:'error'}],
+ ['unreadable star sync row reads unknown','/api/unit-camera-status','GET',{},200,{starFeedUnreadable:true}],
 ];
 for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
   Deno.test(name, async () => {
@@ -160,6 +182,25 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
       const payload=rpcCalls.at(-1).body;
       if(payload.p_unit_id!==recordId||payload.p_accuracy_m!==0)throw new Error('GPS contract changed target or zero accuracy.');
     }
+    if(name.startsWith('star unit status')&&status===200) {
+      if(data.contract!=='COS_STAR_UNIT_STATUS_V1')throw new Error('Unit status contract missing.');
+      const unit=data.units.find(row=>row.unit==='SOLARSPOTTER 006'),shop=data.units.find(row=>row.unit==='SOLARSPOTTER 058');
+      if(data.units.length!==2)throw new Error('Expected one line per unit, received '+data.units.length);
+      if(unit.cameras!==4||unit.online!==3||unit.offline!==1||unit.state!=='YELLOW')throw new Error('Field unit roll-up changed: '+JSON.stringify(unit));
+      if(unit.site!=='ERock - Hyperion'||unit.placement!=='FIELD')throw new Error('Field site or placement changed.');
+      if(unit.down.length!==1||unit.down[0].name!=='SS006_4')throw new Error('Down cameras were not named.');
+      if(shop.placement!=='SHOP'||shop.onlineInShop!==true||shop.site!==null)throw new Error('A unit online in root must stay in the shop.');
+      if(data.counts.field.units!==1||data.counts.field.yellow!==1||data.counts.field.red!==0)throw new Error('Field counts changed: '+JSON.stringify(data.counts.field));
+      if(data.counts.shop.units!==1||data.counts.shop.onlineInShop!==1)throw new Error('Shop counts changed: '+JSON.stringify(data.counts.shop));
+      if(calls.some(call=>call.method!=='GET'&&call.url.includes('/rest/v1/camera')))throw new Error('A read-only route wrote to the camera project.');
+      if(calls.some(call=>call.url.includes('/rpc/cos_mhelp')||call.url.includes('inventory-sync')))throw new Error('The Star4Live route reached mHelp.');
+    }
+    if(['stale star sync reads unknown','failed star sync reads unknown','unreadable star sync row reads unknown'].includes(name)) {
+      if(data.feed.fresh!==false)throw new Error('An unproven feed was presented as current.');
+      if(!data.units.every(row=>row.state==='UNKNOWN'&&row.offline===0&&row.onlineInShop===false))throw new Error('An unproven feed reported health: '+JSON.stringify(data.units));
+      if(data.counts.field.red!==0||data.counts.field.unknown!==1||data.counts.shop.onlineInShop!==0)throw new Error('An unproven feed changed the counts.');
+    }
+    if(name==='star unit status read available'&&data.feed.fresh!==true)throw new Error('A fresh sync was not accepted.');
     if(name==='wall clock schedule contract permitted'&&rpcCalls.at(-1).body.p_start_local!=='2026-10-04 10:00')throw new Error('Local wall time was converted.');
     if(name==='native task create contract permitted'&&(rpcCalls.at(-1).body.p_task_id!==null||rpcCalls.at(-1).body.p_payload.priority!=='medium'))throw new Error('Task create contract changed.');
   });
