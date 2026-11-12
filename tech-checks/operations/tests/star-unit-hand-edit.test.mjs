@@ -1,16 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
-import {mkdtempSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-
-const dir = mkdtempSync(join(tmpdir(), 'star-hand-edit-'));
-execFileSync('npx', ['tsc', 'operations/shared/starUnitHandEdit.ts', 'operations/shared/starUnitStatus.ts',
-  '--target', 'es2022', '--module', 'es2022', '--moduleResolution', 'bundler',
-  '--allowImportingTsExtensions', '--rewriteRelativeImportExtensions', '--outDir', dir], {cwd: process.cwd(), stdio: 'pipe'});
-writeFileSync(join(dir, 'package.json'), JSON.stringify({type: 'module'}));
-const {checkedHandEditRequest, publicIpv4, HandEditError} = await import(join(dir, 'starUnitHandEdit.js'));
+import {checkedHandEditRequest, publicIpv4, HandEditError} from '../shared/starUnitHandEdit.ts';
 
 const REQUEST = '0d3a6038-1f3e-4a2e-9d7a-2b9c6f5a1e44';
 const units = [
