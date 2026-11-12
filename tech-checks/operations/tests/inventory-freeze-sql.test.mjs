@@ -26,7 +26,15 @@ const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',OWNER='11111111-1111-4111-8111-
 const A='a'.repeat(64),B='b'.repeat(64),id=n=>'50000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const call=(actor,rid,action,payload,role='service_role')=>JSON.parse(psql(`set role ${role}; select public.cos_inventory_freeze_v1(${q(actor)},${q(ORG)},${q(rid)},${q(action)},${q(JSON.stringify(payload))}::jsonb);`));
 const state=()=>JSON.parse(psql(`set role service_role; select public.cos_inventory_freeze_state_v1(${q(ORG)});`));
-const approve=(extra={})=>({sourceSha256:A,recordCount:4,fieldCount:3,shopCount:1,acceptedByName:'James Martin',reason:'COS keeps its own copy; inventory is edited by hand',...extra});
+const ipCensus=(sha,extra={})=>({contract:'COS_TRACKER_CONNECTION_CENSUS_V2',expectedMhelpSourceSha256:sha,verifiedAt:'2026-11-11T18:40:00.000Z',records:[
+ {productId:'1001',recordId:'mhelp_product:1001',placement:'FIELD',publicIp:'8.8.8.8',sourceRow:2,reviewReasons:[]},
+ {productId:'1002',recordId:'mhelp_product:1002',placement:'FIELD',publicIp:'9.9.9.9',sourceRow:3,reviewReasons:[]},
+ {productId:'1003',recordId:'mhelp_product:1003',placement:'FIELD',publicIp:null,sourceRow:4,reviewReasons:[]},
+ {productId:'1004',recordId:'mhelp_product:1004',placement:'SHOP',publicIp:null,sourceRow:5,reviewReasons:[]}],...extra});
+const approve=(extra={})=>({sourceSha256:A,recordCount:4,fieldCount:3,shopCount:1,acceptedByName:'James Martin',reason:'COS keeps its own copy; inventory is edited by hand',ipCensus:ipCensus(extra.sourceSha256||A),...extra});
+const edit=(actor,rid,payload,role='service_role')=>JSON.parse(psql(`set role ${role}; select public.cos_inventory_ip_edit_v1(${q(actor)},${q(ORG)},${q(rid)},${q(JSON.stringify({editedByName:'Teddy',reason:'Confirmed in VCC',...payload}))}::jsonb);`));
+const ipOf=pid=>state().ipCensus.records.find(r=>r.productId===pid).publicIp;
+const TECH='33333333-3333-4333-8333-333333333333';
 const rows=()=>Number(psql('select count(*) from cos_mhelp_placement_private.inventory_freeze_log;'));
 const READ_AT='2026-11-11T18:36:05.112Z';
 test.before(()=>{if(!canRun)return;
@@ -47,7 +55,7 @@ test.before(()=>{if(!canRun)return;
    ('${'c'.repeat(64)}','p3','{"complete":true,"reviewed":null,"recordCount":4,"receivedAt":"2026-11-11T19:35:00.000Z"}',${q(recs('SHOP'))});
   insert into cos_mhelp_placement_private.upload_control values(true,${q(A)});
   create function app_private.cos_owner_identity_assert_actor(p_actor uuid,p_org uuid,p_write boolean) returns void language plpgsql as $$
-   begin if p_actor is distinct from '${OWNER}'::uuid or p_org is distinct from '${ORG}'::uuid then raise exception 'Owner access required' using errcode='42501'; end if; end$$;`);
+   begin if p_org is distinct from '${ORG}'::uuid or not(p_actor='${OWNER}'::uuid or (not p_write and p_actor='${IT}'::uuid)) then raise exception 'Owner access required' using errcode='42501'; end if; end$$;`);
  psql(install,{file:true});
 });
 test.after(()=>{if(canRun&&dir)try{sh(`${bin}/pg_ctl -D ${dir}/data -m immediate stop >/dev/null`);}catch{}});
@@ -70,6 +78,13 @@ test('only the Owner can freeze, only the exact active reviewed census, and only
  fails(()=>call(OWNER,id(1),'freeze',approve({fieldCount:4,shopCount:0})),/totals do not match/);
  fails(()=>call(OWNER,id(1),'freeze',approve({recordCount:5})),/totals do not match/);
  fails(()=>call(OWNER,id(1),'freeze',approve({reason:' '})),/incomplete/);
+ // The IP list approved with it must be for this census and list exactly its A#s.
+ fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:undefined})),/IP list does not match/);
+ fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:ipCensus(B)})),/IP list does not match/);
+ const short=ipCensus(A);short.records.pop();fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:short})),/IP list does not match/);
+ const dup=ipCensus(A);dup.records[3].productId='1001';fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:dup})),/IP list does not match/);
+ const stranger=ipCensus(A);stranger.records[3].productId='7777';fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:stranger})),/IP list does not match/);
+ fails(()=>edit(OWNER,id(50),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'}),/not frozen/);
  fails(()=>call(OWNER,id(1),'freeze',approve({acceptedByName:''})),/incomplete/);
  fails(()=>call(OWNER,id(1),'thaw',approve()),/incomplete/);
  fails(()=>call(OWNER,id(1),'unfreeze',approve()),/not frozen/);
@@ -93,6 +108,42 @@ test('a freeze records the real mHelp read time, and the app-side rule accepts e
  assert.equal(readMhelpInventoryAuthority(census(B),later).stale,true,'the same freeze does not cover a different census');
 });
 
+test('IPs change only by a recorded hand edit from the Owner or IT, one A# at a time',{skip},()=>{
+ assert.deepEqual(state().ipCensus,ipCensus(A),'the approved IP list is served exactly as approved');
+ assert.deepEqual(state().ipEdits,{count:0,lastAt:null});
+ fails(()=>edit(TECH,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'}),/Owner access required/);
+ for(const role of ['anon','authenticated'])fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'},role),/permission denied/);
+ fails(()=>edit(IT,id(51),{productId:'9999',expectedOldIp:null,newIp:'8.8.4.4'}),/not in the approved COS inventory/);
+ fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'1.1.1.1',newIp:'8.8.4.4'}),/changed since you opened it/);
+ fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'9.9.9.9'}),/A# 1002 already has that IP/);
+ fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.8.8'}),/already the saved IP/);
+ for(const bad of ['192.168.1.10','10.0.0.5','999.1.1.1','8.8.8','8.8.8.8/24','008.8.8.8','example.com','127.0.0.1'])
+  fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:bad}),/public IPv4/);
+ fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4',reason:' '}),/incomplete/);
+ fails(()=>edit(IT,id(51),{productId:'1001',newIp:'8.8.4.4'}),/incomplete/);
+ assert.equal(psql('select count(*) from cos_mhelp_placement_private.inventory_ip_edit_log;'),'0');
+ // IT corrects one; the Owner fills in a blank; IT clears one.
+ assert.equal(edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'}).applied,true);
+ assert.equal(edit(OWNER,id(52),{productId:'1003',expectedOldIp:null,newIp:'1.1.1.1',editedByName:'James Martin'}).applied,true);
+ assert.equal(edit(IT,id(53),{productId:'1002',expectedOldIp:'9.9.9.9',newIp:null}).applied,true);
+ assert.deepEqual([ipOf('1001'),ipOf('1002'),ipOf('1003'),ipOf('1004')],['8.8.4.4',null,'1.1.1.1',null]);
+ // Everything else about the approved list is untouched, and its real date has not moved.
+ const now=state().ipCensus,seed=ipCensus(A);
+ assert.equal(now.verifiedAt,seed.verifiedAt);assert.equal(now.expectedMhelpSourceSha256,A);
+ assert.deepEqual(now.records.map(({publicIp,...rest})=>rest),seed.records.map(({publicIp,...rest})=>rest));
+ assert.equal(state().ipEdits.count,3);
+ // Repeat of the same edit is a no-op; the same id for something else is refused; the freed IP can now be used.
+ assert.deepEqual(edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'}),{contract:'COS_INVENTORY_IP_EDIT_RESULT_V1',id:id(51),applied:false,repeat:true});
+ fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.5'}),/already used for a different change/);
+ assert.equal(edit(IT,id(54),{productId:'1004',expectedOldIp:null,newIp:'9.9.9.9'}).applied,true);
+ // Each edit is kept with who, old and new; the history cannot be altered.
+ assert.equal(psql(`select string_agg(product_id||':'||coalesce(old_ip,'-')||'>'||coalesce(new_ip,'-')||':'||edited_by_name,' | ' order by seq) from cos_mhelp_placement_private.inventory_ip_edit_log;`),
+  '1001:8.8.8.8>8.8.4.4:Teddy | 1003:->1.1.1.1:James Martin | 1002:9.9.9.9>-:Teddy | 1004:->9.9.9.9:Teddy');
+ fails(()=>psql(`update cos_mhelp_placement_private.inventory_ip_edit_log set new_ip='1.2.3.4';`),/append-only/);
+ fails(()=>psql(`delete from cos_mhelp_placement_private.inventory_ip_edit_log;`),/append-only/);
+ for(const role of ['anon','authenticated','service_role'])fails(()=>psql(`set role ${role}; insert into cos_mhelp_placement_private.inventory_ip_edit_log(id,organization_id,freeze_id,product_id,old_ip,new_ip,edited_by,edited_by_name,reason) values('${id(98)}','${ORG}','${id(1)}','1001','a','b','${IT}','x','y');`),/permission denied/);
+});
+
 test('repeats are harmless only when identical; a second freeze is refused',{skip},()=>{
  assert.deepEqual(call(OWNER,id(1),'freeze',approve()),{contract:'COS_INVENTORY_FREEZE_RESULT_V1',id:id(1),applied:false,repeat:true});
  fails(()=>call(OWNER,id(1),'freeze',approve({reason:'different'})),/already used for a different change/);
@@ -112,13 +163,16 @@ test('while frozen the approved census cannot be swapped out, and loading batche
 test('history is append-only; unfreezing is a new Owner entry and restores normal behaviour',{skip},()=>{
  fails(()=>psql(`update cos_mhelp_placement_private.inventory_freeze_log set reason='x';`),/append-only/);
  fails(()=>psql(`delete from cos_mhelp_placement_private.inventory_freeze_log;`),/append-only/);
- fails(()=>psql(`truncate cos_mhelp_placement_private.inventory_freeze_log;`),/append-only/);
+ fails(()=>psql(`truncate cos_mhelp_placement_private.inventory_freeze_log;`),/append-only|referenced in a foreign key/);
+ fails(()=>psql(`truncate cos_mhelp_placement_private.inventory_freeze_log cascade;`),/append-only/);
  fails(()=>call(IT,id(3),'unfreeze',approve()),/Owner access required/);
  assert.equal(call(OWNER,id(3),'unfreeze',approve({reason:'Resume mHelp updates'})).applied,true);
  assert.deepEqual(state(),{contract:'COS_INVENTORY_FREEZE_STATE_V1',state:'none'});
  assert.equal(psql(`update cos_mhelp_placement_private.upload_control set active_sha256='${B}' where singleton returning 1;`),'1');
  // A later freeze names the census active then, with its own totals and read time.
- assert.equal(call(OWNER,id(4),'freeze',approve({sourceSha256:B,fieldCount:4,shopCount:0})).applied,true);
+ const second=ipCensus(B);second.records[3].placement='FIELD';
+ assert.equal(call(OWNER,id(4),'freeze',approve({sourceSha256:B,fieldCount:4,shopCount:0,ipCensus:second})).applied,true);
+ assert.deepEqual(state().ipCensus,second,'a new freeze starts from its own approved IP list; earlier edits do not carry over silently');
  assert.equal(state().freeze.sourceReadAt,'2026-11-11T19:05:00.000Z');assert.equal(rows(),3);
 });
 
