@@ -39,6 +39,35 @@ export type UnitCameraStatus = {
   onlineInShop: boolean;
   publicIp: string | null;
   observedAt: string | null;
+  providerPlacement?: 'FIELD' | 'SHOP';
+  providerSite?: string | null;
+  providerPublicIp?: string | null;
+  handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
+};
+
+export const HAND_EDIT_FIELDS = ['placement', 'site', 'public_ip'] as const;
+export type HandEditField = typeof HAND_EDIT_FIELDS[number];
+
+export type HandEdit = {
+  unit_key?: string | null;
+  field?: string | null;
+  action?: string | null;
+  value?: string | null;
+  provider_value?: string | null;
+  actor_name?: string | null;
+  actor_role?: string | null;
+  reason?: string | null;
+  created_at?: string | null;
+};
+
+export type AppliedHandEdit = {
+  value: string | null;
+  by: string;
+  role: string;
+  at: string | null;
+  reason: string | null;
+  providerValue: string | null;
+  providerAgrees: boolean;
 };
 
 export type UnitCameraStatusReport = {
@@ -129,23 +158,24 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
     });
   }
   units.sort((a, b) => a.unit.localeCompare(b.unit, 'en', { numeric: true }));
-  const fieldUnits = units.filter(u => u.placement === 'FIELD'), shopUnits = units.filter(u => u.placement === 'SHOP');
+  return { contract: STAR_UNIT_STATUS_CONTRACT, units, counts: countUnits(units) };
+}
+
+/** One place builds the totals, so every projection of these units agrees. */
+export function countUnits(units: UnitCameraStatus[]): UnitCameraStatusReport['counts'] {
+  const field = units.filter(u => u.placement === 'FIELD'), shop = units.filter(u => u.placement === 'SHOP');
   return {
-    contract: STAR_UNIT_STATUS_CONTRACT,
-    units,
-    counts: {
-      units: units.length,
-      cameras: units.reduce((total, u) => total + u.cameras, 0),
-      field: {
-        units: fieldUnits.length,
-        green: fieldUnits.filter(u => u.state === 'GREEN').length,
-        yellow: fieldUnits.filter(u => u.state === 'YELLOW').length,
-        red: fieldUnits.filter(u => u.state === 'RED').length,
-        unknown: fieldUnits.filter(u => u.state === 'UNKNOWN').length,
-        camerasDown: fieldUnits.reduce((total, u) => total + u.offline, 0),
-      },
-      shop: { units: shopUnits.length, onlineInShop: shopUnits.filter(u => u.onlineInShop).length },
+    units: units.length,
+    cameras: units.reduce((total, u) => total + u.cameras, 0),
+    field: {
+      units: field.length,
+      green: field.filter(u => u.state === 'GREEN').length,
+      yellow: field.filter(u => u.state === 'YELLOW').length,
+      red: field.filter(u => u.state === 'RED').length,
+      unknown: field.filter(u => u.state === 'UNKNOWN').length,
+      camerasDown: field.reduce((total, u) => total + u.offline, 0),
     },
+    shop: { units: shop.length, onlineInShop: shop.filter(u => u.onlineInShop).length },
   };
 }
 
@@ -175,13 +205,68 @@ export function applyFeedFreshness(
     down: unit.down.map(camera => ({...camera, status: 'unknown' as const})),
     onlineInShop: false,
   }));
-  const field = units.filter(unit => unit.placement === 'FIELD');
-  return {
-    ...report, feed: stamped, units,
-    counts: {
-      ...report.counts,
-      field: {units: field.length, green: 0, yellow: 0, red: 0, unknown: field.length, camerasDown: 0},
-      shop: {units: units.length - field.length, onlineInShop: 0},
-    },
-  };
+  return {...report, feed: stamped, units, counts: countUnits(units)};
+}
+
+const unitMatchKey = (value: unknown) => text(value).toUpperCase();
+
+/**
+ * Apply hand edits made by the Owner or verified IT on top of the provider's
+ * reading. An edit can move a unit between Field and Shop, name its site, or
+ * correct its public IP. It can never change whether a camera is online: that
+ * stays the provider's word alone.
+ *
+ * The provider's own values are kept beside the edit, so the board can show
+ * both and say when Star4Live has caught up with what a person entered.
+ */
+export function applyHandEdits(
+  report: UnitCameraStatusReport,
+  edits: HandEdit[] | null | undefined,
+): UnitCameraStatusReport {
+  const byUnit = new Map<string, Partial<Record<HandEditField, HandEdit>>>();
+  for (const edit of Array.isArray(edits) ? edits : []) {
+    const unit = unitMatchKey(edit?.unit_key), field = text(edit?.field) as HandEditField;
+    if (!unit || !HAND_EDIT_FIELDS.includes(field)) continue;
+    if (text(edit?.action) === 'clear') continue; // A cleared edit leaves the provider's value in place.
+    if (text(edit?.action) !== 'set' || edit?.value == null) continue;
+    const held = byUnit.get(unit) || {};
+    held[field] = edit;
+    byUnit.set(unit, held);
+  }
+  if (!byUnit.size) return report;
+  const units = report.units.map(unit => {
+    const held = byUnit.get(unitMatchKey(unit.unit));
+    if (!held) return unit;
+    const applied: Partial<Record<HandEditField, AppliedHandEdit>> = {};
+    const record = (field: HandEditField, providerValue: string | null) => {
+      const edit = held[field];
+      if (!edit) return null;
+      const value = text(edit.value);
+      applied[field] = {
+        value, by: text(edit.actor_name) || 'Unknown', role: text(edit.actor_role) || 'unknown',
+        at: text(edit.created_at) || null, reason: text(edit.reason) || null,
+        providerValue, providerAgrees: providerValue !== null && providerValue === value,
+      };
+      return value;
+    };
+    const placement = record('placement', unit.placement) as 'FIELD' | 'SHOP' | null;
+    const site = record('site', unit.site);
+    const publicIp = record('public_ip', unit.publicIp);
+    const nextPlacement = placement === 'FIELD' || placement === 'SHOP' ? placement : unit.placement;
+    const nextSite = nextPlacement === 'FIELD' ? (site ?? unit.site) : null;
+    return {
+      ...unit,
+      placement: nextPlacement,
+      site: nextSite,
+      siteNamePending: nextSite === null ? false : site !== null ? false : unit.siteNamePending,
+      // Where a unit sits never changes whether its cameras answered.
+      onlineInShop: nextPlacement === 'SHOP' && unit.online > 0,
+      publicIp: publicIp ?? unit.publicIp,
+      providerPlacement: unit.placement,
+      providerSite: unit.site,
+      providerPublicIp: unit.publicIp,
+      handEdits: applied,
+    };
+  });
+  return {...report, units, counts: countUnits(units)};
 }
