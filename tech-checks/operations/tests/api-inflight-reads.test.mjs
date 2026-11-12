@@ -10,6 +10,7 @@ import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {checkedFieldMap} from '../src/gpsPersistence.ts';
 import {createOperationsSessionRecovery} from '../src/operationsSessionRecovery.ts';
 import {readExactProductConnections} from '../src/exactProductConnection.ts';
+import {UNIT_CAMERA_STATUS_PATHS} from '../../supabase/functions/cos-unit-camera-status/servedPath.ts';
 import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS} from '../src/refreshCadence.ts';
 import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
 import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
@@ -58,7 +59,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:name==='../../supabase/functions/cos-unit-camera-status/servedPath'?{UNIT_CAMERA_STATUS_PATHS}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
