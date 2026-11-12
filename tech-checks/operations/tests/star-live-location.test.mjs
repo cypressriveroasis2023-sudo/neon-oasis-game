@@ -58,7 +58,23 @@ test('a name the provider itself supplies always wins, and missing organization 
 test('the sync writes the live organization for matched cameras and changes nothing in Star4Live',()=>{
  const src=readFileSync(new URL('../../supabase/functions/camera-provider-reconcile/index.ts',import.meta.url),'utf8');
  assert.match(src,/import \{starKnownSiteNames,starLiveOrganization\} from "\.\/star-live-location\.js"/);
+ assert.match(src,/from\("star4live_site_names"\)\.select\("organization_id,name"\)/);
  assert.match(src,/\.\.\.\(liveOrganization===undefined\?\{\}:\{organization:liveOrganization\}\)/);
  // Still the same three read calls and nothing else to the provider.
  assert.deepEqual([...new Set(src.match(/openapi\/[A-Za-z0-9/_-]+/g))].sort(),['openapi/user/account/server/getbyloginname','openapi/user/account/token/get','openapi/user/organization/sub/resource/list']);
+});
+
+test('a name a person verified for a site number wins, and exposes the same name carried elsewhere as stale',()=>{
+ // SS263's site (#1512402) was verified as "Division 1 New Caney"; SS039 (#1826680) still carries that name from September.
+ const resources=[res('L1','1512402'),res('L2','1512402'),res('L3','1512402'),res('M1','1826680'),res('M2','1826680'),res('M3','1826680'),res('M4','1826680')];
+ const locals=[local('L1',starPendingSiteName('1512402'),'1512402'),local('L2',starPendingSiteName('1512402'),'1512402'),local('L3',starPendingSiteName('1512402'),'1512402'),
+  local('M1','Division 1 New Caney','1826680'),local('M2','Division 1 New Caney','1826680'),local('M3','Division 1 New Caney','1826680'),local('M4','Division 1 New Caney','1826680')];
+ const known=starKnownSiteNames(resources,new Map(locals),undefined,[{organization_id:'1512402',name:'Division 1 New Caney'}]);
+ assert.equal(starLiveOrganization(resources[0],known),'Division 1 New Caney');
+ assert.equal(starLiveOrganization(resources[3],known),starPendingSiteName('1826680'),'the larger group no longer keeps a name verified for another site');
+ // Without the verified entry the old majority rule would have named the wrong site.
+ assert.equal(starLiveOrganization(resources[3],starKnownSiteNames(resources,new Map(locals))),'Division 1 New Caney');
+ // Verified names ignore root, blanks and pending labels, and never rename root.
+ const odd=starKnownSiteNames([res('N1',ROOT),res('N2','900')],new Map([local('N1','root',ROOT),local('N2','Old','900')]),undefined,[{organization_id:ROOT,name:'Not Root'},{organization_id:'900',name:' '},{organization_id:'901',name:'root'},null]);
+ assert.equal(starLiveOrganization(res('N1',ROOT),odd),'root');assert.equal(starLiveOrganization(res('N2','900'),odd),'Old');
 });

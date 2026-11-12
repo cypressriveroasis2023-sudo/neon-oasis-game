@@ -21,7 +21,7 @@ async function producer(resources,locals=[local()],options={}){
  const db={from(table){return {
   select(columns){selections.push({table,columns});return this},eq(){return this},in(){return this},
   maybeSingle(){return {data:{metadata:{existing:'preserved'}}}},
-  then(resolve){resolve({data:table==='camera_devices'?rows:(options.trackers||[])})},
+  then(resolve){resolve(table==='star4live_site_names'?(options.siteNamesError?{data:null,error:{message:'unavailable'}}:{data:options.siteNames||[]}):{data:table==='camera_devices'?rows:(options.trackers||[])})},
   update(patch){return {eq:async(column,id)=>{const clean=JSON.parse(JSON.stringify(patch));writes.push({table,id,patch:clean});Object.assign(rows.find(row=>row.id===id),clean);return {error:null}}}},
   upsert:async(patch)=>{integration.push(patch);return {error:null}}
  }}};
@@ -204,4 +204,15 @@ test('the sync moves Field/Shop and site with Star4Live\'s current organization,
   resource('s-sent-out',1,{deviceName:'Cam s-sent-out',organizationId:'500'}),resource('s-new-site',0,{deviceName:'Cam s-new-site',organizationId:'777'}),resource('s-no-org',1,{deviceName:'Cam s-no-org'}),
  ],r.rows);
  assert.ifError(again.error);assert.deepEqual(again.rows.map(row=>row.organization),r.rows.map(row=>row.organization));
+});
+
+test('verified site names reach the sync, and the sync still runs when that list cannot be read',async()=>{
+ const cam=(id,serial,organization,oid)=>local({id,device_serial:serial,external_device_id:'ext-'+serial,device_name:'Cam '+serial,unit_key:'Unit'+id,organization,source_metadata:{organizationId:oid}});
+ const list=()=>[resource('v-1',1,{deviceName:'Cam v-1',organizationId:'1512402'}),resource('v-2',1,{deviceName:'Cam v-2',organizationId:'1826680'}),resource('v-3',1,{deviceName:'Cam v-3',organizationId:'1826680'})];
+ const locals=()=>[cam(1,'v-1','root','1512402'),cam(2,'v-2','Division 1 New Caney','1826680'),cam(3,'v-3','Division 1 New Caney','1826680')];
+ const named=await producer(list(),locals(),{siteNames:[{organization_id:'1512402',name:'Division 1 New Caney'}]});
+ assert.ifError(named.error);assert.deepEqual(named.rows.map(r=>r.organization),['Division 1 New Caney',starPendingSiteName('1826680'),starPendingSiteName('1826680')]);
+ const broken=await producer(list(),locals(),{siteNamesError:true});
+ assert.ifError(broken.error);assert.deepEqual(broken.rows.map(r=>r.organization),[starPendingSiteName('1512402'),'Division 1 New Caney','Division 1 New Caney']);
+ assert.deepEqual(broken.rows.map(r=>r.source_status),['online','online','online']);
 });

@@ -162,7 +162,10 @@ async function starInventory(db:any){
   const now=new Date().toISOString();let matched=0,online=0,offline=0,unknown=0;
   // Field/Shop and site follow where Star4Live has each camera now (read-only).
   const localBySerial=new Map((locals||[]).map((row:any)=>[String(row.device_serial||"").trim().toLowerCase(),row]));
-  const knownSiteNames=starKnownSiteNames(all,localBySerial);let locationChanges=0;
+  // Site names people verified against VCC, by Star4Live organization number. Optional: if the
+  // list cannot be read the sync still runs and falls back to carried-over names.
+  const {data:verifiedSiteNames,error:siteNameError}=await db.from("star4live_site_names").select("organization_id,name");
+  const knownSiteNames=starKnownSiteNames(all,localBySerial,undefined,siteNameError?[]:verifiedSiteNames||[]);let locationChanges=0;
   const unmatchedResources=resolution.unmatched.map((v:any)=>({
     device_name:String(v.deviceName||""),device_serial:String(v.deviceSerial||""),
     status:resolvedResourceStatus(v),

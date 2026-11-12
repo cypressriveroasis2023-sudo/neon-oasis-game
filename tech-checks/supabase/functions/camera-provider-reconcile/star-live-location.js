@@ -16,7 +16,13 @@ const pending=v=>/^Star4Live site #\S+ \(name pending\)$/.test(text(v));
  * majority of that organization's cameras already carry (at least two cameras,
  * or the organization's only camera). A camera that just arrived carries the
  * name of where it came from, so a lone dissenting name never wins. */
-export function starKnownSiteNames(resources,localBySerial,rootId=STAR_ROOT_ORGANIZATION_ID){
+export function starKnownSiteNames(resources,localBySerial,rootId=STAR_ROOT_ORGANIZATION_ID,verifiedNames=[]){
+ // Names a person read off VCC for a specific Star4Live organization number. These
+ // always win, and a carried-over name equal to a verified name of a DIFFERENT
+ // organization is known to be stale and is never used.
+ const verified=new Map();
+ for(const row of Array.isArray(verifiedNames)?verifiedNames:[]){const id=text(row?.organization_id),name=text(row?.name);if(id&&id!==rootId&&name&&!isRoot(name)&&!pending(name))verified.set(id,name);}
+ const verifiedOwner=new Map([...verified].map(([id,name])=>[name.toLowerCase(),id]));
  const votes=new Map();
  for(const r of Array.isArray(resources)?resources:[]){
   const id=text(r?.organizationId??r?.orgId);if(!id||id===rootId)continue;
@@ -30,8 +36,9 @@ export function starKnownSiteNames(resources,localBySerial,rootId=STAR_ROOT_ORGA
  }
  const known=new Map(),claims=new Map();
  for(const [id,t] of votes){
+  if(verified.has(id)){known.set(id,verified.get(id));continue;}
   if(t.given){known.set(id,t.given);continue;}
-  const ranked=[...t.names].sort((a,b)=>b[1]-a[1]);
+  const ranked=[...t.names].filter(([name])=>!verifiedOwner.has(name.toLowerCase())).sort((a,b)=>b[1]-a[1]);
   if(ranked.length&&ranked[0][1]*2>t.total&&(ranked[0][1]>=2||t.total===1)){
    const list=claims.get(ranked[0][0])||[];list.push({id,votes:ranked[0][1]});claims.set(ranked[0][0],list);
   }
