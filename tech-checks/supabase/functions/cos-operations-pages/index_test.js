@@ -34,21 +34,20 @@ function transport(scenario, calls) {
     if (url.includes('/rest/v1/user_roles?')) return json(scenario.roleRevoked ? [] : [{role_id:recordId,roles:{code:scenario.wrongRole ? 'owner' : technician?.roleCode || 'owner',organization_id:scenario.wrongRoleOrg ? recordId : orgId}}]);
     if (url.includes('/rest/v1/visit_assignments?')) return json(scenario.outsideOrg ? [] : [{visit_id:recordId,user_id:scenario.otherAssignee ? actorId : mappedActor,assignment_role:'technician',status:'assigned',assigned_at:'2026-10-04T10:00:00Z',job_visits:{id:recordId,job_id:recordId,visit_number:1,visit_type:'IT_PREP',department:technician?.department || 'it',status:'scheduled',dispatch_status:'ready',scheduled_start:'2026-10-04T15:00:00Z',scheduled_end:'2026-10-04T16:00:00Z',jobs:{job_number:'COS 001',title:'Assigned Job',job_type:'DELIVERY',customers:{name:'Customer'},sites:{name:'Site'}}}}]);
     if (url.includes('/rest/v1/camera_devices?')) return json(url.includes('offset=0') ? starCameras(scenario) : []);
-    if (url.includes('/rest/v1/camera_unit_hand_edit_current?')) {
-      if (scenario.handEditsUnreadable) return json({message:'unavailable'},500);
-      return json(url.includes('offset=0') ? (scenario.handEdits || []) : []);
-    }
-    if (url.includes('/rest/v1/camera_unit_hand_edits')) {
-      if (scenario.handEditDuplicate) return new Response('',{status:409});
-      if (scenario.handEditRefused) return json({message:'append-only'},500);
-      return new Response('',{status:201});
-    }
     if (url.includes('/rest/v1/camera_integrations?')) {
       if (scenario.starFeedUnreadable) return json({message:'unavailable'},500);
       return json(url.includes('offset=0') ? [{provider:'vigilant',enabled:scenario.starFeedDisabled!==true,last_sync_at:scenario.starSyncedAt||new Date(Date.now()-5*60*1000).toISOString(),last_sync_status:scenario.starSyncStatus||'ok'}] : []);
     }
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
     if (url.includes('/rest/v1/rpc/')) {
+      if (url.endsWith('/rpc/cos_camera_unit_hand_edit_state_v1')) {
+        if (scenario.handEditsUnreadable) return json({message:'unavailable'},500);
+        return json({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits:scenario.handEdits||[]});
+      }
+      if (url.endsWith('/rpc/cos_camera_unit_hand_edit_v1')) {
+        if (scenario.handEditRefused) return json({message:'Request id was already used for a different edit'},400);
+        return json({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:recordId,applied:!scenario.handEditDuplicate,repeat:Boolean(scenario.handEditDuplicate)});
+      }
       if (scenario.rpcDenied) return json({message:'Native department or workflow guard rejected the request'},400);
       if (url.endsWith('/rpc/appdeploy_technician_visit_snapshot')) return json({visit:{id:recordId},execution:{id:recordId,status:'not_started'},current_step:{title:'Native Step',instruction:'Native instruction',step_type:'yes_no',validation_schema:{hidden:true},evidence_requirements:{hidden:true}}});
       if (url.endsWith('/rpc/appdeploy_owner_jobs_snapshot')) return json({items:[{id:recordId,visitId:recordId,jobNumber:'COS 001'}]});
@@ -168,7 +167,7 @@ const cases = [
  ['a hand edit cannot carry a private IP','/api/unit-camera-status/edit','POST',{unitKey:'SOLARSPOTTER 058',field:'public_ip',value:'192.168.10.17'},400],
  ['a hand edit cannot be read as a GET','/api/unit-camera-status/edit','GET',{},405],
  ['a repeated hand edit is not an error','/api/unit-camera-status/edit','POST',{unitKey:'SOLARSPOTTER 058',field:'site',value:'A New Site'},200,{handEditDuplicate:true}],
- ['a refused hand edit changes nothing','/api/unit-camera-status/edit','POST',{unitKey:'SOLARSPOTTER 058',field:'site',value:'A New Site'},503,{handEditRefused:true}],
+ ['a refused hand edit changes nothing','/api/unit-camera-status/edit','POST',{unitKey:'SOLARSPOTTER 058',field:'site',value:'A New Site'},409,{handEditRefused:true}],
  ['no hand edit is recorded while saved edits are unreadable','/api/unit-camera-status/edit','POST',{unitKey:'SOLARSPOTTER 058',field:'site',value:'A New Site'},503,{handEditsUnreadable:true}],
 ];
 for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
@@ -179,7 +178,11 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     const data=await response.json();
     if(response.status!==status)throw new Error('Expected '+status+', received '+response.status+': '+JSON.stringify(data));
     const rpcCalls=calls.filter(c=>c.url.includes('/rest/v1/rpc/'));
-    if(status>=400&&!scenario.rpcDenied&&rpcCalls.length)throw new Error('Rejected request reached a native RPC.');
+    // The unit camera status route reads through an RPC before it validates, so a
+    // rejected edit may legitimately have read. It must never have recorded one.
+    if(status>=400&&!scenario.rpcDenied&&rpcCalls.length&&!path.startsWith('/api/unit-camera-status'))throw new Error('Rejected request reached a native RPC.');
+    if(status>=400&&path.startsWith('/api/unit-camera-status')&&!scenario.handEditRefused
+      &&rpcCalls.some(call=>call.url.endsWith('/rpc/cos_camera_unit_hand_edit_v1')))throw new Error('A rejected hand edit reached the recorder.');
     if(name==='linked technician session'&&(data.productionTechnicianUserId!==technicians[scenario.userId].actorId||data.legacyTechnician!==true))throw new Error('Technician did not use their own actor.');
     if(name==='linked technician day'||name==='linked technician tasks') {
       if(rpcCalls.at(-1).body.p_actor_user_id!==technicians[scenario.userId].actorId)throw new Error('Technician borrowed another actor.');
@@ -237,15 +240,16 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     if(name==='owner records a hand edit'||name==='verified IT records a hand edit') {
       const expected=name.startsWith('owner')?'owner':'it';
       if(data.recorded?.role!==expected)throw new Error('The edit recorded the wrong role: '+JSON.stringify(data.recorded));
-      const write=calls.find(call=>call.url.includes('/rest/v1/camera_unit_hand_edits')&&call.method==='POST');
+      const write=rpcCalls.find(call=>call.url.endsWith('/rpc/cos_camera_unit_hand_edit_v1'));
       if(!write)throw new Error('No hand edit was recorded.');
-      if(write.body.actor_role!==expected||!write.body.actor_user_id)throw new Error('The recorded actor was wrong: '+JSON.stringify(write.body));
-      if(write.body.provider_value===undefined||!write.body.request_id)throw new Error('The provider value or request id was not recorded.');
+      if(write.body.p_payload.actorRole!==expected||!write.body.p_actor_user_id)throw new Error('The recorded actor was wrong: '+JSON.stringify(write.body));
+      if(write.body.p_actor_user_id!==(expected==='owner'?actorId:technicians[scenario.userId].actorId))throw new Error('The edit borrowed another actor.');
+      if(write.body.p_organization_id!==orgId)throw new Error('The caller controlled the organization.');
+      if(!('providerValue' in write.body.p_payload)||!write.body.p_request_id)throw new Error('The provider value or request id was not recorded.');
       if(calls.some(call=>call.method!=='GET'&&call.url.includes('/rest/v1/camera_devices')))throw new Error('A hand edit wrote to the camera inventory.');
     }
-    if(['a refused hand edit changes nothing','no hand edit is recorded while saved edits are unreadable'].includes(name)) {
-      if(name.startsWith('no hand edit')&&calls.some(call=>call.url.includes('/rest/v1/camera_unit_hand_edits')&&call.method==='POST'))throw new Error('An edit was recorded while saved edits were unreadable.');
-    }
+    if(name==='no hand edit is recorded while saved edits are unreadable'
+      &&rpcCalls.some(call=>call.url.endsWith('/rpc/cos_camera_unit_hand_edit_v1')))throw new Error('An edit was recorded while saved edits were unreadable.');
     if(name==='a repeated hand edit is not an error'&&data.recorded?.duplicate!==true)throw new Error('A repeated edit was not reported as already recorded.');
     if(name==='wall clock schedule contract permitted'&&rpcCalls.at(-1).body.p_start_local!=='2026-10-04 10:00')throw new Error('Local wall time was converted.');
     if(name==='native task create contract permitted'&&(rpcCalls.at(-1).body.p_task_id!==null||rpcCalls.at(-1).body.p_payload.priority!=='medium'))throw new Error('Task create contract changed.');

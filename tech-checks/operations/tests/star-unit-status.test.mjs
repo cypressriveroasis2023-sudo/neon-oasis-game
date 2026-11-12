@@ -1,16 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
-import {mkdtempSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-
-// The projection is TypeScript shared by the route and the page. Compile it once
-// with the repo's own TypeScript, then exercise the compiled module.
-const dir = mkdtempSync(join(tmpdir(), 'star-unit-status-'));
-execFileSync('npx', ['tsc', 'operations/shared/starUnitStatus.ts', '--target', 'es2022', '--module', 'es2022', '--outDir', dir], {cwd: process.cwd(), stdio: 'pipe'});
-writeFileSync(join(dir, 'package.json'), JSON.stringify({type: 'module'}));
-const {projectUnitCameraStatus, cameraStatus, cameraPlacement, applyFeedFreshness, applyHandEdits} = await import(join(dir, 'starUnitStatus.js'));
+import {projectUnitCameraStatus, cameraStatus, cameraPlacement, applyFeedFreshness, applyHandEdits} from '../shared/starUnitStatus.ts';
 
 const camera = (over = {}) => ({
   device_name: 'SS001_1', unit_key: 'SOLARSPOTTER 001', organization: 'root',

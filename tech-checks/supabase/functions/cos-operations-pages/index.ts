@@ -1266,7 +1266,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
               // reads as Unknown rather than stopping the page.
               legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status&provider=eq.vigilant&order=provider.asc', context.headers).catch(() => []),
               // Unreadable hand edits must not hide the provider's reading.
-              legacyAll('camera_unit_hand_edit_current?select=unit_key,field,action,value,provider_value,actor_name,actor_role,reason,created_at&order=unit_key.asc', context.headers).catch(() => null),
+              rpc('cos_camera_unit_hand_edit_state_v1', actorPayload, request.signal)
+                .then(state => state?.contract === 'COS_UNIT_STATUS_HAND_EDITS_V1' && Array.isArray(state.edits) ? state.edits : null)
+                .catch(() => null),
             ]);
             const feed = (Array.isArray(integrations) ? integrations : []).find(row => row?.provider === 'vigilant') || null;
             const edited = applyHandEdits(projectUnitCameraStatus(cameras), handEdits);
@@ -1284,20 +1286,20 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           let edit;
           try { edit = checkedHandEditRequest(body, current.units, () => crypto.randomUUID()); }
           catch (error) { if (error instanceof HandEditError) return json({error: error.message}, error.status); throw error; }
-          const row = {
-            unit_key: edit.unitKey, field: edit.field, action: edit.action, value: edit.value,
-            provider_value: edit.providerValue, actor_user_id: context.actorId,
-            actor_name: (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician'),
-            actor_role: actorRole, reason: edit.reason, request_id: edit.requestId,
-          };
-          const response = await requestFetch(LEGACY_URL + '/rest/v1/camera_unit_hand_edits', {
-            method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json', Prefer: 'return=minimal'},
-            body: JSON.stringify(row), cache: 'no-store', redirect: 'error', signal: request.signal,
-          });
-          // The same request recorded twice is the same edit, not an error.
-          if (!response.ok && response.status !== 409) fail('The hand edit could not be recorded. Nothing was changed.', 503);
+          // The actor is the verified session, never the caller's payload. The
+          // database checks the same Owner-or-verified-IT identity again.
+          const actorName = (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician');
+          const receipt = await rpc('cos_camera_unit_hand_edit_v1', {
+            ...actorPayload, p_request_id: edit.requestId,
+            p_payload: {
+              unitKey: edit.unitKey, field: edit.field, action: edit.action, value: edit.value,
+              providerValue: edit.providerValue, actorName, actorRole, reason: edit.reason,
+            },
+          }, request.signal);
+          if (receipt?.contract !== 'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1') fail('The hand edit could not be recorded. Nothing was changed.', 503);
           const after = await readStatus();
-          return json({...after, recorded: {unit: edit.unitKey, field: edit.field, action: edit.action, value: edit.value, by: row.actor_name, role: actorRole, duplicate: response.status === 409}});
+          // The same request recorded twice is the same edit, not an error.
+          return json({...after, recorded: {unit: edit.unitKey, field: edit.field, action: edit.action, value: edit.value, by: actorName, role: actorRole, duplicate: receipt.repeat === true}});
         }
         const history = /^\/api\/field-map\/([^/]+)\/history$/.exec(path);
         if (history) {
