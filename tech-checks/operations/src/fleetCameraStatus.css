@@ -37,3 +37,22 @@
  .cos-camera-status-row{flex-direction:column}
  .cos-camera-status-read{align-items:flex-start}
 }
+.cos-camera-status-saved{margin:0;padding:8px 12px;border-radius:8px;font-size:.82rem;border:1px solid #1a7f37;color:#1a7f37}
+.cos-camera-status-main{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;width:100%}
+.cos-camera-status-edit-note{display:block;color:#b54708;opacity:1}
+.cos-camera-status-edit-open{margin-top:4px;padding:5px 10px;border-radius:7px;border:1px solid rgba(128,128,128,.4);background:transparent;cursor:pointer;font-size:.74rem}
+.cos-camera-status-edit{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:8px;padding:10px 12px;border-radius:8px;border:1px dashed rgba(128,128,128,.45)}
+.cos-camera-status-edit>p{margin:0;font-size:.78rem;opacity:.8}
+.cos-camera-status-edit>small{font-size:.72rem;opacity:.7}
+.cos-camera-status-edit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cos-camera-status-edit-row>label,.cos-camera-status-edit-row>span{font-size:.76rem;min-width:7.5rem;font-weight:600}
+.cos-camera-status-edit-row>input{flex:1;min-width:9rem;padding:7px 10px;border-radius:7px;border:1px solid rgba(128,128,128,.4)}
+.cos-camera-status-edit-row>button{padding:7px 12px;border-radius:7px;cursor:pointer}
+.cos-camera-status-edit-row>button[disabled]{opacity:.5;cursor:not-allowed}
+.cos-camera-status-toggle{display:flex;gap:4px}
+.cos-camera-status-toggle button{padding:7px 11px;border-radius:999px;border:1px solid rgba(128,128,128,.4);background:transparent;cursor:pointer;font-size:.78rem}
+.cos-camera-status-toggle button[aria-pressed='true']{border-color:currentColor;font-weight:700}
+@media (max-width:640px){
+ .cos-camera-status-main{flex-direction:column}
+ .cos-camera-status-edit-row>label,.cos-camera-status-edit-row>span{min-width:100%}
+}

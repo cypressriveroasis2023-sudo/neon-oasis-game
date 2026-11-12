@@ -49,7 +49,8 @@ import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
 import {projectCameraSweepCoverage} from '../../../operations/shared/cameraSweepCoverage.ts';
-import {projectUnitCameraStatus,applyFeedFreshness} from '../../../operations/shared/starUnitStatus.ts';
+import {projectUnitCameraStatus,applyFeedFreshness,applyHandEdits} from '../../../operations/shared/starUnitStatus.ts';
+import {checkedHandEditRequest,HandEditError} from '../../../operations/shared/starUnitHandEdit.ts';
 import {fieldRecorderHealthGuards,projectFieldRecorderAuthority} from './fieldRecorderObservation.ts';
 import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
 import { routerSnapshot } from './routers.ts';
@@ -1247,20 +1248,56 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           return json({ totalDevices: devices.length, healthRows: health.length, fieldDevices: rows.length, shopRoot: shopIds.size, online: rows.filter(r => r.status === 'online').length, offline: rows.filter(r => r.status === 'offline').length, review: rows.filter(r => r.status === 'review').length, rows, refreshedAt: new Date().toISOString(), source: 'Camera Health' });
         }
         // Unit camera status from the Star4Live feed alone: one line per unit,
-        // shop or field from the camera's live organization. This route reads only.
-        // It does not touch mHelp, the tracker, InHand or any placement authority,
-        // and it never moves a unit between the shop and the field.
-        if (path === '/api/unit-camera-status') {
-          if (method !== 'GET') fail('Use GET for unit camera status.', 405);
-          const [cameras, integrations] = await Promise.all([
-            legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId&source=eq.vigilant_control_center&order=id.asc', context.headers),
-            // A missing or unreadable sync row leaves the feed unproven, which
-            // reads as Unknown rather than stopping the page.
-            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status&provider=eq.vigilant&order=provider.asc', context.headers).catch(() => []),
-          ]);
-          const feed = (Array.isArray(integrations) ? integrations : []).find(row => row?.provider === 'vigilant') || null;
-          const report = applyFeedFreshness(projectUnitCameraStatus(cameras), feed && {syncedAt: feed.last_sync_at, status: feed.last_sync_status, enabled: feed.enabled}, Date.now());
-          return json({ ...report, refreshedAt: new Date().toISOString(), source: 'Star4Live' });
+        // shop or field from the camera's live organization. The read touches
+        // nothing; mHelp, the tracker, InHand and every placement authority are
+        // left alone, and no unit is ever moved automatically.
+        //
+        // A hand edit by the Owner or a verified IT technician is recorded beside
+        // the provider's reading and applied on top of it. It can move a unit
+        // between Field and Shop, name its site, or correct its public IP. It can
+        // never say whether a camera is online.
+        if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit') {
+          const editing = path.endsWith('/edit');
+          if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
+          const readStatus = async () => {
+            const [cameras, integrations, handEdits] = await Promise.all([
+              legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId&source=eq.vigilant_control_center&order=id.asc', context.headers),
+              // A missing or unreadable sync row leaves the feed unproven, which
+              // reads as Unknown rather than stopping the page.
+              legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status&provider=eq.vigilant&order=provider.asc', context.headers).catch(() => []),
+              // Unreadable hand edits must not hide the provider's reading.
+              legacyAll('camera_unit_hand_edit_current?select=unit_key,field,action,value,provider_value,actor_name,actor_role,reason,created_at&order=unit_key.asc', context.headers).catch(() => null),
+            ]);
+            const feed = (Array.isArray(integrations) ? integrations : []).find(row => row?.provider === 'vigilant') || null;
+            const edited = applyHandEdits(projectUnitCameraStatus(cameras), handEdits);
+            return {
+              ...applyFeedFreshness(edited, feed && {syncedAt: feed.last_sync_at, status: feed.last_sync_status, enabled: feed.enabled}, Date.now()),
+              handEditsRead: Array.isArray(handEdits),
+              canEdit: true,
+              refreshedAt: new Date().toISOString(), source: 'Star4Live',
+            };
+          };
+          if (!editing) return json(await readStatus());
+          const current = await readStatus();
+          if (!current.handEditsRead) fail('Saved hand edits are unavailable, so a new one cannot be recorded safely.', 503);
+          const actorRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+          let edit;
+          try { edit = checkedHandEditRequest(body, current.units, () => crypto.randomUUID()); }
+          catch (error) { if (error instanceof HandEditError) return json({error: error.message}, error.status); throw error; }
+          const row = {
+            unit_key: edit.unitKey, field: edit.field, action: edit.action, value: edit.value,
+            provider_value: edit.providerValue, actor_user_id: context.actorId,
+            actor_name: (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician'),
+            actor_role: actorRole, reason: edit.reason, request_id: edit.requestId,
+          };
+          const response = await requestFetch(LEGACY_URL + '/rest/v1/camera_unit_hand_edits', {
+            method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json', Prefer: 'return=minimal'},
+            body: JSON.stringify(row), cache: 'no-store', redirect: 'error', signal: request.signal,
+          });
+          // The same request recorded twice is the same edit, not an error.
+          if (!response.ok && response.status !== 409) fail('The hand edit could not be recorded. Nothing was changed.', 503);
+          const after = await readStatus();
+          return json({...after, recorded: {unit: edit.unitKey, field: edit.field, action: edit.action, value: edit.value, by: row.actor_name, role: actorRole, duplicate: response.status === 409}});
         }
         const history = /^\/api\/field-map\/([^/]+)\/history$/.exec(path);
         if (history) {

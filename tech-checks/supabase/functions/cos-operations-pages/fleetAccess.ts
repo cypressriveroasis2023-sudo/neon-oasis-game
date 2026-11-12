@@ -8,7 +8,7 @@ export function verifiedItFleet(context: any): boolean {
 }
 export function fleetRouteAllowed(method: string, path: string): boolean {
   return method === 'GET' && /^\/api\/fleet-saved-board\/history\/[a-f0-9-]{36}$/i.test(path) || method === 'GET' && (path === '/api/unit-tracker' || /^\/api\/unit-tracker\/(?:requests\/)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(path))
-    || method === 'POST' && (path === '/api/fleet-saved-board/refresh' || path === '/api/fleet-saved-board/produce' || path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location')
+    || method === 'POST' && (path === '/api/fleet-saved-board/refresh' || path === '/api/fleet-saved-board/produce' || path === '/api/unit-tracker/requests'||path === '/api/mhelpdesk/partner/unit-location'||path === '/api/unit-camera-status/edit')
     || method === 'GET' && new Set([
     '/api/fleet-map-source', '/api/fleet-saved-board', '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/product-connections', '/api/routers',
