@@ -47,7 +47,7 @@ export default function FleetVisionBriefing({data,readingAt,retained,onOpen,onMa
   {!data&&<p className="cos-vision-brief-empty" role="status">The briefing will appear when the saved Field inventory is verified.</p>}
   {expanded&&data&&<section id={listId} className="cos-vision-attention" aria-label="VISION attention list">
    <header><div><h3>{options.find(item=>item.key===focus)?.title}</h3><p>{matches.length} Field Product {matches.length===1?'ID':'IDs'} · {focus==='offline'?'Source evidence; video status is separate.':focus==='unverified'?'Review the evidence before treating a unit as an outage.':'Address evidence is separate from connectivity.'}</p></div><button type="button" aria-label="Close VISION attention list" onClick={close}>Close ×</button></header>
-   <label className="cos-vision-attention-search">Find in this queue<input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Unit, Product ID, customer or address"/></label>
+   <label className="cos-vision-attention-search">Find in this queue<input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Unit, A#, customer or address"/></label>
    <div className="cos-vision-attention-rows">
     {matches.slice(0,8).map(product=><button type="button" className="cos-vision-attention-row" key={product.productId} aria-label={'Review '+product.unitNumber+' Product '+product.productId} aria-describedby={listId+'-customer-'+product.productId+' '+listId+'-evidence-'+product.productId} onClick={()=>onOpen(product)}>
      <span className={'cos-vision-attention-dot cos-vision-attention-dot-'+product.status}/>

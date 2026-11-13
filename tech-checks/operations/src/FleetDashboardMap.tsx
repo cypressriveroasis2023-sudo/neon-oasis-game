@@ -166,7 +166,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   <div className='cos-fleet-map-legend'><strong>{layer.toUpperCase()} HEALTH</strong><span className='cos-signal-online'>● Online</span><span className='cos-signal-offline'>● Offline</span><span className='cos-signal-unknown'>● Unverified</span><span className='cos-signal-support'>● Solar support</span><details className='cos-fleet-pin-key'><summary>Location key</summary><span>◇ Unlinked equipment · Estimated address</span><span>⌖ MHelp Field address (not GPS)</span><span>{pinMode==='grouped'?'Compact rings show grouped equipment status · select a group to view its units.':'Each labeled pin selects one unit · shared addresses use connector lines to the recorded point.'}</span><small>EST / SRC: installation needs verification · Nearby units may use display offsets; saved locations stay unchanged.</small></details></div>
   {locationsReady&&mhelpAddressReviews.length>0&&<details className='cos-mhelp-address-followups'>
    <summary>{mhelpAddressReviews.length} MHelp Field equipment records need address coordinates (no GPS required)</summary>
-   <p>These equipment records are still in mHelpDesk Field. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>
+   <p>These equipment records are still in the field on the unit list. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>
    <ul>{mhelpAddressReviews.map(item=><li key={item.id}>
     <strong>{item.unitNumber}</strong> · Product {item.productId} · {item.customer} · {item.address||'Address incomplete'}
     <small>{item.state==='no_match'?'Census did not match the recorded street address':item.reason}</small>

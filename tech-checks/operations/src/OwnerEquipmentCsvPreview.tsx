@@ -20,7 +20,7 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
   if(pending)return;
   setFailure('');setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);setApproval(false);
   const file=fileRef.current?.files?.[0];
-  if(!file){setFailure('Choose the original complete mHelpDesk equipment CSV.');return;}
+  if(!file){setFailure('Choose the complete equipment CSV.');return;}
   if(!/\.csv$/i.test(file.name)||file.size<1||file.size>2*1024*1024){setFailure('Choose an equipment CSV no larger than 2 MiB.');return;}
   if(expected.trim()&&!/^[a-f0-9]{64}$/.test(expected.trim())){setFailure('Enter a valid lowercase SHA-256, or leave it blank.');return;}
   setPending(true);
@@ -81,10 +81,10 @@ export default function OwnerEquipmentCsvPreview({allowStage=false,onCommitted}:
   finally{setPending(false);}
  };
  return <section className='cos-fleet-source-group' aria-label='Owner equipment inventory CSV preview'>
-  <h3>mHelpDesk equipment CSV · Owner review</h3>
-  <p>Compare a complete mHelpDesk export against the last reviewed COS source upload. The 2027 Unit Tracker is operational; the 2026 tracker is historical only.</p>
+  <h3>Equipment CSV · Owner review</h3>
+  <p>Compare a complete equipment export against the last reviewed COS source upload. The 2027 Unit Tracker is operational; the 2026 tracker is historical only.</p>
   <p><strong>Preview only.</strong> This control cannot change placements, device associations, IPs, GPS, or history. A separate guarded Owner commit is required after identity review.</p>
-  <label htmlFor='cos-mhelp-equipment-csv'>Original mHelpDesk equipment CSV</label>
+  <label htmlFor='cos-mhelp-equipment-csv'>Equipment CSV file</label>
   <input id='cos-mhelp-equipment-csv' ref={fileRef} type='file' accept='.csv,text/csv' onChange={()=>{setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);setFailure('');}} disabled={pending}/>
   <label htmlFor='cos-mhelp-equipment-sha'>Expected source SHA-256 (optional, from manifest)</label>
   <input id='cos-mhelp-equipment-sha' type='text' maxLength={64} autoComplete='off' spellCheck={false} value={expected} onChange={event=>{setExpected(event.target.value);setPreview(null);setStage(null);setAssignmentReview(null);setApplied(null);}} placeholder='64 lowercase hex characters' disabled={pending}/>

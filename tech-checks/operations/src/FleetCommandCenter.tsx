@@ -31,14 +31,14 @@ const date=(time:string|null)=>time&&Number.isFinite(Date.parse(time))
  ?new Date(time).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})
  :'No successful check recorded';
 
-/** Single-line verification explanation; every count refers to source Product IDs.
+/** Single-line verification explanation; every count refers to units in the list.
  * These are blockers, not additional offline cameras. */
 function verificationSummary(products:FleetCommandProduct[]):string{
  const blockers=fleetVerificationBlockers(products);
  return [
   blockers.identity?blockers.identity+' need COS equipment association':'',
   blockers.provider?blockers.provider+' need a conclusive provider / power observation':'',
-  blockers.inactive?blockers.inactive+' flagged inactive in mHelp':''
+  blockers.inactive?blockers.inactive+' flagged inactive':''
  ].filter(Boolean).join(' · ');
 }
 
@@ -64,7 +64,7 @@ export default function FleetCommandCenter({
  },[data,family,status,query,focus]);
  const selected=entries.find(p=>p.productId===selectedId);
  if(!data)return <p className="cos-command-source-warning" role="status">
-  Complete, verified mHelpDesk Product-ID source is currently unavailable. No inventory or provider totals are being estimated.
+  The complete unit list is currently unavailable. No inventory or provider totals are being estimated.
   {onRefresh&&<button type="button" onClick={onRefresh}>Retry saved data</button>}
  </p>;
  const filter=(next:FamilyFilter,state:StatusFilter='all')=>{
@@ -74,12 +74,12 @@ export default function FleetCommandCenter({
  const cameraTotal=data.counts.online+data.counts.offline+data.counts.unverified;
  const linkReview=data.healthVerified?data.items.filter(p=>p.linked&&['unlinked','review'].includes(p.linked.state)).length:null;
  const showFocus=(next:FocusFilter)=>{setFamily('all');setStatus('all');setFocus(next);setSelectedId('');setLimit(35);document.getElementById('cos-command-product-list')?.scrollIntoView({block:'nearest'});};
- return <section className="cos-fleet-command" aria-label="Complete mHelpDesk Fleet command center">
+ return <section className="cos-fleet-command" aria-label="COS Fleet command center">
   <header className="cos-command-head">
-   <div><h2>Fleet command center</h2><p>All {data.field} Field Product IDs · camera, power and placement shown separately</p></div>
+   <div><h2>Fleet command center</h2><p>All {data.field} field units · camera, power and placement shown separately</p></div>
    {onRefresh&&<button type="button" onClick={onRefresh}>↻ Refresh saved evidence</button>}
   </header>
-  {data.sourceStale&&<p role="status" className="cos-command-source-warning">mHelpDesk source refresh is delayed. These are the last validated assignments, not a live provider read.</p>}
+  {data.sourceStale&&<p role="status" className="cos-command-source-warning">The unit list refresh is delayed. These are the last validated assignments, not a live provider read.</p>}
   {!data.healthVerified&&<p role="status" className="cos-command-source-warning">Camera Health is incomplete or its latest read failed. Camera-capable units are Unverified, not automatically Offline.</p>}
   <div className="cos-command-kpis" aria-label="Full equipment and camera summary">
    <button type="button" onClick={()=>filter('all')}><span>Field equipment</span><strong>{data.field}</strong><small>All recorded Field products</small></button>
@@ -113,7 +113,7 @@ export default function FleetCommandCenter({
   <div className="cos-command-metadata">
    <span><b>Physical inventory:</b> {data.field} Field + {data.shop} Shop = {data.total} products</span>
    <span><b>Camera-capable:</b> {cameraTotal} · <b>Solar/support without cameras:</b> {data.counts.support}</span>
-   <span><b>mHelp source:</b> {date(data.sourceAt)}</span>
+   <span><b>Unit list read:</b> {date(data.sourceAt)}</span>
    <span><b>Camera Health:</b> {data.healthVerified?date(cameraCheckedAt):'Unverified — read unavailable'}</span>
    <span><b>Address map:</b> {data.addressCoverage?data.addressCoverage.located+' located · '+data.addressCoverage.missing+' needing mapping':'No validated map coverage snapshot'}</span>
   </div>
@@ -123,17 +123,17 @@ export default function FleetCommandCenter({
    <button type="button" onClick={()=>showFocus('attention')}><strong>{data.counts.attention}</strong><span>Needs attention · includes unknowns, not necessarily outages</span></button>
    <button type="button" disabled={!data.addressCoverage} onClick={()=>showFocus('mapping')}><strong>{data.addressCoverage?.missing??'—'}</strong><span>Map address lookups needed</span></button>
   </div>
-  <section id="cos-command-product-list" className="cos-command-inventory" aria-label="Every Field Product ID and connectivity status">
+  <section id="cos-command-product-list" className="cos-command-inventory" aria-label="Every field unit and connectivity status">
    <div className="cos-command-list-head">
-    <div><h3>Field inventory</h3><p>{entries.length} of {data.field} Field Product IDs in this view · 1 product = 1 equipment record</p></div>
+    <div><h3>Field inventory</h3><p>{entries.length} of {data.field} field units in this view · 1 unit = 1 record record</p></div>
     <div className="cos-command-list-actions">
      <button type="button" onClick={onMap}>View map ↓</button>
-     {onImport&&<button type="button" onClick={onImport}>mHelpDesk CSV / sync →</button>}
+     {onImport&&<button type="button" onClick={onImport}>Take a fresh unit list →</button>}
     </div>
    </div>
    <div className="cos-command-filters">
-    <label>Find equipment, Product ID, customer or address
-     <input aria-label="Search all Field Product IDs" type="search" value={query} placeholder="Unit, Product ID, customer or address…" onChange={e=>{setQuery(e.target.value);setLimit(35);}}/>
+    <label>Find a unit, A#, customer or address
+     <input aria-label="Search all field units" type="search" value={query} placeholder="Unit, A#, customer or address…" onChange={e=>{setQuery(e.target.value);setLimit(35);}}/>
     </label>
     <label>System
      <select aria-label="Filter all Field products by monitoring system" value={family} onChange={e=>filter(e.target.value as FamilyFilter,status)}>
