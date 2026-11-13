@@ -1,1 +1,1 @@
-{"name":"cos-authority-guard-reuse-verification","private":true,"type":"module","scripts":{"test":"node equivalence.mjs && node recovery-equivalence.mjs"},"devDependencies":{"@electric-sql/pglite":"0.5.16"}}
+{"name":"cos-authority-guard-reuse-verification","private":true,"type":"module","scripts":{"test":"node equivalence.mjs && node recovery-equivalence.mjs && node accumulator-equivalence.mjs"},"devDependencies":{"@electric-sql/pglite":"0.5.16"}}
