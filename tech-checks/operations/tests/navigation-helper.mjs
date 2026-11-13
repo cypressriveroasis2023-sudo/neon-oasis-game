@@ -62,12 +62,16 @@ export async function openWorkspace(frame, workspace) {
   // link, as a bookmark would; the spec still checks the screen itself.
   if (RETIRED_WORKSPACES.includes(workspace)) {
     if (await menu.isVisible()) await menu.getByRole('button', { name: /Close menu/ }).click();
-    // One navigation, as the app sees a single route change. Assigning
-    // location.hash fires popstate AND hashchange, and the app answers both, so
-    // a spec that counts reads would see the screen load twice.
-    await frame.locator('body').evaluate((_, hash) => { history.replaceState(history.state, '', '#' + hash); dispatchEvent(new HashChangeEvent('hashchange')); }, keys[0]);
+    // A real history entry, so a spec's browser Back still returns here. Focus
+    // the app first, as a menu click would have: screens that refresh on focus
+    // must not see their first focus later, in the middle of a spec.
+    await frame.locator('body').evaluate((_, hash) => { window.focus(); history.pushState(history.state, '', '#' + hash); dispatchEvent(new HashChangeEvent('hashchange')); }, keys[0]);
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash.replace(/^#/, '').split('?')[0])).toBe(keys[0]);
     await expect(frame.locator('main')).toBeVisible();
+    // The menu route takes several clicks, which lets the screen's first reads
+    // finish. A link is instant, so wait for them here; specs that count reads
+    // start from a settled screen either way.
+    await frame.owner().page().waitForLoadState('networkidle');
     return;
   }
 
