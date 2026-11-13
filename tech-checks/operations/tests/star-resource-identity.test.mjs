@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {resolveStarResources,starResourceStatus} from '../../supabase/functions/camera-provider-reconcile/star-resource-identity.js';
 import {unmappedResourceDiagnostics} from '../../supabase/functions/camera-provider-reconcile/unmapped-resource-diagnostics.js';
+import {starKnownSiteNames,starLiveOrganization,starPendingSiteName} from '../../supabase/functions/camera-provider-reconcile/star-live-location.js';
 
 const historical='2026-10-10T12:00:00.000Z';
 const local=(patch={})=>({id:901,device_serial:'synthetic-physical-alpha',external_device_id:'synthetic-external-beta',device_name:'Helios901 synthetic camera 3+4',device_type:'IPC',monitoring_profile:'helios',unit_key:'Helios901',activation_state:'active',organization:'Synthetic site',source:'vigilant_control_center',source_status:'online',source_last_seen_at:historical,last_online_at:historical,public_ip:'192.0.2.55',connection_revision:7,...patch});
@@ -20,7 +21,7 @@ async function producer(resources,locals=[local()],options={}){
  const db={from(table){return {
   select(columns){selections.push({table,columns});return this},eq(){return this},in(){return this},
   maybeSingle(){return {data:{metadata:{existing:'preserved'}}}},
-  then(resolve){resolve({data:table==='camera_devices'?rows:(options.trackers||[])})},
+  then(resolve){resolve(table==='star4live_site_names'?(options.siteNamesError?{data:null,error:{message:'unavailable'}}:{data:options.siteNames||[]}):{data:table==='camera_devices'?rows:(options.trackers||[])})},
   update(patch){return {eq:async(column,id)=>{const clean=JSON.parse(JSON.stringify(patch));writes.push({table,id,patch:clean});Object.assign(rows.find(row=>row.id===id),clean);return {error:null}}}},
   upsert:async(patch)=>{integration.push(patch);return {error:null}}
  }}};
@@ -33,7 +34,7 @@ async function producer(resources,locals=[local()],options={}){
    if(options.failInventory)throw new Error('Synthetic inventory unavailable');
    const list=options.inventory?options.inventory(body):resources;
    return {data:{resourceList:list,total:list.length}};
-  },unmappedResourceDiagnostics,resolveStarResources,starResourceStatus
+  },unmappedResourceDiagnostics,resolveStarResources,starResourceStatus,starKnownSiteNames,starLiveOrganization
  });
  try{return {rows,writes,integration,selections,result:await context.starInventory(db)}}catch(error){return {rows,writes,integration,selections,error}};
 }
@@ -167,4 +168,51 @@ test('resolved status metadata preserves raw resources and repeated consistent o
   assert.deepEqual(result.resourceStatuses,[{serial:'synthetic-unmapped',status:expected}]);
   assert.equal(result.unmatched[0],records[0]);assert.deepEqual(records,before);
  }
+});
+
+// Live location, through the real sync code with a stand-in provider.
+test('the sync moves Field/Shop and site with Star4Live\'s current organization, and nothing else about the camera',async()=>{
+ const cam=(id,serial,organization,oid)=>local({id,device_serial:serial,external_device_id:'ext-'+serial,device_name:'Cam '+serial,unit_key:'Unit'+id,organization,source_metadata:{organizationId:oid}});
+ const locals=[
+  cam(1,'s-returned','Harvey Cleary - SEC Energy Building 12','283838'), // back in the shop; COS still shows the customer
+  cam(2,'s-site-a1','Site A','500'),cam(3,'s-site-a2','Site A','500'),
+  cam(4,'s-sent-out','root','500'),                                      // sent out to Site A; COS still shows root
+  cam(5,'s-new-site','root','777'),                                      // at a site COS has never seen
+  cam(6,'s-no-org','Kept As Is',null),                                   // provider sends no organization for it
+ ];
+ const before=structuredClone(locals);
+ const r=await producer([
+  resource('s-returned',0,{deviceName:'Cam s-returned',organizationId:'283838'}),
+  resource('s-site-a1',1,{deviceName:'Cam s-site-a1',organizationId:'500'}),resource('s-site-a2',1,{deviceName:'Cam s-site-a2',organizationId:'500'}),
+  resource('s-sent-out',1,{deviceName:'Cam s-sent-out',organizationId:'500'}),
+  resource('s-new-site',0,{deviceName:'Cam s-new-site',organizationId:'777'}),
+  resource('s-no-org',1,{deviceName:'Cam s-no-org'}),
+ ],locals);
+ assert.ifError(r.error);
+ const org=id=>r.rows.find(row=>row.id===id).organization;
+ assert.equal(org(1),'root');assert.equal(org(2),'Site A');assert.equal(org(3),'Site A');assert.equal(org(4),'Site A');
+ assert.equal(org(5),starPendingSiteName('777'));assert.equal(org(6),'Kept As Is');
+ // Status is still exactly what the provider reported; an offline camera in root is recorded as offline, not hidden or changed.
+ assert.deepEqual(r.rows.map(row=>row.source_status),['offline','online','online','online','offline','online']);
+ // Identity, unit grouping, IP, activation and monitoring fields are untouched.
+ for(const [i,row] of r.rows.entries())for(const key of ['id','device_serial','external_device_id','device_name','unit_key','activation_state','monitoring_profile','public_ip','connection_revision'])assert.deepEqual(row[key],before[i][key],key);
+ // Only camera_devices rows were written, one write per camera.
+ assert.deepEqual([...new Set(r.writes.map(w=>w.table))],['camera_devices']);assert.equal(r.writes.length,6);
+ // A second identical sync changes no location.
+ const again=await producer([
+  resource('s-returned',0,{deviceName:'Cam s-returned',organizationId:'283838'}),resource('s-site-a1',1,{deviceName:'Cam s-site-a1',organizationId:'500'}),resource('s-site-a2',1,{deviceName:'Cam s-site-a2',organizationId:'500'}),
+  resource('s-sent-out',1,{deviceName:'Cam s-sent-out',organizationId:'500'}),resource('s-new-site',0,{deviceName:'Cam s-new-site',organizationId:'777'}),resource('s-no-org',1,{deviceName:'Cam s-no-org'}),
+ ],r.rows);
+ assert.ifError(again.error);assert.deepEqual(again.rows.map(row=>row.organization),r.rows.map(row=>row.organization));
+});
+
+test('verified site names reach the sync, and the sync still runs when that list cannot be read',async()=>{
+ const cam=(id,serial,organization,oid)=>local({id,device_serial:serial,external_device_id:'ext-'+serial,device_name:'Cam '+serial,unit_key:'Unit'+id,organization,source_metadata:{organizationId:oid}});
+ const list=()=>[resource('v-1',1,{deviceName:'Cam v-1',organizationId:'1512402'}),resource('v-2',1,{deviceName:'Cam v-2',organizationId:'1826680'}),resource('v-3',1,{deviceName:'Cam v-3',organizationId:'1826680'})];
+ const locals=()=>[cam(1,'v-1','root','1512402'),cam(2,'v-2','Division 1 New Caney','1826680'),cam(3,'v-3','Division 1 New Caney','1826680')];
+ const named=await producer(list(),locals(),{siteNames:[{organization_id:'1512402',name:'Division 1 New Caney'}]});
+ assert.ifError(named.error);assert.deepEqual(named.rows.map(r=>r.organization),['Division 1 New Caney',starPendingSiteName('1826680'),starPendingSiteName('1826680')]);
+ const broken=await producer(list(),locals(),{siteNamesError:true});
+ assert.ifError(broken.error);assert.deepEqual(broken.rows.map(r=>r.organization),[starPendingSiteName('1512402'),'Division 1 New Caney','Division 1 New Caney']);
+ assert.deepEqual(broken.rows.map(r=>r.source_status),['online','online','online']);
 });

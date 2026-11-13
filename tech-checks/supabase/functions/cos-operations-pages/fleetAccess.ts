@@ -12,6 +12,8 @@ export function fleetRouteAllowed(method: string, path: string): boolean {
     || method === 'GET' && new Set([
     '/api/fleet-map-source', '/api/fleet-saved-board', '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/product-connections', '/api/routers',
+    // Read-only unit camera status from the Star4Live feed. No write, no placement change.
+    '/api/unit-camera-status',
     // Saved, read-only installations only. /refresh and all discovery/sharing writes stay Owner-only.
     '/api/vrm-fleet',
   ]).has(path);

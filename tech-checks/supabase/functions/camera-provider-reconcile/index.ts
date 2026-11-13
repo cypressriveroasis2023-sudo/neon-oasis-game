@@ -1,4 +1,5 @@
 import { resolveStarResources, starResourceStatus } from "./star-resource-identity.js";
+import {starKnownSiteNames,starLiveOrganization} from "./star-live-location.js";
 import { unmappedResourceDiagnostics } from "./unmapped-resource-diagnostics.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -116,7 +117,8 @@ async function starInventory(db:any){
       if(!Array.isArray(res?.data?.resourceList))throw new Error("Star4Live returned no resource list");
       const batch=res.data.resourceList;
       if(!q)providerAccountSummary={total_resources:res.data.total,online_resources:res.data.onlineCount,total_channels:res.data.totalChannel,online_channels:res.data.onlineChannelCount};
-      if(!q)inventoryDiagnostics.push({pageStart,returned:batch.length,data_keys:Object.keys(res.data),total:res.data.total??res.data.totalCount??res.data.resourceCount??null});
+      // Field NAMES only (no values) of one resource, so the organization fields the provider really sends can be seen.
+      if(!q)inventoryDiagnostics.push({pageStart,returned:batch.length,data_keys:Object.keys(res.data),resource_keys:batch[0]&&typeof batch[0]==="object"?Object.keys(batch[0]).sort().slice(0,120):[],total:res.data.total??res.data.totalCount??res.data.resourceCount??null});
       let added=0;for(const v of batch){const key=String(v.deviceSerial||v.deviceName||"");if(key&&!serials.has(key)){serials.add(key);resources.push(v);added++}}
       if(batch.length<100){const total=Number(res.data.total);if(Number.isFinite(total)&&resources.length!==total)throw new Error("Star4Live inventory count mismatch: received "+resources.length+" of "+total+" resources");return resources;}
       if(!added)throw new Error("Star4Live pagination repeated a page");
@@ -158,6 +160,12 @@ async function starInventory(db:any){
   const observedStatuses=new Map(resolution.resourceStatuses.map((row:any)=>[row.serial,row.status]));
   const resolvedResourceStatus=(resource:any)=>observedStatuses.get(String(resource.deviceSerial||"").trim().toLowerCase())||starResourceStatus(resource.status);
   const now=new Date().toISOString();let matched=0,online=0,offline=0,unknown=0;
+  // Field/Shop and site follow where Star4Live has each camera now (read-only).
+  const localBySerial=new Map((locals||[]).map((row:any)=>[String(row.device_serial||"").trim().toLowerCase(),row]));
+  // Site names people verified against VCC, by Star4Live organization number. Optional: if the
+  // list cannot be read the sync still runs and falls back to carried-over names.
+  const {data:verifiedSiteNames,error:siteNameError}=await db.from("star4live_site_names").select("organization_id,name");
+  const knownSiteNames=starKnownSiteNames(all,localBySerial,undefined,siteNameError?[]:verifiedSiteNames||[]);let locationChanges=0;
   const unmatchedResources=resolution.unmatched.map((v:any)=>({
     device_name:String(v.deviceName||""),device_serial:String(v.deviceSerial||""),
     status:resolvedResourceStatus(v),
@@ -188,11 +196,14 @@ async function starInventory(db:any){
   }
   for(const match of resolution.matches){
     const d=match.device,v=match.resource,status=match.status;
+    const liveOrganization=starLiveOrganization(v,knownSiteNames);
+    if(liveOrganization!==undefined&&liveOrganization!==String(d.organization||"")){locationChanges++;d.organization=liveOrganization;}
     countObservation(d,status,v.deviceName);
     const isOnline=status==="online";
     const {error:deviceWriteError}=await db.from("camera_devices").update({
       vigilant_status:isOnline?"Online":status==="offline"?"Offline":"Unknown",
       source_status:status,
+      ...(liveOrganization===undefined?{}:{organization:liveOrganization}),
       source_last_seen_at:now,
       last_online_at:isOnline?now:undefined,
       source_metadata:{

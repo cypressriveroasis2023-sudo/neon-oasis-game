@@ -15,6 +15,14 @@ export class OperationsApiError extends Error {
   }
 }
 const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+// Unit camera status is served by its own function, so the board's own
+// function - a frozen, hash-pinned artifact - is left exactly as it is.
+// Authentication, origins and CORS are the same handler behind both. These two
+// paths are kept in step with the function's own list by a test, rather than
+// imported, so every existing harness that compiles this file keeps working.
+const unitCameraStatusEndpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-unit-camera-status';
+const unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit'];
+const endpointFor = (path: string) => unitCameraStatusPaths.includes(path) ? unitCameraStatusEndpoint : endpoint;
 type ParentSession = { token: string; role: string };
 // Only reviewed snapshot routes may share a pending read. A logical GET alone
 // is not enough: new routes can perform work or have independent-read semantics.
@@ -152,7 +160,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
   try {
     let response: Response;
     try {
-      response = await fetch(endpoint, {
+      response = await fetch(endpointFor(path), {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, method, body: body ?? null }),

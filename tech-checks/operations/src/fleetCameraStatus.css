@@ -1,0 +1,39 @@
+.cos-camera-status{display:flex;flex-direction:column;gap:12px}
+.cos-camera-status>header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start}
+.cos-camera-status>header h2{margin:0;font-size:1.25rem}
+.cos-camera-status>header p{margin:4px 0 0;font-size:.8rem;opacity:.75;max-width:46ch}
+.cos-camera-status-read{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.cos-camera-status-read button{padding:8px 14px;border-radius:8px;cursor:pointer}
+.cos-camera-status-read small{font-size:.72rem;opacity:.75}
+.cos-camera-status-stale,.cos-camera-status-error{margin:0;padding:10px 12px;border-radius:8px;font-size:.82rem;border:1px solid currentColor}
+.cos-camera-status-stale{opacity:.9}
+.cos-camera-status-error{color:#b42318}
+.cos-camera-status-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.cos-camera-status-tile{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;border:1px solid rgba(128,128,128,.28)}
+.cos-camera-status-tile span{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.cos-camera-status-tile strong{font-size:1.5rem;line-height:1.1}
+.cos-camera-status-groups{display:flex;flex-wrap:wrap;gap:6px}
+.cos-camera-status-groups button{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(128,128,128,.35);background:transparent;cursor:pointer;font-size:.82rem}
+.cos-camera-status-groups button[aria-current='page']{border-color:currentColor;font-weight:600}
+.cos-camera-status-groups button b{font-size:.72rem;padding:1px 7px;border-radius:999px;background:rgba(128,128,128,.18)}
+.cos-camera-status-note{margin:0;font-size:.76rem;opacity:.75}
+.cos-camera-status-search{display:flex;gap:6px;align-items:center}
+.cos-camera-status-search input{flex:1;padding:9px 12px;border-radius:8px;border:1px solid rgba(128,128,128,.35)}
+.cos-camera-status-search button{padding:6px 10px;border-radius:8px;cursor:pointer}
+.cos-camera-status-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.cos-camera-status-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid rgba(128,128,128,.28);border-left-width:4px}
+.cos-camera-status-row.cos-camera-state-green{border-left-color:#1a7f37}
+.cos-camera-status-row.cos-camera-state-yellow{border-left-color:#b54708}
+.cos-camera-status-row.cos-camera-state-red{border-left-color:#b42318}
+.cos-camera-status-row.cos-camera-state-unknown{border-left-color:#667085}
+.cos-camera-status-unit{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cos-camera-status-unit strong{display:flex;align-items:center;gap:7px;font-size:.95rem}
+.cos-camera-status-unit small,.cos-camera-status-detail small{font-size:.74rem;opacity:.78}
+.cos-camera-status-detail{display:flex;flex-direction:column;gap:2px;text-align:right;margin-left:auto}
+.cos-camera-status-detail span{font-size:.82rem;font-weight:600}
+.cos-camera-status-empty{padding:16px 12px;font-size:.84rem;opacity:.75;text-align:center}
+@media (max-width:640px){
+ .cos-camera-status-detail{text-align:left;margin-left:0}
+ .cos-camera-status-row{flex-direction:column}
+ .cos-camera-status-read{align-items:flex-start}
+}
