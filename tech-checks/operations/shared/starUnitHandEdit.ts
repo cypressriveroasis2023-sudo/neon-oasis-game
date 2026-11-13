@@ -2,8 +2,9 @@
 //
 // A hand edit can move a unit between Field and Shop, name its site, give its
 // street address (the route geocodes it into the unit's map pin), or correct its
-// public IP. It can never say whether a camera is online, and it can only
-// name a unit Star4Live is already reporting.
+// public IP. It can also say a camera the provider still reports is no longer
+// on the unit - a swap. It can never say whether a camera is online, and it can
+// only name a unit Star4Live is already reporting.
 import {HAND_EDIT_FIELDS, type HandEditField, type UnitCameraStatus} from './starUnitStatus.ts';
 
 export class HandEditError extends Error {
@@ -61,7 +62,7 @@ export function checkedHandEditRequest(
   if (!unit) throw new HandEditError('Star4Live is not reporting a unit named ' + unitKey + '. Only a unit the provider reports can be edited.', 404);
 
   const field = text(payload.field) as HandEditField;
-  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, or its public IP only.');
+  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, its public IP, or which cameras are on it only.');
 
   const action = text(payload.action) || 'set';
   if (action !== 'set' && action !== 'clear') throw new HandEditError('A hand edit is either set or clear.');
@@ -75,11 +76,21 @@ export function checkedHandEditRequest(
   // The provider's value is read here, never taken from the caller.
   const providerValue = field === 'placement' ? unit.providerPlacement ?? unit.placement
     : field === 'site' ? unit.providerSite ?? unit.site
-    : field === 'address' ? null // Star4Live has no street address.
+    : field === 'address' || field === 'camera' ? null // Star4Live has no street address, and it reports every camera it knows.
     : unit.providerPublicIp ?? unit.publicIp;
 
+  // One camera is named when putting that camera back; naming none puts every
+  // camera on the unit back at once.
+  const namedCamera = (raw: string) => {
+    const match = (unit.cameraList || []).find(camera => camera.name.trim().toUpperCase() === raw.toUpperCase());
+    if (!match) throw new HandEditError('Star4Live is not reporting a camera named ' + raw + ' on ' + unit.unit + '.', 404);
+    return match;
+  };
+
   if (action === 'clear') {
-    if (payload.value != null && text(payload.value)) throw new HandEditError('Clearing a hand edit does not take a value.');
+    const raw = text(payload.value);
+    if (raw && field !== 'camera') throw new HandEditError('Clearing a hand edit does not take a value.');
+    if (raw) return {unitKey: unit.unit, field, action, value: namedCamera(raw).name, providerValue: null, reason, requestId};
     return {unitKey: unit.unit, field, action, value: null, providerValue: providerValue ?? null, reason, requestId};
   }
 
@@ -97,6 +108,12 @@ export function checkedHandEditRequest(
     // only what can be stored. A shop unit has no field pin to drop.
     if (value.length > 200 || !PRINTABLE.test(value)) throw new HandEditError('That address is too long or contains characters that cannot be stored.');
     if (unit.placement !== 'FIELD') throw new HandEditError('Put the unit in the Field first; a unit in the shop has no site address.');
+  } else if (field === 'camera') {
+    const camera = namedCamera(value);
+    if (camera.name.length > 200) throw new HandEditError('That camera name is too long to store.');
+    const remaining = (unit.cameraList || []).filter(other => other.name !== camera.name && !other.removed);
+    if (!remaining.length) throw new HandEditError('That is the only camera left on ' + unit.unit + '. Put the unit in the Shop instead of taking its last camera off.');
+    value = camera.name;
   } else {
     const ip = publicIpv4(value);
     if (!ip) throw new HandEditError('That is not a public IPv4 address.');

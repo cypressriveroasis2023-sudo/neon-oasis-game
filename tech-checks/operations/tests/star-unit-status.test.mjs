@@ -379,3 +379,49 @@ test('a cleared address takes the pin away', () => {
     .units.find(u => u.unit === 'SPOTTER 306');
   assert.equal(unit.location ?? null, null);
 });
+
+test('a camera a person swapped out stops counting, and the unit reads from what is left', () => {
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'H001_1', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+    camera({device_name: 'H001_PTZ', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP', vigilant_status: 'Offline'}),
+  ]);
+  assert.equal(report.units[0].state, 'YELLOW');
+  const edited = applyHandEdits(report, [
+    {unit_key: 'helios 001', field: 'camera', action: 'set', value: 'h001_ptz', actor_name: 'James', actor_role: 'owner'},
+  ]);
+  const unit = edited.units[0];
+  assert.equal(unit.state, 'GREEN');
+  assert.deepEqual([unit.cameras, unit.online, unit.offline], [1, 1, 0]);
+  assert.deepEqual(unit.cameraList.map(c => c.name + ':' + Boolean(c.removed)), ['H001_1:false', 'H001_PTZ:true']);
+  assert.equal(edited.counts.field.camerasDown, 0);
+});
+
+test('putting one camera back leaves the others as they were', () => {
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'H001_1', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+    camera({device_name: 'H001_2', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+    camera({device_name: 'H001_PTZ', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP', vigilant_status: 'Offline'}),
+  ]);
+  const edits = [
+    {unit_key: 'HELIOS 001', field: 'camera', action: 'set', value: 'H001_PTZ', actor_name: 'James', actor_role: 'owner'},
+    {unit_key: 'HELIOS 001', field: 'camera', action: 'set', value: 'H001_2', actor_name: 'James', actor_role: 'owner'},
+    {unit_key: 'HELIOS 001', field: 'camera', action: 'clear', value: 'H001_2', actor_name: 'James', actor_role: 'owner'},
+  ];
+  const unit = applyHandEdits(report, edits).units[0];
+  assert.deepEqual([unit.cameras, unit.online], [2, 2]);
+  assert.deepEqual(unit.cameraList.filter(c => c.removed).map(c => c.name), ['H001_PTZ']);
+  // Clearing without naming one puts every camera back.
+  const all = applyHandEdits(report, [...edits, {unit_key: 'HELIOS 001', field: 'camera', action: 'clear', value: null, actor_name: 'James', actor_role: 'owner'}]);
+  assert.deepEqual(all.units[0].cameraList.filter(c => c.removed), []);
+  assert.equal(all.units[0].state, 'YELLOW');
+});
+
+test('a swapped-out camera never changes whether the others answered', () => {
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'H001_1', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP', vigilant_status: 'Offline'}),
+    camera({device_name: 'H001_PTZ', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+  ]);
+  const unit = applyHandEdits(report, [{unit_key: 'HELIOS 001', field: 'camera', action: 'set', value: 'H001_PTZ', actor_name: 'IT', actor_role: 'it'}]).units[0];
+  assert.equal(unit.state, 'RED');
+  assert.deepEqual([unit.online, unit.offline], [0, 1]);
+});

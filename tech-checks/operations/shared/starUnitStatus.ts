@@ -24,6 +24,9 @@ export type StarCameraRow = {
 };
 
 export type UnitCamera = { name: string; status: 'online' | 'offline' | 'unknown' };
+/** Every camera Star4Live reports for a unit, with where it sits and whether a
+ * person has said it is no longer on the unit (a swap). */
+export type UnitCameraEntry = UnitCamera & { atSite: boolean; removed?: boolean };
 
 export type UnitCameraStatus = {
   unit: string;
@@ -40,6 +43,8 @@ export type UnitCameraStatus = {
   // a spare, or one swapped out and not yet removed in Star4Live. They are shown
   // for the record and never counted as an outage at the site.
   awayFromSite?: UnitCamera[];
+  // Every camera the provider reports for this unit, for the unit's own panel.
+  cameraList?: UnitCameraEntry[];
   onlineInShop: boolean;
   publicIp: string | null;
   observedAt: string | null;
@@ -59,7 +64,9 @@ export type UnitSource = 'star4live' | 'ip_check' | 'reconeyez';
 
 export type UnitLocation = { latitude: number; longitude: number; matchedAddress: string | null; source: 'hand' };
 
-export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip'] as const;
+// 'camera' says a camera the provider still reports is no longer on this unit -
+// a swap. It never says whether a camera is online.
+export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip', 'camera'] as const;
 export type HandEditField = typeof HAND_EDIT_FIELDS[number];
 
 export type HandEdit = {
@@ -175,6 +182,7 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
       cameras: atSite.length, online, offline, unknown,
       down: atSite.filter(c => c.status !== 'online').map(c => ({ name: c.name, status: c.status })),
       ...(awayFromSite.length ? { awayFromSite: awayFromSite.map(c => ({ name: c.name, status: c.status })) } : {}),
+      cameraList: named.map(c => ({ name: c.name, status: c.status, atSite: cameraPlacement(c.row) === 'FIELD' })),
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: text(members.find(row => text(row.public_ip))?.public_ip) || null,
       observedAt: observed.length ? observed[observed.length - 1] : null,
@@ -227,6 +235,7 @@ export function applyFeedFreshness(
     online: 0, offline: 0, unknown: unit.cameras,
     down: unit.down.map(camera => ({...camera, status: 'unknown' as const})),
     ...(unit.awayFromSite ? {awayFromSite: unit.awayFromSite.map(camera => ({...camera, status: 'unknown' as const}))} : {}),
+    ...(unit.cameraList ? {cameraList: unit.cameraList.map(camera => ({...camera, status: 'unknown' as const}))} : {}),
     onlineInShop: false,
   }));
   return {...report, feed: stamped, units, counts: countUnits(units)};
@@ -243,24 +252,63 @@ const unitMatchKey = (value: unknown) => text(value).toUpperCase();
  * The provider's own values are kept beside the edit, so the board can show
  * both and say when Star4Live has caught up with what a person entered.
  */
+/**
+ * Drop the cameras a person has said are no longer on this unit, and count the
+ * unit again from the ones that are left. A camera taken off never changes
+ * whether the remaining ones answered: that is still the provider's word.
+ */
+export function withoutRemovedCameras(unit: UnitCameraStatus, removed: ReadonlyMap<string, boolean>): UnitCameraStatus {
+  const isRemoved = (name: string) => removed.get(name.trim().toUpperCase()) === true;
+  const list = (unit.cameraList || []).map(camera => isRemoved(camera.name) ? {...camera, removed: true} : camera);
+  const kept = list.filter(camera => !camera.removed);
+  const atSite = unit.placement === 'FIELD' ? kept.filter(camera => camera.atSite) : kept;
+  const online = atSite.filter(c => c.status === 'online').length;
+  const offline = atSite.filter(c => c.status === 'offline').length;
+  const unknown = atSite.length - online - offline;
+  const away = unit.placement === 'FIELD' ? kept.filter(camera => !camera.atSite) : [];
+  return {
+    ...unit,
+    cameraList: list,
+    state: unitState(online, offline, unknown),
+    cameras: atSite.length, online, offline, unknown,
+    down: atSite.filter(c => c.status !== 'online').map(c => ({name: c.name, status: c.status})),
+    ...(away.length ? {awayFromSite: away.map(c => ({name: c.name, status: c.status}))} : {awayFromSite: undefined}),
+    onlineInShop: unit.placement === 'SHOP' && online > 0,
+  };
+}
+
 export function applyHandEdits(
   report: UnitCameraStatusReport,
   edits: HandEdit[] | null | undefined,
 ): UnitCameraStatusReport {
   const byUnit = new Map<string, Partial<Record<HandEditField, HandEdit>>>();
+  // A unit has one of each ordinary edit, but a camera edit per camera: taking
+  // one camera off a unit says nothing about the others.
+  const removedByUnit = new Map<string, Map<string, boolean>>();
   for (const edit of Array.isArray(edits) ? edits : []) {
-    const unit = unitMatchKey(edit?.unit_key), field = text(edit?.field) as HandEditField;
+    const unit = unitMatchKey(edit?.unit_key), field = text(edit?.field) as HandEditField, action = text(edit?.action);
     if (!unit || !HAND_EDIT_FIELDS.includes(field)) continue;
-    if (text(edit?.action) === 'clear') continue; // A cleared edit leaves the provider's value in place.
-    if (text(edit?.action) !== 'set' || edit?.value == null) continue;
+    if (field === 'camera') {
+      const held = removedByUnit.get(unit) || new Map<string, boolean>();
+      // Clearing with no camera named puts every camera on this unit back.
+      if (action === 'clear' && !text(edit?.value)) held.clear();
+      else if (action === 'set' || action === 'clear') held.set(unitMatchKey(edit?.value), action === 'set');
+      removedByUnit.set(unit, held);
+      continue;
+    }
+    if (action === 'clear') continue; // A cleared edit leaves the provider's value in place.
+    if (action !== 'set' || edit?.value == null) continue;
     const held = byUnit.get(unit) || {};
     held[field] = edit;
     byUnit.set(unit, held);
   }
-  if (!byUnit.size) return report;
+  if (!byUnit.size && !removedByUnit.size) return report;
   const units = report.units.map(unit => {
+    const removedNames = removedByUnit.get(unitMatchKey(unit.unit));
+    const base = removedNames?.size ? withoutRemovedCameras(unit, removedNames) : unit;
     const held = byUnit.get(unitMatchKey(unit.unit));
-    if (!held) return unit;
+    if (!held) return base;
+    unit = base;
     const applied: Partial<Record<HandEditField, AppliedHandEdit>> = {};
     const record = (field: HandEditField, providerValue: string | null) => {
       const edit = held[field];

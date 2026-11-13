@@ -3,7 +3,8 @@ import {mountFleet,fresh} from './fleet-dashboard-fixtures.mjs';
 import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 
-const line=(unit,over={})=>({unit,placement:'FIELD',site:'Fixture customer - yard',siteNamePending:false,state:'GREEN',cameras:1,online:1,offline:0,unknown:0,down:[],onlineInShop:false,publicIp:null,observedAt:fresh,...over});
+const line=(unit,over={})=>({unit,placement:'FIELD',site:'Fixture customer - yard',siteNamePending:false,state:'GREEN',cameras:1,online:1,offline:0,unknown:0,down:[],onlineInShop:false,publicIp:null,observedAt:fresh,
+ cameraList:[{name:unit+' / Cam 1',status:'online',atSite:true}],...over});
 const units=[
  // Three units at one address and two at another: Vision's case.
  line('SPOTTER 101',{address:'1 Shared Yard Rd',location:{latitude:29.8646,longitude:-95.2614,matchedAddress:null,source:'hand'}}),
@@ -36,7 +37,7 @@ test('Camera status lists Avigilon, Reconeyez and Star4Live units with their sou
  // The Fleet map's saved addresses place the same units here, marked unconfirmed.
  await expect(app.locator('.cos-camera-status-map-key small')).toContainText('field units on the map');
  await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-victron')).toHaveCount(0);
- await row(app,'SNIPER 004').getByRole('button',{name:'Edit by hand'}).click();
+ await row(app,'SNIPER 004').getByRole('button',{name:'Open →'}).click();
  await expect(app.getByLabel('Public IP')).toHaveCount(0);
  await expect(row(app,'SNIPER 004').getByRole('button',{name:'In the shop',exact:true})).toBeVisible();
  await page.screenshot({path:info.outputPath('camera-status-sources.png'),fullPage:true});
@@ -110,4 +111,55 @@ test('clicking a count tile shows exactly the units it counts, and the list says
  await app.getByRole('button',{name:'Show all',exact:true}).click();
  await expect(rows).toHaveCount(9);
  await page.screenshot({path:info.outputPath('camera-status-tile-filter.png')});
+});
+
+test('a unit opens one panel with every camera on it, and a swapped-out camera can be taken off and put back',async({page},info)=>{
+ const {app}=await mountFleet(page);
+ const helios=line('HELIOS 001',{cameras:3,online:2,offline:1,state:'YELLOW',site:'Mesa Village MHP',
+  down:[{name:'Helios 001 / Cam 003 & 004',status:'offline'}],
+  cameraList:[{name:'Helios 001 / Cam 001',status:'online',atSite:true},
+   {name:'Helios 001 / Cam 002',status:'online',atSite:true},
+   {name:'Helios 001 / Cam 003 & 004',status:'offline',atSite:true}]});
+ const one={...report,units:[helios],counts:countUnits([helios])};
+ const sent=[];
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  const body=JSON.parse(route.request().postData()||'{}');
+  if(body.path&&body.path.endsWith('/edit')){
+   sent.push(body.body);
+   const name=body.body.value||'';
+   const off=body.body.action!=='clear';
+   const after=helios.cameraList.map(c=>c.name===name?{...c,removed:off}:c);
+   const kept=after.filter(c=>!c.removed);
+   const unit={...helios,cameraList:after,cameras:kept.length,online:kept.filter(c=>c.status==='online').length,
+    offline:kept.filter(c=>c.status==='offline').length,unknown:0,
+    state:kept.every(c=>c.status==='online')?'GREEN':'YELLOW',down:kept.filter(c=>c.status!=='online')};
+   return route.fulfill({status:200,headers:cors,json:{...one,units:[unit],counts:countUnits([unit]),
+    recorded:{unit:'HELIOS 001',field:'camera',action:body.body.action||'set',value:body.body.value??null,by:'Fixture Owner',role:'owner',duplicate:false}}});
+  }
+  return route.fulfill({status:200,headers:cors,json:one});
+ });
+ await openFleetView(app,'Camera status');
+ const unitRow=row(app,'HELIOS 001');
+ await expect(unitRow.locator('.cos-camera-status-detail')).toContainText('Some cameras down · 2 of 3 up');
+ await unitRow.getByRole('button',{name:'Open →'}).click();
+ const panel=app.getByRole('form',{name:'Unit panel for HELIOS 001'});
+ await expect(panel.locator('.cos-camera-status-camera')).toHaveCount(3);
+ await expect(panel).toContainText('Helios 001 / Cam 003 & 004');
+ // Every control for this unit is in this one panel; nothing navigates away.
+ await expect(panel.getByLabel('Customer and site')).toBeVisible();
+ await expect(panel.getByLabel('Address (drops the pin)')).toBeVisible();
+ await page.screenshot({path:info.outputPath('camera-status-unit-panel.png')});
+ const ptz=panel.locator('.cos-camera-status-camera').filter({hasText:'Cam 003 & 004'});
+ await ptz.getByRole('button',{name:'Swapped out'}).click();
+ await expect(app.locator('.cos-camera-status-saved')).toContainText('Helios 001 / Cam 003 & 004 is no longer on HELIOS 001');
+ expect(sent[0]).toMatchObject({unitKey:'HELIOS 001',field:'camera',value:'Helios 001 / Cam 003 & 004'});
+ await expect(app.locator('.cos-fleet-dashboard')).toHaveAttribute('data-fleet-view','camerastatus');
+ await row(app,'HELIOS 001').getByRole('button',{name:'Open →'}).click();
+ const back=app.getByRole('form',{name:'Unit panel for HELIOS 001'}).locator('.cos-camera-status-camera').filter({hasText:'Cam 003 & 004'});
+ await expect(back).toContainText('Taken off this unit by hand');
+ await back.getByRole('button',{name:'Put back'}).click();
+ await expect(app.locator('.cos-camera-status-saved')).toContainText('Helios 001 / Cam 003 & 004 is back on HELIOS 001');
+ expect(sent[1]).toMatchObject({unitKey:'HELIOS 001',field:'camera',action:'clear',value:'Helios 001 / Cam 003 & 004'});
 });

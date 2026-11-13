@@ -193,3 +193,36 @@ test('installing twice changes nothing', async () => {
   const tables = await db.query("select count(*) n from information_schema.tables where table_schema='cos_fleet_hand_edit_private'");
   assert.equal(Number(tables.rows[0].n), 1);
 });
+
+test('a camera swap is recorded, and putting one back names it', async () => {
+  const set = await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'set', value: 'Helios 001 / Cam 003 & 004',
+    providerValue: null, reason: 'PTZ swapped out'});
+  assert.equal(set.applied, true);
+  const back = await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'clear', value: 'Helios 001 / Cam 003 & 004',
+    providerValue: null, reason: null});
+  assert.equal(back.applied, true);
+  const all = await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'clear', value: null, providerValue: null, reason: null});
+  assert.equal(all.applied, true);
+  // Only the latest word on each camera is read back, in the order it was given.
+  const saved = await state();
+  assert.deepEqual(saved.edits.map(row => row.field + '/' + row.action + '/' + (row.value ?? '-')),
+    ['camera/clear/Helios 001 / Cam 003 & 004', 'camera/clear/-']);
+});
+
+test('each camera on a unit keeps its own latest word, beside the unit\'s other edits', async () => {
+  await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'set', value: 'Cam A', providerValue: null, reason: null});
+  await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'set', value: 'Cam B', providerValue: null, reason: null});
+  await edit({unitKey: 'HELIOS 001', field: 'site', action: 'set', value: 'Mesa Village', providerValue: 'root', reason: null});
+  await edit({unitKey: 'HELIOS 001', field: 'camera', action: 'clear', value: 'Cam A', providerValue: null, reason: null});
+  const saved = await state();
+  assert.deepEqual(saved.edits.map(row => row.field + '/' + row.action + '/' + (row.value ?? '-')),
+    ['camera/set/Cam B', 'site/set/Mesa Village', 'camera/clear/Cam A']);
+});
+
+test('clearing any other hand edit still refuses a value, and a camera edit carries no map point', async () => {
+  for (const field of ['placement', 'site', 'address', 'public_ip']) {
+    await refuses(() => edit({field, action: 'clear', value: 'anything'}), /does not take a value/);
+  }
+  await refuses(() => edit({unitKey: 'HELIOS 001', field: 'camera', action: 'set', value: 'Cam 1',
+    providerValue: null, latitude: 29.7, longitude: -95.4}), /Only a set address carries a map point/);
+});

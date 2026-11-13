@@ -78,3 +78,11 @@
 .cos-camera-status-tiles button.cos-camera-status-tile:hover{filter:brightness(1.18)}
 .cos-camera-status-tiles button.cos-camera-status-tile[aria-pressed=true]{outline:2px solid #d33351;outline-offset:1px}
 .cos-camera-status-clear-filter{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.cos-camera-status-panel-heading{margin:0 0 10px;font-size:16px}
+.cos-camera-status-cameras{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}
+.cos-camera-status-camera{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #28344a;border-radius:8px;background:#121a26}
+.cos-camera-status-camera>span{font-weight:600}
+.cos-camera-status-camera>small{opacity:.85}
+.cos-camera-status-camera>button{margin-left:auto;min-height:36px}
+.cos-camera-status-camera-off{opacity:.65}
+.cos-camera-status-camera-off>span{text-decoration:line-through}

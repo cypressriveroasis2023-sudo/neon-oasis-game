@@ -40,7 +40,7 @@ function victronLine(power:SafeVrmPower):string{
  const newest=(metric:string)=>power.measurements.filter(item=>item.metric===metric).sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt))[0];
  return VICTRON.map(([metric,label])=>{const item=newest(metric);return item?label+' '+item.value+' '+item.unit:'';}).filter(Boolean).join(' · ');
 }
-const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP'};
+const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP',camera:'Cameras on this unit'};
 
 /** A read-only check, so a bad shape is reported rather than guessed at. */
 function checkedReport(value:unknown):Report{
@@ -73,16 +73,17 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  },[]);
  useEffect(()=>{const signal={cancelled:false};read(signal);return ()=>{signal.cancelled=true;};},[read]);
 
- const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string)=>{
+ const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string,clearValue?:string)=>{
   setSaving(true);setSaveError('');
   try{
    const body:Record<string,unknown>={unitKey:unit.unit,field,requestId:crypto.randomUUID()};
-   if(value===null)body.action='clear';else body.value=value;
+   if(value===null){body.action='clear';if(clearValue)body.value=clearValue;}else body.value=value;
    if(reason.trim())body.reason=reason.trim();
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
-   setSaved(next.recorded?(value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
+   setSaved(next.recorded?(field==='camera'?(value===null?(clearValue?clearValue+' is back on '+unit.unit:'Every camera is back on '+unit.unit):value+' is no longer on '+unit.unit)
+    :value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
   }catch(failure:any){
    setSaveError(failure?.response?.data?.error||failure?.message||'The edit could not be saved. Nothing was changed.');
   }finally{setSaving(false);}
@@ -163,13 +164,30 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
        :unit.down.length>0&&<small>Down: {unit.down.map(camera=>camera.name+(camera.status==='unknown'?' (not verified)':'')).join(', ')}</small>}
       {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
-      {canEdit&&<button type='button' className='cos-camera-status-edit-open' onClick={()=>{setSaveError('');setSaved('');setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
-       {draft?.unit===unit.unit?'Close':'Edit by hand'}
-      </button>}
+      <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
+       onClick={()=>{setSaveError('');setSaved('');setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
+       {draft?.unit===unit.unit?'Close':canEdit?'Open \u2192':'Details \u2192'}
+      </button>
      </div>
     </div>
-    {canEdit&&draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Hand edit for '+unit.unit}>
-     <p>Where a unit is, its site and its address are yours to set. Up or down always stays whatever {SOURCE_LABEL[sourceOf(unit)]} reports.</p>
+    {draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Unit panel for '+unit.unit}>
+     <h3 className='cos-camera-status-panel-heading'>{unit.unit}</h3>
+     <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
+      {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
+       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
+       <span>{camera.name}</span>
+       <small>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
+        :camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
+        {!camera.removed&&!camera.atSite&&unit.placement==='FIELD'?' \u00b7 in the shop, not at this site':''}</small>
+       {canEdit&&(camera.removed
+        ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>
+        :<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',camera.name,draft.reason)}>Swapped out</button>)}
+      </li>)}
+      {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{SOURCE_LABEL[sourceOf(unit)]} reports no camera list for this unit.</small></li>}
+     </ul>
+     {!canEdit&&<p>Only you and IT can change a unit.</p>}
+     {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {SOURCE_LABEL[sourceOf(unit)]} reports.</p>}
+     {canEdit&&<>
      <div className='cos-camera-status-edit-row'>
       <span id={'placement-'+unit.unit}>Field or shop</span>
       <div role='group' aria-labelledby={'placement-'+unit.unit} className='cos-camera-status-toggle'>
@@ -208,6 +226,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
      </div>
      {saveError&&<p className='cos-camera-status-error' role='alert'>{saveError}</p>}
      <small>Every edit is kept with your name and the time. No provider is ever written to; a tech still changes VCC.</small>
+     </>}
     </form>}
    </li>)}
    {!shown.length&&<li className='cos-camera-status-empty'>{loading?'Reading Star4Live…':error?'No readings to show.':query?'No unit matches that search.':'No units in this group.'}</li>}
