@@ -1,16 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
-import {mkdtempSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-
-// The projection is TypeScript shared by the route and the page. Compile it once
-// with the repo's own TypeScript, then exercise the compiled module.
-const dir = mkdtempSync(join(tmpdir(), 'star-unit-status-'));
-execFileSync('npx', ['tsc', 'operations/shared/starUnitStatus.ts', '--target', 'es2022', '--module', 'es2022', '--outDir', dir], {cwd: process.cwd(), stdio: 'pipe'});
-writeFileSync(join(dir, 'package.json'), JSON.stringify({type: 'module'}));
-const {projectUnitCameraStatus, cameraStatus, cameraPlacement, applyFeedFreshness} = await import(join(dir, 'starUnitStatus.js'));
+import {projectUnitCameraStatus, cameraStatus, cameraPlacement, applyFeedFreshness, applyHandEdits} from '../shared/starUnitStatus.ts';
 
 const camera = (over = {}) => ({
   device_name: 'SS001_1', unit_key: 'SOLARSPOTTER 001', organization: 'root',
@@ -218,4 +208,133 @@ test('a stale feed never reports an outage, and shop units stay in the shop', ()
 test('a clock a little ahead of the sync is still fresh', () => {
   assert.equal(applyFeedFreshness(fieldUnit(), freshFeed, Date.parse('2026-11-12T22:17:30Z')).feed.fresh, true);
   assert.equal(applyFeedFreshness(fieldUnit(), freshFeed, Date.parse('2026-11-12T22:00:00Z')).feed.fresh, false);
+});
+
+const handEdit = (over = {}) => ({unit_key: 'SOLARSPOTTER 029', field: 'site', action: 'set', value: 'ERock - Hyperion',
+  provider_value: 'root', actor_name: 'James Martin', actor_role: 'owner', reason: 'Moved by hand',
+  created_at: '2026-11-12T22:40:00Z', ...over});
+const shopUnit = () => projectUnitCameraStatus([1, 2, 3].map(n => camera({
+  device_name: 'SolarSpotter 029_' + n, unit_key: 'SOLARSPOTTER 029', organization: 'root', vigilant_status: 'Offline'})));
+
+test('a hand edit can move a unit from the shop to a site', () => {
+  const report = applyHandEdits(shopUnit(), [handEdit({field: 'placement', value: 'FIELD', provider_value: 'SHOP'}), handEdit()]);
+  const unit = report.units[0];
+  assert.equal(unit.placement, 'FIELD');
+  assert.equal(unit.site, 'ERock - Hyperion');
+  assert.equal(unit.providerPlacement, 'SHOP');
+  assert.equal(unit.providerSite, null);
+  assert.equal(unit.handEdits.site.by, 'James Martin');
+  assert.equal(unit.handEdits.site.role, 'owner');
+  assert.equal(unit.handEdits.placement.providerAgrees, false);
+  assert.deepEqual(report.counts.field, {units: 1, green: 0, yellow: 0, red: 1, unknown: 0, camerasDown: 3});
+  assert.deepEqual(report.counts.shop, {units: 0, onlineInShop: 0});
+});
+
+test('a hand edit never changes whether a camera is online', () => {
+  const before = projectUnitCameraStatus([camera({unit_key: 'SPOTTER 306', device_name: 'SP306_1', organization: 'A Site', vigilant_status: 'Offline'})]);
+  const after = applyHandEdits(before, [handEdit({unit_key: 'SPOTTER 306', field: 'placement', value: 'SHOP'})]);
+  const unit = after.units[0];
+  assert.equal(unit.state, 'RED');
+  assert.equal(unit.online, 0);
+  assert.equal(unit.offline, 1);
+  assert.equal(unit.onlineInShop, false);
+  assert.equal(unit.placement, 'SHOP');
+  assert.equal(after.counts.field.red, 0, 'a unit moved to the shop is no longer a field outage');
+});
+
+test('moving a unit back to the shop drops its site', () => {
+  const field = projectUnitCameraStatus([camera({unit_key: 'SPOTTER 306', device_name: 'SP306_1', organization: 'A Site'})]);
+  const report = applyHandEdits(field, [handEdit({unit_key: 'SPOTTER 306', field: 'placement', value: 'SHOP'})]);
+  assert.equal(report.units[0].site, null);
+  assert.equal(report.units[0].providerSite, 'A Site');
+  assert.equal(report.units[0].onlineInShop, true);
+});
+
+test('a hand edit can name a site Star4Live has not named, and clears the pending flag', () => {
+  const pending = projectUnitCameraStatus([camera({unit_key: 'SOLARSPOTTER 039', device_name: 'SS039_1', organization: 'Star4Live site #1826680 (name pending)'})]);
+  assert.equal(pending.units[0].siteNamePending, true);
+  const report = applyHandEdits(pending, [handEdit({unit_key: 'SOLARSPOTTER 039', value: 'EMJ Triangle Construction - HEB Aledo'})]);
+  assert.equal(report.units[0].site, 'EMJ Triangle Construction - HEB Aledo');
+  assert.equal(report.units[0].siteNamePending, false);
+});
+
+test('a hand edit can correct the public IP', () => {
+  const report = applyHandEdits(shopUnit(), [handEdit({field: 'public_ip', value: '38.246.195.93', provider_value: '166.203.205.83'})]);
+  assert.equal(report.units[0].publicIp, '38.246.195.93');
+  assert.equal(report.units[0].providerPublicIp, '38.246.0.1');
+  assert.equal(report.units[0].handEdits.public_ip.providerValue, '38.246.0.1');
+});
+
+test('the board says when Star4Live has caught up with a hand edit', () => {
+  const field = projectUnitCameraStatus([camera({unit_key: 'SOLARSPOTTER 006', device_name: 'SS006_1', organization: 'ERock - Hyperion'})]);
+  const report = applyHandEdits(field, [handEdit({unit_key: 'SOLARSPOTTER 006', value: 'ERock - Hyperion'})]);
+  assert.equal(report.units[0].handEdits.site.providerAgrees, true);
+  assert.equal(report.units[0].site, 'ERock - Hyperion');
+});
+
+test('a cleared edit leaves the provider value in place', () => {
+  const report = applyHandEdits(shopUnit(), [handEdit({action: 'clear', value: null})]);
+  assert.equal(report.units[0].placement, 'SHOP');
+  assert.equal(report.units[0].site, null);
+  assert.equal(report.units[0].handEdits, undefined);
+});
+
+test('edits for other units, unknown fields and bad placements are ignored', () => {
+  for (const edits of [
+    [handEdit({unit_key: 'SPOTTER 999'})],
+    [handEdit({field: 'vigilant_status', value: 'Online'})],
+    [handEdit({field: 'placement', value: 'ROOT'})],
+    [handEdit({unit_key: ''})], [handEdit({value: null})], null, undefined, 'nonsense',
+  ]) {
+    const report = applyHandEdits(shopUnit(), edits);
+    assert.equal(report.units[0].placement, 'SHOP', JSON.stringify(edits));
+    assert.equal(report.units[0].site, null, JSON.stringify(edits));
+  }
+});
+
+test('the unit name on an edit is matched without case or spacing getting in the way', () => {
+  const report = applyHandEdits(shopUnit(), [handEdit({unit_key: '  solarspotter 029  ', field: 'placement', value: 'FIELD'})]);
+  assert.equal(report.units[0].placement, 'FIELD');
+});
+
+test('a stale feed still hides health under a hand edit, and keeps the edit', () => {
+  const edited = applyHandEdits(shopUnit(), [handEdit({field: 'placement', value: 'FIELD'}), handEdit()]);
+  const report = applyFeedFreshness(edited, null, atSync);
+  assert.equal(report.units[0].state, 'UNKNOWN');
+  assert.equal(report.units[0].offline, 0);
+  assert.equal(report.units[0].placement, 'FIELD');
+  assert.equal(report.units[0].site, 'ERock - Hyperion');
+  assert.deepEqual(report.counts.field, {units: 1, green: 0, yellow: 0, red: 0, unknown: 1, camerasDown: 0});
+});
+
+const addressEdit = (over = {}) => handEdit({unit_key: 'SPOTTER 306', field: 'address', value: '9500 Katy Fwy, Houston, TX 77024',
+  provider_value: null, latitude: 29.7838, longitude: -95.534, matched_address: '9500 KATY FWY, HOUSTON, TX, 77024', ...over});
+
+test('a recorded address puts a pin on a field unit, and the pin keeps the unit colour', () => {
+  const report = applyHandEdits(fieldUnit(), [addressEdit()]);
+  const unit = report.units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(unit.address, '9500 Katy Fwy, Houston, TX 77024');
+  assert.deepEqual(unit.location, {latitude: 29.7838, longitude: -95.534, matchedAddress: '9500 KATY FWY, HOUSTON, TX, 77024', source: 'hand'});
+  assert.equal(unit.state, fieldUnit().units.find(u => u.unit === 'SPOTTER 306').state, 'an address never changes camera status');
+  assert.equal(unit.handEdits.address.providerValue, null);
+  assert.equal(unit.handEdits.address.providerAgrees, false);
+});
+
+test('no pin without a real matched point, and none for a unit in the shop', () => {
+  for (const bad of [{latitude: null}, {longitude: undefined}, {latitude: 'x'}, {latitude: 0, longitude: 0}, {latitude: 95}]) {
+    const unit = applyHandEdits(fieldUnit(), [addressEdit(bad)]).units.find(u => u.unit === 'SPOTTER 306');
+    assert.equal(unit.location, null, JSON.stringify(bad));
+    assert.equal(unit.address, null, JSON.stringify(bad));
+  }
+  const moved = applyHandEdits(fieldUnit(), [addressEdit(), handEdit({unit_key: 'SPOTTER 306', field: 'placement', value: 'SHOP'})])
+    .units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(moved.placement, 'SHOP');
+  assert.equal(moved.location, null);
+  assert.equal(moved.address, null);
+});
+
+test('a cleared address takes the pin away', () => {
+  const unit = applyHandEdits(fieldUnit(), [addressEdit({action: 'clear', value: null, latitude: null, longitude: null})])
+    .units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(unit.location ?? null, null);
 });
