@@ -1,7 +1,13 @@
 import { expect } from '@playwright/test';
+// Mirrors RETIRED_WORKSPACES in src/approvedCosNavigation.ts; a node test keeps them equal.
+export const RETIRED_WORKSPACES = ['Jobs','Dispatch','Unscheduled','Work Requests','Quotes','CRM',
+  'Billing','Invoices','Payments','Collections','Accounting','Purchasing','Reports',
+  'Daily Board','Owner Review','Owner Tasks','Handoffs','Needs Attention'];
 
 // Display names are explicit test expectations, not imports from the implementation.
 // Always use the visible UI: no hash injection, forced clicks or role overrides.
+// One exception: a retired workspace has no visible way in, so it is opened by
+// its own link (see below). Nothing else may use that path.
 const primaryLabels = {
   'Fleet Dashboard': 'Fleet', 'Field Map': 'Fleet', 'Field View': 'Fleet',
   'Daily Board': 'Boards', 'Tech Check': 'Tech Check', Team: 'Team', Operations: 'More',
@@ -47,6 +53,17 @@ export async function openWorkspace(frame, workspace) {
   const currentKey = await frame.locator('body').evaluate(() => location.hash.replace(/^#/, '').split('?')[0]);
   if (keys.includes(currentKey)) {
     if (await menu.isVisible()) await menu.getByRole('button', { name: /Close menu/ }).click();
+    await expect(frame.locator('main')).toBeVisible();
+    return;
+  }
+
+  // Retired workspaces (RETIRED_WORKSPACES in src/approvedCosNavigation.ts) are no
+  // longer offered in any menu, but their routes are kept. Reach them by their own
+  // link, as a bookmark would; the spec still checks the screen itself.
+  if (RETIRED_WORKSPACES.includes(workspace)) {
+    if (await menu.isVisible()) await menu.getByRole('button', { name: /Close menu/ }).click();
+    await frame.locator('body').evaluate((_, hash) => { location.hash = hash; }, keys[0]);
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash.replace(/^#/, '').split('?')[0])).toBe(keys[0]);
     await expect(frame.locator('main')).toBeVisible();
     return;
   }
