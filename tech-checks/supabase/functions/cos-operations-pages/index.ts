@@ -1077,7 +1077,10 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           projected=await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity);
           const locationProofs=await validatedLocationProofs(projected,Date.now(),{originalInventory:freshSnapshot.inventoryItems});
           const savedPlacement=projectMhelpFleetLocations(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs}):projected,mhelpReceipt?.fleetLocations);
-          const uploaded=projectMhelpUploadPlacement(savedPlacement,mhelpReceipt?.upload,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs});
+          // COS keeps the accepted mHelp census as its own unit list once the
+          // Owner freezes it; an unreadable freeze simply leaves it unfrozen.
+          const inventoryFreeze=await rpc('cos_inventory_freeze_state_v1',{p_organization_id:ORGANIZATION_ID},request.signal).catch(()=>null);
+          const uploaded=projectMhelpUploadPlacement(savedPlacement,mhelpReceipt?.upload,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs,inventoryFreeze});
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
           const combined=projectCombinedFleetRoster(effective,freshAudits,freshBundle.identity);
@@ -1244,6 +1247,29 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             return { id: d.id, name: d.device_name || d.unit_key || ('Camera ' + d.id), unit: d.unit_key || '', type: d.device_type || '', organization: d.organization || '', status, checkedAt: d.source_last_seen_at || d.last_health_checked_at || null };
           }).sort((a, b) => a.name.localeCompare(b.name));
           return json({ totalDevices: devices.length, healthRows: health.length, fieldDevices: rows.length, shopRoot: shopIds.size, online: rows.filter(r => r.status === 'online').length, offline: rows.filter(r => r.status === 'offline').length, review: rows.filter(r => r.status === 'review').length, rows, refreshedAt: new Date().toISOString(), source: 'Camera Health' });
+        }
+        // COS takes the accepted mHelp census as its own unit list. Freezing
+        // stops the board declining it for age: the real read time is never
+        // moved, and from then on only people change the list. Owner only.
+        if (path === '/api/inventory-freeze') {
+          if (method !== 'POST') fail('Use POST to accept or release the unit list.', 405);
+          if (!context.legacyOwner || !context.actorId) fail('An active COS Owner account is required.', 403);
+          allowedFields(body, ['action', 'reason', 'requestId'], 'Unit list request');
+          const action = textValue(body.action, 'Action', true);
+          if (action !== 'freeze' && action !== 'unfreeze') fail('The unit list is either frozen or released.');
+          const reason = textValue(body.reason, 'Reason', true, 500);
+          const requestId = textValue(body.requestId, 'Request id') || crypto.randomUUID();
+          if (!UUID.test(requestId)) fail('A unit list request id must be a UUID.');
+          const [snapshot, receiptSource] = await Promise.all([rpc('appdeploy_field_map_snapshot', actorPayload), readMhelpPlacements(actorPayload)]);
+          const upload = projectMhelpUploadPlacement({...snapshot, items: snapshot.items || [], inventoryItems: snapshot.inventoryItems || []}, receiptSource?.upload, [], undefined, Date.now(), {}).snapshot.uploadInventory;
+          if (!upload || typeof upload.sourceSha256 !== 'string') fail('The current unit list could not be read, so it cannot be accepted.', 503);
+          const by = (context.name || 'Owner').trim();
+          const payload = action === 'freeze'
+            ? {sourceSha256: upload.sourceSha256, recordCount: upload.summary.totalRecords, fieldCount: upload.summary.fieldRecords, shopCount: upload.summary.shopRecords, acceptedByName: by, reason}
+            : {acceptedByName: by, reason};
+          const receipt = await rpc('cos_inventory_freeze_v1', {...actorPayload, p_request_id: requestId, p_action: action, p_payload: payload}, request.signal);
+          if (receipt?.contract !== 'COS_INVENTORY_FREEZE_RESULT_V1') fail('The unit list change could not be recorded. Nothing was changed.', 503);
+          return json({...receipt, action, sourceSha256: upload.sourceSha256, recordCount: upload.summary.totalRecords, by});
         }
         const history = /^\/api\/field-map\/([^/]+)\/history$/.exec(path);
         if (history) {
