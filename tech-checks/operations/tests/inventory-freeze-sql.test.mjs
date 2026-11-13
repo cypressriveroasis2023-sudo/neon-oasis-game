@@ -79,7 +79,9 @@ test('only the Owner can freeze, only the exact active reviewed census, and only
  fails(()=>call(OWNER,id(1),'freeze',approve({recordCount:5})),/totals do not match/);
  fails(()=>call(OWNER,id(1),'freeze',approve({reason:' '})),/incomplete/);
  // The IP list approved with it must be for this census and list exactly its A#s.
- fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:undefined})),/IP list does not match/);
+ // Leaving the IP list out is allowed (seeded empty, see below); sending one that is not a list is not.
+ fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:null})),/IP list does not match/);
+ fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:{expectedMhelpSourceSha256:A}})),/IP list does not match/);
  fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:ipCensus(B)})),/IP list does not match/);
  const short=ipCensus(A);short.records.pop();fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:short})),/IP list does not match/);
  const dup=ipCensus(A);dup.records[3].productId='1001';fails(()=>call(OWNER,id(1),'freeze',approve({ipCensus:dup})),/IP list does not match/);
@@ -109,7 +111,7 @@ test('a freeze records the real mHelp read time, and the app-side rule accepts e
 });
 
 test('IPs change only by a recorded hand edit from the Owner or IT, one A# at a time',{skip},()=>{
- assert.deepEqual(state().ipCensus,ipCensus(A),'the approved IP list is served exactly as approved');
+ assert.deepEqual(state().ipCensus,{...ipCensus(A),seeded:true},'the approved IP list is served exactly as approved, marked as supplied');
  assert.deepEqual(state().ipEdits,{count:0,lastAt:null});
  fails(()=>edit(TECH,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'}),/Owner access required/);
  for(const role of ['anon','authenticated'])fails(()=>edit(IT,id(51),{productId:'1001',expectedOldIp:'8.8.8.8',newIp:'8.8.4.4'},role),/permission denied/);

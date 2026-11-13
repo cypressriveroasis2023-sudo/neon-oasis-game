@@ -940,6 +940,39 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         keepPermitForResponse = true;
         return json(await readPrivateOwnerEvidence(context.actorId, documentId));
       }
+      // Owner acceptance of the unit list. Above the GET-only section so the POST
+      // is reachable; the route checks its own method.
+      if (path === '/api/inventory-freeze') {
+        if (method !== 'POST') fail('Use POST to accept or release the unit list.', 405);
+        if (!context.legacyOwner || !context.actorId) fail('An active COS Owner account is required.', 403);
+        allowedFields(body, ['action', 'reason', 'requestId'], 'Unit list request');
+        const action = textValue(body.action, 'Action', true);
+        if (action !== 'freeze' && action !== 'unfreeze') fail('The unit list is either frozen or released.');
+        const reason = textValue(body.reason, 'Reason', true, 500);
+        const requestId = textValue(body.requestId, 'Request id') || crypto.randomUUID();
+        if (!UUID.test(requestId)) fail('A unit list request id must be a UUID.');
+        const receipt = await rpc('cos_mhelp_placement_snapshot', actorPayload, request.signal);
+        if (!receipt?.upload) fail('The current unit list is unavailable, so it cannot be accepted.', 503);
+        // Structure and identity only, deliberately NOT the 45-minute age gate: a list
+        // too old for the board is exactly the list the Owner is accepting. The database
+        // still requires the census to be the complete, reviewed, active one.
+        let prior;
+        try { prior = validPrior(receipt.upload); }
+        catch { fail('The current unit list could not be verified, so it cannot be accepted.', 503); }
+        const by = (context.name || 'Owner').trim();
+        // The IP list is NOT copied in here. The database seeds it empty and marks it
+        // unseeded, so nothing reads a blank IP as "this A# has no IP". Copying the
+        // real IPs in from the tracker is its own recorded step.
+        const fieldCount = prior.records.filter(row => row.placement === 'FIELD').length;
+        const payload = action === 'freeze'
+          ? {sourceSha256: prior.sourceSha256, recordCount: prior.records.length,
+             fieldCount, shopCount: prior.records.length - fieldCount,
+             acceptedByName: by, reason}
+          : {acceptedByName: by, reason};
+        const result = await rpc('cos_inventory_freeze_v1', {...actorPayload, p_request_id: requestId, p_action: action, p_payload: payload}, request.signal);
+        if (result?.contract !== 'COS_INVENTORY_FREEZE_RESULT_V1') fail('The unit list change could not be recorded. Nothing was changed.', 503);
+        return json({...result, action, sourceSha256: payload.sourceSha256 ?? null, recordCount: payload.recordCount ?? null, by});
+      }
       if (method === 'GET') {
         const contactRoute = /^\/api\/customers\/([^/]+)\/contacts$/.exec(path);
         if (contactRoute) {
@@ -1252,37 +1285,6 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         // COS takes the accepted mHelp census as its own unit list. Freezing
         // stops the board declining it for age: the real read time is never
         // moved, and from then on only people change the list. Owner only.
-        if (path === '/api/inventory-freeze') {
-          if (method !== 'POST') fail('Use POST to accept or release the unit list.', 405);
-          if (!context.legacyOwner || !context.actorId) fail('An active COS Owner account is required.', 403);
-          allowedFields(body, ['action', 'reason', 'requestId'], 'Unit list request');
-          const action = textValue(body.action, 'Action', true);
-          if (action !== 'freeze' && action !== 'unfreeze') fail('The unit list is either frozen or released.');
-          const reason = textValue(body.reason, 'Reason', true, 500);
-          const requestId = textValue(body.requestId, 'Request id') || crypto.randomUUID();
-          if (!UUID.test(requestId)) fail('A unit list request id must be a UUID.');
-          const receipt = await rpc('cos_mhelp_placement_snapshot', actorPayload, request.signal);
-          if (!receipt?.upload) fail('The current unit list is unavailable, so it cannot be accepted.', 503);
-          // Structure and identity only, deliberately NOT the 45-minute age gate: a list
-          // too old for the board is exactly the list the Owner is accepting. The database
-          // still requires the census to be the complete, reviewed, active one.
-          let prior;
-          try { prior = validPrior(receipt.upload); }
-          catch { fail('The current unit list could not be verified, so it cannot be accepted.', 503); }
-          const by = (context.name || 'Owner').trim();
-          // The IP list is NOT copied in here. The database seeds it empty and marks it
-          // unseeded, so nothing reads a blank IP as "this A# has no IP". Copying the
-          // real IPs in from the tracker is its own recorded step.
-          const fieldCount = prior.records.filter(row => row.placement === 'FIELD').length;
-          const payload = action === 'freeze'
-            ? {sourceSha256: prior.sourceSha256, recordCount: prior.records.length,
-               fieldCount, shopCount: prior.records.length - fieldCount,
-               acceptedByName: by, reason}
-            : {acceptedByName: by, reason};
-          const result = await rpc('cos_inventory_freeze_v1', {...actorPayload, p_request_id: requestId, p_action: action, p_payload: payload}, request.signal);
-          if (result?.contract !== 'COS_INVENTORY_FREEZE_RESULT_V1') fail('The unit list change could not be recorded. Nothing was changed.', 503);
-          return json({...result, action, sourceSha256: payload.sourceSha256 ?? null, recordCount: payload.recordCount ?? null, by});
-        }
         const history = /^\/api\/field-map\/([^/]+)\/history$/.exec(path);
         if (history) {
           const id = idValue(history[1], 'Unit');
