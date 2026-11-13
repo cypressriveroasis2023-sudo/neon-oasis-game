@@ -111,7 +111,7 @@ test('only the four fields are editable, and camera status is not one of them', 
   assert.equal((await edit({unitKey: 'SPOTTER 505', field: 'public_ip', value: '38.246.195.93'})).applied, true);
 });
 
-test('an address is recorded only with the map point matched to it', async () => {
+test('an address is saved as typed, with a map point when one is known', async () => {
   const at = {field: 'address', value: '9500 Katy Fwy, Houston, TX 77024', latitude: 29.7838, longitude: -95.5340, matchedAddress: '9500 KATY FWY, HOUSTON, TX, 77024'};
   const done = await edit({unitKey: 'SPOTTER 601', ...at});
   assert.equal(done.applied, true);
@@ -121,18 +121,25 @@ test('an address is recorded only with the map point matched to it', async () =>
   assert.equal(row.latitude, 29.7838); assert.equal(row.longitude, -95.534);
   assert.equal(row.matched_address, at.matchedAddress);
   // No point, half a point, a point that is not a number, off the globe, or 0,0: refused.
-  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value}), /only with the map point/);
+  // An address the service could not locate is still saved, without a point.
+  const unpinned = await edit({unitKey: 'SPOTTER 602', field: 'address', value: 'Behind the HEB on FM 1960'});
+  assert.equal(unpinned.applied, true); assert.equal(unpinned.latitude, null);
+  const saved = (await state()).edits.find(e => e.unit_key === 'SPOTTER 602' && e.field === 'address');
+  assert.equal(saved.value, 'Behind the HEB on FM 1960'); assert.equal(saved.latitude, null); assert.equal(saved.longitude, null);
+  await refuses(() => edit({unitKey: 'SPOTTER 604', field: 'address', value: at.value, matchedAddress: 'X ST'}), /needs its map point/);
   await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 29.7}), /map point is two numbers/);
   await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: '29.7', longitude: '-95.5'}), /map point is two numbers/);
-  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 91, longitude: -95.5}), /only with the map point/);
-  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 0, longitude: 0}), /only with the map point/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 91, longitude: -95.5}), /not a usable map point/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 0, longitude: 0}), /not a usable map point/);
   // Nothing but a set address may carry a point, and a cleared address carries none.
   await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'site', value: 'Somewhere', latitude: 29.7, longitude: -95.5}), /Only a set address/);
   assert.equal((await edit({unitKey: 'SPOTTER 601', field: 'address', action: 'clear', value: null})).applied, true);
   await refuses(() => edit({unitKey: 'SPOTTER 601', field: 'address', action: 'clear', value: null, latitude: 29.7, longitude: -95.5}), /Only a set address/);
   // The table holds the same rule even against a direct insert.
-  await refuses(() => db.query(`insert into cos_fleet_hand_edit_private.unit_status_edit_log(id,organization_id,unit_key,field,action,value,actor,actor_name,actor_role)
-    values (gen_random_uuid(),$1,'SPOTTER 603','address','set','1 Main St, Houston, TX 77002',$2,'James','owner')`, [ORG, OWNER]), /check constraint/);
+  await refuses(() => db.query(`insert into cos_fleet_hand_edit_private.unit_status_edit_log(id,organization_id,unit_key,field,action,value,actor,actor_name,actor_role,latitude,longitude)
+    values (gen_random_uuid(),$1,'SPOTTER 603','site','set','A Site',$2,'James','owner',29.7,-95.5)`, [ORG, OWNER]), /check constraint/);
+  await refuses(() => db.query(`insert into cos_fleet_hand_edit_private.unit_status_edit_log(id,organization_id,unit_key,field,action,value,actor,actor_name,actor_role,latitude)
+    values (gen_random_uuid(),$1,'SPOTTER 603','address','set','1 Main St',$2,'James','owner',29.7)`, [ORG, OWNER]), /check constraint/);
 });
 
 test('a placement is one of two words and a site name is not root', async () => {

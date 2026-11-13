@@ -6,7 +6,7 @@ import UnitStatusMap from './UnitStatusMap';
 import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;canEdit?:boolean;
- recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean}};
+ recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
 type Group='field'|'attention'|'shop-online'|'shop';
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;reason:string};
 
@@ -68,7 +68,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
-   setSaved(next.recorded?(value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value):'Saved.');
+   setSaved(next.recorded?(value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
   }catch(failure:any){
    setSaveError(failure?.response?.data?.error||failure?.message||'The edit could not be saved. Nothing was changed.');
   }finally{setSaving(false);}
@@ -125,7 +125,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unit.unit}</strong>
       <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP · root':'SHOP · root'}</small>
-      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):'No address on the map yet'}</small>}
+      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
        {edit.providerAgrees?' · Star4Live now agrees':edit.providerValue?' · Star4Live still says “'+edit.providerValue+'”':' · Star4Live has no value'}

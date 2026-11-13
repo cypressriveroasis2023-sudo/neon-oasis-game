@@ -280,7 +280,8 @@ export function applyHandEdits(
       onlineInShop: nextPlacement === 'SHOP' && unit.online > 0,
       publicIp: publicIp ?? unit.publicIp,
       // A unit in the shop has no field pin, whatever address it once had.
-      address: nextPlacement === 'FIELD' && location ? address : null,
+      // The address is the person's own text and shows whether or not it has a pin.
+      address: nextPlacement === 'FIELD' ? address : null,
       location: nextPlacement === 'FIELD' ? location : null,
       providerPlacement: unit.placement,
       providerSite: unit.site,

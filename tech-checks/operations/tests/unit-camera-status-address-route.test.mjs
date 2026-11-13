@@ -1,6 +1,6 @@
 // The camera status edit route, driven in-process with a synthetic network:
-// an address becomes a pin only with the point the Census geocoder matched, and
-// no match means nothing is recorded. No real provider, socket or database.
+// an address is saved as typed with the one point the address service has for
+// it, and no single location means nothing is recorded. No real provider, socket or database.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
@@ -12,7 +12,7 @@ const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
 function fixture({geocode=census([katy]),geocodeStatus=200,edits=[]}={}){
- const calls=[],unexpected=[],recorded=[];
+ const calls=[],unexpected=[],recorded=[],asked=[];
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
   calls.push({url,method:init.method||'GET',body});
@@ -27,8 +27,10 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[]}={}){
   if(name==='cos_camera_unit_hand_edit_state_v1')return response({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits});
   if(name==='cos_camera_unit_hand_edit_v1'){recorded.push(body);return response({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:body.p_request_id,applied:true,repeat:false});}
   if(parsed.hostname==='geocoding.geo.census.gov'){
-   // Only the address leaves COS: street, city, state, ZIP and the two fixed settings.
-   assert.deepEqual([...parsed.searchParams.keys()].sort(),['benchmark','city','format','state','street','zip']);
+   // Only the address text leaves COS, with the two fixed settings.
+   assert.equal(parsed.pathname,'/geocoder/locations/onelineaddress');
+   assert.deepEqual([...parsed.searchParams.keys()].sort(),['address','benchmark','format']);
+   asked.push(parsed.searchParams.get('address'));
    return response(geocode,geocodeStatus);
   }
   unexpected.push(url);throw Error('Unexpected synthetic transport: '+parsed.pathname);
@@ -36,7 +38,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[]}={}){
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport});
  const send=(path,method,body)=>handler(new Request('https://synthetic-bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',
   headers:{Authorization:'Bearer '+callerToken,'Content-Type':'application/json'},body:JSON.stringify({path,method,body})}));
- return {calls,unexpected,recorded,send};
+ return {calls,unexpected,recorded,asked,send};
 }
 const geocodeCalls=f=>f.calls.filter(c=>c.url.includes('geocoding.geo.census.gov'));
 
@@ -53,27 +55,56 @@ test('a matched address is recorded with the point the geocoder found',async()=>
  assert.deepEqual(f.unexpected,[]);
 });
 
-for(const [name,geocode,status,code,pattern] of [
- ['no match',census([]),200,422,/No exact address matched/],
- ['two matches',census([katy,katy]),200,422,/Several addresses matched/],
- ['a different address came back',census([{...katy,matchedAddress:'1 OTHER ST, HOUSTON, TX, 77024'}]),200,422,/different address/],
- ['the address service is down',{error:'busy'},503,503,/unavailable/],
+for(const [name,geocode,status,pattern] of [
+ ['no match',census([]),200,/could not find that address/],
+ ['two matches',census([katy,katy]),200,/more than one place/],
+ ['a match with no location',census([{matchedAddress:katy.matchedAddress,coordinates:{x:0,y:0}}]),200,/no usable location/],
+ ['the address service is down',{error:'busy'},503,/unavailable/],
 ]){
- test('nothing is recorded when '+name,async()=>{
+ test('the address is still saved, without a pin, when '+name,async()=>{
   const f=fixture({geocode,geocodeStatus:status});
   const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',value:'9500 Katy Fwy, Houston, TX 77024'});
-  assert.equal(r.status,code);
-  assert.match((await r.json()).error,pattern);
-  assert.equal(f.recorded.length,0);
+  assert.equal(r.status,200,await r.clone().text());
+  const data=await r.json();
+  assert.equal(data.recorded.pinned,false);assert.match(data.recorded.pinNote,pattern);
+  assert.equal(f.recorded.length,1);
+  const p=f.recorded[0].p_payload;
+  assert.equal(p.value,'9500 Katy Fwy, Houston, TX 77024');
+  assert.equal('latitude' in p,false);assert.equal('matchedAddress' in p,false);
  });
 }
 
-test('an address that is not street, city, state and ZIP never reaches the geocoder',async()=>{
- const f=fixture();
- const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',value:'behind the HEB'});
- assert.equal(r.status,422);
- assert.match((await r.json()).error,/street, city, state and ZIP/);
- assert.equal(geocodeCalls(f).length,0);assert.equal(f.recorded.length,0);
+// James, 2026-11-13: "i put the correct one so it shouldnt matter ... it should
+// update what i say." The service's spelling differing from his is not a refusal.
+test('the address is saved as typed even when the service spells it differently',async()=>{
+ const f=fixture({geocode:census([{matchedAddress:'9500 KATY FREEWAY, HOUSTON, TX, 77024-1234',coordinates:{x:-95.534,y:29.7838}}])});
+ const typed='9500 katy fwy  houston tx';
+ const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',value:typed});
+ assert.equal(r.status,200,await r.clone().text());
+ const p=f.recorded[0].p_payload;
+ assert.equal(p.value.toLowerCase().startsWith('9500 katy fwy'),true,'his text, not the service spelling');
+ assert.equal(p.matchedAddress,'9500 KATY FREEWAY, HOUSTON, TX, 77024-1234');
+ assert.equal(p.latitude,29.7838);assert.equal(p.longitude,-95.534);
+ assert.deepEqual(f.asked,['9500 katy fwy houston tx']);
+ assert.equal((await r.clone().json()).recorded.pinned,true);
+});
+
+test('a description instead of a street address is saved as typed, without a pin',async()=>{
+ const f=fixture({geocode:census([])});
+ const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',value:'Behind the HEB on FM 1960'});
+ assert.equal(r.status,200);
+ assert.equal(f.recorded[0].p_payload.value,'Behind the HEB on FM 1960');
+ assert.equal((await r.json()).recorded.pinned,false);
+});
+
+test('text carrying a code or a link is refused and never reaches the service',async()=>{
+ for(const value of ['1 Main St gate code 4471','see https://example.invalid/1']){
+  const f=fixture();
+  const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',value});
+  assert.equal(r.status,422,value);
+  assert.match((await r.json()).error,/street address only/);
+  assert.equal(geocodeCalls(f).length,0);assert.equal(f.recorded.length,0);
+ }
 });
 
 test('a caller cannot supply its own map point',async()=>{
