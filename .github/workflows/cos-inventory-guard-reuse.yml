@@ -1,0 +1,23 @@
+name: COS inventory guard reuse
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/20261113_*.sql'
+      - 'tech-checks/operations/proposals/authority-guard-reuse/**'
+      - '.github/workflows/cos-inventory-guard-reuse.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  equivalence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: tech-checks/operations/proposals/authority-guard-reuse
+      - run: npm test
+        working-directory: tech-checks/operations/proposals/authority-guard-reuse

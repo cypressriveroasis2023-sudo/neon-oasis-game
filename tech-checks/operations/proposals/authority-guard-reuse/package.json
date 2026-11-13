@@ -1,0 +1,1 @@
+{"name":"cos-authority-guard-reuse-verification","private":true,"type":"module","scripts":{"test":"node equivalence.mjs"},"devDependencies":{"@electric-sql/pglite":"0.5.16"}}
