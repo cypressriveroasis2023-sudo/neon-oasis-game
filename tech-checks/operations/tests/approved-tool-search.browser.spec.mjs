@@ -53,7 +53,7 @@ test('primary More selection and responsive drawer keyboard controls remain usab
   const mobile=info.project.use.viewport.width<=700;
   const nav=app.getByRole('navigation',{name:mobile?'Mobile Operations navigation':'COS Operations',exact:true});
   const more=nav.getByRole('button',{name:'More',exact:true});await expect(more).toHaveClass(/cos-approved-selected/);await expect(more).toHaveCSS('background-color','rgb(200, 13, 36)');
-  await expect(nav.getByRole('button')).toHaveCount(5);
+  await expect(nav.getByRole('button')).toHaveCount(4); // Fleet, Tech Check, Team, More
   if(mobile){
     await more.click();const menu=app.getByRole('dialog',{name:'Operations navigation'});await expect(menu).toBeVisible();
     await expect(app.locator('main')).toHaveAttribute('inert','');const input=menu.getByRole('searchbox',{name:'Find a tool'});await input.fill('camera');await expect(menu.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
