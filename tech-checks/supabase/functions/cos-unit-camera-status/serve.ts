@@ -10,6 +10,9 @@ import {handlerUrl, servedEnvelopeBody} from './servedPath.ts';
 const handler = createOperationsHandler({
   platformUrl: Deno.env.get('SUPABASE_URL'),
   serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+  // The second address service, for addresses the free US Census file does not
+  // carry. Absent, a hand-typed address still saves; it just has no pin.
+  geocodioApiKey: Deno.env.get('GEOCODIO_API_KEY'),
 });
 Deno.serve(async request => {
   if (request.method !== 'POST') return handler(request);

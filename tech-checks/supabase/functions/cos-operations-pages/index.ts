@@ -1001,7 +1001,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         // reason goes back to the person. Only a link, email or code is refused.
         let point = {}, pinNote = null;
         if (edit.field === 'address' && edit.action === 'set') {
-          const found = await handAddressPoint(edit.value, requestFetch);
+          const found = await handAddressPoint(edit.value, requestFetch, options.geocodioApiKey);
           if (found.status === 'invalid_address') return json({error: found.reason, geocode: found.status}, 422);
           if (found.status === 'success') point = {latitude: found.latitude, longitude: found.longitude, matchedAddress: found.matchedAddress ?? null};
           else pinNote = found.reason;
