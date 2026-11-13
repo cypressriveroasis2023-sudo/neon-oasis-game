@@ -39,7 +39,7 @@ test('only a unit Star4Live reports can be edited', () => {
 
 test('a hand edit cannot touch camera status or anything else', () => {
   for (const field of ['vigilant_status', 'state', 'online', 'unit_key', 'organization', '']) {
-    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, or its public IP only/);
+    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, its address, or its public IP only/);
   }
 });
 
@@ -92,4 +92,19 @@ test('a request that is not an object, or carries extra fields, is refused', () 
   for (const body of [null, undefined, 'edit', 42, []]) refuses(body, /A hand edit request is required/);
   refuses({unitKey: 'SPOTTER 306', field: 'site', value: 'A Site', actorRole: 'owner'}, /unsupported fields: actorRole/);
   refuses({unitKey: 'SPOTTER 306', field: 'site', value: 'A Site', unit_key: 'other'}, /unsupported fields: unit_key/);
+});
+
+test('an address is stored text for a field unit; the geocoder judges it, and Star4Live has none', () => {
+  const ok = check({unitKey: 'SPOTTER 306', field: 'address', value: ' 9500 Katy Fwy, Houston, TX 77024 '});
+  assert.equal(ok.value, '9500 Katy Fwy, Houston, TX 77024');
+  assert.equal(ok.providerValue, null);
+  refuses({unitKey: 'SPOTTER 306', field: 'address', value: 'x'.repeat(201)}, /too long/);
+  refuses({unitKey: 'SPOTTER 306', field: 'address', value: '1 Main St\nHouston'}, /cannot be stored/);
+  // A caller cannot hand in its own map point; only the route's geocoder supplies one.
+  refuses({unitKey: 'SPOTTER 306', field: 'address', value: '1 Main St, Houston, TX 77002', latitude: 1, longitude: 2}, /unsupported fields: latitude, longitude/);
+  assert.equal(check({unitKey: 'SPOTTER 306', field: 'address', action: 'clear'}).value, null);
+});
+
+test('a unit in the shop gets no address', () => {
+  refuses({unitKey: 'SOLARSPOTTER 029', field: 'address', value: '1 Main St, Houston, TX 77002'}, /Put the unit in the Field first/);
 });

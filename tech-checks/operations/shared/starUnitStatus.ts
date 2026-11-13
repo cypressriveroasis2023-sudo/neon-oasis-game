@@ -42,10 +42,16 @@ export type UnitCameraStatus = {
   providerPlacement?: 'FIELD' | 'SHOP';
   providerSite?: string | null;
   providerPublicIp?: string | null;
+  // Star4Live reports no street address. A unit has one only when the Owner or
+  // IT typed it and the Census geocoder matched it to a point; that is its pin.
+  address?: string | null;
+  location?: UnitLocation | null;
   handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
 };
 
-export const HAND_EDIT_FIELDS = ['placement', 'site', 'public_ip'] as const;
+export type UnitLocation = { latitude: number; longitude: number; matchedAddress: string | null; source: 'hand' };
+
+export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip'] as const;
 export type HandEditField = typeof HAND_EDIT_FIELDS[number];
 
 export type HandEdit = {
@@ -58,6 +64,9 @@ export type HandEdit = {
   actor_role?: string | null;
   reason?: string | null;
   created_at?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  matched_address?: string | null;
 };
 
 export type AppliedHandEdit = {
@@ -252,6 +261,14 @@ export function applyHandEdits(
     const placement = record('placement', unit.placement) as 'FIELD' | 'SHOP' | null;
     const site = record('site', unit.site);
     const publicIp = record('public_ip', unit.publicIp);
+    const address = record('address', null);
+    // typeof, not Number(): Number(null) is 0, which would drop a pin on the equator.
+    const point = held.address, lat = typeof point?.latitude === 'number' ? point.latitude : NaN,
+      lng = typeof point?.longitude === 'number' ? point.longitude : NaN;
+    // A pin only from a recorded, matched point - never a guess from the text.
+    const location: UnitLocation | null = address !== null && Number.isFinite(lat) && Number.isFinite(lng)
+      && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0)
+      ? {latitude: lat, longitude: lng, matchedAddress: text(point?.matched_address) || null, source: 'hand'} : null;
     const nextPlacement = placement === 'FIELD' || placement === 'SHOP' ? placement : unit.placement;
     const nextSite = nextPlacement === 'FIELD' ? (site ?? unit.site) : null;
     return {
@@ -262,6 +279,9 @@ export function applyHandEdits(
       // Where a unit sits never changes whether its cameras answered.
       onlineInShop: nextPlacement === 'SHOP' && unit.online > 0,
       publicIp: publicIp ?? unit.publicIp,
+      // A unit in the shop has no field pin, whatever address it once had.
+      address: nextPlacement === 'FIELD' && location ? address : null,
+      location: nextPlacement === 'FIELD' ? location : null,
       providerPlacement: unit.placement,
       providerSite: unit.site,
       providerPublicIp: unit.publicIp,
