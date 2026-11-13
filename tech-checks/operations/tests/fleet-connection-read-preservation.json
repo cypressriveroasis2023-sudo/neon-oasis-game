@@ -1,12 +1,12 @@
 {
   "contract": "COS_FLEET_CONNECTION_READ_PRESERVATION_V1",
   "baselineCommit": "1712082037e48172bced340a7102c0df98dcfa87",
-  "scope": "Separate the latest connection-read diagnostic from retained completed evidence; preserve existing source and session guards.",
+  "scope": "Separate the latest connection-read diagnostic from retained completed evidence; preserve existing source and session guards. Unit camera status is served by its own function, so the two paths and the endpoint choice are declared here as reversible blocks on api.ts.",
   "files": [
     {
       "path": "api.ts",
       "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
-      "candidateBlob": "839f3594d44b63836b8a4fa325f3fb99cc0ee4d4",
+      "candidateBlob": "f86955866a7b999803834b8797defde461e1830d",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -41,6 +41,16 @@
         {
           "from": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>{\n    const first=await (await readFleet(force)).connectionMap;\n    if((first as any).productConnectionsDiagnostic?.code!=='inventory_changed'\n      &&(!expectedSourceSha||(first as any).uploadInventory?.sourceSha256===expectedSourceSha))return first;\n    // The protected connection read observed a newer census than the map.\n    // Invalidate that generation and reload authority once, never re-probe.\n    clearSharedReads();return (await readFleet(true)).connectionMap;\n  },\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
           "to": "  fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,\n  fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>(await readFleetConnectionMap(force,expectedSourceSha)).map,\n  fleetConnectionMapRead:readFleetConnectionMap,\n  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],\n",
+          "count": 1
+        },
+        {
+          "from": "",
+          "to": "// Unit camera status is served by its own function, so the board's own\n// function - a frozen, hash-pinned artifact - is left exactly as it is.\n// Authentication, origins and CORS are the same handler behind both. These two\n// paths are kept in step with the function's own list by a test, rather than\n// imported, so every existing harness that compiles this file keeps working.\nconst unitCameraStatusEndpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-unit-camera-status';\nconst unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit'];\nconst endpointFor = (path: string) => unitCameraStatusPaths.includes(path) ? unitCameraStatusEndpoint : endpoint;\n",
+          "count": 1
+        },
+        {
+          "from": "      response = await fetch(endpoint, {\n",
+          "to": "      response = await fetch(endpointFor(path), {\n",
           "count": 1
         }
       ]
