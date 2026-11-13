@@ -62,7 +62,10 @@ export async function openWorkspace(frame, workspace) {
   // link, as a bookmark would; the spec still checks the screen itself.
   if (RETIRED_WORKSPACES.includes(workspace)) {
     if (await menu.isVisible()) await menu.getByRole('button', { name: /Close menu/ }).click();
-    await frame.locator('body').evaluate((_, hash) => { location.hash = hash; }, keys[0]);
+    // One navigation, as the app sees a single route change. Assigning
+    // location.hash fires popstate AND hashchange, and the app answers both, so
+    // a spec that counts reads would see the screen load twice.
+    await frame.locator('body').evaluate((_, hash) => { history.replaceState(history.state, '', '#' + hash); dispatchEvent(new HashChangeEvent('hashchange')); }, keys[0]);
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash.replace(/^#/, '').split('?')[0])).toBe(keys[0]);
     await expect(frame.locator('main')).toBeVisible();
     return;

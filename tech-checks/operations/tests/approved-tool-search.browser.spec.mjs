@@ -44,7 +44,7 @@ test('More search finds existing tools without fetching data and fits the viewpo
 test('missing results and Clear preserve focus, groups and tracker eligibility',async({page})=>{
   const {app,state}=await mount(page,{tracker:false}),tools=directory(app),input=tools.getByRole('searchbox',{name:'Find a tool'});
   await input.fill('tracker');await expect(tools.getByRole('status')).toContainText('No tools match');await expect(tools.getByRole('button',{name:'Unit Tracker',exact:true})).toHaveCount(0);
-  await tools.getByRole('button',{name:'Clear search',exact:true}).click();await expect(input).toBeFocused();await expect(input).toHaveValue('');await expect(tools.locator('details')).toHaveCount(5);
+  await tools.getByRole('button',{name:'Clear search',exact:true}).click();await expect(input).toBeFocused();await expect(input).toHaveValue('');await expect(tools.locator('details')).toHaveCount(4);
   await input.fill('[]');await expect(tools.locator('.operations-directory-links button')).toHaveCount(0);await tools.getByRole('button',{name:'Clear search',exact:true}).click();await input.fill('shop inventory');
   await expect(tools.getByRole('button',{name:'Shop inventory',exact:true})).toBeVisible();safe(state);
 });

@@ -14,9 +14,10 @@ test('the browser helper retires exactly the workspaces the app retires',()=>{
  assert.deepEqual([...list].sort(),[...RETIRED_WORKSPACES].sort());
 });
 
-test('only the retired path in the helper sets location.hash',()=>{
+test('only the retired path in the helper changes the route itself',()=>{
  const helper=readFileSync(new URL('./navigation-helper.mjs',import.meta.url),'utf8');
- assert.equal(helper.split('location.hash = hash').length-1,1);
- const at=helper.indexOf('location.hash = hash'),guard=helper.lastIndexOf('if (RETIRED_WORKSPACES.includes(workspace))',at);
- assert.ok(guard>0&&at-guard<400,'hash write is not inside the retired-workspace branch');
+ assert.equal(helper.split('history.replaceState').length-1,1);
+ assert.equal(/location\.hash\s*=[^=]/.test(helper),false,'nothing assigns location.hash');
+ const at=helper.indexOf('history.replaceState'),guard=helper.lastIndexOf('if (RETIRED_WORKSPACES.includes(workspace))',at);
+ assert.ok(guard>0&&at-guard<700,'hash write is not inside the retired-workspace branch');
 });
