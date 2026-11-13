@@ -37,3 +37,16 @@ test('the rewritten path is one the shared handler cannot match', () => {
   assert.ok(NOT_SERVED_HERE.startsWith('/api/'), 'it must still look like an API path so the handler answers 404, not 400');
   assert.equal(UNIT_CAMERA_STATUS_PATHS.includes(NOT_SERVED_HERE), false);
 });
+
+test('the paths inlined in api.ts stay in step with the function’s own list', async () => {
+  // api.ts is compiled in several harnesses with an explicit module list, so it
+  // keeps its own copy of these two paths rather than importing them. This is
+  // the test that keeps the two copies honest.
+  const {readFile} = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/api.ts', import.meta.url), 'utf8');
+  const declared = /const unitCameraStatusPaths = (\[[^\]]*\]);/.exec(source);
+  assert.ok(declared, 'api.ts no longer declares unitCameraStatusPaths');
+  assert.deepEqual(JSON.parse(declared[1].replace(/'/g, '"')), UNIT_CAMERA_STATUS_PATHS);
+  assert.match(source, /fetch\(endpointFor\(path\)/, 'api.ts must choose its endpoint per path');
+  assert.ok(source.includes('functions/v1/cos-unit-camera-status'), 'api.ts must know the new function');
+});
