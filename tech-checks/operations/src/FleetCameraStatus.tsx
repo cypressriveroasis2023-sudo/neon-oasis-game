@@ -3,6 +3,7 @@ import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
 import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
+import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
@@ -69,7 +70,7 @@ export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string):
 
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState('');
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
@@ -106,6 +107,8 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
  },[]);
 
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true;
+ const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
+ const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const shown=useMemo(()=>report?groupedUnits(report.units,group,query):[],[report,group,query]);
  const tiles:[string,number|'—',string][]=counts?[
@@ -147,7 +150,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}</p>
-  {report&&(group==='field'||group==='attention')&&<UnitStatusMap units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
+  {report&&(group==='field'||group==='attention')&&<UnitStatusMap savedAddresses={savedAddresses} units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
    onSelect={unit=>{setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>
    <label className='sr-only' htmlFor='cos-camera-status-search'>Find a unit, site or IP</label>
@@ -160,7 +163,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unit.unit}</strong>
       <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP'+(sourceOf(unit)==='star4live'?' · root':''):'SHOP'+(sourceOf(unit)==='star4live'?' · root':'')}</small>
-      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':'No address on the map yet'}</small>}
+      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
        {edit.providerAgrees?' · '+SOURCE_LABEL[sourceOf(unit)]+' now agrees':edit.providerValue?' · '+SOURCE_LABEL[sourceOf(unit)]+' still says “'+edit.providerValue+'”':' · '+SOURCE_LABEL[sourceOf(unit)]+' has no value'}

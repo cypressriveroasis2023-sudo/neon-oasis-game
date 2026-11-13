@@ -29,6 +29,8 @@ test('Camera status lists Avigilon, Reconeyez and Star4Live units with their sou
  await expect(row(app,'RII010 - Arcosa').locator('.cos-camera-status-detail')).toContainText('ReconeyezSome cameras down · 2 of 3 up');
  await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-detail')).toContainText('Star4LiveAll cameras up · 2 of 2 up');
  await expect(row(app,'HELIOS 001').locator('.cos-camera-status-victron')).toContainText('Victron · Charge 80 %');
+ // The Fleet map's saved addresses place the same units here, marked unconfirmed.
+ await expect(app.locator('.cos-camera-status-map-key small')).toContainText('field units on the map');
  await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-victron')).toHaveCount(0);
  await row(app,'SNIPER 004').getByRole('button',{name:'Edit by hand'}).click();
  await expect(app.getByLabel('Public IP')).toHaveCount(0);

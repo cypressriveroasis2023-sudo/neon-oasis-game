@@ -85,3 +85,40 @@ test('a hand edit moves an Avigilon unit to the shop without touching its readin
     [{unit_key: 'sniper 004', field: 'placement', action: 'set', value: 'SHOP', actor_name: 'James', actor_role: 'owner'}]);
   assert.deepEqual([edited.units[0].placement, edited.units[0].state, edited.units[0].onlineInShop, edited.units[0].source], ['SHOP', 'GREEN', true, 'ip_check']);
 });
+
+// Camera status and the Fleet map draw the same places: a unit with no typed
+// address falls back to the address already on the unit list, marked as unconfirmed.
+import {unitPins, savedAddressByUnit} from '../src/unitStatusPins.ts';
+
+const fieldUnit = (unit, over = {}) => ({unit, placement: 'FIELD', site: 'A site', siteNamePending: false, state: 'GREEN',
+  cameras: 1, online: 1, offline: 0, unknown: 0, down: [], onlineInShop: false, publicIp: null, observedAt: null, ...over});
+const savedPin = (unitNumber, point = [29.76, -95.37], address = '1 Main St, Houston, TX 77002') => ({unitNumber, address, point});
+
+test('a typed address wins over the address already on the unit list', () => {
+  const units = [fieldUnit('SPOTTER 306', {address: '9500 Katy Fwy', location: {latitude: 29.78, longitude: -95.53, matchedAddress: null, source: 'hand'}})];
+  const {pins, handPins, savedPins} = unitPins(units, [savedPin('Spotter 306')]);
+  assert.deepEqual([pins.length, pins[0].source, pins[0].latitude, handPins, savedPins], [1, 'hand', 29.78, 1, 0]);
+});
+
+test('a unit with no typed address takes the saved one, matched on the unit name', () => {
+  const {pins, handPins, savedPins, withoutPin} = unitPins([fieldUnit('SPOTTER 306'), fieldUnit('SPOTTER 999')], [savedPin('Spotter 306')]);
+  assert.deepEqual(pins.map(p => [p.unit, p.source, p.address]), [['SPOTTER 306', 'saved', '1 Main St, Houston, TX 77002']]);
+  assert.deepEqual([handPins, savedPins, withoutPin], [0, 1, 1]);
+});
+
+test('a shop unit never takes a saved field address', () => {
+  const {pins} = unitPins([fieldUnit('SPOTTER 306', {placement: 'SHOP', site: null})], [savedPin('Spotter 306')]);
+  assert.deepEqual(pins, []);
+});
+
+test('two saved addresses under one unit name place nothing, and a bad point is refused', () => {
+  assert.equal(savedAddressByUnit([savedPin('Spotter 306'), savedPin('SPOTTER 306', [30, -95])]).size, 0);
+  for (const point of [[0, 0], [91, -95], [29.7, 181], ['29.7', '-95.4'], [NaN, -95], null])
+    assert.equal(savedAddressByUnit([{unitNumber: 'Spotter 306', address: 'x', point}]).size, 0, JSON.stringify(point));
+});
+
+test('an Avigilon or Recon unit uses a saved address the same way a Star4Live unit does', () => {
+  const units = [fieldUnit('SNIPER 004', {source: 'ip_check'}), fieldUnit('RII010 - Arcosa', {source: 'reconeyez'})];
+  const {pins} = unitPins(units, [savedPin('Sniper 004')]);
+  assert.deepEqual(pins.map(p => p.unit + ':' + p.source), ['SNIPER 004:saved']);
+});
