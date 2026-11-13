@@ -66,3 +66,7 @@
 .cos-camera-status-map-key small{opacity:.8}
 .cos-camera-status-address{opacity:.85}
 @media (max-width:640px){.cos-camera-status-map-canvas{height:260px}}
+.cos-camera-status-source{display:inline-block;margin-right:8px;padding:1px 7px;border-radius:999px;border:1px solid #3a475a;background:#1a2330;color:#c9d3e2;font-size:11px;font-weight:600;letter-spacing:.02em;vertical-align:1px}
+.cos-camera-source-ip_check{border-color:#5a4a8a;color:#d8ccff}
+.cos-camera-source-reconeyez{border-color:#3f6f5a;color:#c4ecd9}
+.cos-camera-status-victron a{color:inherit;text-decoration:underline}

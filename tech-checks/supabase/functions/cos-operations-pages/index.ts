@@ -50,7 +50,8 @@ import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
 import {projectCameraSweepCoverage} from '../../../operations/shared/cameraSweepCoverage.ts';
-import {projectUnitCameraStatus,applyFeedFreshness,applyHandEdits} from '../../../operations/shared/starUnitStatus.ts';
+import {projectUnitCameraStatus,applyFeedFreshness,applyHandEdits,countUnits} from '../../../operations/shared/starUnitStatus.ts';
+import {projectIpCheckUnits,projectReconUnits,mergeUnitSources} from '../../../operations/shared/otherUnitStatus.ts';
 import {checkedHandEditRequest,HandEditError} from '../../../operations/shared/starUnitHandEdit.ts';
 import {fieldRecorderHealthGuards,projectFieldRecorderAuthority} from './fieldRecorderObservation.ts';
 import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
@@ -949,23 +950,35 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         const editing = path.endsWith('/edit');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
-            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status&provider=eq.vigilant&order=provider.asc', context.headers).catch(() => []),
+            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status&provider=in.(vigilant,reconeyez)&order=provider.asc', context.headers).catch(() => []),
             // Unreadable hand edits must not hide the provider's reading.
             rpc('cos_camera_unit_hand_edit_state_v1', actorPayload, request.signal)
               .then(state => state?.contract === 'COS_UNIT_STATUS_HAND_EDITS_V1' && Array.isArray(state.edits) ? state.edits : null)
               .catch(() => null),
+            // Snipers, CAMVs and Recon II: saved readings COS already collects.
+            // If they cannot be read the Star4Live units still show.
+            legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip&source=in.(2026_unit_tracker,reconeyez)&activation_state=eq.active&order=id.asc', context.headers).catch(() => null),
+            legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc', context.headers).catch(() => null),
           ]);
-          const feed = (Array.isArray(integrations) ? integrations : []).find(row => row?.provider === 'vigilant') || null;
-          const edited = applyHandEdits(projectUnitCameraStatus(cameras), handEdits);
+          const feeds = Array.isArray(integrations) ? integrations : [];
+          const feed = feeds.find(row => row?.provider === 'vigilant') || null;
+          const reconFeed = feeds.find(row => row?.provider === 'reconeyez') || null;
+          const now = Date.now();
+          const star = applyFeedFreshness(projectUnitCameraStatus(cameras), feed && {syncedAt: feed.last_sync_at, status: feed.last_sync_status, enabled: feed.enabled}, now);
+          const otherRead = Array.isArray(otherDevices) && Array.isArray(otherHealth);
+          const units = mergeUnitSources(star.units,
+            otherRead ? projectIpCheckUnits(otherDevices, otherHealth, now) : [],
+            otherRead ? projectReconUnits(otherDevices, otherHealth, reconFeed && {syncedAt: reconFeed.last_sync_at, status: reconFeed.last_sync_status, enabled: reconFeed.enabled}, now) : []);
           return {
-            ...applyFeedFreshness(edited, feed && {syncedAt: feed.last_sync_at, status: feed.last_sync_status, enabled: feed.enabled}, Date.now()),
+            ...applyHandEdits({...star, units, counts: countUnits(units)}, handEdits),
             handEditsRead: Array.isArray(handEdits),
+            otherSourcesRead: otherRead,
             canEdit: true,
-            refreshedAt: new Date().toISOString(), source: 'Star4Live',
+            refreshedAt: new Date(now).toISOString(), source: 'Star4Live',
           };
         };
         if (!editing) return json(await readStatus());
@@ -975,6 +988,10 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         let edit;
         try { edit = checkedHandEditRequest(body, current.units, () => crypto.randomUUID()); }
         catch (error) { if (error instanceof HandEditError) return json({error: error.message}, error.status); throw error; }
+        // The IP check tests the address the tracker holds; a hand-typed IP here would
+        // show one address while another is being checked.
+        if (edit.field === 'public_ip' && (current.units.find(unit => unit.unit.toUpperCase() === String(edit.unitKey).toUpperCase())?.source ?? 'star4live') !== 'star4live')
+          return json({error: 'This unit has no Star4Live IP to correct. Its Avigilon check uses the address on the tracker.'}, 422);
         // The actor is the verified session, never the caller's payload. The
         // database checks the same Owner-or-verified-IT identity again.
         const actorName = (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician');
