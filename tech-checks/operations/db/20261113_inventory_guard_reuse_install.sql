@@ -57,7 +57,8 @@ begin
        and coalesce(r->'apiAssignment'->>'serviceLocationId','')~'^[1-9][0-9]{0,14}$'))
  ), candidate_links as materialized (
   select l.*,cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id) current_guard,
-   cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id) current_shop_return
+   case when exists(select 1 from wanted w where w.r->>'productId'=l.equipment_id and w.r->>'placement'='SHOP')
+    then cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id) else false end current_shop_return
   from cos_mhelp_placement_private.links l
   where exists(select 1 from wanted w where w.r->>'productId'=l.equipment_id)
  ), original_batches as materialized (
@@ -176,7 +177,7 @@ do $guard$
 begin
  if not pg_try_advisory_xact_lock(hashtextextended('COS_INVENTORY_GUARD_REUSE_20261113',0)) then raise exception 'Concurrent repair';end if;
  if exists(select 1 from (values
- ('cos_mhelp_placement_private.authoritative_product_records(jsonb,boolean)','c8711954174c3e2d47c06d53776abdb01a2ab46ff57055d603dec544a21221a9','{postgres=X/postgres}',false,'["search_path=\"\""]'::jsonb),
+ ('cos_mhelp_placement_private.authoritative_product_records(jsonb,boolean)','9b53cb6ec820b518e24559ec0395641dc040f5b6aeb79a5e36c3a443b3a61ace','{postgres=X/postgres}',false,'["search_path=\"\""]'::jsonb),
  ('public.cos_mhelp_inventory_baseline()','5063173bb68524cae3f5225b8e8521796af4b4f7fc55e3fa697ed835c878f6c2','{postgres=X/postgres,service_role=X/postgres}',true,'["search_path=\"\"", "work_mem=64MB"]'::jsonb)
  ) expected(signature,sha,acl,security_definer,settings)
  left join pg_proc p on p.oid=to_regprocedure(expected.signature)

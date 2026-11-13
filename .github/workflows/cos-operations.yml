@@ -192,33 +192,250 @@ jobs:
         id: browser_install
       - name: Verify legacy camera saved reads and guarded placement
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
-        run: npm run test:browser -- tests/camera-health-overview.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/camera-place…11317 tokens truncated…[]'::jsonb)
- from jsonb_array_elements(b.value->'records')r
- left join app_private.vision_tracker_locations t on t.id=(r->'binding'->>'trackerId')::uuid)
-)) from baseline b
-)
-select original.value || jsonb_build_object('cameraSnapshotSources',jsonb_build_object(
- 'units',(select coalesce(jsonb_agg(jsonb_build_object('id',u.id,'organization_id',u.organization_id,'unit_number',u.unit_number,'status',u.status) order by u.id),'[]'::jsonb) from public.equipment_units u where u.organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'),
- 'matches',(select coalesce(jsonb_agg(jsonb_build_object('id',m.id,'organization_id',m.organization_id,'equipment_unit_id',m.equipment_unit_id,'vigilant_device_id',m.vigilant_device_id,'camera_key',m.camera_key,'match_method',m.match_method,'confidence',m.confidence) order by m.id),'[]'::jsonb) from public.vision_vigilant_unit_matches m where m.organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'),
- 'providers',(select coalesce(jsonb_agg(jsonb_build_object('id',d.id,'organization_id',d.organization_id,'external_device_id',d.external_device_id,'device_name',d.device_name,'device_type',d.device_type,'source',d.source) order by d.id),'[]'::jsonb) from public.vision_vigilant_devices d where d.organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'),
- 'ownerCrosswalk',app_private.cos_owner_identity_snapshot_value('ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid),
- 'trackerUnits',(select coalesce(jsonb_agg(jsonb_build_object('id',t.id,'unitNumber',t.unit_number,'modelName',t.family,'readOnly',true,'recordSource',t.source_name,'snapshotImportedAt',t.imported_at,'sourceVerifiedAt',t.source_verified_at) order by t.id),'[]'::jsonb) from app_private.vision_tracker_locations t where t.organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5')
-)) from original;
-$function$
-;
-do $guard$
-begin
- if not pg_try_advisory_xact_lock(hashtextextended('COS_INVENTORY_GUARD_REUSE_20261113',0)) then raise exception 'Concurrent repair';end if;
- if exists(select 1 from (values
- ('cos_mhelp_placement_private.authoritative_product_records(jsonb,boolean)','9b53cb6ec820b518e24559ec0395641dc040f5b6aeb79a5e36c3a443b3a61ace','{postgres=X/postgres}',false,'["search_path=\"\""]'::jsonb),
- ('public.cos_mhelp_inventory_baseline()','5063173bb68524cae3f5225b8e8521796af4b4f7fc55e3fa697ed835c878f6c2','{postgres=X/postgres,service_role=X/postgres}',true,'["search_path=\"\"", "work_mem=64MB"]'::jsonb)
- ) expected(signature,sha,acl,security_definer,settings)
- left join pg_proc p on p.oid=to_regprocedure(expected.signature)
- where p.oid is null or p.proowner::regrole::text<>'postgres'
- or p.proacl::text is distinct from expected.acl
- or p.prosecdef is distinct from expected.security_definer
- or to_jsonb(p.proconfig) is distinct from expected.settings
- or encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') is distinct from expected.sha)
- then raise exception 'Function drift or permission mismatch; no repair applied';end if;
-end $guard$;
-commit;
+        run: npm run test:browser -- tests/camera-health-overview.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/camera-effective-placement.browser.spec.mjs
+      - name: Legacy camera and placement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-camera-placement-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify source-equipment address estimate pins
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/source-equipment-pins.browser.spec.mjs
+      - name: Source-equipment estimate pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-equipment-estimate-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify camera observation timestamp provenance
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-observed-timestamp.browser.spec.mjs
+      - name: Camera observation timestamp evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-observed-timestamp-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify guarded last-known camera evidence
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/camera-last-known.browser.spec.mjs
+      - name: Last-known camera evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-last-known-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify read-only Victron dashboards and shared eye branding
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/vrm.browser.spec.mjs tests/eye-branding.browser.spec.mjs tests/company-overview.browser.spec.mjs
+      - name: Victron and eye branding pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: victron-and-eye-ui-pixels
+          path: tech-checks/operations/test-results/**/*.png
+          if-no-files-found: ignore
+      - name: Verify exact TV outage rotation before dashboard regressions
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs --grep "Camera Health rotates every red outage|TV link fills the host|Teddy and Victor have no inspection fields"
+      - name: TV outage rotation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-outage-rotation-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify Fleet usability fixes and placement retry
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/fleet-usability.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/responsive-host.browser.spec.mjs tests/tech-checks-navigation.browser.spec.mjs tests/vrm.browser.spec.mjs tests/verified-health-identity.browser.spec.mjs tests/fleet-battery.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/field-health-flow.browser.spec.mjs --grep "expanded cluster survives|Owner proof colors|four-minute saved-data|actual charge sources|incomplete existing FIELD correction rechecks source access|plain status circles expand|Field setup keeps|MHelp recorded addresses|missing locations|unit drawer scrolls|unverified combined roster|plain colored circles|Shop pending|approved Today workspace|leaving Tech Checks|IT with.*Victron capability"
+      - name: Fleet usability trace and pixel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-usability-visuals
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify bounded Owner session recovery
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/operations-session-recovery.browser.spec.mjs
+      - name: Owner session recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-session-recovery-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify saved-camera refresh timing and visibility
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/saved-camera-refresh.browser.spec.mjs
+      - name: Saved-camera refresh evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saved-camera-refresh-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify integrated Fleet Dashboard for Owner and IT
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/fleet-unified.browser.spec.mjs tests/fleet-first-navigation.browser.spec.mjs tests/fleet-unit-cards.browser.spec.mjs tests/fleet-recorded-roster.browser.spec.mjs tests/company-platform.browser.spec.mjs tests/field-map-deep-link.browser.spec.mjs tests/owner-watchful-shortcut.browser.spec.mjs tests/routers.browser.spec.mjs tests/approved-layout.browser.spec.mjs tests/finance.browser.spec.mjs
+      - name: Fleet candidate visual review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-candidate-visuals
+          path: tech-checks/operations/test-results/**/*.png
+          if-no-files-found: ignore
+      - name: Verify guarded Owner Census preparation and one-use action
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/owner-census-preparation.browser.spec.mjs tests/owner-census-once.browser.spec.mjs
+      - name: Verify Tech Check TV and IT daily navigation and camera scope
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
+      - name: Tech Check TV and IT navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tech-check-tv-navigation-results
+          path: tech-checks/operations/test-results
+          if-no-files-found: ignore
+      - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs tests/mhelp-import-flow.browser.spec.mjs tests/mhelp-reconnect.browser.spec.mjs tests/mhelp-partner-api.browser.spec.mjs tests/unit-tracker.browser.spec.mjs
+      - name: mHelp interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mhelp-interaction-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+      - name: Verify shared map migration and Owner portal regressions before the full browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: >-
+          npm run test:browser --
+          tests/camera-shop-field-restore.browser.spec.mjs
+          tests/company-overview.browser.spec.mjs
+          tests/field-address-estimates.browser.spec.mjs
+          tests/field-health-flow.browser.spec.mjs
+          tests/field-map-deep-link.browser.spec.mjs
+          tests/field-recorder-observation.browser.spec.mjs
+          tests/fleet-battery.browser.spec.mjs
+          tests/operations.browser.spec.mjs
+          tests/owner-watchful-shortcut.browser.spec.mjs
+          tests/recorder-evaluation-clock.browser.spec.mjs
+          tests/routers.browser.spec.mjs
+          tests/shared-fleet-map.browser.spec.mjs
+          tests/verified-health-identity.browser.spec.mjs
+          tests/vision-dashboard.browser.spec.mjs
+          tests/vision-progressive.browser.spec.mjs
+      - name: Shared map and Owner portal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-map-owner-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+      - name: Verify the complete browser suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:browser
+      - name: Browser test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-browser-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+      - name: Commit verified static bundle on publishing branch
+        if: github.event_name == 'push' && (github.ref_name == 'cos-operations-pages' || github.ref_name == 'main')
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          publishing_branch="${{ github.ref_name }}"
+          git fetch origin "$publishing_branch"
+          if git diff --quiet "origin/$publishing_branch" -- tech-checks/operations/dist tech-checks/operations/package-lock.json; then
+            echo "Verified bundle is already published."
+            exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$publishing_branch")" ]; then
+            echo "Publishing branch advanced; its own verification must publish the newer bundle."
+            exit 0
+          fi
+          git add tech-checks/operations/dist tech-checks/operations/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Build verified COS Operations static bundle"
+            if ! git push origin "HEAD:$publishing_branch"; then
+              git fetch origin "$publishing_branch"
+              # A concurrent run may have published these exact verified bytes.
+              git diff --exit-code "origin/$publishing_branch" -- tech-checks/operations/dist tech-checks/operations/package-lock.json
+            fi
+          fi
+
+  verify-recon-ordering:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: recon_ordering_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d recon_ordering_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: tech-checks/operations/legacy/tests/recon-ordering
+    env:
+      RECON_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/recon_ordering_test_ci
+      RECON_WEBHOOK_SOURCE: ../../../../supabase/functions/reconeyez-webhook/index.ts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify ordered webhook handoff
+        run: node --disable-warning=ExperimentalWarning edge-handler.test.mjs
+      - name: Verify actual PostgreSQL 17.6 transactions and permissions
+        run: node run-ci.mjs
+      - name: Verify actual concurrent PostgreSQL clients
+        run: node concurrency.mjs
+      - name: Verify exactly-one Owner Census concurrency and permanent provider holds
+        env:
+          COS_OWNER_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_owner_one_census_test_ci
+          COS_OWNER_TEST_RECEIPT: owner-one-census-receipt.json
+        run: node ../../../tests/owner-one-census-postgres-concurrency.mjs
+      - name: Owner one-Census PostgreSQL verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-one-census-postgres-results
+          path: tech-checks/operations/legacy/tests/recon-ordering/owner-one-census-receipt.json
+          if-no-files-found: ignore
+      - name: Verify MHelp address geocoder quota with concurrent PostgreSQL clients
+        env:
+          COS_MHELP_GEOCODIO_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_mhelp_geocodio_test_ci
+        run: node ../../../tests/mhelp-geocodio-postgres-concurrency.mjs
+

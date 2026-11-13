@@ -38,7 +38,8 @@ begin
        and coalesce(r->'apiAssignment'->>'serviceLocationId','')~'^[1-9][0-9]{0,14}$'))
  ), candidate_links as materialized (
   select l.*,cos_mhelp_placement_private.guard(l.tracker_id,l.native_unit_id) current_guard,
-   cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id) current_shop_return
+   case when exists(select 1 from wanted w where w.r->>'productId'=l.equipment_id and w.r->>'placement'='SHOP')
+    then cos_mhelp_placement_private.recorded_shop_return_current(l.equipment_id,l.tracker_id,l.native_unit_id) else false end current_shop_return
   from cos_mhelp_placement_private.links l
   where exists(select 1 from wanted w where w.r->>'productId'=l.equipment_id)
  ), original_batches as materialized (
