@@ -7,9 +7,10 @@
 --
 -- Four things are editable: where a unit is, the site it sits at, its street
 -- address (which puts its pin on the map) and its public IP. Whether a camera is
--- online is never editable. An address is only recorded with the map point the
--- US Census geocoder matched to it; the database does not geocode, it requires
--- the point and checks it is a real coordinate.
+-- online is never editable. An address is saved exactly as typed. When the
+-- address service can locate it the map point is saved with it; when it cannot,
+-- the address is saved without a point (James, 2026-11-13: "it should update
+-- what i say"). The database does not geocode; it checks any point is real.
 --
 -- Append-only. A correction or a withdrawal is a new row, never an update or a
 -- delete. The request id is the primary key, so the same request recorded twice
@@ -36,8 +37,9 @@ create table if not exists cos_fleet_hand_edit_private.unit_status_edit_log(
  matched_address text check(matched_address is null or (btrim(matched_address)<>'' and length(matched_address)<=200)),
  recorded_at timestamptz not null default clock_timestamp(),
  check((action='set')=(value is not null)),
- -- A set address always carries its map point; nothing else ever does.
- check((field='address' and action='set')=(latitude is not null and longitude is not null)),
+ -- Only a set address may carry a map point, and a point is always both numbers.
+ -- An address the service could not locate is still saved, without a point.
+ constraint unit_status_edit_log_point_rule check((latitude is null)=(longitude is null) and (latitude is null or (field='address' and action='set'))),
  check(matched_address is null or latitude is not null),
  check(field<>'placement' or value is null or value in('FIELD','SHOP'))
 );
@@ -117,8 +119,9 @@ begin
   if length(val)>120 or lower(val) in('root','shop') then raise exception 'Enter a customer and site; root is not a site name' using errcode='PT409'; end if;
  end if;
  if f='address' and act='set' then
-  if lat is null or lng is null or lat not between -90 and 90 or lng not between -180 and 180 or (lat=0 and lng=0) then
-   raise exception 'An address is recorded only with the map point matched to it' using errcode='PT409'; end if;
+  if lat is not null and (lat not between -90 and 90 or lng not between -180 and 180 or (lat=0 and lng=0)) then
+   raise exception 'That is not a usable map point' using errcode='PT409'; end if;
+  if lat is null and matched is not null then raise exception 'A matched address needs its map point' using errcode='PT409'; end if;
   if matched is not null and length(matched)>200 then raise exception 'Hand edit is incomplete' using errcode='PT409'; end if;
  elsif lat is not null or lng is not null or matched is not null then
   raise exception 'Only a set address carries a map point' using errcode='PT409';

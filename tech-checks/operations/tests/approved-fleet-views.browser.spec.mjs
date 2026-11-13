@@ -10,9 +10,9 @@ async function fits(app){
  for(const box of geometry.targets){expect(box.height).toBeGreaterThanOrEqual(48);expect(box.width).toBeGreaterThanOrEqual(44);}
 }
 
-test('Owner Fleet exposes two primary views and all secondary tools without sideways scrolling',async({page},info)=>{
+test('Owner Fleet exposes three primary views and all secondary tools without sideways scrolling',async({page},info)=>{
  const {app,state}=await mountFleet(page);await labelSynthetic(page);
- await expect(nav(app).locator(':scope > button')).toHaveCount(2);
+ await expect(nav(app).locator(':scope > button')).toHaveCount(3);await expect(nav(app).getByRole('button',{name:'Camera status',exact:true})).toBeVisible();
  await expect(nav(app).getByRole('button',{name:'Map',exact:true})).toBeVisible();await expect(nav(app).getByRole('button',{name:'Fleet health',exact:true})).toBeVisible();
  await expect(nav(app).getByRole('button',{name:/Location verification/})).toBeHidden();await fits(app);
  await page.screenshot({path:info.outputPath('fleet-primary.png')});await toggle(app).click();

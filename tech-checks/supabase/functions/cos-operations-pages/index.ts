@@ -6,7 +6,7 @@ import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
-import {censusAddress} from './censusAddress.ts';
+import {handAddressPoint} from './handAddressPoint.ts';
 import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
 import {EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
 import {ownerEquipmentCsvReview} from './mhelpEquipmentOwnerReview.ts';
@@ -978,14 +978,16 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         // The actor is the verified session, never the caller's payload. The
         // database checks the same Owner-or-verified-IT identity again.
         const actorName = (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician');
-        // An address is recorded only with the point the Census geocoder matched
-        // to it, so the pin is where the address is. No match, nothing recorded:
-        // the reason goes back to the person typing it so they can correct it.
-        let point = {};
+        // The address is saved exactly as the person typed it. The address service
+        // is asked only where it is; its one location is the pin. When it has no
+        // single location the address is still saved, without a pin, and the
+        // reason goes back to the person. Only a link, email or code is refused.
+        let point = {}, pinNote = null;
         if (edit.field === 'address' && edit.action === 'set') {
-          const found = await censusAddress(edit.value, requestFetch);
-          if (found.status !== 'success') return json({error: found.reason, geocode: found.status}, found.status === 'provider_error' ? 503 : 422);
-          point = {latitude: found.latitude, longitude: found.longitude, matchedAddress: found.matchedAddress ?? null};
+          const found = await handAddressPoint(edit.value, requestFetch);
+          if (found.status === 'invalid_address') return json({error: found.reason, geocode: found.status}, 422);
+          if (found.status === 'success') point = {latitude: found.latitude, longitude: found.longitude, matchedAddress: found.matchedAddress ?? null};
+          else pinNote = found.reason;
         }
         const receipt = await rpc('cos_camera_unit_hand_edit_v1', {
           ...actorPayload, p_request_id: edit.requestId,
@@ -997,7 +999,8 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         if (receipt?.contract !== 'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1') fail('The hand edit could not be recorded. Nothing was changed.', 503);
         const after = await readStatus();
         // The same request recorded twice is the same edit, not an error.
-        return json({...after, recorded: {unit: edit.unitKey, field: edit.field, action: edit.action, value: edit.value, by: actorName, role: actorRole, duplicate: receipt.repeat === true}});
+        return json({...after, recorded: {unit: edit.unitKey, field: edit.field, action: edit.action, value: edit.value, by: actorName, role: actorRole, duplicate: receipt.repeat === true,
+          ...(edit.field === 'address' && edit.action === 'set' ? {pinned: pinNote === null, pinNote} : {})}});
       }
       if (method === 'GET') {
         const contactRoute = /^\/api\/customers\/([^/]+)\/contacts$/.exec(path);

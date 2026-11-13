@@ -15,26 +15,29 @@ const source=readFileSync(new URL('../src/ApprovedFleetViews.tsx',import.meta.ur
 const require=createRequire(import.meta.url),exports={};
 vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:name=>name.endsWith('.css')?{}:require(name)});
 const View=exports.default;
-const labels=['Map','Fleet health','Location verification','Needs setup','Data sources'];
+const labels=['Map','Fleet health','Camera status','Location verification','Needs setup','Data sources'];
 function render(compact=true,selected=0,setup=true){
- const children=labels.map((label,index)=>index===3&&!setup?null:React.createElement('button',{key:label,'aria-current':index===selected?'page':undefined,onClick:()=>{}},label));
+ const children=labels.map((label,index)=>index===4&&!setup?null:React.createElement('button',{key:label,'aria-current':index===selected?'page':undefined,onClick:()=>{}},label));
  return renderToStaticMarkup(React.createElement(View,{compact},children));
 }
 test('Owner only groups the original secondary buttons in a native closed disclosure',()=>{
- const html=render();assert.equal((html.match(/<button/g)||[]).length,5);
- const before=html.split('<details')[0];assert.match(before,/>Map<\/button>/);assert.match(before,/>Fleet health<\/button>/);
- for(const label of labels.slice(2))assert.equal(before.includes(label),false);
+ const html=render();assert.equal((html.match(/<button/g)||[]).length,6);
+ const before=html.split('<details')[0];assert.match(before,/>Map<\/button>/);assert.match(before,/>Fleet health<\/button>/);assert.match(before,/>Camera status<\/button>/);
+ for(const label of labels.slice(3))assert.equal(before.includes(label),false);
  assert.match(html,/<summary aria-label="More fleet tools"/);assert.doesNotMatch(html,/<details[^>]* open/);
 });
 test('restricted layout retains original direct buttons and no Owner disclosure',()=>{
  const html=render(false);assert.doesNotMatch(html,/<details|cos-approved-fleet-views/);
  for(const label of labels)assert.ok(html.includes(label));
 });
+test('Camera status on the bar never lights the tools summary',()=>{
+ const html=render(true,2);assert.match(html,/<summary aria-label="More fleet tools">/);
+});
 test('a missing setup button stays absent; no permission is inferred by presentation',()=>{
- const html=render(true,0,false);assert.doesNotMatch(html,/Needs setup/);assert.equal((html.match(/<button/g)||[]).length,4);
+ const html=render(true,0,false);assert.doesNotMatch(html,/Needs setup/);assert.equal((html.match(/<button/g)||[]).length,5);
 });
 test('the currently selected secondary view is visible in the collapsed summary',()=>{
- const html=render(true,4);assert.match(html,/<summary aria-label="More fleet tools" aria-current="page">/);assert.match(html,/<small>Data sources<\/small>/);
+ const html=render(true,5);assert.match(html,/<summary aria-label="More fleet tools" aria-current="page">/);assert.match(html,/<small>Data sources<\/small>/);
 });
 test('the reviewed Fleet baseline is preserved by the explicit runtime and wrapper reversals',()=>{
  const old=originalFleetViewMarkup(previousReviewedMainSource('FleetDashboard.tsx',beforeFleetCountTrustSource('FleetDashboard.tsx',readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'))));

@@ -320,11 +320,11 @@ test('a recorded address puts a pin on a field unit, and the pin keeps the unit 
   assert.equal(unit.handEdits.address.providerAgrees, false);
 });
 
-test('no pin without a real matched point, and none for a unit in the shop', () => {
+test('no pin without a real matched point (the address is kept), and none for a unit in the shop', () => {
   for (const bad of [{latitude: null}, {longitude: undefined}, {latitude: 'x'}, {latitude: 0, longitude: 0}, {latitude: 95}]) {
     const unit = applyHandEdits(fieldUnit(), [addressEdit(bad)]).units.find(u => u.unit === 'SPOTTER 306');
     assert.equal(unit.location, null, JSON.stringify(bad));
-    assert.equal(unit.address, null, JSON.stringify(bad));
+    assert.equal(unit.address, '9500 Katy Fwy, Houston, TX 77024', 'the typed address is kept without a pin');
   }
   const moved = applyHandEdits(fieldUnit(), [addressEdit(), handEdit({unit_key: 'SPOTTER 306', field: 'placement', value: 'SHOP'})])
     .units.find(u => u.unit === 'SPOTTER 306');
