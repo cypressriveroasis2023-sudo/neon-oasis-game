@@ -27,6 +27,35 @@ const tests=[['valid',()=>{}],['no candidate',r=>r.productId='2'],['already boun
 let checks=0;
 for(const [name,mutate,sql] of tests){await reset();const r=structuredClone(row);mutate(r);if(sql)await db.exec(sql);for(const projection of [true,false]){const {rows}=await db.query(`select cos_mhelp_placement_private.original_records($1::jsonb,$2) old,cos_mhelp_placement_private.authoritative_product_records($1::jsonb,$2) new`,[JSON.stringify([r]),projection]);assert.deepEqual(rows[0].new,rows[0].old,name);if(name==='valid')assert.equal(rows[0].new[0].binding.expectedGuard,'current');checks++;}}
 for(const input of [{},[row,row]]){for(const fn of ['original_records','authoritative_product_records']){await assert.rejects(db.query(`select cos_mhelp_placement_private.${fn}($1::jsonb,true)`,[JSON.stringify(input)]),/Unique current Product IDs required/);checks++;}}
+async function putHistory(rows,source='source1',when='2026-11-01T00:00:00Z') {
+ const receipt={contract:'COS_MHELP_UPLOAD_V1',sourceSha256:source};
+ await db.query(`delete from cos_mhelp_placement_private.upload_batches where source_sha256=$1`,[source]);
+ await db.query(`insert into cos_mhelp_placement_private.upload_batches select $1,encode(sha256(convert_to(jsonb_build_object('receipt',$2::jsonb,'records',$3::jsonb)::text,'UTF8')),'hex'),$2::jsonb,$3::jsonb,$4::timestamptz`,[source,JSON.stringify(receipt),JSON.stringify(rows),when]);
+}
+for(const scenario of ['native','competing-source','competing-input','multiple-history','tampered-new-history','null-guard']) {
+ await reset(); const input=[structuredClone(row)];
+ if(scenario==='native'){
+  const nid='22222222-2222-4222-8222-222222222222';
+  await db.query(`update cos_mhelp_placement_private.links set native_unit_id=$1,native_label='Native 1'`,[nid]);
+  await db.query(`update app_private.cos_geocode_sources set native_unit_id=$1,entity_kind='equipment_unit'`,[nid]);
+  const h=structuredClone(history);Object.assign(h[0].binding,{nativeUnitId:nid,nativeLabel:'Native 1'});await putHistory(h);
+ }
+ if(scenario==='competing-source')await db.query(`insert into app_private.cos_geocode_sources values('2',$1,null,'tracker','mhelpdesk_product_import',true,'r1')`,[tid]);
+ if(scenario==='competing-input')input.push({productId:'2',binding:{trackerId:tid,nativeUnitId:null}});
+ if(scenario.includes('history')){
+  const old=structuredClone(history),newer=structuredClone(history);old[0].binding.marker='old';newer[0].binding.marker='new';
+  await putHistory(old);await putHistory(newer,'source2','2026-11-02T00:00:00Z');
+  if(scenario==='tampered-new-history')await db.exec(`update cos_mhelp_placement_private.upload_batches set payload_sha256='invalid' where source_sha256='source2'`);
+ }
+ if(scenario==='null-guard')await db.exec('update public.test_guard set value=null');
+ for(const projection of [true,false]){
+  const {rows}=await db.query(`select cos_mhelp_placement_private.original_records($1::jsonb,$2) old,cos_mhelp_placement_private.authoritative_product_records($1::jsonb,$2) new`,[JSON.stringify(input),projection]);assert.deepEqual(rows[0].new,rows[0].old,scenario);
+  if(scenario==='native')assert.equal(rows[0].new[0].binding.nativeUnitId,'22222222-2222-4222-8222-222222222222');
+  if(scenario.startsWith('competing'))assert.equal(rows[0].new[0].binding,null);
+  if(scenario==='multiple-history')assert.equal(rows[0].new[0].binding.marker,'new');
+  if(scenario==='tampered-new-history')assert.equal(rows[0].new[0].binding.marker,'old');checks++;
+ }
+}
 await db.exec(`create schema cos_sheets_placement_private; create schema cos_operational_private;
 create table cos_sheets_placement_private.refresh_requests(equipment_id text,requested_at timestamptz);
 create table cos_sheets_placement_private.bindings(equipment_id text,pending_cells jsonb);
