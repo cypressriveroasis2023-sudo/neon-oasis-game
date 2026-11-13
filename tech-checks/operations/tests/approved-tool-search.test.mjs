@@ -25,8 +25,10 @@ test('matching is case-insensitive and requires every word',()=>{
  assert.deepEqual(names(find('camera finance')),[]);
 });
 test('a group name can find its existing tools without inventing destinations',()=>{
- assert.deepEqual(names(find('customers sites')),['Customers','Sites','Work Requests','CRM']);
- assert.deepEqual(names(find('purchasing')),['Quotes','Purchasing','Billing','Accounting','Collections','Payments']);
+ assert.deepEqual(names(find('customers sites')),['Customers','Sites']);
+ // Finance and purchasing are no longer offered, so searching finds nothing.
+ assert.deepEqual(names(find('purchasing')),[]);
+ assert.deepEqual(names(find('jobs')),[]);
 });
 test('tracker eligibility is applied before any search',()=>{
  assert.deepEqual(names(find('tracker',false)),[]);

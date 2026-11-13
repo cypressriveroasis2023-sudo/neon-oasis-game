@@ -8,12 +8,12 @@ const safe=state=>{expect(state.errors).toEqual([]);expect(state.calls.every(cal
 const route=app=>app.locator('body').evaluate(()=>location.hash);
 const menu=app=>app.getByRole('dialog',{name:'Operations navigation',exact:true});
 
-test('all five approved Owner destinations remain reachable by visible navigation',async({page})=>{
+test('all four approved Owner destinations remain reachable by visible navigation',async({page})=>{
  const {app,state}=await mountFleet(page);
  const mobile=page.viewportSize().width<=700;
  const nav=app.getByRole('navigation',{name:mobile?'Mobile Operations navigation':'COS Operations',exact:true});
- await expect(nav.getByRole('button')).toHaveText(['Fleet','Boards','Tech Check','Team','More']);
- for(const [workspace,hash] of [['Daily Board','#daily-board'],['Tech Check','#tech-check'],['Team','#team'],['Operations','#operations'],['Field Map','#fleet-dashboard']]){
+ await expect(nav.getByRole('button')).toHaveText(['Fleet','Tech Check','Team','More']);
+ for(const [workspace,hash] of [['Tech Check','#tech-check'],['Team','#team'],['Operations','#operations'],['Field Map','#fleet-dashboard']]){
   const before=await route(app);await openWorkspace(app,workspace);
   if(mobile&&workspace==='Operations'){
    await expect(menu(app)).toBeVisible();await expect(menu(app).getByRole('region',{name:'Operations workspaces',exact:true})).toBeVisible();

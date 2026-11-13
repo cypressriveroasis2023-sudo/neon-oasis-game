@@ -20,6 +20,10 @@ export const TRACKER_IP_WORKBOOK='1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA';
 const ID=/^[1-9][0-9]{0,14}$/;
 const HASH=/^[a-f0-9]{64}$/;
 const SOURCE_FRESH_MS=30*60*1000;
+// While an Owner-accepted inventory freeze is in force the IP list is a COS-kept
+// copy too: it is no longer re-read from the tracker, so its age is reported, not
+// enforced. It must still name the frozen census exactly and list the same A#s.
+const FROZEN_SOURCE_MAX_MS=3650*24*60*60*1000;
 const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const safeTime=(v:unknown,now:number,windowMs:number):string|null=>{
  if(typeof v!=='string')return null;
@@ -64,6 +68,8 @@ export type ExactProductConnectionEnvelope={
  contract:typeof EXACT_PRODUCT_CONNECTION_CONTRACT;
  sourceSha256:string;
  trackerVerifiedAt:string;
+ /** Present only when built from an Owner-accepted frozen inventory copy. */
+ inventoryFrozenAt?:string;
  items:ExactProductConnection[];
 };
 const unknown=(productId:string,reason:string):ExactProductConnection=>({
@@ -150,7 +156,7 @@ export function buildExactProductConnections(
   ||tracker.workbookId!==TRACKER_IP_WORKBOOK
   ||tracker.expectedMhelpSourceSha256!==authority.sourceSha256
   ||!HASH.test(tracker.expectedMhelpSourceSha256)
-  ||!safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)
+  ||!safeTime(tracker.verifiedAt,now,authority.frozen?FROZEN_SOURCE_MAX_MS:SOURCE_FRESH_MS)
   ||!Array.isArray(tracker.records)||tracker.records.length!==authority.total
   ||!Array.isArray(devices)||devices.length>10000)return null;
  const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
@@ -213,7 +219,8 @@ export function buildExactProductConnections(
   return {productId:pid,...result};
  });
  if(items.length!==authority.field)return null;
- return {contract:EXACT_PRODUCT_CONNECTION_CONTRACT,sourceSha256:authority.sourceSha256,trackerVerifiedAt:safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)!,items};
+ return {contract:EXACT_PRODUCT_CONNECTION_CONTRACT,sourceSha256:authority.sourceSha256,trackerVerifiedAt:safeTime(tracker.verifiedAt,now,authority.frozen?FROZEN_SOURCE_MAX_MS:SOURCE_FRESH_MS)!,
+  ...(authority.frozen?{inventoryFrozenAt:authority.frozen.acceptedAt}:{}),items};
 }
 
 /** Same saved reachability classifier used by the deployed Fleet bridge. */
@@ -225,7 +232,7 @@ export function buildTrackerIpReachability(acceptedMhelp:unknown,tracker:unknown
  */
 export function readExactProductConnections(value:unknown,sourceSha256:string,expectedFieldIds:readonly string[],now=Date.now()):Map<string,ExactProductConnection>|null{
  if(!object(value)||value.contract!==EXACT_PRODUCT_CONNECTION_CONTRACT||value.sourceSha256!==sourceSha256||!HASH.test(sourceSha256)
-  ||!safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS)||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
+  ||!safeTime(value.trackerVerifiedAt,now,safeTime(value.inventoryFrozenAt,now,FROZEN_SOURCE_MAX_MS)?FROZEN_SOURCE_MAX_MS:SOURCE_FRESH_MS)||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
  const expected=new Set(expectedFieldIds);
  if(expected.size!==expectedFieldIds.length)return null;
  const result=new Map<string,ExactProductConnection>(),seen=new Set<string>();

@@ -103,7 +103,33 @@ function retainedLocation(row:Row,r:Row,b:Row,proof:Row|undefined,customerIds:Ma
 }
 /** Call after the API placement/location projections and before the finalizer.
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
-export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>}={}):{snapshot:Row;authorities:Row[]}{
+/** An Owner-accepted freeze, as cos_inventory_freeze_state_v1 reports it. It is
+ * attached to the inventory only when it names this exact census, so a stale or
+ * mismatched freeze changes nothing and the normal staleness rule applies. */
+export const INVENTORY_FREEZE_CONTRACT='COS_INVENTORY_FREEZE_V1';
+/** Would this saved mHelp upload be declined for age? Read on the raw receipt, with
+ * the same clock the census projection uses, so the board only asks the database for
+ * an Owner freeze in the one case a freeze can change: a list too old to be trusted.
+ * An unreadable receipt answers false — it fails for its own reasons, not for age. */
+export function mhelpUploadAgeDeclines(upload:unknown,now=Date.now()):boolean{
+ if(!upload||typeof upload!=='object'||Array.isArray(upload)||!Number.isFinite(now))return false;
+ const row=upload as Record<string,any>,live=row.origin==='mhelpdesk_api';
+ const observedAt=live?(row.apiSync?.lastSuccessAt||row.receivedAt):row.receivedAt;
+ const at=typeof observedAt==='string'?Date.parse(observedAt):NaN;
+ if(!Number.isFinite(at))return false;
+ return now-at>(live?45*60*1000:24*60*60*1000);
+}
+export function acceptedInventoryFreeze(state:unknown,sourceSha256:string,receivedAt:string,now=Date.now()){
+ if(!object(state)||state.contract!=='COS_INVENTORY_FREEZE_STATE_V1'||state.state!=='frozen')return null;
+ const f=state.freeze;
+ if(!object(f)||f.contract!==INVENTORY_FREEZE_CONTRACT||f.sourceSha256!==sourceSha256)return null;
+ const accepted=typeof f.acceptedAt==='string'?Date.parse(f.acceptedAt):NaN;
+ if(!Number.isFinite(accepted)||accepted>now+60000||accepted<Date.parse(receivedAt))return null;
+ const by=typeof f.acceptedBy==='string'?f.acceptedBy.trim():'';
+ if(!by||by.length>120)return null;
+ return {contract:INVENTORY_FREEZE_CONTRACT,sourceSha256,acceptedAt:f.acceptedAt as string,acceptedBy:by};
+}
+export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>;inventoryFreeze?:unknown}={}):{snapshot:Row;authorities:Row[]}{
  const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
@@ -156,5 +182,9 @@ export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Ro
   exportAsOf:null,trackerRecords:receipt.trackerRecords||[],trackerSource:receipt.trackerSource||null,countBasis:'mhelp_product_records_not_unique_physical_units',physicalDeduplication:'incomplete',
   summary:{totalRecords:records.length,fieldRecords:count(r=>r.placement==='FIELD'),shopRecords:count(r=>r.placement==='SHOP'),unflaggedFieldRecords:count(r=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED'),unflaggedShopRecords:count(r=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED'),doNotUseRecords:count(r=>r.uploadLifecycle==='DO_NOT_USE'),missingRecords:count(r=>r.uploadLifecycle==='MISSING'),linkedRecords:count(r=>r.binding.state==='linked'),unlinkedRecords:count(r=>r.binding.state==='unlinked'),heldRecords:count(r=>r.binding.state==='held'),appliedRecords:count(r=>r.overlayApplied)},records};
  const apiSync=receipt.apiSync;
- return {snapshot:{...snapshot,inventoryItems,items,uploadInventory,...(apiSync?.enabled===true?{mhelpPlacementSync:{...(snapshot.mhelpPlacementSync||{}),contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:apiSync.lastSuccessAt||null,errorCode:apiSync.errorCode||snapshot.mhelpPlacementSync?.errorCode||null}}:{})},authorities};
+ // COS keeps the accepted census as its own unit list once the Owner freezes it.
+ // The read time below is never moved; only the freeze is added beside it.
+ const frozen=acceptedInventoryFreeze(options.inventoryFreeze,uploadInventory.sourceSha256,uploadInventory.receivedAt,now);
+ const inventory=frozen?{...uploadInventory,frozen}:uploadInventory;
+ return {snapshot:{...snapshot,inventoryItems,items,uploadInventory:inventory,...(apiSync?.enabled===true?{mhelpPlacementSync:{...(snapshot.mhelpPlacementSync||{}),contract:'COS_MHELP_PLACEMENT_V1',inventoryEnabled:true,lastInventorySuccessAt:apiSync.lastSuccessAt||null,errorCode:apiSync.errorCode||snapshot.mhelpPlacementSync?.errorCode||null}}:{})},authorities};
 }

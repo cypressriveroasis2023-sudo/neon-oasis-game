@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 export const base='c8d2bbc4348ec94dd44e9edd1e01d92e5fa307f3';
 export const hashes={
- 'company-theme.browser.spec.mjs':['89b63f512c452c295fd7c9c1b84f0097ef2ea3fb','3dfd2953f4d66a44279a52950fcbd3e85853696f'],
+ 'company-theme.browser.spec.mjs':['89b63f512c452c295fd7c9c1b84f0097ef2ea3fb','f96ced1cee499bf2461ec1fa4518d83a64593b98'],
  'company-overview.browser.spec.mjs':['f261f559afb18cc046b7a2f1ef81916f60436f30','990d2ccf4ef121f0ff8c6c5da7204faa98f642ad'],
  'responsive-host.browser.spec.mjs':['2f922425469d2ba3db5e3a7d577713b4bcad5a0b','6e8822b2874a7c56f77fee1702617e07e599ebb4'],
  'approved-layout.browser.spec.mjs':['7899baeebeb7ee574fb393bcb8eec0c55ec9d194','31fad1676f162016a78f238e31f80342461cc3a1'],
@@ -23,7 +23,7 @@ export function adapt(file,original){
   await expectApprovedAreas(frame);
   const opened=await openApprovedMore(frame),{tools,dialog,mobile}=opened;
   expect((await auditDarkPresentation(mobile?dialog:tools)).failures).toEqual([]);
-  await expect(tools.locator('details')).toHaveCount(5);
+  await expect(tools.locator('details')).toHaveCount(4); // four tool groups since the 2026-11-12 menu cleanup
   await tools.getByRole('searchbox',{name:'Find a tool',exact:true}).fill('InHand Routers');
   await expect(tools.getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
   await expect(tools.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);

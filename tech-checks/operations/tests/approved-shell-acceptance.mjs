@@ -8,8 +8,11 @@ export async function primaryNav(frame) {
 export async function expectApprovedAreas(frame) {
   const nav=await primaryNav(frame);
   await expect(nav).toBeVisible();
-  await expect(nav.getByRole('button')).toHaveCount(5);
-  for(const name of ['Fleet','Boards','Tech Check','Team','More'])await expect(nav.getByRole('button',{name,exact:true})).toBeVisible();
+  // Four areas since 2026-11-12: Boards (the Daily Board) is retired with the
+  // other ticketing and billing workspaces. It must not come back silently.
+  await expect(nav.getByRole('button')).toHaveCount(4);
+  for(const name of ['Fleet','Tech Check','Team','More'])await expect(nav.getByRole('button',{name,exact:true})).toBeVisible();
+  await expect(nav.getByRole('button',{name:'Boards',exact:true})).toHaveCount(0);
   await expect(frame.locator('.company-utility-bar .operations-open-menu')).toHaveCount(0);
   return nav;
 }

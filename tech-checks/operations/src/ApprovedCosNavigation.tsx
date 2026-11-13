@@ -4,7 +4,6 @@ import {approvedArea,approvedPrimaryAreas,type ApprovedIcon} from './approvedCos
 export function ApprovedCosIcon({name}:{name:ApprovedIcon}) {
   const paths:Record<ApprovedIcon,string>={
     fleet:'M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2V5z M9 3v16 M15 5v16',
-    boards:'M3 4h18v16H3z M3 9h18 M9 9v11 M15 9v11',
     checks:'M9 4H5v17h14V4h-4 M9 2h6v5H9z M8 13l3 3 5-6',
     team:'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2 M9 3a4 4 0 110 8 4 4 0 010-8 M20 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75',
     more:'M4 6h16 M4 12h16 M4 18h16',

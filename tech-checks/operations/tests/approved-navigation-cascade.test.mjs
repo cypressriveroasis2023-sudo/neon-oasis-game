@@ -18,11 +18,11 @@ test('both approved primary navigation layouts use the same selected style',()=>
  assert.doesNotMatch(css,/#root#root|button\.active/);
  assert.equal((css.match(/background:var\(--approved-red\) !important|background: var\(--approved-red\) !important/g)||[]).length,2);
 });
-test('selection remains presentation only and retains all original primary destinations',()=>{
- assert.deepEqual(approvedPrimaryAreas.map(x=>x.workspace),['Fleet Dashboard','Daily Board','Tech Check','Team','Operations']);
+test('selection remains presentation only across the four destinations',()=>{
+ assert.deepEqual(approvedPrimaryAreas.map(x=>x.workspace),['Fleet Dashboard','Tech Check','Team','Operations']);
  assert.equal(approvedArea('Camera Health'),'Fleet Dashboard');
- assert.equal(approvedArea('Daily Board'),'Daily Board');
- assert.equal(approvedArea('Owner Tasks'),'Team');
+ assert.equal(approvedArea('Daily Board'),'Operations');
+ assert.equal(approvedArea('Owner Tasks'),'Operations');
 });
 
 test('work dialog layout is selected by its existing record view, not by altering Board behavior',()=>{

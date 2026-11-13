@@ -40,6 +40,11 @@ function transport(scenario, calls) {
     }
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
     if (url.includes('/rest/v1/rpc/')) {
+      if (url.endsWith('/rpc/cos_inventory_freeze_state_v1')) return json(scenario.freezeState||{contract:'COS_INVENTORY_FREEZE_STATE_V1',state:'none'});
+      if (url.endsWith('/rpc/cos_inventory_freeze_v1')) {
+        if (scenario.freezeRefused) return json({message:'Request id was already used for a different change'},400);
+        return json({contract:'COS_INVENTORY_FREEZE_RESULT_V1',id:recordId,applied:true,repeat:false});
+      }
       if (scenario.rpcDenied) return json({message:'Native department or workflow guard rejected the request'},400);
       if (url.endsWith('/rpc/appdeploy_technician_visit_snapshot')) return json({visit:{id:recordId},execution:{id:recordId,status:'not_started'},current_step:{title:'Native Step',instruction:'Native instruction',step_type:'yes_no',validation_schema:{hidden:true},evidence_requirements:{hidden:true}}});
       if (url.endsWith('/rpc/appdeploy_owner_jobs_snapshot')) return json({items:[{id:recordId,visitId:recordId,jobNumber:'COS 001'}]});
@@ -141,6 +146,15 @@ const cases = [
  ['native GPS contract permitted', '/api/field-map/'+recordId+'/gps', 'POST', {latitude:30.123456,longitude:-97.123456,accuracyM:0,source:'manual',note:'Verified'}, 200],
  ['wall clock schedule contract permitted', '/api/jobs/'+recordId+'/schedule', 'POST', {start:'2026-10-04T10:00',end:'2026-10-04T11:00',technician:'Tech'}, 200],
  ['native task create contract permitted', '/api/owner-tasks', 'POST', {title:'Review',assignedDepartment:'it',priority:'medium',dueAt:'2026-10-04T15:00:00Z'}, 201],
+ ['owner accepts the unit list','/api/inventory-freeze','POST',{action:'freeze',reason:'COS keeps this list now'},200],
+ ['owner releases the unit list','/api/inventory-freeze','POST',{action:'unfreeze',reason:'Taking a fresh copy'},200],
+ ['a technician cannot accept the unit list','/api/inventory-freeze','POST',{action:'freeze',reason:'Mine now'},403,{userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
+ ['the unit list needs a reason','/api/inventory-freeze','POST',{action:'freeze'},400],
+ ['the unit list takes only freeze or unfreeze','/api/inventory-freeze','POST',{action:'delete',reason:'No'},400],
+ ['the unit list rejects unsupported fields','/api/inventory-freeze','POST',{action:'freeze',reason:'No',sourceSha256:'a'},400],
+ ['the unit list rejects a bad request id','/api/inventory-freeze','POST',{action:'freeze',reason:'No',requestId:'not-a-uuid'},400],
+ ['the unit list cannot be read as a GET','/api/inventory-freeze','GET',{},405],
+ ['a refused unit list change tells the truth','/api/inventory-freeze','POST',{action:'freeze',reason:'No'},409,{freezeRefused:true}],
  ['star unit status read available','/api/unit-camera-status','GET',{},200],
  ['star unit status available to verified IT','/api/unit-camera-status','GET',{},200,{userId:'05bf20fe-19f7-4db7-ac05-5b2a5f681fdf'}],
  ['star unit status denied to service technician','/api/unit-camera-status','GET',{},403,{userId:'78e54fbd-c2db-4d18-8e3d-a9740adcf285'}],
@@ -158,7 +172,8 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     const data=await response.json();
     if(response.status!==status)throw new Error('Expected '+status+', received '+response.status+': '+JSON.stringify(data));
     const rpcCalls=calls.filter(c=>c.url.includes('/rest/v1/rpc/'));
-    if(status>=400&&!scenario.rpcDenied&&rpcCalls.length)throw new Error('Rejected request reached a native RPC.');
+    // A refusal that comes from the database itself has legitimately reached it.
+    if(status>=400&&!scenario.rpcDenied&&!scenario.freezeRefused&&rpcCalls.length)throw new Error('Rejected request reached a native RPC.');
     if(name==='linked technician session'&&(data.productionTechnicianUserId!==technicians[scenario.userId].actorId||data.legacyTechnician!==true))throw new Error('Technician did not use their own actor.');
     if(name==='linked technician day'||name==='linked technician tasks') {
       if(rpcCalls.at(-1).body.p_actor_user_id!==technicians[scenario.userId].actorId)throw new Error('Technician borrowed another actor.');
@@ -182,6 +197,20 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
       const payload=rpcCalls.at(-1).body;
       if(payload.p_unit_id!==recordId||payload.p_accuracy_m!==0)throw new Error('GPS contract changed target or zero accuracy.');
     }
+    if(name==='owner accepts the unit list'||name==='owner releases the unit list') {
+      const call=rpcCalls.find(c=>c.url.endsWith('/rpc/cos_inventory_freeze_v1'));
+      if(!call)throw new Error('The unit list change was not recorded.');
+      if(call.body.p_actor_user_id!==actorId||call.body.p_organization_id!==orgId)throw new Error('The caller controlled the actor or organization.');
+      if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(call.body.p_request_id))throw new Error('No request id was recorded.');
+      const expected=name.includes('accepts')?'freeze':'unfreeze';
+      if(call.body.p_action!==expected)throw new Error('Wrong action: '+call.body.p_action);
+      if(!call.body.p_payload.acceptedByName||!call.body.p_payload.reason)throw new Error('The acceptor or reason was not recorded.');
+      if(expected==='freeze'&&typeof call.body.p_payload.sourceSha256!=='string')throw new Error('A freeze must name the census it accepts.');
+      if(expected==='unfreeze'&&'sourceSha256' in call.body.p_payload)throw new Error('Releasing the list does not name a census.');
+      if(data.action!==expected||data.applied!==true)throw new Error('The receipt did not come back: '+JSON.stringify(data));
+    }
+    if(status>=400&&path==='/api/inventory-freeze'&&!scenario.freezeRefused
+      &&rpcCalls.some(c=>c.url.endsWith('/rpc/cos_inventory_freeze_v1')))throw new Error('A rejected unit list change reached the recorder.');
     if(name.startsWith('star unit status')&&status===200) {
       if(data.contract!=='COS_STAR_UNIT_STATUS_V1')throw new Error('Unit status contract missing.');
       const unit=data.units.find(row=>row.unit==='SOLARSPOTTER 006'),shop=data.units.find(row=>row.unit==='SOLARSPOTTER 058');

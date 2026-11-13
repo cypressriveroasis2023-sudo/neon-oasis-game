@@ -2,39 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {approvedPrimaryAreas,approvedArea,approvedWorkspaceLabel,approvedToolGroups,visibleApprovedTools} from '../src/approvedCosNavigation.ts';
+import {approvedPrimaryAreas,approvedArea,approvedWorkspaceLabel,approvedToolGroups,visibleApprovedTools,RETIRED_WORKSPACES} from '../src/approvedCosNavigation.ts';
 const source=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8');
 const sha=value=>createHash('sha256').update(value).digest('hex');
 // Protected baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
 const app=source('App.tsx');
 
-test('Owner navigation has exactly five unique original destinations',()=>{
- assert.deepEqual(approvedPrimaryAreas.map(x=>x.label),['Fleet','Boards','Tech Check','Team','More']);
- assert.deepEqual(approvedPrimaryAreas.map(x=>x.workspace),['Fleet Dashboard','Daily Board','Tech Check','Team','Operations']);
- assert.equal(new Set(approvedPrimaryAreas.map(x=>x.workspace)).size,5);
+test('Owner navigation has exactly four unique destinations',()=>{
+ // Boards went with the rest of the service-management side (James, 2026-11-12).
+ assert.deepEqual(approvedPrimaryAreas.map(x=>x.label),['Fleet','Tech Check','Team','More']);
+ assert.deepEqual(approvedPrimaryAreas.map(x=>x.workspace),['Fleet Dashboard','Tech Check','Team','Operations']);
+ assert.equal(new Set(approvedPrimaryAreas.map(x=>x.workspace)).size,4);
 });
-test('mobile exposes four destinations plus the existing More dialog button',()=>{
- assert.deepEqual(approvedPrimaryAreas.filter(x=>x.workspace!=='Operations').map(x=>x.label),['Fleet','Boards','Tech Check','Team']);
+test('mobile exposes three destinations plus the existing More dialog button',()=>{
+ assert.deepEqual(approvedPrimaryAreas.filter(x=>x.workspace!=='Operations').map(x=>x.label),['Fleet','Tech Check','Team']);
  assert.match(source('ApprovedCosNavigation.tsx'),/!mobile\|\|area.workspace!=='Operations'/);
  assert.match(app,/<ApprovedCosNavigation active=\{active\} navigate=\{navigate\} mobile\/>/);
  assert.match(app,/aria-label='More' aria-expanded=\{menu\}/);
 });
 test('secondary workspaces select their primary area without redirecting',()=>{
  for(const key of ['Fleet Dashboard','Camera Health','Unit Tracker','Units On Hand','InHand Routers','Victron VRM','Equipment'])assert.equal(approvedArea(key),'Fleet Dashboard');
- assert.equal(approvedArea('Daily Board'),'Daily Board');
- assert.equal(approvedArea('Handoffs'),'Tech Check');
- assert.equal(approvedArea('Owner Tasks'),'Team');
- for(const key of ['Calendar','Invoices','Vision','Jobs'])assert.equal(approvedArea(key),'Operations');
+ assert.equal(approvedArea('Tech Check'),'Tech Check');
+ assert.equal(approvedArea('Team'),'Team');
+ // A retired workspace still resolves: its route works, it is just not offered.
+ for(const key of ['Calendar','Vision','Daily Board','Handoffs','Owner Tasks','Jobs','Invoices'])assert.equal(approvedArea(key),'Operations');
 });
 test('short labels do not change canonical keys or secondary labels',()=>{
- assert.equal(approvedWorkspaceLabel('Daily Board','Dispatch Board'),'Boards');
+ assert.equal(approvedWorkspaceLabel('Daily Board','Dispatch Board'),'Dispatch Board');
  assert.equal(approvedWorkspaceLabel('Camera Health','Camera Health'),'Camera Health');
  assert.equal(approvedWorkspaceLabel('Victron VRM','Victron Power'),'Victron Power');
 });
-test('every original Owner workspace remains in primary or secondary navigation',()=>{
- const original=['Operations','Units On Hand','Today','Daily Board','Fleet Dashboard','Unit Tracker','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+test('COS offers its own workspaces and none of the service-management ones',()=>{
+ // James, 2026-11-12: COS is not to look like mHelpDesk or ReVio. He kept
+ // Customers, Sites and Calendar; the ticketing, dispatch and billing
+ // workspaces are offered nowhere, while their routes stay intact.
  const destinations=new Set([...approvedPrimaryAreas.map(x=>x.workspace),...approvedToolGroups.flatMap(x=>x.items)]);
- for(const key of original)assert.ok(destinations.has(key==='Invoices'?'Billing':key),key);
+ const offered=['Fleet Dashboard','Camera Health','Units On Hand','Unit Tracker','InHand Routers','Victron VRM','Equipment',
+  'Customers','Sites','Today','Calendar','History','Activity','Vision','Tech Check','Team','Operations'];
+ for(const key of offered)assert.ok(destinations.has(key),'should still be offered: '+key);
+ for(const key of RETIRED_WORKSPACES)assert.ok(!destinations.has(key),'should no longer be offered: '+key);
+ assert.equal(destinations.size,offered.length,'nothing unexpected in the menu');
  const secondary=approvedToolGroups.flatMap(x=>x.items);
  assert.equal(new Set(secondary).size,secondary.length);
 });

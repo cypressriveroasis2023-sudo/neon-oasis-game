@@ -54,7 +54,7 @@ test('Single phone menu traps focus; desktop More is a page and browser Back res
   await expectApprovedAreas(frame);
   const opened=await openApprovedMore(frame),{tools,dialog,mobile}=opened;
   expect((await auditDarkPresentation(mobile?dialog:tools)).failures).toEqual([]);
-  await expect(tools.locator('details')).toHaveCount(5);
+  await expect(tools.locator('details')).toHaveCount(4); // four tool groups since the 2026-11-12 menu cleanup
   await tools.getByRole('searchbox',{name:'Find a tool',exact:true}).fill('InHand Routers');
   await expect(tools.getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
   await expect(tools.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
