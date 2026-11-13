@@ -74,3 +74,7 @@
 .cos-camera-status-map{position:relative}
 .cos-camera-status-map-group:not(:empty){margin-top:10px}
 .cos-camera-status-away{opacity:.85;font-style:italic}
+.cos-camera-status-tiles button.cos-camera-status-tile{cursor:pointer;text-align:left;font:inherit;color:inherit}
+.cos-camera-status-tiles button.cos-camera-status-tile:hover{filter:brightness(1.18)}
+.cos-camera-status-tiles button.cos-camera-status-tile[aria-pressed=true]{outline:2px solid #d33351;outline-offset:1px}
+.cos-camera-status-clear-filter{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}

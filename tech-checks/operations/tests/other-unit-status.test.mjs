@@ -139,3 +139,31 @@ test('a unit placed from the saved address is not counted as missing an address'
   const {withoutPin, addressNoPin, noAddress, savedPins} = unitPins([fieldUnit('SPOTTER 306')], [savedPin('Spotter 306')]);
   assert.deepEqual([withoutPin, addressNoPin, noAddress, savedPins], [0, 0, 0, 1]);
 });
+
+// Clicking a count tile must show exactly the units that tile counts.
+import {groupedUnits} from '../src/cameraStatusFilters.ts';
+
+test('each count tile filters the list to exactly the units it counts', () => {
+  const units = [
+    fieldUnit('A'), fieldUnit('B', {state: 'YELLOW', online: 1, offline: 1, cameras: 2}),
+    fieldUnit('C', {state: 'RED', online: 0, offline: 1}), fieldUnit('D', {state: 'UNKNOWN', online: 0, unknown: 1}),
+    fieldUnit('E', {placement: 'SHOP', site: null, onlineInShop: true}),
+    fieldUnit('F', {placement: 'SHOP', site: null, state: 'RED', online: 0, offline: 1}),
+  ];
+  const counts = countUnits(units);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'GREEN').map(u => u.unit), ['A']);
+  assert.equal(groupedUnits(units, 'field', '', 'GREEN').length, counts.field.green);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'YELLOW').map(u => u.unit), ['B']);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'RED').map(u => u.unit), ['C']);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'UNKNOWN').map(u => u.unit), ['D']);
+  assert.deepEqual(groupedUnits(units, 'field', '').map(u => u.unit), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(groupedUnits(units, 'shop-online', '').map(u => u.unit), ['E']);
+  assert.equal(groupedUnits(units, 'shop-online', '').length, counts.shop.onlineInShop);
+});
+
+test('a state filter never reaches past its group, and still searches', () => {
+  const units = [fieldUnit('SPOTTER 1', {site: 'Acme yard'}), fieldUnit('SPOTTER 2', {placement: 'SHOP', site: null})];
+  assert.deepEqual(groupedUnits(units, 'shop', '', 'GREEN').map(u => u.unit), ['SPOTTER 2']);
+  assert.deepEqual(groupedUnits(units, 'field', 'acme', 'GREEN').map(u => u.unit), ['SPOTTER 1']);
+  assert.deepEqual(groupedUnits(units, 'field', 'nothing', 'GREEN'), []);
+});

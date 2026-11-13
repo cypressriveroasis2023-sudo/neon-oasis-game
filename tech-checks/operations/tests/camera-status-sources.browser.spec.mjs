@@ -90,3 +90,24 @@ test('past the grouping threshold a crowd of units becomes one badge that lists 
  await expect(popup).toContainText('SPOTTER 204');
  await page.screenshot({path:info.outputPath('camera-status-group-badge.png')});
 });
+
+test('clicking a count tile shows exactly the units it counts, and the list says what is filtered',async({page},info)=>{
+ const {app}=await mountFleet(page);
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
+ await openFleetView(app,'Camera status');
+ const rows=app.locator('.cos-camera-status-row');
+ await expect(rows).toHaveCount(9);
+ await app.getByRole('button',{name:/^DOWN/}).click();
+ // Both units reading all-cameras-down, and only those.
+ await expect(rows).toHaveCount(2);
+ await expect(rows.first()).toContainText('SPOTTER 102');
+ await expect(rows.nth(1)).toContainText('SNIPER 004');
+ await expect(app.locator('.cos-camera-status-note')).toContainText('Showing only all cameras down');
+ await app.getByRole('button',{name:/^SOME CAMERAS DOWN/}).click();
+ await expect(rows).toHaveCount(1);
+ await expect(rows.first()).toContainText('RII010 - Arcosa');
+ await app.getByRole('button',{name:'Show all',exact:true}).click();
+ await expect(rows).toHaveCount(9);
+ await page.screenshot({path:info.outputPath('camera-status-tile-filter.png')});
+});
