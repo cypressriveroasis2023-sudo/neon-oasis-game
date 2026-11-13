@@ -6,7 +6,7 @@
     {
       "path": "FleetDashboard.tsx",
       "baselineBlob": "27a6ad9858a1685ff449a232c4bee7286c5c710f",
-      "candidateBlob": "b0536fc425e8b80da8c8b696e9da827d77e5e46b",
+      "candidateBlob": "643a51e0014c23606e7868f0b1ff81bbbda3cbff",
       "replacements": [
         {
           "from": "\n  </div><details className='cos-fleet-advanced-filters'><summary>More filters</summary><div className='cos-fleet-filter-row'>   <label>PROVIDER<select aria-label='Fleet provider' value={filters.provider} onChange={e=>change('provider',e.target.value)}><option value='all'>All providers</option>{providers.map(p=><option key={p}>{p}</option>)}</select></label><button onClick={()=>setFilters({...initialFleetFilters})}>Reset filters</button><label className='cos-fleet-checkbox'><input type='checkbox' checked={filters.retired} onChange={e=>change('retired',e.target.checked)}/>Include inactive / retired</label><label>INSTALLATION STATUS<select aria-label='Installation status' value={filters.installationStatus||'all'} onChange={e=>change('installationStatus',e.target.value)}><option value='all'>All installation records</option><option value='field'>Field status</option><option value='installed'>Installed</option><option value='tracker'>Tracker field units</option><option value='assigned'>Assigned</option><option value='in_transit'>In transit</option><option value='returning'>Returning</option><option value='missing'>Location needs verification</option></select></label><label>NEARBY VERIFIED UNIT<select aria-label='Nearby unit center' value={filters.nearbyId||''} onChange={e=>change('nearbyId',e.target.value)}><option value=''>All field locations</option>{rows.filter(row=>row.placement==='field'&&row.locationVerified).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>RADIUS<select aria-label='Nearby radius miles' value={filters.radius||10} onChange={e=>change('radius',Number(e.target.value))}>{[5,10,25,50].map(value=><option key={value} value={value}>{value} miles</option>)}</select></label></div><small>Nearby distances use verified installation coordinates. Estimates and historical locations stay outside these distances.</small></details></div>);\n const wholeSourceHeadline=view==='map'?primaryFieldInventory:view==='sources'?Boolean(mhelpPhysical):fullInventoryHeadline;\n const healthScopeNote=wholeSourceHeadline?'Field camera units':'Field camera units · Shop / root and inactive equipment excluded from outage counts';\n const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,online:boardData?.counts.online??savedReading?.online??'—',offline:boardData?.counts.offline??savedReading?.offline??'—',unknown:boardData?.counts.unverified??savedReading?.unverified??'—'}:counts;\n const mapEquipmentList=<div className='cos-fleet-unit-list' aria-busy={editorBusy||loading}>{filtered.slice(0,limit).map(row=><button key={row.id} data-unit-id={row.id} disabled={editorBusy} className={'cos-fleet-unit-row'+(selected===row.id?' selected':'')} onClick={()=>open(row.id)}><span className='cos-fleet-unit-copy'><strong><i className={'cos-fleet-row-dot cos-signal-'+row.cameraState} aria-hidden='true'>●</i>{row.displayName||row.name}</strong><small>{row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied'}</small><small>{row.displayAddress?.label||'Installation address'}: {(row.displayAddress?.text??row.unit.address)||'Not supplied'}</small><small className='cos-fleet-card-location'>{row.placement==='shop'?(shopOnly(row)?'SHOP':'SHOP / ROOT'):row.placement.toUpperCase()} · {row.locationVerified?'Verified location':locationTag(row.unit)}</small><FleetBatterySummary row={row} now={snapshotNow} compact/>{!shopOnly(row)&&<><small className='cos-fleet-card-evidence'>{unitHealthLabel(row.camera)}</small><LastKnownCameraStatus observation={lastKnown(row)} now={snapshotNow}/></>}</span><Signals row={row}/></button>)}{filteredSource.length>0&&<section className='cos-fleet-source-group' aria-label='Unlinked equipment in view'><h3>Unlinked equipment <b>{filteredSource.length}</b></h3><p>Recorded assignments without a verified COS health link. Accepted address estimates are labeled separately from health and verified installation locations.</p>{filteredSource.slice(0,limit).map(record=><FleetSourceEquipment key={record.id} record={record} now={snapshotNow} estimate={sourcePins.get(record.id)?.estimate} onSelect={sourcePins.has(record.id)?()=>openSource(record.id):undefined}/>)}</section>}{!filtered.length&&!filteredSource.length&&<p className='field-map-empty'>{!map&&!failed?'Loading saved inventory…':'No units match. Change the filters or open the review queue.'}</p>}{Math.max(filtered.length,filteredSource.length)>limit&&<button onClick={()=>setLimit(v=>v+80)}>Show more equipment ({Math.max(0,filtered.length-limit)+Math.max(0,filteredSource.length-limit)})</button>}</div>;\n\n",
@@ -116,6 +116,61 @@
         {
           "from": "  {!['map','sources','setup'].includes(view)&&filtersPanel}\n",
           "to": "  {!['map','sources','setup','camerastatus'].includes(view)&&filtersPanel}\n",
+          "count": 1
+        },
+        {
+          "from": "'mHelpDesk Product IDs · saved source, see timestamp above'",
+          "to": "'Units (A#) · saved list, see timestamp above'",
+          "count": 1
+        },
+        {
+          "from": "'All mHelpDesk Shop equipment · excluded from Field outages'",
+          "to": "'All Shop equipment · excluded from Field outages'",
+          "count": 1
+        },
+        {
+          "from": "'All mHelpDesk Field + Shop Product IDs'",
+          "to": "'All Field + Shop units (A#)'",
+          "count": 1
+        },
+        {
+          "from": "'mHelpDesk Shop equipment · excluded from customer Field outages'",
+          "to": "'Shop equipment · excluded from customer Field outages'",
+          "count": 1
+        },
+        {
+          "from": "'Field Product IDs awaiting address coordinates'",
+          "to": "'Field units awaiting address coordinates'",
+          "count": 1
+        },
+        {
+          "from": "The current mHelpDesk Field address layer could not be validated.",
+          "to": "The current Field address layer could not be validated.",
+          "count": 1
+        },
+        {
+          "from": "aria-label='Current mHelpDesk Field address coverage'",
+          "to": "aria-label='Current Field address coverage'",
+          "count": 1
+        },
+        {
+          "from": "mHelpDesk equipment inventory · Product IDs",
+          "to": "Unit list · A#s",
+          "count": 1
+        },
+        {
+          "from": "A verified complete mHelpDesk Product-ID census is unavailable.",
+          "to": "A verified complete unit list is unavailable.",
+          "count": 1
+        },
+        {
+          "from": "The physical mHelpDesk inventory shown above is a separate count.",
+          "to": "The physical unit list shown above is a separate count.",
+          "count": 1
+        },
+        {
+          "from": "This is a saved source receipt, not a live mHelpDesk read.",
+          "to": "This is a saved copy of the unit list, not a live read.",
           "count": 1
         }
       ]
