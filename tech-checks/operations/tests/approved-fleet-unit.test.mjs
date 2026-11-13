@@ -56,5 +56,10 @@ test('stylesheet is imported once only by approved navigation',()=>{
 
 test('approved navigation component changes only by its presentation import',()=>{
  const s=readFileSync(new URL('../src/ApprovedCosNavigation.tsx',import.meta.url),'utf8').replace("import './approvedFleetUnit.css';\n",'');
- assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(s)+'\0').update(s).digest('hex'),'8bfe64298a899af1c233334c859f831d1b3754f9');
+ // One declared change from the reviewed baseline 8bfe64298a899af1c233334c859f831d1b3754f9:
+ // the 'boards' glyph is gone, because the Daily Board area it drew is retired. Every
+ // other glyph and the whole component body are unchanged.
+ assert.equal(s.includes("boards:'M3 4h18v16H3z"),false,'retired boards glyph is back');
+ for(const icon of ['fleet','checks','team','more'])assert.ok(s.includes(icon+":'M"),'missing glyph '+icon);
+ assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(s)+'\0').update(s).digest('hex'),'f30318785320823fffef69e4756a4c2a34f90bde');
 });

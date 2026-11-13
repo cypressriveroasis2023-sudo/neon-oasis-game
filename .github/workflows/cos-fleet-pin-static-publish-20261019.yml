@@ -44,7 +44,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' }}
 jobs:
   publish-fleet-pins:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:

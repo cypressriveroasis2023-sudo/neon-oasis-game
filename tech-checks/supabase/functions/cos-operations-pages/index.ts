@@ -6,8 +6,8 @@ import {withMhelpAddressMap} from './mhelpAddressMap.ts';
 import {validatedLocationProofs} from './validatedLocationProofs.ts';
 import {projectMhelpFleetLocations} from './mhelpFleetLocationProjection.ts';
 import {projectEffectiveFleetPlacement} from './effectiveFleetPlacement.ts';
-import {projectMhelpUploadPlacement} from './mhelpUploadPlacement.ts';
-import {EQUIPMENT_CSV_MAX_BYTES} from './mhelpEquipmentCsvPreview.ts';
+import {projectMhelpUploadPlacement,mhelpUploadAgeDeclines} from './mhelpUploadPlacement.ts';
+import {EQUIPMENT_CSV_MAX_BYTES, validPrior} from './mhelpEquipmentCsvPreview.ts';
 import {ownerEquipmentCsvReview} from './mhelpEquipmentOwnerReview.ts';
 import {stageOwnerEquipmentCsv,commitOwnerEquipmentCsv} from './mhelpEquipmentWriteBridge.ts';
 import {reviewOwnerEquipmentAssignments} from './mhelpEquipmentAssignmentReview.ts';
@@ -1079,7 +1079,8 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           const savedPlacement=projectMhelpFleetLocations(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs}):projected,mhelpReceipt?.fleetLocations);
           // COS keeps the accepted mHelp census as its own unit list once the
           // Owner freezes it; an unreadable freeze simply leaves it unfrozen.
-          const inventoryFreeze=await rpc('cos_inventory_freeze_state_v1',{p_organization_id:ORGANIZATION_ID},request.signal).catch(()=>null);
+          const inventoryFreeze=mhelpUploadAgeDeclines(mhelpReceipt?.upload)
+            ?await rpc('cos_inventory_freeze_state_v1',{p_organization_id:ORGANIZATION_ID},request.signal).catch(()=>null):null;
           const uploaded=projectMhelpUploadPlacement(savedPlacement,mhelpReceipt?.upload,freshAudits,freshBundle.identity,Date.now(),{validatedLocationProofs:locationProofs,inventoryFreeze});
           const currentTracker=projectCurrentTrackerPlacement(uploaded.snapshot,freshAudits,freshBundle.identity,{validatedLocationProofs:locationProofs});
           const effective=projectEffectiveFleetPlacement(currentTracker,freshAudits,{confirmedPrecedenceBindings:freshSourceContext.confirmedPrecedenceBindings,authorizedUploadPlacements:uploaded.authorities});
@@ -1260,16 +1261,27 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           const reason = textValue(body.reason, 'Reason', true, 500);
           const requestId = textValue(body.requestId, 'Request id') || crypto.randomUUID();
           if (!UUID.test(requestId)) fail('A unit list request id must be a UUID.');
-          const [snapshot, receiptSource] = await Promise.all([rpc('appdeploy_field_map_snapshot', actorPayload), readMhelpPlacements(actorPayload)]);
-          const upload = projectMhelpUploadPlacement({...snapshot, items: snapshot.items || [], inventoryItems: snapshot.inventoryItems || []}, receiptSource?.upload, [], undefined, Date.now(), {}).snapshot.uploadInventory;
-          if (!upload || typeof upload.sourceSha256 !== 'string') fail('The current unit list could not be read, so it cannot be accepted.', 503);
+          const receipt = await rpc('cos_mhelp_placement_snapshot', actorPayload, request.signal);
+          if (!receipt?.upload) fail('The current unit list is unavailable, so it cannot be accepted.', 503);
+          // Structure and identity only, deliberately NOT the 45-minute age gate: a list
+          // too old for the board is exactly the list the Owner is accepting. The database
+          // still requires the census to be the complete, reviewed, active one.
+          let prior;
+          try { prior = validPrior(receipt.upload); }
+          catch { fail('The current unit list could not be verified, so it cannot be accepted.', 503); }
           const by = (context.name || 'Owner').trim();
+          // The IP list is NOT copied in here. The database seeds it empty and marks it
+          // unseeded, so nothing reads a blank IP as "this A# has no IP". Copying the
+          // real IPs in from the tracker is its own recorded step.
+          const fieldCount = prior.records.filter(row => row.placement === 'FIELD').length;
           const payload = action === 'freeze'
-            ? {sourceSha256: upload.sourceSha256, recordCount: upload.summary.totalRecords, fieldCount: upload.summary.fieldRecords, shopCount: upload.summary.shopRecords, acceptedByName: by, reason}
+            ? {sourceSha256: prior.sourceSha256, recordCount: prior.records.length,
+               fieldCount, shopCount: prior.records.length - fieldCount,
+               acceptedByName: by, reason}
             : {acceptedByName: by, reason};
-          const receipt = await rpc('cos_inventory_freeze_v1', {...actorPayload, p_request_id: requestId, p_action: action, p_payload: payload}, request.signal);
-          if (receipt?.contract !== 'COS_INVENTORY_FREEZE_RESULT_V1') fail('The unit list change could not be recorded. Nothing was changed.', 503);
-          return json({...receipt, action, sourceSha256: upload.sourceSha256, recordCount: upload.summary.totalRecords, by});
+          const result = await rpc('cos_inventory_freeze_v1', {...actorPayload, p_request_id: requestId, p_action: action, p_payload: payload}, request.signal);
+          if (result?.contract !== 'COS_INVENTORY_FREEZE_RESULT_V1') fail('The unit list change could not be recorded. Nothing was changed.', 503);
+          return json({...result, action, sourceSha256: payload.sourceSha256 ?? null, recordCount: payload.recordCount ?? null, by});
         }
         const history = /^\/api\/field-map\/([^/]+)\/history$/.exec(path);
         if (history) {

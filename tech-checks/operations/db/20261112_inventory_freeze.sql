@@ -118,7 +118,7 @@ end$$;
 create function public.cos_inventory_freeze_v1(p_actor_user_id uuid,p_organization_id uuid,p_request_id uuid,p_action text,p_payload jsonb)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare b cos_mhelp_placement_private.upload_batches; f cos_mhelp_placement_private.inventory_freeze_log; seen cos_mhelp_placement_private.inventory_freeze_log;
- n integer; nf integer; read_at timestamptz; who text; why text;
+ n integer; nf integer; read_at timestamptz; who text; why text; ip_census jsonb;
 begin
  perform app_private.cos_owner_identity_assert_actor(p_actor_user_id,p_organization_id,true);
  who:=btrim(coalesce(p_payload->>'acceptedByName','')); why:=btrim(coalesce(p_payload->>'reason',''));
@@ -154,17 +154,30 @@ begin
  begin read_at:=(b.receipt->>'receivedAt')::timestamptz; exception when others then read_at:=null; end;
  if read_at is null or read_at>clock_timestamp()+interval '1 minute' then
   raise exception 'The census has no usable mHelp read time' using errcode='PT409'; end if;
+ -- Every A# in the census appears once, so an IP list can be keyed by it.
+ if (select count(distinct x->>'productId') from jsonb_array_elements(b.records) x)<>n then
+  raise exception 'The census lists an A# more than once; it cannot be frozen' using errcode='PT409'; end if;
  -- The IP list approved with it: tied to this census and listing exactly its A#s, each once.
- if jsonb_typeof(p_payload->'ipCensus') is distinct from 'object' or jsonb_typeof(p_payload->'ipCensus'->'records') is distinct from 'array'
-  or p_payload->'ipCensus'->>'expectedMhelpSourceSha256' is distinct from b.source_sha256
-  or jsonb_array_length(p_payload->'ipCensus'->'records')<>n
-  or (select count(distinct r->>'productId') from jsonb_array_elements(p_payload->'ipCensus'->'records') r)<>n
-  or exists(select 1 from jsonb_array_elements(p_payload->'ipCensus'->'records') r
-     where not exists(select 1 from jsonb_array_elements(b.records) x where x->>'productId'=r->>'productId')
-      or not(jsonb_typeof(r->'publicIp') in('string','null'))) then
-  raise exception 'The IP list does not match the census being approved' using errcode='PT409'; end if;
+ -- The Owner may accept the unit list WITHOUT the IPs. The list is then seeded empty and
+ -- marked seeded=false, so no reader can read "not copied in yet" as "this A# has no IP".
+ -- Copying the real IPs in is a separate, recorded step.
+ if p_payload ? 'ipCensus' then
+  if jsonb_typeof(p_payload->'ipCensus') is distinct from 'object' or jsonb_typeof(p_payload->'ipCensus'->'records') is distinct from 'array'
+   or p_payload->'ipCensus'->>'expectedMhelpSourceSha256' is distinct from b.source_sha256
+   or jsonb_array_length(p_payload->'ipCensus'->'records')<>n
+   or (select count(distinct r->>'productId') from jsonb_array_elements(p_payload->'ipCensus'->'records') r)<>n
+   or exists(select 1 from jsonb_array_elements(p_payload->'ipCensus'->'records') r
+      where not exists(select 1 from jsonb_array_elements(b.records) x where x->>'productId'=r->>'productId')
+       or not(jsonb_typeof(r->'publicIp') in('string','null'))) then
+   raise exception 'The IP list does not match the census being approved' using errcode='PT409'; end if;
+  ip_census:=jsonb_set(p_payload->'ipCensus','{seeded}','true'::jsonb);
+ else
+  ip_census:=jsonb_build_object('expectedMhelpSourceSha256',b.source_sha256,'seeded','false'::jsonb,
+   'records',coalesce((select jsonb_agg(jsonb_build_object('productId',x->>'productId','publicIp','null'::jsonb) order by x->>'productId')
+     from jsonb_array_elements(b.records) x),'[]'::jsonb));
+ end if;
  insert into cos_mhelp_placement_private.inventory_freeze_log(id,organization_id,action,source_sha256,source_read_at,record_count,field_count,shop_count,accepted_by,accepted_by_name,reason,ip_census)
-  values(p_request_id,p_organization_id,'freeze',b.source_sha256,read_at,n,nf,n-nf,p_actor_user_id,who,why,p_payload->'ipCensus');
+  values(p_request_id,p_organization_id,'freeze',b.source_sha256,read_at,n,nf,n-nf,p_actor_user_id,who,why,ip_census);
  return jsonb_build_object('contract','COS_INVENTORY_FREEZE_RESULT_V1','id',p_request_id,'applied',true,'repeat',false);
 end$$;
 

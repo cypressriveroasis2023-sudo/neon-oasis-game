@@ -107,6 +107,18 @@ function retainedLocation(row:Row,r:Row,b:Row,proof:Row|undefined,customerIds:Ma
  * attached to the inventory only when it names this exact census, so a stale or
  * mismatched freeze changes nothing and the normal staleness rule applies. */
 export const INVENTORY_FREEZE_CONTRACT='COS_INVENTORY_FREEZE_V1';
+/** Would this saved mHelp upload be declined for age? Read on the raw receipt, with
+ * the same clock the census projection uses, so the board only asks the database for
+ * an Owner freeze in the one case a freeze can change: a list too old to be trusted.
+ * An unreadable receipt answers false — it fails for its own reasons, not for age. */
+export function mhelpUploadAgeDeclines(upload:unknown,now=Date.now()):boolean{
+ if(!upload||typeof upload!=='object'||Array.isArray(upload)||!Number.isFinite(now))return false;
+ const row=upload as Record<string,any>,live=row.origin==='mhelpdesk_api';
+ const observedAt=live?(row.apiSync?.lastSuccessAt||row.receivedAt):row.receivedAt;
+ const at=typeof observedAt==='string'?Date.parse(observedAt):NaN;
+ if(!Number.isFinite(at))return false;
+ return now-at>(live?45*60*1000:24*60*60*1000);
+}
 export function acceptedInventoryFreeze(state:unknown,sourceSha256:string,receivedAt:string,now=Date.now()){
  if(!object(state)||state.contract!=='COS_INVENTORY_FREEZE_STATE_V1'||state.state!=='frozen')return null;
  const f=state.freeze;

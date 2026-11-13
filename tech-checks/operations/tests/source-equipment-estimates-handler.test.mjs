@@ -34,6 +34,9 @@ function fixture({receiptStatus=200,receipts='all',authenticated=true,onReceipt=
   if(name==='equipment_units')return response([{id:native.id,organization_id:org,unit_number:native.unitNumber,status:'field'}]);
   if(name==='cos_mhelp_placement_snapshot'){onPlacement?.();return response({contract:'COS_MHELP_PLACEMENT_V1',enabled:true,items:[],upload});}
   if(name==='cos_mhelp_location_snapshot')return response({contract:'COS_MHELP_FLEET_LOCATIONS_V1',items:[]});
+  // The saved census in this fixture is older than the age gate, so the board asks
+  // once whether the Owner has accepted it. Unfrozen here: read-only, no payload.
+  if(name==='cos_inventory_freeze_state_v1'){assert.deepEqual(body,{p_organization_id:org});return response({contract:'COS_INVENTORY_FREEZE_STATE_V1',state:'none'});}
   if(name==='cos_source_equipment_estimates_snapshot'){
    assert.equal(parsed.origin,nativeOrigin);assert.equal(parsed.pathname,'/rest/v1/rpc/cos_source_equipment_estimates_snapshot');assert.equal(init.method,'POST');
    assert.equal(headers.get('authorization'),'Bearer '+serviceKey);assert.equal(headers.get('apikey'),serviceKey);assert.notEqual(headers.get('authorization'),'Bearer '+callerToken);

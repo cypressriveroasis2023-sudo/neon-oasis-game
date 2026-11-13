@@ -172,7 +172,8 @@ test('history is append-only; unfreezing is a new Owner entry and restores norma
  // A later freeze names the census active then, with its own totals and read time.
  const second=ipCensus(B);second.records[3].placement='FIELD';
  assert.equal(call(OWNER,id(4),'freeze',approve({sourceSha256:B,fieldCount:4,shopCount:0,ipCensus:second})).applied,true);
- assert.deepEqual(state().ipCensus,second,'a new freeze starts from its own approved IP list; earlier edits do not carry over silently');
+ // seeded:true records that these IPs were supplied with the approval, not seeded empty.
+ assert.deepEqual(state().ipCensus,{...second,seeded:true},'a new freeze starts from its own approved IP list; earlier edits do not carry over silently');
  assert.equal(state().freeze.sourceReadAt,'2026-11-11T19:05:00.000Z');assert.equal(rows(),3);
 });
 
@@ -181,4 +182,40 @@ test('the install adds one guard trigger and otherwise alters no existing object
  assert.equal((sql.match(/create trigger[^;]*on cos_mhelp_placement_private\.upload_control/g)||[]).length,1);
  assert.equal(/alter\s+table\s+cos_mhelp_placement_private\.(upload_control|upload_batches)|create\s+or\s+replace|drop\s/i.test(sql),false);
  assert.equal(/equipment_units|camera|sim\b/i.test(sql),false);
+});
+
+// The Owner can accept the unit list without supplying the IPs: the IPs live in the
+// 2027 tracker, and reading that sheet is slow and can fail, so the acceptance must
+// not depend on it. The database then seeds the list from the census it just approved,
+// every IP null, marked seeded:false so nothing can read "not copied in yet" as
+// "this A# has no IP". Copying the real IPs in is its own recorded step.
+test('the unit list can be accepted without the IPs, and says so',{skip},()=>{
+ // The earlier tests leave census B frozen; start again from A, released.
+ if(state().state==='frozen')assert.equal(call(OWNER,id(59),'unfreeze',{acceptedByName:'James Martin',reason:'reset for this case'}).applied,true);
+ assert.equal(psql(`update cos_mhelp_placement_private.upload_control set active_sha256='${A}' where singleton returning 1;`),'1');
+ assert.deepEqual(call(OWNER,id(60),'freeze',{sourceSha256:A,recordCount:4,fieldCount:3,shopCount:1,
+  acceptedByName:'James Martin',reason:'COS keeps its own copy; IPs come later'}),
+  {contract:'COS_INVENTORY_FREEZE_RESULT_V1',id:id(60),applied:true,repeat:false});
+ const s=state();
+ assert.equal(s.state,'frozen');
+ assert.equal(s.ipCensus.seeded,false,'an unsupplied IP list must not claim to be seeded');
+ assert.equal(s.ipCensus.expectedMhelpSourceSha256,A);
+ assert.deepEqual(s.ipCensus.records.map(r=>r.productId).sort(),['1001','1002','1003','1004']);
+ assert.equal(s.ipCensus.records.every(r=>r.publicIp===null),true,'seeded IPs must all be null');
+ // A hand edit still works on the seeded list, and the list stays marked unseeded.
+ assert.equal(edit(OWNER,id(61),{productId:'1002',newIp:'8.8.8.8',expectedOldIp:null}).applied,true);
+ assert.equal(ipOf('1002'),'8.8.8.8');
+ assert.equal(state().ipCensus.seeded,false);
+ assert.deepEqual(call(OWNER,id(62),'unfreeze',{acceptedByName:'James Martin',reason:'done'}).applied,true);
+});
+
+test('a supplied IP list is marked seeded, and one that does not match the census is still refused',{skip},()=>{
+ assert.equal(call(OWNER,id(63),'freeze',approve()).applied,true);
+ const s=state();
+ assert.equal(s.ipCensus.seeded,true,'a supplied IP list must be marked seeded');
+ assert.equal(s.ipCensus.records.find(r=>r.productId==='1001').publicIp,'8.8.8.8');
+ assert.equal(call(OWNER,id(64),'unfreeze',{acceptedByName:'James Martin',reason:'done'}).applied,true);
+ fails(()=>call(OWNER,id(65),'freeze',approve({ipCensus:{expectedMhelpSourceSha256:A,records:[{productId:'1001',publicIp:'8.8.8.8'}]}})),/does not match the census/);
+ fails(()=>call(OWNER,id(66),'freeze',approve({ipCensus:{expectedMhelpSourceSha256:B,records:ipCensus(A).records}})),/does not match the census/);
+ assert.equal(state().state,'none');
 });
