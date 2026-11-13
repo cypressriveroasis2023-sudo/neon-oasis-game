@@ -6,7 +6,7 @@
 // Authentication, origin checks, CORS and every other rule stay exactly as the
 // shared handler already implements them.
 import {createOperationsHandler} from '../cos-operations-pages/index.ts';
-import {servedEnvelopeBody} from './servedPath.ts';
+import {handlerUrl, servedEnvelopeBody} from './servedPath.ts';
 const handler = createOperationsHandler({
   platformUrl: Deno.env.get('SUPABASE_URL'),
   serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
@@ -14,5 +14,5 @@ const handler = createOperationsHandler({
 Deno.serve(async request => {
   if (request.method !== 'POST') return handler(request);
   const text = await request.text();
-  return handler(new Request(request.url, {method: 'POST', headers: request.headers, body: servedEnvelopeBody(text)}));
+  return handler(new Request(handlerUrl(request.url), {method: 'POST', headers: request.headers, body: servedEnvelopeBody(text)}));
 });

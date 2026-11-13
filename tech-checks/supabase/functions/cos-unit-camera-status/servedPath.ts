@@ -22,3 +22,15 @@ export function servedEnvelopeBody(text: string): string {
   if (UNIT_CAMERA_STATUS_PATHS.includes(path)) return JSON.stringify({...record, path});
   return JSON.stringify({...record, path: NOT_SERVED_HERE});
 }
+
+/**
+ * The shared handler reads its transport envelope only when the request URL ends
+ * at a function name it knows; under any other name it treats the URL itself as
+ * the path and answers "COS endpoint not found". Hand it the URL under the
+ * Operations function's name. Only the name segment changes.
+ */
+export function handlerUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.pathname = parsed.pathname.replace(/\/cos-unit-camera-status(?=\/|$)/, '/cos-operations-pages');
+  return parsed.toString();
+}
