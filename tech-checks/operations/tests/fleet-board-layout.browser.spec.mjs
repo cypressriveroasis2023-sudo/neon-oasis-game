@@ -26,7 +26,7 @@ for(const it of [false,true])test(`main Fleet board is map-first and source-labe
  const inventory=board.getByRole('region',{name:'mHelpDesk equipment Product-ID inventory',exact:true}),sourceTime=inventory.locator('.cos-fleet-source-age');
  await expect(sourceTime).toBeVisible();await expect(sourceTime).toContainText('Saved reviewed mHelp source received');
  const savedTime=await sourceTime.evaluate((_,stamp)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(stamp)),f.upload.receivedAt);
- await expect(sourceTime).toContainText(savedTime);await expect(sourceTime).toContainText('This is a saved source receipt, not a live mHelpDesk read.');
+ await expect(sourceTime).toContainText(savedTime);await expect(sourceTime).toContainText('This is a saved copy of the unit list, not a live read.');
  const small=testInfo.project.name==='mobile-390';
  if(small){
   expect(map.y).toBeLessThan(units.y);
