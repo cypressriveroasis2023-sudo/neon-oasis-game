@@ -56,3 +56,13 @@
  .cos-camera-status-main{flex-direction:column}
  .cos-camera-status-edit-row>label,.cos-camera-status-edit-row>span{min-width:100%}
 }
+
+/* Map of field units by camera status (hand-recorded addresses only). */
+.cos-camera-status-map{margin:10px 0 14px}
+.cos-camera-status-map-canvas{height:360px;border-radius:10px;border:1px solid rgba(255,255,255,.12);overflow:hidden}
+.cos-camera-status-map-key{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:6px 2px 0;font-size:.85rem}
+.cos-camera-status-map-key span{display:inline-flex;align-items:center;gap:6px}
+.cos-camera-status-map-key i{display:inline-block;width:11px;height:11px;border-radius:50%;border:1px solid #111}
+.cos-camera-status-map-key small{opacity:.8}
+.cos-camera-status-address{opacity:.85}
+@media (max-width:640px){.cos-camera-status-map-canvas{height:260px}}

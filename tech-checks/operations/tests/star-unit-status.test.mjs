@@ -306,3 +306,35 @@ test('a stale feed still hides health under a hand edit, and keeps the edit', ()
   assert.equal(report.units[0].site, 'ERock - Hyperion');
   assert.deepEqual(report.counts.field, {units: 1, green: 0, yellow: 0, red: 0, unknown: 1, camerasDown: 0});
 });
+
+const addressEdit = (over = {}) => handEdit({unit_key: 'SPOTTER 306', field: 'address', value: '9500 Katy Fwy, Houston, TX 77024',
+  provider_value: null, latitude: 29.7838, longitude: -95.534, matched_address: '9500 KATY FWY, HOUSTON, TX, 77024', ...over});
+
+test('a recorded address puts a pin on a field unit, and the pin keeps the unit colour', () => {
+  const report = applyHandEdits(fieldUnit(), [addressEdit()]);
+  const unit = report.units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(unit.address, '9500 Katy Fwy, Houston, TX 77024');
+  assert.deepEqual(unit.location, {latitude: 29.7838, longitude: -95.534, matchedAddress: '9500 KATY FWY, HOUSTON, TX, 77024', source: 'hand'});
+  assert.equal(unit.state, fieldUnit().units.find(u => u.unit === 'SPOTTER 306').state, 'an address never changes camera status');
+  assert.equal(unit.handEdits.address.providerValue, null);
+  assert.equal(unit.handEdits.address.providerAgrees, false);
+});
+
+test('no pin without a real matched point, and none for a unit in the shop', () => {
+  for (const bad of [{latitude: null}, {longitude: undefined}, {latitude: 'x'}, {latitude: 0, longitude: 0}, {latitude: 95}]) {
+    const unit = applyHandEdits(fieldUnit(), [addressEdit(bad)]).units.find(u => u.unit === 'SPOTTER 306');
+    assert.equal(unit.location, null, JSON.stringify(bad));
+    assert.equal(unit.address, null, JSON.stringify(bad));
+  }
+  const moved = applyHandEdits(fieldUnit(), [addressEdit(), handEdit({unit_key: 'SPOTTER 306', field: 'placement', value: 'SHOP'})])
+    .units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(moved.placement, 'SHOP');
+  assert.equal(moved.location, null);
+  assert.equal(moved.address, null);
+});
+
+test('a cleared address takes the pin away', () => {
+  const unit = applyHandEdits(fieldUnit(), [addressEdit({action: 'clear', value: null, latitude: null, longitude: null})])
+    .units.find(u => u.unit === 'SPOTTER 306');
+  assert.equal(unit.location ?? null, null);
+});

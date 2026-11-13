@@ -2,12 +2,13 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
 import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport} from '../shared/starUnitStatus';
+import UnitStatusMap from './UnitStatusMap';
 import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean}};
 type Group='field'|'attention'|'shop-online'|'shop';
-type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;publicIp:string;reason:string};
+type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;reason:string};
 
 const GROUPS:{id:Group;label:string;note:string}[]=[
  {id:'field',label:'In the field',note:'Units with a camera reporting from a customer site.'},
@@ -17,7 +18,7 @@ const GROUPS:{id:Group;label:string;note:string}[]=[
 ];
 const DOT:Record<UnitCameraStatus['state'],string>={GREEN:'online',YELLOW:'offline',RED:'offline',UNKNOWN:'unknown'};
 const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras up',YELLOW:'Some cameras down',RED:'All cameras down',UNKNOWN:'Not verified'};
-const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',public_ip:'Public IP'};
+const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP'};
 
 /** A read-only check, so a bad shape is reported rather than guessed at. */
 function checkedReport(value:unknown):Report{
@@ -34,11 +35,11 @@ export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string):
   if(group==='shop-online'&&!unit.onlineInShop)return false;
   if(group==='shop'&&unit.placement!=='SHOP')return false;
   if(!text)return true;
-  return [unit.unit,unit.site||'',unit.publicIp||''].some(field=>field.toLowerCase().includes(text));
+  return [unit.unit,unit.site||'',unit.address||'',unit.publicIp||''].some(field=>field.toLowerCase().includes(text));
  });
 }
 
-const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',publicIp:unit.publicIp||'',reason:''});
+const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',reason:''});
 
 export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -111,6 +112,8 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}</p>
+  {report&&(group==='field'||group==='attention')&&<UnitStatusMap units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
+   onSelect={unit=>{setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>
    <label className='sr-only' htmlFor='cos-camera-status-search'>Find a unit, site or IP</label>
    <input id='cos-camera-status-search' type='search' placeholder='Find a unit, site or IP…' value={query} onChange={event=>setQuery(event.target.value)}/>
@@ -122,7 +125,8 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unit.unit}</strong>
       <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP · root':'SHOP · root'}</small>
-      {unit.handEdits&&Object.entries(unit.handEdits).map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
+      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):'No address on the map yet'}</small>}
+      {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
        {edit.providerAgrees?' · Star4Live now agrees':edit.providerValue?' · Star4Live still says “'+edit.providerValue+'”':' · Star4Live has no value'}
        {edit.reason?' · '+edit.reason:''}
@@ -138,7 +142,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      </div>
     </div>
     {canEdit&&draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Hand edit for '+unit.unit}>
-     <p>Where a unit is, its site and its public IP are yours to set. Camera status always stays whatever Star4Live reports.</p>
+     <p>Where a unit is, its site, its address and its public IP are yours to set. Camera status always stays whatever Star4Live reports.</p>
      <div className='cos-camera-status-edit-row'>
       <span id={'placement-'+unit.unit}>Field or shop</span>
       <div role='group' aria-labelledby={'placement-'+unit.unit} className='cos-camera-status-toggle'>
@@ -154,6 +158,14 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
        placeholder='Customer - site' onChange={event=>setDraft({...draft,site:event.target.value})}/>
       <button type='button' disabled={saving||!draft.site.trim()||draft.site.trim()===(unit.site||'')} onClick={()=>submit(unit,'site',draft.site.trim(),draft.reason)}>Save</button>
       {unit.handEdits?.site&&<button type='button' disabled={saving} onClick={()=>submit(unit,'site',null,draft.reason)}>Use Star4Live</button>}
+     </div>}
+     {draft.placement==='FIELD'&&<div className='cos-camera-status-edit-row'>
+      <label htmlFor={'address-'+unit.unit}>Address (drops the pin)</label>
+      <input id={'address-'+unit.unit} type='text' maxLength={200} value={draft.address} disabled={saving||unit.placement!=='FIELD'} autoComplete='street-address'
+       placeholder='123 Main St, Houston, TX 77002' onChange={event=>setDraft({...draft,address:event.target.value})}/>
+      <button type='button' disabled={saving||unit.placement!=='FIELD'||!draft.address.trim()||draft.address.trim()===(unit.address||'')} onClick={()=>submit(unit,'address',draft.address.trim(),draft.reason)}>Save</button>
+      {unit.handEdits?.address&&<button type='button' disabled={saving} onClick={()=>submit(unit,'address',null,draft.reason)}>Remove pin</button>}
+      {unit.placement!=='FIELD'&&<small>Save “In the field” first, then add the address.</small>}
      </div>}
      <div className='cos-camera-status-edit-row'>
       <label htmlFor={'ip-'+unit.unit}>Public IP</label>

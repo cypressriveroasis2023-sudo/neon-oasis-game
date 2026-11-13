@@ -1,7 +1,8 @@
 // What a hand edit to unit camera status may say, checked before anything is recorded.
 //
-// A hand edit can move a unit between Field and Shop, name its site, or correct
-// its public IP. It can never say whether a camera is online, and it can only
+// A hand edit can move a unit between Field and Shop, name its site, give its
+// street address (the route geocodes it into the unit's map pin), or correct its
+// public IP. It can never say whether a camera is online, and it can only
 // name a unit Star4Live is already reporting.
 import {HAND_EDIT_FIELDS, type HandEditField, type UnitCameraStatus} from './starUnitStatus.ts';
 
@@ -60,7 +61,7 @@ export function checkedHandEditRequest(
   if (!unit) throw new HandEditError('Star4Live is not reporting a unit named ' + unitKey + '. Only a unit the provider reports can be edited.', 404);
 
   const field = text(payload.field) as HandEditField;
-  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, or its public IP only.');
+  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, or its public IP only.');
 
   const action = text(payload.action) || 'set';
   if (action !== 'set' && action !== 'clear') throw new HandEditError('A hand edit is either set or clear.');
@@ -74,6 +75,7 @@ export function checkedHandEditRequest(
   // The provider's value is read here, never taken from the caller.
   const providerValue = field === 'placement' ? unit.providerPlacement ?? unit.placement
     : field === 'site' ? unit.providerSite ?? unit.site
+    : field === 'address' ? null // Star4Live has no street address.
     : unit.providerPublicIp ?? unit.publicIp;
 
   if (action === 'clear') {
@@ -90,6 +92,11 @@ export function checkedHandEditRequest(
   } else if (field === 'site') {
     if (value.length > 120 || !PRINTABLE.test(value)) throw new HandEditError('That site name is too long or contains characters that cannot be stored.');
     if (['root', 'shop'].includes(value.toLowerCase())) throw new HandEditError('Use the Shop setting to put a unit in the shop; root is not a site name.');
+  } else if (field === 'address') {
+    // Format and match are the geocoder's job (one rule, in censusAddress); here
+    // only what can be stored. A shop unit has no field pin to drop.
+    if (value.length > 200 || !PRINTABLE.test(value)) throw new HandEditError('That address is too long or contains characters that cannot be stored.');
+    if (unit.placement !== 'FIELD') throw new HandEditError('Put the unit in the Field first; a unit in the shop has no site address.');
   } else {
     const ip = publicIpv4(value);
     if (!ip) throw new HandEditError('That is not a public IPv4 address.');

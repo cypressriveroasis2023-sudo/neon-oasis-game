@@ -103,12 +103,36 @@ test('nothing can be updated or deleted, including by the owner of the table', a
   assert.equal((await log("select * from cos_fleet_hand_edit_private.unit_status_edit_log where upper(btrim(unit_key))='SPOTTER 503'"))[0].value, 'A Site');
 });
 
-test('only the three fields are editable, and camera status is not one of them', async () => {
+test('only the four fields are editable, and camera status is not one of them', async () => {
   for (const field of ['vigilant_status', 'state', 'online', 'unit_key', 'organization', '']) {
     await refuses(() => edit({field, value: 'Online'}), /Hand edit is incomplete/);
   }
   assert.equal((await edit({unitKey: 'SPOTTER 504', field: 'placement', value: 'FIELD'})).applied, true);
   assert.equal((await edit({unitKey: 'SPOTTER 505', field: 'public_ip', value: '38.246.195.93'})).applied, true);
+});
+
+test('an address is recorded only with the map point matched to it', async () => {
+  const at = {field: 'address', value: '9500 Katy Fwy, Houston, TX 77024', latitude: 29.7838, longitude: -95.5340, matchedAddress: '9500 KATY FWY, HOUSTON, TX, 77024'};
+  const done = await edit({unitKey: 'SPOTTER 601', ...at});
+  assert.equal(done.applied, true);
+  assert.equal(done.latitude, 29.7838);
+  const row = (await state()).edits.find(e => e.unit_key === 'SPOTTER 601' && e.field === 'address');
+  assert.equal(row.value, at.value);
+  assert.equal(row.latitude, 29.7838); assert.equal(row.longitude, -95.534);
+  assert.equal(row.matched_address, at.matchedAddress);
+  // No point, half a point, a point that is not a number, off the globe, or 0,0: refused.
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value}), /only with the map point/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 29.7}), /map point is two numbers/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: '29.7', longitude: '-95.5'}), /map point is two numbers/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 91, longitude: -95.5}), /only with the map point/);
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'address', value: at.value, latitude: 0, longitude: 0}), /only with the map point/);
+  // Nothing but a set address may carry a point, and a cleared address carries none.
+  await refuses(() => edit({unitKey: 'SPOTTER 602', field: 'site', value: 'Somewhere', latitude: 29.7, longitude: -95.5}), /Only a set address/);
+  assert.equal((await edit({unitKey: 'SPOTTER 601', field: 'address', action: 'clear', value: null})).applied, true);
+  await refuses(() => edit({unitKey: 'SPOTTER 601', field: 'address', action: 'clear', value: null, latitude: 29.7, longitude: -95.5}), /Only a set address/);
+  // The table holds the same rule even against a direct insert.
+  await refuses(() => db.query(`insert into cos_fleet_hand_edit_private.unit_status_edit_log(id,organization_id,unit_key,field,action,value,actor,actor_name,actor_role)
+    values (gen_random_uuid(),$1,'SPOTTER 603','address','set','1 Main St, Houston, TX 77002',$2,'James','owner')`, [ORG, OWNER]), /check constraint/);
 });
 
 test('a placement is one of two words and a site name is not root', async () => {
