@@ -31,7 +31,7 @@ export function savedAddressByUnit(saved:readonly SavedAddressPin[]|null|undefin
 }
 
 /** One pin per field unit that has a recorded, matched point. Nothing is placed by guesswork. */
-export function unitPins(units:readonly UnitCameraStatus[],saved?:readonly SavedAddressPin[]|null):{pins:UnitPin[];fieldUnits:number;withoutPin:number;handPins:number;savedPins:number}{
+export function unitPins(units:readonly UnitCameraStatus[],saved?:readonly SavedAddressPin[]|null):{pins:UnitPin[];fieldUnits:number;withoutPin:number;handPins:number;savedPins:number;addressNoPin:number;noAddress:number}{
  const field=units.filter(unit=>unit.placement==='FIELD');
  const bySaved=savedAddressByUnit(saved);
  const pins:UnitPin[]=field.flatMap((unit):UnitPin[]=>{
@@ -47,6 +47,12 @@ export function unitPins(units:readonly UnitCameraStatus[],saved?:readonly Saved
  // Problems draw last, so a red pin is never hidden under a green one.
  const order={GREEN:0,UNKNOWN:1,YELLOW:2,RED:3} as const;
  pins.sort((a,b)=>order[a.state]-order[b.state]||a.unit.localeCompare(b.unit));
- return {pins,fieldUnits:field.length,withoutPin:field.length-pins.length,
-  handPins:pins.filter(pin=>pin.source==='hand').length,savedPins:pins.filter(pin=>pin.source==='saved').length};
+ // Three different things, told apart: on the map, saved but the address service
+ // could not place it, and no address entered at all.
+ const placed=new Set(pins.map(pin=>pin.unit));
+ const unplaced=field.filter(unit=>!placed.has(unit.unit));
+ const addressNoPin=unplaced.filter(unit=>Boolean(unit.address&&unit.address.trim())).length;
+ return {pins,fieldUnits:field.length,withoutPin:unplaced.length,
+  handPins:pins.filter(pin=>pin.source==='hand').length,savedPins:pins.filter(pin=>pin.source==='saved').length,
+  addressNoPin,noAddress:unplaced.length-addressNoPin};
 }

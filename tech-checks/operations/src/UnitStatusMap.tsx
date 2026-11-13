@@ -40,7 +40,7 @@ export default function UnitStatusMap({units,savedAddresses,onSelect}:{units:rea
  const [revision,setRevision]=useState(0);
  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
  select.current=onSelect;
- const {pins,fieldUnits,withoutPin,handPins,savedPins}=unitPins(units,savedAddresses);
+ const {pins,fieldUnits,handPins,savedPins,addressNoPin,noAddress}=unitPins(units,savedAddresses);
  const key=pins.map(pin=>pin.unit+pin.state+pin.source+pin.latitude+','+pin.longitude).join('|');
  useEffect(()=>{
   if(!node.current)return;
@@ -133,7 +133,7 @@ export default function UnitStatusMap({units,savedAddresses,onSelect}:{units:rea
    <span><i style={{background:'#2e9e5b'}}/>All up</span><span><i style={{background:'#e0a52a'}}/>Some down</span>
    <span><i style={{background:'#d64545'}}/>All down</span><span><i style={{background:'#8a8f98'}}/>Not verified</span>
    <span><i className='cos-camera-status-key-saved'/>Address on file</span>
-   <small>{pins.length} of {fieldUnits} field units on the map &middot; {handPins} typed by hand, {savedPins} from the address already on the unit list{withoutPin?' · '+withoutPin+' have no address yet (Edit by hand → Address)':''}</small>
+   <small>{pins.length} of {fieldUnits} field units on the map · {handPins} typed by hand, {savedPins} from the address already on the unit list{addressNoPin?' · '+addressNoPin+' have an address saved that the address service could not place':''}{noAddress?' · '+noAddress+' have no address yet (Edit by hand → Address)':''}</small>
   </p>
  </div>;
 }

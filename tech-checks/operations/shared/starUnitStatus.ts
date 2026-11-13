@@ -36,6 +36,10 @@ export type UnitCameraStatus = {
   offline: number;
   unknown: number;
   down: UnitCamera[];
+  // Cameras on this unit that are sitting in root while the unit is at a site:
+  // a spare, or one swapped out and not yet removed in Star4Live. They are shown
+  // for the record and never counted as an outage at the site.
+  awayFromSite?: UnitCamera[];
   onlineInShop: boolean;
   publicIp: string | null;
   observedAt: string | null;
@@ -147,13 +151,18 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
   const units: UnitCameraStatus[] = [];
   for (const members of groups.values()) {
     const named = members.map(row => ({ row, status: cameraStatus(row), name: text(row.device_name) || unitLabel(row) }));
-    const online = named.filter(c => c.status === 'online').length;
-    const offline = named.filter(c => c.status === 'offline').length;
-    const unknown = named.length - online - offline;
     // A camera that reports from a site decides where the unit is: a unit is in
     // the field as soon as one of its cameras sits under a customer name.
     const field = members.filter(row => cameraPlacement(row) === 'FIELD');
     const placement: 'FIELD' | 'SHOP' = field.length ? 'FIELD' : 'SHOP';
+    // A unit at a customer site is judged by the cameras that are there. One left
+    // in root is a spare or a swapped-out camera; root is the shop, and the shop
+    // is never a field outage.
+    const atSite = placement === 'FIELD' ? named.filter(c => cameraPlacement(c.row) === 'FIELD') : named;
+    const awayFromSite = placement === 'FIELD' ? named.filter(c => cameraPlacement(c.row) !== 'FIELD') : [];
+    const online = atSite.filter(c => c.status === 'online').length;
+    const offline = atSite.filter(c => c.status === 'offline').length;
+    const unknown = atSite.length - online - offline;
     const siteRow = field.find(row => cameraStatus(row) === 'online') || field[0];
     const site = placement === 'FIELD' ? text(siteRow?.organization) : null;
     const observed = members.map(row => text(row.source_last_seen_at)).filter(Boolean).sort();
@@ -163,8 +172,9 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
       site: site || null,
       siteNamePending: Boolean(site && PENDING_SITE.test(site)),
       state: unitState(online, offline, unknown),
-      cameras: named.length, online, offline, unknown,
-      down: named.filter(c => c.status !== 'online').map(c => ({ name: c.name, status: c.status })),
+      cameras: atSite.length, online, offline, unknown,
+      down: atSite.filter(c => c.status !== 'online').map(c => ({ name: c.name, status: c.status })),
+      ...(awayFromSite.length ? { awayFromSite: awayFromSite.map(c => ({ name: c.name, status: c.status })) } : {}),
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: text(members.find(row => text(row.public_ip))?.public_ip) || null,
       observedAt: observed.length ? observed[observed.length - 1] : null,
@@ -216,6 +226,7 @@ export function applyFeedFreshness(
     state: 'UNKNOWN' as const,
     online: 0, offline: 0, unknown: unit.cameras,
     down: unit.down.map(camera => ({...camera, status: 'unknown' as const})),
+    ...(unit.awayFromSite ? {awayFromSite: unit.awayFromSite.map(camera => ({...camera, status: 'unknown' as const}))} : {}),
     onlineInShop: false,
   }));
   return {...report, feed: stamped, units, counts: countUnits(units)};

@@ -105,7 +105,7 @@ test('a unit offline in the shop is not online in the shop and is not a field ou
   assert.equal(report.counts.field.red, 0);
 });
 
-test('one camera at a site puts the whole unit in the field', () => {
+test('one camera at a site puts the whole unit in the field, and a camera left in root is not an outage there', () => {
   const report = projectUnitCameraStatus([
     camera({device_name: 'H011_1', unit_key: 'HELIOS 011', organization: 'root', vigilant_status: 'Offline'}),
     camera({device_name: 'H011_2', unit_key: 'HELIOS 011', organization: 'Preload Garland'}),
@@ -113,7 +113,48 @@ test('one camera at a site puts the whole unit in the field', () => {
   const unit = report.units[0];
   assert.equal(unit.placement, 'FIELD');
   assert.equal(unit.site, 'Preload Garland');
-  assert.equal(unit.state, 'YELLOW');
+  // Root is the shop. The camera that is actually at the site is online.
+  assert.equal(unit.state, 'GREEN');
+  assert.deepEqual([unit.cameras, unit.online, unit.offline, unit.unknown], [1, 1, 0, 0]);
+  assert.deepEqual(unit.down, []);
+  assert.deepEqual(unit.awayFromSite, [{name: 'H011_1', status: 'offline'}]);
+});
+
+test('a swapped-out camera still in root keeps the unit green; its shop cameras are still listed', () => {
+  // Helios 001 on 2026-11-13: two cameras at Mesa Village, the old PTZ left in root.
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'Helios 001 / Cam 001', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+    camera({device_name: 'Helios 001 / Cam 002', unit_key: 'HELIOS 001', organization: 'Mesa Village MHP'}),
+    camera({device_name: 'Helios 001 / Cam 003 & 004', unit_key: 'HELIOS 001', organization: 'root', vigilant_status: 'Offline'}),
+  ]);
+  const unit = report.units[0];
+  assert.equal(unit.state, 'GREEN');
+  assert.deepEqual([unit.cameras, unit.online], [2, 2]);
+  assert.deepEqual(unit.awayFromSite.map(c => c.name), ['Helios 001 / Cam 003 & 004']);
+  // The fleet totals count the cameras that are at sites, not the spare.
+  assert.equal(report.counts.cameras, 2);
+  assert.equal(report.counts.field.camerasDown, 0);
+});
+
+test('a unit wholly in the shop counts all its own cameras and lists none as away', () => {
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'SS058_1', unit_key: 'SOLARSPOTTER 058', organization: 'root'}),
+    camera({device_name: 'SS058_2', unit_key: 'SOLARSPOTTER 058', organization: 'root', vigilant_status: 'Offline'}),
+  ]);
+  const unit = report.units[0];
+  assert.equal(unit.placement, 'SHOP');
+  assert.deepEqual([unit.cameras, unit.online, unit.offline], [2, 1, 1]);
+  assert.equal(unit.awayFromSite, undefined);
+  assert.equal(unit.onlineInShop, true);
+});
+
+test('a stale feed leaves a camera in root unverified too, never offline', () => {
+  const report = applyFeedFreshness(projectUnitCameraStatus([
+    camera({device_name: 'H011_1', unit_key: 'HELIOS 011', organization: 'root', vigilant_status: 'Offline'}),
+    camera({device_name: 'H011_2', unit_key: 'HELIOS 011', organization: 'Preload Garland'}),
+  ]), {syncedAt: '2026-11-12T10:00:00Z', status: 'ok', enabled: true}, Date.parse('2026-11-13T10:00:00Z'));
+  assert.deepEqual(report.units[0].awayFromSite, [{name: 'H011_1', status: 'unknown'}]);
+  assert.equal(report.units[0].state, 'UNKNOWN');
 });
 
 test('a site waiting for its name is flagged, and keeps the unit in the field', () => {

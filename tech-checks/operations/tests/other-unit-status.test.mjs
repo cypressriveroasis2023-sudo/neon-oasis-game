@@ -122,3 +122,20 @@ test('an Avigilon or Recon unit uses a saved address the same way a Star4Live un
   const {pins} = unitPins(units, [savedPin('Sniper 004')]);
   assert.deepEqual(pins.map(p => p.unit + ':' + p.source), ['SNIPER 004:saved']);
 });
+
+test('the map legend tells apart placed, saved-but-not-placed, and no address at all', () => {
+  const units = [
+    fieldUnit('SPOTTER 1', {address: '1 Main St', location: {latitude: 29.7, longitude: -95.4, matchedAddress: null, source: 'hand'}}),
+    fieldUnit('SPOTTER 2', {address: '2 Lee Rd'}),            // saved, the service could not place it
+    fieldUnit('SPOTTER 3', {address: '   '}),                  // nothing usable typed
+    fieldUnit('SPOTTER 4'),                                    // nothing entered
+    fieldUnit('SPOTTER 5', {placement: 'SHOP', site: null}),   // shop units are not on this map
+  ];
+  const {pins, fieldUnits, withoutPin, addressNoPin, noAddress} = unitPins(units, []);
+  assert.deepEqual([pins.length, fieldUnits, withoutPin, addressNoPin, noAddress], [1, 4, 3, 1, 2]);
+});
+
+test('a unit placed from the saved address is not counted as missing an address', () => {
+  const {withoutPin, addressNoPin, noAddress, savedPins} = unitPins([fieldUnit('SPOTTER 306')], [savedPin('Spotter 306')]);
+  assert.deepEqual([withoutPin, addressNoPin, noAddress, savedPins], [0, 0, 0, 1]);
+});

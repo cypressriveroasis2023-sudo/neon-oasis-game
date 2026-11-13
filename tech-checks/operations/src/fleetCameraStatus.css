@@ -73,3 +73,4 @@
 .cos-camera-status-map-key .cos-camera-status-key-saved{background:transparent;border:2.5px dashed #8a8f98}
 .cos-camera-status-map{position:relative}
 .cos-camera-status-map-group:not(:empty){margin-top:10px}
+.cos-camera-status-away{opacity:.85;font-style:italic}
