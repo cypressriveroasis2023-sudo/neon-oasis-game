@@ -405,7 +405,14 @@ function linkedUnitObservation(rows, now = Date.now()) {
 }
 
 // ../it-feature-availability.js
-var IT_DAILY_WORKSPACES = Object.freeze(["Fleet Dashboard", "Camera Health"]);
+var IT_DAILY_WORKSPACES = Object.freeze([
+  "Fleet Dashboard",
+  "Camera Health",
+  "InHand Routers",
+  "Victron VRM",
+  "Unit Tracker",
+  "Tech Check"
+]);
 
 // src/fieldRecorderObservation.ts
 var object2 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));

@@ -5,11 +5,26 @@
     {
       "path": "App.tsx",
       "baselineBlob": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
-      "candidateBlob": "f21420e6e353f32b79085350b5b39c9f5eceea07",
+      "candidateBlob": "e6b6047e0acbbc59bbe3073bec4e55515f65ae85",
       "replacements": [
         {
           "from": "",
           "to": "manualRefreshEnabled={session?.role!=='IT'} ",
+          "count": 1
+        },
+        {
+          "from": "import {trackerAccess} from './unitTracker';",
+          "to": "import {trackerAccess} from './unitTracker';\nimport {can} from './cosCapabilities';",
+          "count": 1
+        },
+        {
+          "from": "manualRefreshEnabled={session?.role!=='IT'}",
+          "to": "manualRefreshEnabled={can(session,'equipment.refresh')}",
+          "count": 1
+        },
+        {
+          "from": "createTicket={fleetOnly?undefined:createTicket} canEditPlacement=",
+          "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} canEditPlacement=",
           "count": 1
         }
       ]
