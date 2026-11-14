@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
-      "candidateBlob": "e6b6047e0acbbc59bbe3073bec4e55515f65ae85",
+      "candidateBlob": "ea667bb9b83cb65b2ad1eeb0a052f6e94211152e",
       "replacements": [
         {
           "from": "",
@@ -25,6 +25,16 @@
         {
           "from": "createTicket={fleetOnly?undefined:createTicket} canEditPlacement=",
           "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} canEditPlacement=",
+          "count": 1
+        },
+        {
+          "from": "historyReadEnabled={!fleetOnly}",
+          "to": "historyReadEnabled={can(session,'equipment.history')}",
+          "count": 1
+        },
+        {
+          "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
+          "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} initialUnitId={route.unitId}",
           "count": 1
         }
       ]
