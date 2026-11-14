@@ -17,6 +17,12 @@ export function metresApart(a:[number,number],b:[number,number]):number{
 }
 /** One place, whatever spelling: several results all within a block are the same address. */
 export const SAME_PLACE_METRES=120;
+/**
+ * How far below the best score a result can sit and still count as a rival
+ * claim to be a different place. The second service ranks and scores its
+ * results, so anything much weaker is a worse guess at the same address.
+ */
+export const COMPARABLE_ACCURACY=0.1;
 const MAX_BODY=262144;
 const UNSAFE=/[\r\n<>@=]|https?:|password|passwd|pwd|token|secret|credential|gate[\s-]*code|access[\s-]*code|\bpin\b/i;
 /**
@@ -118,12 +124,24 @@ export async function geocodioPoint(value:string,apiKey:string,requestFetch:type
   // A low score means the service guessed; a guessed pin is worse than none.
   if(typeof best.accuracy!=='number'||!Number.isFinite(best.accuracy)||best.accuracy<0.8)
    return {status:'no_match',reason:'The address services are not confident enough about where that address is to drop a pin. Check the street number, city and ZIP.'};
-  // Several spellings of one place are fine; two real places are not.
-  for(const other of results.slice(1,20)){
+  // Several spellings of one place are fine; two real places are not. This
+  // service returns its results ranked and scored, so a weaker result is a
+  // worse guess at the same address, not a rival claim to be a different
+  // place. Only results scoring about as well as the best one can make an
+  // address ambiguous; the rest are ignored. Without this, one low-scoring
+  // guess somewhere across town throws away a rooftop match.
+  const rivals=results.slice(1,20).filter((other:any)=>
+   typeof other?.accuracy==='number'&&Number.isFinite(other.accuracy)&&other.accuracy>=best.accuracy-COMPARABLE_ACCURACY);
+  let spread=0;
+  for(const other of rivals){
    const at=point(other?.location?.lat,other?.location?.lng);
-   if(!at||metresApart(found,at)>SAME_PLACE_METRES)
-    return {status:'no_match',reason:'That address matches more than one place. Add the city and ZIP so the pin lands on the right one.'};
+   if(!at){spread=Infinity;break;}
+   spread=Math.max(spread,metresApart(found,at));
   }
+  note('second service: '+rivals.length+' result(s) scoring as well as the best, '+
+   (Number.isFinite(spread)?Math.round(spread)+'m apart':'one without a usable location'));
+  if(spread>SAME_PLACE_METRES)
+   return {status:'no_match',reason:'That address matches more than one place. Add the city and ZIP so the pin lands on the right one.'};
   const matched=typeof best.formatted_address==='string'?best.formatted_address.trim().slice(0,200):'';
   return {status:'success',reason:'Pinned at the location the second address service has for this address.',latitude:found[0],longitude:found[1],provider:'geocodio',...(matched?{matchedAddress:matched}:{})};
  }catch{return {status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}

@@ -87,6 +87,24 @@ test('several spellings of one place still pin; two real places do not', async (
   assert.match(found.reason, /more than one place/);
 });
 
+// The service ranks and scores what it returns, so a weaker result is a worse
+// guess at the same address, not a rival claim to be a different place. Before
+// this, one low-scoring guess across town threw away a rooftop match.
+test('a weaker-scoring result elsewhere does not throw away a confident match', async () => {
+  const weakAndFar = geoHit({accuracy: 0.6, location: {lat: 30.1, lng: -95.9}});
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit(), weakAndFar, geoHit({accuracy: 0.45, location: {lat: 31.2, lng: -97.1}})]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
+  assert.deepEqual([found.status, found.latitude, found.longitude], ['success', 29.8646, -95.2614]);
+});
+
+test('a result scoring as well as the best, somewhere else, still blocks the pin', async () => {
+  const strongAndFar = geoHit({accuracy: 0.95, location: {lat: 30.1, lng: -95.9}});
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit(), strongAndFar]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
+  assert.equal(found.status, 'no_match');
+  assert.match(found.reason, /more than one place/);
+});
+
 test('an unreachable or broken second service leaves the Census reason, never a pin', async () => {
   for (const answer of [() => new Response('nope', {status: 500}), () => body({results: 'not a list'}), () => {throw Error('down');}]) {
     const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': answer});
