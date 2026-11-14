@@ -18,6 +18,15 @@ const units=[
  line('SPOTTER 306',{cameras:2,online:2}),
 ];
 const report={contract:'COS_STAR_UNIT_STATUS_V1',units,counts:countUnits(units),feed:{provider:'star4live',syncedAt:fresh,status:'ok',enabled:true,fresh:true,ageMs:1000},handEditsRead:true,otherSourcesRead:true,canEdit:true,refreshedAt:fresh,source:'Star4Live'};
+async function expectPinArtFits(app){
+ const pins=app.locator('.cos-camera-status-map .cos-field-pin');
+ if(!await pins.count())return;
+ const sizes=await pins.evaluateAll(nodes=>nodes.map(pin=>{
+  const art=pin.querySelector('.cos-reticle-artwork');
+  return art?[Math.round(art.getBoundingClientRect().width),Math.round(pin.getBoundingClientRect().width)]:null;
+ }).filter(Boolean));
+ for(const [art,box] of sizes)expect(art).toBeLessThanOrEqual(box+1);
+}
 const row=(app,name)=>app.locator('.cos-camera-status-row').filter({has:app.getByText(name,{exact:true})});
 
 test('Camera status lists Avigilon, Reconeyez and Star4Live units with their source, and Victron on a Helios',async({page},info)=>{
@@ -152,6 +161,8 @@ test('a unit opens one panel with every camera on it, and a swapped-out camera c
  await expect(panel.getByLabel('Customer and site')).toBeVisible();
  await expect(panel.getByLabel('Address (drops the pin)')).toBeVisible();
  await page.screenshot({path:info.outputPath('camera-status-unit-panel.png')});
+ // The pin art must sit inside its pin, not spill over the unit number.
+ await expectPinArtFits(app);
  const ptz=panel.locator('.cos-camera-status-camera').filter({hasText:'Cam 003 & 004'});
  await ptz.getByRole('button',{name:'Swapped out'}).click();
  await expect(app.locator('.cos-camera-status-saved')).toContainText('Helios 001 / Cam 003 & 004 is no longer on HELIOS 001');
