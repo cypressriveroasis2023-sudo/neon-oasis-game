@@ -15,14 +15,15 @@ export class HandEditError extends Error {
 export type HandEditRequest = {
   unitKey: string;
   field: HandEditField;
-  action: 'set' | 'clear';
+  action: 'set' | 'clear' | 'clear_pin';
+  expectedAddressRevision?: string | null;
   value: string | null;
   providerValue: string | null;
   reason: string | null;
   requestId: string;
 };
 
-const FIELDS = new Set<string>(['unitKey', 'field', 'action', 'value', 'reason', 'requestId']);
+const FIELDS = new Set<string>(['unitKey', 'field', 'action', 'value', 'reason', 'requestId', 'expectedAddressRevision']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // No control characters: a site name goes on a board, a sheet and a tech's phone.
 const PRINTABLE = /^[^\u0000-\u001f\u007f]+$/;
@@ -66,7 +67,15 @@ export function checkedHandEditRequest(
   if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, its public IP, what it is called, or which cameras are on it only.');
 
   const action = text(payload.action) || 'set';
-  if (action !== 'set' && action !== 'clear') throw new HandEditError('A hand edit is either set or clear.');
+  if (action !== 'set' && action !== 'clear' && !(field === 'address' && action === 'clear_pin')) throw new HandEditError('A hand edit is either set or clear.');
+
+  let revision: {expectedAddressRevision?: string|null} = {};
+  if (field === 'address') {
+    if (!Object.hasOwn(payload,'expectedAddressRevision') ||
+        (payload.expectedAddressRevision !== null && (typeof payload.expectedAddressRevision !== 'string' || !UUID.test(payload.expectedAddressRevision))))
+      throw new HandEditError('Refresh the saved address before editing it.',409);
+    revision = {expectedAddressRevision: payload.expectedAddressRevision as string|null};
+  } else if (Object.hasOwn(payload,'expectedAddressRevision')) throw new HandEditError('Only an address edit takes an address revision.');
 
   const reason = text(payload.reason) || null;
   if (reason && (reason.length > 400 || !PRINTABLE.test(reason))) throw new HandEditError('That reason is too long or contains characters that cannot be stored.');
@@ -89,11 +98,11 @@ export function checkedHandEditRequest(
     return match;
   };
 
-  if (action === 'clear') {
+  if (action === 'clear' || action === 'clear_pin') {
     const raw = text(payload.value);
     if (raw && field !== 'camera') throw new HandEditError('Clearing a hand edit does not take a value.');
-    if (raw) return {unitKey: unit.unit, field, action, value: namedCamera(raw).name, providerValue: null, reason, requestId};
-    return {unitKey: unit.unit, field, action, value: null, providerValue: providerValue ?? null, reason, requestId};
+    if (raw) return {unitKey: unit.unit, field, action, value: namedCamera(raw).name, providerValue: null, reason, requestId, ...revision};
+    return {unitKey: unit.unit, field, action, value: null, providerValue: providerValue ?? null, reason, requestId, ...revision};
   }
 
   const raw = text(payload.value);
@@ -129,5 +138,5 @@ export function checkedHandEditRequest(
     if (!ip) throw new HandEditError('That is not a public IPv4 address.');
     value = ip;
   }
-  return {unitKey: unit.unit, field, action, value, providerValue: providerValue ?? null, reason, requestId};
+  return {unitKey: unit.unit, field, action, value, providerValue: providerValue ?? null, reason, requestId, ...revision};
 }
