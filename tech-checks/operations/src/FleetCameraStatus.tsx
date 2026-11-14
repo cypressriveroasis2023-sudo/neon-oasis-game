@@ -3,6 +3,7 @@ import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
 import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
+import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
@@ -10,22 +11,15 @@ import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-type Group='field'|'attention'|'shop-online'|'shop';
+import {type Group,type StateFilter,GROUPS,SOURCE_LABEL,sourceOf,groupedUnits} from './cameraStatusFilters';
+export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;reason:string};
 
-const GROUPS:{id:Group;label:string;note:string}[]=[
- {id:'field',label:'In the field',note:'Units with a camera reporting from a customer site.'},
- {id:'attention',label:'Needs attention',note:'Field units with at least one camera not reporting as online.'},
- {id:'shop-online',label:'Online in the shop',note:'Online, still in root. It stays in the shop until somebody moves it to a site.'},
- {id:'shop',label:'In the shop',note:'Everything in root, online or not. Shop units never count as a field outage.'},
-];
 const DOT:Record<UnitCameraStatus['state'],string>={GREEN:'online',YELLOW:'offline',RED:'offline',UNKNOWN:'unknown'};
 const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras up',YELLOW:'Some cameras down',RED:'All cameras down',UNKNOWN:'Not verified'};
 // Where each reading comes from. Avigilon units (Snipers, CAMVs) are a reachability
 // check on the unit, so they are Up or Down as a whole, never camera by camera.
-const SOURCE_LABEL:Record<UnitSource,string>={star4live:'Star4Live',ip_check:'Avigilon',reconeyez:'Reconeyez'};
 const AVIGILON_STATE:Record<UnitCameraStatus['state'],string>={GREEN:'Up',YELLOW:'Down',RED:'Down',UNKNOWN:'Not verified'};
-const sourceOf=(unit:UnitCameraStatus):UnitSource=>unit.source||'star4live';
 const VICTRON:[string,string][]=[['solar_power','Solar'],['load_power','Load'],['battery_voltage','Battery'],['battery_soc','Charge']];
 
 /** One Helios, one Victron installation: matched only when the name is unique on both sides. */
@@ -46,7 +40,7 @@ function victronLine(power:SafeVrmPower):string{
  const newest=(metric:string)=>power.measurements.filter(item=>item.metric===metric).sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt))[0];
  return VICTRON.map(([metric,label])=>{const item=newest(metric);return item?label+' '+item.value+' '+item.unit:'';}).filter(Boolean).join(' · ');
 }
-const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP'};
+const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP',camera:'Cameras on this unit'};
 
 /** A read-only check, so a bad shape is reported rather than guessed at. */
 function checkedReport(value:unknown):Report{
@@ -55,23 +49,12 @@ function checkedReport(value:unknown):Report{
  return report;
 }
 
-export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string):UnitCameraStatus[]{
- const text=query.trim().toLowerCase();
- return units.filter(unit=>{
-  if(group==='field'&&unit.placement!=='FIELD')return false;
-  if(group==='attention'&&!(unit.placement==='FIELD'&&unit.state!=='GREEN'))return false;
-  if(group==='shop-online'&&!unit.onlineInShop)return false;
-  if(group==='shop'&&unit.placement!=='SHOP')return false;
-  if(!text)return true;
-  return [unit.unit,unit.site||'',unit.address||'',unit.publicIp||'',SOURCE_LABEL[sourceOf(unit)]].some(field=>field.toLowerCase().includes(text));
- });
-}
 
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
- const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState('');
+ const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
  const [vrm,setVrm]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
@@ -90,32 +73,37 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
  },[]);
  useEffect(()=>{const signal={cancelled:false};read(signal);return ()=>{signal.cancelled=true;};},[read]);
 
- const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string)=>{
+ const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string,clearValue?:string)=>{
   setSaving(true);setSaveError('');
   try{
    const body:Record<string,unknown>={unitKey:unit.unit,field,requestId:crypto.randomUUID()};
-   if(value===null)body.action='clear';else body.value=value;
+   if(value===null){body.action='clear';if(clearValue)body.value=clearValue;}else body.value=value;
    if(reason.trim())body.reason=reason.trim();
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
-   setSaved(next.recorded?(value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
+   setSaved(next.recorded?(field==='camera'?(value===null?(clearValue?clearValue+' is back on '+unit.unit:'Every camera is back on '+unit.unit):value+' is no longer on '+unit.unit)
+    :value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
   }catch(failure:any){
    setSaveError(failure?.response?.data?.error||failure?.message||'The edit could not be saved. Nothing was changed.');
   }finally{setSaving(false);}
  },[]);
 
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true;
+ const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
+ const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
- const shown=useMemo(()=>report?groupedUnits(report.units,group,query):[],[report,group,query]);
- const tiles:[string,number|'—',string][]=counts?[
-  ['FIELD UNITS',counts.field.units,'field'],
-  ['UP',counts.field.green,'online'],
-  ['SOME CAMERAS DOWN',counts.field.yellow,'offline'],
-  ['DOWN',counts.field.red,'offline'],
-  ['NOT VERIFIED',counts.field.unknown,'unknown'],
-  ['ONLINE IN THE SHOP',counts.shop.onlineInShop,'shop'],
+ const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter):[],[report,group,query,stateFilter]);
+ // Every tile is a filter: clicking one shows exactly the units it counts.
+ const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=counts?[
+  {label:'FIELD UNITS',count:counts.field.units,kind:'field',group:'field',state:'all'},
+  {label:'UP',count:counts.field.green,kind:'online',group:'field',state:'GREEN'},
+  {label:'SOME CAMERAS DOWN',count:counts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
+  {label:'DOWN',count:counts.field.red,kind:'offline',group:'field',state:'RED'},
+  {label:'NOT VERIFIED',count:counts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
+  {label:'ONLINE IN THE SHOP',count:counts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
  ]:[];
+ const pick=(nextGroup:Group,nextState:StateFilter)=>{setGroup(nextGroup);setStateFilter(nextState);setQuery('');};
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header>
    <div>
@@ -139,16 +127,19 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
   </p>}
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
-  {counts&&<div className='cos-camera-status-tiles'>{tiles.map(([label,count,kind])=><div key={label} className={'cos-camera-status-tile cos-camera-tile-'+kind}>
-   {['online','offline','unknown'].includes(kind)&&<i className={'cos-board-status-dot cos-board-dot-'+kind} aria-hidden='true'/>}
-   <span>{label}</span><strong>{count}</strong>
-  </div>)}</div>}
-  <nav className='cos-camera-status-groups' aria-label='Camera status groups'>{GROUPS.map(item=><button key={item.id} type='button' aria-current={group===item.id?'page':undefined} onClick={()=>setGroup(item.id)}>
+  {counts&&<div className='cos-camera-status-tiles'>{tiles.map(tile=><button key={tile.label} type='button'
+   className={'cos-camera-status-tile cos-camera-tile-'+tile.kind} aria-pressed={group===tile.group&&stateFilter===tile.state}
+   onClick={()=>pick(tile.group,tile.state)}>
+   {['online','offline','unknown'].includes(tile.kind)&&<i className={'cos-board-status-dot cos-board-dot-'+tile.kind} aria-hidden='true'/>}
+   <span>{tile.label}</span><strong>{tile.count}</strong>
+  </button>)}</div>}
+  <nav className='cos-camera-status-groups' aria-label='Camera status groups'>{GROUPS.map(item=><button key={item.id} type='button' aria-current={group===item.id?'page':undefined} onClick={()=>pick(item.id,'all')}>
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
-  <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}</p>
-  {report&&(group==='field'||group==='attention')&&<UnitStatusMap units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
-   onSelect={unit=>{setQuery(unit);}}/>}
+  <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}
+   {stateFilter!=='all'&&<> Showing only {STATE_LABEL[stateFilter].toLowerCase()}. <button type='button' className='cos-camera-status-clear-filter' onClick={()=>setStateFilter('all')}>Show all</button></>}</p>
+  {report&&(group==='field'||group==='attention')&&<UnitStatusMap savedAddresses={savedAddresses} units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
+   onSelect={unit=>{setStateFilter('all');setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>
    <label className='sr-only' htmlFor='cos-camera-status-search'>Find a unit, site or IP</label>
    <input id='cos-camera-status-search' type='search' placeholder='Find a unit, site or IP…' value={query} onChange={event=>setQuery(event.target.value)}/>
@@ -160,7 +151,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unit.unit}</strong>
       <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP'+(sourceOf(unit)==='star4live'?' · root':''):'SHOP'+(sourceOf(unit)==='star4live'?' · root':'')}</small>
-      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':'No address on the map yet'}</small>}
+      {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
        {edit.providerAgrees?' · '+SOURCE_LABEL[sourceOf(unit)]+' now agrees':edit.providerValue?' · '+SOURCE_LABEL[sourceOf(unit)]+' still says “'+edit.providerValue+'”':' · '+SOURCE_LABEL[sourceOf(unit)]+' has no value'}
@@ -173,13 +164,30 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
        :unit.down.length>0&&<small>Down: {unit.down.map(camera=>camera.name+(camera.status==='unknown'?' (not verified)':'')).join(', ')}</small>}
       {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
-      {canEdit&&<button type='button' className='cos-camera-status-edit-open' onClick={()=>{setSaveError('');setSaved('');setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
-       {draft?.unit===unit.unit?'Close':'Edit by hand'}
-      </button>}
+      <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
+       onClick={()=>{setSaveError('');setSaved('');setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
+       {draft?.unit===unit.unit?'Close':canEdit?'Open \u2192':'Details \u2192'}
+      </button>
      </div>
     </div>
-    {canEdit&&draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Hand edit for '+unit.unit}>
-     <p>Where a unit is, its site and its address are yours to set. Up or down always stays whatever {SOURCE_LABEL[sourceOf(unit)]} reports.</p>
+    {draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Unit panel for '+unit.unit}>
+     <h3 className='cos-camera-status-panel-heading'>{unit.unit}</h3>
+     <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
+      {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
+       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
+       <span>{camera.name}</span>
+       <small>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
+        :camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
+        {!camera.removed&&!camera.atSite&&unit.placement==='FIELD'?' \u00b7 in the shop, not at this site':''}</small>
+       {canEdit&&(camera.removed
+        ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>
+        :<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',camera.name,draft.reason)}>Swapped out</button>)}
+      </li>)}
+      {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{SOURCE_LABEL[sourceOf(unit)]} reports no camera list for this unit.</small></li>}
+     </ul>
+     {!canEdit&&<p>Only you and IT can change a unit.</p>}
+     {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {SOURCE_LABEL[sourceOf(unit)]} reports.</p>}
+     {canEdit&&<>
      <div className='cos-camera-status-edit-row'>
       <span id={'placement-'+unit.unit}>Field or shop</span>
       <div role='group' aria-labelledby={'placement-'+unit.unit} className='cos-camera-status-toggle'>
@@ -218,6 +226,7 @@ export default function FleetCameraStatus({now=Date.now()}:{now?:number}){
      </div>
      {saveError&&<p className='cos-camera-status-error' role='alert'>{saveError}</p>}
      <small>Every edit is kept with your name and the time. No provider is ever written to; a tech still changes VCC.</small>
+     </>}
     </form>}
    </li>)}
    {!shown.length&&<li className='cos-camera-status-empty'>{loading?'Reading Star4Live…':error?'No readings to show.':query?'No unit matches that search.':'No units in this group.'}</li>}

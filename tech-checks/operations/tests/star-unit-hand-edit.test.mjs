@@ -4,8 +4,12 @@ import {checkedHandEditRequest, publicIpv4, HandEditError} from '../shared/starU
 
 const REQUEST = '0d3a6038-1f3e-4a2e-9d7a-2b9c6f5a1e44';
 const units = [
-  {unit: 'SOLARSPOTTER 029', placement: 'SHOP', site: null, publicIp: '38.246.193.162'},
-  {unit: 'SPOTTER 306', placement: 'FIELD', site: 'Evergen Equity - Chair King', publicIp: '38.246.194.14'},
+  {unit: 'SOLARSPOTTER 029', placement: 'SHOP', site: null, publicIp: '38.246.193.162',
+   cameraList: [{name: 'SS029_1', status: 'offline', atSite: false}]},
+  {unit: 'SPOTTER 306', placement: 'FIELD', site: 'Evergen Equity - Chair King', publicIp: '38.246.194.14',
+   cameraList: [{name: 'Helios 001 / Cam 001', status: 'online', atSite: true},
+     {name: 'Helios 001 / Cam 002', status: 'online', atSite: true},
+     {name: 'Helios 001 / Cam 003 & 004', status: 'offline', atSite: false}]},
 ];
 const newId = () => REQUEST;
 const check = (body) => checkedHandEditRequest(body, units, newId);
@@ -39,7 +43,7 @@ test('only a unit Star4Live reports can be edited', () => {
 
 test('a hand edit cannot touch camera status or anything else', () => {
   for (const field of ['vigilant_status', 'state', 'online', 'unit_key', 'organization', '']) {
-    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, its address, or its public IP only/);
+    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, its address, its public IP, or which cameras are on it only/);
   }
 });
 
@@ -107,4 +111,29 @@ test('an address is stored text for a field unit; the geocoder judges it, and St
 
 test('a unit in the shop gets no address', () => {
   refuses({unitKey: 'SOLARSPOTTER 029', field: 'address', value: '1 Main St, Houston, TX 77002'}, /Put the unit in the Field first/);
+});
+
+test('a camera a person swapped out is named exactly, and only a camera the provider reports', () => {
+  const edit = check({unitKey: 'SPOTTER 306', field: 'camera', value: '  helios 001 / cam 003 & 004  '});
+  assert.deepEqual([edit.field, edit.action, edit.value, edit.providerValue], ['camera', 'set', 'Helios 001 / Cam 003 & 004', null]);
+  refuses({unitKey: 'SPOTTER 306', field: 'camera', value: 'Some other camera'}, /not reporting a camera named/);
+  refuses({unitKey: 'SPOTTER 306', field: 'camera'}, /A value is required/);
+});
+
+test('putting a camera back names it; naming none puts them all back', () => {
+  const one = check({unitKey: 'SPOTTER 306', field: 'camera', action: 'clear', value: 'Helios 001 / Cam 002'});
+  assert.deepEqual([one.action, one.value], ['clear', 'Helios 001 / Cam 002']);
+  const all = check({unitKey: 'SPOTTER 306', field: 'camera', action: 'clear'});
+  assert.deepEqual([all.action, all.value], ['clear', null]);
+  refuses({unitKey: 'SPOTTER 306', field: 'camera', action: 'clear', value: 'Not a camera'}, /not reporting a camera named/);
+});
+
+test('the other fields still refuse a value when cleared', () => {
+  for (const field of ['placement', 'site', 'address', 'public_ip']) {
+    refuses({unitKey: 'SPOTTER 306', field, action: 'clear', value: 'anything'}, /does not take a value/);
+  }
+});
+
+test('the last camera on a unit cannot be taken off; use the Shop setting instead', () => {
+  refuses({unitKey: 'SOLARSPOTTER 029', field: 'camera', value: 'SS029_1'}, /only camera left/);
 });

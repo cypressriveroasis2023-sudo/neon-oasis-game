@@ -85,3 +85,85 @@ test('a hand edit moves an Avigilon unit to the shop without touching its readin
     [{unit_key: 'sniper 004', field: 'placement', action: 'set', value: 'SHOP', actor_name: 'James', actor_role: 'owner'}]);
   assert.deepEqual([edited.units[0].placement, edited.units[0].state, edited.units[0].onlineInShop, edited.units[0].source], ['SHOP', 'GREEN', true, 'ip_check']);
 });
+
+// Camera status and the Fleet map draw the same places: a unit with no typed
+// address falls back to the address already on the unit list, marked as unconfirmed.
+import {unitPins, savedAddressByUnit} from '../src/unitStatusPins.ts';
+
+const fieldUnit = (unit, over = {}) => ({unit, placement: 'FIELD', site: 'A site', siteNamePending: false, state: 'GREEN',
+  cameras: 1, online: 1, offline: 0, unknown: 0, down: [], onlineInShop: false, publicIp: null, observedAt: null, ...over});
+const savedPin = (unitNumber, point = [29.76, -95.37], address = '1 Main St, Houston, TX 77002') => ({unitNumber, address, point});
+
+test('a typed address wins over the address already on the unit list', () => {
+  const units = [fieldUnit('SPOTTER 306', {address: '9500 Katy Fwy', location: {latitude: 29.78, longitude: -95.53, matchedAddress: null, source: 'hand'}})];
+  const {pins, handPins, savedPins} = unitPins(units, [savedPin('Spotter 306')]);
+  assert.deepEqual([pins.length, pins[0].source, pins[0].latitude, handPins, savedPins], [1, 'hand', 29.78, 1, 0]);
+});
+
+test('a unit with no typed address takes the saved one, matched on the unit name', () => {
+  const {pins, handPins, savedPins, withoutPin} = unitPins([fieldUnit('SPOTTER 306'), fieldUnit('SPOTTER 999')], [savedPin('Spotter 306')]);
+  assert.deepEqual(pins.map(p => [p.unit, p.source, p.address]), [['SPOTTER 306', 'saved', '1 Main St, Houston, TX 77002']]);
+  assert.deepEqual([handPins, savedPins, withoutPin], [0, 1, 1]);
+});
+
+test('a shop unit never takes a saved field address', () => {
+  const {pins} = unitPins([fieldUnit('SPOTTER 306', {placement: 'SHOP', site: null})], [savedPin('Spotter 306')]);
+  assert.deepEqual(pins, []);
+});
+
+test('two saved addresses under one unit name place nothing, and a bad point is refused', () => {
+  assert.equal(savedAddressByUnit([savedPin('Spotter 306'), savedPin('SPOTTER 306', [30, -95])]).size, 0);
+  for (const point of [[0, 0], [91, -95], [29.7, 181], ['29.7', '-95.4'], [NaN, -95], null])
+    assert.equal(savedAddressByUnit([{unitNumber: 'Spotter 306', address: 'x', point}]).size, 0, JSON.stringify(point));
+});
+
+test('an Avigilon or Recon unit uses a saved address the same way a Star4Live unit does', () => {
+  const units = [fieldUnit('SNIPER 004', {source: 'ip_check'}), fieldUnit('RII010 - Arcosa', {source: 'reconeyez'})];
+  const {pins} = unitPins(units, [savedPin('Sniper 004')]);
+  assert.deepEqual(pins.map(p => p.unit + ':' + p.source), ['SNIPER 004:saved']);
+});
+
+test('the map legend tells apart placed, saved-but-not-placed, and no address at all', () => {
+  const units = [
+    fieldUnit('SPOTTER 1', {address: '1 Main St', location: {latitude: 29.7, longitude: -95.4, matchedAddress: null, source: 'hand'}}),
+    fieldUnit('SPOTTER 2', {address: '2 Lee Rd'}),            // saved, the service could not place it
+    fieldUnit('SPOTTER 3', {address: '   '}),                  // nothing usable typed
+    fieldUnit('SPOTTER 4'),                                    // nothing entered
+    fieldUnit('SPOTTER 5', {placement: 'SHOP', site: null}),   // shop units are not on this map
+  ];
+  const {pins, fieldUnits, withoutPin, addressNoPin, noAddress} = unitPins(units, []);
+  assert.deepEqual([pins.length, fieldUnits, withoutPin, addressNoPin, noAddress], [1, 4, 3, 1, 2]);
+});
+
+test('a unit placed from the saved address is not counted as missing an address', () => {
+  const {withoutPin, addressNoPin, noAddress, savedPins} = unitPins([fieldUnit('SPOTTER 306')], [savedPin('Spotter 306')]);
+  assert.deepEqual([withoutPin, addressNoPin, noAddress, savedPins], [0, 0, 0, 1]);
+});
+
+// Clicking a count tile must show exactly the units that tile counts.
+import {groupedUnits} from '../src/cameraStatusFilters.ts';
+
+test('each count tile filters the list to exactly the units it counts', () => {
+  const units = [
+    fieldUnit('A'), fieldUnit('B', {state: 'YELLOW', online: 1, offline: 1, cameras: 2}),
+    fieldUnit('C', {state: 'RED', online: 0, offline: 1}), fieldUnit('D', {state: 'UNKNOWN', online: 0, unknown: 1}),
+    fieldUnit('E', {placement: 'SHOP', site: null, onlineInShop: true}),
+    fieldUnit('F', {placement: 'SHOP', site: null, state: 'RED', online: 0, offline: 1}),
+  ];
+  const counts = countUnits(units);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'GREEN').map(u => u.unit), ['A']);
+  assert.equal(groupedUnits(units, 'field', '', 'GREEN').length, counts.field.green);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'YELLOW').map(u => u.unit), ['B']);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'RED').map(u => u.unit), ['C']);
+  assert.deepEqual(groupedUnits(units, 'field', '', 'UNKNOWN').map(u => u.unit), ['D']);
+  assert.deepEqual(groupedUnits(units, 'field', '').map(u => u.unit), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(groupedUnits(units, 'shop-online', '').map(u => u.unit), ['E']);
+  assert.equal(groupedUnits(units, 'shop-online', '').length, counts.shop.onlineInShop);
+});
+
+test('a state filter never reaches past its group, and still searches', () => {
+  const units = [fieldUnit('SPOTTER 1', {site: 'Acme yard'}), fieldUnit('SPOTTER 2', {placement: 'SHOP', site: null})];
+  assert.deepEqual(groupedUnits(units, 'shop', '', 'GREEN').map(u => u.unit), ['SPOTTER 2']);
+  assert.deepEqual(groupedUnits(units, 'field', 'acme', 'GREEN').map(u => u.unit), ['SPOTTER 1']);
+  assert.deepEqual(groupedUnits(units, 'field', 'nothing', 'GREEN'), []);
+});

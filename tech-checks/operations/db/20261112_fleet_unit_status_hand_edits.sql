@@ -24,7 +24,7 @@ create table if not exists cos_fleet_hand_edit_private.unit_status_edit_log(
  seq bigint generated always as identity unique,
  organization_id uuid not null,
  unit_key text not null check(btrim(unit_key)<>'' and length(unit_key)<=120),
- field text not null check(field in('placement','site','address','public_ip')),
+ field text not null check(field in('placement','site','address','public_ip','camera')),
  action text not null check(action in('set','clear')),
  value text check(value is null or length(value)<=200),
  provider_value text check(provider_value is null or length(provider_value)<=200),
@@ -36,7 +36,9 @@ create table if not exists cos_fleet_hand_edit_private.unit_status_edit_log(
  longitude double precision check(longitude is null or longitude between -180 and 180),
  matched_address text check(matched_address is null or (btrim(matched_address)<>'' and length(matched_address)<=200)),
  recorded_at timestamptz not null default clock_timestamp(),
- check((action='set')=(value is not null)),
+ -- Every edit but one names a value only when setting it. Putting one camera
+ -- back on a unit has to name that camera, so a camera clear may carry a value.
+ check((action='set')=(value is not null) or (field='camera' and action='clear')),
  -- Only a set address may carry a map point, and a point is always both numbers.
  -- An address the service could not locate is still saved, without a point.
  constraint unit_status_edit_log_point_rule check((latitude is null)=(longitude is null) and (latitude is null or (field='address' and action='set'))),
@@ -62,10 +64,13 @@ create trigger unit_status_edit_log_no_change
 create or replace function cos_fleet_hand_edit_private.unit_status_edit_current(p_organization_id uuid)
 returns setof cos_fleet_hand_edit_private.unit_status_edit_log
 language sql stable as $$
- select distinct on (upper(btrim(unit_key)),field) *
+ -- One current row per unit and field, except cameras: a unit has one row per
+ -- camera, because taking one camera off says nothing about the others. The
+ -- row that puts every camera back keys on the empty name and is read in turn.
+ select distinct on (upper(btrim(unit_key)),field,case when field='camera' then upper(btrim(coalesce(value,''))) else '' end) *
  from cos_fleet_hand_edit_private.unit_status_edit_log
  where organization_id=p_organization_id
- order by upper(btrim(unit_key)),field,seq desc;
+ order by upper(btrim(unit_key)),field,case when field='camera' then upper(btrim(coalesce(value,''))) else '' end,seq desc;
 $$;
 
 create or replace function public.cos_camera_unit_hand_edit_state_v1(p_actor_user_id uuid,p_organization_id uuid)
@@ -78,7 +83,7 @@ begin
    'unit_key',upper(btrim(e.unit_key)),'field',e.field,'action',e.action,'value',e.value,
    'provider_value',e.provider_value,'actor_name',e.actor_name,'actor_role',e.actor_role,
    'reason',e.reason,'created_at',e.recorded_at,
-   'latitude',e.latitude,'longitude',e.longitude,'matched_address',e.matched_address) order by upper(btrim(e.unit_key)),e.field),'[]'::jsonb)
+   'latitude',e.latitude,'longitude',e.longitude,'matched_address',e.matched_address) order by e.seq),'[]'::jsonb)
  into rows from cos_fleet_hand_edit_private.unit_status_edit_current(p_organization_id) e;
  return jsonb_build_object('contract','COS_UNIT_STATUS_HAND_EDITS_V1','edits',rows);
 end;$$;
@@ -105,12 +110,12 @@ begin
  elsif p_payload ? 'latitude' or p_payload ? 'longitude' then
   raise exception 'A map point is two numbers' using errcode='PT409';
  end if;
- if unit='' or length(unit)>120 or f not in('placement','site','address','public_ip') or act not in('set','clear')
+ if unit='' or length(unit)>120 or f not in('placement','site','address','public_ip','camera') or act not in('set','clear')
   or who='' or length(who)>120 or role_name not in('owner','it')
   or (why is not null and length(why)>400) or (val is not null and length(val)>200) then
   raise exception 'Hand edit is incomplete' using errcode='PT409'; end if;
  if act='set' and val is null then raise exception 'A value is required' using errcode='PT409'; end if;
- if act='clear' and val is not null then raise exception 'Clearing a hand edit does not take a value' using errcode='PT409'; end if;
+ if act='clear' and val is not null and f<>'camera' then raise exception 'Clearing a hand edit does not take a value' using errcode='PT409'; end if;
  if act='set' and f='placement' then
   val:=upper(val);
   if val not in('FIELD','SHOP') then raise exception 'A unit is either in the FIELD or in the SHOP' using errcode='PT409'; end if;

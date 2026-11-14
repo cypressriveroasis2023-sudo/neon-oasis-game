@@ -70,3 +70,19 @@
 .cos-camera-source-ip_check{border-color:#5a4a8a;color:#d8ccff}
 .cos-camera-source-reconeyez{border-color:#3f6f5a;color:#c4ecd9}
 .cos-camera-status-victron a{color:inherit;text-decoration:underline}
+.cos-camera-status-map-key .cos-camera-status-key-saved{background:transparent;border:2.5px dashed #8a8f98}
+.cos-camera-status-map{position:relative}
+.cos-camera-status-map-group:not(:empty){margin-top:10px}
+.cos-camera-status-away{opacity:.85;font-style:italic}
+.cos-camera-status-tiles button.cos-camera-status-tile{cursor:pointer;text-align:left;font:inherit;color:inherit}
+.cos-camera-status-tiles button.cos-camera-status-tile:hover{filter:brightness(1.18)}
+.cos-camera-status-tiles button.cos-camera-status-tile[aria-pressed=true]{outline:2px solid #d33351;outline-offset:1px}
+.cos-camera-status-clear-filter{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.cos-camera-status-panel-heading{margin:0 0 10px;font-size:16px}
+.cos-camera-status-cameras{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}
+.cos-camera-status-camera{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #28344a;border-radius:8px;background:#121a26}
+.cos-camera-status-camera>span{font-weight:600}
+.cos-camera-status-camera>small{opacity:.85}
+.cos-camera-status-camera>button{margin-left:auto;min-height:36px}
+.cos-camera-status-camera-off{opacity:.65}
+.cos-camera-status-camera-off>span{text-decoration:line-through}
