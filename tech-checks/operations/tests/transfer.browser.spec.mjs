@@ -12,16 +12,18 @@ test('desktop IT opens Fleet Map plus Camera Health; unrelated workspaces stay d
  const frame=page.frameLocator('#cosITDailyFrame');
  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  const nav=frame.locator('nav[aria-label="COS Operations"]');
- await expect(nav.getByRole('button')).toHaveCount(2);
+ await expect(nav.getByRole('button')).toHaveCount(6);
  await expect(nav.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();
  await expect(page.locator('#legacy')).toBeHidden();
  await expect(frame.getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('IT-desktop-fleet-map.png'),fullPage:true});
- for(const route of ['#unit-tracker','#daily-board','#victron-vrm']){
+ // The tracker and Victron are equipment and a tech opens them now, so only
+ // the owner's board is still turned away here.
+ for(const route of ['#daily-board']){
   await page.locator('#cosITDailyFrame').evaluate((el,hash)=>el.contentWindow.location.hash=hash,route);
   await expect.poll(()=>page.locator('#cosITDailyFrame').evaluate(el=>el.contentWindow.location.hash)).toBe('#fleet-dashboard');
-  await expect(nav.getByRole('button')).toHaveCount(2);
+  await expect(nav.getByRole('button')).toHaveCount(6);
  }
  expect(f.errors).toEqual([]);expect(f.calls.some(c=>c.path==='/api/unit-tracker')).toBe(false);
 });
