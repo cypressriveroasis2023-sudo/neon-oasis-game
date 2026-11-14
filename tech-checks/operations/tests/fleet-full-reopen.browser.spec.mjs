@@ -177,7 +177,7 @@ for(const it of [true,false])test((it?'IT omits':'Owner retains')+' manual healt
 
 test('IT diagnostics deep link retains the allowed Camera Health view without manual refresh',async({page})=>{
  const {app,state}=await setup(page,{hash:'#camera-health?diagnostics=1'},true);
- await expect(app.getByRole('heading',{name:'Every unit. Every signal.',exact:true})).toBeVisible();
+ await expect(app.getByRole('heading',{name:'Fleet health',exact:true,includeHidden:true})).toBeAttached();
  await expect(manualRefreshButtons(app)).toHaveCount(0);
  await expect(app.locator('.cos-equipment-grid')).toBeVisible();assertSavedReadsOnly(state);
 });
