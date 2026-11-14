@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
 import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
@@ -65,32 +65,38 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   try{
    const result=await api.get<Report>('/api/unit-camera-status');
    if(signal?.cancelled)return;
-   setReport(checkedReport(result.data));setError('');
+   setReport(checkedReport(result.data));setError('');return true;
   }catch(failure:any){
    if(signal?.cancelled)return;
    // The previous reading stays on screen under its own time; it is never relabelled as current.
-   setError(failure?.response?.data?.error||failure?.message||'The Star4Live unit status is unavailable.');
+   setError(failure?.response?.data?.error||failure?.message||'The Star4Live unit status is unavailable.');return false;
   }finally{if(!signal?.cancelled)setLoading(false);}
  },[]);
  useEffect(()=>{const signal={cancelled:false};read(signal);return ()=>{signal.cancelled=true;};},[read]);
 
- const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string,clearValue?:string)=>{
+ const writePending=useRef(false);
+ const [uncertain,setUncertain]=useState(false);
+ const submit=useCallback(async(unit:UnitCameraStatus,field:HandEditField,value:string|null,reason:string,clearValue?:string,pinOnly=false)=>{
+  if(writePending.current)return;
+  writePending.current=true;
   setSaving(true);setSaveError('');
   try{
    const body:Record<string,unknown>={unitKey:unit.unit,field,requestId:crypto.randomUUID()};
-   if(value===null){body.action='clear';if(clearValue)body.value=clearValue;}else body.value=value;
+   if(field==='address')body.expectedAddressRevision=unit.addressRevision??null;
+   if(value===null){body.action=pinOnly?'clear_pin':'clear';if(clearValue)body.value=clearValue;}else body.value=value;
    if(reason.trim())body.reason=reason.trim();
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
    setSaved(next.recorded?(field==='camera'?(value===null?(clearValue?clearValue+' is back on '+unit.unit:'Every camera is back on '+unit.unit):value+' is no longer on '+unit.unit)
-    :value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
+    :pinOnly?'Removed the pin on '+unit.unit+'; saved address kept':value===null?'Cleared the '+FIELD_LABEL[field].toLowerCase()+' edit on '+unit.unit:unit.unit+' '+FIELD_LABEL[field].toLowerCase()+' set to '+value+(next.recorded.pinned===false?' · saved without a pin: '+(next.recorded.pinNote||'no location found'):next.recorded.pinned?' · pin dropped':'')):'Saved.');
   }catch(failure:any){
-   setSaveError(failure?.response?.data?.error||failure?.message||'The edit could not be saved. Nothing was changed.');
-  }finally{setSaving(false);}
+   setUncertain(true);
+   setSaveError(failure?.response?.data?.error||failure?.message||'The edit could not be confirmed. Refresh before trying again.');
+  }finally{writePending.current=false;setSaving(false);}
  },[]);
 
- const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true;
+ const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
@@ -112,7 +118,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
     <p>Every unit, one line each: Avigilon (Snipers and CAM Vs), Recon II and Alibi. Only you and IT can change where a unit is; nothing moves on its own.</p>
    </div>
    <div className='cos-camera-status-read'>
-    <button type='button' disabled={loading||saving} onClick={()=>read()}>{loading?'↻ Reading…':'↻ Refresh'}</button>
+    <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>
     <small>{feed?.syncedAt?'Star4Live reading '+cameraTime(feed.syncedAt,now):loading?'Reading Star4Live…':'No Star4Live reading'}</small>
    </div>
   </header>
@@ -127,6 +133,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    <strong>Avigilon and Reconeyez readings could not be read.</strong> Only Star4Live units are listed until they can be.
   </p>}
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
+  {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
   {counts&&<div className='cos-camera-status-tiles'>{tiles.map(tile=><button key={tile.label} type='button'
    className={'cos-camera-status-tile cos-camera-tile-'+tile.kind} aria-pressed={group===tile.group&&stateFilter===tile.state}
@@ -220,7 +227,9 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       <input id={'address-'+unit.unit} type='text' maxLength={200} value={draft.address} disabled={saving||unit.placement!=='FIELD'} autoComplete='street-address'
        placeholder='123 Main St, Houston, TX 77002' onChange={event=>setDraft({...draft,address:event.target.value})}/>
       <button type='button' disabled={saving||unit.placement!=='FIELD'||!draft.address.trim()||draft.address.trim()===(unit.address||'')} onClick={()=>submit(unit,'address',draft.address.trim(),draft.reason)}>Save</button>
-      {unit.handEdits?.address&&<button type='button' disabled={saving} onClick={()=>submit(unit,'address',null,draft.reason)}>Remove pin</button>}
+      {unit.location&&<button type='button' disabled={saving} onClick={()=>submit(unit,'address',null,draft.reason,undefined,true)}>Remove pin only</button>}
+      {unit.address&&!unit.location&&<button type='button' disabled={saving||unit.placement!=='FIELD'||draft.address!==unit.address} onClick={()=>submit(unit,'address',unit.address!,draft.reason)}>Retry pin lookup</button>}
+      {unit.handEdits?.address&&<button type='button' disabled={saving} onClick={()=>submit(unit,'address',null,draft.reason)}>Remove address and pin</button>}
       {unit.placement!=='FIELD'&&<small>Save “In the field” first, then add the address.</small>}
      </div>}
      {sourceOf(unit)==='star4live'&&<div className='cos-camera-status-edit-row'>

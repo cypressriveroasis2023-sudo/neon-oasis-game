@@ -99,18 +99,18 @@ test('a request that is not an object, or carries extra fields, is refused', () 
 });
 
 test('an address is stored text for a field unit; the geocoder judges it, and Star4Live has none', () => {
-  const ok = check({unitKey: 'SPOTTER 306', field: 'address', value: ' 9500 Katy Fwy, Houston, TX 77024 '});
+  const ok = check({unitKey: 'SPOTTER 306', field: 'address', expectedAddressRevision: null, value: ' 9500 Katy Fwy, Houston, TX 77024 '});
   assert.equal(ok.value, '9500 Katy Fwy, Houston, TX 77024');
   assert.equal(ok.providerValue, null);
-  refuses({unitKey: 'SPOTTER 306', field: 'address', value: 'x'.repeat(201)}, /too long/);
-  refuses({unitKey: 'SPOTTER 306', field: 'address', value: '1 Main St\nHouston'}, /cannot be stored/);
+  refuses({unitKey: 'SPOTTER 306', field: 'address', expectedAddressRevision: null, value: 'x'.repeat(201)}, /too long/);
+  refuses({unitKey: 'SPOTTER 306', field: 'address', expectedAddressRevision: null, value: '1 Main St\nHouston'}, /cannot be stored/);
   // A caller cannot hand in its own map point; only the route's geocoder supplies one.
-  refuses({unitKey: 'SPOTTER 306', field: 'address', value: '1 Main St, Houston, TX 77002', latitude: 1, longitude: 2}, /unsupported fields: latitude, longitude/);
-  assert.equal(check({unitKey: 'SPOTTER 306', field: 'address', action: 'clear'}).value, null);
+  refuses({unitKey: 'SPOTTER 306', field: 'address', expectedAddressRevision: null, value: '1 Main St, Houston, TX 77002', latitude: 1, longitude: 2}, /unsupported fields: latitude, longitude/);
+  assert.equal(check({unitKey: 'SPOTTER 306', field: 'address', expectedAddressRevision: null, action: 'clear'}).value, null);
 });
 
 test('a unit in the shop gets no address', () => {
-  refuses({unitKey: 'SOLARSPOTTER 029', field: 'address', value: '1 Main St, Houston, TX 77002'}, /Put the unit in the Field first/);
+  refuses({unitKey: 'SOLARSPOTTER 029', field: 'address', expectedAddressRevision: null, value: '1 Main St, Houston, TX 77002'}, /Put the unit in the Field first/);
 });
 
 test('a camera a person swapped out is named exactly, and only a camera the provider reports', () => {
@@ -130,7 +130,7 @@ test('putting a camera back names it; naming none puts them all back', () => {
 
 test('the other fields still refuse a value when cleared', () => {
   for (const field of ['placement', 'site', 'address', 'public_ip']) {
-    refuses({unitKey: 'SPOTTER 306', field, action: 'clear', value: 'anything'}, /does not take a value/);
+    refuses({unitKey: 'SPOTTER 306', ...(field==='address'?{expectedAddressRevision:null}:{}), field, action: 'clear', value: 'anything'}, /does not take a value/);
   }
 });
 
