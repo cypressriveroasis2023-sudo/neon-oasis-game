@@ -30,9 +30,10 @@ test('Camera status lists Avigilon, Reconeyez and Star4Live units with their sou
  await expect(row(app,'SNIPER 004').locator('.cos-camera-status-detail')).toContainText('AvigilonDown');
  await expect(row(app,'SNIPER 004')).toContainText('The unit did not answer.');
  await expect(row(app,'SNIPER 007').locator('.cos-camera-status-detail')).toContainText('AvigilonNot verified');
+ await expect(row(app,'CAMV 002').locator('.cos-camera-status-detail')).toContainText('AvigilonUp');
  await expect(row(app,'CAMV 002')).toContainText('The unit answers. Each camera is not checked.');
- await expect(row(app,'RII010 - Arcosa').locator('.cos-camera-status-detail')).toContainText('ReconeyezSome cameras down · 2 of 3 up');
- await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-detail')).toContainText('Star4LiveAll cameras up · 2 of 2 up');
+ await expect(row(app,'RII010 - Arcosa').locator('.cos-camera-status-detail')).toContainText('Recon IISome cameras down · 2 of 3 up');
+ await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-detail')).toContainText('AlibiAll cameras up · 2 of 2 up');
  await expect(row(app,'HELIOS 001').locator('.cos-camera-status-victron')).toContainText('Victron · Charge 80 %');
  // The Fleet map's saved addresses place the same units here, marked unconfirmed.
  await expect(app.locator('.cos-camera-status-map-key small')).toContainText('field units on the map');

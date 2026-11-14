@@ -11,7 +11,7 @@ import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-import {type Group,type StateFilter,GROUPS,SOURCE_LABEL,sourceOf,groupedUnits} from './cameraStatusFilters';
+import {type Group,type StateFilter,GROUPS,FAMILY_LABEL,familyOf,sourceOf,groupedUnits} from './cameraStatusFilters';
 export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;reason:string};
 
@@ -108,7 +108,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   <header>
    <div>
     <h2>Camera status</h2>
-    <p>Every unit, one line each: Star4Live, Avigilon (Snipers and CAMVs) and Reconeyez (Recon II). Only you and IT can change where a unit is; nothing moves on its own.</p>
+    <p>Every unit, one line each: Avigilon (Snipers and CAM Vs), Recon II and Alibi. Only you and IT can change where a unit is; nothing moves on its own.</p>
    </div>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={()=>read()}>{loading?'↻ Reading…':'↻ Refresh'}</button>
@@ -154,12 +154,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
-       {edit.providerAgrees?' · '+SOURCE_LABEL[sourceOf(unit)]+' now agrees':edit.providerValue?' · '+SOURCE_LABEL[sourceOf(unit)]+' still says “'+edit.providerValue+'”':' · '+SOURCE_LABEL[sourceOf(unit)]+' has no value'}
+       {edit.providerAgrees?' · '+FAMILY_LABEL[familyOf(unit)]+' now agrees':edit.providerValue?' · '+FAMILY_LABEL[familyOf(unit)]+' still says “'+edit.providerValue+'”':' · '+FAMILY_LABEL[familyOf(unit)]+' has no value'}
        {edit.reason?' · '+edit.reason:''}
       </small>)}
      </div>
      <div className='cos-camera-status-detail'>
-      <span><b className={'cos-camera-status-source cos-camera-source-'+sourceOf(unit)}>{SOURCE_LABEL[sourceOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
+      <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
       {sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
        :unit.down.length>0&&<small>Down: {unit.down.map(camera=>camera.name+(camera.status==='unknown'?' (not verified)':'')).join(', ')}</small>}
       {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
@@ -183,10 +183,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
         ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>
         :<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',camera.name,draft.reason)}>Swapped out</button>)}
       </li>)}
-      {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{SOURCE_LABEL[sourceOf(unit)]} reports no camera list for this unit.</small></li>}
+      {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{FAMILY_LABEL[familyOf(unit)]} reports no camera list for this unit.</small></li>}
      </ul>
      {!canEdit&&<p>Only you and IT can change a unit.</p>}
-     {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {SOURCE_LABEL[sourceOf(unit)]} reports.</p>}
+     {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {FAMILY_LABEL[familyOf(unit)]} reports.</p>}
      {canEdit&&<>
      <div className='cos-camera-status-edit-row'>
       <span id={'placement-'+unit.unit}>Field or shop</span>
@@ -195,7 +195,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
         onClick={()=>setDraft({...draft,placement:value})}>{value==='FIELD'?'In the field':'In the shop'}</button>)}
       </div>
       <button type='button' disabled={saving||draft.placement===unit.placement} onClick={()=>submit(unit,'placement',draft.placement,draft.reason)}>Save</button>
-      {unit.handEdits?.placement&&<button type='button' disabled={saving} onClick={()=>submit(unit,'placement',null,draft.reason)}>Use {SOURCE_LABEL[sourceOf(unit)]}</button>}
+      {unit.handEdits?.placement&&<button type='button' disabled={saving} onClick={()=>submit(unit,'placement',null,draft.reason)}>Use {FAMILY_LABEL[familyOf(unit)]}</button>}
      </div>
      {draft.placement==='FIELD'&&<div className='cos-camera-status-edit-row'>
       <label htmlFor={'site-'+unit.unit}>Customer and site</label>
