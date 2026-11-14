@@ -167,3 +167,39 @@ test('a state filter never reaches past its group, and still searches', () => {
   assert.deepEqual(groupedUnits(units, 'field', 'acme', 'GREEN').map(u => u.unit), ['SPOTTER 1']);
   assert.deepEqual(groupedUnits(units, 'field', 'nothing', 'GREEN'), []);
 });
+
+// Avigilon covers Sniper, Sniper 2, Sniper 4 and CAM V; Recon II is its own;
+// the rest of the camera units are Alibi.
+import {familyOf, FAMILY_LABEL} from '../src/cameraStatusFilters.ts';
+
+test('Sniper, Sniper 2, Sniper 4 and CAM V are all Avigilon, whichever system reported them', () => {
+  for (const name of ['SNIPER 004', 'Sniper 2-1234', 'SNIPER 2 15', 'Sniper 4 7', 'CAMV 002', 'CAM V 002', 'SNIPER 240']) {
+    for (const source of ['ip_check', 'star4live', 'reconeyez']) {
+      assert.equal(familyOf(fieldUnit(name, {source})), 'avigilon', name + ' from ' + source);
+    }
+  }
+  assert.equal(FAMILY_LABEL.avigilon, 'Avigilon');
+});
+
+test('Recon II is Recon, and the other camera units are Alibi', () => {
+  assert.equal(familyOf(fieldUnit('Recon II 12')), 'recon');
+  for (const name of ['SPOTTER 306', 'SOLARSPOTTER 029', 'HELIOS 001', 'RANGER 029.1']) {
+    assert.equal(familyOf(fieldUnit(name, {source: 'star4live'})), 'alibi', name);
+  }
+  assert.deepEqual([FAMILY_LABEL.recon, FAMILY_LABEL.alibi], ['Recon II', 'Alibi']);
+});
+
+test('a name nothing can parse falls back to the system that reported the unit', () => {
+  // "Sniper Alibi 243" is what Star4Live calls four Alibi recorders.
+  assert.equal(familyOf(fieldUnit('Sniper Alibi 243', {source: 'star4live'})), 'alibi');
+  assert.equal(familyOf(fieldUnit('RII010 - Arcosa', {source: 'reconeyez'})), 'recon');
+  assert.equal(familyOf(fieldUnit('No name anyone parses', {source: 'ip_check'})), 'avigilon');
+  assert.equal(familyOf(fieldUnit('No name anyone parses')), 'alibi');
+});
+
+test('the list can be searched by what kind of equipment a unit is', () => {
+  const units = [fieldUnit('SNIPER 004', {source: 'ip_check'}), fieldUnit('SPOTTER 306'), fieldUnit('Recon II 12', {source: 'reconeyez'})];
+  assert.deepEqual(groupedUnits(units, 'field', 'avigilon').map(u => u.unit), ['SNIPER 004']);
+  assert.deepEqual(groupedUnits(units, 'field', 'recon').map(u => u.unit), ['Recon II 12']);
+  assert.deepEqual(groupedUnits(units, 'field', 'alibi').map(u => u.unit), ['SPOTTER 306']);
+});

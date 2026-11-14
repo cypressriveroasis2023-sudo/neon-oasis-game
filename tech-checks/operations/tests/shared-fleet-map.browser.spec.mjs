@@ -26,7 +26,7 @@ for(const role of ['owner','it'])test(role+' gets an explicit operational field 
  await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('unknown');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-list')).toContainText('Sniper 003');
  await frame.locator('body').evaluate(()=>location.hash='#camera-health?diagnostics=1');
  if(role==='it'){
-  await expect(frame.getByRole('heading',{name:/Fleet health/})).toBeVisible();
+  await expect(frame.getByRole('heading',{level:2,name:/Fleet health/})).toBeVisible();
   await expect(frame.locator('.camera-overview-card')).toHaveCount(0);
   await expect(frame.getByRole('button',{name:'Advanced camera diagnostics'})).toHaveCount(0);
   await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');

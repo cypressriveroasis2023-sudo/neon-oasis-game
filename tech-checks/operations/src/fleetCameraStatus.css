@@ -67,8 +67,8 @@
 .cos-camera-status-address{opacity:.85}
 @media (max-width:640px){.cos-camera-status-map-canvas{height:260px}}
 .cos-camera-status-source{display:inline-block;margin-right:8px;padding:1px 7px;border-radius:999px;border:1px solid #3a475a;background:#1a2330;color:#c9d3e2;font-size:11px;font-weight:600;letter-spacing:.02em;vertical-align:1px}
-.cos-camera-source-ip_check{border-color:#5a4a8a;color:#d8ccff}
-.cos-camera-source-reconeyez{border-color:#3f6f5a;color:#c4ecd9}
+.cos-camera-family-avigilon{border-color:#5a4a8a;color:#d8ccff}
+.cos-camera-family-recon{border-color:#3f6f5a;color:#c4ecd9}
 .cos-camera-status-victron a{color:inherit;text-decoration:underline}
 .cos-camera-status-map-key .cos-camera-status-key-saved{background:transparent;border:2.5px dashed #8a8f98}
 .cos-camera-status-map{position:relative}
@@ -86,3 +86,6 @@
 .cos-camera-status-camera>button{margin-left:auto;min-height:36px}
 .cos-camera-status-camera-off{opacity:.65}
 .cos-camera-status-camera-off>span{text-decoration:line-through}
+/* This map keeps its own height; the Fleet map's canvas rules only size it inside that map's panel. */
+#root#root .cos-camera-status-map-canvas.cos-fleet-map-canvas{height:360px}
+@media (max-width:640px){#root#root .cos-camera-status-map-canvas.cos-fleet-map-canvas{height:300px}}

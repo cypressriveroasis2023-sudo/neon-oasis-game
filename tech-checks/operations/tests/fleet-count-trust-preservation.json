@@ -1,12 +1,12 @@
 {
  "contract": "COS_FLEET_COUNT_TRUST_PRESERVATION_V1",
  "baselineCommit": "34cd9ab5c1ec78eeaec5d24c66ab8f1f4a8616d0",
- "scope": "Exact reversal of the reviewed camera-count and compact Fleet presentation changes before unchanged historical source guards. No baseline is relaxed. The Star4Live camera status tab is declared here as five reversible blocks: its import, its title, its tab, its view (which is handed the Fleet map’s own saved field addresses so both maps show the same places) and keeping the mHelp filter panel off it.",
+ "scope": "Exact reversal of the reviewed camera-count and compact Fleet presentation changes before unchanged historical source guards. No baseline is relaxed. The Star4Live camera status tab is declared here as five reversible blocks: its import, its title, its tab, its view (which is handed the Fleet map’s own saved field addresses so both maps show the same places) and keeping the mHelp filter panel off it. The dashboard slogan and its eyebrow are removed: the page keeps one heading for screen readers and shows its section headings instead.",
  "files": [
   {
    "path": "FleetDashboard.tsx",
    "baselineBlob": "27a6ad9858a1685ff449a232c4bee7286c5c710f",
-   "candidateBlob": "39caa2e5010e8392bb613881a668f9031a920a53",
+   "candidateBlob": "b575ebcdb4d100269cc10a3879ceedb761319e5b",
    "replacements": [
     {
      "from": "\n  </div><details className='cos-fleet-advanced-filters'><summary>More filters</summary><div className='cos-fleet-filter-row'>   <label>PROVIDER<select aria-label='Fleet provider' value={filters.provider} onChange={e=>change('provider',e.target.value)}><option value='all'>All providers</option>{providers.map(p=><option key={p}>{p}</option>)}</select></label><button onClick={()=>setFilters({...initialFleetFilters})}>Reset filters</button><label className='cos-fleet-checkbox'><input type='checkbox' checked={filters.retired} onChange={e=>change('retired',e.target.checked)}/>Include inactive / retired</label><label>INSTALLATION STATUS<select aria-label='Installation status' value={filters.installationStatus||'all'} onChange={e=>change('installationStatus',e.target.value)}><option value='all'>All installation records</option><option value='field'>Field status</option><option value='installed'>Installed</option><option value='tracker'>Tracker field units</option><option value='assigned'>Assigned</option><option value='in_transit'>In transit</option><option value='returning'>Returning</option><option value='missing'>Location needs verification</option></select></label><label>NEARBY VERIFIED UNIT<select aria-label='Nearby unit center' value={filters.nearbyId||''} onChange={e=>change('nearbyId',e.target.value)}><option value=''>All field locations</option>{rows.filter(row=>row.placement==='field'&&row.locationVerified).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>RADIUS<select aria-label='Nearby radius miles' value={filters.radius||10} onChange={e=>change('radius',Number(e.target.value))}>{[5,10,25,50].map(value=><option key={value} value={value}>{value} miles</option>)}</select></label></div><small>Nearby distances use verified installation coordinates. Estimates and historical locations stay outside these distances.</small></details></div>);\n const wholeSourceHeadline=view==='map'?primaryFieldInventory:view==='sources'?Boolean(mhelpPhysical):fullInventoryHeadline;\n const healthScopeNote=wholeSourceHeadline?'Field camera units':'Field camera units · Shop / root and inactive equipment excluded from outage counts';\n const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,online:boardData?.counts.online??savedReading?.online??'—',offline:boardData?.counts.offline??savedReading?.offline??'—',unknown:boardData?.counts.unverified??savedReading?.unverified??'—'}:counts;\n const mapEquipmentList=<div className='cos-fleet-unit-list' aria-busy={editorBusy||loading}>{filtered.slice(0,limit).map(row=><button key={row.id} data-unit-id={row.id} disabled={editorBusy} className={'cos-fleet-unit-row'+(selected===row.id?' selected':'')} onClick={()=>open(row.id)}><span className='cos-fleet-unit-copy'><strong><i className={'cos-fleet-row-dot cos-signal-'+row.cameraState} aria-hidden='true'>●</i>{row.displayName||row.name}</strong><small>{row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied'}</small><small>{row.displayAddress?.label||'Installation address'}: {(row.displayAddress?.text??row.unit.address)||'Not supplied'}</small><small className='cos-fleet-card-location'>{row.placement==='shop'?(shopOnly(row)?'SHOP':'SHOP / ROOT'):row.placement.toUpperCase()} · {row.locationVerified?'Verified location':locationTag(row.unit)}</small><FleetBatterySummary row={row} now={snapshotNow} compact/>{!shopOnly(row)&&<><small className='cos-fleet-card-evidence'>{unitHealthLabel(row.camera)}</small><LastKnownCameraStatus observation={lastKnown(row)} now={snapshotNow}/></>}</span><Signals row={row}/></button>)}{filteredSource.length>0&&<section className='cos-fleet-source-group' aria-label='Unlinked equipment in view'><h3>Unlinked equipment <b>{filteredSource.length}</b></h3><p>Recorded assignments without a verified COS health link. Accepted address estimates are labeled separately from health and verified installation locations.</p>{filteredSource.slice(0,limit).map(record=><FleetSourceEquipment key={record.id} record={record} now={snapshotNow} estimate={sourcePins.get(record.id)?.estimate} onSelect={sourcePins.has(record.id)?()=>openSource(record.id):undefined}/>)}</section>}{!filtered.length&&!filteredSource.length&&<p className='field-map-empty'>{!map&&!failed?'Loading saved inventory…':'No units match. Change the filters or open the review queue.'}</p>}{Math.max(filtered.length,filteredSource.length)>limit&&<button onClick={()=>setLimit(v=>v+80)}>Show more equipment ({Math.max(0,filtered.length-limit)+Math.max(0,filteredSource.length-limit)})</button>}</div>;\n\n",
@@ -100,7 +100,7 @@
     },
     {
      "from": "const title={map:'Know what’s in the field.',fleet:'Every unit. Every signal.',cameras:'Camera units',helios:'Helios power & cameras',stands:'Stands & support equipment',verify:'Put every unit in the right place.',setup:'New units, ready for setup.',sources:'Evidence you can trace.'};\n",
-     "to": "const title={map:'Know what’s in the field.',fleet:'Every unit. Every signal.',camerastatus:'Camera status, straight from Star4Live.',cameras:'Camera units',helios:'Helios power & cameras',stands:'Stands & support equipment',verify:'Put every unit in the right place.',setup:'New units, ready for setup.',sources:'Evidence you can trace.'};\n",
+     "to": "const plainTitle={map:'Fleet Dashboard',fleet:'Fleet health',camerastatus:'Camera status',cameras:'Camera units',helios:'Helios power & cameras',stands:'Stands & support equipment',verify:'Location verification',setup:'Needs setup',sources:'Data sources'};\n",
      "count": 1
     },
     {
@@ -176,6 +176,16 @@
     {
      "from": "import {readMhelpAddressMapPins,mhelpAddressProviderLabel} from './mhelpAddressMapPins';",
      "to": "import {readMhelpAddressMapPins,mhelpAddressProviderLabel,type MhelpAddressMapPin} from './mhelpAddressMapPins';",
+     "count": 1
+    },
+    {
+     "from": "type View=keyof typeof title;",
+     "to": "type View=keyof typeof plainTitle;",
+     "count": 1
+    },
+    {
+     "from": "<div className='cos-fleet-heading'><div><div className='cos-fleet-eyebrow'>FLEET DASHBOARD</div><h1>{view==='map'?'Fleet Dashboard':title[view]}</h1>",
+     "to": "<div className='cos-fleet-heading'><div><h1 className='sr-only'>{view==='map'?'Fleet Dashboard':plainTitle[view]}</h1>",
      "count": 1
     }
    ]

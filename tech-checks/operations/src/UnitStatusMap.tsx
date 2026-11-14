@@ -127,7 +127,7 @@ export default function UnitStatusMap({units,savedAddresses,onSelect}:{units:rea
   current.fitBounds(L.latLngBounds(pins.map(pin=>[pin.latitude,pin.longitude] as [number,number])),{padding:[30,30],maxZoom:13});
  },[key]);
  return <div className='cos-camera-status-map'>
-  <div ref={node} className='cos-camera-status-map-canvas' role='region' aria-label='Map of field units by camera status'/>
+  <div ref={node} className='cos-camera-status-map-canvas cos-fleet-map-canvas' role='region' aria-label='Map of field units by camera status'/>
   <div ref={groupHost} className='cos-camera-status-map-group'/>
   <p className='cos-camera-status-map-key'>
    <span><i style={{background:'#2e9e5b'}}/>All up</span><span><i style={{background:'#e0a52a'}}/>Some down</span>
