@@ -38,6 +38,10 @@ test('only the address and the key are sent to the second service', async () => 
   const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit()]})});
   await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
   const asked = t.asked[1];
+  // The key COS holds is granted the v2.1 geocode endpoint only, so the
+  // request has to go there; an older path would be refused and read as an
+  // address that simply could not be placed.
+  assert.equal(asked.pathname, '/v2.1/geocode');
   assert.deepEqual([...asked.searchParams.keys()].sort(), ['api_key', 'country', 'q']);
   assert.equal(asked.searchParams.get('q'), '20702 Hempstead Rd, Cypress, TX 77065');
 });

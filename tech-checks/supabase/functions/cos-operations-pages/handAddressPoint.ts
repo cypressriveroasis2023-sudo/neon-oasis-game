@@ -85,7 +85,7 @@ async function censusPoint(value:string,requestFetch:typeof fetch):Promise<HandP
  * the service and never returned, stored or logged.
  */
 export async function geocodioPoint(value:string,apiKey:string,requestFetch:typeof fetch=fetch):Promise<HandPoint>{
- const url=new URL('https://api.geocod.io/v2/geocode');
+ const url=new URL('https://api.geocod.io/v2.1/geocode');
  url.searchParams.set('q',value.replace(/\s+/g,' ').trim());
  url.searchParams.set('country','US');
  url.searchParams.set('api_key',apiKey);
