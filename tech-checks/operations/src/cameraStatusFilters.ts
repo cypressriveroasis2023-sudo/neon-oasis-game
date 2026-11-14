@@ -15,8 +15,9 @@ export type UnitFamily='avigilon'|'recon'|'alibi';
 export const FAMILY_LABEL:Record<UnitFamily,string>={avigilon:'Avigilon',recon:'Recon II',alibi:'Alibi'};
 const AVIGILON=new Set(['SNIPER','SNIPER2','SNIPER4','CAMV']);
 const BY_SOURCE:Record<UnitSource,UnitFamily>={ip_check:'avigilon',reconeyez:'recon',star4live:'alibi'};
+export const unitName=(unit:UnitCameraStatus):string=>unit.displayName||unit.unit;
 export function familyOf(unit:UnitCameraStatus):UnitFamily{
- const name=canonicalCameraUnit(unit.unit)?.split('|')[0];
+ const name=canonicalCameraUnit(unitName(unit))?.split('|')[0];
  if(name&&AVIGILON.has(name))return 'avigilon';
  if(name==='RECON2')return 'recon';
  if(name)return 'alibi';
@@ -42,6 +43,6 @@ export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string,s
   if(group==='shop-online'&&!unit.onlineInShop)return false;
   if(group==='shop'&&unit.placement!=='SHOP')return false;
   if(!text)return true;
-  return [unit.unit,unit.site||'',unit.address||'',unit.publicIp||'',FAMILY_LABEL[familyOf(unit)]].some(field=>field.toLowerCase().includes(text));
+  return [unit.unit,unit.displayName||'',unit.site||'',unit.address||'',unit.publicIp||'',FAMILY_LABEL[familyOf(unit)]].some(field=>field.toLowerCase().includes(text));
  });
 }

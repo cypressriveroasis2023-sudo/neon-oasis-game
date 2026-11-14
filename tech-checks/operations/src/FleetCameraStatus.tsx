@@ -11,14 +11,15 @@ import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-import {type Group,type StateFilter,GROUPS,FAMILY_LABEL,familyOf,sourceOf,groupedUnits} from './cameraStatusFilters';
+import {type Group,type StateFilter,GROUPS,FAMILY_LABEL,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
 export {groupedUnits};
-type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;reason:string};
+type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
 const DOT:Record<UnitCameraStatus['state'],string>={GREEN:'online',YELLOW:'offline',RED:'offline',UNKNOWN:'unknown'};
 const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras up',YELLOW:'Some cameras down',RED:'All cameras down',UNKNOWN:'Not verified'};
 // Where each reading comes from. Avigilon units (Snipers, CAMVs) are a reachability
 // check on the unit, so they are Up or Down as a whole, never camera by camera.
+const SOURCE_NAME_LABEL='The provider';
 const AVIGILON_STATE:Record<UnitCameraStatus['state'],string>={GREEN:'Up',YELLOW:'Down',RED:'Down',UNKNOWN:'Not verified'};
 const VICTRON:[string,string][]=[['solar_power','Solar'],['load_power','Load'],['battery_voltage','Battery'],['battery_soc','Charge']];
 
@@ -40,7 +41,7 @@ function victronLine(power:SafeVrmPower):string{
  const newest=(metric:string)=>power.measurements.filter(item=>item.metric===metric).sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt))[0];
  return VICTRON.map(([metric,label])=>{const item=newest(metric);return item?label+' '+item.value+' '+item.unit:'';}).filter(Boolean).join(' · ');
 }
-const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP',camera:'Cameras on this unit'};
+const FIELD_LABEL:Record<HandEditField,string>={placement:'Field or shop',site:'Site',address:'Address',public_ip:'Public IP',camera:'Cameras on this unit',name:'Name'};
 
 /** A read-only check, so a bad shape is reported rather than guessed at. */
 function checkedReport(value:unknown):Report{
@@ -50,7 +51,7 @@ function checkedReport(value:unknown):Report{
 }
 
 
-const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',reason:''});
+const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
 export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -149,7 +150,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    {shown.map(unit=><li key={unit.unit} className={'cos-camera-status-row cos-camera-state-'+unit.state.toLowerCase()}>
     <div className='cos-camera-status-main'>
      <div className='cos-camera-status-unit'>
-      <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unit.unit}</strong>
+      <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unitName(unit)}</strong>
       <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP'+(sourceOf(unit)==='star4live'?' · root':''):'SHOP'+(sourceOf(unit)==='star4live'?' · root':'')}</small>
       {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
@@ -171,7 +172,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
      </div>
     </div>
     {draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Unit panel for '+unit.unit}>
-     <h3 className='cos-camera-status-panel-heading'>{unit.unit}</h3>
+     <h3 className='cos-camera-status-panel-heading'>{unitName(unit)}</h3>
+     {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
       {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
        <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
@@ -196,6 +198,15 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       </div>
       <button type='button' disabled={saving||draft.placement===unit.placement} onClick={()=>submit(unit,'placement',draft.placement,draft.reason)}>Save</button>
       {unit.handEdits?.placement&&<button type='button' disabled={saving} onClick={()=>submit(unit,'placement',null,draft.reason)}>Use {FAMILY_LABEL[familyOf(unit)]}</button>}
+     </div>
+     <div className='cos-camera-status-edit-row'>
+      <label htmlFor={'name-'+unit.unit}>Name</label>
+      <input id={'name-'+unit.unit} type='text' maxLength={120} value={draft.name} disabled={saving} placeholder={unit.unit}
+       onChange={event=>setDraft({...draft,name:event.target.value})}/>
+      <button type='button' disabled={saving||!draft.name.trim()||draft.name.trim()===unitName(unit)}
+       onClick={()=>submit(unit,'name',draft.name.trim(),draft.reason)}>Save name</button>
+      {unit.displayName&&<button type='button' disabled={saving}
+       onClick={()=>submit(unit,'name',null,draft.reason)}>Use {FAMILY_LABEL[familyOf(unit)]}</button>}
      </div>
      {draft.placement==='FIELD'&&<div className='cos-camera-status-edit-row'>
       <label htmlFor={'site-'+unit.unit}>Customer and site</label>

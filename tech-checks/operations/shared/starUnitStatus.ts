@@ -45,6 +45,9 @@ export type UnitCameraStatus = {
   awayFromSite?: UnitCamera[];
   // Every camera the provider reports for this unit, for the unit's own panel.
   cameraList?: UnitCameraEntry[];
+  // What to call this unit on screen, when a person has corrected the provider's
+  // name. The unit's own key is unchanged.
+  displayName?: string;
   onlineInShop: boolean;
   publicIp: string | null;
   observedAt: string | null;
@@ -66,7 +69,10 @@ export type UnitLocation = { latitude: number; longitude: number; matchedAddress
 
 // 'camera' says a camera the provider still reports is no longer on this unit -
 // a swap. It never says whether a camera is online.
-export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip', 'camera'] as const;
+// 'name' is what COS calls a unit when the provider's own name is wrong. It
+// never changes which unit this is: every record still keys on the provider's
+// name, so nothing is relinked and no history moves.
+export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip', 'camera', 'name'] as const;
 export type HandEditField = typeof HAND_EDIT_FIELDS[number];
 
 export type HandEdit = {
@@ -325,6 +331,7 @@ export function applyHandEdits(
     const site = record('site', unit.site);
     const publicIp = record('public_ip', unit.publicIp);
     const address = record('address', null);
+    const name = record('name', null);
     // typeof, not Number(): Number(null) is 0, which would drop a pin on the equator.
     const point = held.address, lat = typeof point?.latitude === 'number' ? point.latitude : NaN,
       lng = typeof point?.longitude === 'number' ? point.longitude : NaN;
@@ -342,6 +349,8 @@ export function applyHandEdits(
       // Where a unit sits never changes whether its cameras answered.
       onlineInShop: nextPlacement === 'SHOP' && unit.online > 0,
       publicIp: publicIp ?? unit.publicIp,
+      // A corrected name is what the unit is called on screen; its key is unchanged.
+      ...(name ? {displayName: name} : {}),
       // A unit in the shop has no field pin, whatever address it once had.
       // The address is the person's own text and shows whether or not it has a pin.
       address: nextPlacement === 'FIELD' ? address : null,

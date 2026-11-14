@@ -24,12 +24,20 @@ const UNSAFE=/[\r\n<>@=]|https?:|password|passwd|pwd|token|secret|credential|gat
  * covers many ordinary addresses the Census file does not. Geocodio is asked only
  * when a key is configured. Either way the address is saved exactly as typed.
  */
-export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=fetch,geocodioApiKey?:string|null):Promise<HandPoint>{
+export type SecondLookup=(address:string)=>Promise<HandPoint>;
+export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=fetch,geocodioApiKey?:string|null,secondLookup?:SecondLookup|null):Promise<HandPoint>{
  if(typeof value!=='string'||!value.trim()||value.length>200||UNSAFE.test(value))
   return {status:'invalid_address',reason:'An address cannot contain a link, an email, or a gate or access code. Enter the street address only.'};
  const census=await censusPoint(value,requestFetch);
- if(census.status==='success'||!usableKey(geocodioApiKey))return census;
- const geocodio=await geocodioPoint(value,geocodioApiKey!,requestFetch);
+ if(census.status==='success')return census;
+ // The second service is reached either with a key configured here, or by
+ // asking the project that holds the key. Neither, and the Census stands.
+ const ask=usableKey(geocodioApiKey)?()=>geocodioPoint(value,geocodioApiKey,requestFetch):secondLookup?()=>secondLookup(value):null;
+ if(!ask)return census;
+ let geocodio:HandPoint;
+ try{geocodio=await ask();}catch{geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
+ if(!geocodio||typeof geocodio!=='object'||!['success','no_match','invalid_address','provider_error'].includes((geocodio as HandPoint).status))
+  geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};
  // The second service ran last and saw the most, so its answer is the one
  // reported - unless it could not be reached at all, where the first service's
  // reason is the one that tells the person what to check.
@@ -77,7 +85,7 @@ async function censusPoint(value:string,requestFetch:typeof fetch):Promise<HandP
  * the service and never returned, stored or logged.
  */
 export async function geocodioPoint(value:string,apiKey:string,requestFetch:typeof fetch=fetch):Promise<HandPoint>{
- const url=new URL('https://api.geocod.io/v2/geocode');
+ const url=new URL('https://api.geocod.io/v2.1/geocode');
  url.searchParams.set('q',value.replace(/\s+/g,' ').trim());
  url.searchParams.set('country','US');
  url.searchParams.set('api_key',apiKey);

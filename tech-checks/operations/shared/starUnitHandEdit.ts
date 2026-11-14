@@ -58,11 +58,12 @@ export function checkedHandEditRequest(
 
   const unitKey = text(payload.unitKey);
   if (!unitKey) throw new HandEditError('A unit is required.');
-  const unit = units.find(row => row.unit.trim().toUpperCase() === unitKey.toUpperCase());
+  const unit = units.find(row => row.unit.trim().toUpperCase() === unitKey.toUpperCase()
+    || (row.displayName || '').trim().toUpperCase() === unitKey.toUpperCase());
   if (!unit) throw new HandEditError('Star4Live is not reporting a unit named ' + unitKey + '. Only a unit the provider reports can be edited.', 404);
 
   const field = text(payload.field) as HandEditField;
-  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, its public IP, or which cameras are on it only.');
+  if (!HAND_EDIT_FIELDS.includes(field)) throw new HandEditError('A hand edit may change where a unit is, its site, its address, its public IP, what it is called, or which cameras are on it only.');
 
   const action = text(payload.action) || 'set';
   if (action !== 'set' && action !== 'clear') throw new HandEditError('A hand edit is either set or clear.');
@@ -77,6 +78,7 @@ export function checkedHandEditRequest(
   const providerValue = field === 'placement' ? unit.providerPlacement ?? unit.placement
     : field === 'site' ? unit.providerSite ?? unit.site
     : field === 'address' || field === 'camera' ? null // Star4Live has no street address, and it reports every camera it knows.
+    : field === 'name' ? unit.unit // The provider's own name for this unit.
     : unit.providerPublicIp ?? unit.publicIp;
 
   // One camera is named when putting that camera back; naming none puts every
@@ -108,6 +110,14 @@ export function checkedHandEditRequest(
     // only what can be stored. A shop unit has no field pin to drop.
     if (value.length > 200 || !PRINTABLE.test(value)) throw new HandEditError('That address is too long or contains characters that cannot be stored.');
     if (unit.placement !== 'FIELD') throw new HandEditError('Put the unit in the Field first; a unit in the shop has no site address.');
+  } else if (field === 'name') {
+    if (value.length > 120) throw new HandEditError('That name is too long. Keep it under 120 characters.');
+    if (/[\r\n\t]/.test(value)) throw new HandEditError('A unit name is one line of plain text.');
+    // Two units answering to one name on the same screen is worse than a wrong name.
+    const taken = (units || []).some(other => other.unit !== unit.unit
+      && (other.unit.trim().toUpperCase() === value.toUpperCase()
+        || (other.displayName || '').trim().toUpperCase() === value.toUpperCase()));
+    if (taken) throw new HandEditError('Another unit is already called ' + value + '. Pick a name no other unit uses.');
   } else if (field === 'camera') {
     const camera = namedCamera(value);
     if (camera.name.length > 200) throw new HandEditError('That camera name is too long to store.');

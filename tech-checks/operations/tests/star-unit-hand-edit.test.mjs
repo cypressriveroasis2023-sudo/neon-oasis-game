@@ -43,7 +43,7 @@ test('only a unit Star4Live reports can be edited', () => {
 
 test('a hand edit cannot touch camera status or anything else', () => {
   for (const field of ['vigilant_status', 'state', 'online', 'unit_key', 'organization', '']) {
-    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, its address, its public IP, or which cameras are on it only/);
+    refuses({unitKey: 'SPOTTER 306', field, value: 'Online'}, /where a unit is, its site, its address, its public IP, what it is called, or which cameras are on it only/);
   }
 });
 
@@ -136,4 +136,26 @@ test('the other fields still refuse a value when cleared', () => {
 
 test('the last camera on a unit cannot be taken off; use the Shop setting instead', () => {
   refuses({unitKey: 'SOLARSPOTTER 029', field: 'camera', value: 'SS029_1'}, /only camera left/);
+});
+
+test('a unit can be given the name COS should call it, and its key never changes', () => {
+  const edit = check({unitKey: 'SPOTTER 306', field: 'name', value: '  Sniper 243  '});
+  assert.deepEqual([edit.field, edit.action, edit.value, edit.unitKey, edit.providerValue],
+    ['name', 'set', 'Sniper 243', 'SPOTTER 306', 'SPOTTER 306']);
+  const back = check({unitKey: 'SPOTTER 306', field: 'name', action: 'clear'});
+  assert.deepEqual([back.action, back.value], ['clear', null]);
+});
+
+test('a name no one can use is refused', () => {
+  refuses({unitKey: 'SPOTTER 306', field: 'name', value: 'x'.repeat(121)}, /too long/);
+  refuses({unitKey: 'SPOTTER 306', field: 'name', value: 'two\nlines'}, /one line of plain text/);
+  refuses({unitKey: 'SPOTTER 306', field: 'name'}, /A value is required/);
+  // Another unit already answers to this one.
+  refuses({unitKey: 'SPOTTER 306', field: 'name', value: 'solarspotter 029'}, /already called/);
+});
+
+test('a renamed unit can still be edited by the name it now shows', () => {
+  const renamed = units.map(unit => unit.unit === 'SPOTTER 306' ? {...unit, displayName: 'Sniper 243'} : unit);
+  const edit = checkedHandEditRequest({unitKey: 'sniper 243', field: 'placement', value: 'SHOP'}, renamed, newId);
+  assert.equal(edit.unitKey, 'SPOTTER 306');
 });
