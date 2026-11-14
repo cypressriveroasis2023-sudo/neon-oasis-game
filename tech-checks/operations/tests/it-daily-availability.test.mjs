@@ -12,10 +12,17 @@ async function repairGate(role,{active=true,fail=false,subject='synthetic'}={}) 
   const available=await new AsyncFunction('db','$',helper.replace("const {IT_DAILY_ONLY}=await import('./it-feature-availability.js');",'const IT_DAILY_ONLY=true;'))(db,()=>tickets);
   return {available,calls,tickets};
 }
-test('daily switch limits desktop to Camera Health and Fleet Dashboard',()=>{
+// A tech reaches every stand and every camera, and nothing of the owner's.
+// The switch itself stays on: it holds the paused IT modules shut, and this
+// list does not reopen them.
+test('the daily list carries the equipment screens and no management one',()=>{
   assert.equal(availability.IT_DAILY_ONLY,true);
-  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Fleet Dashboard','Camera Health']);
-  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Fleet Dashboard','Camera Health']);
+  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],
+    ['Fleet Dashboard','Camera Health','InHand Routers','Victron VRM','Unit Tracker','Tech Check']);
+  for(const workspace of ['Daily Board','Today','Team','Owner Tasks','MHelp','Billing','Jobs','Customers'])
+    assert.ok(!availability.IT_DAILY_WORKSPACES.includes(workspace),workspace+' is the owner’s');
+  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),
+    ['Fleet Dashboard','Camera Health','InHand Routers','Victron Power','2027 Unit Tracker','Tech Check']);
   assert.doesNotMatch(read('it-feature-availability.js'),/localStorage|fetch\(|mhelp.*===|setTimeout/);
 });
 test('standalone repair pauses IT before any ticket read or release, including restored sessions',async()=>{

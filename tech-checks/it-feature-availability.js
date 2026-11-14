@@ -1,8 +1,15 @@
 // Deliberate, reversible product availability switch. Never tied to mHelp health.
 // Existing authorization, records and Owner controls remain unchanged.
 export const IT_DAILY_ONLY = true;
-// Camera Health and Fleet Map only; other IT modules remain paused.
-export const IT_DAILY_WORKSPACES = Object.freeze(['Fleet Dashboard','Camera Health']);
+// Every stand and every camera: the same equipment screens the owner has, so a
+// tech can find a unit and put it right without asking anyone. Boards, Team,
+// mHelp sync and the owner's record-authority screens are not here, and
+// IT_DAILY_ONLY still holds the paused IT modules shut - the standalone repair
+// page, production assignments and ticket instructions are untouched by this
+// list. Each entry is filtered again by what the session actually grants.
+export const IT_DAILY_WORKSPACES = Object.freeze([
+  'Fleet Dashboard','Camera Health','InHand Routers','Victron VRM','Unit Tracker','Tech Check',
+]);
 export const itDailyLabel = name => ({'Field Map':'Fleet Dashboard','Fleet Dashboard':'Fleet Dashboard','Victron VRM':'Victron Power','Unit Tracker':'2027 Unit Tracker'}[name] || name);
 
 // Keep the explicit daily context across the existing camera tools, including new tabs.

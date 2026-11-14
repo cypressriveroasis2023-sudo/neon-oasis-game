@@ -90,6 +90,37 @@ export function can(session:unknown,capability:Capability):boolean{
   return true;
 }
 
+/**
+ * Which capability a workspace needs before it is offered. One app, one nav:
+ * a workspace is absent because the person cannot use it, never because they
+ * signed in as the wrong kind of person. Anything not named here is
+ * management and belongs to the owner.
+ */
+const WORKSPACE_CAPABILITY:Record<string,Capability>={
+  'Fleet Dashboard':'equipment.see',
+  'Camera Health':'equipment.see',
+  'Units On Hand':'equipment.see',
+  'Equipment':'equipment.see',
+  'InHand Routers':'equipment.routers',
+  'Victron VRM':'equipment.power',
+  'Unit Tracker':'equipment.tracker',
+  'Tech Check':'equipment.techCheck',
+  'Handoffs':'equipment.techCheck',
+  // The More drawer itself stays for everyone; it lists only what the person
+  // can open, so a tech still reaches the routers, the power and the tracker.
+  'Operations':'equipment.see',
+  'MHelp':'owner.mhelpSync',
+  'Daily Board':'owner.boards',
+  'Today':'owner.boards',
+  'Team':'owner.team',
+  'Owner Tasks':'owner.team',
+};
+
+/** May this person open this workspace at all? */
+export function canOpenWorkspace(session:unknown,workspace:string):boolean{
+  return can(session,WORKSPACE_CAPABILITY[workspace]??'owner.boards');
+}
+
 /** Every capability at once, for a shell that has to lay out a whole screen. */
 export function capabilities(session:unknown):Record<Capability,boolean>{
   const all=[...EQUIPMENT_CAPABILITIES,...OWNER_CAPABILITIES];

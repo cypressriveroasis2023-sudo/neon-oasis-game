@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {can, capabilities, signedIn, unavailableBecause, EQUIPMENT_CAPABILITIES, OWNER_CAPABILITIES}
+import {can, canOpenWorkspace, capabilities, signedIn, unavailableBecause, EQUIPMENT_CAPABILITIES, OWNER_CAPABILITIES}
   from '../src/cosCapabilities.ts';
 
 // What the deployed function actually hands an IT/fleet session today.
@@ -61,6 +61,24 @@ test('every capability is answered, and the two lists do not overlap', () => {
   for (const name of [...EQUIPMENT_CAPABILITIES, ...OWNER_CAPABILITIES]) assert.equal(typeof all[name], 'boolean', name);
   assert.equal(Object.keys(all).length, EQUIPMENT_CAPABILITIES.length + OWNER_CAPABILITIES.length);
   for (const name of EQUIPMENT_CAPABILITIES) assert.ok(!OWNER_CAPABILITIES.includes(name), name);
+});
+
+// One app, one nav. A workspace is absent because the person cannot use it,
+// never because they signed in as the wrong kind of person.
+test('a tech reaches every equipment workspace, and no management one', () => {
+  for (const workspace of ['Fleet Dashboard','Camera Health','Units On Hand','Equipment',
+    'InHand Routers','Victron VRM','Unit Tracker','Tech Check','Handoffs','Operations']) {
+    assert.equal(canOpenWorkspace(it, workspace), true, workspace + ' must be open to IT');
+    assert.equal(canOpenWorkspace(owner, workspace), true, workspace + ' must be open to the owner');
+  }
+  for (const workspace of ['Daily Board','Today','Team','Owner Tasks','MHelp','Billing','Customers','Jobs']) {
+    assert.equal(canOpenWorkspace(it, workspace), false, workspace + ' must stay with the owner');
+    assert.equal(canOpenWorkspace(owner, workspace), true, workspace);
+  }
+});
+
+test('an unknown workspace is treated as management, not waved through', () => {
+  assert.equal(canOpenWorkspace(it, 'Something Invented Later'), false);
 });
 
 // A control that is simply missing teaches nobody anything.
