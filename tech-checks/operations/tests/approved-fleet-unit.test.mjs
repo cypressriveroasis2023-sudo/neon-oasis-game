@@ -12,15 +12,21 @@ import {createHash} from 'node:crypto';
 // saved-camera-refresh-scheduling and source-equipment-pins browser cases.
 // These remain exact source guards; behavioral/session/identity suites run separately.
 // The reviewed connection-read patch is reversed explicitly; baseline hashes never change.
+// Reviewed change, at James's instruction: power readings are judged by their
+// own freshness window instead of the camera one. Victron arrives every 15
+// minutes already several minutes old, so seven of nine healthy field Helios
+// were reading "Unverified". FleetBatterySummary.tsx and fleetDashboardModel.ts
+// carry that change and their pins move with it. The camera window is
+// untouched, and tests/power-freshness.test.mjs holds both boundaries exactly.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
-  "FleetBatterySummary.tsx": "32d829373e64b6a848dad85d24270aa83b404ebc",
+  "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
-  "fleetDashboardModel.ts": "0a7a25076bb63c8742af9fd6f8f49261c2e1ec3c",
+  "fleetDashboardModel.ts": "1c14c92829e6cbabb681b575c409bb66953337d5",
   "fieldCameraHealth.ts": "b524d935a9f92619e5e9617e19a5b04c5a924b33",
-  "cameraEvidence.ts": "a2000d04cae3516e5a99f0f9024742ac4931b1c4",
+  "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
   "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",

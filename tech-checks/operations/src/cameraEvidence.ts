@@ -1,5 +1,16 @@
 /** Public, pure presentation semantics. A saved observation is not a live probe. */
 export const CAMERA_FRESH_MS = 20 * 60 * 1000;
+/**
+ * Power is not a camera check and does not arrive like one. Victron is polled
+ * every 15 minutes and its own observations are already several minutes old by
+ * the time they land, so a healthy Helios normally reports 19 to 26 minutes
+ * back. Judged by the camera window, seven of nine field Helios read
+ * "Unverified" while their batteries, solar and load were all fine - which
+ * teaches people that the word means nothing. This window is sized to how the
+ * reading actually arrives and still catches a feed that has stopped: HELIOS
+ * 008, silent since October, stays unverified. The camera window is unchanged.
+ */
+export const POWER_FRESH_MS = 45 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
 export type PlacementScope = 'field'|'shop'|'inactive'|'unknown';
@@ -28,6 +39,12 @@ export type UnitEvidence = {
   systemKind:'recorder'|'detector'|'system'; recorderOffline:boolean; fieldRecorderVerified?:boolean;
 };
 const normalized=(value:unknown)=>typeof value==='string'?value.trim().replace(/\s+/g,' ').toUpperCase():'';
+/** The same reading of a timestamp, judged against the power window. */
+export function powerTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
+  const stamp=cameraTimestamp(value,now);
+  return stamp.at===null?stamp:{at:stamp.at,fresh:now-Date.parse(stamp.at)<=POWER_FRESH_MS};
+}
+
 export function cameraTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
   if(typeof value!=='string')return {at:null,fresh:false};
   const p=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.exec(value);
