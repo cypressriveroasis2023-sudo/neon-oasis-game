@@ -33,6 +33,7 @@ export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=f
  // The second service is reached either with a key configured here, or by
  // asking the project that holds the key. Neither, and the Census stands.
  const ask=usableKey(geocodioApiKey)?()=>geocodioPoint(value,geocodioApiKey,requestFetch):secondLookup?()=>secondLookup(value):null;
+ note('census says '+census.status+'; second service '+(usableKey(geocodioApiKey)?'has a key here':secondLookup?'is reached through the project that holds the key':'is not configured'));
  if(!ask)return census;
  let geocodio:HandPoint;
  try{geocodio=await ask();}catch{geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
@@ -45,6 +46,14 @@ export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=f
  return geocodio;
 }
 const usableKey=(key:unknown):key is string=>typeof key==='string'&&Boolean(key.trim())&&key.length<=8192&&!/[\r\n]/.test(key);
+
+/**
+ * A line in the function log saying how the lookup went, so a missing pin can be
+ * told apart from a refused key or an address the services do not carry. It
+ * records outcomes only: never the key, never the URL that carries it, never the
+ * address. Failing to log never fails a lookup.
+ */
+const note=(what:string)=>{try{console.log('[cos-address] '+what);}catch{/* logging is never load-bearing */}};
 
 /** Read a bounded JSON body. Nothing but the address text ever leaves COS. */
 async function readBounded(response:Response):Promise<unknown>{
@@ -88,13 +97,21 @@ export async function geocodioPoint(value:string,apiKey:string,requestFetch:type
  const url=new URL('https://api.geocod.io/v2.1/geocode');
  url.searchParams.set('q',value.replace(/\s+/g,' ').trim());
  url.searchParams.set('country','US');
- url.searchParams.set('api_key',apiKey);
+ // A key pasted into a secret box often carries a trailing space or newline.
+ // Sent as-is it is encoded into the query and the service refuses it, which
+ // reads here as an address that simply could not be placed. Trim it.
+ url.searchParams.set('api_key',apiKey.trim());
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
  try{
   const response=await requestFetch(url.toString(),{method:'GET',redirect:'error',cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
-  if(!response.ok)return {status:'provider_error',reason:'The second address service is unavailable right now, so there is no pin yet. Save the address again later to try for one.'};
+  // Only the outcome is recorded. Never the key, never the URL that carries it.
+  if(!response.ok){
+   note('second service refused the request: HTTP '+response.status);
+   return {status:'provider_error',reason:'The second address service is unavailable right now, so there is no pin yet. Save the address again later to try for one.'};
+  }
   const results=(await readBounded(response) as any)?.results;
   if(!Array.isArray(results))throw Error('shape');
+  note('second service answered: '+results.length+' result(s)'+(results.length?', best accuracy '+String(results[0]?.accuracy):''));
   if(!results.length)return {status:'no_match',reason:'Neither address service could find that address, so there is no point to pin. Check the street number, city and ZIP.'};
   const best=results[0],found=point(best?.location?.lat,best?.location?.lng);
   if(!found)return {status:'no_match',reason:'The second address service found the address but gave no usable location, so there is no pin.'};

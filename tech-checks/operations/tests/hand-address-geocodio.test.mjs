@@ -46,6 +46,16 @@ test('only the address and the key are sent to the second service', async () => 
   assert.equal(asked.searchParams.get('q'), '20702 Hempstead Rd, Cypress, TX 77065');
 });
 
+// A key pasted into a secret box often carries a trailing space or newline.
+// Sent as typed it is encoded into the query and the service refuses it, which
+// shows up as an address that simply could not be placed.
+test('a key saved with stray whitespace is still sent cleanly', async () => {
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit()]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, '  ' + KEY + ' ');
+  assert.equal(found.status, 'success');
+  assert.equal(t.asked[1].searchParams.get('api_key'), KEY, 'the service receives the key, not the whitespace around it');
+});
+
 test('with no key configured nothing is asked of the second service', async () => {
   for (const key of [undefined, null, '', '   ', 'bad\nkey']) {
     const t = transport({'geocoding.geo.census.gov': () => body(census([]))});
