@@ -226,3 +226,19 @@ test('clearing any other hand edit still refuses a value, and a camera edit carr
   await refuses(() => edit({unitKey: 'HELIOS 001', field: 'camera', action: 'set', value: 'Cam 1',
     providerValue: null, latitude: 29.7, longitude: -95.4}), /Only a set address carries a map point/);
 });
+
+test('a corrected unit name is recorded, and clearing it returns to the provider name', async () => {
+  const set = await edit({unitKey: 'SNIPER ALIBI 243', field: 'name', action: 'set', value: 'Sniper 243',
+    providerValue: 'SNIPER ALIBI 243', reason: 'Alibi recorder named wrong in VCC'});
+  assert.equal(set.applied, true);
+  const back = await edit({unitKey: 'SNIPER ALIBI 243', field: 'name', action: 'clear', value: null, providerValue: 'SNIPER ALIBI 243'});
+  assert.equal(back.applied, true);
+  const saved = await state();
+  assert.deepEqual(saved.edits.map(row => row.field + '/' + row.action + '/' + (row.value ?? '-')), ['name/clear/-']);
+});
+
+test('a name carries no map point and keeps the one-value rule', async () => {
+  await refuses(() => edit({unitKey: 'SNIPER ALIBI 243', field: 'name', action: 'set', value: 'Sniper 243',
+    providerValue: null, latitude: 29.7, longitude: -95.4}), /Only a set address carries a map point/);
+  await refuses(() => edit({field: 'name', action: 'clear', value: 'Sniper 243'}), /does not take a value/);
+});

@@ -17,6 +17,12 @@ export function metresApart(a:[number,number],b:[number,number]):number{
 }
 /** One place, whatever spelling: several results all within a block are the same address. */
 export const SAME_PLACE_METRES=120;
+/**
+ * How far below the best score a result can sit and still count as a rival
+ * claim to be a different place. The second service ranks and scores its
+ * results, so anything much weaker is a worse guess at the same address.
+ */
+export const COMPARABLE_ACCURACY=0.1;
 const MAX_BODY=262144;
 const UNSAFE=/[\r\n<>@=]|https?:|password|passwd|pwd|token|secret|credential|gate[\s-]*code|access[\s-]*code|\bpin\b/i;
 /**
@@ -24,12 +30,21 @@ const UNSAFE=/[\r\n<>@=]|https?:|password|passwd|pwd|token|secret|credential|gat
  * covers many ordinary addresses the Census file does not. Geocodio is asked only
  * when a key is configured. Either way the address is saved exactly as typed.
  */
-export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=fetch,geocodioApiKey?:string|null):Promise<HandPoint>{
+export type SecondLookup=(address:string)=>Promise<HandPoint>;
+export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=fetch,geocodioApiKey?:string|null,secondLookup?:SecondLookup|null):Promise<HandPoint>{
  if(typeof value!=='string'||!value.trim()||value.length>200||UNSAFE.test(value))
   return {status:'invalid_address',reason:'An address cannot contain a link, an email, or a gate or access code. Enter the street address only.'};
  const census=await censusPoint(value,requestFetch);
- if(census.status==='success'||!usableKey(geocodioApiKey))return census;
- const geocodio=await geocodioPoint(value,geocodioApiKey!,requestFetch);
+ if(census.status==='success')return census;
+ // The second service is reached either with a key configured here, or by
+ // asking the project that holds the key. Neither, and the Census stands.
+ const ask=usableKey(geocodioApiKey)?()=>geocodioPoint(value,geocodioApiKey,requestFetch):secondLookup?()=>secondLookup(value):null;
+ note('census says '+census.status+'; second service '+(usableKey(geocodioApiKey)?'has a key here':secondLookup?'is reached through the project that holds the key':'is not configured'));
+ if(!ask)return census;
+ let geocodio:HandPoint;
+ try{geocodio=await ask();}catch{geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
+ if(!geocodio||typeof geocodio!=='object'||!['success','no_match','invalid_address','provider_error'].includes((geocodio as HandPoint).status))
+  geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};
  // The second service ran last and saw the most, so its answer is the one
  // reported - unless it could not be reached at all, where the first service's
  // reason is the one that tells the person what to check.
@@ -37,6 +52,14 @@ export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=f
  return geocodio;
 }
 const usableKey=(key:unknown):key is string=>typeof key==='string'&&Boolean(key.trim())&&key.length<=8192&&!/[\r\n]/.test(key);
+
+/**
+ * A line in the function log saying how the lookup went, so a missing pin can be
+ * told apart from a refused key or an address the services do not carry. It
+ * records outcomes only: never the key, never the URL that carries it, never the
+ * address. Failing to log never fails a lookup.
+ */
+const note=(what:string)=>{try{console.log('[cos-address] '+what);}catch{/* logging is never load-bearing */}};
 
 /** Read a bounded JSON body. Nothing but the address text ever leaves COS. */
 async function readBounded(response:Response):Promise<unknown>{
@@ -77,28 +100,48 @@ async function censusPoint(value:string,requestFetch:typeof fetch):Promise<HandP
  * the service and never returned, stored or logged.
  */
 export async function geocodioPoint(value:string,apiKey:string,requestFetch:typeof fetch=fetch):Promise<HandPoint>{
- const url=new URL('https://api.geocod.io/v2/geocode');
+ const url=new URL('https://api.geocod.io/v2.1/geocode');
  url.searchParams.set('q',value.replace(/\s+/g,' ').trim());
  url.searchParams.set('country','US');
- url.searchParams.set('api_key',apiKey);
+ // A key pasted into a secret box often carries a trailing space or newline.
+ // Sent as-is it is encoded into the query and the service refuses it, which
+ // reads here as an address that simply could not be placed. Trim it.
+ url.searchParams.set('api_key',apiKey.trim());
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
  try{
   const response=await requestFetch(url.toString(),{method:'GET',redirect:'error',cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
-  if(!response.ok)return {status:'provider_error',reason:'The second address service is unavailable right now, so there is no pin yet. Save the address again later to try for one.'};
+  // Only the outcome is recorded. Never the key, never the URL that carries it.
+  if(!response.ok){
+   note('second service refused the request: HTTP '+response.status);
+   return {status:'provider_error',reason:'The second address service is unavailable right now, so there is no pin yet. Save the address again later to try for one.'};
+  }
   const results=(await readBounded(response) as any)?.results;
   if(!Array.isArray(results))throw Error('shape');
+  note('second service answered: '+results.length+' result(s)'+(results.length?', best accuracy '+String(results[0]?.accuracy):''));
   if(!results.length)return {status:'no_match',reason:'Neither address service could find that address, so there is no point to pin. Check the street number, city and ZIP.'};
   const best=results[0],found=point(best?.location?.lat,best?.location?.lng);
   if(!found)return {status:'no_match',reason:'The second address service found the address but gave no usable location, so there is no pin.'};
   // A low score means the service guessed; a guessed pin is worse than none.
   if(typeof best.accuracy!=='number'||!Number.isFinite(best.accuracy)||best.accuracy<0.8)
    return {status:'no_match',reason:'The address services are not confident enough about where that address is to drop a pin. Check the street number, city and ZIP.'};
-  // Several spellings of one place are fine; two real places are not.
-  for(const other of results.slice(1,20)){
+  // Several spellings of one place are fine; two real places are not. This
+  // service returns its results ranked and scored, so a weaker result is a
+  // worse guess at the same address, not a rival claim to be a different
+  // place. Only results scoring about as well as the best one can make an
+  // address ambiguous; the rest are ignored. Without this, one low-scoring
+  // guess somewhere across town throws away a rooftop match.
+  const rivals=results.slice(1,20).filter((other:any)=>
+   typeof other?.accuracy==='number'&&Number.isFinite(other.accuracy)&&other.accuracy>=best.accuracy-COMPARABLE_ACCURACY);
+  let spread=0;
+  for(const other of rivals){
    const at=point(other?.location?.lat,other?.location?.lng);
-   if(!at||metresApart(found,at)>SAME_PLACE_METRES)
-    return {status:'no_match',reason:'That address matches more than one place. Add the city and ZIP so the pin lands on the right one.'};
+   if(!at){spread=Infinity;break;}
+   spread=Math.max(spread,metresApart(found,at));
   }
+  note('second service: '+rivals.length+' result(s) scoring as well as the best, '+
+   (Number.isFinite(spread)?Math.round(spread)+'m apart':'one without a usable location'));
+  if(spread>SAME_PLACE_METRES)
+   return {status:'no_match',reason:'That address matches more than one place. Add the city and ZIP so the pin lands on the right one.'};
   const matched=typeof best.formatted_address==='string'?best.formatted_address.trim().slice(0,200):'';
   return {status:'success',reason:'Pinned at the location the second address service has for this address.',latitude:found[0],longitude:found[1],provider:'geocodio',...(matched?{matchedAddress:matched}:{})};
  }catch{return {status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}

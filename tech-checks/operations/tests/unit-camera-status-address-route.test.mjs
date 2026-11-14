@@ -63,7 +63,7 @@ for(const [name,geocode,status,pattern] of [
  ['no match',census([]),200,/could not find that address/],
  ['two matches',census([katy,katy]),200,/more than one place/],
  ['a match with no location',census([{matchedAddress:katy.matchedAddress,coordinates:{x:0,y:0}}]),200,/no usable location/],
- ['the address service is down',{error:'busy'},503,/unavailable/],
+ ['the address service is down',{error:'busy'},503,/could not complete/],
 ]){
  test('the address is still saved, without a pin, when '+name,async()=>{
   const f=fixture({geocode,geocodeStatus:status});

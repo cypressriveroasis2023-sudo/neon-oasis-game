@@ -38,8 +38,22 @@ test('only the address and the key are sent to the second service', async () => 
   const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit()]})});
   await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
   const asked = t.asked[1];
+  // The key COS holds is granted the v2.1 geocode endpoint only, so the
+  // request has to go there; an older path would be refused and read as an
+  // address that simply could not be placed.
+  assert.equal(asked.pathname, '/v2.1/geocode');
   assert.deepEqual([...asked.searchParams.keys()].sort(), ['api_key', 'country', 'q']);
   assert.equal(asked.searchParams.get('q'), '20702 Hempstead Rd, Cypress, TX 77065');
+});
+
+// A key pasted into a secret box often carries a trailing space or newline.
+// Sent as typed it is encoded into the query and the service refuses it, which
+// shows up as an address that simply could not be placed.
+test('a key saved with stray whitespace is still sent cleanly', async () => {
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit()]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, '  ' + KEY + ' ');
+  assert.equal(found.status, 'success');
+  assert.equal(t.asked[1].searchParams.get('api_key'), KEY, 'the service receives the key, not the whitespace around it');
 });
 
 test('with no key configured nothing is asked of the second service', async () => {
@@ -69,6 +83,24 @@ test('several spellings of one place still pin; two real places do not', async (
   assert.equal((await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', same.fetch, KEY)).status, 'success');
   const two = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit(), far]})});
   const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', two.fetch, KEY);
+  assert.equal(found.status, 'no_match');
+  assert.match(found.reason, /more than one place/);
+});
+
+// The service ranks and scores what it returns, so a weaker result is a worse
+// guess at the same address, not a rival claim to be a different place. Before
+// this, one low-scoring guess across town threw away a rooftop match.
+test('a weaker-scoring result elsewhere does not throw away a confident match', async () => {
+  const weakAndFar = geoHit({accuracy: 0.6, location: {lat: 30.1, lng: -95.9}});
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit(), weakAndFar, geoHit({accuracy: 0.45, location: {lat: 31.2, lng: -97.1}})]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
+  assert.deepEqual([found.status, found.latitude, found.longitude], ['success', 29.8646, -95.2614]);
+});
+
+test('a result scoring as well as the best, somewhere else, still blocks the pin', async () => {
+  const strongAndFar = geoHit({accuracy: 0.95, location: {lat: 30.1, lng: -95.9}});
+  const t = transport({'geocoding.geo.census.gov': () => body(census([])), 'api.geocod.io': () => body({results: [geoHit(), strongAndFar]})});
+  const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', t.fetch, KEY);
   assert.equal(found.status, 'no_match');
   assert.match(found.reason, /more than one place/);
 });

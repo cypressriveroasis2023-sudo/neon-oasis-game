@@ -170,7 +170,7 @@ test('a state filter never reaches past its group, and still searches', () => {
 
 // Avigilon covers Sniper, Sniper 2, Sniper 4 and CAM V; Recon II is its own;
 // the rest of the camera units are Alibi.
-import {familyOf, FAMILY_LABEL} from '../src/cameraStatusFilters.ts';
+import {familyOf, FAMILY_LABEL, unitName} from '../src/cameraStatusFilters.ts';
 
 test('Sniper, Sniper 2, Sniper 4 and CAM V are all Avigilon, whichever system reported them', () => {
   for (const name of ['SNIPER 004', 'Sniper 2-1234', 'SNIPER 2 15', 'Sniper 4 7', 'CAMV 002', 'CAM V 002', 'SNIPER 240']) {
@@ -202,4 +202,20 @@ test('the list can be searched by what kind of equipment a unit is', () => {
   assert.deepEqual(groupedUnits(units, 'field', 'avigilon').map(u => u.unit), ['SNIPER 004']);
   assert.deepEqual(groupedUnits(units, 'field', 'recon').map(u => u.unit), ['Recon II 12']);
   assert.deepEqual(groupedUnits(units, 'field', 'alibi').map(u => u.unit), ['SPOTTER 306']);
+});
+
+test('a corrected name decides what a unit is called and which family it is in', () => {
+  const recorder = fieldUnit('Sniper Alibi 243', {placement: 'SHOP', site: null, source: 'star4live'});
+  assert.deepEqual([unitName(recorder), familyOf(recorder)], ['Sniper Alibi 243', 'alibi']);
+  const renamed = {...recorder, displayName: 'Sniper 243'};
+  assert.deepEqual([unitName(renamed), familyOf(renamed)], ['Sniper 243', 'avigilon']);
+  // The unit's own key never moves, so its history and edits still find it.
+  assert.equal(renamed.unit, 'Sniper Alibi 243');
+});
+
+test('the list finds a unit by the name a person gave it and by the provider name', () => {
+  const units = [{...fieldUnit('Sniper Alibi 243'), displayName: 'Sniper 243'}, fieldUnit('SPOTTER 306')];
+  assert.deepEqual(groupedUnits(units, 'field', 'sniper 243').map(u => u.unit), ['Sniper Alibi 243']);
+  assert.deepEqual(groupedUnits(units, 'field', 'alibi 243').map(u => u.unit), ['Sniper Alibi 243']);
+  assert.deepEqual(groupedUnits(units, 'field', 'avigilon').map(u => u.unit), ['Sniper Alibi 243']);
 });
