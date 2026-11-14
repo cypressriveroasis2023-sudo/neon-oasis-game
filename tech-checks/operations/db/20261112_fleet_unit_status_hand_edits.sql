@@ -24,7 +24,7 @@ create table if not exists cos_fleet_hand_edit_private.unit_status_edit_log(
  seq bigint generated always as identity unique,
  organization_id uuid not null,
  unit_key text not null check(btrim(unit_key)<>'' and length(unit_key)<=120),
- field text not null check(field in('placement','site','address','public_ip','camera')),
+ field text not null check(field in('placement','site','address','public_ip','camera','name')),
  action text not null check(action in('set','clear')),
  value text check(value is null or length(value)<=200),
  provider_value text check(provider_value is null or length(provider_value)<=200),
@@ -110,7 +110,7 @@ begin
  elsif p_payload ? 'latitude' or p_payload ? 'longitude' then
   raise exception 'A map point is two numbers' using errcode='PT409';
  end if;
- if unit='' or length(unit)>120 or f not in('placement','site','address','public_ip','camera') or act not in('set','clear')
+ if unit='' or length(unit)>120 or f not in('placement','site','address','public_ip','camera','name') or act not in('set','clear')
   or who='' or length(who)>120 or role_name not in('owner','it')
   or (why is not null and length(why)>400) or (val is not null and length(val)>200) then
   raise exception 'Hand edit is incomplete' using errcode='PT409'; end if;

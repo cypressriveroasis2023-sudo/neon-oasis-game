@@ -175,3 +175,36 @@ test('a unit opens one panel with every camera on it, and a swapped-out camera c
  await expect(app.locator('.cos-camera-status-saved')).toContainText('Helios 001 / Cam 003 & 004 is back on HELIOS 001');
  expect(sent[1]).toMatchObject({unitKey:'HELIOS 001',field:'camera',action:'clear',value:'Helios 001 / Cam 003 & 004'});
 });
+
+test('a unit the provider names wrong can be renamed, and then reads as Avigilon',async({page},info)=>{
+ const {app}=await mountFleet(page);
+ const recorder=line('Sniper Alibi 243',{placement:'SHOP',site:null,state:'RED',online:0,offline:1,
+  down:[{name:'Sniper Alibi 243',status:'offline'}],cameraList:[{name:'Sniper Alibi 243',status:'offline',atSite:false}]});
+ const one={...report,units:[recorder],counts:countUnits([recorder])};
+ const sent=[];
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  const body=JSON.parse(route.request().postData()||'{}');
+  if(body.path&&body.path.endsWith('/edit')){
+   sent.push(body.body);
+   const renamed={...recorder,displayName:body.body.action==='clear'?undefined:body.body.value};
+   return route.fulfill({status:200,headers:cors,json:{...one,units:[renamed],counts:countUnits([renamed]),
+    recorded:{unit:'Sniper Alibi 243',field:'name',action:body.body.action||'set',value:body.body.value??null,by:'Fixture Owner',role:'owner',duplicate:false}}});
+  }
+  return route.fulfill({status:200,headers:cors,json:one});
+ });
+ await openFleetView(app,'Camera status');
+ await app.getByRole('button',{name:/^In the shop/}).first().click();
+ const before=app.locator('.cos-camera-status-row').filter({hasText:'Sniper Alibi 243'});
+ await expect(before.locator('.cos-camera-status-source')).toHaveText('Alibi');
+ await before.getByRole('button',{name:'Open →'}).click();
+ const panel=app.getByRole('form',{name:'Unit panel for Sniper Alibi 243'});
+ await panel.getByLabel('Name').fill('Sniper 243');
+ await panel.getByRole('button',{name:'Save name'}).click();
+ expect(sent[0]).toMatchObject({unitKey:'Sniper Alibi 243',field:'name',value:'Sniper 243'});
+ const after=app.locator('.cos-camera-status-row').filter({hasText:'Sniper 243'});
+ await expect(after.locator('strong')).toContainText('Sniper 243');
+ await expect(after.locator('.cos-camera-status-source')).toHaveText('Avigilon');
+ await page.screenshot({path:info.outputPath('camera-status-rename.png')});
+});
