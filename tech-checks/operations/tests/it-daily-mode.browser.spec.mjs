@@ -174,9 +174,12 @@ async function navMenu(frame) {
 async function scopedMenu(frame) {
   const menu=await navMenu(frame);
   const nav=menu.getByRole('navigation',{name:'COS Operations',exact:true});
-  await expect(nav.getByRole('button')).toHaveCount(2);
-  for(const name of ['Fleet Dashboard','Camera Health'])await expect(nav.getByRole('button',{name,exact:true})).toBeVisible();
-  for(const name of ['IT Dashboard','Victron Power','2027 Unit Tracker','Tech Checks','MHelp','Team','Dispatch'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);
+  // A tech reaches every stand and every camera: the equipment screens, and
+  // nothing of the owner's. IT Dashboard stays out of this nav, and so do
+  // MHelp, Team and Dispatch, which are management.
+  await expect(nav.getByRole('button')).toHaveCount(6);
+  for(const name of ['Fleet Dashboard','Camera Health','InHand Routers','Victron Power','2027 Unit Tracker','Tech Check'])await expect(nav.getByRole('button',{name,exact:true})).toBeVisible();
+  for(const name of ['IT Dashboard','MHelp','Team','Dispatch','Boards','Owner Tasks'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);
   return {menu,nav};
 }
 async function choose(frame,name) {
@@ -244,12 +247,15 @@ test('forbidden direct URL and browser-history workspaces return to Fleet withou
   await desktop(page);
   const {frame,state}=await mount(page,options());
   await readyFleet(frame);
-  for(const hash of ['#mhelp','#tech-check','#unit-tracker','#victron-vrm','#it-dashboard','#jobs','#dispatch']){
+  // Management is still the owner's and a typed URL does not get a tech in.
+  // The equipment screens are no longer on this list: a tech reaches every
+  // stand and every camera, so the tracker, Victron and tech checks open.
+  for(const hash of ['#mhelp','#it-dashboard','#jobs','#dispatch']){
     await frame.locator('body').evaluate((_,value)=>{location.hash=value;},hash);
     await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
     await readyFleet(frame);
   }
-  expect(state.calls.some(call=>/\/api\/(?:unit-tracker|tech\/|jobs|mhelp)/.test(call.path))).toBe(false);
+  expect(state.calls.some(call=>/\/api\/(?:jobs|mhelp)/.test(call.path))).toBe(false);
   await assertReadBoundary(page,state);
 });
 
