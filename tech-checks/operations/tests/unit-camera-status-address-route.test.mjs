@@ -20,10 +20,14 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[]}={}){
   if(name==='profiles')return response([{user_id:owner,full_name:'Synthetic Owner',role:'owner',active:true,archived_at:null}]);
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:'00000000-0000-4000-8000-000000000999',roles:{code:'owner',organization_id:org}}]);
+  if(name==='camera_health_current')return response([{camera_device_id:50,overall_status:'online',checked_at:new Date(Date.now()-120000).toISOString()},{camera_device_id:60,overall_status:'online',checked_at:'2026-11-13T18:00:00Z'}]);
+  if(name==='camera_devices'&&parsed.searchParams.get('source')!=='eq.vigilant_control_center')return response([
+   {id:50,device_name:'Sniper 004',unit_key:'SNIPER 004',organization:'TRACKER FIELD',source:'2026_unit_tracker',activation_state:'active',public_ip:'203.0.113.4'},
+   {id:60,device_name:'CAM 1',unit_key:'RII010 - Arcosa',organization:'RII010 - Arcosa',source:'reconeyez',activation_state:'active',source_last_seen_at:'2026-11-13T18:00:00Z',public_ip:null}]);
   if(name==='camera_devices')return response([
    {id:1,device_name:'SP306_1',unit_key:'SPOTTER 306',organization:'Evergen Equity - Chair King',vigilant_status:'Online',activation_state:'active',source_last_seen_at:'2026-11-12T22:18:00Z',public_ip:'38.246.194.14'},
    {id:2,device_name:'SS029_1',unit_key:'SOLARSPOTTER 029',organization:'root',vigilant_status:'Offline',activation_state:'active',source_last_seen_at:'2026-11-12T22:18:00Z',public_ip:null}]);
-  if(name==='camera_integrations')return response([{provider:'vigilant',enabled:true,last_sync_at:new Date(Date.now()-60000).toISOString(),last_sync_status:'ok'}]);
+  if(name==='camera_integrations')return response(['vigilant','reconeyez'].map(provider=>({provider,enabled:true,last_sync_at:new Date(Date.now()-60000).toISOString(),last_sync_status:'ok'})));
   if(name==='cos_camera_unit_hand_edit_state_v1')return response({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits});
   if(name==='cos_camera_unit_hand_edit_v1'){recorded.push(body);return response({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:body.p_request_id,applied:true,repeat:false});}
   if(parsed.hostname==='geocoding.geo.census.gov'){
@@ -132,4 +136,28 @@ test('the status read carries the pin for a unit with a recorded address',async(
  const unit=(await r.json()).units.find(u=>u.unit==='SPOTTER 306');
  assert.equal(unit.state,'GREEN');
  assert.deepEqual(unit.location,{latitude:29.7838,longitude:-95.534,matchedAddress:katy.matchedAddress,source:'hand'});
+});
+
+test('the read lists Avigilon and Reconeyez units beside Star4Live, each with its source',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status','GET');
+ assert.equal(r.status,200,await r.clone().text());
+ const data=await r.json();
+ assert.equal(data.otherSourcesRead,true);
+ assert.deepEqual(data.units.map(u=>[u.unit,u.source,u.state]),[
+  ['RII010 - Arcosa','reconeyez','GREEN'],['SNIPER 004','ip_check','GREEN'],['SOLARSPOTTER 029','star4live','RED'],['SPOTTER 306','star4live','GREEN']]);
+ assert.equal(data.counts.field.units,3);
+ assert.deepEqual(f.unexpected,[]);
+});
+test('an Avigilon unit has no Star4Live IP to correct by hand',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SNIPER 004',field:'public_ip',value:'8.8.8.8'});
+ assert.equal(r.status,422,await r.clone().text());
+ assert.equal(f.recorded.length,0);
+});
+test('an Avigilon unit can still be moved to the shop by hand',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SNIPER 004',field:'placement',value:'SHOP'});
+ assert.equal(r.status,200,await r.clone().text());
+ assert.equal(f.recorded[0].p_payload.unitKey,'SNIPER 004');
 });

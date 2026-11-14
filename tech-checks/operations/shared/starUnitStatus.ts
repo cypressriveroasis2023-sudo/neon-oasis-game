@@ -47,7 +47,11 @@ export type UnitCameraStatus = {
   address?: string | null;
   location?: UnitLocation | null;
   handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
+  // Where the up/down reading came from. Absent means Star4Live.
+  source?: UnitSource;
 };
+
+export type UnitSource = 'star4live' | 'ip_check' | 'reconeyez';
 
 export type UnitLocation = { latitude: number; longitude: number; matchedAddress: string | null; source: 'hand' };
 
