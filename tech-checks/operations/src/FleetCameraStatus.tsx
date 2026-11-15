@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
-import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
+import {STAR_UNIT_STATUS_CONTRACT,countUnits,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
@@ -105,16 +105,18 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
+ // Keep status counts in the same make scope as the rows selected by a tile.
+ const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
- const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=counts?[
+ const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=statusCounts?[
   // 'Field units' collided with the Fleet board's 'Field equipment', which
   // counts stands and poles too. Say which one this is.
-  {label:'FIELD CAMERA UNITS',count:counts.field.units,kind:'field',group:'field',state:'all'},
-  {label:'UP',count:counts.field.green,kind:'online',group:'field',state:'GREEN'},
-  {label:'SOME CAMERAS DOWN',count:counts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
-  {label:'DOWN',count:counts.field.red,kind:'offline',group:'field',state:'RED'},
-  {label:'NOT VERIFIED',count:counts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
-  {label:'ONLINE IN THE SHOP',count:counts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
+  {label:'FIELD CAMERA UNITS',count:statusCounts.field.units,kind:'field',group:'field',state:'all'},
+  {label:'UP',count:statusCounts.field.green,kind:'online',group:'field',state:'GREEN'},
+  {label:'SOME CAMERAS DOWN',count:statusCounts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
+  {label:'DOWN',count:statusCounts.field.red,kind:'offline',group:'field',state:'RED'},
+  {label:'NOT VERIFIED',count:statusCounts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
+  {label:'ONLINE IN THE SHOP',count:statusCounts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
  ]:[];
  // The three makes COS carries, counted in the field. Each narrows the list the
  // same way a count tile does.
@@ -168,9 +170,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}
+   {family!=='all'&&<> Showing {FAMILY_LABEL[family]} only.</>}
    {stateFilter!=='all'&&<> Showing only {STATE_LABEL[stateFilter].toLowerCase()}. <button type='button' className='cos-camera-status-clear-filter' onClick={()=>setStateFilter('all')}>Show all</button></>}</p>
   {report&&(group==='field'||group==='attention')&&<UnitStatusMap savedAddresses={savedAddresses} units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
-   onSelect={unit=>{setStateFilter('all');setQuery(unit);}}/>}
+   onSelect={unit=>{setStateFilter('all');setFamily('all');setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>
    <label className='sr-only' htmlFor='cos-camera-status-search'>Find a unit, site or IP</label>
    <input id='cos-camera-status-search' type='search' placeholder='Find a unit, site or IP…' value={query} onChange={event=>setQuery(event.target.value)}/>
