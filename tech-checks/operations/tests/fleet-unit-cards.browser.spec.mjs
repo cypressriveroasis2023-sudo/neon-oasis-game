@@ -18,6 +18,13 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} unit card keeps camera rou
 
 test('stale top-card sources cannot stay reachable or show current watts and partial recovery remains independent',async({page})=>{
  const {app,state}=await mountFleet(page,false,{vrm:power(),routers:[router],advancingClock:true});await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();const card=app.getByRole('region',{name:'Selected unit power'});await expect(card.locator('.cos-fleet-power-metrics')).toContainText('190 W');
- const before=await app.locator('body').evaluate(()=>Date.now());await page.clock.fastForward(21*60000);expect(await app.locator('body').evaluate(()=>Date.now())).toBeGreaterThanOrEqual(before+21*60000);await expect(app.getByRole('region',{name:'Selected unit router health'}).locator('.cos-fleet-badge')).toHaveText('●Unverified');await expect(card.locator('.cos-fleet-power-metrics')).not.toContainText('190 W');await expect(card.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('Unverified');
- state.vrm.power[0].measurements.forEach(m=>m.observedAt=new Date(now+21*60000).toISOString());await app.getByRole('dialog').getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(card.locator('.cos-fleet-power-metrics')).toContainText('190 W');await expect(app.getByRole('region',{name:'Selected unit router health'}).locator('.cos-fleet-badge')).toHaveText('●Unverified');expect(state.calls.every(c=>c.method==='GET')).toBe(true);
+ const before=await app.locator('body').evaluate(()=>Date.now());await page.clock.fastForward(21*60000);expect(await app.locator('body').evaluate(()=>Date.now())).toBeGreaterThanOrEqual(before+21*60000);
+ // A router check is unverified at twenty-one minutes. Power is not: Victron is
+ // polled every fifteen minutes and arrives already minutes old, so a healthy
+ // unit normally reads twenty-odd minutes back. The windows are independent and
+ // this is where that shows.
+ await expect(app.getByRole('region',{name:'Selected unit router health'}).locator('.cos-fleet-badge')).toHaveText('●Unverified');await expect(card.locator('.cos-fleet-power-metrics')).toContainText('190 W');
+ // Past its own window power stops being current, like anything else.
+ await page.clock.fastForward(25*60000);await expect(card.locator('.cos-fleet-power-metrics')).not.toContainText('190 W');await expect(card.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('Unverified');
+ state.vrm.power[0].measurements.forEach(m=>m.observedAt=new Date(now+46*60000).toISOString());await app.getByRole('dialog').getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(card.locator('.cos-fleet-power-metrics')).toContainText('190 W');await expect(app.getByRole('region',{name:'Selected unit router health'}).locator('.cos-fleet-badge')).toHaveText('●Unverified');expect(state.calls.every(c=>c.method==='GET')).toBe(true);
 });

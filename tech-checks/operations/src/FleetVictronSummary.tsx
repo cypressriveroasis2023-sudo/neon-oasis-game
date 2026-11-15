@@ -1,6 +1,6 @@
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import {cameraTime} from './fieldCameraHealth';
-import {cameraTimestamp} from './cameraEvidence';
+import {powerTimestamp} from './cameraEvidence';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 
@@ -21,7 +21,7 @@ export default function FleetVictronSummary({row,now}:{row:FleetDashboardRow;now
   <details><summary>All Victron readings · {measurements.length}</summary>
    {measurements.length?<ul>{measurements.map((item,index)=><li key={item.metric+'|'+item.source+'|'+item.instance+'|'+index}>
     {labels[item.metric]||item.metric}: {item.unit==='state'?(item.value>0?'Alarm '+item.value:'No alarm reported'):item.value+' '+item.unit}
-    <small>{item.source} {item.instance} · {cameraTimestamp(item.observedAt,now).fresh?'Recent':'Stale / unverified'} · {cameraTime(item.observedAt,now)}</small>
+    <small>{item.source} {item.instance} · {powerTimestamp(item.observedAt,now).fresh?'Recent':'Stale / unverified'} · {cameraTime(item.observedAt,now)}</small>
    </li>)}</ul>:<small>No saved power readings</small>}
    <small>Last Victron read attempt: {cameraTime(row.power.lastAttemptAt,now)}</small>
   </details>

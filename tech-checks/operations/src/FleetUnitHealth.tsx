@@ -2,7 +2,7 @@ import FleetCardIcon from './FleetCardIcon';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import FleetCameraTools from './FleetCameraTools';
 import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
-import {cameraTimestamp} from './cameraEvidence';
+import {powerTimestamp} from './cameraEvidence';
 import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
 import type {FleetDashboardRow,Signal} from './fleetDashboardModel';
@@ -18,7 +18,7 @@ function Status({state,label}:{state:Signal;label?:string}){return <span classNa
 /** Present only the already reconciled row. This card never fetches or associates devices. */
 export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{row:FleetDashboardRow;now:number;editing?:boolean;lastKnown?:LastKnownCamera|null}){
  const metrics=row.power?.measurements.filter(m=>m.metric in powerLabels)||[];
- const recent=row.batteryReadIssue?[]:metrics.filter(m=>cameraTimestamp(m.observedAt,now).fresh);
+ const recent=row.batteryReadIssue?[]:metrics.filter(m=>powerTimestamp(m.observedAt,now).fresh);
  return <><FleetCameraTools key={row.id} row={row}/><div className='cos-fleet-unit-health-grid'>
   <section className='cos-fleet-unit-health-section cos-fleet-camera-card' aria-label={editing?'Unit health signals':'Selected unit camera health'}>
    <h3><FleetCardIcon kind="camera"/>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
@@ -47,7 +47,7 @@ export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{
      return <div key={metric}><dt>{powerLabels[metric]}</dt><dd>{readings.length?readings.map(m=><span key={m.source+'|'+m.instance}><strong>{m.value} {m.unit}</strong><small>{sourceLabel(m.source,m.instance)} · {cameraTime(m.observedAt,now)}</small></span>):<span className='cos-signal-unknown'>Unverified</span>}</dd></div>;
     })}</dl>
     <small>W = watts. DC system load is the reported DC load, not total site consumption. Separate source readings are not added together.</small>
-    {metrics.length>0&&<details className='cos-fleet-power-evidence'><summary>All saved power readings</summary><dl>{metrics.map((m,index)=><div key={m.metric+'|'+m.source+'|'+m.instance+'|'+index}><dt>{powerLabels[m.metric]} · {sourceLabel(m.source,m.instance)}</dt><dd>{m.unit==='state'?(m.value>0?'Alarm '+m.value:'No alarm reported'):m.value+' '+m.unit} · {row.batteryReadIssue?'Current reading unverified':cameraTimestamp(m.observedAt,now).fresh?'Recent observation':'Stale / unverified'}<small>Measured {cameraTime(m.observedAt,now)}</small></dd></div>)}</dl><p>Signed battery values retain the source reading. They do not establish remaining runtime.</p></details>}
+    {metrics.length>0&&<details className='cos-fleet-power-evidence'><summary>All saved power readings</summary><dl>{metrics.map((m,index)=><div key={m.metric+'|'+m.source+'|'+m.instance+'|'+index}><dt>{powerLabels[m.metric]} · {sourceLabel(m.source,m.instance)}</dt><dd>{m.unit==='state'?(m.value>0?'Alarm '+m.value:'No alarm reported'):m.value+' '+m.unit} · {row.batteryReadIssue?'Current reading unverified':powerTimestamp(m.observedAt,now).fresh?'Recent observation':'Stale / unverified'}<small>Measured {cameraTime(m.observedAt,now)}</small></dd></div>)}</dl><p>Signed battery values retain the source reading. They do not establish remaining runtime.</p></details>}
    </>}
   </section>
  </div></>;
