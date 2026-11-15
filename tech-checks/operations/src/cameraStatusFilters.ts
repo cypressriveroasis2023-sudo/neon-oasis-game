@@ -26,6 +26,18 @@ export function familyOf(unit:UnitCameraStatus):UnitFamily{
 
 export type Group='field'|'attention'|'shop-online'|'shop';
 export type StateFilter='all'|UnitCameraStatus['state'];
+/** Which make of equipment a count tile or the list is narrowed to. 'all' is
+ * every family, so a brand tile narrows what is already shown rather than
+ * replacing it. */
+export type FamilyFilter='all'|UnitFamily;
+
+/** How many field units of each make, for the brand tiles. Counted off the same
+ * units the list shows, so a tile can never disagree with the rows under it. */
+export function familyFieldCounts(units:UnitCameraStatus[]):Record<UnitFamily,number>{
+ const totals:Record<UnitFamily,number>={avigilon:0,recon:0,alibi:0};
+ for(const unit of units)if(unit.placement==='FIELD')totals[familyOf(unit)]+=1;
+ return totals;
+}
 
 export const GROUPS:{id:Group;label:string;note:string}[]=[
  {id:'field',label:'In the field',note:'Units with a camera reporting from a customer site.'},
@@ -34,10 +46,13 @@ export const GROUPS:{id:Group;label:string;note:string}[]=[
  {id:'shop',label:'In the shop',note:'Everything in root, online or not. Shop units never count as a field outage.'},
 ];
 
-export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string,state:StateFilter='all'):UnitCameraStatus[]{
+export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string,state:StateFilter='all',family:FamilyFilter='all'):UnitCameraStatus[]{
  const text=query.trim().toLowerCase();
  return units.filter(unit=>{
   if(state!=='all'&&unit.state!==state)return false;
+  // The make is matched on the parsed family, never on the typed text: a site
+  // or address that happens to contain 'alibi' is not an Alibi unit.
+  if(family!=='all'&&familyOf(unit)!==family)return false;
   if(group==='field'&&unit.placement!=='FIELD')return false;
   if(group==='attention'&&!(unit.placement==='FIELD'&&unit.state!=='GREEN'))return false;
   if(group==='shop-online'&&!unit.onlineInShop)return false;

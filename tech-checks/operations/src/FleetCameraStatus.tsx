@@ -11,7 +11,7 @@ import './fleetCameraStatus.css';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-import {type Group,type StateFilter,GROUPS,FAMILY_LABEL,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
+import {type Group,type StateFilter,type FamilyFilter,type UnitFamily,GROUPS,FAMILY_LABEL,familyFieldCounts,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
 export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
@@ -56,6 +56,7 @@ const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.pla
 export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
+ const [family,setFamily]=useState<FamilyFilter>('all');
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
  const [vrm,setVrm]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
@@ -100,22 +101,33 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
- const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter):[],[report,group,query,stateFilter]);
+ const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
+ // Counted off the same units the list shows, so a brand tile and the rows
+ // under it can never disagree.
+ const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
  const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=counts?[
-  {label:'FIELD UNITS',count:counts.field.units,kind:'field',group:'field',state:'all'},
+  // 'Field units' collided with the Fleet board's 'Field equipment', which
+  // counts stands and poles too. Say which one this is.
+  {label:'FIELD CAMERA UNITS',count:counts.field.units,kind:'field',group:'field',state:'all'},
   {label:'UP',count:counts.field.green,kind:'online',group:'field',state:'GREEN'},
   {label:'SOME CAMERAS DOWN',count:counts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
   {label:'DOWN',count:counts.field.red,kind:'offline',group:'field',state:'RED'},
   {label:'NOT VERIFIED',count:counts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
   {label:'ONLINE IN THE SHOP',count:counts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
  ]:[];
- const pick=(nextGroup:Group,nextState:StateFilter)=>{setGroup(nextGroup);setStateFilter(nextState);setQuery('');};
+ // The three makes COS carries, counted in the field. Each narrows the list the
+ // same way a count tile does.
+ const brands:{id:UnitFamily;count:number}[]=counts?
+  [{id:'avigilon',count:familyCounts.avigilon},
+   {id:'recon',count:familyCounts.recon},
+   {id:'alibi',count:familyCounts.alibi}]:[];
+ const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header>
    <div>
     <h2>Camera status</h2>
-    <p>Every unit, one line each: Avigilon (Snipers and CAM Vs), Recon II and Alibi. Only you and IT can change where a unit is; nothing moves on its own.</p>
+    <p>Every camera unit, one line each. Stands and poles without a camera are not counted here. Only you and IT can change where a unit is; nothing moves on its own.</p>
    </div>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>
@@ -135,9 +147,20 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
+  {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
+   <button type='button' className={'cos-camera-brand-tile'+(family==='all'?' cos-camera-brand-on':'')}
+    aria-pressed={family==='all'} onClick={()=>pick('field','all','all')}>
+    <span>ALL MAKES</span><strong>{counts.field.units}</strong>
+   </button>
+   {brands.map(brand=><button key={brand.id} type='button'
+    className={'cos-camera-brand-tile cos-camera-brand-'+brand.id+(family===brand.id?' cos-camera-brand-on':'')}
+    aria-pressed={family===brand.id} onClick={()=>pick('field','all',brand.id)}>
+    <span>{FAMILY_LABEL[brand.id].toUpperCase()}</span><strong>{brand.count}</strong>
+   </button>)}
+  </div>}
   {counts&&<div className='cos-camera-status-tiles'>{tiles.map(tile=><button key={tile.label} type='button'
    className={'cos-camera-status-tile cos-camera-tile-'+tile.kind} aria-pressed={group===tile.group&&stateFilter===tile.state}
-   onClick={()=>pick(tile.group,tile.state)}>
+   onClick={()=>pick(tile.group,tile.state,family)}>
    {['online','offline','unknown'].includes(tile.kind)&&<i className={'cos-board-status-dot cos-board-dot-'+tile.kind} aria-hidden='true'/>}
    <span>{tile.label}</span><strong>{tile.count}</strong>
   </button>)}</div>}
