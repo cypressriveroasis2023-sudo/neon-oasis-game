@@ -9,6 +9,19 @@
 .cos-camera-status-stale{opacity:.9}
 .cos-camera-status-error{color:#b42318}
 .cos-camera-status-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+/* The make of the equipment, read before anything else on the screen. Four
+   across on a phone so Avigilon, Recon II and Alibi sit on one line beside the
+   total rather than wrapping into a second row. */
+.cos-camera-brand-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cos-camera-brand-tile{display:flex;flex-direction:column;gap:1px;padding:9px 8px;border-radius:10px;cursor:pointer;font:inherit;color:inherit;text-align:left;
+ border:1px solid rgba(128,128,128,.28);background:transparent;transition:border-color .12s ease,background-color .12s ease}
+.cos-camera-brand-tile span{font-size:.58rem;letter-spacing:.05em;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cos-camera-brand-tile strong{font-size:1.25rem;line-height:1.1}
+.cos-camera-brand-tile:hover{filter:brightness(1.18)}
+/* The chosen make is marked by the COS red edge, not by colour alone. */
+.cos-camera-brand-tile.cos-camera-brand-on{border-color:#e8192c;border-width:2px;padding:8px 7px;background:rgba(232,25,44,.08);font-weight:600}
+.cos-camera-brand-tile.cos-camera-brand-on span{opacity:.95}
+@media (max-width:360px){.cos-camera-brand-tiles{grid-template-columns:repeat(2,1fr)}}
 .cos-camera-status-tile{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;border:1px solid rgba(128,128,128,.28)}
 .cos-camera-status-tile span{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
 .cos-camera-status-tile strong{font-size:1.5rem;line-height:1.1}
