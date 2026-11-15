@@ -1227,7 +1227,7 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
     const row = unitRows.length === 1 ? unitRows[0] : null;
     const power = row?.power;
     const available = config?.items.filter((i) => i.installationId === power?.installationId && i.name === power?.name) || [];
-    const recent = power?.measurements.some((m) => cameraTimestamp(m.observedAt, now).fresh) === true;
+    const recent = power?.measurements.some((m) => powerTimestamp(m.observedAt, now).fresh) === true;
     const unique = Boolean(power && available.length === 1 && !seenInstallations.has(power.installationId));
     if (unique && power) seenInstallations.add(power.installationId);
     const status = unique && recent && !power?.errorCode && config?.sync.state === "current" ? "online" : "unverified";

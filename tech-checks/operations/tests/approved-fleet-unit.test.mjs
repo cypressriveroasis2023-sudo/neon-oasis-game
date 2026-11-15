@@ -20,7 +20,7 @@ import {createHash} from 'node:crypto';
 // untouched, and tests/power-freshness.test.mjs holds both boundaries exactly.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
-  "FleetUnitHealth.tsx": "5d3a33000b951c1442771a63be7aed1cdd5e4e35",
+  "FleetUnitHealth.tsx": "6bc714cfd419d01e7b8541ccfc2142dc91fff449",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
