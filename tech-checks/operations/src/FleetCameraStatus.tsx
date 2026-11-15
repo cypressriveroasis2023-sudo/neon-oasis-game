@@ -12,6 +12,7 @@ import './cosMotion.css';
 import './fleetNeedsYou.css';
 import FleetNeedsYou from './FleetNeedsYou';
 import UnitTroubleshoot from './UnitTroubleshoot';
+import {routerEvidenceByUnit,routerEvidenceFor} from './routerEvidence';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
 
@@ -64,9 +65,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
- const [vrm,setVrm]=useState<any>(null);
+ const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
  useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ // Router evidence for the troubleshooting checks. A failure here leaves the
+ // router check reading Not checked, which is the truthful answer.
+ useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
   setLoading(true);
   try{
@@ -106,6 +110,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
+ const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
@@ -217,7 +222,14 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
          IP and the saved address. Router, port and mHelp evidence live on the
          Fleet board and are not read here, so those checks say Not checked
          rather than being guessed at. */}
-     <UnitTroubleshoot unit={unit}
+     <UnitTroubleshoot unit={unit} evidence={(()=>{
+      const router=routerEvidenceFor(unit,routerIndex);
+      // Only what was actually read is handed over. Port and mHelp evidence
+      // live on the Fleet board and are not read here, so those checks say
+      // Not checked rather than being guessed at.
+      return {routerLinked:routers?router.linked:undefined,
+              portsAnswered:router.reachable===undefined?undefined:[router.reachable]};
+     })()}
       onAction={actionId=>{if(actionId==='address'||actionId==='ip')setDraft(draftOf(unit));}}/>
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
