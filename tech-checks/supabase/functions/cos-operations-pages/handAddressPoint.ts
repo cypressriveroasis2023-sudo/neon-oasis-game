@@ -3,12 +3,14 @@
  * The strict adapter in censusAddress.ts refuses any match whose spelling differs
  * from the input, because it runs unattended. A hand edit is different: the person
  * is the authority for the address, and it is saved exactly as typed. The address
- * service is asked only where that address is. One place found: that is the pin,
- * and the service's own spelling is kept beside it so the person can see where the
- * pin went. No place, or several: there is no single point to pin; the caller
+ * service is asked only where that address is. One agreeing place can be pinned;
+ * its house number, street, city and state must agree after harmless normalization.
+ * The service's own spelling is kept beside the pin. No place, or several: there is no single point to pin; the caller
  * still saves the address, without a pin. Only the address text leaves COS.
  */
-export type HandPoint={status:'success'|'no_match'|'invalid_address'|'provider_error';reason:string;latitude?:number;longitude?:number;matchedAddress?:string;provider?:'census'|'geocodio'};
+import {handAddressDisagreement} from './handAddressAgreement.ts';
+
+export type HandPoint={status:'success'|'no_match'|'unverified_match'|'invalid_address'|'provider_error';reason:string;latitude?:number;longitude?:number;matchedAddress?:string;provider?:'census'|'geocodio'};
 
 /** Metres between two points, near enough for deciding whether results are one place. */
 export function metresApart(a:[number,number],b:[number,number]):number{
@@ -35,7 +37,7 @@ export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=f
  if(typeof value!=='string'||!value.trim()||value.length>200||UNSAFE.test(value))
   return {status:'invalid_address',reason:'An address cannot contain a link, an email, or a gate or access code. Enter the street address only.'};
  const census=await censusPoint(value,requestFetch);
- if(census.status==='success')return census;
+ if(census.status==='success'||census.status==='unverified_match')return census;
  // The second service is reached either with a key configured here, or by
  // asking the project that holds the key. Neither, and the Census stands.
  const ask=usableKey(geocodioApiKey)?()=>geocodioPoint(value,geocodioApiKey,requestFetch):secondLookup?()=>secondLookup(value):null;
@@ -43,13 +45,13 @@ export async function handAddressPoint(value:unknown,requestFetch:typeof fetch=f
  if(!ask)return census;
  let geocodio:HandPoint;
  try{geocodio=await ask();}catch{geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
- if(!geocodio||typeof geocodio!=='object'||!['success','no_match','invalid_address','provider_error'].includes((geocodio as HandPoint).status))
+ if(!geocodio||typeof geocodio!=='object'||!['success','no_match','unverified_match','invalid_address','provider_error'].includes((geocodio as HandPoint).status))
   geocodio={status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};
  // The second service ran last and saw the most, so its answer is the one
  // reported - unless it could not be reached at all, where the first service's
  // reason is the one that tells the person what to check.
  if(geocodio.status==='provider_error'&&census.status==='no_match')return census;
- return geocodio;
+ return checkedHandPoint(value,geocodio);
 }
 const usableKey=(key:unknown):key is string=>typeof key==='string'&&Boolean(key.trim())&&key.length<=8192&&!/[\r\n]/.test(key);
 
@@ -88,7 +90,7 @@ async function censusPoint(value:string,requestFetch:typeof fetch):Promise<HandP
   const match=matches[0],found=point(match?.coordinates?.y,match?.coordinates?.x);
   if(!found)return {status:'no_match',reason:'The address service found the address but gave no usable location, so there is no pin.'};
   const matched=typeof match.matchedAddress==='string'?match.matchedAddress.trim().slice(0,200):'';
-  return {status:'success',reason:'Pinned at the location the address service has for this address.',latitude:found[0],longitude:found[1],provider:'census',...(matched?{matchedAddress:matched}:{})};
+  return checkedHandPoint(value,{status:'success',reason:'Pinned at the location the address service has for this address.',latitude:found[0],longitude:found[1],provider:'census',matchedAddress:matched});
  }catch{return {status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
  finally{clearTimeout(timer);controller.abort();}
 }
@@ -134,6 +136,8 @@ export async function geocodioPoint(value:string,apiKey:string,requestFetch:type
    typeof other?.accuracy==='number'&&Number.isFinite(other.accuracy)&&other.accuracy>=best.accuracy-COMPARABLE_ACCURACY);
   let spread=0;
   for(const other of rivals){
+   const mismatch=handAddressDisagreement(value,other?.formatted_address);
+   if(mismatch)return {status:'unverified_match',reason:mismatch};
    const at=point(other?.location?.lat,other?.location?.lng);
    if(!at){spread=Infinity;break;}
    spread=Math.max(spread,metresApart(found,at));
@@ -143,7 +147,16 @@ export async function geocodioPoint(value:string,apiKey:string,requestFetch:type
   if(spread>SAME_PLACE_METRES)
    return {status:'no_match',reason:'That address matches more than one place. Add the city and ZIP so the pin lands on the right one.'};
   const matched=typeof best.formatted_address==='string'?best.formatted_address.trim().slice(0,200):'';
-  return {status:'success',reason:'Pinned at the location the second address service has for this address.',latitude:found[0],longitude:found[1],provider:'geocodio',...(matched?{matchedAddress:matched}:{})};
+  return checkedHandPoint(value,{status:'success',reason:'Pinned at the location the second address service has for this address.',latitude:found[0],longitude:found[1],provider:'geocodio',matchedAddress:matched});
  }catch{return {status:'provider_error',reason:'The address lookup could not complete, so there is no pin yet. Save the address again later to try for one.'};}
  finally{clearTimeout(timer);controller.abort();}
+}
+
+/** Check again at the write boundary, including future remote lookup responses. */
+export function checkedHandPoint(value:unknown,found:HandPoint):HandPoint {
+ if(found.status!=='success')return found;
+ const reason=handAddressDisagreement(value,found.matchedAddress);
+ if(reason)return {status:'unverified_match',reason};
+ if(!point(found.latitude,found.longitude))return {status:'unverified_match',reason:'The address service gave no usable location. Address saved without a pin.'};
+ return found;
 }

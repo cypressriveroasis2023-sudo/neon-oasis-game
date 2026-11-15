@@ -75,7 +75,7 @@ test('the hand edit uses the lookup when it has no key of its own', async () => 
   const census = async () => json({result: {addressMatches: []}});
   const calls = [];
   const found = await handAddressPoint('20702 Hempstead Rd, Cypress, TX 77065', census, null,
-    async address => { calls.push(address); return {status: 'success', reason: 'Pinned.', latitude: 29.8646, longitude: -95.2614, provider: 'geocodio'}; });
+    async address => { calls.push(address); return {status: 'success', reason: 'Pinned.', matchedAddress: address, latitude: 29.8646, longitude: -95.2614, provider: 'geocodio'}; });
   assert.deepEqual([found.status, found.latitude, calls], ['success', 29.8646, ['20702 Hempstead Rd, Cypress, TX 77065']]);
 });
 

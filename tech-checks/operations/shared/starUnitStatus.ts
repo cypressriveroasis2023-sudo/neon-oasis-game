@@ -57,6 +57,7 @@ export type UnitCameraStatus = {
   // Star4Live reports no street address. A unit has one only when the Owner or
   // IT typed it and the Census geocoder matched it to a point; that is its pin.
   address?: string | null;
+  addressRevision?: string | null;
   location?: UnitLocation | null;
   handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
   // Where the up/down reading came from. Absent means Star4Live.
@@ -76,6 +77,7 @@ export const HAND_EDIT_FIELDS = ['placement', 'site', 'address', 'public_ip', 'c
 export type HandEditField = typeof HAND_EDIT_FIELDS[number];
 
 export type HandEdit = {
+  revision?: string | null;
   unit_key?: string | null;
   field?: string | null;
   action?: string | null;
@@ -290,10 +292,12 @@ export function applyHandEdits(
   const byUnit = new Map<string, Partial<Record<HandEditField, HandEdit>>>();
   // A unit has one of each ordinary edit, but a camera edit per camera: taking
   // one camera off a unit says nothing about the others.
+  const addressRevisions = new Map<string,string|null>();
   const removedByUnit = new Map<string, Map<string, boolean>>();
   for (const edit of Array.isArray(edits) ? edits : []) {
     const unit = unitMatchKey(edit?.unit_key), field = text(edit?.field) as HandEditField, action = text(edit?.action);
     if (!unit || !HAND_EDIT_FIELDS.includes(field)) continue;
+    if (field === 'address') addressRevisions.set(unit,edit.revision ?? null);
     if (field === 'camera') {
       const held = removedByUnit.get(unit) || new Map<string, boolean>();
       // Clearing with no camera named puts every camera on this unit back.
@@ -308,10 +312,11 @@ export function applyHandEdits(
     held[field] = edit;
     byUnit.set(unit, held);
   }
-  if (!byUnit.size && !removedByUnit.size) return report;
+  if (!byUnit.size && !removedByUnit.size && !addressRevisions.size) return report;
   const units = report.units.map(unit => {
     const removedNames = removedByUnit.get(unitMatchKey(unit.unit));
-    const base = removedNames?.size ? withoutRemovedCameras(unit, removedNames) : unit;
+    const cameraBase = removedNames?.size ? withoutRemovedCameras(unit, removedNames) : unit;
+    const base = addressRevisions.has(unitMatchKey(unit.unit)) ? {...cameraBase,addressRevision:addressRevisions.get(unitMatchKey(unit.unit))} : cameraBase;
     const held = byUnit.get(unitMatchKey(unit.unit));
     if (!held) return base;
     unit = base;
@@ -319,7 +324,7 @@ export function applyHandEdits(
     const record = (field: HandEditField, providerValue: string | null) => {
       const edit = held[field];
       if (!edit) return null;
-      const value = text(edit.value);
+      const value = field === 'address' ? edit.value! : text(edit.value);
       applied[field] = {
         value, by: text(edit.actor_name) || 'Unknown', role: text(edit.actor_role) || 'unknown',
         at: text(edit.created_at) || null, reason: text(edit.reason) || null,

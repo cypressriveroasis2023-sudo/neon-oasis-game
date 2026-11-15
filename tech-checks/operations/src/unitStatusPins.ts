@@ -40,6 +40,9 @@ export function unitPins(units:readonly UnitCameraStatus[],saved?:readonly Saved
   // An address a person typed wins over the one already on the unit list.
   if(at&&typeof at.latitude==='number'&&typeof at.longitude==='number'&&Number.isFinite(at.latitude)&&Number.isFinite(at.longitude))
    return [{...common,latitude:at.latitude,longitude:at.longitude,address:unit.address??null,source:'hand' as const}];
+  // An explicit hand address without a point (including a pin withdrawal)
+  // must not resurrect a separate saved-source pin.
+  if(unit.address||unit.addressRevision)return [];
   const key=canonicalCameraUnit(unit.unit),fallback=key?bySaved.get(key):undefined;
   if(!fallback)return [];
   return [{...common,latitude:fallback.point[0],longitude:fallback.point[1],address:fallback.address||null,source:'saved' as const}];

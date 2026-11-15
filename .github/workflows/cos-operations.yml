@@ -434,6 +434,18 @@ jobs:
           name: owner-one-census-postgres-results
           path: tech-checks/operations/legacy/tests/recon-ordering/owner-one-census-receipt.json
           if-no-files-found: ignore
+      - name: Verify hand-address stale writes and replay with concurrent PostgreSQL clients
+        env:
+          COS_HAND_ADDRESS_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_hand_address_test_ci
+          COS_HAND_ADDRESS_TEST_RECEIPT: hand-address-postgres-receipt.json
+        run: node ../../../tests/hand-address-postgres-concurrency.mjs
+      - name: Hand-address PostgreSQL verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hand-address-postgres-results
+          path: tech-checks/operations/legacy/tests/recon-ordering/hand-address-postgres-receipt.json
+          if-no-files-found: ignore
       - name: Verify MHelp address geocoder quota with concurrent PostgreSQL clients
         env:
           COS_MHELP_GEOCODIO_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/cos_mhelp_geocodio_test_ci
