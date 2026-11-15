@@ -8,6 +8,8 @@ import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
+import './readingScope.css';
+import {cameraReadingCoverage} from './cameraReadingCoverage';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -97,6 +99,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   }finally{writePending.current=false;setSaving(false);}
  },[]);
 
+ const coverage=useMemo(()=>report?cameraReadingCoverage(report.units):[],[report]);
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
@@ -136,6 +139,20 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
     <small>{feed?.syncedAt?'Star4Live reading '+cameraTime(feed.syncedAt,now):loading?'Reading Star4Live…':'No Star4Live reading'}</small>
    </div>
   </header>
+  <section className='cos-reading-scope' aria-label='Camera status sources and scope'>
+   <h3>Separate provider readings, not the Fleet inventory snapshot</h3>
+   <p>Camera units only; camera-less stands and poles excluded. Totals and map coverage may differ from the mHelp-based Fleet view.</p>
+   <p><strong>Star4Live sync:</strong> {feed?.syncedAt?cameraTime(feed.syncedAt,now):'Not provided'} · {feed?feed.fresh?'Recent sync; individual reading times are below':'Not current':'Freshness unknown'}. This sync time does not date the other sources.</p>
+   {error&&<p className='cos-reading-warning'>Latest read failed. Any retained readings keep their original times; they are not a successful refresh.</p>}
+   <details><summary>Sources, coverage and reading times</summary>
+   {!report?<p>Coverage unknown until a report is read.</p>:<dl>{coverage.map(item=><div key={item.source}>
+    <dt>{item.source==='star4live'?'Star4Live cameras':item.source==='ip_check'?'Avigilon unit connections':'Reconeyez detectors'}</dt>
+    <dd>{report.otherSourcesRead===false&&item.source!=='star4live'?'Source unavailable; coverage unknown':<>{item.field} Field units in this report · {item.unknown} not verified</>}</dd>
+    <dd>Recorded Field observations: {item.oldest?cameraTime(item.oldest,now)+(item.oldest!==item.newest?' to '+cameraTime(item.newest,now):''):'Not provided'}{item.missingTime>0?' · '+item.missingTime+' without a valid reading time':''}</dd>
+    <dd>{item.source==='ip_check'?'Reachability only, not individual camera or video verification.':'Provider status, not independent video or recording verification.'}</dd>
+   </div>)}</dl>}
+   <p>Source coverage above is for all makes before list filters, with saved COS edits where available. A recent observation does not make every unit current; use each row’s status and time. Map pins are separate address evidence, not measured equipment GPS.</p></details>
+  </section>
   {feed&&!feed.fresh&&<p className='cos-camera-status-stale' role='status'>
    <strong>Star4Live has not reported recently.</strong> Every Star4Live unit reads Not verified until the next good sync. No unit is called offline on an old reading.
    {feed.status&&feed.status!=='ok'?' Last sync status: '+feed.status+'.':''}

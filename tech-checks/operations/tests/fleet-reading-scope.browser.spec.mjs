@@ -1,0 +1,44 @@
+import {test,expect} from '@playwright/test';
+import {mountFleet,fresh} from './fleet-dashboard-fixtures.mjs';
+import {openFleetView} from './fleet-view-navigation-helper.mjs';
+import {countUnits} from '../shared/starUnitStatus.ts';
+const unit=(name,source,observedAt,placement='FIELD')=>({unit:name,source,observedAt,placement,site:'Fixture site',siteNamePending:false,state:'UNKNOWN',cameras:1,online:0,offline:0,unknown:1,down:[],onlineInShop:false,publicIp:null});
+const units=[unit('SPOTTER 101','star4live',fresh),unit('SNIPER 001','ip_check',null),unit('RII 001','reconeyez',fresh),unit('SNIPER 002','ip_check',fresh,'SHOP')];
+const report={contract:'COS_STAR_UNIT_STATUS_V1',units,counts:countUnits(units),feed:{provider:'star4live',syncedAt:fresh,status:'ok',enabled:true,fresh:true,ageMs:1000},handEditsRead:true,otherSourcesRead:true,canEdit:false};
+test('separate views explain populations and original observation times without operational writes',async({page},info)=>{
+ const {app,state}=await mountFleet(page);
+ const fleet=app.getByRole('region',{name:'Fleet sources and scope'});
+ await expect(fleet).toContainText('including camera units, stands and poles');
+ await expect(fleet).toContainText('Saved board time:');
+ await expect(fleet).toContainText('Do not add its totals');
+ let fail=false;
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:fail?503:200,headers:cors,json:fail?{error:'Synthetic read failed'}:report}));
+ await openFleetView(app,'Camera status');
+ const scope=app.getByRole('region',{name:'Camera status sources and scope'});
+ await expect(scope).toContainText('Separate provider readings');
+ await expect(scope).toContainText('This sync time does not date the other sources');
+ await scope.getByText('Sources, coverage and reading times',{exact:true}).click();
+ const avigilon=scope.locator('dl > div').filter({hasText:'Avigilon unit connections'});
+ await expect(avigilon).toContainText('1 Field units in this report');
+ await expect(avigilon).toContainText('1 without a valid reading time');
+ await expect(avigilon).toContainText('not individual camera or video verification');
+ fail=true;await app.locator('.cos-camera-status-read button').click();
+ await expect(scope).toContainText('Latest read failed');
+ await expect(avigilon).toContainText('1 Field units in this report');
+ expect(state.calls.filter(call=>call.method==='POST'&&!call.path.includes('refresh'))).toEqual([]);
+ await page.screenshot({path:info.outputPath('reading-scope.png'),fullPage:true});
+});
+
+test('unavailable sources are unknown coverage, not zero healthy units',async({page})=>{
+ const {app}=await mountFleet(page);
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ const partial={...report,units:[units[0]],counts:countUnits([units[0]]),otherSourcesRead:false,feed:{...report.feed,fresh:false}};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:partial}));
+ await openFleetView(app,'Camera status');
+ const scope=app.getByRole('region',{name:'Camera status sources and scope'});
+ await expect(scope).toContainText('Not current');
+ await scope.getByText('Sources, coverage and reading times',{exact:true}).click();
+ await expect(scope.locator('dl > div').filter({hasText:'Avigilon unit connections'})).toContainText('Source unavailable; coverage unknown');
+ await expect(scope.locator('dl > div').filter({hasText:'Reconeyez detectors'})).toContainText('Source unavailable; coverage unknown');
+});
