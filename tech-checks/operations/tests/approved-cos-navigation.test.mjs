@@ -49,10 +49,17 @@ test('presentation metadata and primary buttons do not read or write operational
  for(const file of ['approvedCosNavigation.ts','ApprovedCosNavigation.tsx'])
   assert.doesNotMatch(source(file),/\b(?:fetch|setInterval|setTimeout|localStorage|sessionStorage)\b|api\.(?:get|post)|history\.(?:pushState|replaceState)/);
 });
+// Reviewed change, at James's instruction: a tech reads a unit's history and
+// raises a ticket from the Fleet screen, so historyReadEnabled and createTicket
+// now ask the capability map. No prop was added and no remount key appeared;
+// two existing props changed the expression they are given. The pin moves with
+// that reviewed change and goes on guarding the line against anything else.
 test('native readers and Fleet/Board mounts have no added props or remount keys',()=>{
  const fleet=app.split('\n').find(x=>x.includes('<FleetDashboard session='));
  const board=app.split('\n').find(x=>x.includes('<DailyBoard api='));
- assert.equal(sha(fleet),"1cd46ebcc23761421cb39bad170b0e07ecf6999ecdb8e4e27c1cfe9cc523cf12");
+ assert.equal(fleet.split('={').length-1,22,'the Fleet mount keeps exactly its reviewed prop count');
+ assert.equal(fleet.split('key=').length-1,1,'only the one reviewed remount key');
+ assert.equal(sha(fleet),"7a2eab2ae674b20d61976c41de2bb99bc87f12c7a4ab9c9093b2497d07e7437e");
  assert.equal(sha(board),"2060863c57ccd4f109fbaf828d1e5fcf15be2db635d7caba62698ffb88297285");
 });
 const preserved=[

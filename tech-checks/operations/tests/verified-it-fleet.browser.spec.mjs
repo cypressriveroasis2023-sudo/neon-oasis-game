@@ -42,7 +42,9 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
  const routerReads=calls.filter(c=>c.path==='/api/routers').length;
  expect(routerReads).toBeGreaterThan(0);
- await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
+ // The routers are equipment, so IT reaches them. Opening More must still not
+ // mount the paused Router workspace or read the provider again.
+ await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(1);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
  expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers','/api/vrm-fleet','/api/equipment'].includes(c.path))).toBe(true);
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });

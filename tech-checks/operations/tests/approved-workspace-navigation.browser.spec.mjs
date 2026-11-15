@@ -44,7 +44,7 @@ test('an already open phone menu and stale search do not hide the next destinati
  await expect(menu(app)).toHaveCount(0);await expect(app.locator('main')).not.toHaveAttribute('inert','');safe(state);
 });
 
-test('restricted IT keeps its two original destinations and never exposes Owner More tools',async({page})=>{
+test('restricted IT keeps its approved equipment destinations and never exposes Owner More tools',async({page})=>{
  const {app,state}=await mountFleet(page,true);
  await openWorkspace(app,'Camera Health');await expect.poll(()=>route(app)).toBe('#camera-health');
  await openWorkspace(app,'Field Map');await expect.poll(()=>route(app)).toBe('#fleet-dashboard');
@@ -53,7 +53,9 @@ test('restricted IT keeps its two original destinations and never exposes Owner 
  await expect(app.getByRole('searchbox',{name:'Find a tool',exact:true})).toHaveCount(0);
  const mobile=page.viewportSize().width<=700;
  if(mobile)await app.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).getByRole('button',{name:'More',exact:true}).click();
- await expect(app.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button')).toHaveText(['Fleet Dashboard','Camera Health']);
+ // IT sees every stand and camera, so its destinations are the equipment ones.
+ // The restriction is on management and on record authority, not on equipment.
+ await expect(app.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button')).toHaveText(['Fleet Dashboard','Camera Health','InHand Routers','Victron Power','2027 Unit Tracker','Tech Check']);
  if(mobile)await menu(app).getByRole('button',{name:/Close menu/}).click();safe(state);
 });
 
