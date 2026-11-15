@@ -26,7 +26,7 @@ async function mount(page,{role='owner',openAdvanced=true,inventory=null}={}){
  });
  await page.goto(origin+'/reconnect-fixture');
  const frame=page.frameLocator('iframe'),form=frame.getByRole('region',{name:'Secure mHelpDesk reconnect'});
- await expect(frame.getByRole('region',{name:role==='it'?'COS Fleet Dashboard':'Unit Tracker workspace',exact:true})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toBeVisible();
  if(role==='owner'&&openAdvanced)await frame.getByText('Advanced / IT tools',{exact:true}).click();
  return {frame,form,calls,state};
 }
@@ -76,10 +76,11 @@ test('malformed response cannot display private values or successful connection'
 });
 test('IT cannot see reconnect and initiates no reconnect request',async({page})=>{
  const {frame,form,calls,state}=await mount(page,{role:'it'});
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
- await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+ // IT reads the tracker. Reconnecting mHelpDesk is owner authority and stays
+ // out of the app for IT, request and control alike.
  await expect(form).toHaveCount(0);await expect(frame.getByRole('button',{name:'Reconnect mHelpDesk',exact:true})).toHaveCount(0);
- expect(calls.some(x=>x.path.startsWith(root)||x.path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(calls.some(x=>x.path.startsWith(root))).toBe(false);
+ expect(calls.every(x=>x.method==='GET')).toBe(true);
  expect(calls.every(x=>x.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
 

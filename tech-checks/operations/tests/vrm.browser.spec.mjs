@@ -268,12 +268,14 @@ for(const capability of ['omitted','denied'])test('IT with '+capability+' Victro
  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
-test('IT with explicit Victron read capability keeps a read-only Fleet entry without separate power administration',async({page})=>{
+test('IT with explicit Victron read capability reads power without administering it',async({page})=>{
  const {frame,requests}=await mount(page,{role:'it',mode:'fleet',features:{vrmRead:true},initialHash:'#victron-vrm',config:fleet([syntheticUnit(3000101,'Synthetic authorized IT installation')])});
- await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
- await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
- await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(0);
+ // Power belongs with the stand it is on, so IT reads it where the owner does.
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#victron-vrm');
+ await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(1);
+ if(page.viewportSize().width<=700)await frame.getByRole('button',{name:'More',exact:true}).first().click();
+ await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Victron Power',exact:true})).toHaveCount(1);
+ // Administering the provider is not reading it: no forced provider refresh.
  expect(requests.every(request=>request.method==='GET')).toBe(true);
  expect(requests.some(request=>request.path==='/api/vrm-fleet/refresh')).toBe(false);
 });

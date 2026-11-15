@@ -19,7 +19,7 @@ async function mount(page,{configured=false,tokenOnly=false,role='owner'}={}){
  });
  await page.goto(origin+'/partner-fixture');
  const frame=page.frameLocator('iframe'),workspace=frame.getByRole('region',{name:'Unit Tracker workspace'});
- await expect(role==='it'?frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true}):workspace).toBeVisible();if(role==='owner')await frame.getByText('Advanced / IT tools',{exact:true}).click();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
+ await expect(workspace).toBeVisible();if(role==='owner')await frame.getByText('Advanced / IT tools',{exact:true}).click();return{frame,review:frame.getByRole('region',{name:'mHelpDesk Partner API review'}),calls,state};
 }
 test('setup requires an explicit check and never claims live sync or calls equipment preview',async({page})=>{
  const {review,calls}=await mount(page);await expect(review).toBeVisible();
@@ -59,9 +59,9 @@ test('invalid preview is rejected without leaving stale verified results',async(
 });
 test('verified IT has no Partner API connection controls',async({page})=>{
  const {frame,review,calls,state}=await mount(page,{role:'it'});
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
- await expect(frame.getByRole('region',{name:'Unit Tracker workspace',exact:true})).toHaveCount(0);
+ // The Partner API panel is owner authority; the tracker screen is not.
  await expect(review).toHaveCount(0);
- expect(calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner/')||x.path.startsWith('/api/unit-tracker'))).toBe(false);
+ expect(calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner/'))).toBe(false);
+ expect(calls.every(x=>x.method==='GET')).toBe(true);
  expect(calls.every(x=>x.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });
