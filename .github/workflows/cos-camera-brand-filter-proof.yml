@@ -27,6 +27,8 @@ jobs:
       - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
       - name: Verify synthetic camera sources and make filtering
         run: npm run test:browser -- --workers=1 --retries=0 tests/camera-status-sources.browser.spec.mjs tests/fleet-reading-scope.browser.spec.mjs
+      - name: Verify exact location-source control despite source-summary labels
+        run: npm run test:browser -- --workers=1 --retries=0 tests/operations.browser.spec.mjs --grep 'Field Map'
       - name: Preserve browser regression evidence
         if: always()
         uses: actions/upload-artifact@v4

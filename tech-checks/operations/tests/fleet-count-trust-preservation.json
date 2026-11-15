@@ -261,11 +261,16 @@
     {
       "path": "operations.browser.spec.mjs",
       "baselineBlob": "f1266d21dace939b48f9eccab78e9d61c69c0cf1",
-      "candidateBlob": "a9eadb93fdb2fc19eb7dd3b6eb95c10d29b1db53",
+      "candidateBlob": "85daa85523fa5e25b363d62c48073210533b7017",
       "replacements": [
         {
           "from": "  expect(state.writes).toHaveLength(1);\n  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();\n  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('Last completed results remain displayed with their original check times.');\n  await expect(save).toBeDisabled();\n  expect(state.writes).toHaveLength(1);\n  state.failedPaths.delete('/api/field-map');\n",
           "to": "  expect(state.writes).toHaveLength(1);\n  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();\n  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');\n  await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'})).toContainText('Saved equipment remains visible.');\n  await expect(save).toBeDisabled();\n  expect(state.writes).toHaveLength(1);\n  state.failedPaths.delete('/api/field-map');\n",
+          "count": 1
+        },
+        {
+          "from": "frame.getByLabel('Source').selectOption('manual')",
+          "to": "frame.getByRole('combobox', { name: 'Location source', exact: true }).selectOption('manual')",
           "count": 1
         }
       ]
