@@ -1,0 +1,34 @@
+/* The troubleshooting screen, from the approved phone redesign. */
+.cos-troubleshoot{display:flex;flex-direction:column;gap:11px;margin-top:12px}
+/* One button, the width of the screen, thumb-sized. */
+.cos-troubleshoot-run{width:100%;min-height:56px;padding:16px;border:none;border-radius:13px;
+ background:#e8192c;color:#fff;font-size:.95rem;font-weight:800;letter-spacing:.04em;cursor:pointer}
+.cos-troubleshoot-run:hover{filter:brightness(1.08)}
+.cos-troubleshoot-head{display:flex;align-items:center;justify-content:space-between;padding:0 3px;
+ font-size:.63rem;color:#8e8e99;letter-spacing:.06em}
+.cos-troubleshoot-head span:first-child{font-weight:800}
+.cos-troubleshoot-checks{list-style:none;margin:0;padding:0;border:1px solid #26262e;border-radius:13px;
+ background:#15151a;overflow:hidden}
+.cos-troubleshoot-checks li{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid #1c1c22}
+.cos-troubleshoot-checks li:last-child{border-bottom:none}
+.cos-check-mark{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;
+ justify-content:center;font-size:.75rem;font-weight:800;font-style:normal;
+ background:#101016;border:1px solid #26262e;color:#8e8e99}
+.cos-check-pass .cos-check-mark{background:#0e2419;border-color:#1c4532;color:#7fe3ae}
+.cos-check-fail .cos-check-mark{background:#1e0d11;border-color:#3a171d;color:#ff8a91}
+.cos-check-warn .cos-check-mark{background:#17120a;border-color:#3a2c14;color:#ffc661}
+.cos-check-body{flex:1;min-width:0}
+.cos-check-label{display:block;font-size:.75rem;font-weight:700}
+.cos-check-detail{display:block;font-size:.69rem;color:#8e8e99;margin-top:1px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The verdict in words, so the screen works without colour. */
+.cos-check-said{font-size:.6rem;letter-spacing:.04em;color:#8e8e99;flex:none}
+.cos-check-pass .cos-check-said{color:#7fe3ae}
+.cos-check-fail .cos-check-said{color:#ff8a91}
+.cos-check-warn .cos-check-said{color:#ffc661}
+.cos-check-action{flex:none;min-height:34px;padding:6px 11px;border-radius:8px;cursor:pointer;
+ background:#1a1a21;border:1px solid #2c2c35;color:#fff;font-size:.69rem;font-weight:700}
+.cos-check-action:hover{filter:brightness(1.25)}
+.cos-troubleshoot-advice{border:1px solid #2e1217;border-radius:13px;background:#120c0e;padding:13px}
+.cos-troubleshoot-advice-title{display:block;font-size:.63rem;font-weight:800;color:#ff8a91;letter-spacing:.09em}
+.cos-troubleshoot-advice p{margin:7px 0 0 0;font-size:.81rem;line-height:1.5}

@@ -11,6 +11,8 @@ import './fleetCameraStatus.css';
 import './cosMotion.css';
 import './fleetNeedsYou.css';
 import FleetNeedsYou from './FleetNeedsYou';
+import UnitTroubleshoot from './UnitTroubleshoot';
+import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
@@ -211,6 +213,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
     </div>
     {draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Unit panel for '+unit.unit}>
      <h3 className='cos-camera-status-panel-heading'>{unitName(unit)}</h3>
+     {/* Camera status holds the provider reading, the camera list, the public
+         IP and the saved address. Router, port and mHelp evidence live on the
+         Fleet board and are not read here, so those checks say Not checked
+         rather than being guessed at. */}
+     <UnitTroubleshoot unit={unit}
+      onAction={actionId=>{if(actionId==='address'||actionId==='ip')setDraft(draftOf(unit));}}/>
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
       {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
