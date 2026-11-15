@@ -8,6 +8,10 @@ import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
+import './cosMotion.css';
+import './fleetNeedsYou.css';
+import FleetNeedsYou from './FleetNeedsYou';
+import {needsYouRows} from './fleetNeedsYou';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -104,6 +108,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
+ // Worst first, off the same units the list shows.
+ const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0},[report]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
  const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=counts?[
@@ -147,6 +153,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
+  {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total}
+   onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
    <button type='button' className={'cos-camera-brand-tile'+(family==='all'?' cos-camera-brand-on':'')}
     aria-pressed={family==='all'} onClick={()=>pick('field','all','all')}>
