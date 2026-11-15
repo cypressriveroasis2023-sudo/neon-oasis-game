@@ -36,6 +36,7 @@ export type Capability =
   |'owner.mhelpSync'          // importing and syncing mHelp tickets
   |'owner.census'             // census and field location verification
   |'owner.identityReview'     // reconciling a unit's identity against mHelp
+  |'owner.trackerRequests'    // asking for a 2027 tracker row to be added or changed
   |'owner.diagnostics';       // advanced diagnostics
 
 /** Everything to do with a stand or a camera. Owner and IT are identical here. */
@@ -49,7 +50,7 @@ export const EQUIPMENT_CAPABILITIES = [
 /** Management and record authority. Not field work. */
 export const OWNER_CAPABILITIES = [
   'owner.boards','owner.team','owner.mhelpSync','owner.census',
-  'owner.identityReview','owner.diagnostics',
+  'owner.identityReview','owner.trackerRequests','owner.diagnostics',
 ] as const satisfies readonly Capability[];
 
 type SessionLike = {
@@ -73,6 +74,7 @@ const SERVER_GRANTED:Partial<Record<Capability,string>>={
   'equipment.placement':'fleetPlacementEdit',
   'equipment.publicIp':'fleetConnectionEdit',
   'equipment.tracker':'unitTracker',
+  'owner.trackerRequests':'unitTracker',
   'equipment.power':'vrmRead',
   'owner.mhelpSync':'mhelpTicketImport',
   'owner.census':'fieldLocationVerification',
