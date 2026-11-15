@@ -32,7 +32,7 @@ export default function UnitTroubleshoot({unit,evidence,onAction}:{
      <li key={check.id} className={'cos-motion-rise cos-check-'+check.verdict} style={{animationDelay:index*40+'ms'}}>
       <i className='cos-check-mark' aria-hidden='true'>{MARK[check.verdict]}</i>
       <span className='cos-check-body'>
-       <span className='cos-check-label'>{check.label}</span>
+       <span className='cos-check-label'><b className='cos-check-step'>{index+1}</b>{check.label}</span>
        <span className='cos-check-detail'>{check.detail}</span>
       </span>
       <span className='cos-check-said'>{SAID[check.verdict]}</span>

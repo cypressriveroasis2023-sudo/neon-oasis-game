@@ -32,3 +32,6 @@
 .cos-troubleshoot-advice{border:1px solid #2e1217;border-radius:13px;background:#120c0e;padding:13px}
 .cos-troubleshoot-advice-title{display:block;font-size:.63rem;font-weight:800;color:#ff8a91;letter-spacing:.09em}
 .cos-troubleshoot-advice p{margin:7px 0 0 0;font-size:.81rem;line-height:1.5}
+/* Step numbers: the list is a procedure, worked down in order. */
+.cos-check-step{display:inline-block;min-width:1.15em;margin-right:6px;font-size:.63rem;
+ font-weight:800;color:#55555f;font-style:normal}
