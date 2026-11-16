@@ -19,7 +19,7 @@ const FIXES:{id:FixItAction;label:string;says:string;field:string}[]=[
 export default function FleetFixIt({unitKey,canEdit,onPick}:{
  unitKey:string;canEdit:boolean;onPick:(action:FixItAction,inputId:string)=>void;
 }){
- if(!canEdit)return <p className='cos-fixit-locked'>Only the owner and IT can change a unit.</p>;
+ if(!canEdit)return null;
  return <section className='cos-fixit' aria-label='Fix it'>
   <h4>FIX IT</h4>
   <ul>

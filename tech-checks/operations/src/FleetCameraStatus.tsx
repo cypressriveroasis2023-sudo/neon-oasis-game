@@ -61,6 +61,11 @@ function checkedReport(value:unknown):Report{
 }
 
 
+// The actions this screen can actually carry out. Swapping a camera and
+// linking a router are real jobs, but they are not things this screen can do,
+// so it does not offer a button for them: the written advice says to do them.
+const EDITABLE_ACTIONS=['address','ip','placement','name'] as const;
+
 // What each Fix it choice tells the person to do, in one line.
 const FIX_SAYS:Record<FixItAction,string>={
  address:'Type the street address of the site. Save it, and the unit pins on the map.',
@@ -253,7 +258,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
               portsAnswered:router.reachable===undefined?undefined:[router.reachable],
               mhelp:mhelpEvidenceFor(unit,mhelpIndex)};
      })()}
-      onAction={actionId=>{if(actionId==='address'||actionId==='ip')openFix(unit,actionId as FixItAction);}}/>
+      supported={canEdit?EDITABLE_ACTIONS:[]}
+      onAction={actionId=>openFix(unit,actionId as FixItAction)}/>
      <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={(action,inputId)=>{
       openFix(unit,action);
       // Put the cursor where the work is, once the panel has drawn.
