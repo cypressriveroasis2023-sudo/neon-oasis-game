@@ -25,7 +25,9 @@ import SourceAttentionBanner from './SourceAttentionBanner';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 import {CosPowerAlarmSettings, CosPowerChecks} from './CosPowerAlarmPanel';
-import {readPowerAlarmSettings} from './cosPowerAlarms';
+import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
+import {technicianTodos} from './technicianTodos';
+import TechnicianTodoList from './TechnicianTodoList';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -89,7 +91,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string}[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -151,6 +153,11 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const units=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
+ const todos=useMemo(()=>technicianTodos({
+  cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
+  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
+  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD'})),
+ }),[units,victron,now,powerSettings,addressReviews]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
@@ -231,6 +238,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   <SourceAttentionBanner facts={sourceFacts}/>
   <SourceHealthStrip facts={sourceFacts}/>
   <CosPowerAlarmSettings/>
+  <TechnicianTodoList todos={todos}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
