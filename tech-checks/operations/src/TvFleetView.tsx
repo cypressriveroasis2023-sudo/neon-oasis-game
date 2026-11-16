@@ -21,6 +21,7 @@ import {checkedAddressEstimate,addressEstimateLabel,type AddressEstimate} from '
 import {tvMapTour,tvCameraPageSize} from './tvMapTour';
 import type {FleetPages} from './tvBoardData';
 import SourceAttentionBanner from './SourceAttentionBanner';
+import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
@@ -252,6 +253,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const sourceFacts=fleetSourceFacts({now:clock,map:data.fieldSource||undefined,connectionState:typeof data.fieldSource?.productConnectionsState==='string'?data.fieldSource.productConnectionsState:undefined,boardCheckedAt:data.readAt,trackerVerifiedAt:typeof data.fieldSource?.productConnections?.trackerVerifiedAt==='string'?data.fieldSource.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(data.fieldSource)});
   return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
     <SourceAttentionBanner facts={sourceFacts}/>
+    <SourceHealthStrip facts={sourceFacts}/>
     <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{healthAvailable?census.board?census.board.counts.offline+' down units':outageCards.length+' down units':'Outage count unavailable'}</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{healthAvailable?totals.online:'—'} online</b><b className='tv-offline'>{healthAvailable?totals.offline:'—'} offline</b><b>{locationsAvailable?totals.unknown:'—'} unverified</b>{census.board?<><b>{census.board.field} Field equipment</b><b>{census.board.field-census.board.counts.support} camera-capable equipment</b><b>{census.board.counts.support} support · no cameras</b></>:<b>{locationsAvailable?rows.length+' COS diagnostic units · census unavailable':'Field equipment unavailable'}</b>}<b>{locationsAvailable?tvPins.mhelpLocated:'—'} mHelp address pins</b><b>{locationsAvailable?totals.mapped:'—'} GPS-verified</b></>}<small>Saved camera / placement read every {Math.round(CAMERA_AUTO_REFRESH_MS/60000)} min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}{data.readAt&&clock-data.readAt>CAMERA_AUTO_REFRESH_MS*2?' · last completed reading · not current':''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {data.health?'Last completed results remain displayed with their original check times. ':''}{error}</p>}
     {!data.readAt&&<p className='tv-fleet-loading'>{error?'Fleet information is unavailable.':'Loading Camera Health and field locations…'}</p>}

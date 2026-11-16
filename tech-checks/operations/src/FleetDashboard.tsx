@@ -30,6 +30,7 @@ import {filterSourceEquipment,readRecordedRoster,recordedFamily,recordedSourceLa
 import MhelpPlacementStatus from './MhelpPlacementStatus';
 import MhelpConnectionAlert from './MhelpConnectionAlert';
 import SourceAttentionBanner from './SourceAttentionBanner';
+import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 import {readMhelpInventoryAuthority,showMhelpProductHeadline} from './mhelpInventoryAuthority';
 import {mhelpFieldHealth} from './mhelpFieldHealth';
@@ -323,6 +324,7 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
   {recorded.error&&<details className='cos-fleet-status-strip'><summary><strong>Inventory detail needs review</strong></summary><p>{recorded.error}</p></details>}
   {selectionNotice&&<p className='cos-fleet-message' role='status'>{selectionNotice}</p>}
   <SourceAttentionBanner facts={sourceFacts} canReconnect={canManageOwner&&session.legacyOwner===true} onReconnect={openMhelpConnection||(()=>navigate('Unit Tracker'))}/>
+  <SourceHealthStrip facts={sourceFacts}/>
   <MhelpConnectionAlert value={(map as any)?.mhelpPlacementSync} canReconnect={canManageOwner&&session.legacyOwner===true} onReconnect={openMhelpConnection||(()=>navigate('Unit Tracker'))}/>
   {!map&&!failed&&<p role='status'>Loading the authenticated COS fleet…</p>}
   {view==='map'&&<details className='cos-fleet-vision-toggle'><summary>VISION · What needs attention</summary><FleetVisionBriefing data={boardCurrent?boardData:null} readingAt={boardCurrent?savedReading?.checkedAt??null:null} retained={!boardCurrent||Boolean(cameras.error||mapError||Object.keys(sourceErrors).length)} onMap={()=>document.querySelector('.cos-fleet-map-panel')?.scrollIntoView({block:'start'})} onHealth={()=>tab('fleet')} onOpen={product=>{if(product.linked?.unitId)open(product.linked.unitId);else if(product.linked?.recordId)openSource(product.linked.recordId);else if(mhelpAddresses&&[...mhelpAddresses.pins,...mhelpAddresses.reviews].some(item=>item.productId===product.productId))openMhelpAddress(product.productId);else show('Product '+product.productId+' has no verified COS unit or saved address to open. Review Data sources.');}}/></details>}

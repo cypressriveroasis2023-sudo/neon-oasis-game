@@ -22,6 +22,7 @@ import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
 import SourceAttentionBanner from './SourceAttentionBanner';
+import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
@@ -225,6 +226,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
   <SourceAttentionBanner facts={sourceFacts}/>
+  <SourceHealthStrip facts={sourceFacts}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
