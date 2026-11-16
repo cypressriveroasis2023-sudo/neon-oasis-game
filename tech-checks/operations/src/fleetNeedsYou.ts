@@ -23,11 +23,12 @@ export type NeedsYouRow={
 const TONE_ORDER:Record<NeedsYouTone,number>={down:0,partial:1};
 
 function toneOf(unit:UnitCameraStatus):NeedsYouTone|null{
+ // Called only after a confirmed offline camera. Yellow is a partial outage;
+ // red is every counted camera down. A yellow label with zero offline cameras
+ // never reaches here.
  if(unit.state==='RED')return 'down';
  if(unit.state==='YELLOW')return 'partial';
- // UNKNOWN means the check did not happen. That is not an outage and not work
- // for anyone, so it is counted apart rather than listed here.
- return null;
+ return (unit.online||0)<=0&&(unit.unknown||0)<=0?'down':'partial';
 }
 
 function detailOf(unit:UnitCameraStatus,tone:NeedsYouTone):string{
@@ -47,7 +48,9 @@ export function needsYouRows(units:UnitCameraStatus[],limit=5):{rows:NeedsYouRow
  const all:{row:NeedsYouRow;rank:number;out:number}[]=[];
  for(const unit of units){
   if(unit.placement!=='FIELD')continue;
-  if(unit.state==='UNKNOWN'){unchecked+=1;continue;}
+  // No confirmed offline camera: not an outage. Green stays off the list;
+  // everything else is unchecked rather than "cameras down".
+  if((unit.offline||0)<=0){if(unit.state!=='GREEN')unchecked+=1;continue;}
   const tone=toneOf(unit);
   if(!tone)continue;
   all.push({

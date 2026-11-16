@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
-import {STAR_UNIT_STATUS_CONTRACT,countUnits,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
+import {STAR_UNIT_STATUS_CONTRACT,countUnits,unitVerdict,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
@@ -29,6 +29,12 @@ export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
 const DOT:Record<UnitCameraStatus['state'],string>={GREEN:'online',YELLOW:'offline',RED:'offline',UNKNOWN:'unknown'};
+/** The provider may still mark a mixed online/unverified unit yellow. Zero
+ * confirmed-offline cameras are Unknown on this screen, never "down". */
+function presentedUnit(unit:UnitCameraStatus):UnitCameraStatus{
+ const state=unitVerdict(unit.online||0,unit.offline||0,unit.unknown||0);
+ return state===unit.state?unit:{...unit,state};
+}
 const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras up',YELLOW:'Some cameras down',RED:'All cameras down',UNKNOWN:'Not verified'};
 // Where each reading comes from. Avigilon units (Snipers, CAMVs) are a reachability
 // check on the unit, so they are Up or Down as a whole, never camera by camera.
@@ -137,15 +143,16 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
- const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
+ const units=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
+ const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
  // Worst first, off the same units the list shows.
- const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0,unchecked:0},[report]);
- const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
+ const needsYou=useMemo(()=>report?needsYouRows(units):{rows:[],total:0,unchecked:0},[report,units]);
+ const familyCounts=useMemo(()=>report?familyFieldCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
  // Keep status counts in the same make scope as the rows selected by a tile.
- const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
- const upEvidence=useMemo(()=>report?cameraUpEvidence(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
+ const statusCounts=useMemo(()=>report?countUnits(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
+ const upEvidence=useMemo(()=>report?cameraUpEvidence(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
  const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=statusCounts?[
   // 'Field units' collided with the Fleet board's 'Field equipment', which

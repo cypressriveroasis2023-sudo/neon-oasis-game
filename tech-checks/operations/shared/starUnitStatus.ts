@@ -148,11 +148,17 @@ export function unitLabel(row: StarCameraRow): string {
   return text(row?.unit_key) || text(row?.device_name);
 }
 
-function unitState(online: number, offline: number, unknown: number): UnitCameraStatus['state'] {
-  if (online > 0 && offline === 0 && unknown === 0) return 'GREEN';
-  if (online === 0 && offline === 0) return 'UNKNOWN';
-  if (online === 0 && unknown === 0) return 'RED';
+/** A confirmed offline camera is the only way into yellow or red.
+ * Online mixed with unverified stays Unknown: an incomplete check is not
+ * "some cameras down" and it is not all-up. */
+export function unitVerdict(online: number, offline: number, unknown: number): UnitCameraStatus['state'] {
+  if (offline <= 0) return online > 0 && unknown <= 0 ? 'GREEN' : 'UNKNOWN';
+  if (online <= 0 && unknown <= 0) return 'RED';
   return 'YELLOW';
+}
+
+function unitState(online: number, offline: number, unknown: number): UnitCameraStatus['state'] {
+  return unitVerdict(online, offline, unknown);
 }
 
 /**

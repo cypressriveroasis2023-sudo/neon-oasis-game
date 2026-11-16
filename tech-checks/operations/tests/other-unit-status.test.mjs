@@ -230,10 +230,10 @@ test('fresh Recon inventory never renews stale, missing, invalid or future detec
   }
 });
 
-test('Recon mixed-age observations stay partial and expose the oldest health timestamp', () => {
+test('Recon mixed-age observations stay unknown and expose the oldest health timestamp', () => {
   const [unit] = projectReconUnits([detector(), detector({id: 11})],
     [check({camera_device_id: 10}), check({camera_device_id: 11, checked_at: '2026-11-13T19:00:00Z'})], reconFeed, NOW);
-  assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['YELLOW', 1, 0, 1]);
+  assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['UNKNOWN', 1, 0, 1]);
   assert.equal(unit.observedAt, '2026-11-13T19:00:00.000Z');
   const [missing] = projectReconUnits([detector(), detector({id: 11})], [check({camera_device_id: 10})], reconFeed, NOW);
   assert.equal(missing.observedAt, null);
