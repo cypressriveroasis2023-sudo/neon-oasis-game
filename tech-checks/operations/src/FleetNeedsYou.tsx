@@ -1,13 +1,19 @@
 // The card at the top of the board: what needs a person, worst first.
 import type {NeedsYouRow,NeedsYouTone} from './fleetNeedsYou';
 
-const TONE_LABEL:Record<NeedsYouTone,string>={down:'Down',partial:'Partly down',unchecked:'Not verified'};
+const TONE_LABEL:Record<NeedsYouTone,string>={down:'Down',partial:'Partly down'};
 
-export default function FleetNeedsYou({rows,total,onPick}:{
- rows:NeedsYouRow[];total:number;onPick?:(unit:string)=>void;
+export default function FleetNeedsYou({rows,total,unchecked=0,onPick}:{
+ rows:NeedsYouRow[];total:number;unchecked?:number;onPick?:(unit:string)=>void;
 }){
+ // Said once, the same way, whether or not anything is wrong: a unit that
+ // could not be checked is not known to be faulty and is not a job.
+ const uncheckedNote=unchecked>0?<p className='cos-needs-you-unchecked'>
+  {unchecked} field {unchecked===1?'unit was':'units were'} not checked. Not known to be faulty; nobody needs to drive out for these.
+ </p>:null;
  if(!rows.length)return <section className='cos-needs-you cos-needs-you-clear' aria-label='Units needing attention'>
-  <p><strong>Nothing needs you.</strong> Every field unit reported its cameras up on the last check.</p>
+  <p><strong>Nothing needs you.</strong> Every field unit the app could check reported its cameras up.</p>
+  {uncheckedNote}
  </section>;
  return <section className='cos-needs-you' aria-label='Units needing attention'>
   <header className='cos-motion-sweep'>
@@ -29,5 +35,6 @@ export default function FleetNeedsYou({rows,total,onPick}:{
    </li>)}
   </ul>
   {total>rows.length&&<p className='cos-needs-you-more'>{total-rows.length} more below.</p>}
+  {uncheckedNote}
  </section>;
 }
