@@ -12,3 +12,17 @@ export function cameraReadingCoverage(units:readonly UnitCameraStatus[]){
    newest:times.length?new Date(times[times.length-1]).toISOString():null};
  });
 }
+
+/** Explains existing GREEN groups only; connection success is not camera proof. */
+export function cameraUpEvidence(units:readonly UnitCameraStatus[]){
+ const up=units.filter(unit=>unit.placement==='FIELD'&&unit.state==='GREEN');
+ return {connections:up.filter(unit=>sourceOf(unit)==='ip_check').length,
+  cameraGroups:up.filter(unit=>sourceOf(unit)==='star4live').length,
+  detectorGroups:up.filter(unit=>sourceOf(unit)==='reconeyez').length};
+}
+
+/** Historical provider evidence is not a current health result. */
+export function priorCameraReading(camera:{status:string;lastReportedStatus?:string;lastReportedAt?:string|null}){
+ if(camera.status!=='unknown'||!['online','offline'].includes(camera.lastReportedStatus||'')||!camera.lastReportedAt||!Number.isFinite(Date.parse(camera.lastReportedAt)))return null;
+ return {status:camera.lastReportedStatus!,at:camera.lastReportedAt};
+}

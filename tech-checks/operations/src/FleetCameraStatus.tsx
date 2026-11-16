@@ -9,7 +9,7 @@ import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-opera
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
 import './readingScope.css';
-import {cameraReadingCoverage} from './cameraReadingCoverage';
+import {cameraReadingCoverage,cameraUpEvidence,priorCameraReading} from './cameraReadingCoverage';
 import './cosMotion.css';
 import './fleetNeedsYou.css';
 import FleetNeedsYou from './FleetNeedsYou';
@@ -134,6 +134,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
  // Keep status counts in the same make scope as the rows selected by a tile.
  const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
+ const upEvidence=useMemo(()=>report?cameraUpEvidence(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
  const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=statusCounts?[
   // 'Field units' collided with the Fleet board's 'Field equipment', which
@@ -215,6 +216,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    {['online','offline','unknown'].includes(tile.kind)&&<i className={'cos-board-status-dot cos-board-dot-'+tile.kind} aria-hidden='true'/>}
    <span>{tile.label}</span><strong>{tile.count}</strong>
   </button>)}</div>}
+  {upEvidence&&<p className='cos-camera-status-note' aria-label='What the up count proves'>
+   <strong>UP means different checks:</strong> {upEvidence.connections} unit connections reachable · {upEvidence.cameraGroups} camera groups reported up · {upEvidence.detectorGroups} detector groups reported up.
+   {' '}Field units for {family==='all'?'all makes':FAMILY_LABEL[family]}; Shop units excluded. These checks do not verify live video or recording.
+  </p>}
   <nav className='cos-camera-status-groups' aria-label='Camera status groups'>{GROUPS.map(item=><button key={item.id} type='button' aria-current={group===item.id?'page':undefined} onClick={()=>pick(item.id,'all')}>
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
@@ -244,7 +249,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
      <div className='cos-camera-status-detail'>
       <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
       {sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
-       :unit.down.length>0&&<small>Down: {unit.down.map(camera=>camera.name+(camera.status==='unknown'?' (not verified)':'')).join(', ')}</small>}
+       :unit.down.length>0&&<small>{unit.down.some(camera=>camera.status==='offline')?'Down: ':'Not verified: '}{unit.down.map(camera=>{const prior=priorCameraReading(camera);return camera.name+(camera.status==='unknown'?' (not verified'+(prior?'; last reported '+prior.status+' '+cameraTime(prior.at,now):'')+')':'');}).join(', ')}</small>}
       {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
       <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
@@ -282,6 +287,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
        <span>{camera.name}</span>
        <small>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
         :camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
+        {!camera.removed&&priorCameraReading(camera)&&' · last reported '+priorCameraReading(camera)!.status+' '+cameraTime(priorCameraReading(camera)!.at,now)}
         {!camera.removed&&!camera.atSite&&unit.placement==='FIELD'?' \u00b7 in the shop, not at this site':''}</small>
        {canEdit&&(camera.removed
         ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>
