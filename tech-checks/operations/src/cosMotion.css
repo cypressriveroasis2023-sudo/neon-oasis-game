@@ -1,0 +1,51 @@
+/* COS motion, taken from the approved phone redesign.
+ *
+ * One place for every movement on the board so the fleet reads as one piece of
+ * equipment rather than a set of screens that each animate their own way. Five
+ * movements, and nothing else:
+ *
+ *   pulse  a live fault, breathing so the eye finds it without colour alone
+ *   ring   something reporting right now, expanding and fading away
+ *   rise   a row arriving, staggered down a list so order is readable
+ *   sweep  a band of COS red crossing a header that wants attention
+ *   spin   work in progress
+ *
+ * Motion is never the only carrier of meaning: every state that animates also
+ * has a label and a shape. A technician in sunlight on a cracked phone screen
+ * reads the words, not the movement.
+ */
+
+@keyframes cos-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.78)}}
+@keyframes cos-ring{0%{transform:scale(.8);opacity:.65}75%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+@keyframes cos-rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes cos-sweep{0%{transform:translateX(-120%)}100%{transform:translateX(420%)}}
+@keyframes cos-spin{to{transform:rotate(360deg)}}
+
+/* A fault that is live right now. Paired with the word Down, never alone. */
+.cos-motion-pulse{animation:cos-pulse 1.5s ease-in-out infinite}
+
+/* Something reporting. The ring sits behind its dot and expands out of it. */
+.cos-motion-live{position:relative;display:inline-flex;width:7px;height:7px;flex:none}
+.cos-motion-live::before{content:'';position:absolute;inset:0;border-radius:50%;background:currentColor;animation:cos-ring 2.2s ease-out infinite}
+.cos-motion-live::after{content:'';position:relative;width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* Rows arriving. The delay is set per row so a list reads top to bottom. */
+.cos-motion-rise{animation:cos-rise .42s both}
+
+/* A header that wants attention: one band of COS red crossing it, slowly. */
+.cos-motion-sweep{position:relative;overflow:hidden}
+.cos-motion-sweep::after{content:'';position:absolute;top:0;bottom:0;width:70px;
+ background:linear-gradient(90deg,transparent,rgba(232,25,44,.14),transparent);
+ animation:cos-sweep 3.4s linear infinite;pointer-events:none}
+
+.cos-motion-spin{animation:cos-spin .9s linear infinite}
+
+/* Anyone who has asked their phone to stop moving things gets a still board.
+ * The layout, the colours and the labels are identical; only movement stops. */
+@media (prefers-reduced-motion:reduce){
+ .cos-motion-pulse,.cos-motion-rise,.cos-motion-spin,
+ .cos-motion-live::before,.cos-motion-sweep::after{animation:none}
+ .cos-motion-rise{opacity:1;transform:none}
+ .cos-motion-live::before{opacity:.35}
+ .cos-motion-sweep::after{display:none}
+}
