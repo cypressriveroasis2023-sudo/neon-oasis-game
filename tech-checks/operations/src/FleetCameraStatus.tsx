@@ -24,6 +24,8 @@ import {needsYouRows} from './fleetNeedsYou';
 import SourceAttentionBanner from './SourceAttentionBanner';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
+import {CosPowerAlarmSettings, CosPowerChecks} from './CosPowerAlarmPanel';
+import {readPowerAlarmSettings} from './cosPowerAlarms';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -141,6 +143,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
 
  const coverage=useMemo(()=>report?cameraReadingCoverage(report.units):[],[report]);
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
+ const powerSettings=readPowerAlarmSettings(typeof localStorage==='undefined'?null:localStorage);
  const sourceFacts=useMemo(()=>fleetSourceFacts({now,map:fieldMap||undefined,connectionState:typeof fieldMap?.productConnectionsState==='string'?fieldMap.productConnectionsState:undefined,boardCheckedAt:Number.isFinite(Date.parse(fieldMap?.savedBoardReadAt||''))?Date.parse(fieldMap.savedBoardReadAt):null,star:feed?{fresh:feed.fresh,syncedAt:feed.syncedAt??null,status:feed.status??null}:null,includeStar:Boolean(report),victronError:typeof vrm?.sync?.error==='string'?vrm.sync.error:null,victronAttempt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null,includeVictron:vrmReady,trackerVerifiedAt:typeof fieldMap?.productConnections?.trackerVerifiedAt==='string'?fieldMap.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(fieldMap)}),[now,fieldMap,feed,report,vrm,vrmReady]);
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
@@ -227,6 +230,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
   <SourceAttentionBanner facts={sourceFacts}/>
   <SourceHealthStrip facts={sourceFacts}/>
+  <CosPowerAlarmSettings/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
@@ -280,7 +284,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
       {sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
        :unit.down.length>0&&<small>{unit.down.some(camera=>camera.status==='offline')?'Down: ':'Not verified: '}{unit.down.map(camera=>{const prior=priorCameraReading(camera);return camera.name+(camera.status==='unknown'?' (not verified'+(prior?'; last reported '+prior.status+' '+cameraTime(prior.at,now):'')+')':'');}).join(', ')}</small>}
-      {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
+      {victron.has(unit.unit)&&<><small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small><CosPowerChecks measurements={victron.get(unit.unit)!.measurements} now={now} settings={powerSettings}/></>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
       <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
        onClick={()=>{setSaveError('');setSaved('');setFixStep(null);setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
