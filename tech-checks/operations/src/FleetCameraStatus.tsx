@@ -179,6 +179,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   <header>
    <div>
     <h2>Camera status</h2>
+    <p className='cos-board-identity'><strong>This board is live camera evidence, not inventory.</strong> What the cameras are doing right now. For what is owned and where it is placed, use the Fleet board.</p>
     <p>Every camera unit, one line each. Stands and poles without a camera are not counted here. Only you and IT can change where a unit is; nothing moves on its own.</p>
    </div>
    <div className='cos-camera-status-read'>

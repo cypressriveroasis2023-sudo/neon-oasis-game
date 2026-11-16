@@ -182,3 +182,12 @@ body,#root{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:none}
  #root .cos-fleet-health-table td:first-child strong{font-size:17px}
  #root .cos-fleet-health-table td:last-child button{width:100%;min-height:44px}
 }
+
+/* Each board says what it is before it shows a number. The two were being read
+   as the same thing, and their totals count different populations. */
+#root .cos-board-identity{
+ margin:0 0 10px;padding:10px 12px;border-radius:10px;
+ background:rgba(200,16,46,.10);border:1px solid rgba(200,16,46,.42);
+ color:#E6EDF7;font-size:.86rem;line-height:1.45;
+}
+#root .cos-board-identity strong{display:block;color:#FF8A93;margin-bottom:2px}
