@@ -216,7 +216,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    {['online','offline','unknown'].includes(tile.kind)&&<i className={'cos-board-status-dot cos-board-dot-'+tile.kind} aria-hidden='true'/>}
    <span>{tile.label}</span><strong>{tile.count}</strong>
   </button>)}</div>}
-  {upEvidence&&<p className='cos-camera-status-note' aria-label='What the up count proves'>
+  {upEvidence&&<p className='cos-camera-evidence-note' aria-label='What the up count proves'>
    <strong>UP means different checks:</strong> {upEvidence.connections} unit connections reachable · {upEvidence.cameraGroups} camera groups reported up · {upEvidence.detectorGroups} detector groups reported up.
    {' '}Field units for {family==='all'?'all makes':FAMILY_LABEL[family]}; Shop units excluded. These checks do not verify live video or recording.
   </p>}

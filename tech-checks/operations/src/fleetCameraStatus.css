@@ -103,3 +103,5 @@
 #root#root .cos-camera-status-map-canvas.cos-fleet-map-canvas{height:360px}
 @media (max-width:640px){#root#root .cos-camera-status-map-canvas.cos-fleet-map-canvas{height:300px}}
 .cos-camera-status-renamed{margin:-6px 0 10px;opacity:.8;font-size:12px}
+
+.cos-camera-evidence-note{font-size:.85rem;line-height:1.5;margin:12px 0;color:inherit}
