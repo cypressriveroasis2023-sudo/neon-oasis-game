@@ -50,8 +50,8 @@
           "count": 1
         },
         {
-          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -70,8 +70,8 @@
           "count": 1
         },
         {
-          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -96,7 +96,7 @@
     {
       "path": "mhelp-live-inventory.browser.spec.mjs",
       "baselineBlob": "e01e74347d23f811280f978c7be2bd0d5f85a29c",
-      "candidateBlob": "e4a96b9b97ed669b3f6deea0e82da1c06bfad8ff",
+      "candidateBlob": "1a479ab21d17a4b255e8204c9c34f9ee0d8b7c2c",
       "replacements": [
         {
           "from": "",
@@ -109,8 +109,13 @@
           "count": 1
         },
         {
-          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
-          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "count": 1
+        },
+        {
+          "from": " await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
+          "to": " // No connection evidence here, so online and offline are not known to be\n // zero. Unverified stays a real count: every field unit genuinely is unknown.\n await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
           "count": 1
         }
       ]

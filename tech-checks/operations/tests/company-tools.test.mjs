@@ -89,7 +89,7 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
   });
 }
 test('company tools palette uses local Open Sans and leaves display state to legacy code',()=>{
-  for (const color of ['#0B111C','#111B2A','#172337','#E6EDF7','#A3B3CA','#2C3B51','#315FDF','#91B0FF','#203456','#15352D','#83D6AD','#3B2D18','#EDC27B','#3E202B','#F4A2AC']) assert.ok(theme.includes(color));
+  for (const color of ['#0B111C','#111B2A','#172337','#E6EDF7','#A3B3CA','#2C3B51','#C8102E','#FF8A93','#203456','#15352D','#83D6AD','#3B2D18','#EDC27B','#3E202B','#F4A2AC']) assert.ok(theme.includes(color));
   for(const weight of ['regular','semibold','bold']) {
     assert.ok(readFileSync(new URL(`../../resources/fonts/open-sans-${weight}.woff`,import.meta.url)).length>10000);
     assert.ok(theme.includes(`./resources/fonts/open-sans-${weight}.woff`));

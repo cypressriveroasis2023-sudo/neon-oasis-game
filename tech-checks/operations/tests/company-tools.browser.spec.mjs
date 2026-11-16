@@ -61,7 +61,7 @@ test('company tools Camera Health keeps auth, diagnostics and state cues readabl
   await expect(page.locator('#manageUnitsPanel')).toBeHidden();
   await expect(page.locator('#manageUnitsBtn')).toBeHidden();
   await expect(page.locator('.authcard')).toHaveCSS('background-color','rgb(17, 27, 42)');
-  await expect(page.locator('#cameraLogin')).toHaveCSS('background-color','rgb(49, 95, 223)');
+  await expect(page.locator('#cameraLogin')).toHaveCSS('background-color','rgb(200, 16, 46)');
   await contained(page,['.authcard']);
   await readable(page,['.authcard p','.authcard label','.authcard input','#cameraLogin']);
   await page.evaluate(markup => {
@@ -142,7 +142,7 @@ test('company tools OnSite Vision keeps loading, conversation and modal states',
     await expect(page.locator('.vision-nav-v36 .active')).toHaveCSS('background-color','rgb(32, 52, 86)');
     await expect(page.locator('#visionPrompt')).toHaveCSS('color','rgb(230, 237, 247)');
     await expect(page.locator('.vision-job-card')).toHaveCSS('background-color','rgb(17, 27, 42)');
-    await expect(page.locator('.vision-confirm')).toHaveCSS('background-color','rgb(49, 95, 223)');
+    await expect(page.locator('.vision-confirm')).toHaveCSS('background-color','rgb(200, 16, 46)');
     await expect(page.locator('.vision-action-card.blocked')).toHaveCSS('color','rgb(237, 194, 123)');
     await readable(page,['.vision-answer-title','.vision-answer-copy','.vision-direct.warn','.vision-pill','.vision-confirm','.vision-cancel','.vision-action-card.blocked p']);
     if([390,768,1440].includes(width)) await page.screenshot({path:testInfo.outputPath(`company-vision-conversation-${width}.png`)});
@@ -164,7 +164,7 @@ test('company tools IT repair keeps sign-in and readiness colors', async ({page}
   await mount(page,'it-send-repair');
   await expect(page.locator('#login')).toBeVisible();
   await expect(page.locator('#app')).toBeHidden();
-  await expect(page.locator('#sign')).toHaveCSS('background-color','rgb(49, 95, 223)');
+  await expect(page.locator('#sign')).toHaveCSS('background-color','rgb(200, 16, 46)');
   await page.evaluate(() => {document.querySelector('#loginMsg').innerHTML='<div class="bad">Username or password is incorrect.</div>';});
   await expect(page.locator('#loginMsg .bad')).toHaveCSS('color','rgb(244, 162, 172)');
   for(const width of [320,390,768,1024,1440]) {
