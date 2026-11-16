@@ -49,6 +49,27 @@ function cameraCheck(unit:UnitCameraStatus):UnitCheck{
   detail:on+' of '+total+' reporting'+who,action:{id:'swap',label:'Swap'}};
 }
 
+/**
+ * What mHelp holds about this unit's placement.
+ * The useful case is disagreement: mHelp is the record of record, so when it
+ * says Shop and the board is treating the unit as a field outage, the record
+ * is what needs correcting, not the stand.
+ */
+function mhelpCheck(unit:UnitCameraStatus,mhelp?:{seenAt?:string|null;placement?:'FIELD'|'SHOP'|null;reviewReason?:string|null}):UnitCheck{
+ if(!mhelp)return {id:'mhelp',label:'mHelp location',verdict:'unknown',detail:'No current evidence'};
+ const seen=mhelp.seenAt?' · confirmed '+mhelp.seenAt.slice(0,10):'';
+ if(mhelp.placement&&mhelp.placement!==unit.placement)
+  return {id:'mhelp',label:'mHelp location',verdict:'warn',
+   detail:'mHelp says '+(mhelp.placement==='SHOP'?'shop':'field')+', the board shows '+
+    (unit.placement==='SHOP'?'shop':'field')+seen,action:{id:'placement',label:'Fix'}};
+ if(mhelp.reviewReason)
+  return {id:'mhelp',label:'mHelp location',verdict:'warn',detail:'Held for review · '+mhelp.reviewReason};
+ if(!mhelp.placement)
+  return {id:'mhelp',label:'mHelp location',verdict:'unknown',detail:'No placement recorded'};
+ return {id:'mhelp',label:'mHelp location',verdict:'pass',
+  detail:(mhelp.placement==='SHOP'?'Shop':'Field')+' in mHelp'+seen};
+}
+
 function addressCheck(unit:UnitCameraStatus):UnitCheck{
  const pinned=unit.location&&typeof unit.location.latitude==='number'&&typeof unit.location.longitude==='number';
  const text=(unit.address||'').trim();
@@ -65,7 +86,8 @@ function addressCheck(unit:UnitCameraStatus):UnitCheck{
  * check reports Unknown rather than inventing a result.
  */
 export function troubleshootUnit(unit:UnitCameraStatus,evidence:{
- routerLinked?:boolean;portsAnswered?:boolean[];ipAnswered?:boolean;mhelpSeenAt?:string|null;
+ routerLinked?:boolean;portsAnswered?:boolean[];ipAnswered?:boolean;
+ mhelp?:{seenAt?:string|null;placement?:'FIELD'|'SHOP'|null;reviewReason?:string|null};
 }={}):TroubleshootResult{
  const checks:UnitCheck[]=[];
 
@@ -103,9 +125,7 @@ export function troubleshootUnit(unit:UnitCameraStatus,evidence:{
  checks.push({id:'placement',label:'Placement',verdict:unit.placement==='FIELD'?'pass':'warn',
   detail:unit.placement==='FIELD'?'Field'+(unit.site?' · '+unit.site:''):'Shop · not a customer outage'});
 
- checks.push(evidence.mhelpSeenAt
-  ?{id:'mhelp',label:'mHelp location',verdict:'pass',detail:'Last seen '+evidence.mhelpSeenAt}
-  :{id:'mhelp',label:'mHelp location',verdict:'unknown',detail:'No current evidence'});
+ checks.push(mhelpCheck(unit,evidence.mhelp));
 
  const failures=checks.filter(check=>check.verdict==='fail').length;
  const unknowns=checks.filter(check=>check.verdict==='unknown').length;
@@ -119,6 +139,8 @@ function adviceFor(unit:UnitCameraStatus,checks:UnitCheck[],failures:number,unkn
  const cameras=by('cameras');
  if(unit.placement==='SHOP')
   return name+' is in the shop, so none of this is a customer outage. Leave it for manual review.';
+ if(by('mhelp')?.verdict==='warn'&&/mHelp says/.test(by('mhelp')!.detail))
+  return 'mHelp and the board disagree about where '+name+' is. mHelp is the record of record, so correct the placement before judging anything else here.';
  if(cameras?.verdict==='fail'){
   const out=unit.offline||0,total=unit.cameras||0;
   const where=(unit.address||'').trim()?'':' It also has no address on file, so it will not pin.';
