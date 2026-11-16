@@ -14,7 +14,9 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} sees automatic API invento
  await inventory.getByText('Inventory source details',{exact:true}).click();await expect(inventory).toContainText('Last complete mHelpDesk API read');await expect(inventory).not.toContainText('not a live mHelpDesk read');
  // This synthetic census has no Product-ID/provider associations. Native
  // camera evidence remains separate and must not be assigned to those IDs.
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
+ // No connection evidence here, so online and offline are not known to be
+ // zero. Unverified stays a real count: every field unit genuinely is unknown.
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('\u2014');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('\u2014');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
  await app.locator('.cos-fleet-diagnostic-records > summary').click();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).locator('[aria-label="camera: Online"]')).toBeVisible();
  await expect(app.locator('.cos-fleet-unit-row').filter({hasText:'Spotter 1'}).locator('[aria-label="camera: Offline"]')).toBeVisible();
