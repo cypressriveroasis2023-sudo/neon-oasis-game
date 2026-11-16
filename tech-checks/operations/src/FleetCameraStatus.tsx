@@ -302,7 +302,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       </li>)}
       {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{FAMILY_LABEL[familyOf(unit)]} reports no camera list for this unit.</small></li>}
      </ul>
-     {!canEdit&&<p className='cos-camera-status-locked'>{editLockReason(report,uncertain)}</p>}
+     {!canEdit&&editLockReason(report,uncertain)&&<p className='cos-camera-status-locked'>{editLockReason(report,uncertain)}</p>}
      {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {FAMILY_LABEL[familyOf(unit)]} reports.</p>}
      {canEdit&&<>
      <div className='cos-camera-status-edit-row'>
