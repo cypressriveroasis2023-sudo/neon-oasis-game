@@ -10,6 +10,15 @@ import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
 import './readingScope.css';
 import {cameraReadingCoverage} from './cameraReadingCoverage';
+import './cosMotion.css';
+import './fleetNeedsYou.css';
+import FleetNeedsYou from './FleetNeedsYou';
+import UnitTroubleshoot from './UnitTroubleshoot';
+import {routerEvidenceByUnit,routerEvidenceFor} from './routerEvidence';
+import FleetFixIt,{type FixItAction} from './FleetFixIt';
+import './fleetFixIt.css';
+import './unitTroubleshoot.css';
+import {needsYouRows} from './fleetNeedsYou';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -53,16 +62,28 @@ function checkedReport(value:unknown):Report{
 }
 
 
+// What each Fix it choice tells the person to do, in one line.
+const FIX_SAYS:Record<FixItAction,string>={
+ address:'Type the street address of the site. Save it, and the unit pins on the map.',
+ ip:'Type the public IP the cameras answer on. Check it against the router before saving.',
+ placement:'Set the placement to Shop. It stops counting as a customer outage straight away.',
+ name:'Type the name on the unit\u2019s sticker. The provider keeps its own name.',
+};
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
 export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
+ // Which field a Fix it choice sent the person to, and what it told them.
+ const [fixStep,setFixStep]=useState<{action:FixItAction;says:string}|null>(null);
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
- const [vrm,setVrm]=useState<any>(null);
+ const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
  useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ // Router evidence for the troubleshooting checks. A failure here leaves the
+ // router check reading Not checked, which is the truthful answer.
+ useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
   setLoading(true);
   try{
@@ -103,10 +124,13 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
+ const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
+ // Worst first, off the same units the list shows.
+ const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0},[report]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
  // Keep status counts in the same make scope as the rows selected by a tile.
  const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
@@ -127,6 +151,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   [{id:'avigilon',count:familyCounts.avigilon},
    {id:'recon',count:familyCounts.recon},
    {id:'alibi',count:familyCounts.alibi}]:[];
+ // One place that opens a unit for editing and remembers which step we are on.
+ const openFix=(unit:UnitCameraStatus,action:FixItAction)=>{
+  setSaveError('');setSaved('');
+  setDraft(draftOf(unit));
+  setFixStep({action,says:FIX_SAYS[action]});
+ };
  const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header>
@@ -166,6 +196,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
+  {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total}
+   onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
    <button type='button' className={'cos-camera-brand-tile'+(family==='all'?' cos-camera-brand-on':'')}
     aria-pressed={family==='all'} onClick={()=>pick('field','all','all')}>
@@ -216,13 +248,33 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
       <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
-       onClick={()=>{setSaveError('');setSaved('');setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
+       onClick={()=>{setSaveError('');setSaved('');setFixStep(null);setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>
        {draft?.unit===unit.unit?'Close':canEdit?'Open \u2192':'Details \u2192'}
       </button>
      </div>
     </div>
     {draft?.unit===unit.unit&&<form className='cos-camera-status-edit' onSubmit={event=>event.preventDefault()} aria-label={'Unit panel for '+unit.unit}>
      <h3 className='cos-camera-status-panel-heading'>{unitName(unit)}</h3>
+     {/* Camera status holds the provider reading, the camera list, the public
+         IP and the saved address. Router, port and mHelp evidence live on the
+         Fleet board and are not read here, so those checks say Not checked
+         rather than being guessed at. */}
+     <UnitTroubleshoot unit={unit} evidence={(()=>{
+      const router=routerEvidenceFor(unit,routerIndex);
+      // Only what was actually read is handed over. Port and mHelp evidence
+      // live on the Fleet board and are not read here, so those checks say
+      // Not checked rather than being guessed at.
+      return {routerLinked:routers?router.linked:undefined,
+              portsAnswered:router.reachable===undefined?undefined:[router.reachable]};
+     })()}
+      onAction={actionId=>{if(actionId==='address'||actionId==='ip')openFix(unit,actionId as FixItAction);}}/>
+     <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={(action,inputId)=>{
+      openFix(unit,action);
+      // Put the cursor where the work is, once the panel has drawn.
+      setTimeout(()=>{const field=document.getElementById(inputId);
+       if(field){field.focus();field.scrollIntoView({block:'center',behavior:'smooth'});}},0);
+     }}/>
+     {fixStep&&<p className='cos-fixit-step'>{fixStep.says}</p>}
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
       {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>

@@ -1,0 +1,19 @@
+/* Four choices, in the words the job uses. */
+.cos-fixit{margin-top:12px;border:1px solid #26262e;border-radius:13px;background:#15151a;overflow:hidden}
+.cos-fixit h4{margin:0;padding:10px 13px;border-bottom:1px solid #1e1e25;
+ font-size:.63rem;font-weight:800;color:#8e8e99;letter-spacing:.09em}
+.cos-fixit ul{list-style:none;margin:0;padding:0}
+.cos-fixit li{border-bottom:1px solid #1c1c22}
+.cos-fixit li:last-child{border-bottom:none}
+/* Whole row, thumb-sized: these get used standing at a stand, not at a desk. */
+.cos-fixit button{display:block;width:100%;min-height:52px;padding:11px 13px;text-align:left;
+ background:none;border:none;color:inherit;font:inherit;cursor:pointer}
+.cos-fixit button:hover{background:rgba(255,255,255,.03)}
+.cos-fixit-label{display:block;font-size:.81rem;font-weight:700}
+/* What it does, said once, so nobody has to guess before tapping. */
+.cos-fixit-says{display:block;font-size:.69rem;color:#8e8e99;margin-top:2px;line-height:1.35}
+.cos-fixit-locked{margin:12px 0 0 0;font-size:.75rem;color:#8e8e99}
+/* The field a Fix it choice sent you to, marked until it is touched. */
+.cos-field-focused input,.cos-field-focused select{outline:2px solid #e8192c;outline-offset:1px}
+.cos-fixit-step{margin:10px 0 0 0;padding:9px 11px;border-radius:9px;
+ background:rgba(232,25,44,.08);border:1px solid rgba(232,25,44,.3);font-size:.75rem;line-height:1.4}
