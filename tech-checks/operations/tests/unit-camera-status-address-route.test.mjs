@@ -11,7 +11,7 @@ const response=(data,status=200)=>new Response(JSON.stringify(data),{status,head
 const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
-function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null}={}){
+function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000}={}){
  const calls=[],unexpected=[],recorded=[],asked=[],fixtureNow=Date.now();
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
@@ -20,7 +20,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
   if(name==='profiles')return response([{user_id:owner,full_name:'Synthetic Owner',role,active:true,archived_at:null}]);
   if(name==='user_profiles')return response([{user_id:actor,display_name:'Synthetic Owner',department:'owner',active:true}]);
   if(name==='user_roles')return response([{role_id:'00000000-0000-4000-8000-000000000999',roles:{code:'owner',organization_id:org}}]);
-  if(name==='camera_health_current')return response([{camera_device_id:50,overall_status:'online',checked_at:new Date(fixtureNow-120000).toISOString()},{camera_device_id:60,overall_status:'online',checked_at:'2026-11-13T18:00:00Z'}]);
+  if(name==='camera_health_current')return response([{camera_device_id:50,overall_status:'online',checked_at:new Date(fixtureNow-120000).toISOString()},{camera_device_id:60,overall_status:'online',checked_at:new Date(fixtureNow-reconAgeMs).toISOString()}]);
   if(name==='camera_devices'&&parsed.searchParams.get('source')!=='eq.vigilant_control_center')return response([
    {id:50,device_name:'Sniper 004',unit_key:'SNIPER 004',organization:'TRACKER FIELD',source:'2026_unit_tracker',activation_state:'active',public_ip:'203.0.113.4'},
    {id:60,device_name:'CAM 1',unit_key:'RII010 - Arcosa',organization:'RII010 - Arcosa',source:'reconeyez',activation_state:'active',source_last_seen_at:'2026-11-13T18:00:00Z',public_ip:null}]);
@@ -139,7 +139,8 @@ test('the status read carries the pin for a unit with a recorded address',async(
  assert.deepEqual(unit.location,{latitude:29.7838,longitude:-95.534,matchedAddress:katy.matchedAddress,source:'hand'});
 });
 
-test('the read lists Avigilon and Reconeyez units beside Star4Live, each with its source',async()=>{
+test('the read lists Avigilon and Reconeyez units beside Star4Live, each with its source',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-16T03:00:00Z')});
  const f=fixture();
  const r=await f.send('/api/unit-camera-status','GET');
  assert.equal(r.status,200,await r.clone().text());
@@ -149,6 +150,19 @@ test('the read lists Avigilon and Reconeyez units beside Star4Live, each with it
   ['RII010 - Arcosa','reconeyez','GREEN'],['SNIPER 004','ip_check','GREEN'],['SOLARSPOTTER 029','star4live','RED'],['SPOTTER 306','star4live','GREEN']]);
  assert.equal(data.counts.field.units,3);
  assert.deepEqual(f.unexpected,[]);
+});
+test('fresh inventory does not renew a stale Recon health observation in the route',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-16T03:00:00Z')});
+ const f=fixture({reconAgeMs:48*60*60*1000});
+ const r=await f.send('/api/unit-camera-status','GET');
+ assert.equal(r.status,200);
+ const unit=(await r.json()).units.find(u=>u.source==='reconeyez');
+ assert.equal(unit.state,'UNKNOWN');
+ assert.equal(unit.online,0);assert.equal(unit.offline,0);assert.equal(unit.unknown,1);
+ assert.equal(unit.down[0].lastReportedStatus,'online');
+ assert.equal(unit.down[0].lastReportedAt,unit.observedAt);
+ assert.equal(unit.observedAt,'2026-11-14T03:00:00.000Z');
+ assert.deepEqual(f.recorded,[]);
 });
 test('an Avigilon unit has no Star4Live IP to correct by hand',async()=>{
  const f=fixture();

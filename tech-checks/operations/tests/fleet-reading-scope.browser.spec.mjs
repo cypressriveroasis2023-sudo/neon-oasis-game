@@ -42,3 +42,33 @@ test('unavailable sources are unknown coverage, not zero healthy units',async({p
  await expect(scope.locator('dl > div').filter({hasText:'Avigilon unit connections'})).toContainText('Source unavailable; coverage unknown');
  await expect(scope.locator('dl > div').filter({hasText:'Reconeyez detectors'})).toContainText('Source unavailable; coverage unknown');
 });
+
+test('up evidence stays make-scoped and never labels a connection as verified video',async({page})=>{
+ const {app,state}=await mountFleet(page);
+ const upUnits=units.map(unit=>({...unit,state:'GREEN',online:1,unknown:0}));
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:{...report,units:upUnits,counts:countUnits(upUnits)}}));
+ await openFleetView(app,'Camera status');
+ const explanation=app.getByLabel('What the up count proves',{exact:true});
+ await expect(explanation).toContainText('1 unit connections reachable · 1 camera groups reported up · 1 detector groups reported up');
+ await expect(explanation).toContainText('These checks do not verify live video or recording');
+ await app.getByRole('button',{name:/AVIGILON/}).click();
+ await expect(explanation).toContainText('1 unit connections reachable · 0 camera groups reported up · 0 detector groups reported up');
+ await expect(explanation).toContainText('Shop units excluded');
+ await app.getByRole('button',{name:/ALL MAKES/}).click();
+ await expect(explanation).toContainText('1 camera groups reported up · 1 detector groups reported up');
+ expect(state.calls.filter(call=>call.method==='POST'&&!call.path.includes('refresh'))).toEqual([]);
+});
+
+test('stale offline history stays visible without claiming a current outage',async({page})=>{
+ const {app}=await mountFleet(page);
+ const oldCamera={name:'Historic detector',status:'unknown',lastReportedStatus:'offline',lastReportedAt:'2026-11-01T12:00:00Z'};
+ const staleUnit={...units[2],down:[oldCamera],cameraList:[{...oldCamera,atSite:true}]};
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:{...report,units:[staleUnit],counts:countUnits([staleUnit])}}));
+ await openFleetView(app,'Camera status');
+ const row=app.locator('.cos-camera-status-row').filter({hasText:'Historic detector'});
+ await expect(row).toContainText('Not verified: Historic detector (not verified; last reported offline');
+ await expect(row).not.toContainText('Down: Historic detector');
+ await expect(app.getByRole('button',{name:'DOWN 0',exact:true})).toBeVisible();
+});
