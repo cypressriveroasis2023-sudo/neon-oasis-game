@@ -37,6 +37,6 @@ test('dark host selects dark browser chrome before blocking styles and preserves
   assert.match(css,/color-scheme:dark/);
   assert.doesNotMatch(css,/(?:^|[;{])\s*(?:display|visibility|pointer-events)\s*:/m);
   assert.doesNotMatch(css,/filter\s*:\s*invert|@import|https?:/);
-  for(const color of ['#0B111C','#111B2A','#172337','#E6EDF7','#A3B3CA','#2C3B51','#315FDF','#91B0FF','#15352D','#83D6AD','#3B2D18','#EDC27B','#3E202B','#F4A2AC','#617895'])assert.ok(css.includes(color),color);
+  for(const color of ['#0B111C','#111B2A','#172337','#E6EDF7','#A3B3CA','#2C3B51','#C8102E','#FF8A93','#15352D','#83D6AD','#3B2D18','#EDC27B','#3E202B','#F4A2AC','#617895'])assert.ok(css.includes(color),color);
 });
 

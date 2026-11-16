@@ -1,13 +1,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {workspaces,workspaceGroups,workspaceGroup,workspaceLabel,workspaceHash,readWorkspaceRoute} from '../src/workspaceNavigation.ts';
-test('seven company areas cover every canonical destination with only the deliberate invoice alias',()=>{
-  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Job flow','Schedule','Equipment','Customers','Team','Finance']);
+import {workspaces,workspaceGroups,hiddenWorkspaces,workspaceLabel,workspaceHash,readWorkspaceRoute} from '../src/workspaceNavigation.ts';
+test('six company areas cover every shown destination, the rest deliberately hidden',()=>{
+  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Job flow','Schedule','Equipment','Customers','Team']);
   const items=workspaceGroups.flatMap(group=>group.items);
   assert.equal(new Set(items).size,items.length);
-  assert.deepEqual([...items,'Invoices','Vision'].sort(),[...workspaces].sort());
-  assert.equal(workspaceGroup('Invoices').label,'Finance');
+  // Finance and the unused Customers/Schedule entries came off the navigation
+  // at the owner's request. They stay routable; hiddenWorkspaces is the record.
+  assert.deepEqual([...items,...hiddenWorkspaces,'Invoices','Vision'].sort(),[...workspaces].sort());
+  for(const hidden of hiddenWorkspaces) assert.ok(!items.includes(hidden),hidden+' is still shown');
   assert.equal(workspaceLabel('Today'),'Overview');
   assert.equal(workspaceLabel('Daily Board'),'Dispatch Board');
   assert.equal(workspaceLabel('Invoices'),workspaceLabel('Billing'));

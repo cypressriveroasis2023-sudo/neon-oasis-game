@@ -66,10 +66,10 @@ for(const width of [320,390,701,1024,1440])test('real host authentication surfac
     for(const input of await view.locator('input:visible').all()){
       const style=await readable(input);expect(style.background).toBe('rgb(17, 27, 42)');
       const border=await input.evaluate(el=>getComputedStyle(el).borderTopColor);expect(contrast(border,style.background)).toBeGreaterThanOrEqual(3);
-      await input.focus();expect(await input.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(145, 176, 255)');
+      await input.focus();expect(await input.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(255, 138, 147)');
     }
     for(const button of await view.locator('.btn:visible').all()){
-      const style=await readable(button);expect(style.background).toBe('rgb(49, 95, 223)');expect(style.text).toBe('rgb(255, 255, 255)');
+      const style=await readable(button);expect(style.background).toBe('rgb(200, 16, 46)');expect(style.text).toBe('rgb(255, 255, 255)');
     }
     for(const secondary of await view.locator('.mini:visible').all())await readable(secondary);
     for(const id of ['appView','resetStatusButton','resetTempBox'])await expect(page.locator('#'+id)).toBeHidden();

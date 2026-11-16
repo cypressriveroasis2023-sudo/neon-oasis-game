@@ -235,12 +235,12 @@ for (const colorScheme of ['light','dark']) {
       expect(paints[3].color).toBe('rgb(230, 237, 247)');
       expect(paints[4].background).toBe('rgb(17, 27, 42)');
       expect(paints[4].color).toBe('rgb(230, 237, 247)');
-      expect(paints[5].background).toBe('rgb(49, 95, 223)');
+      expect(paints[5].background).toBe('rgb(200, 16, 46)');
       expect(paints[5].color).toBe('rgb(255, 255, 255)');
       expect(paints[6].color).toBe('rgb(230, 237, 247)');
       expect(paints[7].background).toBe('rgb(17, 27, 42)');
       await page.locator('#ownerGlobalSearchInput').focus();
-      await expect(page.locator('#ownerGlobalSearchInput')).toHaveCSS('outline-color','rgb(145, 176, 255)');
+      await expect(page.locator('#ownerGlobalSearchInput')).toHaveCSS('outline-color','rgb(255, 138, 147)');
       await page.screenshot({path:testInfo.outputPath(`${label.replaceAll(' ','-')}-${colorScheme}.png`),fullPage:true});
       await page.locator('#cosOperationsReturn').click();
       await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
