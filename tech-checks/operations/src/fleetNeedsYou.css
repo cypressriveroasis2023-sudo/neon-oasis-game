@@ -27,3 +27,12 @@
 .cos-needs-you-more{margin:0;padding:8px 13px;font-size:.69rem;color:#8e8e99}
 .cos-needs-you-clear{border-color:rgba(128,128,128,.28);background:transparent}
 .cos-needs-you-clear p{margin:0;padding:11px 13px;font-size:.78rem;color:inherit}
+
+/* Units the app could not check are reported apart from the faults, in plain
+   words. Counting them as work once put 37 in front of the owner when ten
+   were wrong. */
+.cos-needs-you-unchecked{
+ margin:8px 0 0;padding:8px 10px;border-radius:8px;
+ background:rgba(138,143,152,.12);border:1px solid rgba(138,143,152,.32);
+ color:#A3B3CA;font-size:.78rem;line-height:1.4;
+}

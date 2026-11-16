@@ -7,7 +7,7 @@
 import type {UnitCameraStatus} from '../shared/starUnitStatus';
 import {unitName} from './cameraStatusFilters';
 
-export type NeedsYouTone='down'|'partial'|'unchecked';
+export type NeedsYouTone='down'|'partial';
 
 export type NeedsYouRow={
  unit:string;
@@ -17,24 +17,23 @@ export type NeedsYouRow={
  tone:NeedsYouTone;
 };
 
-/** Worst first: every camera down, then some down, then never verified. Within
- * a tone the unit with more cameras out comes first, so a stand with five dead
- * cameras outranks one with a single camera out. */
-const TONE_ORDER:Record<NeedsYouTone,number>={down:0,partial:1,unchecked:2};
+/** Worst first: every camera down, then some down. Within a tone the unit with
+ * more cameras out comes first, so a stand with five dead cameras outranks one
+ * with a single camera out. */
+const TONE_ORDER:Record<NeedsYouTone,number>={down:0,partial:1};
 
 function toneOf(unit:UnitCameraStatus):NeedsYouTone|null{
  if(unit.state==='RED')return 'down';
  if(unit.state==='YELLOW')return 'partial';
- // A check that did not happen is Unknown. It is never reported as an outage.
- if(unit.state==='UNKNOWN')return 'unchecked';
+ // UNKNOWN means the check did not happen. That is not an outage and not work
+ // for anyone, so it is counted apart rather than listed here.
  return null;
 }
 
 function detailOf(unit:UnitCameraStatus,tone:NeedsYouTone):string{
  const out=unit.offline||0,all=unit.cameras||0;
  if(tone==='down')return all>1?'all '+all+' cameras down':'camera down';
- if(tone==='partial')return out+' of '+all+' down';
- return 'not verified';
+ return out+' of '+all+' down';
 }
 
 /**
@@ -43,10 +42,12 @@ function detailOf(unit:UnitCameraStatus,tone:NeedsYouTone):string{
  * reports. `limit` caps what the card shows; the count returned is the whole
  * list, so the badge can say 12 while the card shows 5.
  */
-export function needsYouRows(units:UnitCameraStatus[],limit=5):{rows:NeedsYouRow[];total:number}{
+export function needsYouRows(units:UnitCameraStatus[],limit=5):{rows:NeedsYouRow[];total:number;unchecked:number}{
+ let unchecked=0;
  const all:{row:NeedsYouRow;rank:number;out:number}[]=[];
  for(const unit of units){
   if(unit.placement!=='FIELD')continue;
+  if(unit.state==='UNKNOWN'){unchecked+=1;continue;}
   const tone=toneOf(unit);
   if(!tone)continue;
   all.push({
@@ -57,5 +58,5 @@ export function needsYouRows(units:UnitCameraStatus[],limit=5):{rows:NeedsYouRow
   });
  }
  all.sort((a,b)=>a.rank-b.rank||b.out-a.out||a.row.name.localeCompare(b.row.name));
- return {rows:all.slice(0,Math.max(0,limit)).map(entry=>entry.row),total:all.length};
+ return {rows:all.slice(0,Math.max(0,limit)).map(entry=>entry.row),total:all.length,unchecked};
 }

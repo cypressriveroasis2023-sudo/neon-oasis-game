@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {needsYouRows} from '../src/fleetNeedsYou.ts';
 
 const unit=(u,state,extra={})=>({unit:u,displayName:u,placement:'FIELD',site:'Bristol',
@@ -11,11 +12,11 @@ test('a unit with every camera up never asks for attention', () => {
  assert.equal(total,0);
 });
 
-test('worst first: down, then partly down, then not verified', () => {
+test('worst first: down, then partly down', () => {
  const {rows}=needsYouRows([
   unit('A','UNKNOWN'),unit('B','YELLOW',{cameras:5,offline:1}),unit('C','RED')]);
- assert.deepEqual(rows.map(r=>r.unit),['C','B','A']);
- assert.deepEqual(rows.map(r=>r.tone),['down','partial','unchecked']);
+ assert.deepEqual(rows.map(r=>r.unit),['C','B']);
+ assert.deepEqual(rows.map(r=>r.tone),['down','partial']);
 });
 
 test('more cameras out outranks fewer within the same tone', () => {
@@ -30,11 +31,36 @@ test('a shop unit is never a customer outage, however it reports', () => {
  assert.equal(total,0);
 });
 
-test('a failed check reads Not verified, never as an outage', () => {
- const {rows}=needsYouRows([unit('HELIOS 008','UNKNOWN')]);
- assert.equal(rows[0].tone,'unchecked');
- assert.equal(rows[0].detail,'not verified');
- assert.ok(!/down|offline/i.test(rows[0].detail));
+test('a unit that could not be checked is counted apart, never as work', () => {
+ // Counting these as attention put 37 in front of the owner when ten were
+ // actually wrong. Unknown is not an outage and is not a job for anyone.
+ const {rows,total,unchecked}=needsYouRows([unit('HELIOS 008','UNKNOWN')]);
+ assert.deepEqual(rows,[]);
+ assert.equal(total,0);
+ assert.equal(unchecked,1);
+});
+
+test('the count a person reads is faults only, with unchecked beside it', () => {
+ const units=[unit('C','RED'),unit('B','YELLOW',{cameras:4,offline:2}),
+              ...Array.from({length:27},(_,i)=>unit('U'+i,'UNKNOWN'))];
+ const {total,unchecked}=needsYouRows(units);
+ assert.equal(total,2,'only real faults are counted as needing a person');
+ assert.equal(unchecked,27);
+});
+
+test('unchecked units in the shop are not counted at all', () => {
+ const {total,unchecked}=needsYouRows([unit('SHOPPED','UNKNOWN',{placement:'SHOP'})]);
+ assert.equal(total,0);
+ assert.equal(unchecked,0,'a shop unit is never a customer problem');
+});
+
+test('the card says plainly that unchecked units are not jobs', () => {
+ const card=readFileSync(new URL('../src/FleetNeedsYou.tsx',import.meta.url),'utf8');
+ assert.match(card,/not known to be faulty/i);
+ assert.match(card,/nobody needs to drive out/i);
+ // It must say so even when there is nothing wrong at all.
+ const clear=card.indexOf('Nothing needs you');
+ assert.ok(clear>-1&&card.indexOf('uncheckedNote',clear)>clear,'the clear state must show it too');
 });
 
 test('the detail says how many of how many are out', () => {

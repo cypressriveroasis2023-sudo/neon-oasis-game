@@ -141,7 +141,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
  // Worst first, off the same units the list shows.
- const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0},[report]);
+ const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0,unchecked:0},[report]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
  // Keep status counts in the same make scope as the rows selected by a tile.
  const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
@@ -213,7 +213,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
-  {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total}
+  {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
    <button type='button' className={'cos-camera-brand-tile'+(family==='all'?' cos-camera-brand-on':'')}
