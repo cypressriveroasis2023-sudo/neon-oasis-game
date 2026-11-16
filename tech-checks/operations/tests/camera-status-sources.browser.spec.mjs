@@ -208,3 +208,26 @@ test('a unit the provider names wrong can be renamed, and then reads as Avigilon
  await expect(after.locator('.cos-camera-status-source')).toHaveText('Avigilon');
  await page.screenshot({path:info.outputPath('camera-status-rename.png')});
 });
+
+
+test('make-filtered status totals match the rows and map selection reveals another make',async({page})=>{
+ const {app}=await mountFleet(page);
+ const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
+ await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
+ await openFleetView(app,'Camera status');
+ const rows=app.locator('.cos-camera-status-row');
+ await app.getByRole('button',{name:/^AVIGILON/}).click();
+ await expect(rows).toHaveCount(3);
+ await expect(app.getByRole('button',{name:/^DOWN/}).locator('strong')).toHaveText('1');
+ await app.getByRole('button',{name:/^DOWN/}).click();
+ await expect(rows).toHaveCount(1);
+ await expect(rows.first()).toContainText('SNIPER 004');
+ await expect(app.locator('.cos-camera-status-note')).toContainText('Showing Avigilon only.');
+ await app.locator('.cos-camera-status-map [data-unit-id="SPOTTER 101"]').click();
+ await expect(rows).toHaveCount(1);
+ await expect(rows.first()).toContainText('SPOTTER 101');
+ await expect(app.getByRole('button',{name:/^ALL MAKES/})).toHaveAttribute('aria-pressed','true');
+ await app.getByRole('button',{name:/^ALL MAKES/}).click();
+ await expect(rows).toHaveCount(9);
+ await expect(app.getByRole('button',{name:/^DOWN/}).locator('strong')).toHaveText('2');
+});
