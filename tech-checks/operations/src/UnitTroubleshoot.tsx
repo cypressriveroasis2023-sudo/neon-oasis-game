@@ -7,11 +7,15 @@ const MARK:Record<CheckVerdict,string>={pass:'✓',fail:'✗',warn:'!',unknown:'
 // Written out beside every mark: the colour and the glyph are never the only cue.
 const SAID:Record<CheckVerdict,string>={pass:'Pass',fail:'Fail',warn:'Check',unknown:'Not checked'};
 
-export default function UnitTroubleshoot({unit,evidence,onAction}:{
+export default function UnitTroubleshoot({unit,evidence,supported,onAction}:{
  unit:UnitCameraStatus;
  evidence?:Parameters<typeof troubleshootUnit>[1];
+ /** The actions this screen can actually carry out. A button is only drawn
+  * for one of these: a button that does nothing is worse than no button. */
+ supported?:readonly string[];
  onAction?:(actionId:string,unit:UnitCameraStatus)=>void;
 }){
+ const canDo=(id:string)=>Boolean(onAction)&&(supported?supported.includes(id):false);
  const [result,setResult]=useState<ReturnType<typeof troubleshootUnit>|null>(null);
  const [ranAt,setRanAt]=useState('');
  const run=()=>{
@@ -36,7 +40,7 @@ export default function UnitTroubleshoot({unit,evidence,onAction}:{
        <span className='cos-check-detail'>{check.detail}</span>
       </span>
       <span className='cos-check-said'>{SAID[check.verdict]}</span>
-      {check.action&&<button type='button' className='cos-check-action'
+      {check.action&&canDo(check.action.id)&&<button type='button' className='cos-check-action'
        onClick={()=>onAction?.(check.action!.id,unit)}>{check.action.label}</button>}
      </li>)}
    </ul>

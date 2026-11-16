@@ -16,6 +16,8 @@ import FleetNeedsYou from './FleetNeedsYou';
 import UnitTroubleshoot from './UnitTroubleshoot';
 import {routerEvidenceByUnit,routerEvidenceFor} from './routerEvidence';
 import FleetFixIt,{type FixItAction} from './FleetFixIt';
+import {mhelpEvidenceByUnit,mhelpEvidenceFor} from './mhelpEvidence';
+import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
@@ -62,6 +64,11 @@ function checkedReport(value:unknown):Report{
 }
 
 
+// The actions this screen can actually carry out. Swapping a camera and
+// linking a router are real jobs, but they are not things this screen can do,
+// so it does not offer a button for them: the written advice says to do them.
+const EDITABLE_ACTIONS=['address','ip','placement','name'] as const;
+
 // What each Fix it choice tells the person to do, in one line.
 const FIX_SAYS:Record<FixItAction,string>={
  address:'Type the street address of the site. Save it, and the unit pins on the map.',
@@ -78,11 +85,14 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  // Which field a Fix it choice sent the person to, and what it told them.
  const [fixStep,setFixStep]=useState<{action:FixItAction;says:string}|null>(null);
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
- const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null);
+ const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null),[fieldMap,setFieldMap]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
  useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  // Router evidence for the troubleshooting checks. A failure here leaves the
  // router check reading Not checked, which is the truthful answer.
+ // What mHelp holds about placement, for the mHelp location check. A failure
+ // here leaves that check reading No current evidence, which is truthful.
+ useEffect(()=>{let cancelled=false;api.get('/api/field-map').then(result=>{if(!cancelled)setFieldMap(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
   setLoading(true);
@@ -125,6 +135,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
+ const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
@@ -157,6 +168,11 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   setSaveError('');setSaved('');
   setDraft(draftOf(unit));
   setFixStep({action,says:FIX_SAYS[action]});
+  // The form sits below the checks. Opening it without moving the person to
+  // it looks exactly like a button that does nothing.
+  const inputId=(action==='placement'?'placement':action)+'-'+unit.unit;
+  setTimeout(()=>{const field=document.getElementById(inputId);
+   if(field){field.scrollIntoView({block:'center',behavior:'smooth'});(field as HTMLElement).focus();}},0);
  };
  const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
  return <section className='cos-camera-status' aria-label='Unit camera status'>
@@ -270,15 +286,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       // live on the Fleet board and are not read here, so those checks say
       // Not checked rather than being guessed at.
       return {routerLinked:routers?router.linked:undefined,
-              portsAnswered:router.reachable===undefined?undefined:[router.reachable]};
+              portsAnswered:router.reachable===undefined?undefined:[router.reachable],
+              mhelp:mhelpEvidenceFor(unit,mhelpIndex)};
      })()}
-      onAction={actionId=>{if(actionId==='address'||actionId==='ip')openFix(unit,actionId as FixItAction);}}/>
-     <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={(action,inputId)=>{
-      openFix(unit,action);
-      // Put the cursor where the work is, once the panel has drawn.
-      setTimeout(()=>{const field=document.getElementById(inputId);
-       if(field){field.focus();field.scrollIntoView({block:'center',behavior:'smooth'});}},0);
-     }}/>
+      supported={canEdit?EDITABLE_ACTIONS:[]}
+      onAction={actionId=>openFix(unit,actionId as FixItAction)}/>
+     <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={action=>openFix(unit,action)}/>
      {fixStep&&<p className='cos-fixit-step'>{fixStep.says}</p>}
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
@@ -295,7 +308,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       </li>)}
       {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{FAMILY_LABEL[familyOf(unit)]} reports no camera list for this unit.</small></li>}
      </ul>
-     {!canEdit&&<p>Only you and IT can change a unit.</p>}
+     {!canEdit&&editLockReason(report,uncertain)&&<p className='cos-camera-status-locked'>{editLockReason(report,uncertain)}</p>}
      {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {FAMILY_LABEL[familyOf(unit)]} reports.</p>}
      {canEdit&&<>
      <div className='cos-camera-status-edit-row'>
