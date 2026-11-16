@@ -84,8 +84,9 @@ export function projectIpCheckUnits(
 
 /**
  * Recon II: one line per unit, one camera per Reconeyez detector. Detectors
- * report every few hours, so the feed's own sync decides whether the readings
- * are current: when the feed is missing, failed or old, every unit is Not verified.
+ * report independently of inventory sync. Both the feed and each detector's
+ * health observation must be fresh. A fresh inventory pull cannot renew an old
+ * online/offline observation; stale or missing evidence is Not verified.
  */
 export function projectReconUnits(
   devices: OtherDeviceRow[] | null | undefined, health: DeviceHealthRow[] | null | undefined,
@@ -102,16 +103,27 @@ export function projectReconUnits(
   for (const members of groups.values()) {
     const unit = text(members[0].unit_key) || text(members[0].device_name);
     const cameras = members.map(row => {
-      const said = text(checks.get(String(row.id))?.overall_status).toLowerCase();
-      const status: Status = feedFresh && (said === 'online' || said === 'offline') ? said : 'unknown';
-      return {name: text(row.device_name) || unit, status};
+      const check = checks.get(String(row.id));
+      const said = text(check?.overall_status).toLowerCase();
+      const status: Status = feedFresh && fresh(check?.checked_at, now, maxAgeMs) &&
+        (said === 'online' || said === 'offline') ? said : 'unknown';
+      const reportedAt = Date.parse(text(check?.checked_at));
+      return {name: text(row.device_name) || unit, status,
+        ...(status === 'unknown' && (said === 'online' || said === 'offline') ? {
+          lastReportedStatus: said as 'online' | 'offline',
+          lastReportedAt: Number.isFinite(reportedAt) ? new Date(reportedAt).toISOString() : null,
+        } : {}),
+      };
     });
     const online = cameras.filter(c => c.status === 'online').length, offline = cameras.filter(c => c.status === 'offline').length;
     const unknown = cameras.length - online - offline;
     const organization = text(members.find(row => text(row.organization))?.organization);
     // Reconeyez has no shop folder; the unit's own label says when it is not out.
     const placement: 'FIELD' | 'SHOP' = NOT_DEPLOYED.test(unit) || SHOP_ORGANIZATIONS.has(organization.toLowerCase()) ? 'SHOP' : 'FIELD';
-    const seen = members.map(row => text(row.source_last_seen_at)).filter(Boolean).sort();
+    // A unit timestamp must not make its older detector observations look newer.
+    const seen = members.map(row => Date.parse(text(checks.get(String(row.id))?.checked_at)));
+    const observedAt = seen.every(at => Number.isFinite(at) && at <= now + 60000)
+      ? new Date(Math.min(...seen)).toISOString() : null;
     units.push({
       unit, placement,
       site: placement === 'FIELD' && organization.toUpperCase() !== unit.toUpperCase() ? organization : null,
@@ -121,7 +133,7 @@ export function projectReconUnits(
       down: cameras.filter(c => c.status !== 'online'),
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: null,
-      observedAt: seen.length ? seen[seen.length - 1] : null,
+      observedAt,
       source: 'reconeyez',
     });
   }

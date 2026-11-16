@@ -23,7 +23,12 @@ export type StarCameraRow = {
   star_organization_id?: string | null;
 };
 
-export type UnitCamera = { name: string; status: 'online' | 'offline' | 'unknown' };
+export type UnitCamera = {
+  name: string; status: 'online' | 'offline' | 'unknown';
+  // Historical observation retained when it cannot establish current status.
+  lastReportedStatus?: 'online' | 'offline';
+  lastReportedAt?: string | null;
+};
 /** Every camera Star4Live reports for a unit, with where it sits and whether a
  * person has said it is no longer on the unit (a swap). */
 export type UnitCameraEntry = UnitCamera & { atSite: boolean; removed?: boolean };
