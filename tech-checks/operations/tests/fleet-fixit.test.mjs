@@ -67,3 +67,17 @@ test('every step instruction is one sentence a person can act on', () => {
  assert.equal(says.length,4);
  for(const line of says)assert.ok(/^[A-Z]/.test(line)&&line.length>25,line);
 });
+
+test('both ways into an edit go through one path, so neither can lose the scroll', () => {
+ // A check row's Fix and a Fix it choice must behave identically: open the
+ // draft, then move the person to the field. A form that opens below the
+ // fold is indistinguishable from a button that does nothing.
+ assert.match(screen,/onAction=\{actionId=>openFix\(unit,actionId as FixItAction\)\}/);
+ assert.match(screen,/onPick=\{action=>openFix\(unit,action\)\}/);
+ const body=/const openFix=\(unit:UnitCameraStatus,action:FixItAction\)=>\{[\s\S]*?\n \};/.exec(screen)[0];
+ assert.match(body,/scrollIntoView/);
+ assert.match(body,/\.focus\(\)/);
+ assert.match(body,/setDraft\(draftOf\(unit\)\)/);
+ // The scroll must live in openFix, not be duplicated at a call site.
+ assert.equal((screen.match(/scrollIntoView/g)||[]).length,1);
+});

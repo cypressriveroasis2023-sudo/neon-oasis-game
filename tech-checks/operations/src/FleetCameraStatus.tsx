@@ -15,6 +15,7 @@ import UnitTroubleshoot from './UnitTroubleshoot';
 import {routerEvidenceByUnit,routerEvidenceFor} from './routerEvidence';
 import FleetFixIt,{type FixItAction} from './FleetFixIt';
 import {mhelpEvidenceByUnit,mhelpEvidenceFor} from './mhelpEvidence';
+import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
@@ -161,6 +162,11 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   setSaveError('');setSaved('');
   setDraft(draftOf(unit));
   setFixStep({action,says:FIX_SAYS[action]});
+  // The form sits below the checks. Opening it without moving the person to
+  // it looks exactly like a button that does nothing.
+  const inputId=(action==='placement'?'placement':action)+'-'+unit.unit;
+  setTimeout(()=>{const field=document.getElementById(inputId);
+   if(field){field.scrollIntoView({block:'center',behavior:'smooth'});(field as HTMLElement).focus();}},0);
  };
  const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
  return <section className='cos-camera-status' aria-label='Unit camera status'>
@@ -260,12 +266,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
      })()}
       supported={canEdit?EDITABLE_ACTIONS:[]}
       onAction={actionId=>openFix(unit,actionId as FixItAction)}/>
-     <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={(action,inputId)=>{
-      openFix(unit,action);
-      // Put the cursor where the work is, once the panel has drawn.
-      setTimeout(()=>{const field=document.getElementById(inputId);
-       if(field){field.focus();field.scrollIntoView({block:'center',behavior:'smooth'});}},0);
-     }}/>
+     <FleetFixIt unitKey={unit.unit} canEdit={canEdit} onPick={action=>openFix(unit,action)}/>
      {fixStep&&<p className='cos-fixit-step'>{fixStep.says}</p>}
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
@@ -281,7 +282,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       </li>)}
       {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{FAMILY_LABEL[familyOf(unit)]} reports no camera list for this unit.</small></li>}
      </ul>
-     {!canEdit&&<p>Only you and IT can change a unit.</p>}
+     {!canEdit&&<p className='cos-camera-status-locked'>{editLockReason(report,uncertain)}</p>}
      {canEdit&&<p>Where a unit is, its site, its address and which cameras are on it are yours to set. Up or down always stays whatever {FAMILY_LABEL[familyOf(unit)]} reports.</p>}
      {canEdit&&<>
      <div className='cos-camera-status-edit-row'>

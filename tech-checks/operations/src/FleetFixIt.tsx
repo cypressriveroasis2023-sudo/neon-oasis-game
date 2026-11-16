@@ -17,14 +17,14 @@ const FIXES:{id:FixItAction;label:string;says:string;field:string}[]=[
 ];
 
 export default function FleetFixIt({unitKey,canEdit,onPick}:{
- unitKey:string;canEdit:boolean;onPick:(action:FixItAction,inputId:string)=>void;
+ unitKey:string;canEdit:boolean;onPick:(action:FixItAction)=>void;
 }){
  if(!canEdit)return null;
  return <section className='cos-fixit' aria-label='Fix it'>
   <h4>FIX IT</h4>
   <ul>
    {FIXES.map(fix=><li key={fix.id}>
-    <button type='button' onClick={()=>onPick(fix.id,fix.field+'-'+unitKey)}>
+    <button type='button' onClick={()=>onPick(fix.id)}>
      <span className='cos-fixit-label'>{fix.label}</span>
      <span className='cos-fixit-says'>{fix.says}</span>
     </button>
