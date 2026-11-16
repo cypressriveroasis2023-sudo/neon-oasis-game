@@ -74,6 +74,21 @@ test('a missing check is unknown, never offline', () => {
   assert.deepEqual(unit.down.map(c => c.status), ['unknown', 'unknown']);
 });
 
+test('online mixed with an unverified camera is unknown, never yellow or green', () => {
+  const report = projectUnitCameraStatus([
+    camera({device_name: 'SP500_1', unit_key: 'SPOTTER 500', organization: 'A Site', vigilant_status: 'Online'}),
+    camera({device_name: 'SP500_2', unit_key: 'SPOTTER 500', organization: 'A Site', vigilant_status: null}),
+  ]);
+  const unit = report.units[0];
+  assert.equal(unit.online, 1);
+  assert.equal(unit.offline, 0);
+  assert.equal(unit.unknown, 1);
+  assert.equal(unit.state, 'UNKNOWN');
+  assert.equal(report.counts.field.yellow, 0);
+  assert.equal(report.counts.field.green, 0);
+  assert.equal(report.counts.field.unknown, 1);
+});
+
 test('one offline and one unknown is yellow, not red', () => {
   const report = projectUnitCameraStatus([
     camera({unit_key: 'SPOTTER 400', device_name: 'SP400_1', organization: 'A Site', vigilant_status: 'Offline'}),
