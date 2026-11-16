@@ -49,7 +49,7 @@ test('deactivated devices, other sources and repeats of a unit are left out', ()
 
 test('a Recon II unit groups its detectors and names the ones not reporting', () => {
   const [unit] = projectReconUnits([detector(), detector({id: 11, device_name: 'CAM 2'}), detector({id: 12, device_name: 'CAM 3'})],
-    [check({camera_device_id: 10}), check({camera_device_id: 11, overall_status: 'offline', checked_at: '2026-10-09T13:00:00Z'})], reconFeed, NOW);
+    [check({camera_device_id: 10}), check({camera_device_id: 11, overall_status: 'offline', checked_at: '2026-11-13T21:30:00Z'})], reconFeed, NOW);
   assert.deepEqual([unit.cameras, unit.online, unit.offline, unknownOf(unit), unit.state, unit.source], [3, 1, 1, 1, 'YELLOW', 'reconeyez']);
   assert.deepEqual(unit.down.map(c => c.name + ':' + c.status), ['CAM 2:offline', 'CAM 3:unknown']);
   assert.equal(unit.site, null, 'the unit label already names the site');
@@ -218,4 +218,38 @@ test('the list finds a unit by the name a person gave it and by the provider nam
   assert.deepEqual(groupedUnits(units, 'field', 'sniper 243').map(u => u.unit), ['Sniper Alibi 243']);
   assert.deepEqual(groupedUnits(units, 'field', 'alibi 243').map(u => u.unit), ['Sniper Alibi 243']);
   assert.deepEqual(groupedUnits(units, 'field', 'avigilon').map(u => u.unit), ['Sniper Alibi 243']);
+});
+
+
+test('fresh Recon inventory never renews stale, missing, invalid or future detector health', () => {
+  for (const status of ['online', 'offline']) for (const at of [null, '', 'invalid', '2026-10-09T13:00:00Z', '2026-11-13T21:42:00Z']) {
+    const [unit] = projectReconUnits([detector({source_last_seen_at: reconFeed.syncedAt})],
+      [check({camera_device_id: 10, overall_status: status, checked_at: at})], reconFeed, NOW);
+    assert.equal(unit.state, 'UNKNOWN', `${status} ${at}`);
+    assert.equal(unit.online + unit.offline, 0);
+  }
+});
+
+test('Recon mixed-age observations stay partial and expose the oldest health timestamp', () => {
+  const [unit] = projectReconUnits([detector(), detector({id: 11})],
+    [check({camera_device_id: 10}), check({camera_device_id: 11, checked_at: '2026-11-13T19:00:00Z'})], reconFeed, NOW);
+  assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['YELLOW', 1, 0, 1]);
+  assert.equal(unit.observedAt, '2026-11-13T19:00:00.000Z');
+  const [missing] = projectReconUnits([detector(), detector({id: 11})], [check({camera_device_id: 10})], reconFeed, NOW);
+  assert.equal(missing.observedAt, null);
+});
+
+test('Recon detector freshness honors the existing explicit max-age boundary', () => {
+  for (const [age, expected] of [[60000, 'GREEN'], [60001, 'UNKNOWN']]) {
+    const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10, checked_at: new Date(NOW - age).toISOString()})],
+      reconFeed, NOW, 60000);
+    assert.equal(unit.state, expected);
+  }
+});
+
+
+test('Recon stale offline remains dated historical evidence without becoming a current outage', () => {
+  const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'offline', checked_at: '2026-11-12T19:00:00Z'})], reconFeed, NOW);
+  assert.equal(unit.state, 'UNKNOWN');
+  assert.deepEqual(unit.down[0], {name: 'CAM 1', status: 'unknown', lastReportedStatus: 'offline', lastReportedAt: '2026-11-12T19:00:00.000Z'});
 });

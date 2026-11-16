@@ -7,6 +7,28 @@ export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc';
 export const SERVICE='00000000-0000-4000-8000-000000000003';
 export const hash=s=>createHash('sha256').update(s).digest('hex');
 
+/**
+ * Hold off if the Eastern day is about to turn over.
+ *
+ * These tests stamp a budget row with today's Eastern date and then call code
+ * that derives that date again a moment later. Across midnight in New York the
+ * two dates differ by one and every budget assertion fails at once -- which is
+ * what happened on the 04:5x UTC run. The budget genuinely does roll over
+ * then, so this is the test straddling a real boundary rather than a fault in
+ * the rollover itself. Waiting it out keeps the suite honest without weakening
+ * what it checks.
+ */
+const awaitEasternDayBoundary=async()=>{
+ const easternNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+ for(;;){
+  const now=easternNow();
+  const secondsIntoDay=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
+  const toMidnight=86400-secondsIntoDay;
+  if(toMidnight>90&&secondsIntoDay>10)return;
+  await new Promise(resolve=>setTimeout(resolve,Math.min(toMidnight+11,95)*1000));
+ }
+};
+
 // Synthetic, disposable prerequisite schema. Only columns used by the current
 // legacy geocoder are modeled; no production records, dumps, or credentials.
 // The identity/current-device predicates deliberately match the legacy helper
@@ -110,6 +132,7 @@ grant select,insert,update on app_private.cos_field_geocode_cache,public.camera_
 grant execute on all functions in schema app_private,public to service_role;
 `;
 export async function fixture({imported=false}={}){
+ await awaitEasternDayBoundary();
  const db=new PGlite();
  try{
   await db.exec(legacySchema);
