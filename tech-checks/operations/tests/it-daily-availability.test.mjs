@@ -74,7 +74,7 @@ test('IT desktop lands on Fleet Map while phone mounts named handoffs without le
  assert.match(host,/#fleet-dashboard/);assert.match(host,/if\(value.phone&&!phoneBoard\)/);
  assert.match(host,/disposeTransfer=mountTransferDesk/);
  assert.match(host,/const handoffSelected=value.phone&&!phoneBoard;/);
- assert.match(host,/root.replaceChildren\(phoneNavigation\(value,generation\),handoffFallback\)/);
+ assert.match(host,/root.replaceChildren\(handoffFallback,phoneNavigation\(value,generation\)\)/);
  assert.match(host,/button.disabled=true/);
  assert.match(app,/setRouteLocation\(\{workspace:'Fleet Dashboard'/);
  assert.doesNotMatch(app,/active==='Camera Health'&&dailyOnly\?<CameraHealthWorkspace/);

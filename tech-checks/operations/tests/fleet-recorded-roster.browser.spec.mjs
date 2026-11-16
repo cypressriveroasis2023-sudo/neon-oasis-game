@@ -17,8 +17,12 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Product-ID inventory shows
  await expect(app.locator('.cos-fleet-stats .cos-fleet-stat')).toHaveCount(7);
  await expect(inventory).toContainText('714 Shop');
  await expect(app.locator('div.cos-fleet-count-note')).toContainText('5 assignment representations');
- await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');
- await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');
+ // No connection evidence in this scenario, so online and offline are not
+ // known to be zero -- they are not known at all. A derived zero here reads as
+ // a total outage, which is the one thing a missing check must never claim.
+ // Unverified stays a real count: every field unit genuinely is unknown.
+ await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('\u2014');
+ await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('\u2014');
  await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');
  await expect(app.locator('.cos-dashboard-marker')).toHaveCount(1);
  // This control searches diagnostic representations; the accepted Product-ID census remains separate.

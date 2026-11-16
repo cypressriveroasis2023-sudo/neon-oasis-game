@@ -64,7 +64,7 @@
 
 /* Unit cards are records, not primary action buttons. Keep their text readable. */
 #root#root .operations-shell .field-map-workspace .field-map-list>button{background:#111b2a!important;color:#f3f6fb!important;border-color:#34445b!important;text-align:left}
-#root#root .operations-shell .field-map-workspace .field-map-list>button:hover,#root#root .operations-shell .field-map-workspace .field-map-list>button.selected{background:#203456!important;border-color:#91b0ff!important}
+#root#root .operations-shell .field-map-workspace .field-map-list>button:hover,#root#root .operations-shell .field-map-workspace .field-map-list>button.selected{background:#203456!important;border-color:#ff8a93!important}
 #root#root .operations-shell .field-map-workspace .field-map-list>button small{color:#c0cee0}
 #root#root .operations-shell .field-map-workspace .field-map-list>button strong{color:#f3f6fb!important}
 
@@ -83,7 +83,7 @@
 #root .operations-shell .field-map-filters .field-map-nearby{flex-basis:100%}
 #root .operations-shell .field-map-info{border:1px solid var(--border);border-radius:9px;padding:0 12px;font-size:12px;min-width:0}
 #root .operations-shell .field-map-info>summary{padding:11px 0;cursor:pointer;min-height:44px;box-sizing:border-box;color:#c0cee0}
-#root .operations-shell .field-map-info>summary:focus-visible{outline:2px solid #91b0ff;outline-offset:2px}
+#root .operations-shell .field-map-info>summary:focus-visible{outline:2px solid #ff8a93;outline-offset:2px}
 #root .operations-shell .field-map-info .panel{margin:10px 0}
 #root .operations-shell .field-map-layout:not(.has-selection){grid-template-columns:minmax(200px,.65fr) minmax(0,1.7fr);grid-template-rows:minmax(0,clamp(430px,70dvh,760px))}
 #root .operations-shell .field-map-layout.has-selection{grid-template-columns:minmax(180px,.6fr) minmax(0,1.3fr) minmax(260px,1fr)}

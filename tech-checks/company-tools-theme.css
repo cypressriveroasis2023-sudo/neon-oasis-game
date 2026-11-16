@@ -29,8 +29,8 @@
   --cos-text: #E6EDF7;
   --cos-muted: #A3B3CA;
   --cos-line: #2C3B51;
-  --cos-blue: #91B0FF;
-  --cos-primary: #315FDF;
+  --cos-blue: #FF8A93;
+  --cos-primary: #C8102E;
   --cos-selected: #203456;
   --cos-green: #83D6AD;
   --cos-green-bg: #15352D;
@@ -92,7 +92,7 @@ body input:not([type="checkbox"]):not([type="radio"]), body select, body textare
 }
 body input::placeholder, body textarea::placeholder { color: var(--cos-muted); opacity: 1; }
 body :is(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid #91B0FF !important;
+  outline: 3px solid #FF8A93 !important;
   outline-offset: 3px;
 }
 body .primary, body .action.primary, body #sign, body .verify-unit-now {
@@ -402,7 +402,7 @@ body .vision-knowledge-actions button.primary, body .vision-preview-login button
 }
 body .vision-composer textarea, body .vision-composer-v36 textarea { background: transparent; color: var(--cos-text); }
 body .vision-composer textarea::placeholder, body .vision-composer-v36 textarea::placeholder { color: var(--cos-muted); }
-body .vision-composer:focus-within { border-color: #91B0FF !important; box-shadow: 0 0 0 3px var(--cos-selected) !important; }
+body .vision-composer:focus-within { border-color: #FF8A93 !important; box-shadow: 0 0 0 3px var(--cos-selected) !important; }
 body .vision-add-v36, body .vision-keyboard-v36, body .vision-compose-icon { background: transparent; color: var(--cos-muted); border-color: transparent; }
 body .vision-menu-v37 span { background: var(--cos-text); }
 body .vision-teach-button, body .vision-language-eval-button, body .vision-icon-button { font-weight: 600; }

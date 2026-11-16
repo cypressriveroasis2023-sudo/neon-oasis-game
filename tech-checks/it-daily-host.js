@@ -149,7 +149,7 @@ async function open(value, generation, handoffFailure = null) {
   if(handoffSelected){
     const readiness=handoffFailure?{ready:false,reason:handoffFailure}:await transferReadiness(context(),'it');
     if(generation!==revision || key(scope())!==key(value) || !root)return;
-    if(readiness.ready){root.replaceChildren(phoneNavigation(value,generation));const host=document.createElement('section');root.append(host);disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Checking equipment handoff availability…');void open(value,generation,reason);}});return;}
+    if(readiness.ready){const host=document.createElement('section');root.replaceChildren(host,phoneNavigation(value,generation));disposeTransfer=mountTransferDesk(host,context(),{role:'it',onUnavailable:reason=>{if(generation!==revision||key(scope())!==key(value))return;status('Checking equipment handoff availability…');void open(value,generation,reason);}});return;}
     handoffFallback=document.createElement('section');handoffFallback.className='cos-it-daily-status';
     handoffFallback.setAttribute('aria-label','Equipment handoff availability');
     const note=document.createElement('p');note.setAttribute('role','status');
@@ -165,7 +165,7 @@ async function open(value, generation, handoffFailure = null) {
   }
   if(value.phone&&!phoneBoard) {
     // A failed rollout must not display a substitute workflow on the phone.
-    root.replaceChildren(phoneNavigation(value,generation),handoffFallback);
+    root.replaceChildren(handoffFallback,phoneNavigation(value,generation));
     return;
   }
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='Fleet Dashboard and Camera Health';
@@ -199,7 +199,7 @@ async function open(value, generation, handoffFailure = null) {
     setFieldMapDisplay(currentFrame,false);scheduleFrameFit();
   });
   board.append(frame,pending);
-  root.replaceChildren(...(value.phone?[phoneNavigation(value,generation)]:[]),board);
+  root.replaceChildren(board,...(value.phone?[phoneNavigation(value,generation)]:[]));
   boardLoadTimer=setTimeout(()=>{if(!current())return;note.textContent='The board is taking longer than usual to open. You can keep waiting or retry.';retry.hidden=false;},20000);
   scheduleFrameFit();
 }

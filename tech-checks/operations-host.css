@@ -64,7 +64,7 @@ html body.cos-operations-legacy #appView #view-owner #ownerApp {
   color-scheme:dark;
   --oa-bg:#0B111C;--oa-panel:#111B2A;--oa-panel2:#172337;
   --oa-text:#E6EDF7;--oa-muted:#A3B3CA;--oa-line:#2C3B51;
-  --oa-red:#315FDF;--oa-blue:#315FDF;
+  --oa-red:#C8102E;--oa-blue:#C8102E;
 }
 html body.cos-operations-legacy #appView #view-owner #ownerApp :is(#ownerAppPage,#ownerRouteView,#ownerPersistentControls,#ownerPersistentAccounts) {
   width:100%!important;max-width:100%!important;min-width:0!important;
@@ -102,13 +102,13 @@ html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is
   box-shadow:none!important;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;
 }
 html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(button,.btn):hover {
-  background:#203456!important;border-color:#91B0FF!important;
+  background:#203456!important;border-color:#FF8A93!important;
 }
 html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.btn,button.primary,button.active,button.selected,button[aria-pressed="true"],.ownerTestCreateButton,.ownerGlobalSearchInputWrap button) {
-  background:#315FDF!important;color:#fff!important;border-color:#91B0FF!important;
+  background:#C8102E!important;color:#fff!important;border-color:#FF8A93!important;
 }
 html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(button,a,input,textarea,select,summary):focus-visible {
-  outline:2px solid #91B0FF!important;outline-offset:3px!important;border-color:#91B0FF!important;
+  outline:2px solid #FF8A93!important;outline-offset:3px!important;border-color:#FF8A93!important;
 }
 html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.warn,.ownerTestWarning) {
   background:#3B2D18!important;border-color:#60492B!important;

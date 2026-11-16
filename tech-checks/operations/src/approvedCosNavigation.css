@@ -165,3 +165,33 @@
     display:none !important;
   }
 }
+
+/* The approved panels follow the COS look: dark surfaces, red actions. A white
+   card on a black phone screen reads as a different application. The ink
+   variables are redefined here so every descendant inherits readable text,
+   rather than only the elements named below. */
+#root .operations-shell.cos-approved-shell {
+  --approved-ink: #E6EDF7;
+  --approved-muted: #A3B3CA;
+}
+#root .operations-shell.cos-approved-shell .cos-approved-checks,
+#root .operations-shell.cos-approved-shell .cos-approved-tool-group {
+  background:#111B2A !important;
+  border-color:#2C3B51 !important;
+  color:var(--approved-ink) !important;
+}
+#root .operations-shell.cos-approved-shell .operations-tool-grid > button {
+  background:#172337 !important;
+  border-color:#2C3B51 !important;
+  color:#E6EDF7 !important;
+}
+#root .operations-shell.cos-approved-shell .operations-tool-grid > button:not(.secondary) {
+  background:#C8102E !important;
+  border-color:#FF8A93 !important;
+}
+#root .operations-shell.cos-approved-shell .operations-tool-grid > button :is(b,span) {
+  color:#E6EDF7 !important;
+}
+#root .operations-shell.cos-approved-shell .operations-tool-grid > button:not(.secondary) :is(b,span) {
+  color:#FFFFFF !important;
+}

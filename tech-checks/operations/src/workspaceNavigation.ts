@@ -7,11 +7,23 @@ export const workspaces = ['Operations','Units On Hand','Today','Daily Board','F
 export const workspaceGroups = [
   { label:'Overview', home:'Today', items:['Operations','Today','Daily Board','Needs Attention','Activity'] },
   { label:'Job flow', home:'Jobs', items:['Jobs','Owner Review','Handoffs','Tech Check'] },
-  { label:'Schedule', home:'Calendar', items:['Calendar','Unscheduled','Dispatch'] },
+  { label:'Schedule', home:'Calendar', items:['Calendar'] },
   { label:'Equipment', home:'Equipment', items:['Fleet Dashboard','Units On Hand','Equipment','Unit Tracker','Camera Health','InHand Routers','Victron VRM'] },
-  { label:'Customers', home:'Customers', items:['Customers','Sites','Work Requests','CRM'] },
+  { label:'Customers', home:'Customers', items:['Customers','Sites'] },
   { label:'Team', home:'Team', items:['Team','Owner Tasks'] },
-  { label:'Finance', home:'Billing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },
+];
+
+/**
+ * Workspaces the owner does not use, kept routable but off the navigation.
+ *
+ * Hiding rather than deleting means an old link or bookmark still opens the
+ * page instead of silently landing somewhere else, and putting one back is a
+ * one-line change. Every workspace must appear either in a group above or
+ * here, so nothing can fall off the navigation unnoticed.
+ */
+export const hiddenWorkspaces = [
+  'Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports',
+  'Work Requests','CRM','Unscheduled','Dispatch',
 ];
 export const canonicalWorkspace = (name:string) => name==='Field Map'||name==='Field View'?'Fleet Dashboard':name;
 export const workspaceLabel = (name:string) => ({'Tech Check':'Tech Checks',Today:'Overview','Daily Board':'Dispatch Board','Field Map':'Fleet Dashboard','Victron VRM':'Victron Power',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
