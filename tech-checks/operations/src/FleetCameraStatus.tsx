@@ -21,6 +21,8 @@ import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
+import SourceAttentionBanner from './SourceAttentionBanner';
+import {fleetSourceFacts} from './fleetSourceFacts';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -91,9 +93,9 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  // Which field a Fix it choice sent the person to, and what it told them.
  const [fixStep,setFixStep]=useState<{action:FixItAction;says:string}|null>(null);
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
- const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null),[fieldMap,setFieldMap]=useState<any>(null);
+ const [vrm,setVrm]=useState<any>(null),[vrmReady,setVrmReady]=useState(false),[routers,setRouters]=useState<any>(null),[fieldMap,setFieldMap]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
- useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{}).finally(()=>{if(!cancelled)setVrmReady(true);});return ()=>{cancelled=true;};},[]);
  // Router evidence for the troubleshooting checks. A failure here leaves the
  // router check reading Not checked, which is the truthful answer.
  // What mHelp holds about placement, for the mHelp location check. A failure
@@ -138,6 +140,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
 
  const coverage=useMemo(()=>report?cameraReadingCoverage(report.units):[],[report]);
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
+ const sourceFacts=useMemo(()=>fleetSourceFacts({now,map:fieldMap||undefined,connectionState:typeof fieldMap?.productConnectionsState==='string'?fieldMap.productConnectionsState:undefined,boardCheckedAt:Number.isFinite(Date.parse(fieldMap?.savedBoardReadAt||''))?Date.parse(fieldMap.savedBoardReadAt):null,star:feed?{fresh:feed.fresh,syncedAt:feed.syncedAt??null,status:feed.status??null}:null,includeStar:Boolean(report),victronError:typeof vrm?.sync?.error==='string'?vrm.sync.error:null,victronAttempt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null,includeVictron:vrmReady,trackerVerifiedAt:typeof fieldMap?.productConnections?.trackerVerifiedAt==='string'?fieldMap.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(fieldMap)}),[now,fieldMap,feed,report,vrm,vrmReady]);
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
@@ -221,6 +224,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
+  <SourceAttentionBanner facts={sourceFacts}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>

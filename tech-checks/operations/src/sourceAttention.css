@@ -1,0 +1,15 @@
+.cos-source-alerts{display:grid;gap:10px;margin:12px 0;padding:14px;border:3px solid #9f1239;border-radius:12px;background:#fff1f2;color:#4c0519}
+.cos-source-alert strong{display:block;font-size:1.15rem}
+.cos-source-alert p{margin:4px 0}
+.cos-source-alert button{min-height:44px}
+.cos-source-strip{margin:8px 0}
+.cos-source-strip ul{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.cos-source-strip li{display:flex;gap:6px;align-items:baseline;padding:4px 8px;border:1px solid #94a3b8;border-radius:999px;font-size:12px}
+.cos-source-strip-reconnect_required,.cos-source-strip-failed{color:#9f1239}
+.cos-source-strip-stale,.cos-source-strip-unknown{color:#92400e}
+.cos-source-strip-current{color:#166534}
+.cos-source-strip-absent{color:#475569}
+.cos-power-alarms{margin:8px 0;padding:8px;border:1px solid #cbd5e1;border-radius:8px}
+.cos-power-alarm{color:#9f1239;font-weight:700}
+.cos-tech-todos{margin:12px 0}
+.cos-tech-todos li{margin:6px 0}
