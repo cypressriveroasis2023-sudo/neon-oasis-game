@@ -1,0 +1,40 @@
+name: Verify camera make filters
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/**'
+      - '.github/workflows/cos-camera-brand-filter-proof.yml'
+permissions:
+  contents: read
+jobs:
+  camera-make-filters:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: node --import tsx --test tests/camera-brand-tiles.test.mjs tests/star-unit-status.test.mjs tests/camera-reading-coverage.test.mjs
+      - run: npm run build
+      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: Verify synthetic camera sources and make filtering
+        run: npm run test:browser -- --workers=1 --retries=0 tests/camera-status-sources.browser.spec.mjs tests/fleet-reading-scope.browser.spec.mjs
+      - name: Verify exact location-source control despite source-summary labels
+        run: npm run test:browser -- --workers=1 --retries=0 tests/operations.browser.spec.mjs --grep 'Field Map'
+      - name: Preserve browser regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-make-filter-evidence
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore

@@ -1,13 +1,15 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
-import {STAR_UNIT_STATUS_CONTRACT,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
+import {STAR_UNIT_STATUS_CONTRACT,countUnits,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
+import './readingScope.css';
+import {cameraReadingCoverage} from './cameraReadingCoverage';
 import './cosMotion.css';
 import './fleetNeedsYou.css';
 import FleetNeedsYou from './FleetNeedsYou';
@@ -128,6 +130,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   }finally{writePending.current=false;setSaving(false);}
  },[]);
 
+ const coverage=useMemo(()=>report?cameraReadingCoverage(report.units):[],[report]);
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
@@ -140,16 +143,18 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
  // Worst first, off the same units the list shows.
  const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0},[report]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
+ // Keep status counts in the same make scope as the rows selected by a tile.
+ const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
- const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=counts?[
+ const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=statusCounts?[
   // 'Field units' collided with the Fleet board's 'Field equipment', which
   // counts stands and poles too. Say which one this is.
-  {label:'FIELD CAMERA UNITS',count:counts.field.units,kind:'field',group:'field',state:'all'},
-  {label:'UP',count:counts.field.green,kind:'online',group:'field',state:'GREEN'},
-  {label:'SOME CAMERAS DOWN',count:counts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
-  {label:'DOWN',count:counts.field.red,kind:'offline',group:'field',state:'RED'},
-  {label:'NOT VERIFIED',count:counts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
-  {label:'ONLINE IN THE SHOP',count:counts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
+  {label:'FIELD CAMERA UNITS',count:statusCounts.field.units,kind:'field',group:'field',state:'all'},
+  {label:'UP',count:statusCounts.field.green,kind:'online',group:'field',state:'GREEN'},
+  {label:'SOME CAMERAS DOWN',count:statusCounts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
+  {label:'DOWN',count:statusCounts.field.red,kind:'offline',group:'field',state:'RED'},
+  {label:'NOT VERIFIED',count:statusCounts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
+  {label:'ONLINE IN THE SHOP',count:statusCounts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
  ]:[];
  // The three makes COS carries, counted in the field. Each narrows the list the
  // same way a count tile does.
@@ -180,6 +185,20 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
     <small>{feed?.syncedAt?'Star4Live reading '+cameraTime(feed.syncedAt,now):loading?'Reading Star4Live…':'No Star4Live reading'}</small>
    </div>
   </header>
+  <section className='cos-reading-scope' aria-label='Camera status sources and scope'>
+   <h3>Separate provider readings, not the Fleet inventory snapshot</h3>
+   <p>Camera units only; camera-less stands and poles excluded. Totals and map coverage may differ from the mHelp-based Fleet view.</p>
+   <p><strong>Star4Live sync:</strong> {feed?.syncedAt?cameraTime(feed.syncedAt,now):'Not provided'} · {feed?feed.fresh?'Recent sync; individual reading times are below':'Not current':'Freshness unknown'}. This sync time does not date the other sources.</p>
+   {error&&<p className='cos-reading-warning'>Latest read failed. Any retained readings keep their original times; they are not a successful refresh.</p>}
+   <details><summary>Sources, coverage and reading times</summary>
+   {!report?<p>Coverage unknown until a report is read.</p>:<dl>{coverage.map(item=><div key={item.source}>
+    <dt>{item.source==='star4live'?'Star4Live cameras':item.source==='ip_check'?'Avigilon unit connections':'Reconeyez detectors'}</dt>
+    <dd>{report.otherSourcesRead===false&&item.source!=='star4live'?'Source unavailable; coverage unknown':<>{item.field} Field units in this report · {item.unknown} not verified</>}</dd>
+    <dd>Recorded Field observations: {item.oldest?cameraTime(item.oldest,now)+(item.oldest!==item.newest?' to '+cameraTime(item.newest,now):''):'Not provided'}{item.missingTime>0?' · '+item.missingTime+' without a valid reading time':''}</dd>
+    <dd>{item.source==='ip_check'?'Reachability only, not individual camera or video verification.':'Provider status, not independent video or recording verification.'}</dd>
+   </div>)}</dl>}
+   <p>Source coverage above is for all makes before list filters, with saved COS edits where available. A recent observation does not make every unit current; use each row’s status and time. Map pins are separate address evidence, not measured equipment GPS.</p></details>
+  </section>
   {feed&&!feed.fresh&&<p className='cos-camera-status-stale' role='status'>
    <strong>Star4Live has not reported recently.</strong> Every Star4Live unit reads Not verified until the next good sync. No unit is called offline on an old reading.
    {feed.status&&feed.status!=='ok'?' Last sync status: '+feed.status+'.':''}
@@ -216,9 +235,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
    {item.label}{report&&<b>{groupedUnits(report.units,item.id,'').length}</b>}
   </button>)}</nav>
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}
+   {family!=='all'&&<> Showing {FAMILY_LABEL[family]} only.</>}
    {stateFilter!=='all'&&<> Showing only {STATE_LABEL[stateFilter].toLowerCase()}. <button type='button' className='cos-camera-status-clear-filter' onClick={()=>setStateFilter('all')}>Show all</button></>}</p>
   {report&&(group==='field'||group==='attention')&&<UnitStatusMap savedAddresses={savedAddresses} units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
-   onSelect={unit=>{setStateFilter('all');setQuery(unit);}}/>}
+   onSelect={unit=>{setStateFilter('all');setFamily('all');setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>
    <label className='sr-only' htmlFor='cos-camera-status-search'>Find a unit, site or IP</label>
    <input id='cos-camera-status-search' type='search' placeholder='Find a unit, site or IP…' value={query} onChange={event=>setQuery(event.target.value)}/>
