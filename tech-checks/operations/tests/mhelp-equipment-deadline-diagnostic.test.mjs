@@ -61,6 +61,39 @@ test('second equipment pass reports the same bounded reason at resources and nev
  const body=await(await handler(run())).json();assert.equal(body.failureStage,'resources');assert.equal(body.reason,'equipment_pass_deadline_exceeded');assert.equal(body.inventoryWrites,0);assert.equal(writes,0);assert.equal(released,1);
 });
 
+test('a partner preview failure reports only its operation and HTTP status',async()=>{
+ const secret='synthetic-private-token https://connect.mhelpdesk.com/api/v1.0/portal/224643/equipment';
+ const cause=new MhelpPartnerError(secret,503,{operation:'equipment_read',httpStatus:403});
+ cause.provider.url='https://evil.example/token';
+ let recorded;
+ const handler=createInventoryComparisonHandler({authenticate:async()=>true,readEquipment:async()=>{throw cause;},readBaseline:async()=>{assert.fail('baseline must not be read');},recordFailure:async code=>{recorded=code;}});
+ const body=await(await handler(run())).json();
+ assert.equal(body.failureStage,'equipment');
+ assert.equal(body.providerOperation,'equipment_read');
+ assert.equal(body.httpStatus,403);
+ assert.equal(body.reason,undefined);
+ assert.equal(recorded,'inventory_source_unavailable');
+ const text=JSON.stringify(body);
+ assert.equal(text.includes('synthetic-private'),false);
+ assert.equal(text.includes('mhelpdesk'),false);
+ assert.equal(text.includes('evil.example'),false);
+ assert.equal(text.includes(secret),false);
+});
+test('an account denial and an unclosed provider shape stay distinct',async()=>{
+ const denied=new MhelpPartnerError('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.',503,{operation:'account_read',httpStatus:401});
+ const open=new MhelpPartnerError('synthetic-private',503,{operation:'equipment_read',httpStatus:99});
+ const plain=Object.assign(Error('synthetic-private'),{status:403,provider:{operation:'equipment_read',httpStatus:403,token:'synthetic-private'}});
+ for(const [cause,expect] of [[denied,{providerOperation:'account_read',httpStatus:401}],[open,{}],[plain,{}]]){
+  const handler=createInventoryComparisonHandler({authenticate:async()=>true,readEquipment:async()=>{throw cause;},readBaseline:async()=>{assert.fail('baseline must not be read');}});
+  const body=await(await handler(run())).json();
+  assert.equal(body.failureStage,'equipment');
+  assert.equal(body.providerOperation,expect.providerOperation);
+  assert.equal(body.httpStatus,expect.httpStatus);
+  assert.equal(body.reason,undefined);
+  assert.equal(JSON.stringify(body).includes('synthetic-private'),false);
+  assert.equal(JSON.stringify(body).includes('Verify the token'),false);
+ }
+});
 test('ordinary transport, forged diagnostic fields and provider 429 remain distinct from own deadline',async()=>{
  const transport=partner(async()=>{throw Error('synthetic-private-transport');});
  await assert.rejects(transport('/api/mhelpdesk/partner/preview','POST',{}),error=>error instanceof MhelpPartnerError&&!(error instanceof MhelpPartnerReadDeadlineError)&&!error.message.includes('synthetic-private'));
