@@ -143,7 +143,7 @@ test('body-portaled prompt placeholders stay readable outside the app root', asy
       expect(style.placeholder).toBe('rgb(163, 179, 202)');
       expect(style.opacity).toBe('1');
       expect(style.background).toBe('rgb(17, 27, 42)');
-      expect(style.outline).toBe('rgb(145, 176, 255)');
+      expect(style.outline).toBe('rgb(255, 138, 147)');
       expect(style.placeholderContrast).toBeGreaterThanOrEqual(4.5);
       expect(style.borderContrast).toBeGreaterThanOrEqual(3);
       measurements.push({ closeMethod, ...style });
