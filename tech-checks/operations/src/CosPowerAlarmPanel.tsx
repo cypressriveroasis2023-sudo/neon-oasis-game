@@ -1,34 +1,56 @@
-import {useState} from 'react';
-import {cosPowerLabel, cosPowerVerdict, powerSamples, readPowerAlarmSettings, writePowerAlarmSettings, type CosPowerSettings, type PowerMeasurement} from './cosPowerAlarms';
+import {useEffect, useState} from 'react';
+import {cosPowerLabel, cosPowerVerdict, powerSamples, preferSharedSettings, readParentAccessToken, readPowerAlarmSettings, readSharedPowerAlarmSettings, writePowerAlarmSettings, writeSharedPowerAlarmSettings, type CosPowerSettings, type PowerMeasurement} from './cosPowerAlarms';
 import './sourceAttention.css';
 
 function blank(value: number | null): string {
   return value === null ? '' : String(value);
 }
 
-/** Owner thresholds live in this browser. Nothing here is a default voltage or charge. */
+/** Shared thresholds, with this browser kept only as a cache when the read fails. */
 export function CosPowerAlarmSettings({storage = typeof localStorage === 'undefined' ? null : localStorage}:{storage?: Storage | null}) {
   const [settings, setSettings] = useState<CosPowerSettings>(() => readPowerAlarmSettings(storage));
   const [draft, setDraft] = useState({voltage: blank(settings.lowVoltageV), soc: blank(settings.lowSocPercent), silent: blank(settings.silentHours)});
-  const save = () => {
+  const [note, setNote] = useState('Reading the shared thresholds.');
+  const apply = (next: CosPowerSettings) => {
+    setSettings(next);
+    setDraft({voltage: blank(next.lowVoltageV), soc: blank(next.lowSocPercent), silent: blank(next.silentHours)});
+  };
+  useEffect(() => {
+    let cancelled = false;
+    readParentAccessToken().then(token => readSharedPowerAlarmSettings(token)).then(shared => {
+      if (cancelled) return;
+      const cache = readPowerAlarmSettings(storage);
+      const next = preferSharedSettings(shared, cache);
+      if (shared) writePowerAlarmSettings(storage, shared);
+      apply(next);
+      setNote(shared ? 'Shared thresholds. An empty box stays unset.' : 'Shared thresholds could not be read. Showing the last copy saved in this browser.');
+    });
+    return () => { cancelled = true; };
+  }, [storage]);
+  const save = async () => {
     const next: CosPowerSettings = {
       lowVoltageV: draft.voltage.trim() === '' ? null : Number(draft.voltage),
       lowSocPercent: draft.soc.trim() === '' ? null : Number(draft.soc),
       silentHours: draft.silent.trim() === '' ? null : Number(draft.silent),
     };
-    writePowerAlarmSettings(storage, next);
-    const stored = readPowerAlarmSettings(storage);
-    setSettings(stored);
-    setDraft({voltage: blank(stored.lowVoltageV), soc: blank(stored.lowSocPercent), silent: blank(stored.silentHours)});
+    const token = await readParentAccessToken();
+    const saved = await writeSharedPowerAlarmSettings(token, next);
+    if (!saved) {
+      setNote('The shared thresholds were not saved. This browser was not updated.');
+      return;
+    }
+    writePowerAlarmSettings(storage, saved);
+    apply(saved);
+    setNote('Saved for every signed-in COS account. An empty box stays unset.');
   };
-  return <form className='cos-power-alarms' aria-label='COS power alarm settings' onSubmit={event => {event.preventDefault(); save();}}>
+  return <form className='cos-power-alarms' aria-label='COS power alarm settings' onSubmit={event => {event.preventDefault(); void save();}}>
     <strong>COS power thresholds</strong>
     <p>Leave a box empty to keep that check unset. COS does not guess a voltage, a charge, or a silence window.</p>
     <label>Low voltage, volts<input inputMode='decimal' aria-label='Low voltage threshold volts' value={draft.voltage} onChange={event => setDraft({...draft, voltage: event.target.value})} placeholder='threshold not set'/></label>
     <label>Low charge, percent<input inputMode='decimal' aria-label='Low charge threshold percent' value={draft.soc} onChange={event => setDraft({...draft, soc: event.target.value})} placeholder='threshold not set'/></label>
     <label>Power silent after, hours<input inputMode='decimal' aria-label='Power silent hours' value={draft.silent} onChange={event => setDraft({...draft, silent: event.target.value})} placeholder='threshold not set'/></label>
-    <button type='submit'>Save thresholds on this browser</button>
-    <small>Saved here only. A blank field stays unset.</small>
+    <button type='submit'>Save shared thresholds</button>
+    <small role='status'>{note}</small>
   </form>;
 }
 

@@ -125,3 +125,78 @@ export function writePowerAlarmSettings(storage: Storage | null, settings: CosPo
   };
   storage.setItem(KEY, JSON.stringify(stored));
 }
+
+/** A shared payload. Undefined means the request failed and the cache stands. */
+export function settingsFromShared(value: unknown): CosPowerSettings | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const row = value as Partial<CosPowerSettings>;
+  if (!('lowVoltageV' in row) || !('lowSocPercent' in row) || !('silentHours' in row)) return undefined;
+  return {
+    lowVoltageV: finiteOrNull(row.lowVoltageV, 0, 80),
+    lowSocPercent: finiteOrNull(row.lowSocPercent, 0, 100),
+    silentHours: finiteOrNull(row.silentHours, 1, 168),
+  };
+}
+
+/** Shared numbers win, including an explicit unset. The cache is only for a failed read. */
+export function preferSharedSettings(shared: CosPowerSettings | undefined, cache: CosPowerSettings): CosPowerSettings {
+  return shared ?? cache;
+}
+
+const SHARED_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-power-alarm-settings';
+
+export async function readParentAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined' || window.parent === window || location.origin === 'null') return null;
+  const requestId = crypto.randomUUID();
+  return new Promise(resolve => {
+    const timer = window.setTimeout(() => { window.removeEventListener('message', receive); resolve(null); }, 10000);
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== location.origin || event.source !== window.parent) return;
+      const message = event.data;
+      if (!message || message.type !== 'COS_OPERATIONS_TOKEN_RESPONSE' || message.requestId !== requestId) return;
+      window.removeEventListener('message', receive);
+      window.clearTimeout(timer);
+      resolve(typeof message.accessToken === 'string' && message.accessToken.trim() ? message.accessToken : null);
+    };
+    window.addEventListener('message', receive);
+    window.parent.postMessage({type: 'COS_OPERATIONS_TOKEN_REQUEST', requestId}, location.origin);
+  });
+}
+
+export async function readSharedPowerAlarmSettings(token: string | null, fetcher: typeof fetch = fetch): Promise<CosPowerSettings | undefined> {
+  if (!token) return undefined;
+  try {
+    const response = await fetcher(SHARED_URL, {
+      method: 'POST',
+      headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'read'}),
+      cache: 'no-store',
+    });
+    if (!response.ok) return undefined;
+    return settingsFromShared(await response.json());
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeSharedPowerAlarmSettings(token: string | null, settings: CosPowerSettings, fetcher: typeof fetch = fetch): Promise<CosPowerSettings | undefined> {
+  if (!token) return undefined;
+  const body = {
+    action: 'write',
+    lowVoltageV: finiteOrNull(settings.lowVoltageV, 0, 80),
+    lowSocPercent: finiteOrNull(settings.lowSocPercent, 0, 100),
+    silentHours: finiteOrNull(settings.silentHours, 1, 168),
+  };
+  try {
+    const response = await fetcher(SHARED_URL, {
+      method: 'POST',
+      headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+    if (!response.ok) return undefined;
+    return settingsFromShared(await response.json());
+  } catch {
+    return undefined;
+  }
+}
