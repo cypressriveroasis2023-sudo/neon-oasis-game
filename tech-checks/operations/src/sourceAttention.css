@@ -21,7 +21,17 @@
 .cos-today-issues-count b{margin-right:8px}
 .cos-today-issues ul{list-style:none;margin:12px 0 0;padding:0}
 .cos-today-issues li{margin:0}
-.cos-today-issues button,.cos-today-issues span{display:block;width:100%;min-height:44px;padding:10px 0;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-top:1px solid #243044}
+.cos-check-counts{display:flex;gap:16px;margin:0 0 8px}
+.cos-check-counts b{font-size:1.4rem;margin-left:4px}
+.cos-check-line,.cos-check-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #243044}
+.cos-today-issues button{min-height:36px;padding:6px 10px;font:inherit;color:inherit;background:transparent;border:1px solid #334155;border-radius:8px;cursor:pointer}
+.cos-check-blocker{margin:8px 0}
+.cos-admin-details{margin:8px 0}
+html[data-staff='service'] #root .company-shell>.operations-sidebar,html[data-staff='service'] #root#root .cos-approved-shell .operations-bottom-nav,html[data-staff='service'] #root .company-sidebar-footer{display:none!important}
+html[data-staff='service'] #root .operations-main,html[data-staff='service'] #root .company-main{margin:0!important;width:100%!important;max-width:none!important}
+.cos-fleet-dashboard[data-audience='tech'] .cos-admin-fold{display:none!important}
+.cos-fleet-dashboard[data-audience='admin'] .cos-admin-details:not([open]) ~ .cos-admin-fold,
+.cos-fleet-dashboard[data-audience='admin'] .cos-admin-details:not([open]) ~ * .cos-admin-fold{display:none!important}
 .cos-family-card{margin-top:12px;padding-top:10px;border-top:1px solid #243044}
 .cos-family-card h3{margin:0}
 .cos-issue-guide{margin-top:12px;padding-top:10px;border-top:1px solid #243044}

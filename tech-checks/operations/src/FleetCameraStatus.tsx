@@ -92,7 +92,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews,showDetails=false,onFixAddress}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null;showDetails?:boolean;onFixAddress?:(productId:string)=>void}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -197,7 +197,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    if(field){field.scrollIntoView({block:'center',behavior:'smooth'});(field as HTMLElement).focus();}},0);
  };
  const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
- const openTodo=(todo:{unit:string})=>{
+ const openTodo=(todo:{unit:string;kind?:string;productId?:string})=>{
+  if(todo.kind==='mhelp_address'&&todo.productId&&onFixAddress){onFixAddress(todo.productId);return;}
   const unit=units.find(item=>item.unit===todo.unit||unitName(item)===todo.unit);
   pick('field','all','all');
   setQuery(todo.unit);
@@ -224,8 +225,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   </header>
   {sourceNotice&&<p className='cos-camera-source-note' role='status'>{sourceNotice}</p>}
   <TechnicianTodoList todos={todos} onOpen={openTodo}/>
-  <details className='cos-camera-about'>
-   <summary>About this data</summary>
+  {showDetails&&<details className='cos-camera-about'>
+   <summary>Details</summary>
   <section className='cos-reading-scope' aria-label='Camera status sources and scope'>
    <p className='cos-board-identity'><strong>This board is live camera evidence, not inventory.</strong> What the cameras are doing right now. For what is owned and where it is placed, use the Fleet board.</p>
    <p>Every camera unit, one line each. Stands and poles without a camera are not counted here. Only you and IT can change where a unit is; nothing moves on its own.</p>
@@ -275,7 +276,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}
    {family!=='all'&&<> Showing {FAMILY_LABEL[family]} only.</>}
    {stateFilter!=='all'&&<> Showing only {STATE_LABEL[stateFilter].toLowerCase()}. <button type='button' className='cos-camera-status-clear-filter' onClick={()=>setStateFilter('all')}>Show all</button></>}</p>
-  </details>
+  </details>}
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}

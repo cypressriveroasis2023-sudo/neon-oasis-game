@@ -101,6 +101,18 @@ export function todayIssues(input: {
   };
 }
 
+export type ChecklistRow =
+  | { kind: 'item'; issue: TodayIssue }
+  | { kind: 'group'; id: string; line: string; items: TodayIssue[] };
+
+/** Repeated address lines become one item. The count is the number of units. */
+export function checklistRows(issues: TodayIssue[]): ChecklistRow[] {
+  const addresses = issues.filter(issue => issue.kind === 'address');
+  const rest = issues.filter(issue => issue.kind !== 'address').map(issue => ({ kind: 'item' as const, issue }));
+  if (addresses.length <= 1) return [...rest, ...addresses.map(issue => ({ kind: 'item' as const, issue }))];
+  return [...rest, { kind: 'group', id: 'addresses', line: 'Fix '+addresses.length+' addresses in mHelpDesk', items: addresses }];
+}
+
 export type CameraFamilyId = 'recon' | 'avigilon' | 'alibi' | 'walle';
 export type FamilyDetector = {
   name: string;

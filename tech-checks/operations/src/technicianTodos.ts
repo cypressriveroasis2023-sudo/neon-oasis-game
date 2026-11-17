@@ -6,6 +6,7 @@ export type TechnicianTodo = {
   kind: 'camera_offline' | 'battery_alarm' | 'power_silent' | 'mhelp_address';
   unit: string;
   detail: string;
+  productId?: string;
 };
 
 export type TodoCamera = {
@@ -63,6 +64,7 @@ export function technicianTodos(input: {
       id: 'address:'+(address.productId || address.unit),
       kind: 'mhelp_address',
       unit: address.unit,
+      productId: address.productId,
       detail: addressTodoDetail(address),
     });
   }

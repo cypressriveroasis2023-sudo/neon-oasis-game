@@ -11,6 +11,7 @@ import {checkedFieldMap} from '../src/gpsPersistence.ts';
 import {createOperationsSessionRecovery} from '../src/operationsSessionRecovery.ts';
 import {readExactProductConnections} from '../src/exactProductConnection.ts';
 import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS} from '../src/refreshCadence.ts';
+import {denyStaffRoute, staffRole} from '../../supabase/functions/cos-operations-pages/staffAccess.ts';
 import {checkedOwnerCensusPreparationBinding} from '../src/ownerCensusPreparation.ts';
 import {fixture as preparationSnapshot,id as preparationId} from './owner-census-preparation-fixtures.mjs';
 
@@ -58,7 +59,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
     Date: class extends Date { static now() { return clock; } },
-    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./connectionDiagnostics'?{readConnectionDiagnostic}:name==='./exactProductConnection'?{readExactProductConnections:(v,h,ids,now)=>readExactProductConnections(v,h,ids,now)}:name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='./refreshCadence'?{CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:name==='../../supabase/functions/cos-operations-pages/staffAccess'?{denyStaffRoute,staffRole}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -191,12 +192,15 @@ test('an in-flight read cannot bypass a newly unavailable parent session', async
   const f = fixture();
   const first = f.api.get('/api/jobs');
   await flush();
-  for (const [role, token] of [['service', 'synthetic-service'], ['owner', ''], ['owner', '   '], ['owner', null]]) {
+  for (const [role, token] of [['guest', 'synthetic-guest'], ['owner', ''], ['owner', '   '], ['owner', null]]) {
     Object.assign(f.state, { role, token });
     await assert.rejects(f.api.get('/api/jobs'), status(401));
     assert.equal(f.requests.length, 1);
   }
   assert.equal(f.handshakes.length, 5);
+  Object.assign(f.state, {role: 'service', token: 'synthetic-service'});
+  await assert.rejects(f.api.get('/api/jobs'), status(403));
+  assert.equal(f.requests.length, 1);
   f.answer(0);
   await assert.rejects(first,status(409));
 });
@@ -525,7 +529,7 @@ test('fleet consumers share a complete paired snapshot and re-authorize before u
  f.answer(0,fleetHealth);f.answer(1,fleetMap);const values=await Promise.all([a,b]);assert.equal(values[0],values[1]);
  const cached=await f.api.fleet();assert.equal(cached,values[0]);assert.equal(f.requests.length,2);assert.equal(f.handshakes.length,2);
  const forced=f.api.fleet(true);await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await forced;
- f.state.role='service';await assert.rejects(f.api.fleet(),status(401));
+ f.state.role='service';const serviceRead=f.api.fleet();await flush();assert.equal(f.requests.length,6,'a service session cannot reuse the owner snapshot');f.answer(4,fleetHealth);f.answer(5,fleetMap);assert.notEqual(await serviceRead,values[0]);
 });
 test('paired cache expires fifteen minutes from attempt start, including delayed auth and responses',async()=>{
  const f=fixture({autoReply:false}),first=f.api.fleet();
@@ -653,7 +657,7 @@ for(const code of [401,403])test('real source HTTP '+code+' cannot become an aut
  const f=await recoveryFixture(),pending=assert.rejects(f.api.get('/api/routers'),status(code));await flush();f.answer(1,{error:'Synthetic denied'},code);await pending;await recoveryTurn();assert.deepEqual(f.reasons,['authentication-denied']);assert.equal(f.requests.length,2);assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();
 });
 test('real parent role denial and empty token are hard stops, not transient timeouts',async()=>{
- for(const patch of [{role:'service'},{token:''}]){const f=await recoveryFixture();Object.assign(f.state,patch);await assert.rejects(f.api.get('/api/routers'),status(401));await recoveryTurn();assert.deepEqual(f.reasons,['authentication-denied']);assert.equal(f.requests.length,1);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();}
+ for(const patch of [{role:'guest'},{token:''}]){const f=await recoveryFixture();Object.assign(f.state,patch);await assert.rejects(f.api.get('/api/routers'),status(401));await recoveryTurn();assert.deepEqual(f.reasons,['authentication-denied']);assert.equal(f.requests.length,1);assert.equal(f.sessionState.reloadRequired,true);f.current.stop();}
 });
 test('trusted host security hide during verification rejects its late successful session body',async()=>{
  const f=await recoveryFixture();f.state.token='synthetic-session-b';const pending=f.api.get('/api/routers');await recoveryTurn();
@@ -852,7 +856,7 @@ test('scope preview uses existing authenticated wrapper, exact body, cancellatio
  const f=fixture(),c=new AbortController(),p=f.api.post('/api/product-tcp-preview',{productIds:['123']},{signal:c.signal});await flush();
  assert.equal(f.handshakes.length,1);assert.equal(f.requests.length,1);assert.equal(f.requests[0].init.headers.Authorization,'Bearer synthetic-session-a');assert.deepEqual(JSON.parse(f.requests[0].init.body),{path:'/api/product-tcp-preview',method:'POST',body:{productIds:['123']}});
  c.abort();await assert.rejects(p);assert.equal(f.requests[0].init.signal.aborted,true);assert.equal(f.requests.length,1);
- const denied=fixture({role:'service'});await assert.rejects(denied.api.post('/api/product-tcp-preview',{productIds:['123']}),status(401));assert.equal(denied.requests.length,0);
+ const denied=fixture({role:'service'});await assert.rejects(denied.api.post('/api/product-tcp-preview',{productIds:['123']}),status(403));assert.equal(denied.requests.length,0);
  const late=fixture(),pending=late.api.post('/api/product-tcp-preview',{productIds:['123']});await flush();late.window.dispatchEvent(new Event('cos-private-data-invalidated'));late.answer(0,{contract:'COS_PRODUCT_TCP_PREVIEW_V1'});await assert.rejects(pending);assert.equal(late.requests.length,1);
 });
 test('pre-attribution cached V1 proof cannot bridge a pending read or return late',async()=>{

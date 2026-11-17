@@ -126,17 +126,17 @@ function sync() {
  if(!s)return;
  const target=s.role==='service'?document.querySelector('#wlSvcHome .wl-service-action-list')||document.getElementById('wlSvcTruckInventory'):document.getElementById('cosITDailyHost');
  if(!target)return;
- if(!mounted?.isConnected||mounted.parentElement!==target){mounted?.remove();mounted=button(s.role==='service'?'Equipment swaps & returns':'Returned by Service — Check In',()=>{
+ if(s.role==='service'){if(!mounted?.isConnected||mounted.parentElement!==target){mounted?.remove();mounted=button('Equipment swaps & returns',()=>{
    closePanel?.();closePanel=openTicketfreeReturns(s.c,{onSaved:()=>{lastCountAt=0;void updateCount();window.dispatchEvent(new CustomEvent('techcheck:ticketfree-return-saved'));}});
-  },'cos-ticketfree-launch');mounted.dataset.cosTicketfreeReturns='';target.prepend(mounted);}
- if(s.role!=='service')void updateCount();
+  },'cos-ticketfree-launch');mounted.dataset.cosTicketfreeReturns='';target.prepend(mounted);}}
+ else void updateCount();
 }
 async function updateCount() {
  const s=scope(),button=mounted,id=owner;
- if(!s||s.role==='service'||!button?.isConnected||countBusy||Date.now()-lastCountAt<60000||document.hidden)return;
+ if(!s||s.role==='service'||countBusy||Date.now()-lastCountAt<60000||document.hidden)return;
  countBusy=true;lastCountAt=Date.now();
- try{const data=await ticketfreeClient(s.c).read();if(owner===id&&button.isConnected)button.textContent='Returned by Service ('+data.pending_count+') — Check In';}
- catch{if(owner===id&&button.isConnected)button.title='Return count could not refresh. Open the queue to retry.';}
+ try{const data=await ticketfreeClient(s.c).read();if(owner!==id)return;const count=Number(data.pending_count)||0;if(count<=0){mounted?.remove();mounted=null;return;}const host=document.getElementById('cosITDailyHost');if(!host)return;if(!mounted?.isConnected||mounted.parentElement!==host){mounted?.remove();mounted=button('Returned by Service ('+count+') — Check In',()=>{closePanel?.();closePanel=openTicketfreeReturns(s.c,{onSaved:()=>{lastCountAt=0;void updateCount();window.dispatchEvent(new CustomEvent('techcheck:ticketfree-return-saved'));}});},'cos-ticketfree-launch');mounted.dataset.cosTicketfreeReturns='';host.prepend(mounted);}else mounted.textContent='Returned by Service ('+count+') — Check In';}
+ catch{if(owner===id&&button?.isConnected)button.title='Return count could not refresh. Open the queue to retry.';}
  finally{countBusy=false;}
 }
 function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
