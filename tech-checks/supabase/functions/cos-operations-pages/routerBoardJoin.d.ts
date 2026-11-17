@@ -3,6 +3,7 @@ export function cameraHealthUnitKey(value: unknown): string | null;
 export function routerJoinKey(value: unknown): string;
 export function routerTypeOf(row: object | null | undefined): { column: boolean; type: string | null };
 export function deviceDoNotUse(device: object | null | undefined): boolean;
+export function displayedRouterStatus(status: string | undefined, checkedAt: string | null | undefined, now?: number): string;
 export function boardRouterStatus(row: object | null | undefined, now?: number, placement?: string): { status: 'Online' | 'Offline' | 'Unknown' | 'Unknown (no feed)'; checkedAt: string | null; outage: boolean };
 export function joinUnitRouter(input: { unitKey?: unknown; serial?: unknown; placement?: unknown; routers?: object[]; devices?: object[]; now?: number }): { status: string; checkedAt: string | null; outage: boolean; matched: boolean };
 export function doNotUseForKey(unitKey: unknown, devices?: object[]): boolean;

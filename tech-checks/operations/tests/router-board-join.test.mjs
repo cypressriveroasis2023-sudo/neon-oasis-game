@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { canonicalCameraUnit } from '../src/fieldCameraHealth.ts';
 import { routerSnapshot, readRouterSnapshot } from '../../supabase/functions/cos-operations-pages/routers.ts';
 import {
-  cameraHealthUnitKey, routerJoinKey, boardRouterStatus, joinUnitRouter, deviceDoNotUse,
+  cameraHealthUnitKey, routerJoinKey, boardRouterStatus, displayedRouterStatus, joinUnitRouter, deviceDoNotUse,
   annotateSavedBoard, presentRouterPage, ROUTER_BOARD_FRESH_MS,
 } from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 
@@ -130,6 +130,13 @@ test('do not use is a badge only and null means false', () => {
   assert.equal(board.units[1].doNotUse, false);
   assert.equal(JSON.stringify(board).includes('prior_inhand_serial'), false);
   assert.equal(JSON.stringify(board).includes('publicIp'), false);
+});
+
+test('a saved Online label older than 3 hours displays as Unknown', () => {
+  assert.equal(displayedRouterStatus('Online', fresh, now), 'Online');
+  assert.equal(displayedRouterStatus('Offline', stale, now), 'Unknown');
+  assert.equal(displayedRouterStatus('Unknown (no feed)', stale, now), 'Unknown (no feed)');
+  assert.equal(displayedRouterStatus('Online', null, now), 'Unknown');
 });
 
 test('owner and IT keep router addresses and everyone else does not', () => {

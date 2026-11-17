@@ -19,11 +19,11 @@
   },
   "edits": [],
   "expectedBefore": {
-    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "index.ts": "e1cd7ae339bd4df4114d50fa427069f61dce8e39b813c73e839da64fafa3b200",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
   },
   "expectedAfter": {
-    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "index.ts": "e1cd7ae339bd4df4114d50fa427069f61dce8e39b813c73e839da64fafa3b200",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
   }
 }

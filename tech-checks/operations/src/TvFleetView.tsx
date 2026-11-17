@@ -11,7 +11,7 @@ import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './f
 import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,type FieldLocation} from './fieldLocations';
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 // @ts-ignore plain module shared with the edge function
-import {routerJoinKey} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
+import {displayedRouterStatus, routerJoinKey} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
 import {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
@@ -124,7 +124,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       const linked=(data.routers?.items||[]).find((item:any)=>routerJoinKey(item.unitKey)===key);
       const flagged=(data.routers?.doNotUseKeys||[]).includes(key)||linked?.doNotUse===true;
       const shop=String(unit.currentLocationType||unit.placement||'').toLowerCase()==='shop';
-      return {unit,health,doNotUse:flagged,routerLabel:shop&&linked?.boardStatus==='Offline'?'Offline':linked?.boardStatus,routerOutage:shop?false:linked?.boardOutage===true,router:fieldReachability(unit,data.routers?.items,clock),
+      const aged=linked?.boardStatus?displayedRouterStatus(linked.boardStatus, linked.boardCheckedAt||linked.checkedAt, clock):undefined;
+      return {unit,health,doNotUse:flagged,routerLabel:aged,routerOutage:shop||aged!=='Offline'?false:linked?.boardOutage===true,router:fieldReachability(unit,data.routers?.items,clock),
         point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),
         estimate:data.estimates.get(unit.id)};
     }).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]

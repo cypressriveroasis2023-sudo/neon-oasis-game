@@ -52,14 +52,14 @@
     }
   ],
   "expectedBefore": {
-    "index.ts": "64cb04d8b07e6c205ee9b51e9ba596a579f03968808d045b0c2feb6dffa1a98c",
+    "index.ts": "7ed24bbae2e2d4d62a49a2b647393126afe07290926261e79e24f71493b852fc",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
   },
   "expectedAfter": {
-    "index.ts": "babfc6f0b5607d755c547871c601dd840f3f4278ccc42f3fbbe3084483430361",
+    "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
   },
   "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-board-on-gate-v17.json --dry-run",
   "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-board-on-gate-v17.json --deploy",

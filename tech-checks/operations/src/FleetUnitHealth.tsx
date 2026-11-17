@@ -5,6 +5,8 @@ import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
 import {powerTimestamp} from './cameraEvidence';
 import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
+// @ts-ignore plain module shared with the edge function
+import {displayedRouterStatus} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import type {FleetDashboardRow,Signal} from './fleetDashboardModel';
 import FleetBatterySummary from './FleetBatterySummary';
 import LastKnownCameraStatus from './LastKnownCameraStatus';
@@ -14,6 +16,11 @@ const stateLabels:Record<Signal,string>={online:'Online',offline:'Offline',unkno
 const powerLabels:Record<string,string>={solar_power:'Solar output',load_power:'DC system load',battery_power:'Battery power',battery_voltage:'Battery voltage',battery_current:'Battery current',low_voltage_alarm:'Low voltage alarm',low_soc_alarm:'Low charge alarm',high_voltage_alarm:'High voltage alarm'};
 const sourceLabel=(source:string,instance:number)=>`${source==='solarcharger'?'Solar charger':source==='system'?'System':'Battery'} ${instance}`;
 function Status({state,label}:{state:Signal;label?:string}){return <span className={'cos-fleet-badge cos-signal-'+state}><i aria-hidden='true'>●</i>{label||stateLabels[state]}</span>;}
+function RouterStatusPill({row,now}:{row:FleetDashboardRow;now:number}){
+ const label=row.routerLabel?displayedRouterStatus(row.routerLabel, row.routerCheckedAt, now):(row.routerState==='online'?'Reachable':row.routerState==='offline'?'Unreachable':'Unverified');
+ const state:Signal=row.placement==='shop'||label==='Unknown'||label==='Unknown (no feed)'?'unknown':label==='Offline'?'offline':label==='Online'?'online':row.routerState;
+ return <Status state={state} label={label}/>;
+}
 
 /** Present only the already reconciled row. This card never fetches or associates devices. */
 export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{row:FleetDashboardRow;now:number;editing?:boolean;lastKnown?:LastKnownCamera|null}){
@@ -27,7 +34,7 @@ export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{
    <details><summary>{row.cameraState==='unknown'?'Why is this unverified?':'Camera source details'}</summary><p>{row.camera.reason}</p><p>Camera troubleshooting contains the matched devices and saved checks.</p></details>
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-router-card' aria-label='Selected unit router health'>
-   <h3><FleetCardIcon kind="router"/>Router &amp; connection</h3>{row.doNotUse&&<b className='cos-do-not-use-badge'>DO NOT USE</b>}<Status state={row.placement==='shop'?'unknown':row.routerState} label={row.routerLabel||(row.routerState==='online'?'Reachable':row.routerState==='offline'?'Unreachable':'Unverified')}/>
+   <h3><FleetCardIcon kind="router"/>Router &amp; connection</h3>{row.doNotUse===true&&<b className='cos-do-not-use-badge'>DO NOT USE</b>}<RouterStatusPill row={row} now={now}/>
    {row.routerCheckedAt&&<small>Last contact: {cameraTime(row.routerCheckedAt,now)}</small>}
    {row.routers.length>0&&<small>Management check; camera health is separate.</small>}
    {row.routers.length?<div className="cos-router-readable">{row.routers.map(router=><article key={router.id}>

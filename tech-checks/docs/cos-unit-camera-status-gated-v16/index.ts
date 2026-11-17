@@ -13283,8 +13283,16 @@ var handler = createOperationsHandler({
 });
 const CAMERA_STATUS_ROUTES=["/api/unit-camera-status","/api/unit-camera-status/edit"];
 const CAMERA_BODY_LIMIT=65536;
-function cameraUrlPath(url){
-  return new URL(url).pathname.replace(/^.*\/cos-unit-camera-status(?=\/|$)/,"").replace(/\/$/,"");
+function cameraRepeated(pathname){
+  const camera=(pathname.match(/\/cos-unit-camera-status(?=\/|$)/g)||[]).length;
+  const pages=(pathname.match(/\/cos-operations-pages(?=\/|$)/g)||[]).length;
+  return camera>1||pages>1;
+}
+function cameraSeenPath(url){
+  const original=new URL(url).pathname;
+  const rewritten=new URL(handlerUrl(url)).pathname;
+  if(cameraRepeated(original)||cameraRepeated(rewritten))return null;
+  return rewritten.replace(/^.*\/cos-(?:operations-(?:pages|bridge)|fleet-board-producer)(?=\/|$)/,"").replace(/\/$/,"");
 }
 function cameraNotFound(){
   return new Response(JSON.stringify({error:"COS endpoint not found."}),{status:404,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
@@ -13315,7 +13323,8 @@ async function readCameraBody(request){
 }
 Deno.serve(async (request) => {
   if(request.method==="OPTIONS")return handler(request);
-  const urlPath=cameraUrlPath(request.url);
+  const urlPath=cameraSeenPath(request.url);
+  if(urlPath===null)return cameraNotFound();
   const allowedUrl=CAMERA_STATUS_ROUTES.includes(urlPath);
   if(request.method!=="POST")return allowedUrl?handler(request):cameraNotFound();
   if(urlPath&&!allowedUrl)return cameraNotFound();

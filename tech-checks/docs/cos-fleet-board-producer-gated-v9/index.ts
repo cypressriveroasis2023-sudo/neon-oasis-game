@@ -9,11 +9,16 @@ Deno.serve=(first,second)=>{
   if(typeof handler!=="function")throw new TypeError("COS producer expected a request handler.");
   const restricted=async request=>{
     if(request.method==="OPTIONS")return handler(request);
-    const urlPath=new URL(request.url).pathname.replace(/^.*\/cos-(?:operations-(?:pages|bridge)|fleet-board-producer)(?=\/|$)/,"").replace(/\/$/,"");
-    if(request.method==="POST"&&urlPath==="/api/fleet-saved-board/produce")return handler(request);
-    if(urlPath||request.method!=="POST")return producerNotFound();
+    const pathname=new URL(request.url).pathname;
+    const own=(pathname.match(/\/cos-fleet-board-producer(?=\/|$)/g)||[]).length;
+    const pages=(pathname.match(/\/cos-operations-pages(?=\/|$)/g)||[]).length;
+    if(own>1||pages>1)return producerNotFound();
+    const urlPath=pathname.replace(/^.*\/cos-(?:operations-(?:pages|bridge)|fleet-board-producer)(?=\/|$)/,"").replace(/\/$/,"");
+    const directProduce=request.method==="POST"&&urlPath==="/api/fleet-saved-board/produce";
+    if(!directProduce&&!(request.method==="POST"&&!urlPath))return producerNotFound();
     const limited=await readProducerBody(request);
     if(limited.tooBig)return new Response(JSON.stringify({error:"Request body is too large."}),{status:413,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+    if(directProduce)return handler(new Request(request.url,{method:request.method,headers:request.headers,body:limited.text}));
     let envelope=null;
     try{envelope=JSON.parse(limited.text);}catch{envelope=null;}
     const path=envelope&&typeof envelope==="object"&&!Array.isArray(envelope)&&typeof envelope.path==="string"?envelope.path.replace(/\/$/,""):"";

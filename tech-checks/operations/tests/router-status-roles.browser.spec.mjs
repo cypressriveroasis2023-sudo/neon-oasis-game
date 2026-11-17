@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, units, fresh} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, units, fresh, now} from './fleet-dashboard-fixtures.mjs';
 import {mountServiceBasics} from './helpers/service-basics-fixture.mjs';
 
 const router = {
@@ -41,6 +41,40 @@ for (const it of [false, true]) {
     await page.screenshot({path: info.outputPath(`${it ? 'it' : 'owner'}-${info.project.name}.png`), fullPage: true});
   });
 }
+
+test('a false do-not-use flag renders no badge on the router card', async ({page}) => {
+  const {app} = await mountFleet(page, false, {routers: [{...router, doNotUse: false}]});
+  const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Helios 1'});
+  await expect(row.locator('.cos-do-not-use-badge')).toHaveCount(0);
+  await row.click();
+  await expect(app.locator('.cos-fleet-router-card .cos-do-not-use-badge')).toHaveCount(0);
+});
+
+test('the do-not-use badge keeps readable text on the router card', async ({page}) => {
+  const {app} = await mountFleet(page, false, {routers: [router]});
+  await app.locator('.cos-fleet-unit-row').filter({hasText: 'Helios 1'}).click();
+  const badge = app.locator('.cos-fleet-router-card .cos-do-not-use-badge');
+  await expect(badge).toHaveText('DO NOT USE');
+  expect(await badge.evaluate(node => getComputedStyle(node).color)).toBe('rgb(154, 52, 18)');
+});
+
+test('a reading older than 3 hours shows Unknown on the fleet card, unit details, and routers page', async ({page}) => {
+  const old = new Date(now - 4 * 60 * 60 * 1000).toISOString();
+  const stale = {...router, doNotUse: false, boardStatus: 'Online', boardCheckedAt: old, checkedAt: old, reportedAt: old};
+  const {app} = await mountFleet(page, false, {routers: [stale]});
+  const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Helios 1'});
+  await expect(row.locator('.cos-fleet-router-text')).toContainText('Unknown');
+  await expect(row.locator('.cos-fleet-router-text')).not.toContainText('Online');
+  await row.click();
+  const card = app.locator('.cos-fleet-router-card');
+  await expect(card.locator('.cos-fleet-badge')).toContainText('Unknown');
+  await expect(card.locator('.cos-do-not-use-badge')).toHaveCount(0);
+  await page.locator('iframe').evaluate(frame => { frame.contentWindow.location.hash = '#inhand-routers'; });
+  const routers = app.getByRole('region', {name: 'InHand Routers workspace'});
+  await expect(routers).toBeVisible();
+  await expect(routers.locator('.router-list .router-badge')).toHaveText('Unknown');
+  await expect(routers.locator('.router-detail .router-badge')).toHaveText('Unknown');
+});
 
 test('Service inventory does not gain a router address', async ({page}, info) => {
   await mountServiceBasics(page);

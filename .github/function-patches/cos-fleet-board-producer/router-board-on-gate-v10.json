@@ -28,26 +28,20 @@
     },
     {
       "file": "index.ts",
-      "needle": "if(request.method===\"POST\"&&urlPath===\"/api/fleet-saved-board/produce\")return handler(request);",
-      "replacement": "if(request.method===\"POST\"&&urlPath===\"/api/fleet-saved-board/produce\")return routerBoardAuth.run(request.headers,()=>handler(request));",
-      "occurrences": 1
-    },
-    {
-      "file": "index.ts",
       "needle": "return handler(new Request(request.url,{method:request.method,headers:request.headers,body:limited.text}));",
       "replacement": "return routerBoardAuth.run(request.headers,()=>handler(new Request(request.url,{method:request.method,headers:request.headers,body:limited.text})));",
-      "occurrences": 1
+      "occurrences": 2
     }
   ],
   "expectedBefore": {
-    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "index.ts": "e1cd7ae339bd4df4114d50fa427069f61dce8e39b813c73e839da64fafa3b200",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
   },
   "expectedAfter": {
-    "index.ts": "60d2826b55acd321ad2508fccc35a7f9dcee65359821bc00624b6567d725d22b",
+    "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
   },
   "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --dry-run",
   "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --deploy",
