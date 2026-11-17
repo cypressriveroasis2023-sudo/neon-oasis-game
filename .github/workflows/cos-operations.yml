@@ -145,19 +145,25 @@ jobs:
           git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../technician-wizard-owner-dashboard-v5.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../truck-spares-shared-v1.js
           # James asked on 2026-11-17 for the SIM cancellation step. These two
           # files are pinned at the reviewed blobs. Any other edit still fails.
+          # The intake wizard pin moved when the full SIM number was taken out
+          # of the saved checklist record.
           rules_blob='7b5873d15ba4c2cb95f916d30847badb1348a068'
-          intake_blob='561ea22ba74baf6bd661ee9cc3b40b02883f4a2d'
+          intake_blob='386f1c00157af12af907cdb1ad85c1a884771c27'
           test "$(git rev-parse HEAD:tech-checks/tech-check-rules.js)" = "$rules_blob"
           test "$(git hash-object ../tech-check-rules.js)" = "$rules_blob"
           test "$(git rev-parse HEAD:tech-checks/it-intake-wizard-v1.js)" = "$intake_blob"
           test "$(git hash-object ../it-intake-wizard-v1.js)" = "$intake_blob"
           # James authorized the shared COS power-alarm settings table on
           # 2026-11-16. The SIM cancellation table was added on 2026-11-17 and
-          # is not applied by this workflow. The pin still fails closed.
+          # is not applied by this workflow. The grant revoke matches the
+          # already-applied platform migration. The owner-check migration is
+          # also not applied here. The pin still fails closed.
           timeout_migration='tech-checks/supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql'
           settings_migration='tech-checks/supabase/migrations/20261116_cos_power_alarm_settings.sql'
           sim_migration='tech-checks/supabase/migrations/20261117_cos_sim_cancel_records.sql'
-          test "$(git diff --name-only f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../supabase/migrations | sort)" = "$(printf '%s\n%s\n%s' "$settings_migration" "$sim_migration" "$timeout_migration" | sort)"
+          grants_migration='tech-checks/supabase/migrations/20261117_cos_sim_cancel_records_tighten_grants.sql'
+          owner_migration='tech-checks/supabase/migrations/20261117_cos_sim_cancel_records_owner_check.sql'
+          test "$(git diff --name-only f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../supabase/migrations | sort)" = "$(printf '%s\n%s\n%s\n%s\n%s' "$settings_migration" "$sim_migration" "$grants_migration" "$owner_migration" "$timeout_migration" | sort)"
           timeout_blob='be212be3ca031febc644d6d2a23816b9e7a12d91'
           test "$(git rev-parse HEAD:$timeout_migration)" = "$timeout_blob"
           test "$(git hash-object ../supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql)" = "$timeout_blob"
@@ -167,6 +173,12 @@ jobs:
           sim_blob='377799dc204046dcb390594324e6fbd1163fc2d1'
           test "$(git rev-parse HEAD:$sim_migration)" = "$sim_blob"
           test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records.sql)" = "$sim_blob"
+          grants_blob='a05484aa259e23979b59839e2615f8307dd00054'
+          test "$(git rev-parse HEAD:$grants_migration)" = "$grants_blob"
+          test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records_tighten_grants.sql)" = "$grants_blob"
+          owner_blob='ef8277d52923caf1ae42111c7eb03efc960c55d2'
+          test "$(git rev-parse HEAD:$owner_migration)" = "$owner_blob"
+          test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records_owner_check.sql)" = "$owner_blob"
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Verify real PostgreSQL intake concurrency

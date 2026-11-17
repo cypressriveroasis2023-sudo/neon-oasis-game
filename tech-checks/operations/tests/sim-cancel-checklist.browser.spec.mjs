@@ -16,7 +16,8 @@ test('the cancellation stays blocked until the SIM step is saved, and lists keep
   await step.getByRole('button', {name: 'Save this step'}).click();
   await expect(step.getByRole('button', {name: 'Mark cancellation complete'})).toBeEnabled();
   await expect(step.getByText('•••• 0007')).toBeVisible();
-  await expect(step.getByLabel('SIM number')).toHaveValue(EXAMPLE);
+  await expect(step.getByLabel('SIM number')).toHaveValue('');
+  await expect(step).not.toContainText(EXAMPLE);
   const board = step.locator('.cos-sim-board');
   await expect(board).toContainText('•••• 0007');
   await expect(board).not.toContainText(EXAMPLE);

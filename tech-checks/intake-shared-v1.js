@@ -3,13 +3,23 @@ import {closeoutAllowed, recordSimCancel, simCancelForNotes} from './sim-cancel-
 // Keeps the chain-of-custody record format authoritative across IT and Owner views.
 const INTAKE_META_RE=/(?:^|\n)\[\[INTAKE_META:([A-Za-z0-9+/=]+)\]\]/;
 
+function encodeMeta(meta){
+  const bytes=new TextEncoder().encode(JSON.stringify(meta||{}));
+  let binary='';
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary);
+}
+function decodeMeta(payload){
+  const binary=atob(payload),bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
 function readRecord(raw){
   const text=String(raw||''),match=text.match(INTAKE_META_RE); let meta={};
-  if(match?.[1]){try{meta=JSON.parse(atob(match[1]));}catch{meta={};}}
+  if(match?.[1]){try{meta=decodeMeta(match[1]);}catch{meta={};}}
   return {notes:text.replace(INTAKE_META_RE,'').trim(),meta};
 }
 function writeRecord(notes,meta){
-  const payload=btoa(JSON.stringify(meta||{})),clean=String(notes||'').trim();
+  const payload=encodeMeta(meta),clean=String(notes||'').trim();
   return clean+(clean?'\n':'')+'[[INTAKE_META:'+payload+']]';
 }
 function techInitials(name){
@@ -25,13 +35,18 @@ async function saveProgress({returnId,notes='',meta={}}){
   if(error)throw error;
   return {damage_notes,updated_at};
 }
-async function finishIntake({row,tech,notes='',meta={},intakePhotoPaths=[]}){
+async function finishIntake({row,tech,notes='',meta={},intakePhotoPaths=[],simNumber=null}){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   const now=new Date().toISOString();
   const nextMeta={...(meta||{})};
-  const gate=closeoutAllowed({action:'pickup',simCancel:nextMeta.simCancel});
+  if(!nextMeta.cancellationDoc)nextMeta.cancellationDoc=documentation(row,tech,new Date(now));
+  const held=nextMeta.simCancel?{...nextMeta.simCancel,simNumber:simNumber||null}:null;
+  const gate=closeoutAllowed({action:'pickup',simCancel:held});
   if(!gate.ok)throw new Error(gate.error);
-  const stored=await recordSimCancel(ctx.db,gate.record,tech?.id||null);
+  let accessToken='';
+  try{const session=await ctx.db.auth.getSession();accessToken=session?.data?.session?.access_token||'';}
+  catch{throw new Error('The SIM step could not be saved.');}
+  const stored=await recordSimCancel({accessToken},gate.record,row.id);
   if(!stored.ok)throw new Error(stored.error);
   nextMeta.simCancel=simCancelForNotes(gate.record);
   const payload={status:'pending_mhelp_inventory',it_tech_id:tech.id,it_tech_name:tech.name,it_received_at:now,damage_notes:writeRecord(notes,nextMeta),intake_photo_paths:intakePhotoPaths,updated_at:now};

@@ -19,9 +19,10 @@ export default function SimCancelChecklist() {
   const [saved, setSaved] = useState<SimCancelRecord | null>(null);
   const [done, setDone] = useState(false);
   const [open, setOpen] = useState(true);
+  const [ending, setEnding] = useState('');
   const todo = simCancelTodo(EXAMPLE);
   const waiting = done ? 0 : 1;
-  const masked = saved?.simNumber ? simLast4(saved.simNumber) : '';
+  const masked = ending;
 
   const save = () => {
     const result = assessSimCancel({
@@ -32,9 +33,11 @@ export default function SimCancelChecklist() {
       simNumber: noSim ? '' : simNumber,
       noSimReason,
     });
-    if (!result.ok) { setSaved(null); setError(result.error); return; }
+    if (!result.ok) { setSaved(null); setEnding(''); setError(result.error); return; }
     setError('');
-    setSaved(result.record);
+    setEnding(result.record.simNumber ? simLast4(result.record.simNumber) : '');
+    setSimNumber('');
+    setSaved({ ...result.record, simNumber: null });
   };
 
   return <main className='cos-sim-cancel' aria-label='SIM card canceled'>
@@ -45,7 +48,7 @@ export default function SimCancelChecklist() {
     <TechnicianTodoList todos={done ? [] : [todo]} onOpen={() => setOpen(true)}/>
     <details className='cos-sim-about'>
       <summary>About this step</summary>
-      <p>A pickup or cancellation stays incomplete until this step is saved. Lists and the board show the last four digits. The full SIM number stays on this step.</p>
+      <p>A pickup or cancellation stays incomplete until this step is saved. Lists and the board show the last four digits.</p>
     </details>
     {masked && <p className='cos-sim-board'>Board · Product {EXAMPLE.productId} · {masked}</p>}
     {saved?.outcome === 'no_sim' && <p className='cos-sim-board'>Board · Product {EXAMPLE.productId} · No SIM in this unit</p>}
