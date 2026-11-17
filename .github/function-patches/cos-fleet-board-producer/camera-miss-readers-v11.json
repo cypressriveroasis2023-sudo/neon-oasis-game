@@ -22,7 +22,7 @@
    "file": "routerBoardJoin.mjs",
    "occurrences": 1,
    "needle": "    const reading = boardRouterStatus(raw, now, '');",
-   "replacement": "    const shopDevice = (devices || []).some((device) => routerJoinKey(device.unit_key) === routerJoinKey(item.unitKey) && ['root', 'shop', 'shop equipment'].includes(text(device.organization).toLowerCase()));\n    const reading = boardRouterStatus(raw, now, shopDevice ? 'shop' : '');",
+   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));",
    "occurrences": 1
   },
   {
@@ -35,7 +35,7 @@
    "file": "index.ts",
    "occurrences": 1,
    "needle": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/b5b188229346182d9a4e29da42415a1b9d3b9d53/tech-checks/docs/vision-native-preview-20261107/source/serve.ts\");",
-   "replacement": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/411138b49fd6b7fd2ab426bb8318c08a86e7da01/tech-checks/docs/cos-fleet-board-producer-handler/serve.ts\");"
+   "replacement": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/cee1d65a73ad45cc86b26863d7703a340f0b9802/tech-checks/docs/cos-fleet-board-producer-handler/serve.ts\");"
   }
  ],
  "expectedBefore": {
@@ -44,8 +44,8 @@
   "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  },
  "expectedAfter": {
-  "index.ts": "cd970c6be49b78b09d3f29605f1800925ddd8c555530525e30cf3f1152ad3819",
+  "index.ts": "ff4932861402c6889d3f3c1f2f3965a0808cc6840a54851d3dd8d31229a4a7db",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "33df91f2393304de2f47e39e18bf8c05e07b738105f1f3de53f6b04b09f74785"
+  "routerBoardJoin.mjs": "236a3adf412d4043c120fb5437d685c9f48d402120b6848490642aabd133483c"
  }
 }

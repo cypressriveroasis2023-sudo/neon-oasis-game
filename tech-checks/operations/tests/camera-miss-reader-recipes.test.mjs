@@ -58,7 +58,7 @@ test('producer recipe keeps the router wrap and points at the patched handler',(
   const {patch, files}=patched('.github/function-patches/cos-fleet-board-producer/camera-miss-readers-v11.json');
   assert.equal(patch.requireLiveBeforeDeploy.version, 11);
   assert.match(files['index.ts'], /routerBoardAuth\.run/);
-  assert.match(files['index.ts'], /411138b49fd6b7fd2ab426bb8318c08a86e7da01\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
+  assert.match(files['index.ts'], /cee1d65a73ad45cc86b26863d7703a340f0b9802\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
   assert.equal(files['index.ts'].includes('b5b188229346182d9a4e29da42415a1b9d3b9d53'), false);
   assert.match(files['routerBoardJoin.mjs'], /if \(shop\) return \{ status: 'In Shop', checkedAt, outage: false \}/);
 });

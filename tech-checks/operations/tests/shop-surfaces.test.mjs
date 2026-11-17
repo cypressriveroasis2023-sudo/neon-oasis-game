@@ -34,6 +34,26 @@ test('opening a Shop unit components view says In Shop and never Offline', () =>
   assert.match(field, /OFFLINE/);
 });
 
+test('a Field unit with ROOT inventory stays Field and outage-eligible', () => {
+  const api = overview();
+  const device = {id: 1, unit_key: 'SNIPER 90', organization: 'ROOT', activation_state: 'ACTIVE', device_name: 'Field camera', device_type: 'ipc', source: 'vigilant_control_center', source_status: 'offline', source_last_seen_at: checked, current_location_type: 'field', placement: 'field'};
+  assert.equal(api.placement(device, []), 'field');
+  const group = api.classifyUnit([device], [], +now, {});
+  assert.equal(group.scope, 'field');
+  assert.notEqual(group.state, 'shop');
+  const html = api.details({k: 'SNIPER 90', ...group, ds: [device]}, {health: {}, cameraGroup: () => 'Camera', effectiveHealth: () => 'offline', reconBatteryBadge: () => '', role: 'Owner'});
+  assert.doesNotMatch(html, /In Shop/);
+  assert.match(html, /OFFLINE/);
+  const unit = {id: '33333333-3333-4333-8333-333333333333', unit_number: 'SNIPER 90', current_location_type: 'field'};
+  const router = {id: 9, unit_key: 'SNIPER 90', router_name: 'Field router', router_model: 'IR302', router_public_ip: '192.0.2.90', web_port: 8080, web_protocol: 'http', current_status: 'offline', last_checked_at: checked, inhand_serial: 'SERIAL-90', router_serial: 'SERIAL-90', last_online_at: '2026-09-10T10:00:00Z', reported_status: 'offline', status_observed_at: '2026-09-22T10:00:00Z', status_source: 'inhand_export', reported_latency_ms: 40};
+  const deviceRow = {id: 9, unit_key: 'SNIPER 90', organization: 'ROOT', device_serial: 'SERIAL-90'};
+  const row = routerSnapshot([router], [unit], now, [deviceRow]).items[0];
+  assert.notEqual(row.boardStatus, 'In Shop');
+  assert.equal(row.candidateUnit.placement, 'field');
+  assert.equal(routerRowView(row), null);
+  assert.equal(portUnreachableTally([row], +now), 1);
+});
+
 test('the Routers page shows In Shop and a Shop unit adds 0 to Port unreachable', () => {
   const unit = {id: '11111111-1111-4111-8111-111111111111', unit_number: 'SNIPER 80', current_location_type: 'shop'};
   const router = {id: 1, unit_key: 'SNIPER 80', router_name: 'Shop router', router_model: 'IR302', router_public_ip: '192.0.2.10', web_port: 8080, web_protocol: 'http', current_status: 'offline', last_checked_at: checked, last_online_at: '2026-09-10T10:00:00Z', reported_status: 'offline', status_observed_at: '2026-09-22T10:00:00Z', status_source: 'inhand_export', reported_latency_ms: 40};

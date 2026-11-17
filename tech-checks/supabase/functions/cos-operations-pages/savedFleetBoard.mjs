@@ -1071,7 +1071,7 @@ function fieldProductFollowUp(state, reason, exactUnknownReason, directSourceUna
 var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
 var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
 var CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
-var fieldHealthLabels = { online: "Online", offline: "Offline", verifying: "Verifying", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
+var fieldHealthLabels = { online: "Online", offline: "Offline", verifying: "Verifying", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive", shop: "In Shop" };
 function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
   const authority = readMhelpInventoryAuthority(value, now);
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
@@ -1095,6 +1095,9 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
       reason = product2.uploadLifecycle === "MISSING" ? "Marked Missing in the reviewed mHelpDesk source." : "Marked Do Not Use in the reviewed mHelpDesk source.";
+    } else if (record2?.placement === "shop" || row?.placement === "shop") {
+      state = "shop";
+      reason = "A unit placed in Shop is not an outage.";
     } else if (record2?.kind === "identity_review" || record2 && record2.placement !== "field" || binding?.state === "held" || binding?.placementHeld === true || binding?.candidateUnitIds?.length) {
       state = "review";
       reason = record2?.reviewReason || "The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.";
@@ -1125,9 +1128,6 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
       } else if (exact.status === "online") {
         state = "online";
         reason = exact.reason;
-      } else if (record2?.placement === "shop" || row?.placement === "shop") {
-        state = "review";
-        reason = "A unit placed in Shop is not an outage.";
       } else {
         state = "offline";
         reason = exact.reason;
@@ -1184,7 +1184,7 @@ function mhelpProviderFleet(upload, health, healthReadSucceeded, now = Date.now(
   for (const product2 of products) {
     const provider = mhelpProviderFamily(product2.category, product2.unitNumber);
     const linked = healthById.get(product2.productId) || null;
-    const healthStatus = provider === "support" ? "not_applicable" : usable && (linked?.state === "online" || linked?.state === "offline") ? linked.state : "unverified";
+    const healthStatus = provider === "support" || linked?.state === "shop" ? "not_applicable" : usable && (linked?.state === "online" || linked?.state === "offline") ? linked.state : "unverified";
     const reason = provider === "support" ? "Support equipment has no camera-health requirement. Verify its power separately." : !usable ? "Latest Field camera health is unavailable. No offline condition is inferred." : product2.uploadLifecycle && product2.uploadLifecycle !== "UNFLAGGED" ? "Source is marked Do Not Use / Missing. Do not activate from a saved connection." : linked?.reason || "No verified Product-ID-to-camera association. Not counted as an outage.";
     const group = groupByProvider.get(provider);
     group.count++;
@@ -1233,15 +1233,16 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
   if (items.length !== authority.field || new Set(items.map((p) => p.productId)).size !== authority.field)
     throw Error("Field inventory violates unique Product-ID accounting.");
   const count = (status) => items.filter((p) => p.status === status).length;
+  const shopCount = items.filter((p) => p.linked?.state === "shop").length;
   const counts = {
     online: count("online"),
     offline: count("offline"),
     unverified: count("unverified"),
-    support: count("not_applicable"),
-    attention: items.filter((p) => p.status === "offline" || p.status === "unverified" || p.mappingIssue).length,
+    support: count("not_applicable") - shopCount,
+    attention: items.filter((p) => p.linked?.state !== "shop" && (p.status === "offline" || p.status === "unverified" || p.mappingIssue)).length,
     unmapped: validAddresses ? validAddresses.unlocated : 0
   };
-  if (counts.online + counts.offline + counts.unverified + counts.support !== authority.field || authority.field + authority.shop !== authority.total) throw Error("Fleet accounting does not reconcile.");
+  if (counts.online + counts.offline + counts.unverified + counts.support + shopCount !== authority.field || authority.field + authority.shop !== authority.total) throw Error("Fleet accounting does not reconcile.");
   const panels = ["star4live", "avigilon", "reconeyez"].map((key) => {
     const group = provider.groups.find((g) => g.provider === key);
     return {

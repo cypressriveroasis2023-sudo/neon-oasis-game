@@ -83,13 +83,14 @@ export function buildFleetCommandCenter(
   if(items.length!==authority.field||new Set(items.map(p=>p.productId)).size!==authority.field)
     throw Error('Field inventory violates unique Product-ID accounting.');
   const count=(status:FleetCommandStatus)=>items.filter(p=>p.status===status).length;
+  const shopCount=items.filter(p=>p.linked?.state==='shop').length;
   const counts={
     online:count('online'),offline:count('offline'),unverified:count('unverified'),
-    support:count('not_applicable'),
-    attention:items.filter(p=>p.status==='offline'||p.status==='unverified'||p.mappingIssue).length,
+    support:count('not_applicable')-shopCount,
+    attention:items.filter(p=>p.linked?.state!=='shop'&&(p.status==='offline'||p.status==='unverified'||p.mappingIssue)).length,
     unmapped:validAddresses?validAddresses.unlocated:0
   };
-  if(counts.online+counts.offline+counts.unverified+counts.support!==authority.field
+  if(counts.online+counts.offline+counts.unverified+counts.support+shopCount!==authority.field
     ||authority.field+authority.shop!==authority.total)throw Error('Fleet accounting does not reconcile.');
 
   const panels:FleetCommandPanel[]=(['star4live','avigilon','reconeyez'] as const).map(key=>{

@@ -9,7 +9,7 @@ import {fieldProductFollowUp} from './fieldProductFollowUp';
 export const PROVIDER_REPORTED='Provider-reported, not direct-connection verified. ';
 export const DIRECT_SOURCE_GAP='No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ';
 export const CURRENT_SOURCE_CONFLICT='Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ';
-export const fieldHealthLabels={online:'Online',offline:'Offline',verifying:'Verifying',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
+export const fieldHealthLabels={online:'Online',offline:'Offline',verifying:'Verifying',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive',shop:'In Shop'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
 export type FieldProduct={productId:string;unitNumber:string;state:FieldProductHealth;reason:string;unitId:string|null;recordId:string|null;evidence?:FieldProductEvidence};
 
@@ -47,6 +47,8 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
   let state:FieldProductHealth,reason:string;
   if(product.uploadLifecycle!=='UNFLAGGED'){
    state='inactive';reason=product.uploadLifecycle==='MISSING'?'Marked Missing in the reviewed mHelpDesk source.':'Marked Do Not Use in the reviewed mHelpDesk source.';
+  }else if(record?.placement==='shop'||row?.placement==='shop'){
+   state='shop';reason='A unit placed in Shop is not an outage.';
   }else if(record?.kind==='identity_review'||record&&record.placement!=='field'||binding?.state==='held'||binding?.placementHeld===true||binding?.candidateUnitIds?.length){
    state='review';reason=record?.reviewReason||'The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.';
   }else if(record&&(!record.active||record.lifecycle!=='active'||row?.retired)){
@@ -80,9 +82,6 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
    }else if(exact.status==='online'){
     state='online';
     reason=exact.reason;
-   }else if(record?.placement==='shop'||row?.placement==='shop'){
-    state='review';
-    reason='A unit placed in Shop is not an outage.';
    }else{
     state='offline';
     reason=exact.reason;

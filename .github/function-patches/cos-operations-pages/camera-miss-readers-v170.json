@@ -75,7 +75,7 @@
   {
    "file": "routerBoardJoin.mjs",
    "needle": "    const reading = boardRouterStatus(raw, now, '');",
-   "replacement": "    const shopDevice = (devices || []).some((device) => routerJoinKey(device.unit_key) === routerJoinKey(item.unitKey) && ['root', 'shop', 'shop equipment'].includes(text(device.organization).toLowerCase()));\n    const reading = boardRouterStatus(raw, now, shopDevice ? 'shop' : '');",
+   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));",
    "occurrences": 1
   },
   {
@@ -96,7 +96,7 @@
   "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
   "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
   "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-  "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
+  "savedFleetBoard.mjs": "909870005deface4a596be4d6ba2f2b3ff5fb53822aa7c13b3d1250402c77d3b",
   "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
@@ -107,10 +107,10 @@
   "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
   "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
   "productVerifyNow.ts": "235e4857a2a6712f1a670a81f8468e9430f5125b1139f70059934e6e110dd9e7",
-  "savedFleetBoard.mjs": "9edb24154edfba5369a9f3bfdea8c937f592da108acc702bdaa7f4ecad56e717",
+  "savedFleetBoard.mjs": "e0795e5fe75c85dd2864436b3e213559f435707b47bf727287399616e70a00b5",
   "serve.ts": "c8dbcfd1c5b6bdd6ffceee0d318a6bf4d1325f90041de6844a27ed5fa716f0b0",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "33df91f2393304de2f47e39e18bf8c05e07b738105f1f3de53f6b04b09f74785"
+  "routerBoardJoin.mjs": "236a3adf412d4043c120fb5437d685c9f48d402120b6848490642aabd133483c"
  }
 }

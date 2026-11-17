@@ -10,7 +10,7 @@ export function clusterMapPoints<T>(points:MapPoint<T>[],radius=38,verticalPaddi
 }
 /** Presentation only. Camera evidence and support classification remain upstream. */
 export type ReticleState = 'online'|'offline'|'unknown'|'support';
-export const fieldReticleColors = {online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff'};
+export const fieldReticleColors = {online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff',shop:'#64748b'};
 export function mapUnitIdentifier(unitNumber:string):string {
   // Only numeric characters reach the HTML template. Full imported labels stay text nodes.
   return /^(?:SOLAR\s*SPOTTER|SS\s*HYBRID|SPOTTER|RANGER|HELIOS|SNIPER(?:\s+[24](?=\s))?|CAM\s*V|RSU|RECON(?:\s*II)?)[\s#-]*(\d{1,6}(?:\.\d+)?)(?:HD4|HDC[24]S?|HD)?$/i.exec(unitNumber.trim())?.[1] || /^ST\s*[-#]?\s*(\d{1,6})$/i.exec(unitNumber.trim())?.[1] || /(?:^|\s|[-#])(\d{1,6}(?:\.\d+)?)$/.exec(unitNumber.trim())?.[1] || '';

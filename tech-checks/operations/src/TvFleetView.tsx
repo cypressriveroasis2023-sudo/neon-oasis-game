@@ -229,7 +229,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         continue;
       }
       const {item}=members[0],health=item.health,shown=item.label||health;
-      const html=item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,health,item.verifiedGps?'current':'estimate');
+      const html=(item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,health,item.verifiedGps?'current':'estimate')).replace(item.label==='In Shop'?'#94a3b8':'#00000000','#64748b');
       const marker=L.marker(item.point,{title:item.name+' · '+shown,alt:item.name+' · '+shown,
         icon:L.divIcon({className:'cos-field-pin-wrap cos-tv-fleet-unit-marker',html,iconSize:[44,56],iconAnchor:[22,34]})});
       marker.on('add',()=>{

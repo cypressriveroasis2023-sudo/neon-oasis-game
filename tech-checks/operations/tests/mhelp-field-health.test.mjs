@@ -3,7 +3,7 @@ import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('every Field Product ID appears once in a complete partition; Shop never enters it',()=>{
  const f=fieldProductFixture(),before=structuredClone(f),view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
- assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,verifying:0,unverified:1,support:1,unlinked:1,review:1,inactive:1});
+ assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,verifying:0,unverified:1,support:1,unlinked:1,review:1,inactive:1,shop:0});
  assert.equal(new Set(view.items.map(item=>item.productId)).size,7);assert(!view.items.some(item=>item.productId==='1008'));assert.deepEqual(f,before);
 });
 test('possible candidate matches cannot inherit healthy native evidence',()=>{
@@ -16,8 +16,12 @@ test('inactive source lifecycle stays separate even when a linked service respon
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);assert.equal(view.counts.inactive,2);
 });
 test('missing, duplicate or inconsistent unit associations never assign an online product',()=>{
- for(const change of [f=>f.rows.shift(),f=>f.rows.push({...f.rows[0]}),f=>f.upload.records[0].binding.unitIds=[],f=>f.rows[0].placement='shop']){
+ for(const change of [f=>f.rows.shift(),f=>f.rows.push({...f.rows[0]}),f=>f.upload.records[0].binding.unitIds=[]]){
   const f=fieldProductFixture();change(f);const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);assert.equal(view.counts.online,0);assert.equal(view.counts.review,2);
+ }
+ {
+  const f=fieldProductFixture();f.rows[0].placement='shop';const before=mhelpFieldHealth(fieldProductFixture().upload,fieldProductFixture().roster,fieldProductFixture().rows,f.now);const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
+  assert.equal(view.counts.online,0);assert.equal(view.counts.review,before.counts.review);assert.equal(view.counts.offline,before.counts.offline);assert.equal(view.counts.unverified,before.counts.unverified);assert.equal(view.counts.shop,1);
  }
 });
 test('malformed, incomplete or duplicate-source receipts cannot produce a certified count',()=>{
@@ -75,9 +79,18 @@ test('a unit placed in Shop is never an outage',()=>{
  const receipt=structuredClone(f.connections);
  Object.assign(receipt.items.find(p=>p.productId==='1002'),{status:'offline',checkedAt:f.fresh,resourceId:'2',reason:'Three fresh probe misses in a row.'});
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ const field=fieldProductFixture();
+ const fieldReceipt=structuredClone(field.connections);
+ Object.assign(fieldReceipt.items.find(p=>p.productId==='1002'),{status:'offline',checkedAt:f.fresh,resourceId:'2',reason:'Three fresh probe misses in a row.'});
+ const before=mhelpFieldHealth(field.upload,field.roster,field.rows,f.now,fieldReceipt);
  const item=view.items.find(p=>p.productId==='1002');
- assert.equal(item.state,'review');
+ assert.equal(item.state,'shop');
  assert.equal(view.counts.offline,0);
+ assert.equal(view.counts.review,before.counts.review);
+ assert.equal(view.counts.unverified,before.counts.unverified);
+ assert.equal(view.counts.support,before.counts.support);
+ assert.equal(view.counts.online,before.counts.online);
+ assert.equal(view.counts.shop,before.counts.shop+1);
 });
 test('matching exact resource and provider evidence remains definitive',()=>{
  const f=fieldProductFixture(),receipt=structuredClone(f.connections);
