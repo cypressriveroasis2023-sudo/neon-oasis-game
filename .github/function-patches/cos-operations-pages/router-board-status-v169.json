@@ -1,0 +1,91 @@
+{
+  "description": "Carry each unit router status on the saved board and match the Routers page with the Camera Health unit key. The same retired-route 410 needles as draft PR #425 are included, so deploying this after that patch does not remove them. Deploy PR #425 first. Do not deploy from this task.",
+  "authorization": "Preparation only. #425 deploys first. Existing sign-in and Owner/IT gates stay in front of router data. Router addresses are not added to the saved board.",
+  "releaseStatus": "PREPARATION_ONLY",
+  "slug": "cos-operations-pages",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceRecord": "tech-checks/docs/vision-native-preview-20261107/manifest.json",
+  "sourceDir": "tech-checks/docs/vision-native-preview-20261107/source",
+  "sourceCommit": "b5b188229346182d9a4e29da42415a1b9d3b9d53",
+  "deployedFileNames": {
+    "deno.json": "cos-operations-pages/deno.json",
+    "productCheckSource.ts": "cos-operations-pages/productCheckSource.ts",
+    "productTcpRuntime.ts": "cos-operations-pages/productTcpRuntime.ts",
+    "productVerifyNow.ts": "cos-operations-pages/productVerifyNow.ts",
+    "savedFleetBoard.mjs": "cos-operations-pages/savedFleetBoard.mjs",
+    "serve.ts": "cos-operations-pages/serve.ts",
+    "trackerEndpointProducer.mjs": "cos-operations-pages/trackerEndpointProducer.mjs",
+    "trackerEndpointRead.mjs": "cos-operations-pages/trackerEndpointRead.mjs",
+    "routerBoardJoin.mjs": "cos-operations-pages/routerBoardJoin.mjs"
+  },
+  "entrypointPath": "cos-operations-pages/serve.ts",
+  "importMapPath": "cos-operations-pages/deno.json",
+  "verifyJwt": false,
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 169
+  },
+  "edits": [
+    {
+      "file": "serve.ts",
+      "needle": "function fleetRouteAllowed(method,path){",
+      "replacement": "function cosBusinessGone(path){if(typeof path!=\"string\")return false;const under=base=>path===base||path.startsWith(base+\"/\");if(under(\"/api/jobs\")||under(\"/api/quotes\")||under(\"/api/ar\")||under(\"/api/purchasing\")||under(\"/api/customers\")||under(\"/api/sites\")||under(\"/api/work-requests\")||under(\"/api/owner-tasks\")||under(\"/api/mhelpdesk/imports\"))return true;if(path===\"/api/financial-summary\"||path===\"/api/owner/control-data\"||path===\"/api/owner/jobs/manual\"||path===\"/api/owner-review\"||path===\"/api/owner-review/signatures\"||path===\"/api/mhelpdesk/intake/status\"||path===\"/api/mhelpdesk/intake/status?capability=pending_schedule_v1\"||path===\"/api/team\")return true;if(/^\\/api\\/owner\\/jobs\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/advance-it$/i.test(path))return true;if(/^\\/api\\/owner\\/truck-checks\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/approve$/i.test(path))return true;return false;}function fleetRouteAllowed(method,path){",
+      "occurrences": 1
+    },
+    {
+      "file": "serve.ts",
+      "needle": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,productionTechnicianUserId:context.actorId,provisioningNeeded:null,reason:null});",
+      "replacement": "if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16(\"An active COS Owner account is required.\",403),method===\"GET\"&&path===\"/api/session\"&&verifiedFleetIt)return json({authorized:!0,legacyOwner:!1,role:\"IT\",name:context.name,features:fleetFeatures(),productionOwnerUserId:null,productionTechnicianUserId:context.actorId,provisioningNeeded:null,reason:null});if(cosBusinessGone(path))return json({error:\"gone\",reason:\"COS is cameras, locations, troubleshooting and equipment handoff only\"},410);",
+      "occurrences": 1
+    },
+    {
+      "file": "serve.ts",
+      "needle": "import {savedFleetBoard,acceptFleetBatch,completedBoard} from \"./savedFleetBoard.mjs\";\n",
+      "replacement": "import {savedFleetBoard,acceptFleetBatch,completedBoard} from \"./savedFleetBoard.mjs\";\nimport {projectBoard, loadRouterInventory, presentRouterPage, routerJoinKey} from \"./routerBoardJoin.mjs\";\n",
+      "occurrences": 1
+    },
+    {
+      "file": "serve.ts",
+      "needle": "exactUnitName(",
+      "replacement": "routerJoinKey(",
+      "occurrences": 3
+    },
+    {
+      "file": "serve.ts",
+      "needle": "if(path===\"/api/routers\"){let[routers,units]=await Promise.all([legacyAll(\"camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc\",context.headers),platformAll(\"equipment_units?select=id,unit_number&organization_id=eq.\"+ORGANIZATION_ID+\"&order=id.asc\")]);return json(routerSnapshot(routers,units))}",
+      "replacement": "if(path===\"/api/routers\"){let[inventory,units]=await Promise.all([loadRouterInventory(fetch,context.headers),platformAll(\"equipment_units?select=id,unit_number&organization_id=eq.\"+ORGANIZATION_ID+\"&order=id.asc\")]);let devices=inventory.devices||[];let extra=devices.filter(device=>!units.some(unit=>routerJoinKey(unit.unit_number)===routerJoinKey(device.unit_key))).map(device=>({id:\"camera-device:\"+String(device.id),unit_number:String(device.unit_key||\"\")})).filter(unit=>unit.unit_number.trim());return json(presentRouterPage(routerSnapshot(inventory.routers,units.concat(extra)),inventory.routers,devices,context.legacyOwner?\"owner\":\"it\"))}",
+      "occurrences": 1
+    },
+    {
+      "file": "serve.ts",
+      "needle": "project:completedBoard",
+      "replacement": "project:(...args)=>projectBoard(completedBoard,args,context.headers,fetch)",
+      "occurrences": 2
+    }
+  ],
+  "expectedBefore": {
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+    "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+    "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+    "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
+    "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  },
+  "expectedAfter": {
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+    "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+    "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+    "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
+    "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-operations-pages/router-board-status-v169.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-operations-pages/router-board-status-v169.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-operations-pages/rollback-router-board-to-v168.json --deploy"
+}

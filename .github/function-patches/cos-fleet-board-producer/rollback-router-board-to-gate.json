@@ -1,0 +1,29 @@
+{
+  "slug": "cos-fleet-board-producer",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-fleet-board-producer-gated-v9",
+  "sourceCommit": "b5b188229346182d9a4e29da42415a1b9d3b9d53",
+  "deployedFileNames": {
+    "index.ts": "cos-fleet-board-producer/index.ts",
+    "deno.json": "cos-fleet-board-producer/deno.json"
+  },
+  "entrypointPath": "cos-fleet-board-producer/index.ts",
+  "importMapPath": "cos-fleet-board-producer/deno.json",
+  "verifyJwt": false,
+  "description": "Redeploy the #425 produce-only producer entry and drop the router annotation. The gate remains. Full return to the exact live v9 entry is rollback-router-board-to-live-v9.json.",
+  "authorization": "Rollback material. The #425 gate stays.",
+  "releaseStatus": "ROLLBACK_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-fleet-board-producer-gated-v9/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE"
+  },
+  "edits": [],
+  "expectedBefore": {
+    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  }
+}

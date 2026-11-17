@@ -10,7 +10,7 @@ import {cameraTimestamp,powerTimestamp} from './cameraEvidence';
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
-export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;vrmInstallation?:VrmUnit|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
+export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;routerLabel?:string;routerCheckedAt?:string|null;doNotUse?:boolean;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;vrmInstallation?:VrmUnit|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
 export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
 export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'all',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
@@ -20,6 +20,10 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const key=canonicalCameraUnit(unit.unitNumber),family=key?.split('|')[0]||unit.modelName||'Other equipment',support=isSupportEquipment(unit),placement=inventoryPlacement(unit);
   const camera=fieldCameraHealth(unit,units,health,now),linkedRouters=(routers||[]).filter(r=>r.match==='exact_name'&&r.candidateUnit?.id===unit.id);
   const routerStates=linkedRouters.map(r=>routerStatus(r,now)).map(s=>s==='reachable'?'online':s==='unreachable'?'offline':'unknown') as Signal[];
+  const single=linkedRouters.length===1?linkedRouters[0]:null;
+  const routerLabel=typeof single?.boardStatus==='string'?single.boardStatus:undefined;
+  const routerCheckedAt=single?.boardCheckedAt??null;
+  const doNotUse=linkedRouters.some(r=>r.doNotUse===true);
   const matches=key?.startsWith('HELIOS|')?power.filter(r=>canonicalCameraUnit(r.name)===key):[];
   const p=matches.length===1&&vrm.items.filter((item:{name:string})=>canonicalCameraUnit(item.name)===key).length===1&&units.filter(u=>canonicalCameraUnit(u.unitNumber)===key).length===1?matches[0]:null;
   const installation=p?vrm.items.find((item:VrmUnit)=>item.installationId===p.installationId&&canonicalCameraUnit(item.name)===key):null;
@@ -44,7 +48,9 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const locationVerified=isCurrentFieldPin(unit),locationNeedsReview=placement==='field'&&!locationVerified;
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];
   const providers=[...new Set(camera.rows.map(r=>r.evidence?.source).filter(Boolean))];
-  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,vrmInstallation,locationVerified,locationNeedsReview,review};
+  let routerState:Signal=routers?combine(routerStates):'unknown';
+  if(routerLabel)routerState=placement==='shop'?'unknown':routerLabel==='Online'?'online':routerLabel==='Offline'?'offline':'unknown';
+  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState,routerLabel,routerCheckedAt,doNotUse,batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,vrmInstallation,locationVerified,locationNeedsReview,review};
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){

@@ -27,7 +27,8 @@ export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{
    <details><summary>{row.cameraState==='unknown'?'Why is this unverified?':'Camera source details'}</summary><p>{row.camera.reason}</p><p>Camera troubleshooting contains the matched devices and saved checks.</p></details>
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-router-card' aria-label='Selected unit router health'>
-   <h3><FleetCardIcon kind="router"/>Router &amp; connection</h3><Status state={row.routerState} label={row.routerState==='online'?'Reachable':row.routerState==='offline'?'Unreachable':'Unverified'}/>
+   <h3><FleetCardIcon kind="router"/>Router &amp; connection</h3>{row.doNotUse&&<b className='cos-do-not-use-badge'>DO NOT USE</b>}<Status state={row.placement==='shop'?'unknown':row.routerState} label={row.routerLabel||(row.routerState==='online'?'Reachable':row.routerState==='offline'?'Unreachable':'Unverified')}/>
+   {row.routerCheckedAt&&<small>Last contact: {cameraTime(row.routerCheckedAt,now)}</small>}
    {row.routers.length>0&&<small>Management check; camera health is separate.</small>}
    {row.routers.length?<div className="cos-router-readable">{row.routers.map(router=><article key={router.id}>
     <strong>{router.name}{router.model?' · '+router.model:''}</strong>

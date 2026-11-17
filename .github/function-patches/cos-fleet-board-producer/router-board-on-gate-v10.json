@@ -1,0 +1,55 @@
+{
+  "slug": "cos-fleet-board-producer",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-fleet-board-producer-gated-v9",
+  "sourceCommit": "b5b188229346182d9a4e29da42415a1b9d3b9d53",
+  "deployedFileNames": {
+    "index.ts": "cos-fleet-board-producer/index.ts",
+    "deno.json": "cos-fleet-board-producer/deno.json",
+    "routerBoardJoin.mjs": "cos-fleet-board-producer/routerBoardJoin.mjs"
+  },
+  "entrypointPath": "cos-fleet-board-producer/index.ts",
+  "importMapPath": "cos-fleet-board-producer/deno.json",
+  "verifyJwt": false,
+  "description": "Annotate the saved Fleet board with router status as the producer commits it. Built on the #425 produce-only gate. Deploy PR #425 first. Do not deploy from this task.",
+  "authorization": "Preparation only. The produce-only gate and the 64 KiB limit stay. Precheck is the gated producer entry.",
+  "releaseStatus": "PREPARATION_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-fleet-board-producer-gated-v9/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 10
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "const PRODUCER_BODY_LIMIT=65536;\n",
+      "replacement": "import { AsyncLocalStorage } from \"node:async_hooks\";\nimport { annotateSavedBoard, loadRouterBoardSources } from \"./routerBoardJoin.mjs\";\nconst routerBoardAuth = new AsyncLocalStorage();\nconst nativeFetch = globalThis.fetch.bind(globalThis);\nglobalThis.fetch = async (input, init) => {\n  const url = typeof input === \"string\" ? input : input instanceof URL ? input.toString() : input && input.url || \"\";\n  if (url.includes(\"/rpc/cos_fleet_board_finish\") && init && typeof init.body === \"string\") {\n    try {\n      const body = JSON.parse(init.body);\n      if (body && body.p_payload && body.p_payload.contract === \"COS_SAVED_FLEET_BOARD_V1\") {\n        const sources = await loadRouterBoardSources(nativeFetch, routerBoardAuth.getStore() || {});\n        body.p_payload = annotateSavedBoard(body.p_payload, sources, Date.now());\n        init = { ...init, body: JSON.stringify(body) };\n      }\n    } catch { /* the camera board still commits */ }\n  }\n  return nativeFetch(input, init);\n};\nconst PRODUCER_BODY_LIMIT=65536;\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "if(request.method===\"POST\"&&urlPath===\"/api/fleet-saved-board/produce\")return handler(request);",
+      "replacement": "if(request.method===\"POST\"&&urlPath===\"/api/fleet-saved-board/produce\")return routerBoardAuth.run(request.headers,()=>handler(request));",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "return handler(new Request(request.url,{method:request.method,headers:request.headers,body:limited.text}));",
+      "replacement": "return routerBoardAuth.run(request.headers,()=>handler(new Request(request.url,{method:request.method,headers:request.headers,body:limited.text})));",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "99d59a0717803fa2293167f63135d3cd08dc9b527f639f013fe7c1a7a2270476",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  },
+  "expectedAfter": {
+    "index.ts": "60d2826b55acd321ad2508fccc35a7f9dcee65359821bc00624b6567d725d22b",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/rollback-router-board-to-gate.json --deploy"
+}

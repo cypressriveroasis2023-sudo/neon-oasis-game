@@ -1,0 +1,31 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-gated-v16",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "Redeploy the #425 gated cos-unit-camera-status entry and drop the router-board changes. The route gate remains. sha256 64cb04d8. Full return to the exact live v16 bytes is rollback-router-board-to-live-v16.json.",
+  "authorization": "Rollback material. Run it only with an explicit instruction. It does not remove the #425 gate.",
+  "releaseStatus": "ROLLBACK_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-gated-v16/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE"
+  },
+  "edits": [],
+  "expectedBefore": {
+    "index.ts": "64cb04d8b07e6c205ee9b51e9ba596a579f03968808d045b0c2feb6dffa1a98c",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "64cb04d8b07e6c205ee9b51e9ba596a579f03968808d045b0c2feb6dffa1a98c",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-router-board-to-gate.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-router-board-to-gate.json --deploy"
+}

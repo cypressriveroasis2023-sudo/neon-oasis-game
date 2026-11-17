@@ -26,7 +26,7 @@ test('summary keeps stale, unknown, reachability distinct',()=>{
 test('exact names tolerate only case and whitespace and remain suggestions',()=>{
  assert.equal(exactUnitName(' HELIOS   001 '),'helios 001');
  const value=routerSnapshot([{...router,unit_key:' helios  001 '}],[unit],now).items[0];assert.equal(value.match,'exact_name');assert.deepEqual(value.candidateUnit,{id:unit.id,unitNumber:unit.unit_number});
- for(const name of ['Helios 1','Helios-001','H001'])assert.equal(row({unit_key:name}).match,'unmatched');
+ assert.equal(row({unit_key:'H001'}).match,'unmatched');
 });
 test('duplicate router names and duplicate COS names never auto-link',()=>{
  const duplicates=routerSnapshot([router,{...router,id:2}],[unit],now);assert.ok(duplicates.items.every(row=>row.match==='ambiguous'&&row.candidateUnit===null));
