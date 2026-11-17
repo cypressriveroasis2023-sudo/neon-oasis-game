@@ -382,7 +382,7 @@ test('The dashboard uses old-backend fallback only for an absent dynamic fleet r
 });
 
 function powerFixture(item,{stale=false}={}){
- const observedAt=new Date(Date.now()-(stale?31*60*1000:60*1000)).toISOString();
+ const observedAt=new Date(Date.now()-(stale?46*60*1000:60*1000)).toISOString();
  return {installationId:item.installationId,name:item.name,lastAttemptAt:new Date().toISOString(),errorCode:null,measurements:[
   {metric:'battery_soc',value:98.5,unit:'%',source:'system',instance:0,observedAt},
   {metric:'battery_voltage',value:24.9,unit:'V',source:'system',instance:0,observedAt},

@@ -25,7 +25,7 @@ import {needsYouRows} from './fleetNeedsYou';
 import SourceAttentionBanner from './SourceAttentionBanner';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
-import {CosPowerAlarmSettings, CosPowerChecks} from './CosPowerAlarmPanel';
+import {CosPowerChecks} from './CosPowerAlarmPanel';
 import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
 import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
@@ -238,7 +238,6 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
   <SourceAttentionBanner facts={sourceFacts}/>
   <SourceHealthStrip facts={sourceFacts}/>
-  <CosPowerAlarmSettings/>
   <TechnicianTodoList todos={todos}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}

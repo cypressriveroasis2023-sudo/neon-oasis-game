@@ -49,10 +49,13 @@ export async function collectInstallationPower(id:number,token:string,fetcher:ty
   if(all.length<total)throw Error('invalid_response');const observations=parsePowerRecords(all,id,now);return{checkedAt,observations,errorCode:observations.length?null:'no_data'};
  }catch(error){const code=error instanceof Error?error.message:'';return{checkedAt,observations:[],errorCode:['access','rate_limit','invalid_response'].includes(code)?code as PowerResult['errorCode']:'provider'};}
 }
-export async function collectHeliosPower<T extends {installationId:number;name:string}>(items:T[],token:string,fetcher:typeof fetch=fetch,now=Date.now()):Promise<Array<T&{power?:PowerResult}>>{
- const result:Array<T&{power?:PowerResult}>=[],start=Date.now();let stop=false;
+/** Long enough for every saved Helios installation in one cycle. A provider
+ * failure still stops the rest. This does not run until the sync function is deployed. */
+export const HELIOS_POWER_COLLECTION_MS = 180_000;
+export async function collectHeliosPower<T extends {installationId:number;name:string}>(items:T[],token:string,fetcher:typeof fetch=fetch,now=Date.now(),clock:()=>number=Date.now):Promise<Array<T&{power?:PowerResult}>>{
+ const result:Array<T&{power?:PowerResult}>=[],start=clock();let stop=false;
  if(items.filter(x=>/^HELIOS\s+\d{1,3}$/i.test(x.name)).length>100)return items;
- for(const item of items){if(!/^HELIOS\s+\d{1,3}$/i.test(item.name)||stop||Date.now()-start>20000){result.push(item);continue;}
+ for(const item of items){if(!/^HELIOS\s+\d{1,3}$/i.test(item.name)||stop||clock()-start>HELIOS_POWER_COLLECTION_MS){result.push(item);continue;}
   const power=await collectInstallationPower(item.installationId,token,fetcher,now);result.push({...item,power});
   if(power.errorCode==='access'||power.errorCode==='rate_limit'||power.errorCode==='provider')stop=true;
   else if(items.indexOf(item)<items.length-1)await new Promise(resolve=>setTimeout(resolve,350));

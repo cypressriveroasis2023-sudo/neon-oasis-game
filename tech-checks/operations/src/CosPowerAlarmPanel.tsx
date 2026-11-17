@@ -6,13 +6,14 @@ function blank(value: number | null): string {
 }
 
 /** Shared thresholds, with this browser kept only as a cache when the read fails. */
-export function CosPowerAlarmSettings({storage = typeof localStorage === 'undefined' ? null : localStorage}:{storage?: Storage | null}) {
+export function CosPowerAlarmSettings({storage = typeof localStorage === 'undefined' ? null : localStorage, onChange}:{storage?: Storage | null; onChange?: (settings: CosPowerSettings) => void}) {
   const [settings, setSettings] = useState<CosPowerSettings>(() => readPowerAlarmSettings(storage));
   const [draft, setDraft] = useState({voltage: blank(settings.lowVoltageV), soc: blank(settings.lowSocPercent), silent: blank(settings.silentHours)});
   const [note, setNote] = useState('Reading the shared thresholds.');
   const apply = (next: CosPowerSettings) => {
     setSettings(next);
     setDraft({voltage: blank(next.lowVoltageV), soc: blank(next.lowSocPercent), silent: blank(next.silentHours)});
+    onChange?.(next);
   };
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +45,7 @@ export function CosPowerAlarmSettings({storage = typeof localStorage === 'undefi
   };
   return <form className='cos-power-alarms' aria-label='COS power alarm settings' onSubmit={event => {event.preventDefault(); void save();}}>
     <strong>COS power thresholds</strong>
-    <p>Leave a box empty to keep that check unset. COS does not guess a voltage, a charge, or a silence window.</p>
+    <p>Charge is the Field alarm. Leave it empty until a percent is chosen. Voltage is optional. An empty box stays unset.</p>
     <label>Low voltage, volts<input inputMode='decimal' aria-label='Low voltage threshold volts' value={draft.voltage} onChange={event => setDraft({...draft, voltage: event.target.value})} placeholder='threshold not set'/></label>
     <label>Low charge, percent<input inputMode='decimal' aria-label='Low charge threshold percent' value={draft.soc} onChange={event => setDraft({...draft, soc: event.target.value})} placeholder='threshold not set'/></label>
     <label>Power silent after, hours<input inputMode='decimal' aria-label='Power silent hours' value={draft.silent} onChange={event => setDraft({...draft, silent: event.target.value})} placeholder='threshold not set'/></label>

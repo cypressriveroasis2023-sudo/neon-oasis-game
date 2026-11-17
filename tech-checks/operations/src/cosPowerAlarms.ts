@@ -1,5 +1,8 @@
+import {POWER_FRESH_MS} from './cameraEvidence';
+
 /** COS thresholds are separate from Victron's own alarm bits.
- * Nothing here invents a voltage or a charge percentage. */
+ * Nothing here invents a voltage or a charge percentage.
+ * A reading older than the power window is Unknown, never an alarm. */
 
 export type CosPowerSettings = {
   lowVoltageV: number | null;
@@ -18,7 +21,7 @@ export type CosPowerVerdict = {
   victronLowVoltage: 'alarm' | 'clear' | 'unknown';
 };
 
-const OBSERVATION_FRESH_MS = 20 * 60 * 1000;
+const OBSERVATION_FRESH_MS = POWER_FRESH_MS;
 
 export const EMPTY_POWER_SETTINGS: CosPowerSettings = {
   lowVoltageV: null,
