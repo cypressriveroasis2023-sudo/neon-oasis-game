@@ -14,3 +14,14 @@
 .cos-power-alarm{color:#9f1239;font-weight:700}
 .cos-tech-todos{margin:12px 0}
 .cos-tech-todos li{margin:6px 0}
+.cos-phone-landing{display:none}
+.cos-phone-board-info>summary{display:none}
+.cos-phone-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cos-phone-counts div{padding:12px 8px;border:1px solid #334155;border-radius:10px;text-align:center}
+.cos-phone-counts b{display:block;font-size:28px;line-height:1.1}
+.cos-phone-counts span{font-size:12px;letter-spacing:.04em}
+.cos-phone-note{margin:8px 0 0;font-size:13px}
+@media(max-width:700px){
+ .cos-phone-landing{display:grid;gap:12px;margin:0 0 14px}
+ .cos-phone-board-info>summary{display:inline-flex;min-height:44px;align-items:center;margin:0 0 8px;font:inherit;color:inherit}
+}

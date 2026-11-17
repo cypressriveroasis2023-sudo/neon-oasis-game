@@ -1,12 +1,12 @@
 {
   "contract": "COS_FLEET_COUNT_TRUST_PRESERVATION_V1",
   "baselineCommit": "34cd9ab5c1ec78eeaec5d24c66ab8f1f4a8616d0",
-  "scope": "Exact reversal of the reviewed camera-count and compact Fleet presentation changes before unchanged historical source guards. No baseline is relaxed. The Star4Live camera status tab is declared here as five reversible blocks: its import, its title, its tab, its view (which is handed the Fleet map’s own saved field addresses so both maps show the same places) and keeping the mHelp filter panel off it. The dashboard slogan and its eyebrow are removed: the page keeps one heading for screen readers and shows its section headings instead. The approved reading-scope presentation is declared as two additional reversible blocks: its stylesheet import and explanatory source/freshness section. Original baseline hashes and strict byte checks are preserved. Stacked on the theme branch: a board older than the current window keeps online and offline unknown, while a connection check that did not answer still holds the last reading inside that window. A present board keeps its last online, offline and unverified counts and labels them not current. A durable board that has not arrived, and a failed read, still cannot print a count.",
+  "scope": "Exact reversal of the reviewed camera-count and compact Fleet presentation changes before unchanged historical source guards. No baseline is relaxed. The Star4Live camera status tab is declared here as five reversible blocks: its import, its title, its tab, its view (which is handed the Fleet map’s own saved field addresses so both maps show the same places) and keeping the mHelp filter panel off it. The dashboard slogan and its eyebrow are removed: the page keeps one heading for screen readers and shows its section headings instead. The approved reading-scope presentation is declared as two additional reversible blocks: its stylesheet import and explanatory source/freshness section. Original baseline hashes and strict byte checks are preserved. Stacked on the theme branch: a board older than the current window keeps online and offline unknown, while a connection check that did not answer still holds the last reading inside that window. A present board keeps its last online, offline and unverified counts and labels them not current. A durable board that has not arrived, and a failed read, still cannot print a count. Phone width shows the technician to-do list and saved up, down and unknown counts first, and keeps the inventory identity card behind an info button. Desktop and TV keep that card visible. The map, briefing and camera status views load after first paint.",
   "files": [
     {
       "path": "FleetDashboard.tsx",
       "baselineBlob": "27a6ad9858a1685ff449a232c4bee7286c5c710f",
-      "candidateBlob": "cdebbe7665be3c49745033ebf9f08112b841c670",
+      "candidateBlob": "4c16317d1f3b4c9b214ac4d5ab29e5231daf0803",
       "replacements": [
         {
           "from": "\n  </div><details className='cos-fleet-advanced-filters'><summary>More filters</summary><div className='cos-fleet-filter-row'>   <label>PROVIDER<select aria-label='Fleet provider' value={filters.provider} onChange={e=>change('provider',e.target.value)}><option value='all'>All providers</option>{providers.map(p=><option key={p}>{p}</option>)}</select></label><button onClick={()=>setFilters({...initialFleetFilters})}>Reset filters</button><label className='cos-fleet-checkbox'><input type='checkbox' checked={filters.retired} onChange={e=>change('retired',e.target.checked)}/>Include inactive / retired</label><label>INSTALLATION STATUS<select aria-label='Installation status' value={filters.installationStatus||'all'} onChange={e=>change('installationStatus',e.target.value)}><option value='all'>All installation records</option><option value='field'>Field status</option><option value='installed'>Installed</option><option value='tracker'>Tracker field units</option><option value='assigned'>Assigned</option><option value='in_transit'>In transit</option><option value='returning'>Returning</option><option value='missing'>Location needs verification</option></select></label><label>NEARBY VERIFIED UNIT<select aria-label='Nearby unit center' value={filters.nearbyId||''} onChange={e=>change('nearbyId',e.target.value)}><option value=''>All field locations</option>{rows.filter(row=>row.placement==='field'&&row.locationVerified).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>RADIUS<select aria-label='Nearby radius miles' value={filters.radius||10} onChange={e=>change('radius',Number(e.target.value))}>{[5,10,25,50].map(value=><option key={value} value={value}>{value} miles</option>)}</select></label></div><small>Nearby distances use verified installation coordinates. Estimates and historical locations stay outside these distances.</small></details></div>);\n const wholeSourceHeadline=view==='map'?primaryFieldInventory:view==='sources'?Boolean(mhelpPhysical):fullInventoryHeadline;\n const healthScopeNote=wholeSourceHeadline?'Field camera units':'Field camera units · Shop / root and inactive equipment excluded from outage counts';\n const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,online:boardData?.counts.online??savedReading?.online??'—',offline:boardData?.counts.offline??savedReading?.offline??'—',unknown:boardData?.counts.unverified??savedReading?.unverified??'—'}:counts;\n const mapEquipmentList=<div className='cos-fleet-unit-list' aria-busy={editorBusy||loading}>{filtered.slice(0,limit).map(row=><button key={row.id} data-unit-id={row.id} disabled={editorBusy} className={'cos-fleet-unit-row'+(selected===row.id?' selected':'')} onClick={()=>open(row.id)}><span className='cos-fleet-unit-copy'><strong><i className={'cos-fleet-row-dot cos-signal-'+row.cameraState} aria-hidden='true'>●</i>{row.displayName||row.name}</strong><small>{row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied'}</small><small>{row.displayAddress?.label||'Installation address'}: {(row.displayAddress?.text??row.unit.address)||'Not supplied'}</small><small className='cos-fleet-card-location'>{row.placement==='shop'?(shopOnly(row)?'SHOP':'SHOP / ROOT'):row.placement.toUpperCase()} · {row.locationVerified?'Verified location':locationTag(row.unit)}</small><FleetBatterySummary row={row} now={snapshotNow} compact/>{!shopOnly(row)&&<><small className='cos-fleet-card-evidence'>{unitHealthLabel(row.camera)}</small><LastKnownCameraStatus observation={lastKnown(row)} now={snapshotNow}/></>}</span><Signals row={row}/></button>)}{filteredSource.length>0&&<section className='cos-fleet-source-group' aria-label='Unlinked equipment in view'><h3>Unlinked equipment <b>{filteredSource.length}</b></h3><p>Recorded assignments without a verified COS health link. Accepted address estimates are labeled separately from health and verified installation locations.</p>{filteredSource.slice(0,limit).map(record=><FleetSourceEquipment key={record.id} record={record} now={snapshotNow} estimate={sourcePins.get(record.id)?.estimate} onSelect={sourcePins.has(record.id)?()=>openSource(record.id):undefined}/>)}</section>}{!filtered.length&&!filteredSource.length&&<p className='field-map-empty'>{!map&&!failed?'Loading saved inventory…':'No units match. Change the filters or open the review queue.'}</p>}{Math.max(filtered.length,filteredSource.length)>limit&&<button onClick={()=>setLimit(v=>v+80)}>Show more equipment ({Math.max(0,filtered.length-limit)+Math.max(0,filteredSource.length-limit)})</button>}</div>;\n\n",
@@ -282,6 +282,66 @@
           "from": "import './readingScope.css';\n",
           "to": "import './readingScope.css';\nimport './sourceAttention.css';\n",
           "count": 1
+        },
+        {
+          "from": "import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';\n",
+          "to": "import {lazy,Suspense,useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';\n",
+          "count": 1
+        },
+        {
+          "from": "import FleetDashboardMap from './FleetDashboardMap';\n",
+          "to": "const FleetDashboardMap = lazy(() => import('./FleetDashboardMap'));\n",
+          "count": 1
+        },
+        {
+          "from": "import {fleetSourceFacts} from './fleetSourceFacts';\n",
+          "to": "import {fleetSourceFacts} from './fleetSourceFacts';\nimport PhoneTechLanding from './PhoneTechLanding';\nimport {phoneBoardCounts, phoneTechnicianTodos} from './phoneTechLanding';\n",
+          "count": 1
+        },
+        {
+          "from": "import FleetVisionBriefing from './FleetVisionBriefing';\n",
+          "to": "const FleetVisionBriefing = lazy(() => import('./FleetVisionBriefing'));\n",
+          "count": 1
+        },
+        {
+          "from": "import FleetCameraStatus from './FleetCameraStatus';\n",
+          "to": "const FleetCameraStatus = lazy(() => import('./FleetCameraStatus'));\n",
+          "count": 1
+        },
+        {
+          "from": " const [savedReading,setSavedReading]=useState(()=>readFleetReading(browserFleetStorage(),readingKey));\n",
+          "to": " const [savedReading,setSavedReading]=useState(()=>readFleetReading(browserFleetStorage(),readingKey));\n const [phoneLanding,setPhoneLanding]=useState(()=>typeof matchMedia==='function'&&matchMedia('(max-width:700px)').matches);\n useEffect(()=>{if(typeof matchMedia!=='function')return;const query=matchMedia('(max-width:700px)');const apply=()=>setPhoneLanding(query.matches);query.addEventListener('change',apply);return()=>query.removeEventListener('change',apply);},[]);\n",
+          "count": 1
+        },
+        {
+          "from": " const sourceFacts=fleetSourceFacts({now:Date.now(),map,inventory:mhelpPhysical,connectionState:(connectionRead as any)?.productConnectionsState??null,boardCheckedAt:Number.isFinite(snapshotNow)?snapshotNow:null,victronError:sourceErrors.victron||(typeof vrm?.sync?.error==='string'?vrm.sync.error:null),victronAttempt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null,trackerVerifiedAt:(connectionRead as any)?.productConnections?.trackerVerifiedAt??null,includeTracker:Number.isFinite(snapshotNow)||typeof (connectionRead as any)?.productConnectionsState==='string',includeVictron:Boolean(vrm)||Boolean(sourceErrors.victron)});\n",
+          "to": " const sourceFacts=fleetSourceFacts({now:Date.now(),map,inventory:mhelpPhysical,connectionState:(connectionRead as any)?.productConnectionsState??null,boardCheckedAt:Number.isFinite(snapshotNow)?snapshotNow:null,victronError:sourceErrors.victron||(typeof vrm?.sync?.error==='string'?vrm.sync.error:null),victronAttempt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null,trackerVerifiedAt:(connectionRead as any)?.productConnections?.trackerVerifiedAt??null,includeTracker:Number.isFinite(snapshotNow)||typeof (connectionRead as any)?.productConnectionsState==='string',includeVictron:Boolean(vrm)||Boolean(sourceErrors.victron)});\n const phoneCounts=phoneBoardCounts({now:Date.now(),windowMs:CAMERA_AUTO_REFRESH_MS*2,saved:savedReading,live:map&&boardCurrent?{online:counts.online,offline:counts.offline,unknown:counts.unknown,checkedAt:snapshotNow}:null,shop:savedReading?.shop});\n const phoneTodos=phoneTechnicianTodos(rows.map(row=>({name:row.displayName||row.name,placement:row.placement,cameraState:row.cameraState,support:row.support})),(mhelpAddresses?.reviews||[]).map((review:{unitNumber:string;productId:string})=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD'})));\n",
+          "count": 1
+        },
+        {
+          "from": "  {view!=='camerastatus'&&<section className='cos-reading-scope' aria-label='Fleet sources and scope'>\n",
+          "to": "  {view==='map'&&<PhoneTechLanding counts={phoneCounts} todos={phoneTodos}/>}\n  {view!=='camerastatus'&&<details className='cos-phone-board-info' open={!phoneLanding}><summary>About this board</summary><section className='cos-reading-scope' aria-label='Fleet sources and scope'>\n",
+          "count": 1
+        },
+        {
+          "from": "  </section>}\n",
+          "to": "  </section></details>}\n",
+          "count": 1
+        },
+        {
+          "from": "  {view==='camerastatus'&&<ViewErrorBoundary fallback={retry=><p className='cos-fleet-message' role='alert'>The camera status view could not be shown. <button onClick={retry}>Try again</button></p>}><FleetCameraStatus savedAddresses={mhelpAddresses?.pins.map((pin:MhelpAddressMapPin)=>({unitNumber:pin.unitNumber,address:pin.address,point:pin.point}))||null} addressReviews={mhelpAddresses?.reviews.map((review:{unitNumber:string;productId:string})=>({unitNumber:review.unitNumber,productId:review.productId}))||null}/></ViewErrorBoundary>}\n",
+          "to": "  {view==='camerastatus'&&<ViewErrorBoundary fallback={retry=><p className='cos-fleet-message' role='alert'>The camera status view could not be shown. <button onClick={retry}>Try again</button></p>}><Suspense fallback={<p role='status'>Loading camera status…</p>}><FleetCameraStatus savedAddresses={mhelpAddresses?.pins.map((pin:MhelpAddressMapPin)=>({unitNumber:pin.unitNumber,address:pin.address,point:pin.point}))||null} addressReviews={mhelpAddresses?.reviews.map((review:{unitNumber:string;productId:string})=>({unitNumber:review.unitNumber,productId:review.productId}))||null}/></Suspense></ViewErrorBoundary>}\n",
+          "count": 1
+        },
+        {
+          "from": "  {view==='map'&&<details className='cos-fleet-vision-toggle'><summary>VISION · What needs attention</summary><FleetVisionBriefing data={boardCurrent?boardData:null} readingAt={boardCurrent?savedReading?.checkedAt??null:null} retained={!boardCurrent||Boolean(cameras.error||mapError||Object.keys(sourceErrors).length)} onMap={()=>document.querySelector('.cos-fleet-map-panel')?.scrollIntoView({block:'start'})} onHealth={()=>tab('fleet')} onOpen={product=>{if(product.linked?.unitId)open(product.linked.unitId);else if(product.linked?.recordId)openSource(product.linked.recordId);else if(mhelpAddresses&&[...mhelpAddresses.pins,...mhelpAddresses.reviews].some(item=>item.productId===product.productId))openMhelpAddress(product.productId);else show('Product '+product.productId+' has no verified COS unit or saved address to open. Review Data sources.');}}/></details>}\n",
+          "to": "  {view==='map'&&<details className='cos-fleet-vision-toggle'><summary>VISION · What needs attention</summary><Suspense fallback={<p role='status'>Loading the briefing…</p>}><FleetVisionBriefing data={boardCurrent?boardData:null} readingAt={boardCurrent?savedReading?.checkedAt??null:null} retained={!boardCurrent||Boolean(cameras.error||mapError||Object.keys(sourceErrors).length)} onMap={()=>document.querySelector('.cos-fleet-map-panel')?.scrollIntoView({block:'start'})} onHealth={()=>tab('fleet')} onOpen={product=>{if(product.linked?.unitId)open(product.linked.unitId);else if(product.linked?.recordId)openSource(product.linked.recordId);else if(mhelpAddresses&&[...mhelpAddresses.pins,...mhelpAddresses.reviews].some(item=>item.productId===product.productId))openMhelpAddress(product.productId);else show('Product '+product.productId+' has no verified COS unit or saved address to open. Review Data sources.');}}/></Suspense></details>}\n",
+          "count": 1
+        },
+        {
+          "from": "  )}><FleetDashboardMap rows={filtered} locationsReady={locationsReady} pins={acceptedPins.filter(pin=>pin.kind==='source_equipment_estimate'?filteredSource.some(record=>record.id===pin.record.id):filtered.some(row=>row.id===pin.row.id))} layer={filters.layer} onSelect={id=>sourcePins.has(id)?openSource(id):open(id)} selectedId={selectedSourceId||selected} pickLocation={locationPicker?finishPick:null} mhelpAddressUnits={addressDisplayIds} mhelpAddressHealth={addressHealth} mhelpAddressPins={showMhelpAddresses?mhelpAddresses?.pins:undefined} mhelpAddressReviews={showMhelpAddresses?mhelpAddresses?.reviews:undefined} onSelectMhelpAddress={openMhelpAddress} filters={filters}/></ViewErrorBoundary></div><div className='cos-fleet-map-footnote'><button onClick={()=>{setLocationQueue('missing');tab('verify');}}>{mhelpAddresses?'COS installation verification: ':'Missing map location: '}{recorded.error?'—':locationsReady?missingLocations:'…'}</button><button onClick={()=>{setLocationQueue('estimated');tab('verify');}}>Estimated / source-recorded location: {locationsReady?estimatedLocations:'…'}</button><span>Shop / ROOT and retired units stay off the field map. Estimates require installation verification.</span></div></>}\n",
+          "to": "  )}><Suspense fallback={<p role='status'>Loading the map…</p>}><FleetDashboardMap rows={filtered} locationsReady={locationsReady} pins={acceptedPins.filter(pin=>pin.kind==='source_equipment_estimate'?filteredSource.some(record=>record.id===pin.record.id):filtered.some(row=>row.id===pin.row.id))} layer={filters.layer} onSelect={id=>sourcePins.has(id)?openSource(id):open(id)} selectedId={selectedSourceId||selected} pickLocation={locationPicker?finishPick:null} mhelpAddressUnits={addressDisplayIds} mhelpAddressHealth={addressHealth} mhelpAddressPins={showMhelpAddresses?mhelpAddresses?.pins:undefined} mhelpAddressReviews={showMhelpAddresses?mhelpAddresses?.reviews:undefined} onSelectMhelpAddress={openMhelpAddress} filters={filters}/></Suspense></ViewErrorBoundary></div><div className='cos-fleet-map-footnote'><button onClick={()=>{setLocationQueue('missing');tab('verify');}}>{mhelpAddresses?'COS installation verification: ':'Missing map location: '}{recorded.error?'—':locationsReady?missingLocations:'…'}</button><button onClick={()=>{setLocationQueue('estimated');tab('verify');}}>Estimated / source-recorded location: {locationsReady?estimatedLocations:'…'}</button><span>Shop / ROOT and retired units stay off the field map. Estimates require installation verification.</span></div></>}\n",
+          "count": 1
         }
       ],
       "scope": " A board that has not completed does not show zero as a live online or offline count."
@@ -352,7 +412,7 @@
     {
       "path": "operations.browser.spec.mjs",
       "baselineBlob": "f1266d21dace939b48f9eccab78e9d61c69c0cf1",
-      "candidateBlob": "85daa85523fa5e25b363d62c48073210533b7017",
+      "candidateBlob": "c5b5f296b1f1d78bc372ebebc2b51f273ed8899c",
       "replacements": [
         {
           "from": "  expect(state.writes).toHaveLength(1);\n  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();\n  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('Last completed results remain displayed with their original check times.');\n  await expect(save).toBeDisabled();\n  expect(state.writes).toHaveLength(1);\n  state.failedPaths.delete('/api/field-map');\n",
@@ -362,6 +422,11 @@
         {
           "from": "frame.getByLabel('Source').selectOption('manual')",
           "to": "frame.getByRole('combobox', { name: 'Location source', exact: true }).selectOption('manual')",
+          "count": 1
+        },
+        {
+          "from": "  await page.clock.install({ time: new Date(now) });\n  await page.route('**/*', async route => {\n    const request = route.request(), url = request.url();\n    if (url === origin + '/harness') return route.fulfill({ status: 200, contentType: 'text/html', body: harness });\n    if (url.startsWith(origin + '/')) return route.continue();\n",
+          "to": "  await page.clock.install({ time: new Date(now) });\n  // The Fleet screen loads its map and briefing after the click. Those files\n  // are this app's own build. Holding them in the catch-all route stalls the\n  // click, because the route cannot answer while the click is still in progress.\n  await page.route(origin + '/harness', route => route.fulfill({ status: 200, contentType: 'text/html', body: harness }));\n  await page.route(url => !url.toString().startsWith(origin + '/'), async route => {\n    const request = route.request(), url = request.url();\n",
           "count": 1
         }
       ]
