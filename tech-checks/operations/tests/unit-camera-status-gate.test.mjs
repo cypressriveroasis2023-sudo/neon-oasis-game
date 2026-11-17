@@ -79,6 +79,11 @@ test('camera status is served for the URL path and the envelope, and retired rou
     assert.equal((await call(restricted,{envelope:{path,method,body:null}})).status,404,'envelope '+method+' '+path);
     assert.equal((await call(restricted,{httpMethod:method==='GET'?'GET':'POST',urlPath:path,raw:method==='GET'?undefined:'{}'})).status,404,'url '+method+' '+path);
   }
+  const doubled=await call(restricted,{urlPath:'/api/unit-tracker/cos-unit-camera-status/api/unit-camera-status/edit',raw:'{}'});
+  const doubledPages=await call(restricted,{urlPath:'/api/unit-tracker/cos-operations-pages/api/unit-camera-status/edit',raw:'{}'});
+  assert.equal(doubled.status,404);
+  assert.deepEqual(doubled.body,{error:'COS endpoint not found.'});
+  assert.equal(doubledPages.status,404);
   assert.equal(calls.length,3);
   const bulky=await call(restricted,{raw:JSON.stringify({path:'/api/unit-camera-status',method:'GET',pad:'x'.repeat(70000)})});
   assert.equal(bulky.status,413);
