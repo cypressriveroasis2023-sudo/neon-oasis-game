@@ -15,7 +15,7 @@ test('expired health counts stay readable under their own time after a failed re
  const offlineBefore=await offline.textContent();
  await page.clock.fastForward(25*60000);
  // The last completed counts stay readable, labelled with their own time and never as current.
- const kept=async()=>{await expect(online).toHaveText('—');await expect(offline).toHaveText('—');await expect(board.locator('.cos-equipment-totals-note')).toContainText(/Last completed reading .*\d{1,2}:\d{2}.* · not current\./);await expect(board.getByRole('status',{name:'Last completed reading'})).toContainText('not current');};
+ const kept=async()=>{await expect(online).toHaveText('1');await expect(offline).toHaveText(offlineBefore);await expect(board.locator('.cos-equipment-totals-note')).toContainText(/Last completed reading .*\d{1,2}:\d{2}.* · not current\./);await expect(board.getByRole('status',{name:'Last completed reading'})).toContainText('not current');};
  await kept();
  await board.getByRole('button',{name:/Refresh data/}).click();
  const warning=board.locator('.cos-fleet-status-strip').filter({hasText:'Synthetic saved camera read unavailable'});await expect(warning.locator('summary')).toBeVisible();await warning.locator('summary').click();await expect(warning.getByText('Synthetic saved camera read unavailable',{exact:true})).toBeVisible();
@@ -30,7 +30,7 @@ test('expired health counts stay readable under their own time after a failed re
  const item=state.productConnections.items.find(i=>i.productId==='1001');item.status='offline';item.reason='Completed saved nonresponse.';
  await board.getByRole('button',{name:/Refresh data/}).click();
  await page.clock.fastForward(5000);
- await expect(online).toHaveText('—');await expect(offline).toHaveText('—');
+ await expect(online).toHaveText('1');await expect(offline).toHaveText(offlineBefore);
  release();await expect(offline).toHaveText('1');await expect(online).toHaveText('0');
  expect(originalTime).toContain('Saved health');expect(state.errors).toEqual([]);
  await app.locator('body').evaluate(()=>window.dispatchEvent(new Event('cos-private-data-invalidated')));
