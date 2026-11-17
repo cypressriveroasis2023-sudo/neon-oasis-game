@@ -46,10 +46,12 @@ function mapSnapshot(state) {
 async function fixturePage(page,{locationWritesEnabled=true}={}) {
   const state = makeFixture();
   await page.clock.install({ time: new Date(now) });
-  await page.route('**/*', async route => {
+  // The Fleet screen loads its map and briefing after the click. Those files
+  // are this app's own build. Holding them in the catch-all route stalls the
+  // click, because the route cannot answer while the click is still in progress.
+  await page.route(origin + '/harness', route => route.fulfill({ status: 200, contentType: 'text/html', body: harness }));
+  await page.route(url => !url.toString().startsWith(origin + '/'), async route => {
     const request = route.request(), url = request.url();
-    if (url === origin + '/harness') return route.fulfill({ status: 200, contentType: 'text/html', body: harness });
-    if (url.startsWith(origin + '/')) return route.continue();
     if (/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(url)) return route.fulfill({ status: 200, contentType: 'image/png', body: png });
     if (url !== edge) return route.abort('blockedbyclient');
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type' } });
