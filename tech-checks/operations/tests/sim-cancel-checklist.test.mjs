@@ -80,8 +80,21 @@ test('the protected insert refuses the Cameras On Site project', async () => {
   assert.equal(calls.length, 1);
   assert.equal(simCancelProject(calls[0].url), 'platform');
   assert.equal(calls[0].url.includes('goqrnolcvqnirjmzaeyk'), false);
-  assert.equal(calls[0].body.includes('/api/sim-cancel'), true);
+  assert.equal(calls[0].url.endsWith('/functions/v1/cos-sim-cancel'), true);
+  assert.equal(calls[0].url.includes('cos-operations-pages'), false);
+  assert.equal(JSON.parse(calls[0].body).returnId, '00000000-0000-4000-8000-000000000001');
+  assert.equal(calls[0].body.includes('/api/sim-cancel'), false);
   assert.equal(legacy.simCancelProject(calls[0].url), 'platform');
+});
+
+test('a conflicting retry is reported without the SIM number', async () => {
+  const conflict = await recordSimCancel({
+    accessToken: 'synthetic',
+    fetch: async () => ({ok: false, json: async () => ({error: 'This return already has a different SIM record.', simNumber: EXAMPLE})}),
+  }, canceled, '00000000-0000-4000-8000-000000000001');
+  assert.equal(conflict.ok, false);
+  assert.equal(conflict.error, 'This return already has a different SIM record.');
+  assert.equal(JSON.stringify(conflict).includes(EXAMPLE), false);
 });
 
 test('other identifier fields are refused', () => {
@@ -115,6 +128,32 @@ test('the intake page uses the same completion rule', () => {
   const policy = readFileSync(new URL('../../supabase/migrations/20261117_cos_sim_cancel_records_owner_check.sql', import.meta.url), 'utf8');
   assert.match(policy, /recorded_by = auth\.uid\(\)/);
   assert.match(policy, /unique \(product_id, return_id\)/);
+  assert.match(policy, /already has rows/);
+  assert.match(policy, /add column if not exists return_id/);
+});
+
+test('the deployed SIM save is the dedicated function and the rule copies match', () => {
+  const client = readFileSync(new URL('../../sim-cancel-checklist.mjs', import.meta.url), 'utf8');
+  const twin = readFileSync(new URL('../src/simCancelChecklist.ts', import.meta.url), 'utf8');
+  assert.match(client, /functions\/v1\/cos-sim-cancel/);
+  assert.match(twin, /functions\/v1\/cos-sim-cancel/);
+  assert.doesNotMatch(client, /functions\/v1\/cos-operations-pages/);
+  assert.doesNotMatch(twin, /functions\/v1\/cos-operations-pages/);
+  const pages = readFileSync(new URL('../../supabase/functions/cos-operations-pages/index.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(pages, /\/api\/sim-cancel/);
+  assert.doesNotMatch(pages, /sim-cancel/);
+  const frozen = readFileSync(new URL('../../docs/vision-native-preview-20261107/source/serve.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(frozen, /sim-cancel|cos_sim_cancel_records/);
+  const fn = readFileSync(new URL('../../supabase/functions/cos-sim-cancel/index.ts', import.meta.url), 'utf8');
+  assert.match(fn, /\/rest\/v1\/cos_sim_cancel_records/);
+  assert.match(fn, /createSimCancelHandler/);
+  assert.match(fn, /23505/);
+  assert.match(fn, /This return already has a different SIM record/);
+  assert.doesNotMatch(fn, /\.\.\/\.\.\/\.\.\//);
+  const rules = readFileSync(new URL('../../sim-cancel-rules.mjs', import.meta.url), 'utf8');
+  const vendored = readFileSync(new URL('../../supabase/functions/cos-sim-cancel/simCancelRules.mjs', import.meta.url), 'utf8');
+  assert.equal(vendored, rules);
+  assert.match(rules, /export function assessSimCancel/);
 });
 
 test('damage notes and page meta keep only the last four digits', async () => {

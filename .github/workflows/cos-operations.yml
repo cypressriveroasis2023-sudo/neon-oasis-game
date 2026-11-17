@@ -176,7 +176,7 @@ jobs:
           grants_blob='a05484aa259e23979b59839e2615f8307dd00054'
           test "$(git rev-parse HEAD:$grants_migration)" = "$grants_blob"
           test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records_tighten_grants.sql)" = "$grants_blob"
-          owner_blob='517d39bfd9694a42018d3476d79382f15e94f0b6'
+          owner_blob='ef8277d52923caf1ae42111c7eb03efc960c55d2'
           test "$(git rev-parse HEAD:$owner_migration)" = "$owner_blob"
           test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records_owner_check.sql)" = "$owner_blob"
       - run: npm install --no-audit --no-fund

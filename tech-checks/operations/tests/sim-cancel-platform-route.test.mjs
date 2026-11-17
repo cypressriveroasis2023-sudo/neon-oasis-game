@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
+import {readFileSync} from 'node:fs';
+import {createSimCancelHandler} from '../../supabase/functions/cos-sim-cancel/index.ts';
 
 const EXAMPLE = 'EXAMPLE-SIM-0007';
 const RETURN_ID = '00000000-0000-4000-8000-000000000001';
@@ -11,10 +12,28 @@ const SERVICE = {legacy: '78e54fbd-c2db-4d18-8e3d-a9740adcf285', actor: '7b3b856
 const json = (value, status = 200) => new Response(JSON.stringify(value), {status});
 const record = () => ({productId: '900014', unit: 'SNIPER 014', outcome: 'canceled', carrier: 'Verizon', canceledOn: '2026-11-17', canceledBy: 'Example IT', confirmation: 'CONFIRM-EXAMPLE', simNumber: EXAMPLE, returnId: RETURN_ID});
 
+function stored(user, patch = {}) {
+  const input = record();
+  return {
+    product_id: input.productId,
+    unit_number: input.unit,
+    outcome: input.outcome,
+    carrier: input.carrier,
+    canceled_on: input.canceledOn,
+    canceled_by: input.canceledBy,
+    confirmation: input.confirmation,
+    sim_number: input.simNumber,
+    no_sim_reason: null,
+    recorded_by: user.actor,
+    return_id: RETURN_ID,
+    ...patch,
+  };
+}
+
 function fixture(change = {}) {
   const user = change.user || IT;
   const calls = [];
-  const handler = createOperationsHandler({
+  const handler = createSimCancelHandler({
     platformUrl: change.platformUrl || 'https://native.example',
     serviceKey: 'synthetic-service',
     fetch: async (url, init = {}) => {
@@ -23,23 +42,36 @@ function fixture(change = {}) {
       if (url.includes('/rest/v1/profiles?')) return json([{user_id: user.legacy, full_name: user.name, role: user.role, active: true, archived_at: null}]);
       if (url.includes('/rest/v1/user_profiles?')) return json([{user_id: user.actor, display_name: user.name, department: user.role, active: true}]);
       if (url.includes('/rest/v1/user_roles?')) return json([{roles: {code: user.code, organization_id: ORG}}]);
+      if (url.includes('/rest/v1/cos_sim_cancel_records?')) return change.existing || json([]);
       if (url.endsWith('/rest/v1/cos_sim_cancel_records')) return change.insert || new Response(null, {status: 201});
       throw Error('Unexpected request');
     },
   });
-  const invoke = body => handler(new Request('https://native.example/functions/v1/cos-operations-pages', {
+  const invoke = body => handler(new Request('https://native.example/functions/v1/cos-sim-cancel', {
     method: 'POST',
     headers: {Origin: 'https://cos-vision-integration-preview.pages.dev', Authorization: 'Bearer synthetic-session', 'Content-Type': 'application/json'},
-    body: JSON.stringify({path: '/api/sim-cancel', method: 'POST', body}),
+    body: JSON.stringify(body),
   }));
   return {calls, invoke};
 }
 
 function inserts(calls) {
-  return calls.filter(call => call.url.includes('/rest/v1/cos_sim_cancel_records'));
+  return calls.filter(call => call.init?.method === 'POST' && call.url.endsWith('/rest/v1/cos_sim_cancel_records'));
 }
 
-test('an IT session writes the SIM row on Tech Check Platform and the reply stays generic', async () => {
+test('the deployed function source is the route the client calls', () => {
+  const source = readFileSync(new URL('../../supabase/functions/cos-sim-cancel/index.ts', import.meta.url), 'utf8');
+  const client = readFileSync(new URL('../../sim-cancel-checklist.mjs', import.meta.url), 'utf8');
+  const pages = readFileSync(new URL('../../supabase/functions/cos-operations-pages/index.ts', import.meta.url), 'utf8');
+  const frozen = readFileSync(new URL('../../docs/vision-native-preview-20261107/source/serve.ts', import.meta.url), 'utf8');
+  assert.match(source, /\/rest\/v1\/cos_sim_cancel_records/);
+  assert.match(client, /functions\/v1\/cos-sim-cancel/);
+  assert.doesNotMatch(client, /cos-operations-pages/);
+  assert.doesNotMatch(pages, /sim-cancel/);
+  assert.doesNotMatch(frozen, /sim-cancel|cos_sim_cancel_records/);
+});
+
+test('an IT session writes the SIM row with the service key after the user is verified', async () => {
   const f = fixture();
   const response = await f.invoke(record());
   assert.equal(response.status, 200);
@@ -48,25 +80,46 @@ test('an IT session writes the SIM row on Tech Check Platform and the reply stay
   assert.equal(saved.length, 1);
   assert.equal(saved[0].url, 'https://native.example/rest/v1/cos_sim_cancel_records');
   assert.equal(saved[0].url.includes('goqrnolcvqnirjmzaeyk'), false);
+  assert.equal(saved[0].init.headers.Authorization, 'Bearer synthetic-service');
+  assert.notEqual(saved[0].init.headers.Authorization, 'Bearer synthetic-session');
   const row = JSON.parse(saved[0].init.body);
   assert.equal(row.recorded_by, IT.actor);
   assert.equal(row.return_id, RETURN_ID);
   assert.equal(row.sim_number.endsWith('0007'), true);
   assert.equal(row.sim_number.length > 4, true);
-  assert.equal(f.calls.some(call => call.url.includes('cos_sim_cancel_records') && call.url.includes('goqrnolcvqnirjmzaeyk')), false);
 });
 
-test('a database error that repeats the SIM number is not returned', async () => {
+test('a repeated save is accepted only when the stored row matches', async () => {
   const leaked = fixture({insert: json({code: '42501', message: EXAMPLE, details: EXAMPLE}, 403)});
   const response = await leaked.invoke(record());
   assert.equal(response.status, 503);
   const text = await response.text();
   assert.equal(text.includes(EXAMPLE), false);
   assert.match(text, /could not be saved/);
-  const duplicate = fixture({insert: json({code: '23505', message: EXAMPLE, details: EXAMPLE}, 409)});
-  const again = await duplicate.invoke(record());
+  const same = fixture({
+    insert: json({code: '23505', message: EXAMPLE, details: EXAMPLE}, 409),
+    existing: json([stored(IT)]),
+  });
+  const again = await same.invoke(record());
   assert.equal(again.status, 200);
   assert.equal((await again.text()).includes(EXAMPLE), false);
+  assert.equal(same.calls.some(call => call.url.includes('/rest/v1/cos_sim_cancel_records?') && call.url.includes('native.example')), true);
+  const changed = fixture({
+    insert: json({code: '23505', message: EXAMPLE, details: EXAMPLE}, 409),
+    existing: json([stored(IT, {confirmation: 'DIFFERENT-NOTE'})]),
+  });
+  const conflict = await changed.invoke(record());
+  assert.equal(conflict.status, 409);
+  const conflictText = await conflict.text();
+  assert.equal(conflictText.includes(EXAMPLE), false);
+  assert.match(conflictText, /different SIM record/);
+  const unread = fixture({
+    insert: json({code: '23505', message: EXAMPLE}, 409),
+    existing: json({message: EXAMPLE}, 500),
+  });
+  const failedRead = await unread.invoke(record());
+  assert.equal(failedRead.status, 503);
+  assert.equal((await failedRead.text()).includes(EXAMPLE), false);
 });
 
 test('the SIM insert refuses the Cameras On Site project, service accounts, and a missing number', async () => {

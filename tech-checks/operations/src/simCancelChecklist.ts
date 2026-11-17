@@ -104,7 +104,7 @@ export function simCancelForNotes(record: SimCancelRecord & { simLast4?: string 
   };
 }
 
-export const PLATFORM_SIM_CANCEL_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+export const PLATFORM_SIM_CANCEL_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-sim-cancel';
 
 export function simCancelProject(url: string): 'platform' | 'cameras-on-site' | 'other' {
   try {
@@ -131,14 +131,25 @@ export async function recordSimCancel(transport: SimCancelTransport, record: unk
   if (simCancelProject(url) !== 'platform' || typeof transport?.from === 'function' || !transport?.accessToken || typeof returnId !== 'string' || !returnId) {
     return fail('The SIM step could not be saved.');
   }
+  if (!url.endsWith('/functions/v1/cos-sim-cancel')) return fail('The SIM step could not be saved.');
   const send = typeof transport.fetch === 'function' ? transport.fetch : globalThis.fetch.bind(globalThis);
   try {
     const response = await send(url, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + transport.accessToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'POST', path: '/api/sim-cancel', body: { ...gate.record, returnId } }),
+      body: JSON.stringify({ ...gate.record, returnId }),
     });
-    if (!response?.ok) return fail('The SIM step could not be saved.');
+    if (!response?.ok) {
+      let message = 'The SIM step could not be saved.';
+      const read = (response as { json?: () => Promise<{ error?: unknown }> }).json;
+      if (typeof read === 'function') {
+        try {
+          const data = await read();
+          if (data?.error === 'This return already has a different SIM record.') message = data.error;
+        } catch { /* Keep the generic message. */ }
+      }
+      return fail(message);
+    }
     return { ok: true };
   } catch {
     return fail('The SIM step could not be saved.');
