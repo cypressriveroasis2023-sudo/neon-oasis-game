@@ -170,7 +170,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     host.replaceChildren(compactGroupPopup(groupDetails.members,groupDetails.zoom));
     return()=>{host.replaceChildren();};
   },[groupDetails]);
-  useEffect(()=>{setGroupDetails(null);},[mode,page,enabled,data.readAt]);
+  useEffect(()=>{setGroupDetails(null);},[mode,page,enabled]);
   useEffect(()=>{
     if(!groupDetails)return;
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setGroupDetails(null);};
