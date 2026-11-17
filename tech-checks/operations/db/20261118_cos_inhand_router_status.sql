@@ -3,7 +3,10 @@
 --
 -- The router serial columns belong to a separate pending migration. This
 -- function refuses to run until inhand_serial and inhand_device_id both exist.
--- It updates an existing row only when the CSV serial is exactly that column.
+-- It updates an existing row only when the CSV serial is exactly that column
+-- and the CSV last-seen is strictly newer than the stored probe check and the
+-- stored last-seen. The CSV time is saved as status_observed_at. It is not
+-- written into last_checked_at, and it is not replaced with the load time.
 -- It does not insert a router, delete a router, or rename one.
 --
 -- Rollback keeps every inventory row. Turn the loader off by unsetting
@@ -149,10 +152,12 @@ begin
     end if;
     execute 'select id from public.camera_unit_routers where inhand_serial = $1' into v_id using v_row.serial;
     v_ip := case when v_row.ip is null then null else v_row.ip::inet end;
+    -- $2 is the CSV last-seen. A probe checked later, or a last-seen already
+    -- at this instant, keeps the stored row. Load time is not a last-seen.
     execute $sql$
       update public.camera_unit_routers
       set current_status = $1,
-          last_checked_at = $2,
+          status_observed_at = $2,
           updated_at = pg_catalog.clock_timestamp(),
           last_online_at = case
             when $1 = 'online' and (current_status is distinct from 'online' or last_online_at is null) then $2
@@ -164,10 +169,13 @@ begin
       where id = $6
         and inhand_serial = $4
         and (
-          current_status is distinct from $1
-          or last_checked_at is distinct from $2
-          or ($3::inet is not null and router_public_ip is distinct from $3::inet)
-          or ($5::text is not null and inhand_device_id is distinct from $5::text)
+          (status_observed_at is null and last_checked_at is null)
+          or $2 > case
+            when status_observed_at is null then last_checked_at
+            when last_checked_at is null then status_observed_at
+            when status_observed_at > last_checked_at then status_observed_at
+            else last_checked_at
+          end
         )
     $sql$ using v_row.status, v_row.last_seen, v_ip, v_row.serial, v_row.device_id, v_id;
     get diagnostics v_wrote = row_count;

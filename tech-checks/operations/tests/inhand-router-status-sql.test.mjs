@@ -28,6 +28,7 @@ before(async () => {
       current_status text,
       last_checked_at timestamptz,
       last_online_at timestamptz,
+      status_observed_at timestamptz,
       router_public_ip inet,
       updated_at timestamptz
     );
@@ -47,7 +48,8 @@ const load = async (actor, csv) => {
     try { await db.exec('reset role'); } catch { /* a refusal aborts only its statement */ }
   }
 };
-const ids = async () => (await db.query('select id, router_name, current_status, host(router_public_ip) ip, last_checked_at, inhand_serial, inhand_device_id from public.camera_unit_routers order by id')).rows;
+const ids = async () => (await db.query('select id, router_name, current_status, host(router_public_ip) ip, last_checked_at, status_observed_at, inhand_serial, inhand_device_id from public.camera_unit_routers order by id')).rows;
+const seenAt = row => row.status_observed_at ? new Date(row.status_observed_at).toISOString() : null;
 
 test('the loader refuses to run until the serial columns exist', async () => {
   const csv = await readFile(new URL('./fixtures/inhand-router-status.csv', import.meta.url), 'utf8');
@@ -77,6 +79,8 @@ test('exact serials are updated in place, unmatched serials are reported, and a 
   assert.equal(after[0].current_status, 'online');
   assert.equal(after[0].ip, '203.0.113.50');
   assert.equal(after[0].inhand_serial, 'RF3152533024049');
+  assert.equal(seenAt(after[0]), '2026-11-17T22:00:00.000Z');
+  assert.equal(after[0].last_checked_at, null);
   assert.equal(after[1].current_status, 'online');
   assert.equal(after[1].ip, '198.51.100.11');
   const again = await load(IT, csv);
@@ -87,7 +91,27 @@ test('exact serials are updated in place, unmatched serials are reported, and a 
   const labelOnly = await load(OWNER, renamed);
   assert.equal(labelOnly.updated, 0);
   assert.equal((await ids())[0].router_name, 'Old name');
-  const withDevice = csv.replace(',203.0.113.50', ',203.0.113.50').replace(
+  await db.exec("update public.camera_unit_routers set last_checked_at = '2026-11-17T22:30:00Z' where id = 1");
+  const older = await load(OWNER, 'Name,Serial,Online/Offline,Last Seen,IP\nFixture Router One,RF3152533024049,offline,2026-11-17T21:00:00.000Z,203.0.113.60\n');
+  assert.equal(older.updated, 0);
+  assert.equal(older.unchanged, 1);
+  const equal = await load(OWNER, 'Name,Serial,Online/Offline,Last Seen,IP\nFixture Router One,RF3152533024049,offline,2026-11-17T22:30:00.000Z,203.0.113.61\n');
+  assert.equal(equal.updated, 0);
+  assert.equal(equal.unchanged, 1);
+  let held = (await ids())[0];
+  assert.equal(held.current_status, 'online');
+  assert.equal(held.ip, '203.0.113.50');
+  assert.equal(seenAt(held), '2026-11-17T22:00:00.000Z');
+  assert.equal(new Date(held.last_checked_at).toISOString(), '2026-11-17T22:30:00.000Z');
+  const newer = await load(OWNER, 'Name,Serial,Online/Offline,Last Seen,IP\nFixture Router One,RF3152533024049,offline,2026-11-17T22:31:00.000Z,203.0.113.62\n');
+  assert.equal(newer.updated, 1);
+  assert.equal(newer.unchanged, 0);
+  held = (await ids())[0];
+  assert.equal(held.current_status, 'offline');
+  assert.equal(held.ip, '203.0.113.62');
+  assert.equal(seenAt(held), '2026-11-17T22:31:00.000Z');
+  assert.equal(new Date(held.last_checked_at).toISOString(), '2026-11-17T22:30:00.000Z');
+  const withDevice = csv.replace('2026-11-17T22:00:00.000Z', '2026-11-17T23:00:00.000Z').replace(
     'Name,Serial,Online/Offline,Last Seen,IP',
     'Name,Serial,Online/Offline,Last Seen,IP,Device ID',
   ).replace('203.0.113.50', '203.0.113.50,dev-fixture-1').replace('203.0.113.51', '203.0.113.51,');
