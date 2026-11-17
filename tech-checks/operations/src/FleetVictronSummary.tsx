@@ -3,12 +3,15 @@ import {cameraTime} from './fieldCameraHealth';
 import {powerTimestamp} from './cameraEvidence';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {FleetDashboardRow} from './fleetDashboardModel';
+import {CosPowerChecks} from './CosPowerAlarmPanel';
+import {readPowerAlarmSettings} from './cosPowerAlarms';
 
 const labels:Record<string,string>={battery_voltage:'Battery voltage',battery_current:'Battery current',battery_power:'Battery power',solar_power:'Solar output',load_power:'DC system load',low_voltage_alarm:'Low voltage alarm',low_soc_alarm:'Low charge alarm',high_voltage_alarm:'High voltage alarm'};
 
 /** Keep the exact installation's energy dashboard inside its Helios card. */
 export default function FleetVictronSummary({row,now}:{row:FleetDashboardRow;now:number}){
  const measurements=row.power?.measurements||[];
+ const powerSettings=readPowerAlarmSettings(typeof localStorage==='undefined'?null:localStorage);
  if(!row.power)return <div className='cos-helios-victron'><strong>Victron</strong><small>{row.batteryReadIssue||'No unique Victron installation linked'}</small></div>;
  const newest=(metric:string)=>measurements.filter(item=>item.metric===metric).sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt))[0];
  const compact=['solar_power','load_power','battery_voltage'].map(metric=>({metric,item:newest(metric)})).filter(entry=>entry.item);
@@ -25,6 +28,7 @@ export default function FleetVictronSummary({row,now}:{row:FleetDashboardRow;now
    </li>)}</ul>:<small>No saved power readings</small>}
    <small>Last Victron read attempt: {cameraTime(row.power.lastAttemptAt,now)}</small>
   </details>
+  <CosPowerChecks measurements={measurements} now={now} settings={powerSettings}/>
   <a href={vrmPortalUrl(row.power.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a>
  </div>;
 }

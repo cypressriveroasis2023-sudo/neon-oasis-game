@@ -1,13 +1,14 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
-import {STAR_UNIT_STATUS_CONTRACT,countUnits,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
+import {STAR_UNIT_STATUS_CONTRACT,countUnits,unitVerdict,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
+import './sourceAttention.css';
 import './readingScope.css';
 import {cameraReadingCoverage,cameraUpEvidence,priorCameraReading} from './cameraReadingCoverage';
 import './cosMotion.css';
@@ -21,6 +22,13 @@ import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
+import SourceAttentionBanner from './SourceAttentionBanner';
+import SourceHealthStrip from './SourceHealthStrip';
+import {fleetSourceFacts} from './fleetSourceFacts';
+import {CosPowerAlarmSettings, CosPowerChecks} from './CosPowerAlarmPanel';
+import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
+import {technicianTodos} from './technicianTodos';
+import TechnicianTodoList from './TechnicianTodoList';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -29,6 +37,12 @@ export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
 const DOT:Record<UnitCameraStatus['state'],string>={GREEN:'online',YELLOW:'offline',RED:'offline',UNKNOWN:'unknown'};
+/** The provider may still mark a mixed online/unverified unit yellow. Zero
+ * confirmed-offline cameras are Unknown on this screen, never "down". */
+function presentedUnit(unit:UnitCameraStatus):UnitCameraStatus{
+ const state=unitVerdict(unit.online||0,unit.offline||0,unit.unknown||0);
+ return state===unit.state?unit:{...unit,state};
+}
 const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras up',YELLOW:'Some cameras down',RED:'All cameras down',UNKNOWN:'Not verified'};
 // Where each reading comes from. Avigilon units (Snipers, CAMVs) are a reachability
 // check on the unit, so they are Up or Down as a whole, never camera by camera.
@@ -78,16 +92,16 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string}[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
  // Which field a Fix it choice sent the person to, and what it told them.
  const [fixStep,setFixStep]=useState<{action:FixItAction;says:string}|null>(null);
  const [draft,setDraft]=useState<Draft|null>(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState(''),[saved,setSaved]=useState('');
- const [vrm,setVrm]=useState<any>(null),[routers,setRouters]=useState<any>(null),[fieldMap,setFieldMap]=useState<any>(null);
+ const [vrm,setVrm]=useState<any>(null),[vrmReady,setVrmReady]=useState(false),[routers,setRouters]=useState<any>(null),[fieldMap,setFieldMap]=useState<any>(null);
  // Victron readings for Helios lines. A failed or refused read leaves the lines without power; it is never an outage.
- useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ useEffect(()=>{let cancelled=false;api.get('/api/vrm-fleet').then(result=>{if(!cancelled)setVrm(result.data);}).catch(()=>{}).finally(()=>{if(!cancelled)setVrmReady(true);});return ()=>{cancelled=true;};},[]);
  // Router evidence for the troubleshooting checks. A failure here leaves the
  // router check reading Not checked, which is the truthful answer.
  // What mHelp holds about placement, for the mHelp location check. A failure
@@ -132,20 +146,28 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
 
  const coverage=useMemo(()=>report?cameraReadingCoverage(report.units):[],[report]);
  const counts=report?.counts,feed=report?.feed,canEdit=report?.canEdit===true&&report?.handEditsRead===true&&!uncertain;
+ const powerSettings=readPowerAlarmSettings(typeof localStorage==='undefined'?null:localStorage);
+ const sourceFacts=useMemo(()=>fleetSourceFacts({now,map:fieldMap||undefined,connectionState:typeof fieldMap?.productConnectionsState==='string'?fieldMap.productConnectionsState:undefined,boardCheckedAt:Number.isFinite(Date.parse(fieldMap?.savedBoardReadAt||''))?Date.parse(fieldMap.savedBoardReadAt):null,star:feed?{fresh:feed.fresh,syncedAt:feed.syncedAt??null,status:feed.status??null}:null,includeStar:Boolean(report),victronError:typeof vrm?.sync?.error==='string'?vrm.sync.error:null,victronAttempt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null,includeVictron:vrmReady,trackerVerifiedAt:typeof fieldMap?.productConnections?.trackerVerifiedAt==='string'?fieldMap.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(fieldMap)}),[now,fieldMap,feed,report,vrm,vrmReady]);
  const savedByUnit=useMemo(()=>savedAddressByUnit(savedAddresses),[savedAddresses]);
  const savedAddressOf=useCallback((unit:UnitCameraStatus)=>{const key=canonicalCameraUnit(unit.unit);return key?savedByUnit.get(key):undefined;},[savedByUnit]);
  const routerIndex=useMemo(()=>routerEvidenceByUnit(routers,now),[routers,now]);
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
- const shown=useMemo(()=>report?groupedUnits(report.units,group,query,stateFilter,family):[],[report,group,query,stateFilter,family]);
+ const units=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
+ const todos=useMemo(()=>technicianTodos({
+  cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
+  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
+  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD'})),
+ }),[units,victron,now,powerSettings,addressReviews]);
+ const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
  // Worst first, off the same units the list shows.
- const needsYou=useMemo(()=>report?needsYouRows(report.units):{rows:[],total:0,unchecked:0},[report]);
- const familyCounts=useMemo(()=>report?familyFieldCounts(report.units):{avigilon:0,recon:0,alibi:0},[report]);
+ const needsYou=useMemo(()=>report?needsYouRows(units):{rows:[],total:0,unchecked:0},[report,units]);
+ const familyCounts=useMemo(()=>report?familyFieldCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
  // Keep status counts in the same make scope as the rows selected by a tile.
- const statusCounts=useMemo(()=>report?countUnits(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
- const upEvidence=useMemo(()=>report?cameraUpEvidence(report.units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,family]);
+ const statusCounts=useMemo(()=>report?countUnits(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
+ const upEvidence=useMemo(()=>report?cameraUpEvidence(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
  // Every tile is a filter: clicking one shows exactly the units it counts.
  const tiles:{label:string;count:number;kind:string;group:Group;state:StateFilter}[]=statusCounts?[
   // 'Field units' collided with the Fleet board's 'Field equipment', which
@@ -214,6 +236,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
   {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
   {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
   {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
+  <SourceAttentionBanner facts={sourceFacts}/>
+  <SourceHealthStrip facts={sourceFacts}/>
+  <CosPowerAlarmSettings/>
+  <TechnicianTodoList todos={todos}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
@@ -267,7 +293,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses}:{now?:
       <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
       {sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
        :unit.down.length>0&&<small>{unit.down.some(camera=>camera.status==='offline')?'Down: ':'Not verified: '}{unit.down.map(camera=>{const prior=priorCameraReading(camera);return camera.name+(camera.status==='unknown'?' (not verified'+(prior?'; last reported '+prior.status+' '+cameraTime(prior.at,now):'')+')':'');}).join(', ')}</small>}
-      {victron.has(unit.unit)&&<small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small>}
+      {victron.has(unit.unit)&&<><small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small><CosPowerChecks measurements={victron.get(unit.unit)!.measurements} now={now} settings={powerSettings}/></>}
       <small>{unit.publicIp?unit.publicIp+' · ':''}{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
       <button type='button' className='cos-camera-status-edit-open' aria-expanded={draft?.unit===unit.unit}
        onClick={()=>{setSaveError('');setSaved('');setFixStep(null);setDraft(draft?.unit===unit.unit?null:draftOf(unit));}}>

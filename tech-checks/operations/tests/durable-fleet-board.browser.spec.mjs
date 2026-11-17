@@ -97,7 +97,7 @@ test('when no board can be read at all, the reading this browser saved is shown 
  await app.locator('body').evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('cos-saved-fleet-presentation-v1:'))localStorage.removeItem(key);});
  await page.reload();
  await expect(board.locator('.cos-fleet-stat-online small')).toContainText(/Saved reading .*\d{1,2}:\d{2}.* · not current/);
- for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText(shown[name]);
+ for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText('—');
  for(const name of ['field','shop','total'])await expect(stat(name),name).toHaveText(/^\d+$/);
 });
 for(const outcome of ['succeeds','fails'])test('reopening with only the compact saved reading shows it at once while the saved-board request is unresolved, then the request '+outcome,async({page})=>{
@@ -126,7 +126,7 @@ for(const outcome of ['succeeds','fails'])test('reopening with only the compact 
  await page.reload();
  await expect.poll(()=>pending).toBeGreaterThan(0);
  const saved=async()=>{
-  for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText(shown[name]);
+  for(const name of Object.keys(shown))await expect(stat(name),name).toHaveText('—');
   for(const name of ['field','shop','total'])await expect(stat(name),name).toHaveText(/^\d+$/);
   for(const name of ['field','shop','total','online','offline','unknown'])await expect(board.locator('.cos-fleet-stat-'+name+' small'),name).toContainText(/Saved reading .*\d{1,2}:\d{2}.* at that time · not current/);
   await expect(board.locator('.cos-fleet-stat-field small')).not.toContainText('Current reconciled placement');

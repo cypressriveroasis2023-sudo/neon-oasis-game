@@ -4,7 +4,7 @@
 //
 // An IP answer proves the unit can be reached. It never proves each camera works,
 // so an IP-checked unit is one line that is Up, Down or Not verified.
-import {STAR_FEED_FRESH_MS, type UnitCameraStatus} from './starUnitStatus.ts';
+import {STAR_FEED_FRESH_MS, unitVerdict, type UnitCameraStatus} from './starUnitStatus.ts';
 
 export type OtherDeviceRow = {
   id?: number | string | null;
@@ -29,10 +29,7 @@ const UNNAMED_FIELD = new Set(['tracker field', 'field']);
 const NOT_DEPLOYED = /\bshop\b|\broot\b|\bnot in use\b|\bstolen\b/i;
 
 type Status = 'online' | 'offline' | 'unknown';
-const state = (online: number, offline: number, unknown: number): UnitCameraStatus['state'] =>
-  online > 0 && offline === 0 && unknown === 0 ? 'GREEN'
-    : online === 0 && offline === 0 ? 'UNKNOWN'
-    : online === 0 && unknown === 0 ? 'RED' : 'YELLOW';
+const state = unitVerdict;
 
 function healthById(health: DeviceHealthRow[] | null | undefined) {
   const map = new Map<string, DeviceHealthRow>();

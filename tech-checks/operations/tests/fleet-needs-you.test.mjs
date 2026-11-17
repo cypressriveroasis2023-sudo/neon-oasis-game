@@ -6,6 +6,13 @@ import {needsYouRows} from '../src/fleetNeedsYou.ts';
 const unit=(u,state,extra={})=>({unit:u,displayName:u,placement:'FIELD',site:'Bristol',
  state,cameras:1,online:0,offline:state==='RED'?1:0,unknown:0,down:[],onlineInShop:false,...extra});
 
+test('yellow with no confirmed offline camera is not cameras down', () => {
+ const {rows,total,unchecked}=needsYouRows([unit('MIX','YELLOW',{cameras:4,online:2,offline:0,unknown:2})]);
+ assert.deepEqual(rows,[]);
+ assert.equal(total,0);
+ assert.equal(unchecked,1);
+});
+
 test('a unit with every camera up never asks for attention', () => {
  const {rows,total}=needsYouRows([unit('SNIPER 302','GREEN')]);
  assert.deepEqual(rows,[]);
@@ -83,4 +90,15 @@ test('the badge counts everything even when the card shows fewer', () => {
 test('a unit with no site recorded still gets a readable line', () => {
  const {rows}=needsYouRows([unit('SNIPER 302','RED',{site:'   '})]);
  assert.equal(rows[0].site,'No site recorded');
+});
+
+test('a present board keeps its last counts and labels them not current', () => {
+ const source=readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8');
+ assert.match(source,/UNITS ONLINE',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.online:'—'/);
+ assert.match(source,/UNITS OFFLINE',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.offline:'—'/);
+ assert.match(source,/UNITS UNVERIFIED',boardVisible&&!durableWaiting\?headlineCounts\.unknown:'—'/);
+ assert.match(source,/healthCurrent=\{boardVisible\}/);
+ assert.match(source,/Last completed reading '\+boardReadingTime\+' · not current\./);
+ assert.doesNotMatch(source,/savedOnly\?savedOnly\.online/);
+ assert.doesNotMatch(source,/!boardVisible\|\|failed\?'—':headlineCounts\.online/);
 });

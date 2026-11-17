@@ -41,7 +41,7 @@ test('Camera status lists Avigilon, Reconeyez and Star4Live units with their sou
  await expect(row(app,'SNIPER 007').locator('.cos-camera-status-detail')).toContainText('AvigilonNot verified');
  await expect(row(app,'CAMV 002').locator('.cos-camera-status-detail')).toContainText('AvigilonUp');
  await expect(row(app,'CAMV 002')).toContainText('The unit answers. Each camera is not checked.');
- await expect(row(app,'RII010 - Arcosa').locator('.cos-camera-status-detail')).toContainText('Recon IISome cameras down · 2 of 3 up');
+ await expect(row(app,'RII010 - Arcosa').locator('.cos-camera-status-detail')).toContainText('Recon IINot verified · 2 of 3 up');
  await expect(row(app,'SPOTTER 306').locator('.cos-camera-status-detail')).toContainText('AlibiAll cameras up · 2 of 2 up');
  await expect(row(app,'HELIOS 001').locator('.cos-camera-status-victron')).toContainText('Victron · Charge 80 %');
  // The Fleet map's saved addresses place the same units here, marked unconfirmed.
@@ -116,8 +116,10 @@ test('clicking a count tile shows exactly the units it counts, and the list says
  await expect(rows.nth(1)).toContainText('SNIPER 004');
  await expect(app.locator('.cos-camera-status-note')).toContainText('Showing only all cameras down');
  await app.getByRole('button',{name:/^SOME CAMERAS DOWN/}).click();
- await expect(rows).toHaveCount(1);
- await expect(rows.first()).toContainText('RII010 - Arcosa');
+ // Two cameras up and one never checked is not a partial outage.
+ await expect(rows).toHaveCount(0);
+ await app.getByRole('button',{name:/^NOT VERIFIED/}).click();
+ await expect(rows.filter({hasText:'RII010 - Arcosa'})).toHaveCount(1);
  await app.getByRole('button',{name:'Show all',exact:true}).click();
  await expect(rows).toHaveCount(9);
  await page.screenshot({path:info.outputPath('camera-status-tile-filter.png')});
