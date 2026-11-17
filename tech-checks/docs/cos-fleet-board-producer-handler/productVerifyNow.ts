@@ -25,7 +25,7 @@ export async function verifyProductsNow(body:unknown,options:Options){
    const row=admission.items.find(r=>r.productId===id);
    if(!row||row.status!=='unknown'||row.reason!==missingCheck){results.set(id,unknown(id,row?.reason||'This Product ID is not current Field equipment.'));continue;}
    const saved=connections?.items.find((r:Verdict)=>r.productId===id);
-   if(options.reuseCurrent&&saved&&['online','offline'].includes(saved.status)&&saved.checkedAt){results.set(id,{...saved,reason:'Current saved connection check confirmed. '+saved.reason});continue;}
+   if(options.reuseCurrent&&saved&&['online','offline','verifying'].includes(saved.status)&&saved.checkedAt){results.set(id,{...saved,reason:'Current saved connection check confirmed. '+saved.reason});continue;}
    const entries=before.tracker.records.filter((r:any)=>r.productId===id),ip=entries.length===1?entries[0].publicIp:null;
    const devices=before.devices.filter(d=>d.public_ip===ip&&d.monitoring_enabled===true&&(d.activation_state===undefined||d.activation_state==='active'));
    if(!devices.length||devices.length>8||devices.some(d=>!(/^[1-9][0-9]{0,14}$/).test(String(d.id))||!d.unit_key||!Array.isArray(d.expected_ports)||!d.expected_ports.length||d.expected_ports.length>32||new Set(d.expected_ports).size!==d.expected_ports.length||d.expected_ports.some(p=>!Number.isInteger(p)||p<1||p>65535))){results.set(id,unknown(id,'Saved camera IP or port configuration needs correction. Open the equipment record.'));continue;}
@@ -37,7 +37,7 @@ export async function verifyProductsNow(body:unknown,options:Options){
   if(targets.size){
    if(controller.signal.aborted)throw Error('The check outcome is uncertain. Refresh saved results before retrying.');
    const after=await options.read(controller.signal);if(controller.signal.aborted)throw Error('The check outcome is uncertain. Refresh saved results before retrying.');const saved=options.classify(after);connections=saved;const changed=fingerprint(before)!==fingerprint(after);
-   for(const [id,devices]of targets){const row=saved?.items.find(r=>r.productId===id);results.set(id,changed?unknown(id,'The source or saved connection changed during verification. Review the current record.'):devices.some(d=>errors.has(String(d.id)))?unknown(id,'A connection check could not complete. Refresh saved results before retrying.'):row&&['online','offline'].includes(row.status)&&row.checkedAt&&Date.parse(row.checkedAt)>=startedAt-1000?row:unknown(id,row?.status==='unknown'?row.reason:'The newly requested check is not yet confirmed in saved results. Refresh before retrying.'));}
+   for(const [id,devices]of targets){const row=saved?.items.find(r=>r.productId===id);results.set(id,changed?unknown(id,'The source or saved connection changed during verification. Review the current record.'):devices.some(d=>errors.has(String(d.id)))?unknown(id,'A connection check could not complete. Refresh saved results before retrying.'):row&&['online','offline','verifying'].includes(row.status)&&row.checkedAt&&Date.parse(row.checkedAt)>=startedAt-1000?row:unknown(id,row?.status==='unknown'?row.reason:'The newly requested check is not yet confirmed in saved results. Refresh before retrying.'));}
   }
   if(connections)connections={...connections,items:connections.items.map((row:Verdict)=>results.get(row.productId)?.status==='unknown'?{...row,...results.get(row.productId),resourceId:null}:row)};
   return {contract:'COS_VERIFY_PRODUCTS_NOW_V1',connections,items:ids.map(id=>results.get(id)||unknown(id,'Verification did not complete.'))};

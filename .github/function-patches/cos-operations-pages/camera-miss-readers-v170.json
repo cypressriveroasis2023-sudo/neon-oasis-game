@@ -67,16 +67,10 @@
    "occurrences": 1
   },
   {
-   "file": "savedFleetBoard.mjs",
-   "needle": "  const state = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states.includes(\"offline\") ? \"offline\" : operational && states.length > 0 && states.every((s) => s === \"online\") ? \"online\" : \"unknown\";",
-   "replacement": "  let state = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states.includes(\"offline\") ? \"offline\" : operational && states.length > 0 && states.every((s) => s === \"online\") ? \"online\" : \"unknown\";\n  if (classification.scope === \"shop\" && state === \"offline\") state = \"unknown\";",
-   "occurrences": 1
-  },
-  {
-   "file": "savedFleetBoard.mjs",
-   "needle": "[\"shop\", \"inactive\"].includes(classification.scope) ? \" PLACEMENT CONFLICT: camera inventory says \" + (classification.scope === \"shop\" ? \"SHOP / ROOT\" : \"INACTIVE\") + \" while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.\"",
-   "replacement": "classification.scope === \"shop\" ? \" A unit placed in Shop is not an outage.\" : classification.scope === \"inactive\" ? \" PLACEMENT CONFLICT: camera inventory says INACTIVE while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.\"",
-   "occurrences": 1
+   "file": "productVerifyNow.ts",
+   "needle": "['online','offline']",
+   "replacement": "['online','offline','verifying']",
+   "occurrences": 2
   }
  ],
  "expectedBefore": {
@@ -94,8 +88,8 @@
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
   "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
   "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
-  "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-  "savedFleetBoard.mjs": "eb083fbaff69b1aeea3e5264c330c20641b5d3c8ce1b27bc90051885608b276f",
+  "productVerifyNow.ts": "235e4857a2a6712f1a670a81f8468e9430f5125b1139f70059934e6e110dd9e7",
+  "savedFleetBoard.mjs": "9edb24154edfba5369a9f3bfdea8c937f592da108acc702bdaa7f4ecad56e717",
   "serve.ts": "5ea085aae7c9700f4dcbaa1de672070101e6273ba0291423bb7cee7ddcc3489d",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",

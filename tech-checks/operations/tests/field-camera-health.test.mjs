@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {canonicalCameraUnit,fieldCameraHealth,validateCameraHealth} from '../src/fieldCameraHealth.ts';
+import {fleetDashboardRows,fleetDashboardSummary} from '../src/fleetDashboardModel.ts';
 import {cameraTimestamp,currentCameraStatus,CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 import {cameraOverview} from '../src/cameraHealthCounts.ts';
 import {resource,port,snapshot,withStatus,now,fresh} from './fixtures/camera-evidence-fixtures.mjs';
@@ -30,13 +31,18 @@ test('stale, future, invalid and absent times never color current pins',()=>{
  for(const observedAt of [null,undefined,'','invalid','2027-01-01T00:00:00Z','2026-02-30T10:00:00Z','2026-10-06T17:55:00','2026-10-06T16:00:00Z'])assert.equal(project([{...row,evidence:{...row.evidence,observedAt}}]).state,'unknown');
  assert.equal(cameraTimestamp('2026-10-06 17:55:00.123456+00',now).fresh,true);assert.equal(currentCameraStatus(row.evidence,Date.parse(fresh)+CAMERA_FRESH_MS),'online');assert.equal(currentCameraStatus(row.evidence,Date.parse(fresh)+CAMERA_FRESH_MS+1),'review');
 });
-test('a Sniper placed in Shop is never an outage, even after three missed probes',()=>{
- const sniper={id:'synthetic-shop-sniper',unitNumber:'Sniper 501',modelName:'Sniper',status:'installed'};
+test('a Sniper placed in Shop keeps a confirmed connection on its own record and is not a Field outage',()=>{
+ const sniper={id:'synthetic-shop-sniper',unitNumber:'Sniper 501',modelName:'Sniper',status:'available',placement:'SHOP',currentLocationType:'shop'};
  const down=resource(9,'Sniper 501',{scope:'shop',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true,consecutiveFailures:3})});
+ const health=snapshot([down]);
  const result=project([down],[sniper],sniper);
- assert.notEqual(result.state,'offline');
- assert.match(result.reason,/not an outage/);
+ assert.equal(result.state,'offline');
+ assert.match(result.reason,/saved IP \/ port checks confirmed no response/);
+ assert.match(result.reason,/PLACEMENT CONFLICT/);
  assert.equal(result.classification.scope,'shop');
+ const rows=fleetDashboardRows([sniper],health,[],null,now);
+ assert.equal(rows[0].cameraState,'offline');
+ assert.equal(fleetDashboardSummary(rows).offline,0);
 });
 test('placement confidence is independent, shop and inactive are excluded, and unresolved retains review',()=>{
  assert.equal(project([{...row,scope:'unknown'}]).state,'online');assert.match(project([{...row,scope:'unknown'}]).reason,/LOCATION REVIEW/);

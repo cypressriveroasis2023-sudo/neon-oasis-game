@@ -41,18 +41,6 @@
    "occurrences": 1,
    "needle": "exactAllowed && exact8) {\n      if (reviewedProvider && row2.cameraState !== exact8.status) {",
    "replacement": "exactAllowed && exact8) {\n      if (exact8.status === \"verifying\") {\n        state2 = \"verifying\";\n        reason = exact8.reason;\n      } else if (reviewedProvider && row2.cameraState !== exact8.status) {"
-  },
-  {
-   "file": "index.ts",
-   "occurrences": 1,
-   "needle": "  const state2 = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states2.includes(\"offline\") ? \"offline\" : operational && states2.length > 0 && states2.every((s) => s === \"online\") ? \"online\" : \"unknown\";",
-   "replacement": "  let state2 = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states2.includes(\"offline\") ? \"offline\" : operational && states2.length > 0 && states2.every((s) => s === \"online\") ? \"online\" : \"unknown\";\n  if (classification.scope === \"shop\" && state2 === \"offline\") state2 = \"unknown\";"
-  },
-  {
-   "file": "index.ts",
-   "occurrences": 1,
-   "needle": "[\"shop\", \"inactive\"].includes(classification.scope) ? \" PLACEMENT CONFLICT: camera inventory says \" + (classification.scope === \"shop\" ? \"SHOP / ROOT\" : \"INACTIVE\")",
-   "replacement": "classification.scope === \"shop\" ? \" A unit placed in Shop is not an outage.\" : classification.scope === \"inactive\" ? \" PLACEMENT CONFLICT: camera inventory says INACTIVE\""
   }
  ],
  "expectedBefore": {
@@ -61,7 +49,7 @@
   "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  },
  "expectedAfter": {
-  "index.ts": "98285d97c160c985820ede6790221e3fde43d76a567716ed905e066ae03f365d",
+  "index.ts": "afeb07d4d7e55b327dcef8b4236a06d3a8b1b233b1da1c3aee31bb76a3ead467",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
   "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  }

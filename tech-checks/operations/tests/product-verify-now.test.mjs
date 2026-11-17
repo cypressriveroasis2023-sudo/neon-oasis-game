@@ -15,7 +15,9 @@ function fixture(){
 }
 test('manual check uses every saved port and confirms Online/Offline only from persisted readback',async()=>{
  const f=fixture(),r=await verifyProductsNow({productIds:['1001','1002']},f);
- assert.deepEqual(r.items.map(i=>i.status),['online','offline']);assert.deepEqual(f.calls.sort(),[41,42]);assert.equal(f.reads,2);assert.ok(r.items.every(i=>i.checkedAt));
+ assert.deepEqual(r.items.map(i=>i.status),['online','verifying']);assert.deepEqual(f.calls.sort(),[41,42]);assert.equal(f.reads,2);assert.ok(r.items.every(i=>i.checkedAt));
+ const confirmed=fixture();confirmed.check=async d=>{confirmed.calls.push(d.id);const online=d.id===41;confirmed.checks.set(d.id,{80:{online,attempted:true},443:{online:false,attempted:true},_connection:{ip:d.public_ip,revision:4,checkedAt:new Date().toISOString(),status:online?'online':'offline',reachable:online,confirmedOutage:false,consecutiveFailures:online?0:3}});};
+ const third=await verifyProductsNow({productIds:['1002']},confirmed);assert.equal(third.items[0].status,'offline');
 });
 test('Shop, source holds, missing tracker IP and cross-product shared IP never launch checks',async()=>{
  for(const mutate of [f=>{},f=>{f.tracker.records[0].reviewReasons=['identity_mismatch'];},f=>{f.tracker.records[0].publicIp=null;},f=>{f.tracker.records[2].publicIp='8.8.8.8';}]){

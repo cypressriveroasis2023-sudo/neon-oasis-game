@@ -29,7 +29,8 @@ test('persisted Verify evidence survives fresh Fleet GETs without browser state 
   assert.equal(receipt.items.length,1);assert.equal(f.calls.length,1);
  }
  const saved=f.checks.get(41);saved[80]={online:false,attempted:true};saved._connection.status='offline';saved._connection.reachable=false;
- assert.equal((await f.reopen()).items[0].status,'offline');
+ assert.equal((await f.reopen()).items[0].status,'verifying');
+ saved._connection.consecutiveFailures=3;assert.equal((await f.reopen()).items[0].status,'offline');
  f.tracker.records[0].publicIp='9.9.9.9';assert.equal((await f.reopen()).items[0].status,'unknown');
 });
 test('deployment patch preserves authorization, optional adapters and every unrelated byte',()=>{
