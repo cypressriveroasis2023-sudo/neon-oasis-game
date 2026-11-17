@@ -59,7 +59,7 @@ test('native readers and Fleet/Board mounts have no added props or remount keys'
  const board=app.split('\n').find(x=>x.includes('<DailyBoard api='));
  assert.equal(fleet.split('={').length-1,22,'the Fleet mount keeps exactly its reviewed prop count');
  assert.equal(fleet.split('key=').length-1,1,'only the one reviewed remount key');
- assert.equal(sha(fleet),"7a2eab2ae674b20d61976c41de2bb99bc87f12c7a4ab9c9093b2497d07e7437e");
+ assert.equal(sha(fleet),"e6a559e22c6b1c4980afb48678f8d7d884aadeb30941d85953ab2e85b888f949");
  assert.equal(sha(board),"2060863c57ccd4f109fbaf828d1e5fcf15be2db635d7caba62698ffb88297285");
 });
 const preserved=[
@@ -79,7 +79,7 @@ const preserved=[
     "roleEligibility",
     "  const dailyOnly=",
     "  const label=",
-    "ffeff39b054a1dc03093d8ee5184f1a429c8846ba9b7e92a2b2dbb4873712035"
+    "7661ee519abf0e6475f4268112ff9e10148f3bedb1c1ea07e7a0ed9dab5b2c80"
   ],
   [
     "navigationAndUnitHandlers",

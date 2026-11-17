@@ -30,8 +30,6 @@
 html[data-staff='service'] #root .company-shell>.operations-sidebar,html[data-staff='service'] #root#root .cos-approved-shell .operations-bottom-nav,html[data-staff='service'] #root .company-sidebar-footer{display:none!important}
 html[data-staff='service'] #root .operations-main,html[data-staff='service'] #root .company-main{margin:0!important;width:100%!important;max-width:none!important}
 .cos-fleet-dashboard[data-audience='tech'] .cos-admin-fold{display:none!important}
-.cos-fleet-dashboard[data-audience='admin'] .cos-admin-details:not([open]) ~ .cos-admin-fold,
-.cos-fleet-dashboard[data-audience='admin'] .cos-admin-details:not([open]) ~ * .cos-admin-fold{display:none!important}
 .cos-family-card{margin-top:12px;padding-top:10px;border-top:1px solid #243044}
 .cos-family-card h3{margin:0}
 .cos-issue-guide{margin-top:12px;padding-top:10px;border-top:1px solid #243044}

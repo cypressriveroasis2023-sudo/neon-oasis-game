@@ -30,7 +30,7 @@ const expected={
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "1c14c92829e6cbabb681b575c409bb66953337d5",
   "fieldCameraHealth.ts": "b524d935a9f92619e5e9617e19a5b04c5a924b33",
-  "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
+  "cameraEvidence.ts": "4b0a60f05cc9624d992ffd3b28cc89b645d46921",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
   "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",

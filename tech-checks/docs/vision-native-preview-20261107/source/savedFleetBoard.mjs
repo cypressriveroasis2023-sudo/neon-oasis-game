@@ -243,6 +243,7 @@ async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUnti
 // src/cameraEvidence.ts
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
 var POWER_FRESH_MS = 45 * 60 * 1e3;
+var RECON_DETECTOR_FRESH_MS = 6 * 60 * 60 * 1e3;
 var normalized = (value) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : "";
 function powerTimestamp(value, now = Date.now()) {
   const stamp2 = cameraTimestamp(value, now);
@@ -266,12 +267,18 @@ function providerRecord(row) {
   const kind = resourceKind(row), resource = kind === "cameras" ? "camera" : kind === "detectors" ? "detector" : kind === "recorders" ? "recorder" : null;
   return !row.trackerOnly && resource !== null && row.evidence?.kind === "provider" && row.evidence.resource === resource && providerSource(row.evidence.source);
 }
+function observationFresh(evidence, now = Date.now()) {
+  const stamp2 = cameraTimestamp(evidence?.observedAt, now);
+  if (!stamp2.at) return false;
+  const max = evidence?.source === "Reconeyez" && evidence.resource === "detector" ? RECON_DETECTOR_FRESH_MS : CAMERA_FRESH_MS;
+  return now - Date.parse(stamp2.at) <= max;
+}
 function currentCameraStatus(evidence, now = Date.now()) {
-  return evidence?.kind === "provider" && ["camera", "detector"].includes(evidence.resource || "") && evidence.active === true && providerSource(evidence.source) && cameraTimestamp(evidence.observedAt, now).fresh && ["online", "offline"].includes(evidence.status) ? evidence.status : "review";
+  return evidence?.kind === "provider" && ["camera", "detector"].includes(evidence.resource || "") && evidence.active === true && providerSource(evidence.source) && observationFresh(evidence, now) && ["online", "offline"].includes(evidence.status) ? evidence.status : "review";
 }
 function providerState(row, now = Date.now()) {
   if (normalized(row.activationState) !== "ACTIVE" || !providerRecord(row) || row.evidence?.active !== true) return "verifying";
-  return cameraTimestamp(row.evidence.observedAt, now).fresh && ["online", "offline"].includes(row.evidence.status) ? row.evidence.status : "verifying";
+  return observationFresh(row.evidence, now) && ["online", "offline"].includes(row.evidence.status) ? row.evidence.status : "verifying";
 }
 function cameraState(row, now = Date.now()) {
   if (row.trackerOnly) return "mapping";
@@ -882,10 +889,7 @@ function readMhelpInventoryAuthority(value, now = Date.now()) {
 
 // src/fieldProductEvidence.ts
 function fieldProductEvidence(row, state, now = Date.now(), exact = null, requiredConnectionUnavailable = false) {
-  const providerReadingFresh = Boolean(row?.camera?.rows?.some((resource) => {
-    const stamps = [resource.evidence?.observedAt, resource.serviceEvidence?.observedAt];
-    return stamps.some((at) => cameraTimestamp(at, now).fresh);
-  }));
+  const providerReadingFresh = Boolean(row?.camera?.rows?.some((resource) => [resource.evidence, resource.serviceEvidence].some((evidence) => observationFresh(evidence, now))));
   if (exact && exact.status !== "unknown" && exact.status === state && exact.resourceId && cameraTimestamp(exact.checkedAt, now).fresh) {
     return {
       gap: null,

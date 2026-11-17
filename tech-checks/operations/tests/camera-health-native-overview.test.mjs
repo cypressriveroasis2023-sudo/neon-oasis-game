@@ -27,7 +27,9 @@ test('service failures and reachable ports cannot supply or override provider ca
  group=classifyCameraUnit([resource(2,'Sniper 2',{type:'Sniper',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})})],now);assert.equal(group.providerState,'verifying');assert.equal(group.cameraState,'mapping');assert.equal(group.serviceState,'offline');assert.notEqual(group.state,'offline');
 });
 test('older Recon state is retained while presentation recentness never infers an outage',()=>{
- for(const observedAt of [null,'bad','2026-10-06T16:00:00Z','2027-01-01T00:00:00Z']){const row=withStatus(resource(1,'RII-001',{type:'detector'}),'online',observedAt),overview=cameraOverview(snapshot([row]),now);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].rows[0].evidence.status,'online');assert.equal(overview.groups[0].rows[0].evidence.observedAt,observedAt);}
+ for(const observedAt of [null,'bad','2027-01-01T00:00:00Z']){const row=withStatus(resource(1,'RII-001',{type:'detector'}),'online',observedAt),overview=cameraOverview(snapshot([row]),now);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].rows[0].evidence.status,'online');assert.equal(overview.groups[0].rows[0].evidence.observedAt,observedAt);}
+ const recent=withStatus(resource(1,'RII-001',{type:'detector'}),'online','2026-10-06T16:00:00Z'),recentView=cameraOverview(snapshot([recent]),now);
+ assert.equal(recentView.summary.online,1);assert.equal(recentView.summary.offline,0);assert.equal(recentView.groups[0].rows[0].evidence.status,'online');
 });
 test('partial known rows keep mixed status; expected channel counts are never fabricated',()=>{
  const overview=cameraOverview(snapshot([resource(1),withStatus(resource(2),'unknown')]),now);assert.equal(overview.summary.online,0);assert.equal(overview.coverage.cameraMixed,1);

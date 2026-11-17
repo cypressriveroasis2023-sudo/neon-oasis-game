@@ -17,7 +17,7 @@ const map=(units=[unit])=>({items:units,inventoryItems:units,summary:{fieldUnits
 const pair=(health=raw(),units=[unit])=>reconcileFleetSnapshot(health,map(units),now);
 const current=(fleet,time=now)=>fieldCameraHealth(fleet.fieldMap.items[0],fleet.fieldMap.items,fleet.health,time);
 const last=(history,fleet,time=now)=>lastKnownCamera(history,fleet.fieldMap.items[0],fleet.fieldMap.items,current(fleet,time));
-const expired=now+16*60000;
+const expired=now+16*60000,reconExpired=now+6*60*60*1000+60000;
 
 for(const state of ['online','offline'])test('accepted '+state+' survives aging with original source time and unchanged current totals',()=>{
  const fleet=pair(raw([withStatus(resource(1),state)])),history=rememberCameraHistory(new Map(),fleet,now);
@@ -76,10 +76,10 @@ test('new canonical alias membership or duplicate unit blocks legacy-name histor
 test('recorder, detector and saved service-port history retain their actual basis',()=>{
  const cases=[
   [pair(raw([resource(1,'Helios 1',{type:'NVR'})])),'recorder','RECORDER ONLINE'],
-  [pair(snapshot([resource(1,'Helios 1',{type:'detector'})])),'camera','DETECTOR RECORDS ONLINE'],
+  [pair(snapshot([resource(1,'Helios 1',{type:'detector'})])),'camera','DETECTOR RECORDS ONLINE',reconExpired],
   [pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]),'connection','IP / PORT ONLINE'],
  ];
- for(const [fleet,basis,label] of cases){const history=rememberCameraHistory(new Map(),fleet,now),result=last(history,fleet,expired);assert.equal(result.basis,basis);assert.equal(result.label,label);}
+ for(const [fleet,basis,label,when=expired] of cases){const history=rememberCameraHistory(new Map(),fleet,now),result=last(history,fleet,when);assert.equal(result.basis,basis);assert.equal(result.label,label);}
 });
 
 test('camera history cannot borrow a newer recorder, port or opposite-state observation time',()=>{
@@ -90,7 +90,7 @@ test('camera history cannot borrow a newer recorder, port or opposite-state obse
  const direct=pair(snapshot([resource(1,'Sniper 1',{type:'Sniper',evidence:{...resource(1).evidence,observedAt:newer},serviceEvidence:port()})]),[{...unit,unitNumber:'Sniper 1',modelName:'Snipers'}]);
  const service=last(rememberCameraHistory(new Map(),direct,now),direct,expired);assert.equal(service.basis,'connection');assert.equal(service.observedAt,new Date(fresh).toISOString());
  const detector=pair(snapshot([withStatus(resource(1,'Helios 1',{type:'detector'}),'offline'),withStatus(resource(2,'Helios 1',{type:'NVR'}),'online',newer)]));
- const detected=last(rememberCameraHistory(new Map(),detector,now),detector,expired);assert.equal(detected.label,'DETECTOR RECORDS OFFLINE');assert.equal(detected.observedAt,new Date(fresh).toISOString());
+ const detected=last(rememberCameraHistory(new Map(),detector,now),detector,reconExpired);assert.equal(detected.label,'DETECTOR RECORDS OFFLINE');assert.equal(detected.observedAt,new Date(fresh).toISOString());
 });
 
 test('historical presentation is neutral, clearly stale, and preserves the observation range',()=>{
