@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ViewErrorBoundary from './ViewErrorBoundary';
 import MhelpLocationImport from './MhelpLocationImport';
+import SimCancelChecklist from './SimCancelChecklist';
 import './index.css';
 import './shell.css';
 import './companyTheme.css';
@@ -23,7 +24,7 @@ ReactDOM.createRoot(root).render(
         <button type="button" onClick={retry}>Reopen workspace</button>
       </main>
     )}>
-      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : <App />}
+      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : new URLSearchParams(location.search).get('simCancelPreview') === '1' ? <SimCancelChecklist /> : <App />}
     </ViewErrorBoundary>
   </React.StrictMode>
 );

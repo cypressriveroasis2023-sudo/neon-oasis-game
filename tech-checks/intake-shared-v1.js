@@ -1,3 +1,4 @@
+import {closeoutAllowed, recordSimCancel, simCancelForNotes} from './sim-cancel-checklist.mjs';
 // Shared return / IT Intake record helpers.
 // Keeps the chain-of-custody record format authoritative across IT and Owner views.
 const INTAKE_META_RE=/(?:^|\n)\[\[INTAKE_META:([A-Za-z0-9+/=]+)\]\]/;
@@ -28,7 +29,11 @@ async function finishIntake({row,tech,notes='',meta={},intakePhotoPaths=[]}){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   const now=new Date().toISOString();
   const nextMeta={...(meta||{})};
-  if(!nextMeta.cancellationDoc)nextMeta.cancellationDoc=documentation(row,tech,new Date(now));
+  const gate=closeoutAllowed({action:'pickup',simCancel:nextMeta.simCancel});
+  if(!gate.ok)throw new Error(gate.error);
+  const stored=await recordSimCancel(ctx.db,gate.record,tech?.id||null);
+  if(!stored.ok)throw new Error(stored.error);
+  nextMeta.simCancel=simCancelForNotes(gate.record);
   const payload={status:'pending_mhelp_inventory',it_tech_id:tech.id,it_tech_name:tech.name,it_received_at:now,damage_notes:writeRecord(notes,nextMeta),intake_photo_paths:intakePhotoPaths,updated_at:now};
   const expectedPaths=[...(intakePhotoPaths||[])].map(String).sort();
   const matchesSaved=rowData=>{
