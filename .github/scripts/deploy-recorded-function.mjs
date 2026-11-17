@@ -79,6 +79,28 @@ export function replaceAll(haystack,needle,replacement){
 }
 
 // Stage 4 predicate. Pure.
+// Optional file-level live precheck. Hashes are of the served source, compared
+// before any upload. A missing file or a different hash refuses the deploy.
+export function liveFileProblems(servedFiles,required){
+  const problems=[];
+  const served=Array.isArray(servedFiles)?servedFiles:[];
+  for(const [name,hash] of Object.entries(required||{})){
+    let content;
+    const direct=served.find(file=>file.name===name);
+    if(direct) content=direct.content;
+    else {
+      const base=name.replace(/^.*\//,'');
+      const candidates=served.filter(file=>String(file.name).replace(/^.*\//,'')===base);
+      if(candidates.length===1) content=candidates[0].content;
+      else if(candidates.length>1){problems.push(`live file name is ambiguous for ${name}`);continue;}
+    }
+    if(content===undefined){problems.push(`live file missing: ${name}`);continue;}
+    const actual=sha256(Buffer.from(content,'utf8'));
+    if(actual!==hash) problems.push(`live file hash mismatch for ${name}: required ${hash.slice(0,12)}..., live ${actual.slice(0,12)}...`);
+  }
+  return problems;
+}
+
 export function liveMatchesPrecondition(live,required){
   const problems=[];
   if(required.status!==undefined&&live.status!==required.status) problems.push(`status: required ${required.status}, live ${live.status}`);
@@ -137,6 +159,15 @@ async function main(){
   const pre=liveMatchesPrecondition(live,patch.requireLiveBeforeDeploy||{});
   if(pre.length){console.error('PRECONDITION FAILED: live function does not match the state this patch was approved against:');for(const p of pre)console.error(`  ${p}`);process.exit(1);}
   console.log(`Live before deploy: ${live.slug} v${live.version} ${live.status} archive ${String(live.ezbr_sha256).slice(0,12)}...`);
+  if(patch.requireLiveFiles){
+    const body=await fetch(`${api}/${patch.slug}/body`,{headers:auth}).catch(cause=>({ok:false,status:String(cause)}));
+    const served=body.ok?await body.json().catch(()=>null):null;
+    const servedFiles=Array.isArray(served?.files)?served.files:null;
+    if(!servedFiles){console.error(`PRECONDITION FAILED: live source could not be read (HTTP ${body.status}); nothing deployed.`);process.exit(2);}
+    const fileProblems=liveFileProblems(servedFiles,patch.requireLiveFiles);
+    if(fileProblems.length){console.error('PRECONDITION FAILED: live file bytes are not the reviewed bytes:');for(const p of fileProblems)console.error(`  ${p}`);process.exit(1);}
+    console.log('Live file hashes match requireLiveFiles.');
+  }
 
   // Deploy: multipart to the Management API, exact bytes, exact names.
   const form=new FormData();
