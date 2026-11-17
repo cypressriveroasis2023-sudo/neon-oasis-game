@@ -1,4 +1,4 @@
-import {cameraTimestamp,providerState,cameraState} from './cameraEvidence';
+import {cameraTimestamp,observationFresh,providerState,cameraState} from './cameraEvidence';
 import {savedConnectionObservation} from './savedConnectionObservation';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {FieldProduct} from './mhelpFieldHealth';
@@ -25,10 +25,7 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
  // This attribution is independently keyed by the accepted Product ID,
  // verified 2027 tracker IP and saved endpoint configuration revision.
  // It is never inferred from the provider/channel name or device label.
- const providerReadingFresh=Boolean(row?.camera?.rows?.some(resource=>{
-  const stamps=[resource.evidence?.observedAt,resource.serviceEvidence?.observedAt];
-  return stamps.some(at=>cameraTimestamp(at,now).fresh);
- }));
+ const providerReadingFresh=Boolean(row?.camera?.rows?.some(resource=>[resource.evidence,resource.serviceEvidence].some(evidence=>observationFresh(evidence,now))));
  if(exact&&exact.status!=='unknown'&&exact.status===state&&exact.resourceId&&cameraTimestamp(exact.checkedAt,now).fresh){
   return {gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:exact.checkedAt,providerReadingFresh,video:'not_verified',
    observations:[{resourceId:exact.resourceId,source:'Saved TCP/service-port check',kind:'connection',observedAt:exact.checkedAt,fresh:true,reportedStatus:exact.status,currentState:exact.status}]};

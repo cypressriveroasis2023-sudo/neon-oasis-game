@@ -41,13 +41,12 @@ test('phone first screen, desktop inventory card, and TV-sized inventory card', 
     await expect(landing).not.toContainText('Sniper 44');
   } else {
     await expect(landing).toBeHidden();
+    await expect(identity).toBeHidden();
+    await expect(app.getByText('About this board')).toBeVisible();
+    await app.getByText('About this board').click();
     await expect(identity).toBeVisible();
     await expect(sentence).toBeVisible();
-    await expect(app.getByText('About this board')).toBeHidden();
-    if (project === 'desktop-1024') {
-      await expect(app.locator('.tech-check-tv')).toHaveCount(0);
-      await expect(identity).toBeVisible();
-    }
+    if (project === 'desktop-1024') await expect(app.locator('.tech-check-tv')).toHaveCount(0);
   }
   expect(state.errors).toEqual([]);
 });
