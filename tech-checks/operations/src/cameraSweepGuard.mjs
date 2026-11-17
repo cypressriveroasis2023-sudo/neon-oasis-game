@@ -3,6 +3,10 @@
 export const CELLULAR_PROBE_TIMEOUT_MS = 5000;
 export const SWEEP_SHARD_DEADLINE_MS = 60000;
 export const SWEEP_CRON_TIMEOUT_MS = 145000;
+/** One wall clock for the whole run, under the 145s cron limit. */
+export const SWEEP_RUN_DEADLINE_MS = 140000;
+/** A small fleet can have a few real outages. Inconclusive only above this count AND 10%. */
+export const MASS_FAILURE_FLOOR = 8;
 export const HOST_ANSWERED_ERROR = "Connection refused (os error 111)";
 export const PENDING_DETAIL = "Pending sweep verdict. Not a confirmed outage.";
 
@@ -80,7 +84,22 @@ export function mergeSweepVerdict(parts) {
     counts.sort((a, b) => b - a);
     if (counts.length >= 3 && counts[0] >= 15 && counts[1] >= 7 && counts[2] >= 4) pattern = true;
   }
-  return { probed, failed, pattern, inconclusive: probed > 0 && (failed / probed > 0.10 || pattern) };
+  const rate = probed > 0 && failed > MASS_FAILURE_FLOOR && failed / probed > 0.10;
+  return { probed, failed, pattern, inconclusive: probed === 0 || rate || pattern };
+}
+
+/** Cleanup may touch only units this run probed. A run that checked nobody is inconclusive. */
+export function cleanupTargets(checkedIds, pendingRows) {
+  const checked = new Set((Array.isArray(checkedIds) ? checkedIds : []).map((id) => String(id)));
+  return (Array.isArray(pendingRows) ? pendingRows : []).filter((row) => checked.has(String(row?.camera_device_id)));
+}
+
+export function zeroUnitRun(eligible) {
+  return !Number.isInteger(eligible) || eligible <= 0;
+}
+
+export function phaseAllowed(now, deadline) {
+  return Number.isFinite(now) && Number.isFinite(deadline) && now < deadline;
 }
 
 export function sweepGuard(units) {

@@ -2040,7 +2040,8 @@ function mergeSweepVerdict(parts) {
     counts.sort((a, b) => b - a);
     if (counts.length >= 3 && counts[0] >= 15 && counts[1] >= 7 && counts[2] >= 4) pattern = true;
   }
-  return { probed, failed, pattern, inconclusive: probed > 0 && (failed / probed > 0.10 || pattern) };
+  const rate = probed > 0 && failed > 8 && failed / probed > 0.10;
+  return { probed, failed, pattern, inconclusive: probed === 0 || rate || pattern };
 }
 function sweepGuard(units) {
   const rows = Array.isArray(units) ? units : [];
@@ -2132,6 +2133,8 @@ async function collectScheduledDirect(db, probe, options = {}) {
           health.acknowledged_at = null;
           health.acknowledged_by = null;
           if (prev.overall_status && prev.overall_status !== "online") health.last_recovered_at = checked;
+        } else if (decision.pending) {
+          health.first_failed_at = prev.first_failed_at || checked;
         }
         // Final write fence. The ticket was admitted before the probe; if
         // the authority has been refused or lost while the probe was in
@@ -3599,11 +3602,12 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
     if (valid !== true) return json({ error: "Forbidden" }, 403);
     let endpointDiagnostic = null;
     async function reconcilePending(database, body) {
-      const inconclusive = body.inconclusive === true;
+      const inconclusive = body.inconclusive === true || !Number.isInteger(body.eligible) || body.eligible <= 0;
+      const checkedIds = new Set(Array.isArray(body.checked_ids) ? body.checked_ids.map((id) => String(id)) : []);
       const shardCount = body.shard_count, shardIndex = body.shard_index;
-      const health = await database.from("camera_health_current").select("camera_device_id,consecutive_failures,port_status,detail").eq("detail", PENDING_DETAIL).limit(1000);
+      const health = await database.from("camera_health_current").select("camera_device_id,consecutive_failures,port_status,detail,checked_at").eq("detail", PENDING_DETAIL).limit(1000);
       if (health.error || !Array.isArray(health.data)) return json({ error: "reconcile_unreadable", shard: { index: shardIndex, count: shardCount } }, 503);
-      const rows = health.data.filter((row) => Number(row.camera_device_id) % shardCount === shardIndex);
+      const rows = health.data.filter((row) => checkedIds.has(String(row.camera_device_id)) && Number(row.camera_device_id) % shardCount === shardIndex);
       if (!rows.length) return json({ reconciled: 0, inconclusive, shard: { index: shardIndex, count: shardCount, partial: true } });
       const devices = await database.from("camera_devices").select("id,connection_revision,public_ip,expected_ports,monitoring_profile").in("id", rows.map((row) => row.camera_device_id));
       if (devices.error || !Array.isArray(devices.data)) return json({ error: "reconcile_unreadable", shard: { index: shardIndex, count: shardCount } }, 503);
@@ -3615,7 +3619,7 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
         const next = finalizePending(prior, inconclusive);
         const ports = row.port_status && typeof row.port_status === "object" ? Object.fromEntries(Object.entries(row.port_status).filter(([key]) => key !== "_connection")) : null;
         if (!ports || !Object.keys(ports).length) continue;
-        const patch = { camera_device_id: device.id, port_status: ports, checked_at: new Date().toISOString(), overall_status: next.status, ip_reachable: false, consecutive_failures: next.failures, confirmed_outage: next.confirmed, confirmation_reason: next.confirmed ? "3 consecutive failed checks of the saved service endpoint" : null, detail: inconclusive ? "Sweep inconclusive. Status is Unknown and this check is not a miss." : next.status === "offline" ? "Three consecutive missed probes of the saved service endpoint." : "Verifying after a missed probe. Not an outage yet." };
+        const patch = { camera_device_id: device.id, port_status: ports, checked_at: row.checked_at, overall_status: next.status, ip_reachable: false, consecutive_failures: next.failures, confirmed_outage: next.confirmed, confirmation_reason: next.confirmed ? "3 consecutive failed checks of the saved service endpoint" : null, detail: inconclusive ? "Sweep inconclusive. Status is Unknown and this check is not a miss." : next.status === "offline" ? "Three consecutive missed probes of the saved service endpoint." : "Verifying after a missed probe. Not an outage yet." };
         const saved = await database.rpc("publish_camera_connection_v1", { p_device_id: device.id, p_revision: device.connection_revision, p_public_ip: device.public_ip, p_expected_ports: device.expected_ports, p_monitoring_profile: device.monitoring_profile, p_health: patch, p_source: "automatic_tcp_sweep" });
         if (!saved.error && saved.data?.ok === true) reconciled++;
       }
@@ -3653,12 +3657,12 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
           }
         }
         const lockStamp = new Date().toISOString();
-        const lockRow = await db.from("camera_integrations").select("provider,last_sync_status,last_sync_at").eq("provider", "avigilon").limit(1);
+        const lockRow = await db.from("camera_integrations").select("provider,last_sync_status,last_sync_at").eq("provider", "camera_sweep_lock").limit(1);
         if (lockRow.error) return json({ error: "sweep_lock_unreadable" }, 503);
         if (lockRow.data?.length) {
           const row = lockRow.data[0];
           if (sweepLockBusy(row.last_sync_status, row.last_sync_at, Date.now())) return json({ state: "overlap", error: "sweep_already_running" }, 409);
-          const taken = await db.from("camera_integrations").update({ last_sync_status: "running", last_sync_at: lockStamp, last_error: null }).eq("provider", "avigilon").eq("last_sync_status", row.last_sync_status).eq("last_sync_at", row.last_sync_at).select("provider");
+          const taken = await db.from("camera_integrations").update({ last_sync_status: "running", last_sync_at: lockStamp, last_error: null }).eq("provider", "camera_sweep_lock").eq("last_sync_status", row.last_sync_status).eq("last_sync_at", row.last_sync_at).select("provider");
           if (taken.error || taken.data?.length !== 1) return json({ state: "overlap", error: "sweep_already_running" }, 409);
         }
         const shardCount = 4;
@@ -3678,13 +3682,13 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
               const result = await response.json().catch(() => ({}));
               noteShardAuthority(result);
               if (response.ok && result.shard?.index === index && result.shard?.count === shardCount) return { index, ok: true, result };
-              if (attempt === 0 && [502, 503, 546].includes(response.status)) {
+              if (attempt === 0 && Date.now() < requestStarted + 140000 && [502, 503, 546].includes(response.status)) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
                 continue;
               }
               return { index, ok: false, status: response.status, error: result.error || "shard_failed", result };
             } catch (error) {
-              if (attempt === 0 && !req.signal.aborted) {
+              if (attempt === 0 && !req.signal.aborted && Date.now() < requestStarted + 140000) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
                 continue;
               }
@@ -3693,12 +3697,13 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
           }
           return { index, ok: false, status: 0, error: "shard_retry_exhausted" };
         };
-        const runReconcile = async (index, inconclusive) => {
+        const runReconcile = async (index, inconclusive, checkedIds, eligible) => {
+          if (Date.now() >= requestStarted + 140000) return false;
           try {
             const response = await fetch("https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-health-sweep", {
               method: "POST",
               headers: { "Content-Type": "application/json", "x-camera-cron-secret": secret },
-              body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, reconcile: true, inconclusive }),
+              body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, reconcile: true, inconclusive, checked_ids: checkedIds, eligible }),
               redirect: "error",
               cache: "no-store",
               signal: req.signal
@@ -3716,7 +3721,9 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
         const ok = shards.filter((s) => s.ok);
         const guardParts = ok.map((s) => s.result?.guard).filter((guard) => guard && Number.isInteger(guard.probed));
         const verdict = guardParts.length === shardCount ? mergeSweepVerdict(guardParts) : { probed: 0, failed: 0, pattern: false, inconclusive: true };
-        if (ok.length === shardCount) await Promise.all(Array.from({ length: shardCount }, (_, index) => runReconcile(index, verdict.inconclusive)));
+        if (Date.now() >= requestStarted + 140000) verdict.inconclusive = true;
+        const checkedIds = ok.flatMap((shard) => (shard.result?.results || []).filter((row) => row.published).map((row) => row.id));
+        if (ok.length === shardCount) await Promise.all(Array.from({ length: shardCount }, (_, index) => runReconcile(index, verdict.inconclusive, checkedIds, verdict.probed)));
         const direct = ok.map((s) => s.result.coverage).filter(Boolean), providers = ok.map((s) => s.result.provider_coverage).filter(Boolean), routers = direct.map((c) => c.router_coverage).filter(Boolean);
         const sum = (rows, key) => rows.reduce((n, row) => n + (Number.isFinite(row?.[key]) ? row[key] : 0), 0);
         const providerEligible = providers.length ? Math.max(...providers.map((c) => c.eligible ?? 0)) : 0;

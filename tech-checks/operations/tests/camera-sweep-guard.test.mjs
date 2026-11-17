@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
  publicationForProbe,finalizePending,mergeSweepVerdict,sweepLockBusy,addressBlockKey,
- CELLULAR_PROBE_TIMEOUT_MS,SWEEP_SHARD_DEADLINE_MS,SWEEP_CRON_TIMEOUT_MS
+ cleanupTargets,zeroUnitRun,phaseAllowed,
+ CELLULAR_PROBE_TIMEOUT_MS,SWEEP_SHARD_DEADLINE_MS,SWEEP_CRON_TIMEOUT_MS,SWEEP_RUN_DEADLINE_MS
 } from '../src/cameraSweepGuard.mjs';
 
 const bundle=readFileSync(new URL('../../docs/camera-health-sweep-endpoint-retry-20261110/source/index.ts',import.meta.url),'utf8');
@@ -19,19 +20,61 @@ function recordedCluster(){
 }
 
 test('Nov 13 and Nov 15 refusal clusters flip no unit and do not count as misses',()=>{
- for(const event of ['nov13','nov15']){
+ // Recorded counts are the 15/7/4 refusal blocks. The other six clocks in
+ // Nov 13-16 are synthetic: the raw sweep rows are not in this repo.
+ const events=[
+  {id:'2026-11-13T16:15:00Z',source:'recorded'},
+  {id:'2026-11-13T18:00:00Z',source:'synthetic'},
+  {id:'2026-11-14T02:00:00Z',source:'synthetic'},
+  {id:'2026-11-14T16:00:00Z',source:'synthetic'},
+  {id:'2026-11-15T04:00:00Z',source:'synthetic'},
+  {id:'2026-11-15T16:00:00Z',source:'synthetic'},
+  {id:'2026-11-16T05:00:00Z',source:'recorded'},
+  {id:'2026-11-16T20:00:00Z',source:'synthetic'}
+ ];
+ assert.equal(events.length,8);
+ for(const event of events){
   const units=recordedCluster();
   const verdict=mergeSweepVerdict([{probed:units.length,failed:units.length,tallies:units.reduce((map,unit)=>{const id=unit.blockKey;map.set(id,(map.get(id)||0)+1);return map;},new Map())}].map(part=>({probed:part.probed,failed:part.failed,tallies:[...part.tallies].map(([key,count])=>({klass:'refused',key,count}))})));
-  assert.equal(verdict.pattern,true,event);
-  assert.equal(verdict.inconclusive,true,event);
-  assert.equal(verdict.failed,26,event);
+  assert.equal(verdict.pattern,true,event.id+' '+event.source);
+  assert.equal(verdict.inconclusive,true,event.id);
+  assert.equal(verdict.failed,26,event.id);
   for(const unit of units){
    const published=publicationForProbe(unit.klass,unit.prior);
    const final=published.pending?finalizePending(published.failures,true):published;
-   assert.notEqual(final.status,'offline',event);
-   assert.equal(final.failures,unit.prior,event);
+   assert.notEqual(final.status,'offline',event.id);
+   assert.equal(final.failures,unit.prior,event.id);
   }
  }
+});
+
+test('four real outages in a 35-unit sweep still classify',()=>{
+ const verdict=mergeSweepVerdict([{probed:35,failed:4,tallies:[{klass:'miss',key:'solo',count:4}]}]);
+ assert.equal(verdict.inconclusive,false);
+ assert.equal(verdict.pattern,false);
+ const published=publicationForProbe('miss',2);
+ assert.deepEqual(finalizePending(published.failures,verdict.inconclusive),{status:'offline',failures:3,confirmed:true});
+});
+
+test('cleanup touches only this run and a zero-unit run is inconclusive',()=>{
+ const pending=[{camera_device_id:1,checked_at:'2026-11-13T15:00:00Z'},{camera_device_id:2,checked_at:'2026-11-13T15:00:00Z'}];
+ assert.deepEqual(cleanupTargets([1],pending).map(row=>row.camera_device_id),[1]);
+ assert.deepEqual(cleanupTargets([],pending),[]);
+ assert.equal(zeroUnitRun(0),true);
+ assert.equal(zeroUnitRun(35),false);
+ const stale=finalizePending(2,zeroUnitRun(0));
+ assert.equal(stale.failures,2);
+ assert.equal(stale.status,'unknown');
+});
+
+test('a phase past the run deadline is skipped and is not a miss',()=>{
+ const start=Date.parse('2026-11-17T20:00:00Z');
+ assert.equal(phaseAllowed(start,start+SWEEP_RUN_DEADLINE_MS),true);
+ assert.equal(phaseAllowed(start+SWEEP_RUN_DEADLINE_MS,start+SWEEP_RUN_DEADLINE_MS),false);
+ assert.ok(SWEEP_RUN_DEADLINE_MS<SWEEP_CRON_TIMEOUT_MS);
+ const skipped=finalizePending(1,true);
+ assert.equal(skipped.failures,1);
+ assert.notEqual(skipped.status,'offline');
 });
 
 test('more than 10 percent failed is inconclusive and does not advance a miss',()=>{
@@ -77,6 +120,10 @@ test('the live sweep bundle uses one retry, the guard, and the overlap lock',()=
  assert.match(bundle,/deadlineMs: completedSnapshotEnabled \? 95e3 : 60e3/);
  assert.match(bundle,/function publicationForProbe/);
  assert.match(bundle,/function mergeSweepVerdict/);
+ assert.match(bundle,/camera_sweep_lock/);
+ assert.match(bundle,/checked_ids/);
+ assert.match(bundle,/first_failed_at = prev.first_failed_at \|\| checked/);
+ assert.match(bundle,/requestStarted \+ 140000/);
  assert.match(bundle,/sweep_already_running/);
  assert.match(bundle,/body\.reconcile === true/);
  assert.match(bundle,/Pending sweep verdict/);
