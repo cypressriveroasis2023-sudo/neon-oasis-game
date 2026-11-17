@@ -15,7 +15,23 @@
 .cos-tech-todos{margin:12px 0}
 .cos-tech-todos li{margin:6px 0}
 .cos-phone-landing{display:none}
-.cos-phone-board-info>summary{display:none}
+.cos-today-issues{margin:0 0 14px;padding:14px;border:1px solid #334155;border-radius:14px}
+.cos-today-issues h2{margin:0 0 6px;font-size:22px}
+.cos-today-issues-count{margin:0;font-size:28px;font-weight:700}
+.cos-today-issues-count b{margin-right:8px}
+.cos-today-issues ul{list-style:none;margin:12px 0 0;padding:0}
+.cos-today-issues li{margin:0}
+.cos-today-issues button,.cos-today-issues span{display:block;width:100%;min-height:44px;padding:10px 0;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-top:1px solid #243044}
+.cos-family-card{margin-top:12px;padding-top:10px;border-top:1px solid #243044}
+.cos-family-card h3{margin:0}
+.cos-issue-guide{margin-top:12px;padding-top:10px;border-top:1px solid #243044}
+.cos-issue-guide ol{margin:8px 0 0;padding-left:1.2em}
+.cos-issue-guide li{margin:10px 0}
+.cos-issue-guide button,.cos-issue-guide textarea,.cos-issue-guide input{display:block;width:100%;min-height:44px;margin-top:6px;font:inherit}
+.cos-issue-outcomes{display:grid;gap:8px}
+.cos-issue-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.cos-issue-actions button,.cos-issue-actions a{min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid #e3344c;background:#a20f29;color:#fff;font-weight:700;text-decoration:none}
+.cos-phone-board-info>summary{display:inline-flex;min-height:44px;align-items:center;margin:0 0 8px;font:inherit;color:inherit}
 .cos-phone-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cos-phone-counts div{padding:12px 8px;border:1px solid #334155;border-radius:10px;text-align:center}
 .cos-phone-counts b{display:block;font-size:28px;line-height:1.1}

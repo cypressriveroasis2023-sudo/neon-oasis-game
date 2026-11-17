@@ -15,12 +15,19 @@ export type OtherDeviceRow = {
   activation_state?: string | null;
   source_last_seen_at?: string | null;
   public_ip?: string | null;
+  recon_battery_percent?: number | string | null;
+  /** Explicit stored mHelp Product ID. Absent means this row did not carry the column. */
+  mhelp_product_id?: string | number | null;
 };
 export type DeviceHealthRow = { camera_device_id?: number | string | null; overall_status?: string | null; checked_at?: string | null };
 export type OtherFeed = { syncedAt?: string | null; status?: string | null; enabled?: boolean | null } | null | undefined;
 
 export const IP_CHECK_SOURCE = '2026_unit_tracker';
 export const RECON_SOURCE = 'reconeyez';
+/** Reconeyez detectors check in every few hours. This window is only for that
+ * feed. Star4Live and Avigilon stay on the 45-minute cutoff. */
+export const RECON_DETECTOR_FRESH_MS = 6 * 60 * 60 * 1000;
+export const RECON_CRITICAL_BATTERY_PERCENT = 10;
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const SHOP_ORGANIZATIONS = new Set(['', 'root', 'shop']);
@@ -36,8 +43,15 @@ function healthById(health: DeviceHealthRow[] | null | undefined) {
   for (const row of Array.isArray(health) ? health : []) if (row?.camera_device_id != null) map.set(String(row.camera_device_id), row);
   return map;
 }
+const productId = (row: OtherDeviceRow) => {
+  if (!Object.prototype.hasOwnProperty.call(row, 'mhelp_product_id')) return undefined;
+  const value = text(row.mhelp_product_id);
+  return /^[1-9]\d*$/.test(value) ? value : null;
+};
 const active = (row: OtherDeviceRow, source: string) =>
   text(row?.source) === source && text(row?.activation_state).toLowerCase() !== 'deactivated' && Boolean(text(row?.unit_key) || text(row?.device_name));
+const listed = (row: OtherDeviceRow, source: string) =>
+  active(row, source) || text(row?.source) === source && productId(row) != null && Boolean(text(row?.unit_key) || text(row?.device_name));
 const fresh = (at: unknown, now: number, maxAgeMs: number) => {
   const time = Date.parse(text(at));
   return Number.isFinite(time) && now - time >= -60000 && now - time <= maxAgeMs;
@@ -53,13 +67,14 @@ export function projectIpCheckUnits(
 ): UnitCameraStatus[] {
   const checks = healthById(health), seen = new Set<string>(), units: UnitCameraStatus[] = [];
   for (const row of Array.isArray(devices) ? devices : []) {
-    if (!active(row, IP_CHECK_SOURCE)) continue;
+    if (!listed(row, IP_CHECK_SOURCE)) continue;
     const unit = text(row.unit_key) || text(row.device_name), key = unit.toUpperCase();
     if (seen.has(key)) continue; // One unit is one line.
     seen.add(key);
     const check = checks.get(String(row.id)), ip = text(row.public_ip) || null;
     const said = text(check?.overall_status).toLowerCase();
-    const status: Status = ip && fresh(check?.checked_at, now, maxAgeMs) && (said === 'online' || said === 'offline') ? said : 'unknown';
+    const inactive = text(row.activation_state).toLowerCase() === 'deactivated';
+    const status: Status = !inactive && ip && fresh(check?.checked_at, now, maxAgeMs) && (said === 'online' || said === 'offline') ? said : 'unknown';
     const organization = text(row.organization), lower = organization.toLowerCase();
     const placement: 'FIELD' | 'SHOP' = SHOP_ORGANIZATIONS.has(lower) ? 'SHOP' : 'FIELD';
     const online = status === 'online' ? 1 : 0, offline = status === 'offline' ? 1 : 0, unknown = 1 - online - offline;
@@ -72,8 +87,9 @@ export function projectIpCheckUnits(
       down: status === 'online' ? [] : [{name: ip ? 'Avigilon check' : 'No IP on file', status}],
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: ip,
-      observedAt: text(check?.checked_at) || null,
+      observedAt: inactive ? null : text(check?.checked_at) || null,
       source: 'ip_check',
+      ...(productId(row) !== undefined ? {mhelpProductId: productId(row), productIdKnown: true as const, trackerActive: !inactive} : {}),
     });
   }
   return units;
@@ -87,7 +103,7 @@ export function projectIpCheckUnits(
  */
 export function projectReconUnits(
   devices: OtherDeviceRow[] | null | undefined, health: DeviceHealthRow[] | null | undefined,
-  feed: OtherFeed, now = Date.now(), maxAgeMs = STAR_FEED_FRESH_MS,
+  feed: OtherFeed, now = Date.now(), maxAgeMs = RECON_DETECTOR_FRESH_MS,
 ): UnitCameraStatus[] {
   const checks = healthById(health), groups = new Map<string, OtherDeviceRow[]>();
   const feedFresh = feed?.enabled !== false && text(feed?.status) === 'ok' && fresh(feed?.syncedAt, now, maxAgeMs);
@@ -99,13 +115,18 @@ export function projectReconUnits(
   const units: UnitCameraStatus[] = [];
   for (const members of groups.values()) {
     const unit = text(members[0].unit_key) || text(members[0].device_name);
+    const criticalBatteries: {name: string; percent: number}[] = [];
     const cameras = members.map(row => {
       const check = checks.get(String(row.id));
       const said = text(check?.overall_status).toLowerCase();
       const status: Status = feedFresh && fresh(check?.checked_at, now, maxAgeMs) &&
         (said === 'online' || said === 'offline') ? said : 'unknown';
       const reportedAt = Date.parse(text(check?.checked_at));
-      return {name: text(row.device_name) || unit, status,
+      const percent = typeof row.recon_battery_percent === 'number' ? row.recon_battery_percent
+        : typeof row.recon_battery_percent === 'string' && /^\d+(?:\.\d+)?$/.test(row.recon_battery_percent.trim()) ? Number(row.recon_battery_percent) : null;
+      const name = text(row.device_name) || unit;
+      if (percent != null && percent <= RECON_CRITICAL_BATTERY_PERCENT) criticalBatteries.push({name, percent});
+      return {name, status,
         ...(status === 'unknown' && (said === 'online' || said === 'offline') ? {
           lastReportedStatus: said as 'online' | 'offline',
           lastReportedAt: Number.isFinite(reportedAt) ? new Date(reportedAt).toISOString() : null,
@@ -132,6 +153,8 @@ export function projectReconUnits(
       publicIp: null,
       observedAt,
       source: 'reconeyez',
+      ...(criticalBatteries.length ? {criticalBatteries} : {}),
+      ...(productId(members[0]) !== undefined ? {mhelpProductId: productId(members[0]), productIdKnown: true as const, ...(productId(members[0]) ? {} : {deviceLinkNeeded: true})} : {}),
     });
   }
   return units;

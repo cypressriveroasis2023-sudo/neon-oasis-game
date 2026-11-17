@@ -45,8 +45,8 @@ function cameraCheck(unit:UnitCameraStatus):UnitCheck{
  if(off<=0)return {id:'cameras',label:'Cameras',verdict:'pass',detail:'all '+plural(total,'camera')+' reporting'};
  const named=unit.down?.map(camera=>camera?.name).filter(Boolean) as string[]|undefined;
  const who=named&&named.length?' · '+named.slice(0,2).join(', ')+(named.length>2?' +'+(named.length-2):''):'';
- return {id:'cameras',label:'Cameras',verdict:off>=total?'fail':'fail',
-  detail:on+' of '+total+' reporting'+who,action:{id:'swap',label:'Swap'}};
+ return {id:'cameras',label:'Cameras',verdict:'fail',
+  detail:on+' of '+total+' reporting'+who,action:{id:'swap',label:'Swapped out'}};
 }
 
 /**
@@ -61,7 +61,7 @@ function mhelpCheck(unit:UnitCameraStatus,mhelp?:{seenAt?:string|null;placement?
  if(mhelp.placement&&mhelp.placement!==unit.placement)
   return {id:'mhelp',label:'mHelp location',verdict:'warn',
    detail:'mHelp says '+(mhelp.placement==='SHOP'?'shop':'field')+', the board shows '+
-    (unit.placement==='SHOP'?'shop':'field')+seen,action:{id:'placement',label:'Fix'}};
+    (unit.placement==='SHOP'?'shop':'field')+seen,action:{id:'placement',label:'Confirm Shop'}};
  if(mhelp.reviewReason)
   return {id:'mhelp',label:'mHelp location',verdict:'warn',detail:'Held for review · '+mhelp.reviewReason};
  if(!mhelp.placement)
@@ -75,8 +75,8 @@ function addressCheck(unit:UnitCameraStatus):UnitCheck{
  const text=(unit.address||'').trim();
  if(pinned)return {id:'address',label:'Address',verdict:'pass',detail:text||'On the map'};
  if(text)return {id:'address',label:'Address',verdict:'warn',
-  detail:text+' · not on the map',action:{id:'address',label:'Fix'}};
- return {id:'address',label:'Address',verdict:'fail',detail:'None on file',action:{id:'address',label:'Add'}};
+  detail:text+' · not on the map',action:{id:'address',label:'Open address'}};
+ return {id:'address',label:'Address',verdict:'fail',detail:'None on file',action:{id:'address',label:'Open address'}};
 }
 
 /**
@@ -100,7 +100,7 @@ export function troubleshootUnit(unit:UnitCameraStatus,evidence:{
 
  const ip=(unit.publicIp||'').trim();
  checks.push(!ip
-  ?{id:'ip',label:'Public IP',verdict:'warn',detail:'None recorded',action:{id:'ip',label:'Add'}}
+  ?{id:'ip',label:'Public IP',verdict:'warn',detail:'None recorded',action:{id:'ip',label:'Correct the public IP'}}
   :evidence.ipAnswered===undefined
    ?{id:'ip',label:'Public IP',verdict:'unknown',detail:ip+' · not checked'}
    :{id:'ip',label:'Public IP',verdict:evidence.ipAnswered?'pass':'fail',
@@ -118,7 +118,7 @@ export function troubleshootUnit(unit:UnitCameraStatus,evidence:{
   ?{id:'router',label:'Router',verdict:'unknown',detail:'Not checked'}
   :evidence.routerLinked
    ?{id:'router',label:'Router',verdict:'pass',detail:'Linked · a router answering is not proof the cameras work'}
-   :{id:'router',label:'Router',verdict:'warn',detail:'None linked',action:{id:'router',label:'Link'}});
+   :{id:'router',label:'Router',verdict:'warn',detail:'None linked. Router status is read-only and does not decide the cameras.'});
 
  checks.push(addressCheck(unit));
 

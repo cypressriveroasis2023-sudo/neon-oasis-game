@@ -67,6 +67,14 @@ export type UnitCameraStatus = {
   handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
   // Where the up/down reading came from. Absent means Star4Live.
   source?: UnitSource;
+  /** Present only when the tracker row included the stored mHelp Product ID column. */
+  mhelpProductId?: string | null;
+  productIdKnown?: true;
+  trackerActive?: boolean;
+  notInUse?: boolean;
+  deviceLinkNeeded?: boolean;
+  placementReview?: string;
+  criticalBatteries?: { name: string; percent: number }[];
 };
 
 export type UnitSource = 'star4live' | 'ip_check' | 'reconeyez';
@@ -213,7 +221,8 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
 
 /** One place builds the totals, so every projection of these units agrees. */
 export function countUnits(units: UnitCameraStatus[]): UnitCameraStatusReport['counts'] {
-  const field = units.filter(u => u.placement === 'FIELD'), shop = units.filter(u => u.placement === 'SHOP');
+  const counted = units.filter(u => !u.notInUse && !u.deviceLinkNeeded);
+  const field = counted.filter(u => u.placement === 'FIELD'), shop = counted.filter(u => u.placement === 'SHOP');
   return {
     units: units.length,
     cameras: units.reduce((total, u) => total + u.cameras, 0),

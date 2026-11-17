@@ -68,3 +68,12 @@ test('only exact synthetic placeholders are replaced while a complete current ar
  const expired=healthWithFieldInventory(source,f.units,now+1200001);assert.equal(expired.rows.length,3);assert(expired.rows.includes(placeholder));
  const actual={...source,rows:source.rows.map(row=>row===placeholder?{...row,trackerOnly:false}:row)};assert.equal(healthWithFieldInventory(actual,f.units,now).rows.length,3);
 });
+test('a Recon detector seen a few hours ago stays online, and one past its check-in window is Unknown',async()=>{
+ const recent=await fixture();
+ for(const device of recent.devices)device.source_last_seen_at=new Date(now-2*60*60*1000).toISOString();
+ assert.equal(fieldCameraHealth(recent.units[0],recent.units,await health(recent),now).state,'online');
+ const stale=await fixture();
+ for(const device of stale.devices){device.source_last_seen_at=new Date(now-7*60*60*1000).toISOString();device.source_status='offline';}
+ const state=fieldCameraHealth(stale.units[0],stale.units,await health(stale),now);
+ assert.equal(state.state,'unknown');
+});
