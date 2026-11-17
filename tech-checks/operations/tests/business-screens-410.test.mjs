@@ -134,6 +134,7 @@ test('rollback redeploys the v168 import of the frozen serve.ts and has no 410 h
   assert.match(entry,/b5b188229346182d9a4e29da42415a1b9d3b9d53\/tech-checks\/docs\/vision-native-preview-20261107\/source\/serve\.ts/);
   assert.equal(entry.includes('cosBusinessGone'),false);
   assert.equal(entry.includes('"gone"'),false);
+  assert.equal(rollback.expectedBefore['index.ts'],'4340eb2f772cf4e7c0bc26475f1c7ca164f2ca0e9ae321fe6f6ce21ef1fdb7c3');
 });
 
 function boot(source){
@@ -149,6 +150,7 @@ const orgId='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const people={
   owner:{id:ownerId,actor:'3f073784-96e7-43d8-b9e0-33ab31c3c8b1',name:'Synthetic Owner',department:'owner',role:'owner'},
   it:{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc',actor:'d0757b64-9623-4adc-afff-21cc7853e88a',name:'Teddy Hopper',department:'it',role:'it_technician'},
+  service:{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285',actor:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',name:'Abel Cervantes',department:'service',role:'service_technician'},
 };
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 function handlerFor(who){
@@ -167,12 +169,20 @@ async function call(handler,method,path,bearer){
   let body=null;try{body=await response.json();}catch{body=null;}
   return {status:response.status,body};
 }
-const handlers={owner:handlerFor('owner'),it:handlerFor('it'),anon:factory({platformUrl:'https://platform.example',serviceKey:'synthetic-service-key',fetch:async()=>{throw Error('anonymous proof must not reach transport');}})};
+const handlers={owner:handlerFor('owner'),it:handlerFor('it'),service:handlerFor('service'),anon:factory({platformUrl:'https://platform.example',serviceKey:'synthetic-service-key',fetch:async()=>{throw Error('anonymous proof must not reach transport');}})};
 
 test('anonymous callers stay 401 on every retired route',async()=>{
   for(const [method,path] of gonePaths){
     const result=await call(handlers.anon,method,path,false);
     assert.equal(result.status,401,method+' '+path+' '+JSON.stringify(result.body));
+    assert.notEqual(result.body?.error,'gone');
+  }
+});
+
+test('Service stays 403 on every retired route',async()=>{
+  for(const [method,path] of gonePaths){
+    const result=await call(handlers.service,method,path,true);
+    assert.equal(result.status,403,method+' '+path+' '+JSON.stringify(result.body));
     assert.notEqual(result.body?.error,'gone');
   }
 });
