@@ -68,22 +68,22 @@
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-    "savedFleetBoard.mjs": "909870005deface4a596be4d6ba2f2b3ff5fb53822aa7c13b3d1250402c77d3b",
+    "savedFleetBoard.mjs": "963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299",
     "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
   },
   "expectedAfter": {
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-    "savedFleetBoard.mjs": "909870005deface4a596be4d6ba2f2b3ff5fb53822aa7c13b3d1250402c77d3b",
+    "savedFleetBoard.mjs": "963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299",
     "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
   },
   "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-operations-pages/router-board-status-v169.json --dry-run",
   "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-operations-pages/router-board-status-v169.json --deploy",

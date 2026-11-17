@@ -49,8 +49,10 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];
   const providers=[...new Set(camera.rows.map(r=>r.evidence?.source).filter(Boolean))];
   let routerState:Signal=routers?combine(routerStates):'unknown';
-  if(routerLabel)routerState=placement==='shop'?'unknown':routerLabel==='Online'?'online':routerLabel==='Offline'?'offline':'unknown';
-  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState,routerLabel,routerCheckedAt,doNotUse,batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,vrmInstallation,locationVerified,locationNeedsReview,review};
+  let shownLabel=routerLabel;
+  if(placement==='shop'&&routerLabel){shownLabel='In Shop';routerState='unknown';}
+  else if(routerLabel)routerState=routerLabel==='Online'?'online':routerLabel==='Offline'?'offline':'unknown';
+  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState,routerLabel:shownLabel,routerCheckedAt,doNotUse,batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,vrmInstallation,locationVerified,locationNeedsReview,review};
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){

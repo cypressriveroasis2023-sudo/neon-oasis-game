@@ -36,12 +36,12 @@
   "expectedBefore": {
     "index.ts": "e1cd7ae339bd4df4114d50fa427069f61dce8e39b813c73e839da64fafa3b200",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
   },
   "expectedAfter": {
     "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-    "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
   },
   "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --dry-run",
   "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-fleet-board-producer/router-board-on-gate-v10.json --deploy",

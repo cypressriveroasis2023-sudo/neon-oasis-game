@@ -4,8 +4,9 @@ import { canonicalCameraUnit } from '../src/fieldCameraHealth.ts';
 import { routerSnapshot, readRouterSnapshot } from '../../supabase/functions/cos-operations-pages/routers.ts';
 import {
   cameraHealthUnitKey, routerJoinKey, boardRouterStatus, displayedRouterStatus, joinUnitRouter, deviceDoNotUse,
-  annotateSavedBoard, presentRouterPage, ROUTER_BOARD_FRESH_MS,
+  annotateSavedBoard, presentRouterPage, loadRouterBoardSources, COS_PUBLISHABLE_KEY, ROUTER_BOARD_FRESH_MS,
 } from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
+import {readFileSync} from 'node:fs';
 
 const now = Date.parse('2026-11-17T21:00:00Z');
 const fresh = new Date(now - 60 * 1000).toISOString();
@@ -43,8 +44,16 @@ test('exact match, a missing row, and a stale row never become Offline', () => {
   assert.equal(down.status, 'Offline');
   assert.equal(down.outage, true);
   const shop = joinUnitRouter({ unitKey: 'SNIPER 148', placement: 'shop', routers: [router({ current_status: 'offline' })], now });
-  assert.equal(shop.status, 'Offline');
+  assert.equal(shop.status, 'In Shop');
   assert.equal(shop.outage, false);
+  const fieldWithRootDevice = joinUnitRouter({
+    unitKey: 'SNIPER 148', placement: 'field',
+    routers: [router({ current_status: 'offline' })],
+    devices: [{ id: 9, unit_key: 'SNIPER 148', device_serial: 'SERIAL-148', organization: 'ROOT', scope: 'shop' }],
+    now,
+  });
+  assert.equal(fieldWithRootDevice.status, 'Offline');
+  assert.equal(fieldWithRootDevice.outage, true);
 });
 
 test('router_type is optional and prior_inhand_serial is never a live join', () => {
@@ -137,6 +146,26 @@ test('a saved Online label older than 3 hours displays as Unknown', () => {
   assert.equal(displayedRouterStatus('Offline', stale, now), 'Unknown');
   assert.equal(displayedRouterStatus('Unknown (no feed)', stale, now), 'Unknown (no feed)');
   assert.equal(displayedRouterStatus('Online', null, now), 'Unknown');
+});
+
+test('COS router reads send the pages apikey, authorization, and a short timeout', async () => {
+  const serve = readFileSync(new URL('../../docs/vision-native-preview-20261107/source/serve.ts', import.meta.url), 'utf8');
+  const pagesKey = serve.match(/LEGACY_PUBLISHABLE_KEY="([^"]+)"/)[1];
+  assert.equal(COS_PUBLISHABLE_KEY, pagesKey);
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  await loadRouterBoardSources(fetchImpl, { Authorization: 'Bearer synthetic-session' });
+  assert.ok(calls.length >= 1);
+  for (const call of calls) {
+    assert.equal(call.init.headers.apikey, pagesKey);
+    assert.equal(call.init.headers.Authorization, 'Bearer synthetic-session');
+    assert.equal(call.init.headers.Accept, 'application/json');
+    assert.ok(call.init.signal);
+    assert.equal(call.init.headers.apikey.length > 0, true);
+  }
 });
 
 test('owner and IT keep router addresses and everyone else does not', () => {

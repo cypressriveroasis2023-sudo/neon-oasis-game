@@ -4,7 +4,7 @@
 import { boardRouterStatus, deviceDoNotUse, doNotUseForKey, routerJoinKey } from './routerBoardJoin.mjs';
 export const ROUTER_FRESHNESS_MS = 20 * 60 * 1000;
 export type RouterStatus = 'reachable' | 'unreachable' | 'stale' | 'unknown';
-export type BoardRouterStatus = 'Online' | 'Offline' | 'Unknown' | 'Unknown (no feed)';
+export type BoardRouterStatus = 'Online' | 'Offline' | 'Unknown' | 'Unknown (no feed)' | 'In Shop';
 export type RouterRow = {
   id: string; unitKey: string; name: string; model: string; publicIp: string | null;
   unitIp: string | null; port: number | null; protocol: string | null;
@@ -67,7 +67,9 @@ export function routerSnapshot(routers: Row[], units: Row[], now = new Date(), d
         candidateUnit = null;
       }
     }
-    const reading = boardRouterStatus(row, +now);
+    const matched = match === 'exact_name' ? candidates[0] : null;
+    const unitPlacement = text(matched?.placement || matched?.current_location_type).toLowerCase();
+    const reading = boardRouterStatus(row, +now, unitPlacement === 'shop' ? 'shop' : '');
     const port = number(row.web_port);
     return { id, unitKey: text(row.unit_key), name: text(row.router_name) || text(row.unit_key), model: text(row.router_model),
       publicIp: text(row.router_public_ip) || null, unitIp: text(row.unit_ip) || null,
@@ -99,7 +101,7 @@ export function readRouterSnapshot(value: unknown): RouterSnapshot {
       !['online', 'offline', 'unknown'].includes(row.probeStatus) || !['exact_name', 'ambiguous', 'unmatched'].includes(row.match) || row.gps !== null ||
       (row.checkedAt !== null && !stamp(row.checkedAt)) ||
       (row.doNotUse !== undefined && typeof row.doNotUse !== 'boolean') ||
-      (row.boardStatus !== undefined && !['Online', 'Offline', 'Unknown', 'Unknown (no feed)'].includes(row.boardStatus)) ||
+      (row.boardStatus !== undefined && !['Online', 'Offline', 'Unknown', 'Unknown (no feed)', 'In Shop'].includes(row.boardStatus)) ||
       (row.match === 'exact_name' ? !row.candidateUnit || typeof row.candidateUnit.id !== 'string' || typeof row.candidateUnit.unitNumber !== 'string' : row.candidateUnit !== null))
       throw new Error('Router inventory returned inconsistent records.');
     ids.add(row.id);
@@ -108,6 +110,6 @@ export function readRouterSnapshot(value: unknown): RouterSnapshot {
 }
 export const routerLabels: Record<RouterStatus, string> = { reachable: 'Port reachable', unreachable: 'Port unreachable', stale: 'Stale check', unknown: 'Not verified' };
 export function summarizeRouters(rows: RouterRow[], now = Date.now()) {
-  return rows.reduce((counts, row) => { counts[routerStatus(row, now)]++; return counts; }, { reachable: 0, unreachable: 0, stale: 0, unknown: 0 });
+  return rows.reduce((counts, row) => { if (row.boardStatus === 'In Shop') return counts; counts[routerStatus(row, now)]++; return counts; }, { reachable: 0, unreachable: 0, stale: 0, unknown: 0 });
 }
 

@@ -42,6 +42,41 @@ for (const it of [false, true]) {
   });
 }
 
+test('a router label becomes Unknown after 3 hours when refreshes stop', async ({page}) => {
+  const {app} = await mountFleet(page, false, {routers: [router], advancingClock: true});
+  const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Helios 1'});
+  await expect(row.locator('.cos-fleet-router-text')).toContainText('Online');
+  await app.locator('body').evaluate(() => {
+    Object.defineProperty(document, 'hidden', {configurable: true, get: () => true});
+  });
+  await page.clock.fastForward(3 * 60 * 60 * 1000 + 60 * 1000);
+  await expect(row.locator('.cos-fleet-router-text')).toContainText('Unknown');
+  await expect(row.locator('.cos-fleet-router-text')).not.toContainText('Online');
+});
+
+test('a Shop unit says In Shop on the fleet card, details, equipment cards and routers page', async ({page}) => {
+  const shop = {...router, id: 'shop-router', unitKey: 'Sniper 44', boardStatus: 'In Shop', probeStatus: 'offline', doNotUse: false, candidateUnit: {id: units[3].id, unitNumber: 'Sniper 44'}};
+  const {app} = await mountFleet(page, false, {routers: [shop]});
+  await app.getByLabel('Fleet placement').selectOption('shop');
+  const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Sniper 44'});
+  await expect(row.locator('.cos-fleet-router-text')).toContainText('In Shop');
+  await expect(row.locator('.cos-fleet-router-text')).not.toContainText('Offline');
+  expect(await row.locator('.cos-signal-shop').evaluate(node => getComputedStyle(node).color)).toBe('rgb(100, 116, 139)');
+  await row.click();
+  const card = app.locator('.cos-fleet-router-card');
+  await expect(card.locator('.cos-signal-shop')).toContainText('In Shop');
+  await expect(card).not.toContainText('Offline');
+  await app.getByRole('button', {name: 'Close unit details'}).click();
+  await app.getByRole('button', {name: 'Fleet health'}).click();
+  await expect(app.locator('.cos-equipment-card').filter({hasText: 'Sniper 44'})).toContainText('In Shop');
+  await expect(app.locator('.cos-equipment-card').filter({hasText: 'Sniper 44'})).not.toContainText('Offline');
+  await page.locator('iframe').evaluate(frame => { frame.contentWindow.location.hash = '#inhand-routers'; });
+  const routers = app.getByRole('region', {name: 'InHand Routers workspace'});
+  await expect(routers.locator('.router-list .router-shop')).toHaveText('In Shop');
+  await expect(routers.locator('.router-detail .router-shop')).toHaveText('In Shop');
+  await expect(routers.locator('.router-list')).not.toContainText('Offline');
+});
+
 test('a false do-not-use flag renders no badge on the router card', async ({page}) => {
   const {app} = await mountFleet(page, false, {routers: [{...router, doNotUse: false}]});
   const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Helios 1'});

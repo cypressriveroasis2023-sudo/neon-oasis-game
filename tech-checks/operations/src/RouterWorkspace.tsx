@@ -4,7 +4,7 @@ import { routerLabels, routerStatus, summarizeRouters, type RouterRow } from '..
 import { displayedRouterStatus } from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import './routers.css';
 export const routerTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded';
-export function RouterBadge({ row, now }: { row: RouterRow; now: number }) { const status = routerStatus(row, now); const board = row.boardStatus ? displayedRouterStatus(row.boardStatus, row.boardCheckedAt || row.checkedAt, now) : null; return <span className={'router-badge router-' + status}>{board || routerLabels[status]}</span>; }
+export function RouterBadge({ row, now }: { row: RouterRow; now: number }) { const status = routerStatus(row, now); const board = row.boardStatus ? displayedRouterStatus(row.boardStatus, row.boardCheckedAt || row.checkedAt, now) : null; const shop = board === 'In Shop'; return <span className={'router-badge ' + (shop ? 'router-shop' : 'router-' + status)}>{board || routerLabels[status]}</span>; }
 export function RouterOverview({ openWorkspace }: { openWorkspace: (name: string) => void }) {
   const { data, error, loading, refresh, now } = useRouters();
   const summary = data ? summarizeRouters(data.items, now) : null;
