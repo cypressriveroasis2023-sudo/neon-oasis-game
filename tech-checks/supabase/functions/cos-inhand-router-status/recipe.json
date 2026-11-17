@@ -1,0 +1,13 @@
+{
+  "contract": "COS_FUNCTION_EDIT_RECIPE_V1",
+  "function": "cos-inhand-router-status",
+  "baselineSha256": null,
+  "baselineNote": "New function. No deployed source is replaced, so no pin moves.",
+  "files": [
+    {"name": "access.ts", "sha256": "08fde4d46755aa8152809d85ab68713a39309a9d7a651e652174dba1c7fb62d0"},
+    {"name": "model.ts", "sha256": "7f612501af5cd9cb9c5e2ed3c713b3c0f21504f6376d4bf6d3accc946eeee96a"},
+    {"name": "serve.ts", "sha256": "bd126ff73b97fbc656b653698f8816410098dbfc1e8b189e78529a7f1fdb58f3"},
+    {"name": "index.ts", "sha256": "20f51cf6abd1ee0912b87d13084737139ad95369ae3302f6f61df373326327b4"}
+  ],
+  "edits": []
+}

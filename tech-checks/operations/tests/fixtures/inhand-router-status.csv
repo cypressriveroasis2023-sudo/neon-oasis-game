@@ -1,0 +1,3 @@
+Name,Serial,Online/Offline,Last Seen,IP
+Fixture Router One,RF3152533024049,online,2026-11-17T22:00:00.000Z,203.0.113.50
+Fixture Router Missing,RF-NOT-IN-INVENTORY,offline,2026-11-17T22:05:00.000Z,203.0.113.51
