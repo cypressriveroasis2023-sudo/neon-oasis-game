@@ -1,0 +1,6 @@
+Device Name,Site,Type,Status,Last Seen
+NVR Fixture Alpha,Fixture Yard North,NVR,offline,2026-11-17T22:00:00.000Z
+Camera Fixture Beta,Fixture Yard North,camera,down,2026-11-17T22:10:00.000Z
+Bridge Fixture Gamma,Fixture Shop,bridge,offline,2026-11-17T22:12:00.000Z
+VMS Fixture Delta,Fixture Nowhere,VMS,offline,2026-11-17T18:00:00.000Z
+Camera Fixture Epsilon,Fixture Yard North,camera,,2026-11-17T22:20:00.000Z

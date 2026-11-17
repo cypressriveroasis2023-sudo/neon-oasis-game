@@ -1,0 +1,13 @@
+{
+  "contract": "COS_FUNCTION_EDIT_RECIPE_V1",
+  "function": "cos-watchful-device-health",
+  "baselineSha256": null,
+  "baselineNote": "New function. No deployed source is replaced, so no pin moves.",
+  "files": [
+    {"name": "access.ts", "sha256": "17f5203969f87eb8dd4999aa8fb5fe5d83aa854e531cdd1138a361864498a168"},
+    {"name": "model.ts", "sha256": "15eb16e5095e2871a9c5de0ce4f88094bfc183e7439f8304faa65d769b95ee2f"},
+    {"name": "serve.ts", "sha256": "9e0486ddf67f01e8d0efb3f242d0f289432c660ceef21108907160229f84d5bb"},
+    {"name": "index.ts", "sha256": "b7c406af89454c60029c9fd52d54aa59744b33487091ca3c045d530371aef2bf"}
+  ],
+  "edits": []
+}
