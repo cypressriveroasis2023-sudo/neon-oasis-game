@@ -5,7 +5,7 @@ export default function TechnicianTodoList({todos, onOpen}:{todos: TechnicianTod
   return <section className='cos-tech-todos' aria-label='Technician to-do'>
     <h2>To do</h2>
     {todos.length ? <ol>{todos.map(todo => <li key={todo.id}>{onOpen
-      ? <button type='button' onClick={() => onOpen(todo)}>{todo.unit} — {todo.detail}</button>
+      ? <button type='button' onClick={() => onOpen(todo)}>{todo.kind === 'sim_cancel' ? todo.detail : <>{todo.unit} — {todo.detail}</>}</button>
       : <><strong>{todo.unit}</strong> {todo.detail}</>}</li>)}</ol>
       : <p>No evidence-backed jobs. Unknown readings stay off this list.</p>}
   </section>;

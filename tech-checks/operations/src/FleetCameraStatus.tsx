@@ -108,17 +108,19 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  // here leaves that check reading No current evidence, which is truthful.
  useEffect(()=>{let cancelled=false;api.fleetSource('fieldMap').then(map=>{if(!cancelled)setFieldMap(map);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ const readGeneration=useRef(0);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
+  const generation=++readGeneration.current;
   setLoading(true);
   try{
    const result=await api.get<Report>('/api/unit-camera-status');
-   if(signal?.cancelled)return;
+   if(signal?.cancelled||generation!==readGeneration.current)return;
    setReport(checkedReport(result.data));setError('');return true;
   }catch(failure:any){
-   if(signal?.cancelled)return;
+   if(signal?.cancelled||generation!==readGeneration.current)return;
    // The previous reading stays on screen under its own time; it is never relabelled as current.
    setError(failure?.response?.data?.error||failure?.message||'The Star4Live unit status is unavailable.');return false;
-  }finally{if(!signal?.cancelled)setLoading(false);}
+  }finally{if(!signal?.cancelled&&generation===readGeneration.current)setLoading(false);}
  },[]);
  useEffect(()=>{const signal={cancelled:false};read(signal);return ()=>{signal.cancelled=true;};},[read]);
 
@@ -133,7 +135,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    if(field==='address')body.expectedAddressRevision=unit.addressRevision??null;
    if(value===null){body.action=pinOnly?'clear_pin':'clear';if(clearValue)body.value=clearValue;}else body.value=value;
    if(reason.trim())body.reason=reason.trim();
+   // A slow status read that started before this save must not replace it.
+   readGeneration.current++;
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
+   readGeneration.current++;
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
    setSaved(next.recorded?(field==='camera'?(value===null?(clearValue?clearValue+' is back on '+unit.unit:'Every camera is back on '+unit.unit):value+' is no longer on '+unit.unit)

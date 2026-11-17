@@ -1,0 +1,9 @@
+.cos-sim-cancel{display:grid;gap:12px;max-width:720px;margin:0 auto;padding:16px}
+.cos-sim-counts{display:flex;gap:16px;margin:0}
+.cos-sim-counts b{font-size:1.6rem;margin-left:4px}
+.cos-sim-about>summary{cursor:pointer;font-size:.8rem}
+.cos-sim-step{display:grid;gap:8px}
+.cos-sim-step label{display:grid;gap:4px;font-size:.85rem}
+.cos-sim-step input,.cos-sim-step select{font:inherit;padding:8px;border-radius:8px}
+.cos-sim-none{display:flex!important;align-items:center;gap:8px}
+.cos-tech-todos button{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline}

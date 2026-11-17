@@ -27,7 +27,9 @@ export function fleetEquipmentTotals(upload:unknown,data:FleetCommandCenterData|
   const online=key==='stands'?0:products.filter(p=>p.status==='online').length,offline=key==='stands'?0:products.filter(p=>p.status==='offline').length;
   const unverified=key==='stands'?0:field-online-offline;
   const unverifiedDeviceLink=key==='stands'?0:products.filter(p=>unverifiedTile(p)==='device_link').length;
-  const unverifiedNoReading=key==='stands'?0:unverified-unverifiedDeviceLink;
+  // The tile opens this same product list. Field minus the other tiles counts
+  // inventory rows that have no product record, so it can disagree with the list.
+  const unverifiedNoReading=key==='stands'?0:products.filter(p=>p.status==='unverified'&&unverifiedTile(p)==='no_reading').length;
   return {key,total:members.length,field,shop:members.length-field,online,offline,unverified,unverifiedDeviceLink,unverifiedNoReading,products};
  });
 }
