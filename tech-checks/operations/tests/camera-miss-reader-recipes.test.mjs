@@ -36,6 +36,14 @@ test('unit camera status recipe patches the bundled classifier and keeps the rou
   assert.match(files['index.ts'], /Connection refused \(os error 111\)/);
 });
 
+test('producer recipe keeps the router wrap and points at the patched handler',()=>{
+  const {patch, files}=patched('.github/function-patches/cos-fleet-board-producer/camera-miss-readers-v11.json');
+  assert.equal(patch.requireLiveBeforeDeploy.version, 11);
+  assert.match(files['index.ts'], /routerBoardAuth\.run/);
+  assert.match(files['index.ts'], /a8708bf65ee710b2fa7c79f0907a7dd9233b12a9\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
+  assert.equal(files['index.ts'].includes('b5b188229346182d9a4e29da42415a1b9d3b9d53'), false);
+});
+
 test('step-back rollbacks restore the pre-miss bytes and live rollbacks match the recorded entries',()=>{
   const pages=patched('.github/function-patches/cos-operations-pages/rollback-camera-miss-readers-to-433.json');
   assert.match(pages.files['serve.ts'], /function cosBusinessGone\(path\)/);

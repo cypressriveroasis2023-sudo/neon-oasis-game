@@ -1,0 +1,38 @@
+{
+ "description": "Point the producer at the 3-miss handler pinned at a8708bf65ee710b2fa7c79f0907a7dd9233b12a9. The entry is the #425 final produce gate with the #433 router wrap. One needle replaces the old serve.ts import. Live version must be 11. Do not deploy until #425 and #433 are live.",
+ "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
+ "releaseStatus": "PREPARATION_ONLY",
+ "slug": "cos-fleet-board-producer",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-fleet-board-producer-after-433",
+ "entrypointPath": "cos-fleet-board-producer/index.ts",
+ "importMapPath": "cos-fleet-board-producer/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE",
+  "version": 11
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-fleet-board-producer/index.ts",
+  "deno.json": "cos-fleet-board-producer/deno.json",
+  "routerBoardJoin.mjs": "cos-fleet-board-producer/routerBoardJoin.mjs"
+ },
+ "edits": [
+  {
+   "file": "index.ts",
+   "occurrences": 1,
+   "needle": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/b5b188229346182d9a4e29da42415a1b9d3b9d53/tech-checks/docs/vision-native-preview-20261107/source/serve.ts\");",
+   "replacement": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/a8708bf65ee710b2fa7c79f0907a7dd9233b12a9/tech-checks/docs/cos-fleet-board-producer-handler/serve.ts\");"
+  }
+ ],
+ "expectedBefore": {
+  "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+ },
+ "expectedAfter": {
+  "index.ts": "a14ebd22ced32fc29f6f84178da8f601ea3807dcfd57cec446e9d9dffc0d3d6e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+ }
+}
