@@ -47,7 +47,7 @@ test('a Sniper placed in Shop keeps a confirmed connection on its own record and
 });
 test('placement confidence is independent, shop and inactive are excluded, and unresolved retains review',()=>{
  assert.equal(project([{...row,scope:'unknown'}]).state,'online');assert.match(project([{...row,scope:'unknown'}]).reason,/LOCATION REVIEW/);
- const shopResult=project([{...row,scope:'shop'}]);assert.equal(shopResult.state,'shop');assert.equal(unitHealthLabel(shopResult),'In Shop');assert.equal(shopResult.classification.scope,'shop');
+ const shopResult=project([{...row,scope:'shop'}]);assert.equal(shopResult.state,'unknown');assert.equal(shopResult.classification.scope,'shop');assert.match(shopResult.reason,/PLACEMENT CONFLICT/);
  const inactiveResult=project([{...row,scope:'inactive'}]);assert.equal(inactiveResult.state,'unknown');assert.equal(inactiveResult.classification.scope,'inactive');
  assert.equal(project([row],[{...unit,status:'returning'}],{...unit,status:'returning'}).state,'online');
 });

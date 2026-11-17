@@ -37,7 +37,7 @@ test('follow-up guidance leaves product health, counts, timestamps and source re
  const f=fieldProductFixture();setReason(f,'1003',missingIp);setReason(f,'1005',savedCheck);
  const sources=structuredClone([f.upload,f.roster,f.rows,f.connections]);
  const view=build(f);
- assert.deepEqual(view.counts,{online:1,offline:1,unverified:2,support:1,unlinked:0,review:1,inactive:1});
+ assert.deepEqual(view.counts,{online:1,offline:1,verifying:0,unverified:2,support:1,unlinked:0,review:1,inactive:1});
  assert.equal(view.total,7);
  for(const id of ['1001','1002']){
   assert.equal(item(view,id).evidence.followUp,undefined);

@@ -18,6 +18,9 @@ import {createHash} from 'node:crypto';
 // were reading "Unverified". FleetBatterySummary.tsx and fleetDashboardModel.ts
 // carry that change and their pins move with it. The camera window is
 // untouched, and tests/power-freshness.test.mjs holds both boundaries exactly.
+// Reviewed with the Shop reader: fieldCameraHealth.ts presents a unit placed in
+// Shop as In Shop. A camera-inventory scope of shop on a field unit stays a
+// placement conflict and is not relabeled.
 // Reviewed 2026-11-15 at the owner's request: workspaceNavigation.ts drops the
 // Finance group and the unused Customers/Schedule entries (routes kept, see
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
@@ -32,7 +35,7 @@ const expected={
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "3bca1d816e98eae7cb593de68b8394d223058ae5",
-  "fieldCameraHealth.ts": "b524d935a9f92619e5e9617e19a5b04c5a924b33",
+  "fieldCameraHealth.ts": "d1c87f61f7e97fabf97c4366fe866f073bd31715",
   "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",

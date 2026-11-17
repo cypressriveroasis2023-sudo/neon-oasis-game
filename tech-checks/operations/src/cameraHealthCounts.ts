@@ -77,8 +77,8 @@ export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];obs
 }
 export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
   if(group.identityConflict)return 'EQUIPMENT LINK UNVERIFIED';
-  if(sniperShopGroup(group)||group.scope==='shop')return 'In Shop';
-  if((group as CameraUnitGroup).sharedState&&group.scope==='inactive')return 'INACTIVE';
+  if(sniperShopGroup(group))return 'In Shop';
+  if((group as CameraUnitGroup).sharedState&&group.scope==='shop')return 'SHOP / ROOT';if((group as CameraUnitGroup).sharedState&&group.scope==='inactive')return 'INACTIVE';
   if((group as CameraUnitGroup).sharedLabel)return (group as CameraUnitGroup).sharedLabel!;
   if(group.observation)return group.observation.label;
   const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));

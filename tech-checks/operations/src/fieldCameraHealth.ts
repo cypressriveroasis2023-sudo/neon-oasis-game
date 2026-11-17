@@ -113,9 +113,10 @@ function unitPlacedInShop(unit:FieldHealthUnit){
   return value==='shop'||value==='root'||value==='warehouse'||value==='yard';
 }
 function presentShop(result:UnitCameraHealth, unit:FieldHealthUnit):UnitCameraHealth{
-  if(result.classification?.scope!=='shop'&&!unitPlacedInShop(unit))return result;
-  const saved=result.state==='online'||result.state==='offline'||result.state==='unknown'?result.state:'unknown';
-  return {...result,state:'shop',savedReading:saved,reason:result.reason.replace(/\boffline\b/gi,'not answering')};
+  // Inventory scope "shop" on a field unit is a placement conflict, not a Shop unit.
+  // A denied Field authority stays unknown. Only a unit placed in Shop replaces a live reading.
+  if(!unitPlacedInShop(unit)||(result.state!=='online'&&result.state!=='offline'))return result;
+  return {...result,state:'shop',savedReading:result.state,reason:result.reason.replace(/\boffline\b/gi,'not answering')};
 }
 export function cameraTime(value?:string|null,now=Date.now()) {
   const {at}=cameraTimestamp(value,now);
@@ -123,7 +124,7 @@ export function cameraTime(value?:string|null,now=Date.now()) {
 }
 
 export function unitHealthLabel(info:UnitCameraHealth|null|undefined){
-  if(info?.state==='shop'||info?.classification?.scope==='shop')return 'In Shop';
+  if(info?.state==='shop')return 'In Shop';
   if(info?.state==='support')return 'SUPPORT EQUIPMENT · 0 CAMERAS';
   if(info?.observation)return info.observation.label;
   const shown=info?.state==='online'||info?.state==='offline'||info?.state==='unknown'?info.state:'unknown';

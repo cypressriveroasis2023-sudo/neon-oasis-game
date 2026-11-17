@@ -43,7 +43,7 @@ test('complete exact-ID census isolates one conflicting placement without reloca
  assert.deepEqual(proof.records[1].reviewReasons,['placement_mismatch','customer_mismatch']);
  assert.deepEqual(proof.records[0].reviewReasons,[]);
  const result=buildExactProductConnections(f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
- assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','offline']]);
+ assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','verifying']]);
  assert.match(result.items[1].reason,/review is required/);
  assert.equal(result.items[1].resourceId,null);
  assert.equal(result.items[1].checkedAt,null);
@@ -58,7 +58,7 @@ test('held records still reserve IP ownership across Field and Shop',async()=>{
  const f=fixture();f.values[6].values[2]=['8.8.8.8'];
  const result=buildExactProductConnections(f.accepted,await verify(f),devices,now,new Map([['11',['101']],['13',['103']]]));
  assert.equal(result.items[0].status,'unknown');assert.equal(result.items[1].status,'unknown');
- assert.equal(result.items[2].status,'offline');
+ assert.equal(result.items[2].status,'verifying');
 });
 test('missing/extra/duplicate Product IDs, shifted rows/columns and inconsistent source index fail the entire source',async()=>{
  const mutations=[
@@ -87,7 +87,7 @@ test('source identity/customer/restriction changes hold that exact Product ID',a
   const f=fixture();mutate(f);const proof=await verify(f);
   assert.ok(proof.records[0].reviewReasons.includes(reason));
   const result=buildExactProductConnections(f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
-  assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'offline');
+  assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'verifying');
  }
 });
 test('safe A1 quoting and trailing empty cells are allowed, row indices remain stable',async()=>{

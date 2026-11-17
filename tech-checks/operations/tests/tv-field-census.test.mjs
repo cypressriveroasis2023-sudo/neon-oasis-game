@@ -79,10 +79,10 @@ test('TV excludes conflicting or unlinked TCP proof and accepts matching reviewe
   const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(Number(resourceId),'8.8.8.8'),endpoint(56,'9.9.9.9')],f.now,new Map([['1001',[resourceId]]]));
   assert.ok(receipt);
   const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,f.health,null,null,f.now);
-  // Exact resource 1 conflicts with its reviewed provider. Resource 55 is not
-  // associated with this unit. Neither may fabricate a verified TCP outage.
+  // Exact resource 1 has one fresh miss, so it is Verifying and not an outage.
+  // Resource 55 is not associated with this unit. Neither may fabricate a verified TCP outage.
   assert.equal(tv.board.items.find(p=>p.productId==='1001').status,resourceId==='1'?'unverified':'online');
-  if(resourceId==='1')assert.match(tv.board.items.find(p=>p.productId==='1001').reason,/status disagree/i);
+  if(resourceId==='1')assert.match(tv.board.items.find(p=>p.productId==='1001').reason,/Verifying, not an outage/);
   else {
    assert.match(tv.board.items.find(p=>p.productId==='1001').reason,/^CAMERA RECORDS ONLINE\./);
    assert.equal(tv.board.items.find(p=>p.productId==='1001').linked.evidence.basis,'camera');
@@ -97,7 +97,9 @@ test('TV excludes conflicting or unlinked TCP proof and accepts matching reviewe
  }
  // Agreement on the exact reviewed resource still produces a real TCP-based
  // outage, while the independent provider-only outage keeps its own label.
- const receipt=buildExactProductConnections(f.upload,tracker,[endpoint(1,'8.8.8.8')],f.now,new Map([['1001',['1']]]));
+ const agreed=endpoint(1,'8.8.8.8');
+ agreed.portStatus._connection.consecutiveFailures=3;
+ const receipt=buildExactProductConnections(f.upload,tracker,[agreed],f.now,new Map([['1001',['1']]]));
  const health=structuredClone(f.health);health.rows[0].evidence.status='offline';
  const tv=tvFieldCensus({...f.field,productConnections:receipt},f.units,health,null,null,f.now);
  assert.equal(tv.board.counts.offline,2);
