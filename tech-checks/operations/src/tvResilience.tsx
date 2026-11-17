@@ -18,8 +18,11 @@ export function tvNetworkBackoff(attempt:number):number|null{
   return attempt>=0&&attempt<TV_NETWORK_BACKOFF_MS.length?TV_NETWORK_BACKOFF_MS[attempt]:null;
 }
 
-export function isTvNetworkStatus(status:number|null):boolean{
-  return status!==null&&[502,503,504,546].includes(status);
+/** A fetch that rejected, or the request timer aborting it. HTTP 546 and the
+ * other saved-read statuses are not transport failures and do not use this backoff. */
+export type TvTransportFailure='rejected'|'timeout';
+export function isTvTransportFailure(value:unknown):value is TvTransportFailure{
+  return value==='rejected'||value==='timeout';
 }
 
 type BoundaryProps={children:ReactNode};

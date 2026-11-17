@@ -8,6 +8,8 @@ import {readExactProductConnections} from './exactProductConnection';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
+  /** Set only when fetch itself rejects or the request timer aborts it. An HTTP status is not a transport failure. */
+  transportFailure?: 'rejected' | 'timeout';
   constructor(message: string, status = 503) {
     super(message);
     this.name = 'OperationsApiError';
@@ -170,9 +172,11 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     } catch (cause) {
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
       if(scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',503),{diagnostic:{stage:'connection_transport',code:abortKind==='timeout'?'timeout':abortKind==='cancelled'?'cancelled':'request_failed'}});
-      throw new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
+      const disconnected=new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
+      disconnected.transportFailure=abortKind==='timeout'?'timeout':'rejected';
+      throw disconnected;
     }
     // An obsolete request still fails, but cannot revoke a newer session. No
     // data (including a late successful body) may cross this private-view fence.

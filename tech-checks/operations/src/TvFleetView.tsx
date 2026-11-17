@@ -13,7 +13,7 @@ import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
 import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS,TV_SAVED_BOARD_STALE_MS} from './refreshCadence';
-import {isTvNetworkStatus,tvAuthDecision,tvNetworkBackoff,TV_SIGN_IN_PROMPT} from './tvResilience';
+import {isTvTransportFailure,tvAuthDecision,tvNetworkBackoff,TV_SIGN_IN_PROMPT} from './tvResilience';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -60,7 +60,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       // must never be displayed with the preceding read's health claims.
       let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,transientFieldFailure=false,recoveryBlocked=false,networkFailure=false;
       const errors=await loadTvFleetFeeds(api,{
-        readFailure:(source,status)=>{if(source==='fieldMap')transientFieldFailure=transientReadStatus(status);if(isTvNetworkStatus(status))networkFailure=true;if(!transientReadStatus(status))recoveryBlocked=true;},
+        readFailure:(source,status,transport)=>{if(isTvTransportFailure(transport))networkFailure=true;else if(source==='fieldMap')transientFieldFailure=transientReadStatus(status);if(!isTvTransportFailure(transport)&&!transientReadStatus(status))recoveryBlocked=true;},
         healthUnavailable:()=>{nextHealth=null;},
         routersUnavailable:()=>{nextRouters=null;},
         field:async field=>{
@@ -78,14 +78,18 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         setError(sourceErrorText(lastErrors.current));
         // One cold-load recovery only, after the complete initial read settles.
         // This reads saved records and never schedules a provider probe.
-        if(initialAttempt&&!nextField&&transientFieldFailure&&!recoveryBlocked&&!retryUsed.current&&!sessionBlocked.current){
+        // HTTP 546 stays on this single 30-second retry. A fetch that rejects
+        // or times out uses the 5/15/30 backoff instead, never both.
+        const shortRetry=initialAttempt&&!nextField&&transientFieldFailure&&!recoveryBlocked&&!networkFailure&&!retryUsed.current&&!sessionBlocked.current;
+        if(shortRetry){
+          clearNetworkTimer();
           retryAt.current=Date.now()+INITIAL_READ_RETRY_MS;
           retryTimer.current=window.setTimeout(()=>retryRead.current(),INITIAL_READ_RETRY_MS);
         }
         if(nextField){networkAttempt.current=0;reloginUsed.current=false;clearNetworkTimer();}
-        else if(!initialAttempt&&networkFailure&&!sessionBlocked.current){
+        else if(!shortRetry&&networkFailure&&!sessionBlocked.current){
           const delay=tvNetworkBackoff(networkAttempt.current);
-          if(delay!==null){networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)void refresh(true);},delay);}
+          if(delay!==null){cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)void refresh(true);},delay);}
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){lastErrors.current={camera:[],routers:[]};setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
