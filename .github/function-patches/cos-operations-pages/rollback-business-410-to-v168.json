@@ -1,0 +1,29 @@
+{
+  "description": "Redeploy the v168 entry unchanged. It only imports tech-checks/docs/vision-native-preview-20261107/source/serve.ts frozen at b5b188229346182d9a4e29da42415a1b9d3b9d53 and contains no 410 handler.",
+  "authorization": "Rollback material. Running it still requires an explicit instruction for that specific run. Do not use it to deploy the 410 patch.",
+  "releaseStatus": "ROLLBACK_ONLY",
+  "slug": "cos-operations-pages",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceRecord": "tech-checks/docs/cos-operations-pages-v168-entry/index.ts",
+  "sourceDir": "tech-checks/docs/cos-operations-pages-v168-entry",
+  "sourceCommit": "b5b188229346182d9a4e29da42415a1b9d3b9d53",
+  "deployedFileNames": {
+    "index.ts": "cos-operations-pages/index.ts",
+    "deno.json": "cos-operations-pages/deno.json"
+  },
+  "entrypointPath": "cos-operations-pages/index.ts",
+  "importMapPath": "cos-operations-pages/deno.json",
+  "verifyJwt": false,
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE"
+  },
+  "edits": [],
+  "expectedBefore": {
+    "index.ts": "dfa4b87873a7bde8aba9daa40be1d6e890c11a981c6c8528294f6468611e7c18",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "dfa4b87873a7bde8aba9daa40be1d6e890c11a981c6c8528294f6468611e7c18",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  }
+}
