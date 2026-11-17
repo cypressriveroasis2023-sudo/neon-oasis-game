@@ -3,7 +3,16 @@ import {mhelpProviderFamily} from './mhelpProviderFleet';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import type {FleetCommandCenterData,FleetCommandProduct} from './fleetCommandCenterModel';
 export type EquipmentGroup='cameras'|'helios'|'stands';
-export type EquipmentTotal={key:EquipmentGroup;total:number;field:number;shop:number;online:number;offline:number;unverified:number;products:FleetCommandProduct[]};
+export type EquipmentTotal={key:EquipmentGroup;total:number;field:number;shop:number;online:number;offline:number;unverified:number;unverifiedDeviceLink:number;unverifiedNoReading:number;products:FleetCommandProduct[]};
+
+/** Unverified stays unverified. A fresh provider reading without a reviewed
+ * product-to-device link is its own tile and is never counted online. */
+export function unverifiedTile(product:FleetCommandProduct):'device_link'|'no_reading'|null{
+ if(product.status!=='unverified')return null;
+ const evidence=product.linked?.evidence;
+ if(evidence?.gap==='device_link_needed'&&evidence.providerReadingFresh)return 'device_link';
+ return 'no_reading';
+}
 /** Counts unique accepted Product IDs, including unlinked records. Health is Field-only. */
 export function fleetEquipmentTotals(upload:unknown,data:FleetCommandCenterData|null,now:number):EquipmentTotal[]|null {
  const authority=readMhelpInventoryAuthority(upload,now);
@@ -16,6 +25,9 @@ export function fleetEquipmentTotals(upload:unknown,data:FleetCommandCenterData|
   const ids=new Set(members.map(r=>r.productId)),field=members.filter(r=>r.placement==='FIELD').length;
   const products=trusted?data!.items.filter(p=>ids.has(p.productId)):[];
   const online=key==='stands'?0:products.filter(p=>p.status==='online').length,offline=key==='stands'?0:products.filter(p=>p.status==='offline').length;
-  return {key,total:members.length,field,shop:members.length-field,online,offline,unverified:key==='stands'?0:field-online-offline,products};
+  const unverified=key==='stands'?0:field-online-offline;
+  const unverifiedDeviceLink=key==='stands'?0:products.filter(p=>unverifiedTile(p)==='device_link').length;
+  const unverifiedNoReading=key==='stands'?0:unverified-unverifiedDeviceLink;
+  return {key,total:members.length,field,shop:members.length-field,online,offline,unverified,unverifiedDeviceLink,unverifiedNoReading,products};
  });
 }
