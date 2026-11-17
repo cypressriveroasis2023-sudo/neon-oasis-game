@@ -13,6 +13,52 @@ export class MhelpPartnerError extends Error {
 export class MhelpPartnerReadDeadlineError extends MhelpPartnerError {
   constructor() { super('The mHelpDesk read timed out. Retry the preview.'); }
 }
+// Diagnostic labels are finite constants. Never retain the original thrown value.
+const wrappedDiagnostics = new WeakMap<MhelpPartnerError,string>();
+const partnerDiagnostics: Readonly<Record<string,string>> = Object.freeze({
+  "mHelpDesk returned an unsupported record.": "equipment_record_shape",
+  "mHelpDesk returned an invalid equipment identity.": "equipment_identity",
+  "mHelpDesk returned an invalid equipment label.": "equipment_label",
+  "mHelpDesk returned equipment from a different portal.": "equipment_portal",
+  "mHelpDesk returned an invalid update time.": "equipment_update_time",
+  "mHelpDesk returned an invalid equipment status.": "equipment_status",
+  "mHelpDesk returned an oversized response.": "equipment_response_size",
+  "mHelpDesk returned an incomplete response. Retry the preview.": "equipment_response_decode_or_stream",
+  "mHelpDesk needs a server-held access token before previewing equipment.": "equipment_token_config",
+  "The saved mHelpDesk portal ID must be a numeric company ID. Correct or remove that setting before previewing equipment.": "equipment_portal_config",
+  "A mHelpDesk preview is already running. Wait for it to finish.": "equipment_busy",
+  "mHelpDesk could not be reached. Retry the preview.": "equipment_transport_or_unknown_wrapper",
+  "mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.": "equipment_renewal_failed",
+  "mHelpDesk secure token renewal is unavailable.": "equipment_renewal_invalid_config",
+  "mHelpDesk did not return a valid company portal ID. Contact mHelpDesk Partner API support.": "equipment_account_portal",
+  "The saved portal ID does not match the mHelpDesk account for this token. Correct the server setting before previewing equipment.": "equipment_account_portal_mismatch",
+  "mHelpDesk returned an unsupported equipment page.": "equipment_page_shape",
+  "mHelpDesk returned duplicate equipment identities.": "equipment_duplicate_ids",
+  "The mHelpDesk equipment list exceeds the maintenance limit.": "equipment_maintenance_limit",
+  "mHelpDesk did not return equipment in stable identity order.": "equipment_order",
+  "mHelpDesk returned an incomplete equipment page.": "equipment_page_incomplete",
+  "mHelpDesk equipment changed during the read. Retry the review.": "equipment_page_changed",
+  "mHelpDesk returned overlapping or incomplete equipment pages.": "equipment_page_overlap_or_incomplete",
+  "COS returned an invalid equipment identity.": "equipment_native_identity",
+  "COS equipment could not be verified. Retry the preview.": "equipment_native_shape"
+});
+const wrapperDiagnostics: Readonly<Record<string,string>> = Object.freeze({
+  "Token storage unavailable": "equipment_token_storage",
+  "Request allowance unavailable": "equipment_allowance_rpc",
+  "mHelpDesk request allowance unavailable": "equipment_allowance_contract",
+  "Stored access unavailable": "equipment_stored_access",
+  "mHelpDesk backoff state is unavailable": "equipment_backoff_contract",
+  "mHelpDesk backoff could not be recorded": "equipment_backoff_record"
+});
+export function classifyMhelpPartnerDiagnostic(cause: unknown): string | null {
+  if (!(cause instanceof MhelpPartnerError)) return null;
+  return wrappedDiagnostics.get(cause) ?? (Object.hasOwn(partnerDiagnostics,cause.message) ? partnerDiagnostics[cause.message] : null);
+}
+function wrappedFailure(message: string, cause: unknown): never {
+  const error = new MhelpPartnerError(message);
+  if (cause instanceof Error && Object.hasOwn(wrapperDiagnostics,cause.message)) wrappedDiagnostics.set(error,wrapperDiagnostics[cause.message]);
+  throw error;
+}
 type ObjectValue = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
 export type PartnerEquipment = {
@@ -119,10 +165,10 @@ export function createMhelpPartnerHandler(options: {
       const read = async (url: string, maxBytes?: number) => {
         let response: Response;
         try { response = await options.fetch(url, {method: 'GET', headers: {Authorization: 'Bearer ' + config.accessToken, Accept: 'application/json'}, redirect: 'error', cache: 'no-store', signal: controller.signal}); }
-        catch { if (controller.signal.aborted) throw new MhelpPartnerReadDeadlineError(); return fail('mHelpDesk could not be reached. Retry the preview.'); }
+        catch (cause) { if (controller.signal.aborted) throw new MhelpPartnerReadDeadlineError(); return wrappedFailure('mHelpDesk could not be reached. Retry the preview.',cause); }
         if (response.status===401 && url===CURRENT_USER_API && options.renewAccess && !renewed) {
           renewed=true; await response.body?.cancel().catch(()=>{});
-          try { config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess); } catch { return fail('mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.'); }
+          try { config=await currentMhelpConfigOrRenew(config,options.getConfig,options.renewAccess); } catch (cause) { return wrappedFailure('mHelpDesk could not renew its server token. Check the protected refresh-token and API client settings.',cause); }
           if (!config || typeof config.accessToken!=='string' || !config.accessToken || config.accessToken.length>16384 || /\s/.test(config.accessToken)) fail('mHelpDesk secure token renewal is unavailable.');
           return read(url,maxBytes);
         }

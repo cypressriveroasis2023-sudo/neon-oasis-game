@@ -3,7 +3,10 @@ import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 import {readInventorySource} from './source.ts';
 import {createInventoryCache} from './cache.ts';
+import {createTrackerHandoff} from './handoff.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co';
+const PLACEMENT_SYNC=NATIVE+'/functions/v1/cos-mhelp-placement-sync';
+const TRACKER_PUBLISHER=NATIVE+'/functions/v1/cos-sheets-placement-publish';
 const tokens=nativeMhelpTokens(name=>Deno.env.get(name));
 const partner=createMhelpPartnerHandler({fetch:tokens.fetch,getConfig:tokens.getPartnerConfig,renewAccess:tokens.renewAccess,readNativeUnits:async()=>[],fullEquipmentReview:true});
 async function json(response:Response,max=2097152){
@@ -13,6 +16,39 @@ async function json(response:Response,max=2097152){
 }
 async function session(action:string,payload:unknown={}){const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!key||Deno.env.get('SUPABASE_URL')!==NATIVE)throw Error('Backend unavailable');return json(await fetch(NATIVE+'/rest/v1/rpc/cos_mhelp_live_inventory_session',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({p_action:action,p_payload:payload}),redirect:'error',signal:AbortSignal.timeout(35000)}),16384);}
 async function readLease(action:string,lease:string|null=null){const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!key||Deno.env.get('SUPABASE_URL')!==NATIVE)throw Error('Backend unavailable');return json(await fetch(NATIVE+'/rest/v1/rpc/cos_mhelp_inventory_read_lease',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({p_action:action,p_lease:lease}),redirect:'error',signal:AbortSignal.timeout(10000)}),4096);}
+async function refreshPlacementAfterCommit(req:Request,receipt:Record<string,unknown>){
+ const secret=req.headers.get('x-camera-cron-secret');
+ if(!secret||secret.length>1024||/\s/.test(secret))return {state:'not_started'};
+ try{
+  const response=await fetch(PLACEMENT_SYNC,{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':secret},body:'{"action":"run"}',redirect:'error',signal:AbortSignal.timeout(115000)});
+  if(!response.ok){void response.body?.cancel();return {state:'failed',httpStatus:response.status};}
+  const result=await json(response,16384);
+  if(!result||typeof result!=='object'||Array.isArray(result))return {state:'failed'};
+  const count=(value:unknown)=>Number.isSafeInteger(value)&&Number(value)>=0?Number(value):0;
+  return {state:typeof result.state==='string'?result.state:'failed',committed:result.committed===true,
+   sourceSha256:typeof result.sourceSha256==='string'?result.sourceSha256:null,confirmed:count(result.confirmed),held:count(result.held)};
+ }catch{return {state:'failed'};}
+}
+async function publishTrackerAfterCommit(req:Request){
+ const secret=req.headers.get('x-camera-cron-secret');
+ if(!secret||secret.length>1024||/\s/.test(secret))return {state:'not_started'};
+ try{
+  const response=await fetch(TRACKER_PUBLISHER,{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':secret},body:'{"action":"run"}',redirect:'error',signal:AbortSignal.timeout(25000)});
+  if(!response.ok){void response.body?.cancel();return {state:'failed',httpStatus:response.status};}
+  const result=await json(response,16384);
+  if(!result||typeof result!=='object'||Array.isArray(result))return {state:'failed'};
+  const count=(value:unknown)=>Number.isSafeInteger(value)&&Number(value)>=0?Number(value):0;
+  const receipt:Record<string,unknown>={state:typeof result.state==='string'?result.state:'failed'};
+  for(const key of ['published','recovered','unchanged','held'])receipt[key]=count(result[key]);
+  if(result.heldReasons&&typeof result.heldReasons==='object'&&!Array.isArray(result.heldReasons)){
+   const reasons:Record<string,number>={};
+   for(const [key,value] of Object.entries(result.heldReasons))if(/^[a-z_]{1,64}$/.test(key)&&Number.isSafeInteger(value)&&Number(value)>=0)reasons[key]=Number(value);
+   receipt.heldReasons=reasons;
+  }
+  return receipt;
+ }catch{return {state:'failed'};}
+}
+const trackerHandoff=createTrackerHandoff({refreshPlacement:refreshPlacementAfterCommit,publish:publishTrackerAfterCommit});
 Deno.serve(createInventoryComparisonHandler({authenticate:async req=>{
  if(Deno.env.get('SUPABASE_URL')!==NATIVE)return false;
  const secret=req.headers.get('x-camera-cron-secret');if(!secret||secret.length>1024||/\s/.test(secret))return false;
@@ -28,4 +64,4 @@ Deno.serve(createInventoryComparisonHandler({authenticate:async req=>{
  const config=await tokens.getPartnerConfig();if(config.portalId!=='224643'||!config.accessToken)throw Error('Source unavailable');const deadline=AbortSignal.timeout(125000);
  const cache=createInventoryCache({cache:async(action,key,payload=null,observedAt?:string)=>{const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!service||Deno.env.get('SUPABASE_URL')!==NATIVE)throw Error('Cache unavailable');return json(await fetch(NATIVE+'/rest/v1/rpc/cos_mhelp_inventory_cache',{method:'POST',headers:{apikey:service,Authorization:'Bearer '+service,'Content-Type':'application/json'},body:JSON.stringify({p_action:action,p_key:key,p_payload:payload,p_observed_at:observedAt}),redirect:'error',signal:AbortSignal.timeout(10000)}),1100000);},read:async path=>{const r=await tokens.fetch('https://connect.mhelpdesk.com/api/v1.0/portal/224643'+path,{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(12000)])});if(!r.ok){void r.body?.cancel();throw Error('source_http_'+r.status+'_'+(path.startsWith('/equipmentTypes')?'equipment_categories':path.includes('/servicelocations')?'service_locations':'customers'));}return json(r,1048576);}});
  return readInventorySource({review,baseline,read:cache.read,observedAt:cache.observedAt,readStats:cache.stats,verifyEquipment:()=>partner('/api/mhelpdesk/partner/preview','POST',{})});
-},writeSource:(action,source,baseline)=>session(action,{portalId:source.portalId,complete:source.complete,records:source.records,readAt:source.readAt,baselineSourceSha256:baseline.sourceSha256}),status:()=>session('status'),recordFailure:code=>session('fail',{errorCode:code})}));
+},writeSource:(action,source,baseline)=>session(action,{portalId:source.portalId,complete:source.complete,records:source.records,readAt:source.readAt,baselineSourceSha256:baseline.sourceSha256}),publishAfterCommit:trackerHandoff,status:()=>session('status'),recordFailure:code=>session('fail',{errorCode:code})}));

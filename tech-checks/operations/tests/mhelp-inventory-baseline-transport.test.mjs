@@ -8,7 +8,7 @@ const compiled=(await transform(source.replace(/^import .*;\r?\n/gm,''),{loader:
 function baselineReader(fetch){
  let options;
  const Deno={env:{get:name=>name==='SUPABASE_SERVICE_ROLE_KEY'?'synthetic-service':undefined},serve:()=>{}};
- new Function('createInventoryComparisonHandler','createMhelpPartnerHandler','nativeMhelpTokens','readInventorySource','createInventoryCache','Deno','fetch',compiled)(value=>{options=value;return ()=>{};},()=>()=>{},()=>({}),()=>{},()=>{},Deno,fetch);
+ new Function('createInventoryComparisonHandler','createMhelpPartnerHandler','nativeMhelpTokens','readInventorySource','createInventoryCache','createTrackerHandoff','Deno','fetch',compiled)(value=>{options=value;return ()=>{};},()=>()=>{},()=>({}),()=>{},()=>{},()=>async()=>({state:'not_started'}),Deno,fetch);
  return options.readBaseline;
 }
 const records=Array.from({length:1001},(_,i)=>({productId:String(i+1),unitNumber:'Ranger '+(i+1),customerId:'3',apiAssignment:{placementProof:{version:1}},syntheticSavedEvidence:'x'.repeat(2070)}));

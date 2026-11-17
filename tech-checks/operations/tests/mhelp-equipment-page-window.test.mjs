@@ -97,7 +97,7 @@ test('two stalled sibling requests settle at 40s before lease and busy release, 
  let releases=0,baselines=0,writes=0;
  const handler=createInventoryComparisonHandler({authenticate:async()=>true,acquireRead:async()=>({allowed:true,leaseId:'00000000-0000-4000-8000-000000000001'}),releaseRead:async()=>{assert.equal(f.state().active,0);releases++;},readEquipment:f.read,readBaseline:async()=>{baselines++;},writeSource:async()=>{writes++;}});
  const response=await advance(t,handler(run()));
- assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Complete mHelpDesk inventory comparison unavailable',inventoryWrites:0,failureStage:'equipment',reason:'equipment_pass_deadline_exceeded'});
+ assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Complete mHelpDesk inventory comparison unavailable',inventoryWrites:0,failureStage:'equipment',failureClass:'equipment_pass_deadline',reason:'equipment_pass_deadline_exceeded'});
  assert.equal(f.state().maxActive,2);assert.equal(f.state().active,0);assert.equal(f.state().nativeReads,0);
  assert.equal(releases,1);assert.equal(baselines,0);assert.equal(writes,0);assert(!f.starts.some(r=>r.start>=800));
  // The same handler is available again; it must fail at its next real deadline,
