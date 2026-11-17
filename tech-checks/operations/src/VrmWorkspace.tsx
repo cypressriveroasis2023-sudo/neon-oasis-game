@@ -5,6 +5,9 @@ import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-o
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower } from './vrmReadOnlyModel';
+import { CosPowerAlarmSettings } from './CosPowerAlarmPanel';
+import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
+import { readPowerAlarmSettings, type CosPowerSettings } from './cosPowerAlarms';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
 type SelectionHint = { initialUnit?:number; initialInstallationId?:number };
@@ -49,6 +52,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [inventory, setInventory] = useState<{unitNumber?: string; placement?: string; currentLocationType?: string}[]>([]);
+  const [powerSettings, setPowerSettings] = useState<CosPowerSettings>(() => readPowerAlarmSettings(typeof localStorage === 'undefined' ? null : localStorage));
   const [expanded, setExpanded] = useState(false);
   const mounted = useRef(false);
   const running = useRef(false);
@@ -102,6 +107,12 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     // Defer the initial read so StrictMode's setup/cleanup probe cannot create
     // an orphaned request or leave the single-flight guard locked.
     queueMicrotask(() => { if (active) void refresh(); });
+    api.get('/api/field-map').then(response => {
+      if (!active) return;
+      const data = response.data as {inventoryItems?: unknown; items?: unknown};
+      const items = Array.isArray(data?.inventoryItems) ? data.inventoryItems : Array.isArray(data?.items) ? data.items : [];
+      setInventory(items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object'));
+    }).catch(() => { if (active) setInventory([]); });
     const timer = window.setInterval(() => {
       setNow(Date.now());
       if (workspaceVisible()) void refresh();
@@ -121,18 +132,24 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
+  const attention = victronNeedsAttention({units, inventory, power: power.rows, settings: powerSettings, now});
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
   return <section className={'panel module vrm-workspace' + (expanded ? ' vrm-expanded' : '')} aria-label='Victron VRM Helios fleet'>
     <div className='panelhead vrm-fleet-heading'><div><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2><span>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</span></div>
       <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
     </div>
+    <section className='vrm-attention' aria-label='Needs attention'>
+      <h3>Needs attention</h3>
+      <CosPowerAlarmSettings storage={typeof localStorage === 'undefined' ? null : localStorage} onChange={setPowerSettings}/>
+      {attention.length ? <ul>{attention.map(item => <li key={item.installationId}><button type='button' onClick={() => select(item.installationId)}>{item.line}</button></li>)}</ul> : <p>No field power issues.</p>}
+    </section>
     {error && <p role='alert'>{error}{privateInvalidated ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
     {sync && <div className='vrm-sync-status' role='status'><p>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)} {sync.error || ''}</p><p>{lastSuccess ? 'Last successful fleet sync: ' + lastSuccess + '. ' : 'No successful fleet sync recorded. '}{sync.scheduleActive ? 'Automatic discovery runs every 15 minutes.' : 'Automatic discovery is not active.'}{nextSync ? ' Next scheduled sync: ' + nextSync + '.' : ''}</p></div>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
     {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={selected === item.installationId ? 'selected' : 'secondary'} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
-      <strong>{item.name}</strong>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
+      <strong>{item.name}</strong><small>{placementLabel(heliosPlacement(item.name, inventory))}</small>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
     </button>)}</nav>}
     {unit && <>
     <div className='vrm-dashboard-heading'><div className='vrm-selected-unit'><span className='vrm-eyebrow'>SELECTED INSTALLATION</span><h3>{unit.name}</h3><span className='vrm-access-status'>{unit.available === false ? 'Unavailable in the latest fleet sync' : unit.embedUrl ? 'Read-only dashboard' : 'Read-only power dashboard'}</span></div>

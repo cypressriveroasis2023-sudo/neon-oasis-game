@@ -1,8 +1,9 @@
 import { safeVrmPower, type SafeVrmPower } from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import type { PowerMetric, PowerObservation } from '../../supabase/functions/cos-operations-pages/vrmPower';
 import type { VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
+import { POWER_FRESH_MS } from './cameraEvidence';
 
-export const VRM_READING_MAX_AGE_MS = 30 * 60 * 1000;
+export const VRM_READING_MAX_AGE_MS = POWER_FRESH_MS;
 export function readDashboardPower(value: unknown, items: VrmUnit[]): { rows: SafeVrmPower[]; invalid: boolean } {
   if (value === undefined) return { rows: [], invalid: false };
   try { return { rows: safeVrmPower(value, items), invalid: false }; }

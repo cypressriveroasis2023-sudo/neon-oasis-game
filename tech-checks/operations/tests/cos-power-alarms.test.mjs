@@ -44,8 +44,8 @@ test('a stale voltage is unknown, not an alarm, even under the threshold', () =>
   const verdict = cosPowerVerdict({
     now: NOW,
     settings: {lowVoltageV: 22, lowSocPercent: 30, silentHours: null},
-    voltage: {value: 12, observedAt: ago(25 * 60 * 1000)},
-    soc: {value: 10, observedAt: ago(25 * 60 * 1000)},
+    voltage: {value: 12, observedAt: ago(46 * 60 * 1000)},
+    soc: {value: 10, observedAt: ago(46 * 60 * 1000)},
   });
   assert.equal(verdict.voltage, 'unknown');
   assert.equal(verdict.soc, 'unknown');
