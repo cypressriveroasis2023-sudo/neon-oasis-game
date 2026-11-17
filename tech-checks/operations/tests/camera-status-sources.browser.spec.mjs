@@ -107,6 +107,7 @@ test('clicking a count tile shows exactly the units it counts, and the list says
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const rows=app.locator('.cos-camera-status-row');
  await expect(rows).toHaveCount(9);
  await app.getByRole('button',{name:/^DOWN/}).click();
@@ -197,6 +198,7 @@ test('a unit the provider names wrong can be renamed, and then reads as Avigilon
   return route.fulfill({status:200,headers:cors,json:one});
  });
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  await app.getByRole('button',{name:/^In the shop/}).first().click();
  const before=app.locator('.cos-camera-status-row').filter({hasText:'Sniper Alibi 243'});
  await expect(before.locator('.cos-camera-status-source')).toHaveText('Alibi');
@@ -217,6 +219,7 @@ test('make-filtered status totals match the rows and map selection reveals anoth
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const rows=app.locator('.cos-camera-status-row');
  await app.getByRole('button',{name:/^AVIGILON/}).click();
  await expect(rows).toHaveCount(3);

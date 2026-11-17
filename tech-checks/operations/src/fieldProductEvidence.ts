@@ -1,4 +1,4 @@
-import {cameraTimestamp,providerState,cameraState} from './cameraEvidence';
+import {cameraTimestamp,observationFresh,providerState,cameraState} from './cameraEvidence';
 import {savedConnectionObservation} from './savedConnectionObservation';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 import type {FieldProduct} from './mhelpFieldHealth';
@@ -12,6 +12,8 @@ export type FieldProductEvidence={
  association:string|null;
  basis:string|null;
  observedAt:string|null;
+ /** A provider timestamp exists. It is not a reviewed device link and cannot make the unit online. */
+ providerReadingFresh:boolean;
  video:'not_verified';
  observations:{resourceId:string;source:string;kind:string;observedAt:string|null;fresh:boolean;reportedStatus:string;currentState:string}[];
  followUp?:FieldProductFollowUp;
@@ -23,17 +25,18 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
  // This attribution is independently keyed by the accepted Product ID,
  // verified 2027 tracker IP and saved endpoint configuration revision.
  // It is never inferred from the provider/channel name or device label.
+ const providerReadingFresh=Boolean(row?.camera?.rows?.some(resource=>[resource.evidence,resource.serviceEvidence].some(evidence=>observationFresh(evidence,now))));
  if(exact&&exact.status!=='unknown'&&exact.status===state&&exact.resourceId&&cameraTimestamp(exact.checkedAt,now).fresh){
-  return {gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:exact.checkedAt,video:'not_verified',
+  return {gap:null,association:'exact_product_id_tracker_endpoint',basis:'connection',observedAt:exact.checkedAt,providerReadingFresh,video:'not_verified',
    observations:[{resourceId:exact.resourceId,source:'Saved TCP/service-port check',kind:'connection',observedAt:exact.checkedAt,fresh:true,reportedStatus:exact.status,currentState:exact.status}]};
  }
  if(exact?.status==='unknown'&&state==='unverified'){
   return {gap:'no_current_reading',association:'exact_product_id_tracker_endpoint',
-   basis:'connection',observedAt:null,video:'not_verified',observations:[]};
+   basis:'connection',observedAt:null,providerReadingFresh,video:'not_verified',observations:[]};
  }
  if(requiredConnectionUnavailable&&state==='unverified'){
   return {gap:'no_current_reading',association:'product_id_connection_unavailable',
-   basis:'connection',observedAt:null,video:'not_verified',observations:[]};
+   basis:'connection',observedAt:null,providerReadingFresh,video:'not_verified',observations:[]};
  }
  const camera=row?.camera,linked=Boolean(camera?.association);
  const observations:FieldProductEvidence['observations']=[];
@@ -50,7 +53,7 @@ export function fieldProductEvidence(row:FleetDashboardRow|null,state:string,now
  const selected=observations.filter(o=>basis==='connection'?o.kind==='connection':basis==='recorder'?o.kind==='recorder':basis==='camera'?['camera','detector'].includes(o.kind):o.kind!=='connection');
  const gap:FieldEvidenceGap=state==='support'?'not_applicable':state==='inactive'?'inactive':state==='review'||state==='unlinked'||!linked?'device_link_needed':state==='online'||state==='offline'?null:selected.some(o=>o.fresh)?'incomplete_check':'no_current_reading';
  return {gap,association:linked?camera!.association!.kind:null,basis:linked?basis:null,
-  observedAt:linked?cameraTimestamp(camera!.checkedAt,now).at:null,video:'not_verified',observations};
+  observedAt:linked?cameraTimestamp(camera!.checkedAt,now).at:null,providerReadingFresh,video:'not_verified',observations};
 }
 
 /** One audit row per Product ID, including every distinct attributed resource.

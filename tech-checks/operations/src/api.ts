@@ -5,6 +5,7 @@ import {validateCameraHealth} from './fieldCameraHealth';
 import {checkedFieldMap} from './gpsPersistence';
 import {CAMERA_AUTO_REFRESH_MS,PROOF_PRESENTATION_BUDGET_MS} from './refreshCadence';
 import {readExactProductConnections} from './exactProductConnection';
+import {denyStaffRoute, staffRole} from '../../supabase/functions/cos-operations-pages/staffAccess';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -67,7 +68,9 @@ function requestParentToken(): Promise<ParentSession> {
       if (!message || message.type !== 'COS_OPERATIONS_TOKEN_RESPONSE' || message.requestId !== requestId) return;
       cleanup();
       const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
-      if (!(queueMode ? ['it','service'].includes(message.role) : new URLSearchParams(location.search).get('mode') === 'fleet' ? message.role === 'it' : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
+      const asked = message.role;
+      const sessionAllowed = queueMode ? ['it','service'].includes(asked) : new URLSearchParams(location.search).get('mode') === 'fleet' ? asked === 'it' : asked === 'owner' || asked === 'service';
+      if (!sessionAllowed || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
         invalidatePrivateData('authentication-denied');
         reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
       } else {
@@ -112,6 +115,8 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   if (method === 'POST' && sessionRevision !== privateSessionRevision) throw new OperationsApiError('Your session changed before the save. Reload COS Operations before trying again.', 401);
   if (options?.signal?.aborted) throw new OperationsApiError('The read was cancelled.', 499);
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
+  const staffDenied = path.startsWith('/api/tech/') ? null : denyStaffRoute(staffRole({role: session.role}), method, path);
+  if (staffDenied) throw new OperationsApiError(staffDenied, 403);
   if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
   if(method==='POST'&&path==='/api/product-connections/verify')return sendRequest<T>(method,path,session.token,body,options?.signal);

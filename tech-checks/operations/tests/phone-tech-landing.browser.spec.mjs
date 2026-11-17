@@ -18,36 +18,29 @@ test('phone first screen, desktop inventory card, and TV-sized inventory card', 
     skipInitialFieldCount: phone,
     holdField: phone,
   });
-  const landing = app.getByRole('region', {name: 'Phone technician landing'});
-  const about = app.getByRole('group', {name: 'About this board'}).or(app.locator('.cos-phone-board-info'));
+  const hub = app.getByRole('region', {name: "Today's issues"});
   const identity = app.getByRole('heading', {name: 'Fleet inventory and saved health snapshot'});
   const sentence = app.getByText('This board is inventory, not live health.');
   if (phone) {
-    await expect(landing).toBeVisible();
-    await expect(landing.getByRole('group', {name: 'Field units up, down and unknown'})).toBeVisible();
-    await expect(landing.locator('.cos-phone-counts b')).toHaveText(['7', '1', '3']);
-    await expect(landing).toContainText('not current');
-    await expect(landing).toContainText('Unknown is not offline');
-    await expect(landing.getByRole('region', {name: 'Technician to-do'})).toBeVisible();
+    await expect(hub.getByRole('group', {name: 'Field units up, down and unknown'})).toBeVisible();
+    await expect(hub.locator('.cos-check-counts b')).toHaveText(['7', '1', '3']);
     await expect(identity).toBeHidden();
-    await expect(app.getByText('About this board')).toBeVisible();
-    await app.getByText('About this board').click();
+    await expect(app.getByText('Details', {exact: true})).toBeVisible();
+    await app.getByText('Details', {exact: true}).click();
+    await app.getByText('About this board', {exact: true}).click();
     await expect(identity).toBeVisible();
     await expect(sentence).toBeVisible();
     state.releaseField();
-    await expect(landing.locator('.cos-phone-counts b')).toHaveText(['1', '1', '1']);
-    await expect(landing).not.toContainText('not current');
-    await expect(landing.getByRole('listitem')).toContainText(['Spotter 1']);
-    await expect(landing).not.toContainText('Sniper 44');
+    await expect(hub.locator('.cos-check-counts b')).toHaveText(['1', '1', '1']);
+    await expect(hub).not.toContainText('Sniper 44');
   } else {
-    await expect(landing).toBeHidden();
+    await expect(identity).toBeHidden();
+    await expect(app.getByText('Details', {exact: true})).toBeVisible();
+    await app.getByText('Details', {exact: true}).click();
+    await app.getByText('About this board', {exact: true}).click();
     await expect(identity).toBeVisible();
     await expect(sentence).toBeVisible();
-    await expect(app.getByText('About this board')).toBeHidden();
-    if (project === 'desktop-1024') {
-      await expect(app.locator('.tech-check-tv')).toHaveCount(0);
-      await expect(identity).toBeVisible();
-    }
+    if (project === 'desktop-1024') await expect(app.locator('.tech-check-tv')).toHaveCount(0);
   }
   expect(state.errors).toEqual([]);
 });

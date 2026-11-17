@@ -57,7 +57,7 @@ test('a Recon II unit groups its detectors and names the ones not reporting', ()
 const unknownOf = unit => unit.unknown;
 
 test('a Reconeyez feed that is missing, failed, disabled or old makes every Recon unit Not verified', () => {
-  for (const feed of [null, {...reconFeed, status: 'error'}, {...reconFeed, enabled: false}, {...reconFeed, syncedAt: '2026-11-13T19:00:00Z'}]) {
+  for (const feed of [null, {...reconFeed, status: 'error'}, {...reconFeed, enabled: false}, {...reconFeed, syncedAt: '2026-11-13T12:00:00Z'}]) {
     const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10})], feed, NOW);
     assert.equal(unit.state, 'UNKNOWN', JSON.stringify(feed));
   }
@@ -69,6 +69,28 @@ test('a Recon unit labelled shop, not in use or stolen is never a field outage',
       [check({camera_device_id: 10, overall_status: 'offline'})], reconFeed, NOW);
     assert.equal(unit.placement, 'SHOP', label);
   }
+});
+
+test('a Recon detector a few hours old stays up, and past its check-in window is Unknown with the last report', () => {
+  const twoHours = '2026-11-13T19:40:00Z';
+  const [current] = projectReconUnits([detector({recon_battery_percent: 2, device_name: 'RII022 Cam 1'})],
+    [check({camera_device_id: 10, checked_at: twoHours})], {...reconFeed, syncedAt: twoHours}, NOW);
+  assert.equal(current.state, 'GREEN');
+  assert.deepEqual(current.criticalBatteries, [{name: 'RII022 Cam 1', percent: 2}]);
+  const [stale] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'offline', checked_at: '2026-11-13T12:00:00Z'})],
+    {...reconFeed, syncedAt: '2026-11-13T12:00:00Z'}, NOW);
+  assert.equal(stale.state, 'UNKNOWN');
+  assert.equal(stale.offline, 0);
+  assert.equal(stale.down[0].lastReportedStatus, 'offline');
+  const [avigilon] = projectIpCheckUnits([sniper()], [check({checked_at: twoHours})], NOW);
+  assert.equal(avigilon.state, 'UNKNOWN');
+});
+
+test('Recon without a stored product id is a device-link review, not a name match', () => {
+  const [unit] = projectReconUnits([detector({unit_key: 'RECON II 005', mhelp_product_id: null})], [check({camera_device_id: 10})], reconFeed, NOW);
+  assert.equal(unit.productIdKnown, true);
+  assert.equal(unit.mhelpProductId, null);
+  assert.equal(unit.deviceLinkNeeded, true);
 });
 
 test('merging keeps the Star4Live line for a unit both sources list, and counts every unit once', () => {
@@ -232,9 +254,9 @@ test('fresh Recon inventory never renews stale, missing, invalid or future detec
 
 test('Recon mixed-age observations stay unknown and expose the oldest health timestamp', () => {
   const [unit] = projectReconUnits([detector(), detector({id: 11})],
-    [check({camera_device_id: 10}), check({camera_device_id: 11, checked_at: '2026-11-13T19:00:00Z'})], reconFeed, NOW);
+    [check({camera_device_id: 10}), check({camera_device_id: 11, checked_at: '2026-11-13T12:00:00Z'})], reconFeed, NOW);
   assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['UNKNOWN', 1, 0, 1]);
-  assert.equal(unit.observedAt, '2026-11-13T19:00:00.000Z');
+  assert.equal(unit.observedAt, '2026-11-13T12:00:00.000Z');
   const [missing] = projectReconUnits([detector(), detector({id: 11})], [check({camera_device_id: 10})], reconFeed, NOW);
   assert.equal(missing.observedAt, null);
 });

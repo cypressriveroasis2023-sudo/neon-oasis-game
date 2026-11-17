@@ -11,6 +11,10 @@ export const CAMERA_FRESH_MS = 20 * 60 * 1000;
  * 008, silent since October, stays unverified. The camera window is unchanged.
  */
 export const POWER_FRESH_MS = 45 * 60 * 1000;
+/** Reconeyez detectors check in every few hours. Only that detector observation
+ * uses this window. Cameras, recorders, Star4Live and Avigilon stay on the
+ * camera window. Past it, the detector is Unknown, never Offline. */
+export const RECON_DETECTOR_FRESH_MS = 6 * 60 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
 export type PlacementScope = 'field'|'shop'|'inactive'|'unknown';
@@ -63,12 +67,18 @@ export function providerRecord(row:CameraRow) {
   const kind=resourceKind(row),resource=kind==='cameras'?'camera':kind==='detectors'?'detector':kind==='recorders'?'recorder':null;
   return !row.trackerOnly&&resource!==null&&row.evidence?.kind==='provider'&&row.evidence.resource===resource&&providerSource(row.evidence.source);
 }
+export function observationFresh(evidence:{source?:string;resource?:string;observedAt?:string|null}|null|undefined,now=Date.now()):boolean {
+  const stamp=cameraTimestamp(evidence?.observedAt,now);
+  if(!stamp.at)return false;
+  const max=evidence?.source==='Reconeyez'&&evidence.resource==='detector'?RECON_DETECTOR_FRESH_MS:CAMERA_FRESH_MS;
+  return now-Date.parse(stamp.at)<=max;
+}
 export function currentCameraStatus(evidence?:CameraEvidence,now=Date.now()):'online'|'offline'|'review' {
-  return evidence?.kind==='provider'&&['camera','detector'].includes(evidence.resource||'')&&evidence.active===true&&providerSource(evidence.source)&&cameraTimestamp(evidence.observedAt,now).fresh&&['online','offline'].includes(evidence.status)?evidence.status as 'online'|'offline':'review';
+  return evidence?.kind==='provider'&&['camera','detector'].includes(evidence.resource||'')&&evidence.active===true&&providerSource(evidence.source)&&observationFresh(evidence,now)&&['online','offline'].includes(evidence.status)?evidence.status as 'online'|'offline':'review';
 }
 export function providerState(row:CameraRow,now=Date.now()):EvidenceState {
   if(normalized(row.activationState)!=='ACTIVE'||!providerRecord(row)||row.evidence?.active!==true)return 'verifying';
-  return cameraTimestamp(row.evidence.observedAt,now).fresh&&['online','offline'].includes(row.evidence.status)?row.evidence.status as 'online'|'offline':'verifying';
+  return observationFresh(row.evidence,now)&&['online','offline'].includes(row.evidence.status)?row.evidence.status as 'online'|'offline':'verifying';
 }
 export function cameraState(row:CameraRow,now=Date.now()):CameraState {
   if(row.trackerOnly)return 'mapping';

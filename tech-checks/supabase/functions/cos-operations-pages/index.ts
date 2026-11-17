@@ -37,6 +37,7 @@ import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
 // Keep the verified production reader until the V3 database rollout passes its live map check.
 import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjectionV2.ts';
 import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
+import {denyStaffRoute, staffRole} from './staffAccess.ts';
 import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
 import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';
 import {OWNER_CENSUS_NATIVE_FIELDS,OWNER_CENSUS_SITE_FIELDS,readOwnerCensusEvidence,readOwnerCensusPreparation,readOwnerCensusJson,matchesOwnerCensusProof} from './ownerCensusProof.ts';
@@ -511,6 +512,10 @@ export function createOperationsHandler(options) {
         if (method === 'GET' && Object.keys(body).length) fail('GET endpoints do not accept a request body.');
       }
       if (!path.startsWith('/api/')) fail('COS endpoint not found.', 404);
+      // Extra refusal only. Owner checks below are unchanged. Service keeps the
+      // existing /api/tech queue and is limited to the inventory checklist elsewhere.
+      const staffDenied = path.startsWith('/api/tech/') ? null : denyStaffRoute(staffRole({department: context.department, legacyOwner: context.legacyOwner}), method, path);
+      if (staffDenied) fail(staffDenied, 403);
       if (path.startsWith('/api/tech/')) {
         if (context.legacyOwner || !['it', 'service'].includes(context.department)) fail('A signed-in technician account is required for the production queue.', 403);
         const claimRoute = /^\/api\/tech\/it-queue\/([^/]+)\/claim$/.exec(path);
@@ -961,7 +966,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
               .catch(() => null),
             // Snipers, CAMVs and Recon II: saved readings COS already collects.
             // If they cannot be read the Star4Live units still show.
-            legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip&source=in.(2026_unit_tracker,reconeyez)&activation_state=eq.active&order=id.asc', context.headers).catch(() => null),
+            legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip,mhelp_product_id,recon_battery_percent:source_metadata->battery_percent,recon_battery_status:source_metadata->>battery_status&source=in.(2026_unit_tracker,reconeyez)&order=id.asc', context.headers).catch(() => null),
             legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc', context.headers).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
