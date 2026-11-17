@@ -51,7 +51,7 @@ export type SavedTcpEndpoint={
  activationState?:string;
  portStatus:Record<string,unknown>|null;
 };
-export type ExactProductConnectionStatus='online'|'offline'|'unknown';
+export type ExactProductConnectionStatus='online'|'offline'|'verifying'|'unknown';
 export type ExactProductConnection={
  productId:string;
  status:ExactProductConnectionStatus;
@@ -102,12 +102,21 @@ const completedPortOutcome=(v:unknown):v is Record<string,any>=>{
 const deviceId=(v:unknown):string|null=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):
  typeof v==='string'&&ID.test(v)?v:null;
 
+const HOST_ANSWERED='Connection refused (os error 111)';
+const MISS_ERROR=new Set(['timeout','Connection timed out (os error 110)']);
+/** A saved streak is trusted only when this observation is itself a miss.
+ * A missing counter is one observation, never three. */
+const missStreak=(proof:Record<string,any>)=>{
+ const n=proof.consecutiveFailures;
+ return Number.isInteger(n)&&n>0&&n<=3?n:1;
+};
 /** The evidence boundary is deliberately stricter than displaying a saved
  * endpoint: every configured port must have one finished Boolean outcome,
  * the checked IP and configuration revision must still match, and the
- * underlying observation must be recent. A first valid complete negative
- * result is OFFLINE; confirmedOutage and three-failure thresholds are NOT
- * applied to connectivity. Video and provider acceptance are not checked.
+ * underlying observation must be recent. Offline requires three fresh misses
+ * in a row. One or two misses stay Verifying. A host that answers, including
+ * connection refused, is not a miss and not Offline. Stale or missing data
+ * stays Unknown. Video and provider acceptance are not checked.
  */
 export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):Omit<ExactProductConnection,'productId'>|null{
  if(device.monitoringEnabled!==true||!deviceId(device.deviceId))return null;
@@ -126,15 +135,25 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  const states=ports.map(port=>device.portStatus![String(port)]);
  if(states.some(v=>!completedPortOutcome(v)))return null;
  const responded=states.some(v=>(v as Record<string,any>).online===true);
+ const basis='tcp_service_port' as const,resourceId=deviceId(device.deviceId);
  if(responded&&proof.status==='online'&&proof.reachable===true)return {
-  status:'online',basis:'tcp_service_port',checkedAt,resourceId:deviceId(device.deviceId),
+  status:'online' as const,basis,checkedAt,resourceId,
   reason:'Completed saved TCP/service-port check responded. Camera video is not verified.'
  };
- if(!responded&&['offline','verifying'].includes(proof.status)&&proof.reachable===false)return {
-  status:'offline',basis:'tcp_service_port',checkedAt,resourceId:deviceId(device.deviceId),
-  reason:'Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.'
+ if(responded||!['offline','verifying'].includes(proof.status)||proof.reachable!==false)return null;
+ if(states.some(v=>!(v as Record<string,any>).online&&(v as Record<string,any>).error===HOST_ANSWERED))return {
+  status:'unknown' as const,basis,checkedAt:null,resourceId:null,
+  reason:'The host answered with connection refused. That is not a missed probe and not an outage.'
  };
- return null;
+ if(!states.every(v=>!(v as Record<string,any>).online&&((v as Record<string,any>).error==null||MISS_ERROR.has((v as Record<string,any>).error))))return null;
+ if(missStreak(proof)>=3)return {
+  status:'offline' as const,basis,checkedAt,resourceId,
+  reason:'Three fresh probe misses in a row. The host did not answer. Camera video is not verified.'
+ };
+ return {
+  status:'verifying' as const,basis,checkedAt,resourceId,
+  reason:'One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.'
+ };
 }
 
 /** Missing/duplicate IDs, changed source hashes or workbook identity fail
@@ -203,12 +222,19 @@ export function buildExactProductConnections(
    if(!active.length)return unknown(pid,'No enabled service-port check configuration matches the current tracker IP.');
    const checks=active.map(d=>completedSavedTcpCheck(d,now));
    if(checks.some(c=>!c))return unknown(pid,'No fresh, completed check covers every enabled service-port configuration at this tracker IP.');
-   const completed=checks as NonNullable<ReturnType<typeof completedSavedTcpCheck>>[],positive=completed.find(c=>c.status==='online'),result=positive||completed[0];
-   return {productId:pid,...result,checkedAt:completed.map(c=>c.checkedAt!).sort()[0],reason:positive?'Completed service-port checks responded at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.':'Completed service-port checks had no response at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'};
+   const completed=checks as NonNullable<ReturnType<typeof completedSavedTcpCheck>>[];
+   const answered=completed.find(c=>c.status==='unknown');
+   if(answered)return {productId:pid,...answered};
+   const positive=completed.find(c=>c.status==='online');
+   if(positive)return {productId:pid,...positive,checkedAt:completed.map(c=>c.checkedAt!).sort()[0],reason:'Completed service-port checks responded at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'};
+   if(completed.every(c=>c.status==='offline'))return {productId:pid,...completed[0],checkedAt:completed.map(c=>c.checkedAt!).sort()[0],reason:'Three fresh probe misses in a row at this Product ID’s current tracker IP. Equipment identity, video and recording are not verified.'};
+   const verifying=completed.find(c=>c.status==='verifying')||completed[0];
+   return {productId:pid,...verifying,checkedAt:completed.map(c=>c.checkedAt).filter((v):v is string=>!!v).sort()[0]||null,reason:'One or two fresh probe misses. Status is Verifying, not an outage. Equipment identity, video and recording are not verified.'};
   }
   if(devicesForIp.length!==1)return unknown(pid,devicesForIp.length?'More than one saved endpoint claims this tracker IP; verify exact device ownership.':'No saved camera endpoint matches the current tracker IP.');
   const result=completedSavedTcpCheck(devicesForIp[0],now);
   if(!result)return unknown(pid,'No fresh, completed, exact-target TCP/service-port check is available.');
+  if(result.status==='unknown')return {productId:pid,...result};
   if(!resourceMembership?.get(pid)?.includes(String(devicesForIp[0].deviceId)))return unknown(pid,'No current verified Product-to-resource membership is available for this saved endpoint.');
   return {productId:pid,...result};
  });
@@ -231,7 +257,7 @@ export function readExactProductConnections(value:unknown,sourceSha256:string,ex
  const result=new Map<string,ExactProductConnection>(),seen=new Set<string>();
  for(const raw of value.items){
   if(!object(raw)||!ID.test(raw.productId)||seen.has(raw.productId)
-   ||!['online','offline','unknown'].includes(raw.status)||raw.basis!=='tcp_service_port'||typeof raw.reason!=='string'||raw.reason.length>300
+   ||!['online','offline','verifying','unknown'].includes(raw.status)||raw.basis!=='tcp_service_port'||typeof raw.reason!=='string'||raw.reason.length>300
    ||!(raw.resourceId===null||deviceId(raw.resourceId)===raw.resourceId))return null;
   if(raw.status==='unknown'&&(raw.resourceId!==null||raw.checkedAt!==null))return null;
   const observed=raw.status==='unknown'?null:cameraTimestamp(raw.checkedAt,now);

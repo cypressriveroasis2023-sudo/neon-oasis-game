@@ -1,0 +1,102 @@
+{
+ "description": "Readers show Offline only after three fresh probe misses. One or two misses show Verifying. Stale or missing data stays Unknown. Connection refused is not a miss and not Offline. A unit placed in Shop is not an outage. Preparation only. Do not deploy.",
+ "authorization": "James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026. This patch is not applied by this pull request.",
+ "releaseStatus": "PREPARATION_ONLY",
+ "slug": "cos-operations-pages",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/vision-native-preview-20261107/source",
+ "entrypointPath": "cos-operations-pages/serve.ts",
+ "importMapPath": "cos-operations-pages/deno.json",
+ "verifyJwt": false,
+ "deployedFileNames": {
+  "deno.json": "cos-operations-pages/deno.json",
+  "productCheckSource.ts": "cos-operations-pages/productCheckSource.ts",
+  "productTcpRuntime.ts": "cos-operations-pages/productTcpRuntime.ts",
+  "productVerifyNow.ts": "cos-operations-pages/productVerifyNow.ts",
+  "savedFleetBoard.mjs": "cos-operations-pages/savedFleetBoard.mjs",
+  "serve.ts": "cos-operations-pages/serve.ts",
+  "trackerEndpointProducer.mjs": "cos-operations-pages/trackerEndpointProducer.mjs",
+  "trackerEndpointRead.mjs": "cos-operations-pages/trackerEndpointRead.mjs"
+ },
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE",
+  "version": 168,
+  "ezbr_sha256": "ea649429a36f21ef8272911615a802e3ccc6d2a6c21ac6ea6718eeb68ddf02af"
+ },
+ "edits": [
+  {
+   "file": "serve.ts",
+   "needle": ":!responded&&[\"offline\",\"verifying\"].includes(proof.status)&&proof.reachable===!1?{status:\"offline\",basis:\"tcp_service_port\",checkedAt,resourceId:deviceId(device.deviceId),reason:\"Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.\"}:null",
+   "replacement": ":!responded&&[\"offline\",\"verifying\"].includes(proof.status)&&proof.reachable===!1?(states.some(v=>v&&v.online!==!0&&v.error===\"Connection refused (os error 111)\")?{status:\"unknown\",basis:\"tcp_service_port\",checkedAt:null,resourceId:null,reason:\"The host answered with connection refused. That is not a missed probe and not an outage.\"}:(Number.isInteger(proof.consecutiveFailures)&&proof.consecutiveFailures>=3?{status:\"offline\",basis:\"tcp_service_port\",checkedAt,resourceId:deviceId(device.deviceId),reason:\"Three fresh probe misses in a row. The host did not answer. Camera video is not verified.\"}:{status:\"verifying\",basis:\"tcp_service_port\",checkedAt,resourceId:deviceId(device.deviceId),reason:\"One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.\"})):null",
+   "occurrences": 1
+  },
+  {
+   "file": "productTcpRuntime.ts",
+   "needle": "  if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) return {\n    status: \"offline\",\n    basis: \"tcp_service_port\",\n    checkedAt,\n    resourceId: deviceId(device.deviceId),\n    reason: \"Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.\"\n  };",
+   "replacement": "  if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) {\n    if (states.some((v) => v && v.online !== true && v.error === \"Connection refused (os error 111)\")) return {\n      status: \"unknown\", basis: \"tcp_service_port\", checkedAt: null, resourceId: null,\n      reason: \"The host answered with connection refused. That is not a missed probe and not an outage.\"\n    };\n    const misses = Number.isInteger(proof.consecutiveFailures) && proof.consecutiveFailures >= 3;\n    return {\n      status: misses ? \"offline\" : \"verifying\",\n      basis: \"tcp_service_port\",\n      checkedAt,\n      resourceId: deviceId(device.deviceId),\n      reason: misses ? \"Three fresh probe misses in a row. The host did not answer. Camera video is not verified.\" : \"One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.\"\n    };\n  }",
+   "occurrences": 1
+  },
+  {
+   "file": "productTcpRuntime.ts",
+   "needle": "    if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) return {\n      status: \"offline\",\n      basis: \"tcp_service_port\",\n      checkedAt,\n      resourceId: deviceId(device.deviceId),\n      reason: \"Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.\"\n    };",
+   "replacement": "    if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) {\n      if (states.some((v) => v && v.online !== true && v.error === \"Connection refused (os error 111)\")) return {\n        status: \"unknown\", basis: \"tcp_service_port\", checkedAt: null, resourceId: null,\n        reason: \"The host answered with connection refused. That is not a missed probe and not an outage.\"\n      };\n      const misses = Number.isInteger(proof.consecutiveFailures) && proof.consecutiveFailures >= 3;\n      return {\n        status: misses ? \"offline\" : \"verifying\",\n        basis: \"tcp_service_port\",\n        checkedAt,\n        resourceId: deviceId(device.deviceId),\n        reason: misses ? \"Three fresh probe misses in a row. The host did not answer. Camera video is not verified.\" : \"One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.\"\n      };\n    }",
+   "occurrences": 1
+  },
+  {
+   "file": "productTcpRuntime.ts",
+   "needle": "|| ![\"online\", \"offline\"].includes(r.status) ||",
+   "replacement": "|| ![\"online\", \"offline\", \"verifying\"].includes(r.status) ||",
+   "occurrences": 1
+  },
+  {
+   "file": "savedFleetBoard.mjs",
+   "needle": "![\"online\", \"offline\", \"unknown\"].includes(raw.status)",
+   "replacement": "![\"online\", \"offline\", \"verifying\", \"unknown\"].includes(raw.status)",
+   "occurrences": 1
+  },
+  {
+   "file": "savedFleetBoard.mjs",
+   "needle": "offline: \"Offline\", unverified:",
+   "replacement": "offline: \"Offline\", verifying: \"Verifying\", unverified:",
+   "occurrences": 1
+  },
+  {
+   "file": "savedFleetBoard.mjs",
+   "needle": "    } else if (exactAllowed && exact) {\n      if (reviewedProvider && row.cameraState !== exact.status) {",
+   "replacement": "    } else if (exactAllowed && exact) {\n      if (exact.status === \"verifying\") {\n        state = \"verifying\";\n        reason = exact.reason;\n      } else if (reviewedProvider && row.cameraState !== exact.status) {",
+   "occurrences": 1
+  },
+  {
+   "file": "savedFleetBoard.mjs",
+   "needle": "  const state = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states.includes(\"offline\") ? \"offline\" : operational && states.length > 0 && states.every((s) => s === \"online\") ? \"online\" : \"unknown\";",
+   "replacement": "  let state = direct ? connection === \"online\" ? \"online\" : connection === \"offline\" ? \"offline\" : \"unknown\" : operational && states.includes(\"offline\") ? \"offline\" : operational && states.length > 0 && states.every((s) => s === \"online\") ? \"online\" : \"unknown\";\n  if (classification.scope === \"shop\" && state === \"offline\") state = \"unknown\";",
+   "occurrences": 1
+  },
+  {
+   "file": "savedFleetBoard.mjs",
+   "needle": "[\"shop\", \"inactive\"].includes(classification.scope) ? \" PLACEMENT CONFLICT: camera inventory says \" + (classification.scope === \"shop\" ? \"SHOP / ROOT\" : \"INACTIVE\") + \" while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.\"",
+   "replacement": "classification.scope === \"shop\" ? \" A unit placed in Shop is not an outage.\" : classification.scope === \"inactive\" ? \" PLACEMENT CONFLICT: camera inventory says INACTIVE while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.\"",
+   "occurrences": 1
+  }
+ ],
+ "expectedBefore": {
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+  "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
+  "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+  "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
+  "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
+  "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+ },
+ "expectedAfter": {
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
+  "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
+  "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
+  "savedFleetBoard.mjs": "eb083fbaff69b1aeea3e5264c330c20641b5d3c8ce1b27bc90051885608b276f",
+  "serve.ts": "282a1f6e45040e84c34c8325e988f7e40470229e3ac82a16565372a8defa83e8",
+  "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+ }
+}

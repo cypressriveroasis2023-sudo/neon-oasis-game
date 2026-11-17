@@ -9,7 +9,7 @@ import {fieldProductFollowUp} from './fieldProductFollowUp';
 export const PROVIDER_REPORTED='Provider-reported, not direct-connection verified. ';
 export const DIRECT_SOURCE_GAP='No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ';
 export const CURRENT_SOURCE_CONFLICT='Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ';
-export const fieldHealthLabels={online:'Online',offline:'Offline',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
+export const fieldHealthLabels={online:'Online',offline:'Offline',verifying:'Verifying',unverified:'Health unverified',support:'Solar / support — no cameras',unlinked:'Health not linked',review:'Identity / placement review',inactive:'Do Not Use / Missing / inactive'};
 export type FieldProductHealth=keyof typeof fieldHealthLabels;
 export type FieldProduct={productId:string;unitNumber:string;state:FieldProductHealth;reason:string;unitId:string|null;recordId:string|null;evidence?:FieldProductEvidence};
 
@@ -71,11 +71,20 @@ export function mhelpFieldHealth(value:unknown,roster:RecordedRoster|null,rows:F
     state='unverified';reason=directSourceUnavailable?'The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown.':exact!.reason;
    }
   }else if(exactAllowed&&exact){
-   if(reviewedProvider&&row!.cameraState!==exact.status){
+   if(exact.status==='verifying'){
+    state='verifying';
+    reason=exact.reason;
+   }else if(reviewedProvider&&row!.cameraState!==exact.status){
     state='unverified';
     reason=CURRENT_SOURCE_CONFLICT+'Direct: '+exact.reason+' Provider: '+unitHealthLabel(row!.camera)+'.';
+   }else if(exact.status==='online'){
+    state='online';
+    reason=exact.reason;
+   }else if(record?.placement==='shop'||row?.placement==='shop'){
+    state='review';
+    reason='A unit placed in Shop is not an outage.';
    }else{
-    state=exact.status==='online'?'online':'offline';
+    state='offline';
     reason=exact.reason;
    }
   }else if(!record){

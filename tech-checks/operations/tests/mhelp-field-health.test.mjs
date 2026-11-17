@@ -3,7 +3,7 @@ import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('every Field Product ID appears once in a complete partition; Shop never enters it',()=>{
  const f=fieldProductFixture(),before=structuredClone(f),view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now);
- assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,unverified:1,support:1,unlinked:1,review:1,inactive:1});
+ assert.equal(view.total,7);assert.deepEqual(view.counts,{online:1,offline:1,verifying:0,unverified:1,support:1,unlinked:1,review:1,inactive:1});
  assert.equal(new Set(view.items.map(item=>item.productId)).size,7);assert(!view.items.some(item=>item.productId==='1008'));assert.deepEqual(f,before);
 });
 test('possible candidate matches cannot inherit healthy native evidence',()=>{
@@ -67,6 +67,17 @@ test('direct TCP cannot override a different verified provider state',()=>{
  assert.equal(view.items.find(p=>p.productId==='1001').state,'unverified');
  assert.equal(view.items.find(p=>p.productId==='1002').state,'unverified');
  assert.match(view.items.find(p=>p.productId==='1001').reason,/status disagree/i);
+});
+test('a unit placed in Shop is never an outage',()=>{
+ const f=fieldProductFixture();
+ const roster=f.roster.items.find(item=>item.productIds.includes('1002'));
+ f.rows.find(row=>row.id===roster.unitId).placement='shop';
+ const receipt=structuredClone(f.connections);
+ Object.assign(receipt.items.find(p=>p.productId==='1002'),{status:'offline',checkedAt:f.fresh,resourceId:'2',reason:'Three fresh probe misses in a row.'});
+ const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now,receipt);
+ const item=view.items.find(p=>p.productId==='1002');
+ assert.equal(item.state,'review');
+ assert.equal(view.counts.offline,0);
 });
 test('matching exact resource and provider evidence remains definitive',()=>{
  const f=fieldProductFixture(),receipt=structuredClone(f.connections);
