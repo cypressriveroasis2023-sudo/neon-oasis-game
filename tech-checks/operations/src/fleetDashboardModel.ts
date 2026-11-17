@@ -7,7 +7,7 @@ import {validVrmEmbed,type VrmUnit} from '../../supabase/functions/cos-operation
 import type {FleetDisplayAddress} from './fleetDisplayAddress';
 import {cameraTimestamp,powerTimestamp} from './cameraEvidence';
 
-export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
+export type Signal='online'|'offline'|'unknown'|'support'|'not_available'|'shop';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
 export type FleetDashboardRow={unit:DashboardUnit;displayAddress?:FleetDisplayAddress;displayCustomer?:string;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;routerLabel?:string;routerCheckedAt?:string|null;doNotUse?:boolean;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;vrmInstallation?:VrmUnit|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};

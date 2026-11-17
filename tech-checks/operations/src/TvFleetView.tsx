@@ -127,8 +127,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       return {unit,health,doNotUse:flagged,routerLabel,routerOutage:shop||routerLabel!=='Offline'?false:linked?.boardOutage===true,router:fieldReachability(unit,data.routers?.items,clock),
         point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),
         estimate:data.estimates.get(unit.id)};
-    }).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]
-      -{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber));
+    }).sort((a,b)=>({offline:0,unknown:1,online:2,support:3,shop:4}[a.health.state]
+      -{offline:0,unknown:1,online:2,support:3,shop:4}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber));
   },[data,snapshotClock,census]);
   const outages=useMemo(()=>tvCensusOutages(census.board,rows),[census,rows]);
   // Fleet and TV use the same strict mHelp Product-ID/address proof; never
@@ -139,7 +139,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     const health=products?fleetAddressHealth(products.items,dashboardRows,'camera'):new Map<string,ReticleState>();
     const productUnits=new Map((products?.items||[]).filter(product=>product.unitId).map(product=>[product.productId,product.unitId!]));
     const coveredUnitIds=new Set((addresses?.pins||[]).map(pin=>productUnits.get(pin.productId)).filter(Boolean));
-    type TvPin={key:string;name:string;point:[number,number];health:ReticleState;site:string;address:string;locationLabel:string;verifiedGps:boolean;productId?:string};
+    type TvPin={key:string;name:string;point:[number,number];health:ReticleState;label?:string;site:string;address:string;locationLabel:string;verifiedGps:boolean;productId?:string};
     const located:TvPin[]=(addresses?.pins||[]).map(pin=>({
       key:'mhelp:'+pin.productId,name:pin.unitNumber,point:pin.point,
       health:pin.lifecycle==='UNFLAGGED'&&!pin.placementHeld?health.get(pin.productId)||'unknown':'unknown',
@@ -148,7 +148,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     const native:TvPin[]=rows.filter(row=>row.point&&!coveredUnitIds.has(row.unit.id)&&(!census.board||census.board.items.some(product=>product.linked?.unitId===row.unit.id))).map(row=>({
       key:'native:'+row.unit.id,name:row.unit.unitNumber,
       point:[row.point!.latitude,row.point!.longitude],
-      health:row.health.state==='online'||row.health.state==='offline'||row.health.state==='support'?row.health.state:'unknown',
+      health:row.health.state==='shop'?'unknown':row.health.state==='online'||row.health.state==='offline'||row.health.state==='support'?row.health.state:'unknown',
+      label:row.health.state==='shop'?'In Shop':row.health.state,
       site:row.unit.site||row.unit.customer||'',address:row.unit.address||'',
       locationLabel:isCurrentFieldPin(row.unit)?'Verified installation':row.estimate?addressEstimateLabel(row.estimate)+' · not GPS':locationTag(row.unit),
       verifiedGps:isCurrentFieldPin(row.unit)
@@ -227,9 +228,9 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         group.addLayer(marker);
         continue;
       }
-      const {item}=members[0],health=item.health;
+      const {item}=members[0],health=item.health,shown=item.label||health;
       const html=item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,health,item.verifiedGps?'current':'estimate');
-      const marker=L.marker(item.point,{title:item.name+' · '+health,alt:item.name+' · '+health,
+      const marker=L.marker(item.point,{title:item.name+' · '+shown,alt:item.name+' · '+shown,
         icon:L.divIcon({className:'cos-field-pin-wrap cos-tv-fleet-unit-marker',html,iconSize:[44,56],iconAnchor:[22,34]})});
       marker.on('add',()=>{
         const element=marker.getElement();element?.setAttribute('data-map-member-id',item.key);
@@ -237,7 +238,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       });
       const popup=document.createElement('div');popup.className='cos-compact-tv-pin-popup';
       const title=document.createElement('strong');title.textContent=item.name;popup.append(title);
-      for(const value of [item.site||'Site not linked',item.address||'Address not recorded','Camera / connection: '+health.toUpperCase(),item.locationLabel]){
+      for(const value of [item.site||'Site not linked',item.address||'Address not recorded','Camera / connection: '+(item.label||health.toUpperCase()),item.locationLabel]){
         const p=document.createElement('p');p.textContent=value;popup.append(p);
       }
       marker.bindPopup(popup);group.addLayer(marker);

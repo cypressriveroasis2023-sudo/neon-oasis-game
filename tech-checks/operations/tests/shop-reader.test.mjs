@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fieldCameraHealth,unitHealthLabel,cameraColors} from '../src/fieldCameraHealth.ts';
+import {fleetDashboardRows,fleetDashboardSummary} from '../src/fleetDashboardModel.ts';
+import {phoneTechnicianTodos} from '../src/phoneTechLanding.ts';
+import {tvCensusOutages} from '../src/tvFieldCensus.ts';
+import {shopLastCheck,shopRouterReading,shopCameraLine,isShopPlacement,SHOP_LABEL,SHOP_COLOR,OFFLINE_COLOR} from '../src/shopReader.ts';
+import {resource,port,snapshot,now} from './fixtures/camera-evidence-fixtures.mjs';
+import {summarizeRouters} from '../../supabase/functions/cos-operations-pages/routers.ts';
+
+const sniper={id:'synthetic-shop-sniper',unitNumber:'Sniper 501',modelName:'Sniper',status:'available',placement:'SHOP',currentLocationType:'shop'};
+const down=resource(9,'Sniper 501',{scope:'shop',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true,consecutiveFailures:3})});
+const health=snapshot([down]);
+const reading=()=>fieldCameraHealth(sniper,[sniper],health,now);
+
+test('a Shop unit with three misses shows In Shop on every reader and adds nothing to outage counts',()=>{
+ const result=reading();
+ assert.equal(result.state,'shop');
+ assert.equal(result.savedReading,'offline');
+ assert.equal(down.serviceEvidence.status,'offline');
+ assert.equal(down.serviceEvidence.consecutiveFailures,3);
+ assert.equal(unitHealthLabel(result),SHOP_LABEL);
+ assert.equal(cameraColors[result.state],SHOP_COLOR);
+ assert.notEqual(cameraColors[result.state],OFFLINE_COLOR);
+ assert.doesNotMatch(unitHealthLabel(result),/offline/i);
+ assert.doesNotMatch(result.reason,/offline/i);
+ const rows=fleetDashboardRows([sniper],health,[],null,now);
+ assert.equal(rows[0].cameraState,'shop');
+ assert.equal(unitHealthLabel(rows[0].camera),SHOP_LABEL);
+ const summary=fleetDashboardSummary(rows);
+ assert.equal(summary.offline,0);
+ assert.equal(summary.online,0);
+ assert.equal(summary.unknown,0);
+ assert.equal(phoneTechnicianTodos(rows.map(row=>({name:row.name,placement:row.placement,cameraState:row.cameraState}))).length,0);
+ assert.equal(tvCensusOutages(null,[{unit:sniper,health:result}]).length,0);
+ assert.equal(shopCameraLine('SHOP','offline'),SHOP_LABEL);
+ assert.equal(shopCameraLine('FIELD','offline'),null);
+ const router=shopRouterReading('offline','shop','2026-11-17T20:00:00Z','Owner');
+ assert.equal(router.primary,SHOP_LABEL);
+ assert.equal(router.visibleProbe,SHOP_LABEL);
+ assert.equal(router.alert,false);
+ assert.match(router.detail,/Last check failed/);
+ assert.doesNotMatch(router.detail,/offline/i);
+ assert.equal(shopRouterReading('offline','shop','2026-11-17T20:00:00Z','Service').detail,null);
+ assert.equal(shopLastCheck({savedReading:'offline',checkedAt:result.checkedAt,reason:result.reason,role:'IT'}),shopLastCheck({savedReading:result.savedReading,checkedAt:result.checkedAt,reason:result.reason,role:'IT'}));
+ assert.match(shopLastCheck({savedReading:'offline',checkedAt:'2026-11-17T20:00:00Z',reason:'saved check',role:'Owner'}),/Last check failed/);
+ assert.equal(shopLastCheck({savedReading:'offline',checkedAt:'2026-11-17T20:00:00Z',reason:'saved check',role:'Service'}),null);
+ const metrics=summarizeRouters([{probeStatus:'offline',checkedAt:'2026-11-17T20:00:00Z'}].filter(()=>!isShopPlacement('shop')),+now);
+ assert.equal(metrics.unreachable,0);
+});
+
+test('three misses on a Field unit stay Offline, and an existing Shop unit is not flipped to Offline',()=>{
+ const field={id:'synthetic-field-sniper',unitNumber:'Sniper 502',modelName:'Sniper',status:'installed',placement:'FIELD',currentLocationType:'field'};
+ const missed=resource(10,'Sniper 502',{scope:'field',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true,consecutiveFailures:3})});
+ const fieldHealth=fieldCameraHealth(field,[field],snapshot([missed]),now);
+ assert.equal(fieldHealth.state,'offline');
+ assert.match(unitHealthLabel(fieldHealth),/OFFLINE/);
+ const quiet=resource(11,'Sniper 503',{scope:'shop',serviceEvidence:port({status:'online',reachable:true})});
+ const shop={...sniper,id:'synthetic-shop-quiet',unitNumber:'Sniper 503'};
+ const shown=fieldCameraHealth(shop,[shop],snapshot([quiet]),now);
+ assert.equal(shown.state,'shop');
+ assert.notEqual(shown.state,'offline');
+ assert.equal(unitHealthLabel(shown),SHOP_LABEL);
+});

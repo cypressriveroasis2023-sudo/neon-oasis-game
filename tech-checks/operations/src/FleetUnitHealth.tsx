@@ -2,6 +2,7 @@ import FleetCardIcon from './FleetCardIcon';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import FleetCameraTools from './FleetCameraTools';
 import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
+import {shopLastCheck} from './shopReader';
 import {powerTimestamp} from './cameraEvidence';
 import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
@@ -11,7 +12,7 @@ import FleetBatterySummary from './FleetBatterySummary';
 import LastKnownCameraStatus from './LastKnownCameraStatus';
 import type {LastKnownCamera} from './cameraLastKnown';
 
-const stateLabels:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support',not_available:'Not available'};
+const stateLabels:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support',not_available:'Not available',shop:'In Shop'};
 const powerLabels:Record<string,string>={solar_power:'Solar output',load_power:'DC system load',battery_power:'Battery power',battery_voltage:'Battery voltage',battery_current:'Battery current',low_voltage_alarm:'Low voltage alarm',low_soc_alarm:'Low charge alarm',high_voltage_alarm:'High voltage alarm'};
 const sourceLabel=(source:string,instance:number)=>`${source==='solarcharger'?'Solar charger':source==='system'?'System':'Battery'} ${instance}`;
 function Status({state,label}:{state:Signal|'shop';label?:string}){return <span className={'cos-fleet-badge cos-signal-'+state}><i aria-hidden='true'>●</i>{label||stateLabels[state as Signal]}</span>;}
@@ -23,13 +24,14 @@ function RouterStatusPill({row,now}:{row:FleetDashboardRow;now:number}){
 }
 
 /** Present only the already reconciled row. This card never fetches or associates devices. */
-export default function FleetUnitHealth({row,now,routerNow,editing=false,lastKnown=null}:{row:FleetDashboardRow;now:number;routerNow?:number;editing?:boolean;lastKnown?:LastKnownCamera|null}){
+export default function FleetUnitHealth({row,now,routerNow,editing=false,lastKnown=null,role=null}:{row:FleetDashboardRow;now:number;routerNow?:number;editing?:boolean;lastKnown?:LastKnownCamera|null;role?:string|null}){
  const metrics=row.power?.measurements.filter(m=>m.metric in powerLabels)||[];
  const recent=row.batteryReadIssue?[]:metrics.filter(m=>powerTimestamp(m.observedAt,now).fresh);
  return <><FleetCameraTools key={row.id} row={row}/><div className='cos-fleet-unit-health-grid'>
   <section className='cos-fleet-unit-health-section cos-fleet-camera-card' aria-label={editing?'Unit health signals':'Selected unit camera health'}>
    <h3><FleetCardIcon kind="camera"/>Camera health</h3><b className={'camera-unit-state cos-fleet-badge camera-status-'+row.cameraState+' cos-signal-'+row.cameraState} style={{color:cameraColors[row.camera.state]}}>{unitHealthLabel(row.camera)}</b>
    <small>{healthObservationLabel(row.camera.basis,row.camera.state)}: {cameraTime(row.camera.checkedAt,now)}</small>
+   {shopLastCheck({savedReading:row.camera.savedReading,checkedAt:row.camera.checkedAt,reason:row.camera.reason,role})&&<p className='cos-shop-last-check'>{shopLastCheck({savedReading:row.camera.savedReading,checkedAt:row.camera.checkedAt,reason:row.camera.reason,role})}</p>}
    <LastKnownCameraStatus observation={lastKnown} now={now}/>
    <details><summary>{row.cameraState==='unknown'?'Why is this unverified?':'Camera source details'}</summary><p>{row.camera.reason}</p><p>Camera troubleshooting contains the matched devices and saved checks.</p></details>
   </section>

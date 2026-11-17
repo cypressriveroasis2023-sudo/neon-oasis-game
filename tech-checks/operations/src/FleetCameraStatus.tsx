@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api} from './api';
 import {cameraTime} from './fieldCameraHealth';
+import {isShopPlacement, SHOP_LABEL} from './shopReader';
 import {STAR_UNIT_STATUS_CONTRACT,countUnits,unitVerdict,type HandEditField,type UnitCameraStatus,type UnitCameraStatusReport,type UnitSource} from '../shared/starUnitStatus';
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
@@ -290,7 +291,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
       </small>)}
      </div>
      <div className='cos-camera-status-detail'>
-      <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
+      <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{isShopPlacement(unit.placement)?SHOP_LABEL:sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
       {sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
        :unit.down.length>0&&<small>{unit.down.some(camera=>camera.status==='offline')?'Down: ':'Not verified: '}{unit.down.map(camera=>{const prior=priorCameraReading(camera);return camera.name+(camera.status==='unknown'?' (not verified'+(prior?'; last reported '+prior.status+' '+cameraTime(prior.at,now):'')+')':'');}).join(', ')}</small>}
       {victron.has(unit.unit)&&<><small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small><CosPowerChecks measurements={victron.get(unit.unit)!.measurements} now={now} settings={powerSettings}/></>}
@@ -323,11 +324,11 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
       {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
-       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
+       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed||isShopPlacement(unit.placement)?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
        <span>{camera.name}</span>
        <small>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
-        :camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
-        {!camera.removed&&priorCameraReading(camera)&&' · last reported '+priorCameraReading(camera)!.status+' '+cameraTime(priorCameraReading(camera)!.at,now)}
+        :isShopPlacement(unit.placement)?SHOP_LABEL:camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
+        {!camera.removed&&!isShopPlacement(unit.placement)&&priorCameraReading(camera)&&' · last reported '+priorCameraReading(camera)!.status+' '+cameraTime(priorCameraReading(camera)!.at,now)}
         {!camera.removed&&!camera.atSite&&unit.placement==='FIELD'?' \u00b7 in the shop, not at this site':''}</small>
        {canEdit&&(camera.removed
         ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>

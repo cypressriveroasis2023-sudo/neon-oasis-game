@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {canonicalCameraUnit,fieldCameraHealth,validateCameraHealth} from '../src/fieldCameraHealth.ts';
+import {canonicalCameraUnit,fieldCameraHealth,unitHealthLabel,validateCameraHealth} from '../src/fieldCameraHealth.ts';
 import {fleetDashboardRows,fleetDashboardSummary} from '../src/fleetDashboardModel.ts';
 import {cameraTimestamp,currentCameraStatus,CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 import {cameraOverview} from '../src/cameraHealthCounts.ts';
@@ -36,17 +36,19 @@ test('a Sniper placed in Shop keeps a confirmed connection on its own record and
  const down=resource(9,'Sniper 501',{scope:'shop',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true,consecutiveFailures:3})});
  const health=snapshot([down]);
  const result=project([down],[sniper],sniper);
- assert.equal(result.state,'offline');
+ assert.equal(result.state,'shop');
+ assert.equal(result.savedReading,'offline');
  assert.match(result.reason,/saved IP \/ port checks confirmed no response/);
- assert.match(result.reason,/PLACEMENT CONFLICT/);
+ assert.doesNotMatch(result.reason,/\boffline\b/i);
  assert.equal(result.classification.scope,'shop');
  const rows=fleetDashboardRows([sniper],health,[],null,now);
- assert.equal(rows[0].cameraState,'offline');
+ assert.equal(rows[0].cameraState,'shop');
  assert.equal(fleetDashboardSummary(rows).offline,0);
 });
 test('placement confidence is independent, shop and inactive are excluded, and unresolved retains review',()=>{
  assert.equal(project([{...row,scope:'unknown'}]).state,'online');assert.match(project([{...row,scope:'unknown'}]).reason,/LOCATION REVIEW/);
- for(const scope of ['shop','inactive']){const result=project([{...row,scope}]);assert.equal(result.state,'unknown');assert.equal(result.classification.scope,scope);}
+ const shopResult=project([{...row,scope:'shop'}]);assert.equal(shopResult.state,'shop');assert.equal(unitHealthLabel(shopResult),'In Shop');assert.equal(shopResult.classification.scope,'shop');
+ const inactiveResult=project([{...row,scope:'inactive'}]);assert.equal(inactiveResult.state,'unknown');assert.equal(inactiveResult.classification.scope,'inactive');
  assert.equal(project([row],[{...unit,status:'returning'}],{...unit,status:'returning'}).state,'online');
 });
 test('legacy summary or direct port evidence cannot supply current camera state',()=>{

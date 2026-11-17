@@ -8,7 +8,7 @@ import type {LastKnownCamera} from './cameraLastKnown';
 import {unitHealthLabel} from './fieldCameraHealth';
 import {displayedRouterStatus} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 
-const words:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'No cameras',not_available:'Not available'};
+const words:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'No cameras',not_available:'Not available',shop:'In Shop'};
 function SignalValue({label,state}:{label:string;state:Signal}){return <div className={'cos-equipment-signal cos-signal-'+state}><span>{label}</span><strong><i aria-hidden='true'/> {words[state]}</strong></div>;}
 /** Presentation of reconciled rows only; never creates status, identity, or power evidence. */
 export default function FleetEquipmentCards({rows,now,routerNow,onOpen,lastKnown,onVerified,verifyProduct}:{onVerified?:(connections?:unknown)=>Promise<unknown>;verifyProduct?:(row:FleetDashboardRow)=>{productId:string;unitNumber:string}|null;rows:FleetDashboardRow[];now:number;routerNow?:number;lastKnown:(row:FleetDashboardRow)=>LastKnownCamera|null;onOpen:(id:string)=>void}){

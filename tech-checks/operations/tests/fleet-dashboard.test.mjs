@@ -75,8 +75,10 @@ test('a shop Sniper with a confirmed port outage keeps its own OFFLINE record bu
  const rows=fleetDashboardRows([bench,installed],scoped,[],null,now);
  const shopRow=rows.find(r=>r.name==='Sniper 440'),fieldRow=rows.find(r=>r.name==='Sniper 441');
  assert.equal(shopRow.placement,'shop');
- assert.equal(shopRow.cameraState,'offline','the bench unit keeps its true connection state on its own record');
+ assert.equal(shopRow.cameraState,'shop');
+ assert.equal(shopRow.camera.savedReading,'offline');
  assert.match(shopRow.camera.reason,/saved IP \/ port checks confirmed no response/);
+ assert.doesNotMatch(shopRow.camera.reason,/\boffline\b/i);
  assert.equal(fieldRow.cameraState,'offline');
  const summary=fleetDashboardSummary(rows);
  assert.equal(summary.offline,1,'only the installed unit is a Field outage; the bench unit must not be counted');

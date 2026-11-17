@@ -26,6 +26,7 @@
 #root#root .cos-fleet-dashboard .cos-fleet-stat strong{color:var(--cos-text)!important}
 #root#root .cos-fleet-dashboard :is(.cos-fleet-stat-online strong,.cos-signal-online){color:#2bff35!important}
 #root#root .cos-fleet-dashboard :is(.cos-fleet-stat-offline strong,.cos-signal-offline){color:#ff2734!important}
+#root#root .cos-fleet-dashboard .cos-signal-shop{color:#64748b!important}
 #root#root .cos-fleet-dashboard :is(.cos-fleet-stat-unknown strong,.cos-signal-unknown){color:#cad5e2!important}
 #root#root .cos-fleet-dashboard .cos-signal-support{color:#15a8ff!important}
 #root#root .cos-fleet-dashboard .cos-fleet-stat-verify strong{color:#6fb6ff!important}

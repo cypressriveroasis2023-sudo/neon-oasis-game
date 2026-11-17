@@ -38,6 +38,7 @@ test('pages recipe keeps the 410 gate and replaces the first-miss classifier',()
   assert.match(files['savedFleetBoard.mjs'], /PLACEMENT CONFLICT: camera inventory says/);
   assert.equal(files['savedFleetBoard.mjs'].includes('classification.scope === "shop" && state === "offline"'), false);
   assert.match(files['productVerifyNow.ts'], /\['online','offline','verifying'\]/);
+  assert.match(files['routerBoardJoin.mjs'], /if \(shop\) return \{ status: 'In Shop', checkedAt, outage: false \}/);
   assert.match(files['productTcpRuntime.ts'], /Connection refused \(os error 111\)/);
 });
 
@@ -49,6 +50,7 @@ test('unit camera status recipe patches the bundled classifier and keeps the rou
   assert.match(files['index.ts'], new RegExp(verifying.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
   assert.match(files['index.ts'], /PLACEMENT CONFLICT: camera inventory says/);
   assert.equal(files['index.ts'].includes('classification.scope === "shop" && state2 === "offline"'), false);
+  assert.match(files['routerBoardJoin.mjs'], /if \(shop\) return \{ status: 'In Shop', checkedAt, outage: false \}/);
   assert.match(files['index.ts'], /Connection refused \(os error 111\)/);
 });
 
@@ -58,6 +60,7 @@ test('producer recipe keeps the router wrap and points at the patched handler',(
   assert.match(files['index.ts'], /routerBoardAuth\.run/);
   assert.match(files['index.ts'], /411138b49fd6b7fd2ab426bb8318c08a86e7da01\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
   assert.equal(files['index.ts'].includes('b5b188229346182d9a4e29da42415a1b9d3b9d53'), false);
+  assert.match(files['routerBoardJoin.mjs'], /if \(shop\) return \{ status: 'In Shop', checkedAt, outage: false \}/);
 });
 
 test('step-back rollbacks restore the pre-miss bytes and live rollbacks match the recorded entries',()=>{

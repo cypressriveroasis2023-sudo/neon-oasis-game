@@ -8,9 +8,9 @@ import {healthObservationTime} from './healthObservationTime';
 export type { CameraRow } from './cameraEvidence';
 export type Health = FieldRecorderGuardEnvelope & {sweepCoverage?:CameraSweepCoverage|null;fleetFieldUnits?:FieldHealthUnit[];totalDevices:number;online:number;offline:number;review:number;shopRoot:number;healthRows:number;fieldDevices:number;refreshedAt:string;rows:CameraRow[];evidenceVersion?:number;inventory?:{allRecords:number;activeFieldRecords:number;activeShopRecords:number;inactiveRecords:number;unknownScopeRecords?:number};coverageNote?:string;identityVersion?:number;unitIdentities?:VerifiedUnitIdentity[];ownerConfirmedIdentityVersion?:number;ownerConfirmedUnitIdentities?:VerifiedUnitIdentity[];reconProviderIdentityVersion?:number;reconProviderUnitIdentities?:VerifiedUnitIdentity[];identityWarnings?:IdentityWarning[]};
 export type FieldHealthUnit = FieldRecorderContext & {id:string;unitNumber:string;modelName?:string;category?:string;readOnly?:boolean;address?:string;site?:string;customer?:string;placementAuditId?:string;placementUnitKey?:string};
-export type UnitCameraHealth = {state:'online'|'offline'|'unknown'|'support';reason:string;rows:CameraRow[];unitKey:string|null;checkedAt:string|null;identity:'matched'|'missing'|'ambiguous';classification:(UnitEvidence&{observation?:LinkedUnitObservation})|null;basis?:'camera'|'connection'|'recorder'|'provider';observation?:LinkedUnitObservation;association?:VerifiedUnitIdentity};
-export const cameraColors={online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff'};
-export const cameraLabels={online:'Camera records online',offline:'Camera outage observed',unknown:'Camera status unverified'};
+export type UnitCameraHealth = {state:'online'|'offline'|'unknown'|'support'|'shop';savedReading?:'online'|'offline'|'unknown';reason:string;rows:CameraRow[];unitKey:string|null;checkedAt:string|null;identity:'matched'|'missing'|'ambiguous';classification:(UnitEvidence&{observation?:LinkedUnitObservation})|null;basis?:'camera'|'connection'|'recorder'|'provider';observation?:LinkedUnitObservation;association?:VerifiedUnitIdentity};
+export const cameraColors={online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff',shop:'#64748b'};
+export const cameraLabels={online:'Camera records online',offline:'Camera outage observed',unknown:'Camera status unverified',shop:'In Shop'};
 export function validateCameraHealth(value:any):Health {
   const object=(v:any)=>v&&typeof v==='object'&&!Array.isArray(v);
   if(!object(value)||['totalDevices','online','offline','review','shopRoot','healthRows','fieldDevices'].some(key=>!Number.isSafeInteger(value[key])||value[key]<0)||!Array.isArray(value.rows)||value.rows.some((r:any)=>!object(r)||(typeof r.id!=='string'&&typeof r.id!=='number')||String(r.id).trim()===''||typeof r.name!=='string'||typeof r.unit!=='string'||!['online','offline','review'].includes(r.status))||value.online+value.offline+value.review!==value.fieldDevices||!Number.isFinite(Date.parse(value.refreshedAt)))throw new Error('Camera Health returned an incomplete summary.');
@@ -85,7 +85,7 @@ export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],h
     const detail=association.identity.kind==='reconeyez_area'?'Reviewed provider-area group: '+detectorStates.filter(state=>state==='online').length+' of '+rows.length+' detector records recently online; '+detectorStates.filter(state=>state==='offline').length+' offline; '+detectorStates.filter(state=>!['online','offline'].includes(state)).length+' unverified. Bridge contact is shown separately.':observation.basis==='recorder'?'This observation describes the recorder. Individual camera channels and video are not verified.':observation.basis==='connection'?'The saved IP / port observation describes service reachability. Camera video is not verified.':'Expected camera channel coverage is unknown; reported records do not verify every camera or video.';
     const freshness=state==='unknown'?' Source records are mixed, stale, missing, or unverified; silence is not a confirmed outage.':'';
     const placement=fieldRecorder?' Current Field installation and exact recorder identity are verified. Legacy provider folder/activation remains recorded separately; this observation does not move equipment.':classification.scope==='unknown'?' LOCATION REVIEW: saved placement is unresolved.':['shop','inactive'].includes(classification.scope)?' PLACEMENT CONFLICT: source inventory says '+classification.scope.toUpperCase()+' while this record is in the field map. The source observation does not move equipment.':'';
-    return {state,reason:detail+freshness+placement,rows,unitKey:association.identity.unitKeys[0],checkedAt:observation.checkedAt,identity:'matched',classification,basis:observation.basis,observation,association:association.identity};
+    return presentShop({state,reason:detail+freshness+placement,rows,unitKey:association.identity.unitKeys[0],checkedAt:observation.checkedAt,identity:'matched',classification,basis:observation.basis,observation,association:association.identity}, unit);
   }
   const key=scopedFieldIdentity(unit);
   if(!key)return unknown('No verified equipment-to-resource association is available for this saved identifier. Review its identity; source status is not inferred from a similar name.');
@@ -105,7 +105,17 @@ export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],h
   const checkedAt=healthObservationTime(direct?safeRows:cameras,direct?'connection':'camera',state,now);
   const location=classification.scope==='unknown'?' LOCATION REVIEW: saved placement is unresolved.':['shop','inactive'].includes(classification.scope)?' PLACEMENT CONFLICT: camera inventory says '+(classification.scope==='shop'?'SHOP / ROOT':'INACTIVE')+' while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.':'';
   const reason=health.evidenceVersion!==2?'Source-separated observations are not available in this response.':!operational?'Shop/root or inactive inventory is excluded from operational camera colors.':state==='offline'?'At least one matched camera/detector has a recent provider OFFLINE observation.':state==='online'?'Reported camera/detector records are recently ONLINE. Expected channel coverage is unknown; this does not verify every camera.':cameras.length?'Camera/detector observations are older, missing, or unverified. Silence is not a confirmed outage.':'Camera channel status unavailable. Recorder and service observations remain separate.';
-  return {state,identity:'matched',rows,unitKey:rows[0].unit,checkedAt,classification,basis:direct?'connection':'camera',reason:(direct?(state==='online'?'The saved IP / port check responded.':state==='offline'?'The saved IP / port checks confirmed no response.':'No recent definitive IP / port result is available.')+' This is connection status; camera video is not verified. Location confidence does not change this connection result.':reason)+location};
+  return presentShop({state,identity:'matched',rows,unitKey:rows[0].unit,checkedAt,classification,basis:direct?'connection':'camera',reason:(direct?(state==='online'?'The saved IP / port check responded.':state==='offline'?'The saved IP / port checks confirmed no response.':'No recent definitive IP / port result is available.')+' This is connection status; camera video is not verified. Location confidence does not change this connection result.':reason)+location}, unit);
+}
+function unitPlacedInShop(unit:FieldHealthUnit){
+  const extra=unit as FieldHealthUnit&{placement?:string;currentLocationType?:string};
+  const value=String(extra.placement||extra.currentLocationType||'').toLowerCase();
+  return value==='shop'||value==='root'||value==='warehouse'||value==='yard';
+}
+function presentShop(result:UnitCameraHealth, unit:FieldHealthUnit):UnitCameraHealth{
+  if(result.classification?.scope!=='shop'&&!unitPlacedInShop(unit))return result;
+  const saved=result.state==='online'||result.state==='offline'||result.state==='unknown'?result.state:'unknown';
+  return {...result,state:'shop',savedReading:saved,reason:result.reason.replace(/\boffline\b/gi,'not answering')};
 }
 export function cameraTime(value?:string|null,now=Date.now()) {
   const {at}=cameraTimestamp(value,now);
@@ -113,9 +123,11 @@ export function cameraTime(value?:string|null,now=Date.now()) {
 }
 
 export function unitHealthLabel(info:UnitCameraHealth|null|undefined){
+  if(info?.state==='shop'||info?.classification?.scope==='shop')return 'In Shop';
   if(info?.state==='support')return 'SUPPORT EQUIPMENT · 0 CAMERAS';
   if(info?.observation)return info.observation.label;
-  return info?.basis==='connection'?({online:'IP / PORT ONLINE',offline:'IP / PORT OFFLINE',unknown:'IP / PORT UNKNOWN'}[info.state]):cameraLabels[info?.state||'unknown'];
+  const shown=info?.state==='online'||info?.state==='offline'||info?.state==='unknown'?info.state:'unknown';
+  return info?.basis==='connection'?{online:'IP / PORT ONLINE',offline:'IP / PORT OFFLINE',unknown:'IP / PORT UNKNOWN'}[shown]:cameraLabels[shown];
 }
 export function unitDiagnosticsPath(unit:FieldHealthUnit,rows:CameraRow[]=[]){
   const source=new Set(rows.map(row=>row.unit));
