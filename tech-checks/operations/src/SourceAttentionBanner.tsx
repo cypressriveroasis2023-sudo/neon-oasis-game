@@ -1,6 +1,5 @@
 import {loudSourceAlerts, type SourceFacts} from './sourceAttention';
 import {cameraTime} from './fieldCameraHealth';
-import './sourceAttention.css';
 
 /** Owner and IT see a failed or stale source by name, with when and what to do.
  * The banner never calls that condition an outage. */
@@ -9,7 +8,7 @@ export default function SourceAttentionBanner({facts, canReconnect, onReconnect}
 }) {
   const alerts = loudSourceAlerts(facts);
   if (!alerts.length) return null;
-  return <section className='cos-source-alerts' aria-label='Source attention' role='alert'>
+  return <section className='cos-source-alerts' aria-label='Source attention' role='status'>
     {alerts.map(alert => <article key={alert.id} className={'cos-source-alert cos-source-alert-'+alert.state}>
       <strong>{alert.source}</strong>
       <p>{alert.state === 'reconnect_required' ? 'Authorization rejected.' : alert.state === 'failed' ? 'Last read failed.' : alert.state === 'stale' ? 'Stale.' : 'Not verified.'}

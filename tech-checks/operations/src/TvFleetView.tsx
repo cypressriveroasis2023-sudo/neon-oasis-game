@@ -4,6 +4,7 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
+import './sourceAttention.css';
 import './tvBoardExtensions.css';
 import './fleetCompactSheet.css';
 import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';

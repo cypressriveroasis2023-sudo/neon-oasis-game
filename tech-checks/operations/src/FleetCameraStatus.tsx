@@ -8,6 +8,7 @@ import {canonicalCameraUnit} from './fieldCameraHealth';
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
+import './sourceAttention.css';
 import './readingScope.css';
 import {cameraReadingCoverage,cameraUpEvidence,priorCameraReading} from './cameraReadingCoverage';
 import './cosMotion.css';

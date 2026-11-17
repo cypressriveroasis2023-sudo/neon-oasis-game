@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
 import {cosPowerLabel, cosPowerVerdict, powerSamples, preferSharedSettings, readParentAccessToken, readPowerAlarmSettings, readSharedPowerAlarmSettings, writePowerAlarmSettings, writeSharedPowerAlarmSettings, type CosPowerSettings, type PowerMeasurement} from './cosPowerAlarms';
-import './sourceAttention.css';
 
 function blank(value: number | null): string {
   return value === null ? '' : String(value);
