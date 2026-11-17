@@ -3674,7 +3674,7 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
               const response = await fetch("https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-health-sweep", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-camera-cron-secret": secret },
-                body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, ...endpointAuthorityDirective ? { endpoint_authority: endpointAuthorityDirective } : {} }),
+                body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, ...body.camera_only === true ? { camera_only: true } : {}, ...endpointAuthorityDirective ? { endpoint_authority: endpointAuthorityDirective } : {} }),
                 redirect: "error",
                 cache: "no-store",
                 signal: req.signal
@@ -3786,7 +3786,8 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
       const endpointAuthorityBlocked = isShardCall && (body.endpoint_authority === "refused" || body.endpoint_authority === "unavailable") ? body.endpoint_authority : null;
       const endpointEvidence = endpointSourceEnabled ? scheduledEndpointFromExistingCron(db, req, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3), endpointAuthorityBlocked) : scheduledTrackerEndpointRuntime(db, endpointRuntime, req.signal, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3));
       if (endpointEvidence) await endpointEvidence.prepare();
-      const star4liveRun = star4LiveTcpEnabled ? CosStar4LiveScheduledPing20261102.collectScheduledStar4Live(db, tcp, { startedAt: requestStarted, deadlineMs: 95e3, signal: req.signal, shardIndex, shardCount }).then(value => ({ value, error: null }), () => ({ value: null, error: "Star4Live saved TCP inventory unavailable" })) : Promise.resolve(null);
+      const cameraOnly = body.camera_only === true;
+      const star4liveRun = !cameraOnly && star4LiveTcpEnabled ? CosStar4LiveScheduledPing20261102.collectScheduledStar4Live(db, tcp, { startedAt: requestStarted, deadlineMs: 95e3, signal: req.signal, shardIndex, shardCount }).then(value => ({ value, error: null }), () => ({ value: null, error: "Star4Live saved TCP inventory unavailable" })) : Promise.resolve(null);
       const cameraRun = collectScheduledDirect(db, tcp, { startedAt: requestStarted, deadlineMs: completedSnapshotEnabled ? 95e3 : 60e3, endpointEvidence, shardIndex, shardCount }).then((value) => ({ value, error: null }), () => ({ value: null, error: "Direct inventory unavailable" }));
       const { data: routerMappings, error: routerQueryError } = await db.from("camera_unit_routers").select("id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,reported_status,reported_latency_ms,status_source,status_observed_at,current_status,last_checked_at,last_online_at,updated_at").or("router_public_ip.not.is.null,unit_ip.not.is.null");
       const routerReadError = routerQueryError || !Array.isArray(routerMappings) || routerMappings.length >= 1e3;
@@ -3833,6 +3834,7 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
       };
       let routerCursor = 0;
       const routerRun = (async () => {
+        if (cameraOnly) return [];
         const results2 = [];
         while (routerCursor < routers.length && Date.now() + 3200 < requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3)) {
           const wave = routers.slice(routerCursor, routerCursor + n);

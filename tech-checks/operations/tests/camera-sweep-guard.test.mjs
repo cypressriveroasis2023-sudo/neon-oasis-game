@@ -120,6 +120,7 @@ test('the live sweep bundle uses one retry, the guard, and the overlap lock',()=
  assert.match(bundle,/deadlineMs: completedSnapshotEnabled \? 95e3 : 60e3/);
  assert.match(bundle,/function publicationForProbe/);
  assert.match(bundle,/function mergeSweepVerdict/);
+ assert.match(bundle,/body\.camera_only === true/);
  assert.match(bundle,/camera_sweep_lock/);
  assert.match(bundle,/checked_ids/);
  assert.match(bundle,/first_failed_at = prev.first_failed_at \|\| checked/);
