@@ -17,10 +17,10 @@
  },
  "edits": [],
  "expectedBefore": {
-  "index.ts": "b40ddeda04361b03287f4e67ec6a240fe06315615002c621e2a4a507e94c0b1f"
+  "index.ts": "b092f24b650d9ff987985abf018bdf9c1809b47b8eac14df6904abc78ed8bd5b"
  },
  "expectedAfter": {
-  "index.ts": "b40ddeda04361b03287f4e67ec6a240fe06315615002c621e2a4a507e94c0b1f"
+  "index.ts": "b092f24b650d9ff987985abf018bdf9c1809b47b8eac14df6904abc78ed8bd5b"
  },
  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/camera-health-sweep/rollback-to-v101.json --deploy"
 }
