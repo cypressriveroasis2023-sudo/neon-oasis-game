@@ -27,34 +27,16 @@ async function mount(page,authorized=true,importEnabled=true){
   await page.goto('/mhelp-native-fixture');
   return{frame:page.frameLocator('#operations'),writes};
 }
-test('production bundle on native board loads its local PDF worker and preserves responsive review',async({page},info)=>{
-  const{frame,writes}=await mount(page);
-  const panel=frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true});
-  await expect(panel).toBeHidden();
-  await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
-  await expect(panel.getByRole('heading',{name:'Import mHelpDesk ticket'})).toBeVisible();
-  await panel.locator('input[type=file]').setInputFiles({name:'Ticket123456_999.pdf',mimeType:'application/pdf',buffer:syntheticTicketPdf()});
-  await expect(panel.getByRole('heading',{name:'Review Work Order 009001'})).toBeVisible();
-  await panel.getByRole('button',{name:'Fixture Builders',exact:true}).click();
-  await panel.getByLabel('Existing service site').selectOption(site);
-  await expect(panel.getByLabel('Source contact instructions and restrictions')).toHaveValue(/Excluded Person/);
-  await expect(panel.getByLabel('Work instructions',{exact:true})).not.toHaveValue(/Excluded Person/);
-  expect(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  expect(writes).toEqual([]);
-  await page.screenshot({path:info.outputPath('mhelp-native-review.png'),fullPage:true});
-});
-test('unauthorized native board never exposes PDF import or source history',async({page})=>{
-  const{frame,writes}=await mount(page,false);
-  await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();
-  await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket'})).toHaveCount(0);
-  expect(writes).toEqual([]);
-});
-
-test('native board with an older backend never exposes import actions before capability is enabled',async({page})=>{
- const {frame,writes}=await mount(page,true,false);
+test('Daily Board does not open mHelp ticket import',async({page})=>{
+ const {frame,writes}=await mount(page);
  await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
- await frame.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
- await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toHaveCount(0);
+ await expect(frame.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
+ await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket'})).toHaveCount(0);
  expect(writes).toEqual([]);
 });
-
+test('unauthorized native board never exposes PDF import or source history',async({page})=>{
+ const {frame,writes}=await mount(page,false);
+ await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();
+ await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket'})).toHaveCount(0);
+ expect(writes).toEqual([]);
+});

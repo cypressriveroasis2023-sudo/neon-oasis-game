@@ -25,9 +25,11 @@ export default function DirectoryWorkspace({kind,show,createCustomerId,cancelCre
   const load=useCallback(async()=>{
     const request=++revision.current;setLoading(true);
     try {
-      const result=await api.get(definition(kind).endpoint);
+      const endpoint=definition(kind).endpoint;
+      if(!endpoint) throw new Error('Customers and sites are not available in COS.');
+      const result=await api.get(endpoint);
       const next=records(result.data,kind);
-      const people=kind==='Sites'?records((await api.get('/api/customers')).data,'Customers'):[];
+      const people:Row[]=[];
       if(request!==revision.current)return;
       if(createCustomerId&&!people.some(customer=>customer.id===createCustomerId&&customer.status==='active'))throw new Error('This customer is no longer active. Refresh the customer directory before adding a site.');
       setRows(next);setCustomers(people);setError('');if(createCustomerId)setForm({...fresh('Sites'),customerId:createCustomerId});return next;

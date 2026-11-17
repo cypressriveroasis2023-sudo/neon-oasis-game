@@ -1,23 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
-import {workspaces,workspaceGroups,hiddenWorkspaces,readWorkspaceRoute,workspaceHash} from '../src/workspaceNavigation.ts';
+import {workspaces,workspaceGroups,hiddenWorkspaces,retiredBusinessWorkspaces,readWorkspaceRoute,workspaceHash} from '../src/workspaceNavigation.ts';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
-test('every company route is either shown in a group or deliberately hidden',()=>{
-  assert.deepEqual(workspaceGroups.map(g=>g.label),['Overview','Job flow','Schedule','Equipment','Customers','Team']);
+test('every company route is shown or retired to Today',()=>{
+  assert.deepEqual(workspaceGroups.map(g=>g.label),['Overview','Cameras & handoff','Equipment','Team']);
   const destinations=workspaceGroups.flatMap(g=>g.items);
   assert.equal(new Set(destinations).size,destinations.length);
-  // The owner does not use these, so they are off the navigation. They stay
-  // routable, and this list is what stops one falling off unnoticed.
-  assert.deepEqual([...destinations,...hiddenWorkspaces,'Vision','Invoices'].sort(),[...workspaces].sort());
-  assert.equal(new Set([...destinations,...hiddenWorkspaces]).size,destinations.length+hiddenWorkspaces.length);
-  for(const workspace of workspaces) assert.equal(readWorkspaceRoute(workspaceHash({workspace,jobId:'',detail:false})).workspace,workspace);
-});
-
-test('a hidden workspace still opens from an old link',()=>{
-  // Hiding is not deleting: a bookmark must not land somewhere else silently.
-  for(const workspace of hiddenWorkspaces)
-   assert.equal(readWorkspaceRoute(workspaceHash({workspace,jobId:'',detail:false})).workspace,workspace);
+  assert.deepEqual([...destinations,...hiddenWorkspaces,...retiredBusinessWorkspaces].sort(),[...workspaces].sort());
+  for(const workspace of destinations) assert.equal(readWorkspaceRoute(workspaceHash({workspace,jobId:'',detail:false})).workspace,workspace);
+  for(const workspace of retiredBusinessWorkspaces) assert.equal(readWorkspaceRoute(workspaceHash({workspace,jobId:'job',detail:true})).workspace,'Today');
 });
 test('native app uses exact approved dark palette and self-hosted Open Sans',()=>{
   const css=read('../src/companyTheme.css');

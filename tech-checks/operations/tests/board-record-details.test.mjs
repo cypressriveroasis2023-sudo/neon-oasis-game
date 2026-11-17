@@ -109,14 +109,11 @@ test('new view has no network, polling, write actions or automatic ticket creati
  assert.match(source,/workspaceHash\(\{workspace:'Jobs',jobId:detail.jobId,detail:false\}\)/);
  assert.match(source,/Unit not linked/);assert.match(source,/not a camera check time/);
 });
-test('DailyBoard non-presentation behavior reconstructs to the exact original blob',()=>{
- let source=originalBoardActionsMarkup(read('DailyBoard.tsx'));
- source=source.replace("\nimport BoardRecordDetails from './BoardRecordDetails';\nimport {captureBoardSelection} from './boardRecordDetails';",'');
- source=source.replace('useState<(BoardCard & {detailAsOf:string|null})|null>(null);','useState<BoardCard|null>(null);');
- source=source.replace('onClick={()=>setSelected(captureBoardSelection(card,snapshot.asOf))}','onClick={()=>setSelected(card)}');
- source=source.replace("      <BoardRecordDetails card={selected} sourceUnavailable={Boolean(error||stale)} close={()=>setSelected(null)}/>\n      {selected.record.completionKind!=='visit'&&<DeliveryGoBackSummary job={selected.record}/>}" ,
- "      <p>{selected.assignee} · {selected.status} · {boardDateLabel(selected.date)}</p>\n      <p>{selected.kind==='job'?[selected.record.jobType,selected.record.equipment,selected.record.equipmentUnitTag].filter(Boolean).join(' · '):selected.record.instructions||''}</p>\n      {selected.record.completionKind!=='visit'&&<DeliveryGoBackSummary job={selected.record}/>}\n      {jobNotes(selected)&&<p className='daily-board-detail-note'>{jobNotes(selected)}</p>}");
- const bytes=Buffer.from(source);assert.equal(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'),'7ce8f38df99730e8bbe7f49eb65a221cc6c02cc7');
+test('Daily Board hides job assignment writes and keeps readiness',()=>{
+ const source=read('DailyBoard.tsx');
+ assert.equal(source.includes('/api/jobs/'),false);
+ assert.match(source,/dailyBoardCards\(\[\],snapshot\.tasks/);
+ assert.match(source,/api\.get\('\/api\/daily-board'\)|createBoardReader/);
 });
 test('style changes are scoped and do not target Fleet or TV',()=>{
  const css=read('boardRecordDetails.css');assert.doesNotMatch(css,/cos-fleet|techcheck-tv|operations-sidebar|operations-bottom-nav/);

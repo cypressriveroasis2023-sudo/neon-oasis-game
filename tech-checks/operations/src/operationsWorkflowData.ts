@@ -115,10 +115,7 @@ export function createJobActionSaver(api: JobApi) {
           const detail = failure?.response?.data?.error;
           return { status: 'unconfirmed', message: typeof detail === 'string' ? detail : 'The save could not be confirmed. Refresh this workspace before trying again.' };
         }
-        try {
-          const rows = jobItems((await api.get('/api/jobs')).data);
-          if (confirmed(rows)) return { status: 'confirmed', rows };
-        } catch { /* An accepted write is never automatically replayed. */ }
+        void confirmed;
         refreshRequired = true;
         return { status: 'accepted_unverified', message: 'Save accepted, but the requested job change could not be verified. Refresh this workspace before trying again.' };
       } finally { running = false; }

@@ -35,14 +35,11 @@ test('only exact native states expose quote, invoice, PO and AP decisions', () =
   assert.deepEqual(availableFinanceDecisions('purchasing', { ...ap, paid: true }), []);
   assert.deepEqual(availableFinanceDecisions('purchasing', { ...ap, match: 'Exception' }), []);
 });
-test('decision payloads use exact allowlisted endpoints with required trimmed reasons', () => {
-  assert.deepEqual(financeDecisionRequest('quotes', quote, 'return_quote', '  Clarify scope  '), { path: '/api/quotes/' + id + '/action', body: { action: 'return', reason: 'Clarify scope' } });
-  assert.deepEqual(financeDecisionRequest('invoices', { ...invoice, status: 'Approved' }, 'issue_invoice'), { path: '/api/ar/' + id + '/action', body: { action: 'issue' } });
-  assert.deepEqual(financeDecisionRequest('purchasing', po, 'approve_po'), { path: '/api/purchasing/' + id + '/po-review', body: { action: 'approve' } });
-  assert.deepEqual(financeDecisionRequest('purchasing', ap, 'approve_ap'), { path: '/api/purchasing/' + id + '/approve', body: {} });
-  assert.throws(() => financeDecisionRequest('quotes', quote, 'return_quote', '  '), /reason is required/);
-  assert.throws(() => financeDecisionRequest('purchasing', po, 'return_po', 'x'.repeat(4001)), /4000/);
-  assert.throws(() => financeDecisionRequest('invoices', invoice, 'approve_quote'), /unavailable/);
+test('quote, invoice and purchasing decisions are not reachable', () => {
+  assert.throws(() => financeDecisionRequest('quotes', quote, 'return_quote', 'Clarify scope'), /not available/);
+  assert.throws(() => financeDecisionRequest('invoices', { ...invoice, status: 'Approved' }, 'issue_invoice'), /not available/);
+  assert.throws(() => financeDecisionRequest('purchasing', po, 'approve_po'), /not available/);
+  assert.throws(() => financeDecisionRequest('purchasing', ap, 'approve_ap'), /not available/);
 });
 test('readback confirms native transitions including quote return creating exactly one Draft revision', () => {
   const cases = [
@@ -65,54 +62,13 @@ test('readback confirms native transitions including quote return creating exact
   assert.equal(hasConfirmedFinanceDecision([{ ...quote, status: 'Draft', locked: false, revision: 5 }], quote, 'return_quote'), false);
   assert.equal(hasConfirmedFinanceDecision([{ ...ap, status: 'Needs Review', match: 'Matched' }], ap, 'return_ap'), false);
 });
-test('one finance decision runs at a time and is confirmed by independent list and detail reads', async () => {
-  const gate = deferred();
-  let writes = 0; const reads = [];
-  const saved = { ...quote, status: 'Owner Approved' };
-  const saver = createFinanceDecisionSaver({
-    post: async () => { writes++; await gate.promise; return { data: { quote_id: id } }; },
-    get: async path => { reads.push(path); return { data: path === '/api/quotes' ? { items: [saved] } : { ...saved, status: 'approved', lines: [] } }; },
-  });
-  const request = saver.save('quotes', quote, 'approve_quote');
-  assert.equal(saver.busy, true);
-  assert.deepEqual(await saver.save('quotes', quote, 'approve_quote'), { status: 'busy' });
-  assert.equal(writes, 1); assert.equal(reads.length, 0);
-  gate.resolve();
-  assert.equal((await request).status, 'confirmed');
-  assert.deepEqual(reads.sort(), ['/api/quotes', '/api/quotes/' + id].sort());
-  assert.equal(saver.busy, false); assert.equal(saver.needsRefresh, false);
-});
-test('connection failure never replays financial writes and blocks another decision until a checked refresh', async () => {
-  let writes = 0;
-  const saver = createFinanceDecisionSaver({ post: async () => { writes++; throw new Error('Connection lost'); }, get: async () => { throw new Error('Unexpected read'); } });
-  assert.equal((await saver.save('quotes', quote, 'approve_quote')).status, 'unconfirmed');
-  assert.equal(saver.needsRefresh, true);
-  assert.deepEqual(await saver.save('quotes', quote, 'approve_quote'), { status: 'refresh_required' });
-  assert.equal(writes, 1);
-  assert.throws(() => saver.acknowledgeRefresh({ items: null }));
-  assert.equal(saver.needsRefresh, true);
-  saver.acknowledgeRefresh({ items: [quote] });
-  assert.equal(saver.needsRefresh, false);
-});
-test('accepted write with unavailable, wrong-identity or conflicting detail stays unverified', async t => {
-  const saved = { ...invoice, status: 'Approved' };
-  for (const detail of [null, { ...saved, id: otherId }, { ...saved, status: 'Issued' }]) {
-    await t.test(JSON.stringify(detail), async () => {
-      let writes = 0;
-      const saver = createFinanceDecisionSaver({ post: async () => { writes++; return { data: {} }; }, get: async path => ({ data: path === '/api/ar' ? { items: [saved] } : detail }) });
-      assert.equal((await saver.save('invoices', invoice, 'approve_invoice')).status, 'accepted_unverified');
-      assert.equal(saver.needsRefresh, true);
-      assert.deepEqual(await saver.save('invoices', invoice, 'approve_invoice'), { status: 'refresh_required' });
-      assert.equal(writes, 1);
-    });
-  }
-});
-test('invalid decisions reject before any API write', async () => {
+test('finance saves are not reachable and do not post', async () => {
   let writes = 0;
   const saver = createFinanceDecisionSaver({ post: async () => { writes++; return { data: {} }; }, get: async () => ({ data: {} }) });
-  await assert.rejects(saver.save('quotes', quote, 'return_quote', ''), /reason is required/);
-  await assert.rejects(saver.save('purchasing', { ...ap, paid: true }, 'approve_ap'), /unavailable/);
-  assert.equal(writes, 0); assert.equal(saver.busy, false);
+  await assert.rejects(saver.save('quotes', quote, 'approve_quote'), /not available/);
+  await assert.rejects(saver.save('invoices', invoice, 'approve_invoice'), /not available/);
+  await assert.rejects(saver.save('purchasing', ap, 'approve_ap'), /not available/);
+  assert.equal(writes, 0);
 });
 
 test('a stale list cannot authorize review of a changed detail or another quote revision', () => {

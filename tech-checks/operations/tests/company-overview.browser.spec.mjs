@@ -43,93 +43,49 @@ async function mount(page,{cameraData=camera}={}) {
   return { frame, state };
 }
 
-test('company overview orders real health sources before the eight-stage customer journey', async ({ page }, testInfo) => {
+test('company overview keeps camera health and routers and does not open the job journey', async ({ page }, testInfo) => {
   const { frame, state } = await mount(page);
   const overview = frame.getByRole('region', { name: 'Company overview', exact: true });
-  await expect(overview.getByRole('navigation',{name:'Equipment systems'})).toBeVisible();
-  await expect(overview.locator('.company-health-card')).toHaveCount(0);
-  const lifecycle = overview.getByRole('navigation', { name: 'Company job lifecycle' });
-  expect(await lifecycle.locator('strong').allTextContents()).toEqual(['Quote', 'Agreement', 'Signed', 'Schedule & Parts', 'IT Prep', 'Service Install', 'Closeout', 'Billing']);
-  await expect(lifecycle.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
-  await expect(lifecycle.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
-  await expect(lifecycle.getByRole('button', { name: 'Agreement: Not connected', exact: true })).toBeVisible();
-  await expect(lifecycle.getByRole('button', { name: 'Signed: Not connected', exact: true })).toBeVisible();
-  await lifecycle.getByRole('button', { name: 'Agreement: Not connected', exact: true }).click();
-  await expect(overview.getByText('Agreement tracking is not connected.', { exact: true })).toBeVisible();
-  const healthBox = await overview.getByRole('navigation',{name:'Equipment systems'}).boundingBox();
-  const stagesBox = await lifecycle.boundingBox();
-  const attentionBox = await overview.getByRole('heading', { name: 'What needs attention' }).boundingBox();
-  expect(healthBox.y + healthBox.height).toBeLessThan(stagesBox.y);
-  expect(stagesBox.y + stagesBox.height).toBeLessThan(attentionBox.y);
-  const gridColumns = await lifecycle.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
-  expect(gridColumns).toBe(testInfo.project.name.startsWith('mobile') ? 2 : 8);
-  const overflow = await frame.locator('body').evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, nodes: [...document.querySelectorAll('body *')].map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right, left: el.getBoundingClientRect().left })).filter(el => el.right > innerWidth + 1 || el.left < -1).slice(0, 12) }));
-  expect(overflow, JSON.stringify(overflow)).toMatchObject({ scrollWidth: overflow.width });
+  await expect(overview.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
+  await expect(overview.getByRole('region', {name: 'Router summary'})).toBeVisible();
+  await expect(overview.getByRole('navigation', {name: 'Company job lifecycle'})).toHaveCount(0);
+  await expect(overview.getByRole('button', {name: /Open quotes/})).toHaveCount(0);
+  expect(state.requests.some(item => item.path === '/api/camera-health/summary-v3')).toBe(true);
+  expect(state.requests.some(item => item.path === '/api/routers')).toBe(true);
+  expect(state.requests.some(item => ['/api/jobs','/api/quotes','/api/ar','/api/purchasing','/api/owner-tasks'].includes(item.path))).toBe(false);
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
-  await frame.locator('body').evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath('company-overview.png') });
 });
 
-test('refresh replaces failed sources with unavailable values and recovers verified zero separately', async ({ page }) => {
+test('refresh still reads camera health and routers when those sources fail and recover', async ({ page }) => {
   const { frame, state } = await mount(page);
-  // Change the fixture only after the initial independent sources have settled.
-  await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
-  state.failures.add('/api/jobs');
+  await expect(frame.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
   state.failures.add('/api/camera-health/summary-v3');
   state.failures.add('/api/routers');
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Schedule & Parts: Unavailable', exact: true })).toBeVisible();
-  await expect(frame.getByText('Nothing currently needs Owner attention in the loaded review sources.', { exact: true })).toHaveCount(0);
-  await expect(frame.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
+  await expect(frame.getByRole('alert', {name: 'Dashboard data unavailable'})).toBeVisible();
   state.failures.clear();
-  await frame.getByRole('button', { name: 'Retry dashboard', exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'IT Prep: 0 jobs', exact: true })).toBeVisible();
-  await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
+  await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
+  await expect(frame.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
 });
 
-test('stage selection keeps the real job search and selected-detail back flow', async ({ page }) => {
+test('job lifecycle and billing stages are not reachable from Today', async ({ page }) => {
   const { frame } = await mount(page);
-  await frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true }).click();
-  const workspace = frame.getByRole('region', { name: 'Daily workspace', exact: true });
-  await expect(workspace.getByRole('button', { name: /FIX-101/ })).toBeVisible();
-  await expect(workspace.getByRole('button', { name: /FIX-103/ })).toHaveCount(0);
-  await workspace.getByRole('searchbox', { name: 'Find an active job' }).fill('FIX-102');
-  await expect(workspace.getByRole('button', { name: /FIX-101/ })).toHaveCount(0);
-  await workspace.getByRole('button', { name: /FIX-102/ }).click();
-  await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toHaveCount(0);
-  await frame.getByRole('button', { name: /Back to jobs/ }).click();
+  await expect(frame.getByRole('navigation', { name: 'Company job lifecycle' })).toHaveCount(0);
+  await expect(frame.getByRole('region', { name: 'Daily workspace' })).toHaveCount(0);
+  await frame.locator('body').evaluate(() => { location.hash = '#jobs'; });
+  await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
-  await expect(workspace.getByRole('button', { name: /FIX-102/ })).toBeFocused();
-  await frame.locator('body').evaluate(() => history.forward());
-  await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toHaveCount(0);
-  await expect(frame.getByRole('button', { name: /Back to jobs/ })).toBeVisible();
-  await frame.locator('body').evaluate(() => history.back());
-  await expect(workspace.getByRole('button', { name: /FIX-102/ })).toBeFocused();
-  await frame.getByRole('button', { name: 'Billing: 1 job', exact: true }).click();
-  await expect(workspace.getByRole('button', { name: /FIX-105/ })).toBeVisible();
-  await expect(workspace.getByRole('button', { name: /FIX-102/ })).toHaveCount(0);
-  expect(await frame.locator('body').evaluate(() => location.hash)).toContain('#today');
 });
 
 
-test('intermediate-width stage cards preserve all labels, counts and arrows', async ({ page }, testInfo) => {
+test('intermediate widths do not render the retired job lifecycle', async ({ page }) => {
   for (const width of [701, 768]) {
     await page.setViewportSize({ width, height: 1100 });
     const { frame } = await mount(page);
-    const lifecycle = frame.getByRole('navigation', { name: 'Company job lifecycle' });
-    await expect(lifecycle.getByRole('button')).toHaveCount(8);
-    expect(await lifecycle.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(4);
-    const geometry = await lifecycle.locator('.company-stage').evaluateAll(cards => cards.map(card => ({
-      label: card.getAttribute('aria-label'), width: card.clientWidth, content: card.scrollWidth,
-      overflowingChildren: [...card.querySelectorAll('strong, .company-stage-total')].filter(child => child.scrollWidth > child.clientWidth).map(child => child.textContent),
-    })));
-    for (const card of geometry) {
-      expect(card.content, width + 'px ' + card.label).toBeLessThanOrEqual(card.width);
-      expect(card.overflowingChildren, width + 'px ' + card.label).toEqual([]);
-    }
-    expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-    await page.screenshot({ path: testInfo.outputPath('company-overview-' + width + '.png') });
+    await expect(frame.getByRole('navigation', { name: 'Company job lifecycle' })).toHaveCount(0);
+    expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
   }
 });
 
@@ -175,11 +131,10 @@ test('approved red eye branding stays readable through responsive navigation and
       await expect(brand.locator('.cos-company-logo')).toHaveAttribute('data-company-logo','full');
     }
     await dismissApprovedMore(frame,opened);
-    await openWorkspace(frame, 'Jobs');
-    await expect(frame.getByRole('heading', { name: 'Job flow', exact: true })).toBeVisible();
-    await expect(brand).toBeVisible();
-    await frame.locator('body').evaluate(() => history.back());
+    await frame.locator('body').evaluate(() => { location.hash = '#jobs'; });
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
     await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
+    await expect(brand).toBeVisible();
   }
 });
 
@@ -266,6 +221,6 @@ test('Overview uses one inventory source and sends troubleshooting to the common
 test('legacy health does not create a second set of Overview totals',async({page})=>{
  const {frame}=await mount(page,{cameraData:{...camera,evidenceVersion:1}});
  await expect(frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card')).toHaveCount(0);
- await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).not.toContainText('0 Field equipment');
 });

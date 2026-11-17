@@ -41,121 +41,19 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
 }
 const reads=state=>state.calls.filter(x=>x.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1');
 const refresh=panel=>panel.getByRole('button',{name:'Refresh intake status',exact:true});
-test('explicit saved-status read shows active state, activation, poll, counts, held printed number and code',async({page})=>{
- const {panel,state}=await mount(page);await expect(panel).toContainText('Intake state unknown');expect(reads(state)).toHaveLength(0);
- await refresh(panel).focus();await page.keyboard.press('Enter');await expect(panel).toContainText('Recent source scan completed');
- await expect(panel).toContainText('Active configuration');await expect(panel).toContainText('Oct 10, 2026, 4:00:00 AM UTC');
- await expect(panel).toContainText('000042');await expect(panel).toContainText('source_changed_review_required');await expect(panel).toContainText('Created by intake2');
- expect(reads(state)).toHaveLength(1);expect(reads(state)[0].method).toBe('GET');expect(state.calls.some(x=>x.method==='POST')).toBe(false);
- expect(state.calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner'))).toBe(false);
- expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);expect(state.errors).toEqual([]);
+test('intake refresh does not call the retired status route',async({page})=>{
+ const {panel,state}=await mount(page);
+ await expect(panel).toContainText('Intake state unknown');
+ await refresh(panel).click();
+ await expect(panel.getByRole('alert')).toContainText('Intake state is unknown');
+ expect(reads(state)).toHaveLength(0);
+ expect(state.calls.some(item=>String(item.path).includes('/api/mhelpdesk/intake'))).toBe(false);
+ expect(state.errors).toEqual([]);
 });
-test('disabled and unrecorded timing never claim a successful poll or activation',async({page})=>{
- const {panel,state}=await mount(page,{value:status({enabled:false,activationAt:null,lastAttemptAt:null,lastSuccessAt:null,pendingReviewCount:0,held:[]})});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Disabled');await expect(panel).toContainText('Not recorded');await expect(panel).toContainText('No tickets are held');await expect(panel).not.toContainText('Recent source scan');
- state.value=status({activationAt:null});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('activation unverified');await expect(panel.getByRole('status')).not.toContainText('Active configuration');
-});
-test('stale, backoff, error and local read age are explicit without automatic network refresh',async({page})=>{
- const {panel,state}=await mount(page,{value:status({lastSuccessAt:'2026-10-10T04:00:00.000Z'})});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Stale');
- state.value=status({failureCount:2,retryAfter:'2026-10-10T05:20:00.000Z',lastErrorCode:'SOURCE_UNAVAILABLE'});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Backoff');await expect(panel).toContainText('SOURCE_UNAVAILABLE');
- await page.clock.fastForward(21*60000);await expect(panel.getByRole('status')).toContainText('Poll error');await expect(panel).toContainText('This status was read more than 15 minutes ago');expect(reads(state)).toHaveLength(2);
-});
-test('non-auth failed or malformed refresh clears held rows and can recover without exposing raw errors',async({page})=>{
- const {panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');
- for(const failure of [503,404]){state.failure=failure;await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');await expect(panel).not.toContainText('000042');await expect(panel.locator('dl')).toHaveCount(0);await expect(panel).not.toContainText('PRIVATE');}
- state.failure=0;state.value={...status(),source:{body:'PRIVATE'}};await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');await expect(panel).not.toContainText('000042');
- state.value=status();await refresh(panel).click();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
-});
-for(const failure of [401,403])test(`${failure} intake denial quarantines held rows and requires reload`,async({page})=>{
- const {frame,panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');
- state.failure=failure;await refresh(panel).click();await expectOperationsReloadRequired(frame);
- await expect(panel).toHaveCount(0);await expect(panel.locator('dl')).toHaveCount(0);
- await expect(frame.locator('body')).not.toContainText('000042');await expect(frame.locator('body')).not.toContainText('PRIVATE');
- await expect(refresh(panel)).toHaveCount(0);expect(reads(state)).toHaveLength(2);
- expect(state.calls.every(x=>x.method==='GET')).toBe(true);expect(state.calls.some(x=>x.path.startsWith('/api/mhelpdesk/partner'))).toBe(false);expect(state.errors).toEqual([]);
-});
-test('repeated clicks share one in-flight status read and clear previous results immediately',async({page})=>{
- const {panel,state}=await mount(page);await refresh(panel).click();await expect(panel).toContainText('000042');state.hold=true;
- await refresh(panel).evaluate(button=>{button.click();button.click();button.click();});await expect.poll(()=>state.releases.length).toBe(1);
- await expect(panel.getByRole('button')).toBeDisabled();await expect(panel).not.toContainText('000042');expect(reads(state)).toHaveLength(2);
- state.releases.shift()();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
-});
-test('hidden host cancels old reads and a newer refresh wins over the old response',async({page})=>{
- const {panel,state}=await mount(page);state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
- await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));
- await expect(panel).toContainText('Intake state unknown');state.hold=false;state.value=status({pendingReviewCount:0,held:[],createdCount:7});
- await refresh(panel).click();await expect(panel).toContainText('Created by intake7');state.releases.shift()();await expect(panel).not.toContainText('000042');await expect(panel).toContainText('Created by intake7');expect(state.errors).toEqual([]);
-});
-test('navigation and Back/Forward discard a pending result and return to unknown status',async({page})=>{
- const {frame,panel,state}=await mount(page);state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
- await frame.locator('body').evaluate(()=>{location.hash='#units-on-hand';});await expect(panel).toHaveCount(0);state.releases.shift()();
- await traverseIframeHistory(frame,'back','#unit-tracker');
- await expect(panel).toBeVisible();await expect(panel).toContainText('Intake state unknown');await expect(panel).not.toContainText('000042');
- await traverseIframeHistory(frame,'forward','#units-on-hand');await expect(panel).toHaveCount(0);
- await traverseIframeHistory(frame,'back','#unit-tracker');await expect(panel).toContainText('Intake state unknown');
- state.hold=false;await refresh(panel).click();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
-});
-test('bounded held list remains readable on mobile and clearly says it is truncated',async({page})=>{
- const held=Array.from({length:25},(_,i)=>({ticketNumber:String(i).padStart(128,'0'),reasonCodes:['assignment_identity_unverified','source_status_unreviewed']}));
- const {panel}=await mount(page,{value:status({pendingReviewCount:30,held,heldTruncated:true})});await refresh(panel).click();await expect(panel).toContainText('Showing 25 of 30');await expect(panel.locator('.mhelp-intake-held>li')).toHaveCount(25);
- expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
-});
-for(const role of ['it','service'])test(`${role} session has no intake review or read even with forged Owner flag`,async({page})=>{
- const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);expect(state.calls.some(x=>x.method!=='GET')).toBe(false);expect(state.errors).toEqual([]);
-});
-
-test('a completed all-held scan never claims that Tech Check assignments were created',async({page})=>{
- const {panel,state}=await mount(page,{value:status({createdCount:0})});await refresh(panel).click();
- await expect(panel.getByRole('status')).toContainText('Saved receipt holds remain');await expect(panel).toContainText('No Tech Check assignments have been created by this intake yet.');
- state.value=status({createdCount:0,pendingReviewCount:0,held:[]});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');await expect(panel.getByRole('status')).not.toContainText('Saved receipt holds remain');await expect(panel).toContainText('No Tech Check assignments have been created');
-});
-
-const pending=(patch={})=>({contract:'cos-mhelp-pending-status-v1',waitingCount:3,dueCount:2,oldestWaitingCreatedAt:'2026-10-10T04:30:00.000Z',lastRefreshAt:'2026-10-10T04:59:00.000Z',lastRefreshState:'review_needed',lastRefreshCode:null,...patch});
-const extended=(pendingSchedule=pending(),review=status())=>({contract:'cos-mhelp-intake-status-pending-v1',review,pendingSchedule});
-test('legacy v1 response makes missing enrichment evidence explicit and never invents waiting counts',async({page})=>{
- const {panel,state}=await mount(page);await refresh(panel).click();
- await expect(panel.getByRole('status')).toContainText('Recent source scan completed');
- await expect(panel.getByRole('status')).toContainText('Schedule enrichment status unavailable');
- await expect(panel).not.toContainText('Tickets waiting for recheck');
- expect(reads(state)[0].path).toBe('/api/mhelpdesk/intake/status?capability=pending_schedule_v1');
- expect(reads(state)[0].body).toBe(null);
-});
-test('waiting ticket counts remain separate from receipt holds and technician work after discovery completes',async({page})=>{
- const {panel,state}=await mount(page,{value:extended(pending(),status({createdCount:0,held:[{ticketNumber:'000042',reasonCodes:['source_scope_or_route_invalid']}]}))});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Tickets are waiting for automatic recheck');
- await expect(panel).toContainText('Tickets waiting for recheck3');await expect(panel).toContainText('Eligible for recheck now2');
- await expect(panel).toContainText('Oct 10, 2026, 4:30:00 AM UTC');await expect(panel).toContainText('Unresolved receipt holds1');
- await expect(panel).toContainText('counts are not added together');await expect(panel).toContainText('No Tech Check assignments have been created');
- await expect(panel.getByRole('status')).not.toContainText('Review is required');await expect(panel.getByRole('status')).not.toContainText('healthy');
- expect(reads(state)).toHaveLength(1);expect(state.calls.some(x=>x.method==='POST'||x.path.startsWith('/api/mhelpdesk/partner'))).toBe(false);
- expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);expect(state.errors).toEqual([]);
-});
-test('deferred pending refresh stays visible alongside completed discovery and subsequent unavailable evidence',async({page})=>{
- const {panel,state}=await mount(page,{value:extended(pending({lastRefreshState:'deferred',lastRefreshCode:'SOURCE_UNAVAILABLE'}),status({pendingReviewCount:0,held:[]}))});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');
- await expect(panel.getByRole('status')).toContainText('Pending-ticket refresh deferred or failed');
- await expect(panel).toContainText('Last ticket recheck deferred; waiting for a later retry');await expect(panel).toContainText('SOURCE_UNAVAILABLE');
- state.value=extended(null,status({pendingReviewCount:0,held:[]}));await refresh(panel).click();
- await expect(panel.getByRole('status')).toContainText('Schedule enrichment status unavailable');await expect(panel).not.toContainText('Tickets waiting for recheck');
- await expect(panel).not.toContainText('SOURCE_UNAVAILABLE');await expect(panel).toContainText('Created by intake2');
- state.value=extended(pending({waitingCount:0,dueCount:0,oldestWaitingCreatedAt:null,lastRefreshState:'created'}),status({pendingReviewCount:0,held:[],createdCount:3}));await refresh(panel).click();
- await expect(panel).toContainText('Tickets waiting for recheck0');await expect(panel).toContainText('Created by intake3');await expect(panel).toContainText('Assignment created on the last ticket recheck');
-});
-test('invalid enrichment response clears all evidence and arbitrary source data stays redacted',async({page})=>{
- const {panel,state}=await mount(page,{value:extended()});await refresh(panel).click();await expect(panel).toContainText('Tickets waiting for recheck3');
- for(const pendingSchedule of [{...pending(),ticketId:'PRIVATE'},{...pending(),lastRefreshCode:'PRIVATE'},{...pending(),dueCount:4}]){
-  state.value=extended(pendingSchedule);await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');
-  await expect(panel.locator('dl')).toHaveCount(0);await expect(panel).not.toContainText('PRIVATE');await expect(panel).not.toContainText('000042');
- }
- state.value=extended(pending(),status({held:[{ticketNumber:'000042',reasonCodes:['source_identity_changed_review_required']}]}));await refresh(panel).click();
- await expect(panel).toContainText('Source identity changed; reconciliation is required');await expect(panel).toContainText('source_identity_changed_review_required');expect(state.errors).toEqual([]);
-});
-test('hidden host discards old enrichment counts and newer refresh wins as a complete snapshot',async({page})=>{
- const {panel,state}=await mount(page,{value:extended()});state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
- await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));await expect(panel).toContainText('Intake state unknown');
- state.hold=false;state.value=extended(pending({waitingCount:8,dueCount:1}),status({createdCount:7}));await refresh(panel).click();
- await expect(panel).toContainText('Tickets waiting for recheck8');await expect(panel).toContainText('Created by intake7');state.releases.shift()();
- await expect(panel).not.toContainText('Tickets waiting for recheck3');await expect(panel).toContainText('Tickets waiting for recheck8');expect(state.errors).toEqual([]);
+test('IT and Service sessions do not read intake status',async({page})=>{
+ const it=await mount(page,{role:'it'});
+ await expect(it.panel).toHaveCount(0);
+ expect(reads(it.state)).toHaveLength(0);
+ const service=await mount(page,{role:'service'});
+ expect(reads(service.state)).toHaveLength(0);
 });

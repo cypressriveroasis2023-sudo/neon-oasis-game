@@ -16,9 +16,7 @@ export default function OperationsCalendar({show,onOpenJob}:Props) {
   const revision=useRef(0);
   const refresh=useCallback(async()=>{
     const request=++revision.current;setLoading(true);
-    try{const rows=jobItems((await api.get('/api/jobs')).data);if(request===revision.current){setJobs(rows);setError('');}}
-    catch(cause){if(request===revision.current){const message=cause instanceof Error?cause.message:'Calendar could not be loaded.';setError(message);show(message);}}
-    finally{if(request===revision.current)setLoading(false);}
+    if(request===revision.current){setJobs(null);setError('Calendar is not available in COS.');setLoading(false);}
   },[show]);
   useEffect(()=>{void refresh();const updated=()=>void refresh();window.addEventListener('cos-board-updated',updated);return()=>{revision.current+=1;window.removeEventListener('cos-board-updated',updated);};},[refresh]);
   const scheduled=(jobs||[]).filter(job=>Boolean(scheduledDay(job.scheduled)));

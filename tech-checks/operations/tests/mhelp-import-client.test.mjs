@@ -5,38 +5,15 @@ const ids={attachment:'10000000-0000-4000-8000-000000000001',org:'20000000-0000-
 const source={system:'mhelpdesk',sourceTicketId:'000901',sha256:'a'.repeat(64),filename:'synthetic.pdf',byteLength:20,mimeType:'application/pdf',parserId:'synthetic',parserVersion:'1'};
 const attachment=()=>({id:ids.attachment,organizationId:ids.org,jobId:ids.job,attemptId:ids.attempt,sha256:source.sha256,byteLength:20,state:'staged',recoverable:true,disposition:'duplicate',source:{...source}});
 const ticket=()=>({source:{...source},customerId:'customer',siteId:'site',jobType:'DELIVERY',priority:'normal',title:'Synthetic',description:'Work',contactInstructions:'',unitIds:[],requestedSchedule:'',additionalInformation:'',shopPrep:false,parserData:{sourceTicketId:{value:source.sourceTicketId,sourceLabel:'Work Order No.'},units:[],additionalFields:[],warnings:[],documentText:'Synthetic'}});
-test('confirmed duplicate recovery retains its new copy and returns the existing job without readback or writes',async()=>{
-  let calls=0;const client=mhelpImportClient({get:async()=>{calls++;throw Error('Should not require old import readback');},post:async()=>{calls++;throw Error('Must not replay');}});
-  assert.deepEqual(await client.recoverSaved(attachment(),ticket()),{status:'duplicate',jobId:ids.job});
-  assert.equal(calls,0);
-});
-test('duplicate recovery rejects unverified source, wrong bytes and wrong printed identity',async()=>{
-  const client=mhelpImportClient({get:async()=>{throw Error('No read expected');},post:async()=>{throw Error('No write expected');}});
-  for(const changed of [{source:undefined},{sha256:'b'.repeat(64)},{source:{...source,sourceTicketId:'901'}},{source:{...source,filename:'other.pdf'}},{state:'trash'}])await assert.rejects(()=>client.recoverSaved({...attachment(),...changed},ticket()));
-});
-test('recovery metadata must identify the requested attempt and a valid disposition',async()=>{
+test('recovery metadata must identify the requested attempt and a valid disposition',()=>{
   assert.throws(()=>checkedImportAttachment({...attachment(),disposition:'unknown'}),/recovery metadata/);
   assert.throws(()=>checkedImportAttachment({...attachment(),jobId:undefined}),/recovery metadata/);
-  const client=mhelpImportClient({get:async()=>({data:{...attachment(),attemptId:ids.attachment}}),post:async()=>{throw Error('No write');}});
-  await assert.rejects(()=>client.readAttempt(ids.attempt),/different import attempt/);
 });
-test('newly created recovery still requires full job and attachment readback',async()=>{
-  let record={jobId:ids.job,organizationId:ids.org,attachmentId:ids.attachment,status:'saved',ticket:ticket()};
-  const client=mhelpImportClient({get:async()=>({data:record}),post:async()=>{throw Error('No write');}});
-  const result=await client.recoverSaved({...attachment(),disposition:'created'},ticket());
-  assert.equal(result.status,'saved');assert.equal(result.saved.jobId,ids.job);
-  record={...record,attachmentId:ids.attempt};
-  await assert.rejects(()=>client.recoverSaved({...attachment(),disposition:'created'},ticket()),/does not match every reviewed field/);
-});
-
-test('file preparation cannot upload after its originating import view is invalidated',async()=>{
- let valid=true,resolve;const bytes=new Promise(done=>resolve=done),calls=[];
- const client=mhelpImportClient({get:async()=>({data:null}),post:async(...args)=>{calls.push(args);return {data:attachment()};}},()=>valid);
- const pending=client.stage(ids.attempt,source,{arrayBuffer:()=>bytes});valid=false;resolve(new Uint8Array(20).buffer);await assert.rejects(pending,/session changed/);assert.equal(calls.length,0);
-});
-test('old import commit, deferred cleanup and restore cannot mutate after invalidation',async()=>{
- let valid=false;const calls=[];const client=mhelpImportClient({get:async()=>({data:null}),post:async(...args)=>{calls.push(args);return {data:attachment()};}},()=>valid);
- await assert.rejects(client.adapter.commit({organizationId:ids.org,attachmentId:ids.attachment,ticket:ticket()}),/session changed/);
- await assert.rejects(client.adapter.moveToRecoverableTrash(ids.attachment,ids.job,ticket()),/session changed/);
- await assert.rejects(client.restore(ids.attachment),/session changed/);assert.equal(calls.length,0);
+test('mHelp ticket import calls are not reachable',async()=>{
+  let calls=0;const client=mhelpImportClient({get:async()=>{calls++;return {data:null};},post:async()=>{calls++;return {data:attachment()};}});
+  await assert.rejects(client.recoverSaved(attachment(),ticket()),/not available/);
+  await assert.rejects(client.readAttempt(ids.attempt),/not available/);
+  await assert.rejects(client.stage(ids.attempt,source,{arrayBuffer:async()=>new Uint8Array(20).buffer}),/not available/);
+  await assert.rejects(client.adapter.commit({organizationId:ids.org,attachmentId:ids.attachment,ticket:ticket()}),/not available/);
+  assert.equal(calls,0);
 });

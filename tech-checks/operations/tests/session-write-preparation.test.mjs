@@ -67,9 +67,9 @@ test('import action lease cancels pending bytes on healthy hide, permits a fresh
  const api={captureSession:()=>{const before=epoch;return()=>before===epoch;},get:async()=>({data:null}),post:async(...args)=>{calls.push(args);return {data:attachment};}};
  vm.runInNewContext(importCapture,{exports,api,mounted,importSessionValid:valid,revision,mhelpImportClient});
  const beforeHide=exports.action(),pending=beforeHide.client.stage(attachment.id,{}, {arrayBuffer:()=>bytes.promise});
- epoch++;revision.current++;bytes.resolve(new Uint8Array([1]).buffer);await assert.rejects(pending,/session changed/);assert.equal(calls.length,0);assert.equal(beforeHide.current(),false);
- const afterReturn=exports.action();assert.equal(afterReturn.current(),true);await afterReturn.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer});assert.equal(calls.length,1);
- valid.current=false;epoch++;revision.current++;assert.equal(afterReturn.current(),false);const hardStopped=exports.action();assert.equal(hardStopped.current(),false);await assert.rejects(hardStopped.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/session changed/);assert.equal(calls.length,1);
+ epoch++;revision.current++;bytes.resolve(new Uint8Array([1]).buffer);await assert.rejects(pending,/not available/);assert.equal(calls.length,0);assert.equal(beforeHide.current(),false);
+ const afterReturn=exports.action();assert.equal(afterReturn.current(),true);await assert.rejects(afterReturn.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/not available/);assert.equal(calls.length,0);
+ valid.current=false;epoch++;revision.current++;assert.equal(afterReturn.current(),false);const hardStopped=exports.action();assert.equal(hardStopped.current(),false);await assert.rejects(hardStopped.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/not available/);assert.equal(calls.length,0);
 });
 test('every multi-step import action captures its lease before preparation',()=>{
  const source=readFileSync(new URL('../src/MhelpTicketImport.tsx',import.meta.url),'utf8');

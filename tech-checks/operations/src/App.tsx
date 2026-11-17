@@ -22,13 +22,8 @@ import {ownerCensusSessionAllowed} from './ownerCensusOnce';
 import UnitTrackerWorkspace from './UnitTrackerWorkspace';
 import {trackerAccess} from './unitTracker';
 import {can} from './cosCapabilities';
-import OwnerBoardControls from './OwnerBoardControls';
-import TicketActions from './TicketActions';
 import OwnerWatchfulShortcut from './OwnerWatchfulShortcut';
 import HomeFieldView from './HomeFieldView';
-import MhelpTicketImport from './MhelpTicketImport';
-import type { TicketType } from './ticketTypes';
-import {isTicketUnitId} from './ticketContext';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
 import VrmWorkspace from './VrmWorkspace';
@@ -37,20 +32,17 @@ import ITDashboard from './ITDashboard';
 import ITDailyDashboard from './ITDailyDashboard';
 import {IT_DAILY_ONLY, IT_DAILY_WORKSPACES, itDailyLabel} from '../../it-feature-availability';
 import ITMhelpWorkspace from './ITMhelpWorkspace';
-import OperationsJobs from './OperationsJobs';
-import OperationsCalendar from './OperationsCalendar';
 import HandoffsWorkspace from './HandoffsWorkspace';
-import DirectoryWorkspace from './DirectoryWorkspace';
 import EquipmentWorkspace from './EquipmentWorkspace';
 import TeamWorkspace from './TeamWorkspace';
-import { QuotesWorkspace, InvoicesWorkspace, PurchasingWorkspace } from './FinanceWorkspaces';
+import LegacyInstallEvidence from './LegacyInstallEvidence';
 import './continuation.css';
-import { workspaces as nav, itWorkspaces, workspaceGroups, workspaceLabel, workspaceGroup, canonicalWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
+import { workspaces as nav, itWorkspaces, workspaceGroups, workspaceLabel, workspaceGroup, canonicalWorkspace, isRetiredBusinessWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
 
 type Row = Record<string, any>;
 type NativeWorkspace = 'Today' | 'Daily Board' | 'Fleet Dashboard' | 'Unit Tracker' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
 const native: NativeWorkspace[] = ["Today","Daily Board","Fleet Dashboard","Unit Tracker","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
-const legacy: Record<string,string> = { Vision:'vision' };
+const legacy: Record<string,string> = {};
 const baseFleetWorkspaces = ['Fleet Dashboard','IT Dashboard','InHand Routers','Camera Health','Victron VRM','Unit Tracker','MHelp','Tech Check'];
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
@@ -91,101 +83,6 @@ function localInput(value:string) {
   if (!Number.isFinite(date.getTime())) return '';
   const pad=(n:number)=>String(n).padStart(2,'0');
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes());
-}
-type TaskDraft={id?:string;title:string;instructions:string;priority:string;assignedUserId:string;assignedDepartment:string;relatedJobId:string;relatedSiteId:string;dueAt:string;ownerNotes:string};
-const emptyTask=():TaskDraft=>({title:'',instructions:'',priority:'medium',assignedUserId:'',assignedDepartment:'it',relatedJobId:'',relatedSiteId:'',dueAt:'',ownerNotes:''});
-function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
-  const [items,setItems]=useState<Row[]|null>(null);
-  const [draft,setDraft]=useState<TaskDraft|null>(null);
-  const [error,setError]=useState('');
-  const [notice,setNotice]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [saving,setSaving]=useState(false);
-  const [needsRefresh,setNeedsRefresh]=useState(false);
-  const [team,setTeam]=useState<Row[]>([]);
-  const [sites,setSites]=useState<Row[]>([]);
-  const [jobs,setJobs]=useState<Row[]>([]);
-  const [optionsError,setOptionsError]=useState('');
-  const running=useRef(false);
-  const activeTaskReads=useRef(0);
-  const revision=useRef(0);
-  const refresh=useCallback(async(fromSave=false)=>{
-    if(running.current&&!fromSave)return null;
-    activeTaskReads.current++;
-    const request=++revision.current;
-    setLoading(true);
-    try { const rows=collection((await api.get('/api/owner-tasks')).data); if(request===revision.current){setItems(rows);setError('');setNeedsRefresh(false);} return rows; }
-    catch(cause){if(request===revision.current)setError(errorMessage(cause,'Owner Tasks could not be loaded.'));return null;}
-    finally{activeTaskReads.current--;if(request===revision.current)setLoading(false);}
-  },[]);
-  useEffect(()=>{
-    void refresh();
-    let live=true;
-    void Promise.allSettled([api.get('/api/team-production'),api.get('/api/sites'),api.get('/api/jobs')]).then(results=>{
-      if(!live)return;
-      const setters=[setTeam,setSites,setJobs];
-      const unavailable:string[]=[];
-      results.forEach((result,index)=>{
-        if(result.status==='fulfilled'){try{setters[index](collection(result.value.data));}catch{unavailable.push(['Technician','Site','Job'][index]);}}
-        else unavailable.push(['Technician','Site','Job'][index]);
-      });
-      setOptionsError(unavailable.length?unavailable.join(', ')+' selections could not be loaded. Department assignments remain available.':'');
-    });
-    return()=>{live=false;revision.current+=1;};
-  },[refresh]);
-  const edit=(row:Row)=>setDraft({
-    id:String(row.id),title:String(row.title||''),instructions:String(row.instructions||''),priority:String(row.priority||'medium'),
-    assignedUserId:String(row.assignedUserId||''),assignedDepartment:row.assignedUserId?'':String(row.assignedDepartment||'it'),
-    relatedJobId:String(row.relatedJobId||''),relatedSiteId:String(row.relatedSiteId||''),dueAt:row.dueAt?localInput(String(row.dueAt)):'',ownerNotes:String(row.ownerNotes||''),
-  });
-  const save=async()=>{
-    if(running.current||activeTaskReads.current>0||!draft||needsRefresh)return;
-    if(!draft.title.trim()){setError('Task title is required.');return;}
-    if(!draft.assignedUserId&&!['it','service'].includes(draft.assignedDepartment)){setError('Select an IT or Service department.');return;}
-    const parsedDue=draft.dueAt?new Date(draft.dueAt):null;
-    if(parsedDue&&!Number.isFinite(parsedDue.getTime())){setError('Enter a valid due date and time.');return;}
-    const dueAt=parsedDue?parsedDue.toISOString():null;
-    const payload={...draft,assignedDepartment:draft.assignedUserId?'':draft.assignedDepartment,title:draft.title.trim(),instructions:draft.instructions.trim(),ownerNotes:draft.ownerNotes.trim(),dueAt};
-    const previousIds=new Set((items||[]).map(row=>row.id));
-    running.current=true;setSaving(true);setError('');setNotice('');
-    let accepted=false;
-    try {
-      const response=await api.post('/api/owner-tasks',payload);
-      accepted=true;setDraft(null);
-      const fresh=await refresh(true);
-      const savedId=response.data?.id||response.data?.taskId||response.data?.task_id||draft.id;
-      const candidates=(fresh||[]).filter(row=>savedId?row.id===savedId:!previousIds.has(row.id));
-      const confirmed=candidates.length===1&&candidates[0].title===payload.title&&String(candidates[0].instructions||'').trim()===payload.instructions&&candidates[0].priority===payload.priority&&String(candidates[0].assignedUserId||'')===payload.assignedUserId&&String(candidates[0].assignedDepartment||'')===payload.assignedDepartment&&String(candidates[0].relatedJobId||'')===payload.relatedJobId&&String(candidates[0].relatedSiteId||'')===payload.relatedSiteId&&String(candidates[0].ownerNotes||'').trim()===payload.ownerNotes&&(!dueAt?!candidates[0].dueAt:Date.parse(candidates[0].dueAt)===Date.parse(dueAt));
-      if(!confirmed){setNeedsRefresh(true);setError('Save accepted, but the task could not be verified. Refresh Owner Tasks before saving again.');return;}
-      setNotice('Owner Task saved and verified.');show('Owner Task saved and verified.');
-      window.dispatchEvent(new Event('cos-board-updated'));
-    } catch(cause) {
-      setNeedsRefresh(true);
-      setError(accepted?'Save accepted, but confirmation is unavailable. Refresh Owner Tasks before saving again.':errorMessage(cause,'The task save could not be confirmed. Refresh before trying again.'));
-    } finally {running.current=false;setSaving(false);}
-  };
-  const set=(key:keyof TaskDraft,value:string)=>setDraft(current=>current?{...current,[key]:value}:current);
-  const open=(items||[]).filter(row=>!['complete','cancelled'].includes(row.status));
-  return <section className='panel module owner-task-workspace' aria-label='Owner Tasks'>
-    <div className='panelhead'><h2>Owner Tasks</h2><button className='secondary' disabled={loading||saving} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tasks'}</button></div>
-    <div className='purchase-actions'><button disabled={saving||loading||needsRefresh} onClick={()=>{setDraft(emptyTask());setError('');}}>+ New Owner Task</button><span>{items?open.length+' open · '+open.filter(row=>row.priority==='high').length+' high priority':'Task counts unavailable'}</span></div>
-    {error&&<div className='operations-error' role='alert'>{error}</div>}{notice&&<p className='operations-notice' role='status'>{notice}</p>}
-    {draft&&<section className='quote-card directory-editor'><div className='quote-section-head'><div><h3>{draft.id?'Edit':'New'} Owner Task</h3><small>Assigned work remains auditable after completion.</small></div><div><button className='secondary' disabled={saving} onClick={()=>setDraft(null)}>Cancel</button><button disabled={saving||loading||needsRefresh} onClick={()=>void save()}>{saving?'Saving…':'Save task'}</button></div></div>
-      {optionsError&&<p role='status'>{optionsError}</p>}
-      <div className='quote-detail-grid'>
-        <label>Task Title *<input disabled={saving} value={draft.title} onChange={event=>set('title',event.target.value)}/></label>
-        <label>Priority<select disabled={saving} value={draft.priority} onChange={event=>set('priority',event.target.value)}><option value='high'>High</option><option value='medium'>Medium</option><option value='low'>Low</option></select></label>
-        <label>Technician<select disabled={saving} value={draft.assignedUserId} onChange={event=>setDraft(current=>current?{...current,assignedUserId:event.target.value,assignedDepartment:event.target.value?'':current.assignedDepartment||'it'}:current)}><option value=''>Assign by department</option>{draft.assignedUserId&&!team.some(row=>row.userId===draft.assignedUserId)&&<option value={draft.assignedUserId}>Current assigned technician</option>}{team.filter(row=>row.active&&['it','service'].includes(String(row.department).toLowerCase())).map(row=><option key={row.userId} value={row.userId}>{row.displayName||row.name}</option>)}</select></label>
-        <label>Department<select disabled={saving||Boolean(draft.assignedUserId)} value={draft.assignedDepartment} onChange={event=>set('assignedDepartment',event.target.value)}><option value='it'>IT</option><option value='service'>Service</option></select></label>
-        <label>Due Date / Time (your local time)<input disabled={saving} type='datetime-local' value={draft.dueAt} onChange={event=>set('dueAt',event.target.value)}/></label>
-        <label>Related Job<select disabled={saving} value={draft.relatedJobId} onChange={event=>set('relatedJobId',event.target.value)}><option value=''>No job</option>{draft.relatedJobId&&!jobs.some(row=>row.id===draft.relatedJobId)&&<option value={draft.relatedJobId}>Current related job</option>}{jobs.filter(row=>row.status!=='Closed').map(row=><option key={row.id} value={row.id}>{row.jobNumber} · {row.customer}</option>)}</select></label>
-        <label>Related Site<select disabled={saving} value={draft.relatedSiteId} onChange={event=>set('relatedSiteId',event.target.value)}><option value=''>No site</option>{draft.relatedSiteId&&!sites.some(row=>row.id===draft.relatedSiteId)&&<option value={draft.relatedSiteId}>Current related site</option>}{sites.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-        <label className='wide'>Detailed Instructions<textarea disabled={saving} value={draft.instructions} onChange={event=>set('instructions',event.target.value)}/></label>
-        <label className='wide'>Owner Notes<textarea disabled={saving} value={draft.ownerNotes} onChange={event=>set('ownerNotes',event.target.value)}/></label>
-      </div>
-    </section>}
-    {!items&&!error?<p role='status'>Loading Owner Tasks…</p>:<div className='records'>{(items||[]).map(row=><button disabled={saving} type='button' className='record op-record' key={row.id} onClick={()=>edit(row)}><div><strong>{row.title}</strong><small>{String(row.priority||'').toUpperCase()} · {row.assignedTo||String(row.assignedDepartment||'').toUpperCase()} · {row.jobNumber||row.siteName||'General'}{row.dueAt?' · Due '+new Date(row.dueAt).toLocaleString():''}</small></div><em>{String(row.status||'').replaceAll('_',' ').toUpperCase()}</em></button>)}{items?.length===0&&<p>No Owner Tasks in the current records. Create a daily assignment for IT or Service.</p>}</div>}
-  </section>;
 }
 function FleetDisplayRecovery({retry, reference, session}: {retry: () => void; reference: string; session: Record<string,any>}) {
   const key = fleetReadingKey(session,new URLSearchParams(location.search).get('mode')||'');
@@ -234,16 +131,24 @@ function OwnerApp() {
     if(window.parent!==window)window.parent.postMessage({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:active},location.origin);
   },[active]);
   const group=workspaceGroup(active);
-  const focusedJob=route.jobId;
   const setRouteLocation=useCallback((next:WorkspaceRoute,replace=false,state:unknown=null)=>{
-    const hash=workspaceHash(next);
+    const workspace=canonicalWorkspace(next.workspace);
+    const safe:WorkspaceRoute=isRetiredBusinessWorkspace(workspace)?{workspace:'Today',jobId:'',detail:false}:{...next,workspace,detail:false};
+    delete safe.createType;
+    const hash=workspaceHash(safe);
     lastRouteHash.current=hash;
     if(location.hash!==hash){
       window.dispatchEvent(new Event('cos-workspace-navigation'));
       if(replace)history.replaceState(state,'',hash);else history.pushState(state,'',hash);
     }
-    setRoute({...next,workspace:canonicalWorkspace(next.workspace)});
+    setRoute(safe);
   },[]);
+  useEffect(()=>{
+    const hash=workspaceHash(route);
+    if(location.hash===hash)return;
+    lastRouteHash.current=hash;
+    history.replaceState(history.state,'',hash);
+  },[route]);
   useEffect(()=>{
     const returnToChecks=(event:MessageEvent)=>{
       if(window.parent===window||event.origin!==location.origin||event.source!==window.parent||event.data?.type!=='COS_OPERATIONS_TECH_CHECK_HOME')return;
@@ -344,37 +249,6 @@ function OwnerApp() {
     if(history.state?.cosUnitHealthFromMap===unitId)history.back();
     else{setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId});window.scrollTo({top:0,behavior:'instant'});}
   }),[guardCurrent,setRouteLocation]);
-  const createTicket=useCallback(guardCurrent((createType:TicketType,unitId?:string)=>{
-    setMenu(false);
-    // A label route reaches this callback only after the shared drawer resolves one saved unit.
-    const fromUnitHealth=isTicketUnitId(unitId)&&(['Camera Health','Fleet Dashboard'].includes(active)&&route.unitId===unitId||active==='Fleet Dashboard'&&!route.unitId&&Boolean(route.unitLabel));
-    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType,...(unitId?{unitId}:{})},false,fromUnitHealth?{cosTicketFromUnitHealth:unitId}:null);
-    window.scrollTo({top:0,behavior:'instant'});
-  }),[guardCurrent,setRouteLocation,active,route.unitId,route.unitLabel]);
-  const cancelCreateTicket=useCallback(guardCurrent(()=>{
-    if(route.unitId){if(history.state?.cosTicketFromUnitHealth===route.unitId)history.back();else openUnitHealth(route.unitId);}
-    else navigate('Today');
-  }),[guardCurrent,route.unitId,openUnitHealth,navigate]);
-  const openJob=useCallback(guardCurrent((id:string,workspace:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch'='Jobs')=>{
-    setMenu(false);
-    setRouteLocation({workspace,jobId:id,detail:false});
-    window.scrollTo({top:0,behavior:'instant'});
-  }),[guardCurrent,setRouteLocation]);
-  const selectOverviewJob=useCallback(guardCurrent((id:string)=>{
-    const list={workspace:'Today',jobId:id,detail:false};
-    setRouteLocation(list,true);
-    setRouteLocation({...list,detail:true},false,{cosOverviewDetail:true});
-    if(window.matchMedia('(max-width:700px)').matches)window.scrollTo({top:0,behavior:'instant'});
-  }),[guardCurrent,setRouteLocation]);
-  const openLifecycle=useCallback(guardCurrent((id:string)=>{
-    setMenu(false);
-    setRouteLocation({workspace:'Today',jobId:id,detail:true},false,{cosOverviewDetail:true,cosLifecycleOrigin:'Jobs'});
-    window.scrollTo({top:0,behavior:'instant'});
-  }),[guardCurrent,setRouteLocation]);
-  const backToOverviewJobs=useCallback(guardCurrent(()=>{
-    if(history.state?.cosOverviewDetail)history.back();
-    else setRouteLocation({workspace:'Today',jobId:route.jobId,detail:false},true);
-  }),[guardCurrent,route.jobId,setRouteLocation]);
   const authorized=session?.authorized===true;
   useEffect(()=>{
     if(fleetOnly&&!fleetWorkspaces.includes(active)) setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false},true);
@@ -402,27 +276,19 @@ function OwnerApp() {
 
       {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&(active!=='Camera Health'||route.diagnostics)&&!route.createType&&<header className='command-page-header'><div><label>{active==='Fleet Dashboard'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'><p>{sessionError||'Verifying your current Operations account…'}</p><button type='button' onClick={()=>window.location.reload()}>Reload app</button></section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p>{!reloadRequired&&<div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>}{!dailyOnly&&<TechChecksWorkspace/>}</section>
-        :<Fragment key={sessionGeneration}>{fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Fleet Dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<FleetInventoryOverview navigate={navigate}/><nav className='cos-daily-shortcuts' aria-label='Daily work shortcuts'><button onClick={()=>navigate('Daily Board')}>Today’s work</button><button onClick={()=>navigate('Units On Hand')}>Shop / ROOT</button><button onClick={()=>openLegacy('it')}>IT check out / check in</button><button onClick={()=>openLegacy('service')}>Service work & returns</button>{trackerAccess(session)&&<button onClick={()=>navigate('Unit Tracker')}>2027 Unit Tracker</button>}</nav><TicketActions createTicket={createTicket}/>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={guardCurrent(unit=>{setHeliosUnit(unit);navigate('Victron VRM');})} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :<Fragment key={sessionGeneration}>{fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Fleet Dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<FleetInventoryOverview navigate={navigate}/><nav className='cos-daily-shortcuts' aria-label='Daily work shortcuts'><button onClick={()=>navigate('Daily Board')}>Today’s work</button><button onClick={()=>navigate('Units On Hand')}>Shop / ROOT</button><button onClick={()=>openLegacy('it')}>IT check out / check in</button><button onClick={()=>openLegacy('service')}>Service work & returns</button>{trackerAccess(session)&&<button onClick={()=>navigate('Unit Tracker')}>2027 Unit Tracker</button>}</nav>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate} trackerVisible={trackerAccess(session)}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate} openUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>
-        :active==='Daily Board'?<>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate} initialTv={tvIntent.current} onTvChange={onTvChange} createTicket={createTicket}/>} {!tvDisplay&&(route.createType?<OwnerBoardControls key={'create-ticket-'+(route.unitId||'')} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>:<details className='cos-workspace-settings'><summary>Owner tools · import, create and manage jobs</summary>{session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key='board-controls' show={show} unitId={route.unitId} cancelCreateLabel='Back to dashboard' cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/></details>)}</>
-        :(active==='Fleet Dashboard'||active==='Camera Health'&&(!route.diagnostics||dailyOnly))?<ViewErrorBoundary key={active} fallback={(retry, reference) => <FleetDisplayRecovery retry={retry} reference={reference} session={session!}/>}><FleetDashboard session={session!} navigate={navigate} openMhelpConnection={guardCurrent(()=>{navigate('Unit Tracker');setTrackerConnectionOpen(true);})} initialView={active==='Camera Health'?'fleet':'map'} entryRevision={fleetEntryRevision} openAdvancedDiagnostics={!fleetOnly&&!dailyOnly?guardCurrent(()=>setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,...(route.unitId?{unitId:route.unitId}:{})})):undefined} createTicket={can(session,'equipment.ticket')?createTicket:undefined} initialUnitId={route.unitId} initialUnitLabel={route.unitLabel} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:active==='Camera Health'?'Camera Health':'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true,history.state))} show={show} openUnitHealth={openUnitHealth} historyReadEnabled={can(session,'equipment.history')} locationWritesEnabled={!fleetOnly&&!dailyOnly&&session?.features?.fieldLocationVerification===true} ownerManagementEnabled={!fleetOnly&&!dailyOnly} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} registerEquipment={guardCurrent(name=>{setRegisterUnitName(name);navigate('Equipment');})}/></ViewErrorBoundary>
+        :active==='Daily Board'?<DailyBoard api={api} openWorkspace={navigate} initialTv={tvIntent.current} onTvChange={onTvChange}/>
+        :(active==='Fleet Dashboard'||active==='Camera Health'&&(!route.diagnostics||dailyOnly))?<ViewErrorBoundary key={active} fallback={(retry, reference) => <FleetDisplayRecovery retry={retry} reference={reference} session={session!}/>}><FleetDashboard session={session!} navigate={navigate} openMhelpConnection={guardCurrent(()=>{navigate('Unit Tracker');setTrackerConnectionOpen(true);})} initialView={active==='Camera Health'?'fleet':'map'} entryRevision={fleetEntryRevision} openAdvancedDiagnostics={!fleetOnly&&!dailyOnly?guardCurrent(()=>setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,diagnostics:true,...(route.unitId?{unitId:route.unitId}:{})})):undefined} createTicket={undefined} initialUnitId={route.unitId} initialUnitLabel={route.unitLabel} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:active==='Camera Health'?'Camera Health':'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true,history.state))} show={show} openUnitHealth={openUnitHealth} historyReadEnabled={can(session,'equipment.history')} locationWritesEnabled={!fleetOnly&&!dailyOnly&&session?.features?.fieldLocationVerification===true} ownerManagementEnabled={!fleetOnly&&!dailyOnly} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} registerEquipment={guardCurrent(name=>{setRegisterUnitName(name);navigate('Equipment');})}/></ViewErrorBoundary>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialConnectionOpen={trackerConnectionOpen} initialUnitId={route.unitId} onSelectUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true))} openMap={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))} openHealth={openUnitHealth}/>
-        :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
-        :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={guardCurrent(()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true))}/>
-        :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show} initialJobId={focusedJob} clearFocusedJob={guardCurrent(()=>setRouteLocation({workspace:'Unscheduled',jobId:'',detail:false},true))}/>
-        :active==='Dispatch'?<OperationsJobs key='dispatch' mode='dispatch' show={show} initialJobId={focusedJob} clearFocusedJob={guardCurrent(()=>setRouteLocation({workspace:'Dispatch',jobId:'',detail:false},true))}/>
-        :active==='Owner Review'?<OperationsJobs key='review' mode='review' show={show} legacyInstallEvidenceEnabled={session?.features?.legacyInstallEvidence===true} initialJobId={focusedJob} clearFocusedJob={guardCurrent(()=>setRouteLocation({workspace:'Owner Review',jobId:'',detail:false},true))}/>
-        :active==='Calendar'?<OperationsCalendar show={show}/>
+        :active==='Owner Review'?<section className='panel module' aria-label='Legacy install evidence'>{session?.features?.legacyInstallEvidence===true?<LegacyInstallEvidence/>:<p role='status'>Legacy install evidence is not enabled for this account.</p>}</section>
+        :isRetiredBusinessWorkspace(active)?<p role='status'>Opening Overview…</p>
         :active==='Handoffs'?<HandoffsWorkspace show={show}/>
-        :active==='Customers'||active==='Sites'?<DirectoryWorkspace kind={active} show={show}/>
         :active==='Equipment'?<EquipmentWorkspace show={show} initialUnitName={registerUnitName}/>
         :active==='Team'?<TeamWorkspace show={show} openWorkspace={navigate}/>
-        :active==='Quotes'?<QuotesWorkspace show={show}/>
-        :active==='Invoices'||active==='Billing'?<InvoicesWorkspace show={show}/>
-        :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?(fleetOnly?<section className='panel module'><h2>IT Tech Checks</h2><button onClick={()=>openLegacy('it')}>Return to my IT Tech Checks</button></section>:<TechChecksWorkspace/>)
-        :active==='Camera Health'?<CameraHealthWorkspace manualRefreshEnabled={can(session,'equipment.refresh')} powerReadEnabled={fleetVrmReadAllowed(session||{})} initialUnitId={route.unitId} backToMap={returnToMap} createTicket={can(session,'equipment.ticket')?createTicket:undefined} canEditPlacement={session?.features?.fleetPlacementEdit===true} canEditConnection={session?.features?.fleetConnectionEdit===true} canReviewIdentity={session?.features?.ownerIdentityReview===true}/>
+        :active==='Camera Health'?<CameraHealthWorkspace manualRefreshEnabled={can(session,'equipment.refresh')} powerReadEnabled={fleetVrmReadAllowed(session||{})} initialUnitId={route.unitId} backToMap={returnToMap} createTicket={undefined} canEditPlacement={session?.features?.fleetPlacementEdit===true} canEditConnection={session?.features?.fleetConnectionEdit===true} canReviewIdentity={session?.features?.ownerIdentityReview===true}/>
         :active==='InHand Routers'?<RouterWorkspace openMap={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>
         :active==='Victron VRM'?<VrmWorkspace canDiscover={!fleetOnly} initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={guardCurrent(installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true))}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}</Fragment>}

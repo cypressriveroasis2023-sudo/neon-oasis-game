@@ -39,11 +39,8 @@ export default function MhelpTicketImport({show,openJob}:{show:(message:string)=
     return {current,client:mhelpImportClient(api,current)};
   };
   const directory=async()=>{
-    const {current}=captureAction();
-    const [people,locations]=await Promise.all([api.get('/api/customers'),api.get('/api/sites')]);
-    const result=readTicketDirectory(people.data,locations.data);
-    if(current()){setCustomers(result.customers);setSites(result.sites);setDirectoryReady(true);}
-    return result;
+    captureAction();
+    throw new Error('Customers and sites are not available in COS.');
   };
   const historyRead=async()=>{const {current,client}=captureAction();const rows=await client.history();if(current())setHistory(rows);return rows;};
   const loadHistory=async()=>{

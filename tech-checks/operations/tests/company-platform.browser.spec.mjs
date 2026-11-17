@@ -1,7 +1,7 @@
 import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
-import { workspaces, workspaceLabel } from '../src/workspaceNavigation.ts';
+import { workspaces, retiredBusinessWorkspaces } from '../src/workspaceNavigation.ts';
 
 const origin = 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -41,19 +41,14 @@ async function mount(page, denied = false) {
 test('every company destination remains reachable with a dark responsive boundary', async ({page}, testInfo) => {
   test.setTimeout(120000);
   const {frame, requests} = await mount(page);
-  for (const workspace of workspaces.filter(name => !['Vision','Invoices'].includes(name))) {
+  const retired=new Set(retiredBusinessWorkspaces);
+  for (const workspace of workspaces.filter(name => !retired.has(name))) {
     const previousHash=await frame.locator('body').evaluate(()=>location.hash);
     await openWorkspace(frame, workspace);
     const phoneMore=workspace==='Operations'&&await frame.getByRole('navigation',{name:'Mobile Operations navigation',exact:true}).isVisible();
     if(phoneMore)await expect(frame.getByRole('dialog',{name:'Operations navigation',exact:true})).toBeVisible();
     await expect.poll(() => frame.locator('body').evaluate(()=>location.hash)).toBe(phoneMore?previousHash:'#' + workspace.toLowerCase().replaceAll(' ','-'));
     await expect(frame.locator('.owner-it-main')).toBeVisible();
-    if (external.includes(workspace)) {
-      const boundary = frame.getByRole('region',{name:workspace+' workspace'});
-      await expect(boundary).toContainText('AppDeploy');
-      await expect(boundary.getByRole('link')).toHaveAttribute('href','https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/');
-      await expect(boundary.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
-    }
     const measurements = await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,background:getComputedStyle(document.body).backgroundColor,text:getComputedStyle(document.body).color}));
     expect(measurements.scroll, workspace+' must fit').toBeLessThanOrEqual(measurements.width+1);
     expect(measurements.background, workspace+' must use dark presentation').toBe('rgb(11, 17, 28)');
@@ -62,7 +57,13 @@ test('every company destination remains reachable with a dark responsive boundar
     await testInfo.attach(workspace + '-dark-contrast', { body: JSON.stringify(audit, null, 2), contentType: 'application/json' });
     expect.soft(audit.failures, workspace + ' readable text').toEqual([]);
   }
+  for (const workspace of [...retired, ...external]) {
+    await frame.locator('body').evaluate((_, value) => { location.hash = '#' + value.toLowerCase().replaceAll(' ', '-'); }, workspace);
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
+    await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
+  }
   expect(requests.every(request=>request.method==='GET')).toBe(true);
+  expect(requests.some(request => ['/api/jobs','/api/quotes','/api/ar','/api/purchasing','/api/customers','/api/sites','/api/owner-tasks','/api/work-requests','/api/owner/control-data'].includes(request.path))).toBe(false);
   await page.screenshot({path:testInfo.outputPath('company-route-sweep.png'),fullPage:true});
 });
 

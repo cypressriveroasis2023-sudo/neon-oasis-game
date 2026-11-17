@@ -17,13 +17,7 @@ export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityCh
   const load=async()=>{
     const request=++revision.current;setLoading(true);setError('');
     try {
-      // These existing RPC endpoints return one JSON aggregate containing the full directory, not a table page.
-      const [people,locations]=await Promise.all([api.get('/api/customers'),api.get('/api/sites')]);
-      const {customers:nextCustomers,sites:nextSites}=readTicketDirectory(people.data,locations.data);
-      if(request!==revision.current)return;
-      setCustomers(nextCustomers);setSites(nextSites);
-      if(siteId){const selected=nextSites.find(site=>site.id===siteId),customer=nextCustomers.find(item=>item.id===selected?.customerId);
-        if(selected&&customer){setCustomerId(customer.id);setQuery(customer.name);}else setSiteId('');}
+      throw new Error('Customers and sites are not available in COS.');
     }catch(cause){if(request===revision.current)setError(cause instanceof Error?cause.message:'Customers and sites could not be loaded.');}
     finally{if(request===revision.current)setLoading(false);}
   };

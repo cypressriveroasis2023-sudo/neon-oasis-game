@@ -25,8 +25,17 @@ test('payload uses only allowed editable fields and validates identifiers and re
   assert.throws(()=>payloadFor('Customers',{...customer,name:'  '}),/Name is required/);
 });
 
-test('customer, site, and equipment saves write once and verify a fresh authoritative snapshot',async()=>{
-  for(const[kind,row]of [['Customers',customer],['Sites',site],['Equipment',unit]]) {
+test('customers and sites are not reachable and do not call a directory route',async()=>{
+  for(const[kind,row]of [['Customers',customer],['Sites',site]]) {
+    let calls=0;
+    const client={async post(){calls++;},async get(){calls++;}};
+    await assert.rejects(()=>saveDirectory(client,kind,row),error=>error instanceof DirectorySaveError&&error.phase==='rejected'&&/not available/.test(error.message));
+    assert.equal(calls,0);
+  }
+});
+
+test('equipment saves write once and verify a fresh authoritative snapshot',async()=>{
+  for(const[kind,row]of [['Equipment',unit]]) {
     const calls=[];
     const data={items:[row],...(kind==='Equipment'?{models:modelRows}:{})};
     const client={
@@ -44,31 +53,27 @@ test('customer, site, and equipment saves write once and verify a fresh authorit
   }
 });
 
-test('creation uses returned identity, not a matching name from an older record',async()=>{
+test('customer creation is not reachable',async()=>{
   let writes=0;
-  const client={
-    async post(path){writes++;assert.equal(path,'/api/customers');return{data:{id:other}};},
-    async get(){return{data:{items:[customer,{...customer,id:other}]}};},
-  };
-  const result=await saveDirectory(client,'Customers',{...customer,id:null});
-  assert.equal(result.record.id,other);
-  assert.equal(writes,1);
+  const client={async post(){writes++;return{data:{id:other}};},async get(){writes++;return{data:{items:[customer]}};}};
+  await assert.rejects(()=>saveDirectory(client,'Customers',{...customer,id:null}),/not available/);
+  assert.equal(writes,0);
 });
 
 test('successful write with stale readback cannot show success or replay a write',async()=>{
   let writes=0;
   const client={async post(){writes++;return{data:{id}};},async get(){return{data:{items:[{...customer,name:'Old Name'}]}};}};
-  await assert.rejects(()=>saveDirectory(client,'Customers',customer),error=>error instanceof DirectorySaveError&&error.phase==='uncertain'&&error.recordId===id);
+  await assert.rejects(()=>saveDirectory(client,'Equipment',unit),error=>error instanceof DirectorySaveError&&error.phase==='uncertain'&&error.recordId===id);
   assert.equal(writes,1);
 });
 
 test('lost write response and failed readback require refresh without automatic retries',async()=>{
   let writes=0;
   const unknown={async post(){writes++;throw new Error('Connection closed');},async get(){assert.fail('No readback after unknown write result');}};
-  await assert.rejects(()=>saveDirectory(unknown,'Customers',customer),error=>error.phase==='uncertain');
+  await assert.rejects(()=>saveDirectory(unknown,'Equipment',unit),error=>error.phase==='uncertain');
   assert.equal(writes,1);
   const accepted={async post(){writes++;return{data:{id}};},async get(){throw new Error('Offline');}};
-  await assert.rejects(()=>saveDirectory(accepted,'Customers',customer),error=>error.phase==='uncertain'&&/fresh records/.test(error.message));
+  await assert.rejects(()=>saveDirectory(accepted,'Equipment',unit),error=>error.phase==='uncertain'&&/fresh records/.test(error.message));
   assert.equal(writes,2);
 });
 
@@ -76,7 +81,7 @@ test('validation rejections remain editable, and an unexpected saved identity is
   const rejected={async post(){throw Object.assign(new Error('Duplicate unit'),{response:{status:409}});},async get(){assert.fail('Rejected write must not read back');}};
   await assert.rejects(()=>saveDirectory(rejected,'Equipment',unit),error=>error.phase==='rejected'&&error.message==='Duplicate unit');
   const wrong={async post(){return{data:{id:other}};},async get(){assert.fail('Do not trust another record identity');}};
-  await assert.rejects(()=>saveDirectory(wrong,'Customers',customer),error=>error.phase==='uncertain');
+  await assert.rejects(()=>saveDirectory(wrong,'Equipment',unit),error=>error.phase==='uncertain');
 });
 
 test('team workload follows exact platform technician UUID and excludes closed work',()=>{

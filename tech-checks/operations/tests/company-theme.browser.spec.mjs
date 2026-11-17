@@ -70,13 +70,10 @@ test('Single phone menu traps focus; desktop More is a page and browser Back res
 });
 test('native records forms and load errors remain dark and readable on narrow screens',async({page},testInfo)=>{
   const {frame}=await mount(page);
-  await openWorkspace(frame,'Owner Tasks');
-  await frame.getByRole('button',{name:'+ New Owner Task',exact:true}).click();
-  const input=frame.getByLabel('Task Title *');await expect(input).toBeVisible();
-  expect(await input.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}))).toEqual({bg:'rgb(17, 27, 42)',color:'rgb(230, 237, 247)'});
-  await frame.getByRole('button',{name:'Save task',exact:true}).click();
-  await expect(frame.getByRole('alert')).toContainText('Task title is required.');
-  expect(await frame.getByRole('alert').evaluate(el=>getComputedStyle(el).color)).toBe('rgb(244, 162, 172)');
+  await frame.locator('body').evaluate(()=>{location.hash='#owner-tasks';});
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#today');
+  await expect(frame.getByRole('button',{name:'+ New Owner Task',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
   for(const width of [320,390,768,1024,1440]){await page.setViewportSize({width,height:900});const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));expect(size.scroll,'form fits '+width).toBeLessThanOrEqual(size.width+1);}
   expect((await auditDarkPresentation(frame.locator('body'))).failures).toEqual([]);
   await page.screenshot({path:testInfo.outputPath('company-native-form.png'),fullPage:true});

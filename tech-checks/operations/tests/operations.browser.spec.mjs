@@ -132,258 +132,37 @@ async function assignmentDialog(frame) {
   return dialog;
 }
 
-test('approved workspace selects real job details and opens only that job without writes', async ({ page }, testInfo) => {
+test('job lifecycle, job cards and ticket creation are not reachable from Today or the Daily Board', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
-  await frame.getByRole('button', { name: /Delivery · FIX-102/ }).click();
-  const details=frame.getByRole('complementary',{name:'Selected job details'});
-  await expect(details).toContainText('Jordan IT');
-  await expect(details).toContainText('East Entrance');
-  for(const width of [320,390,1024,1440,2560]){
-    await page.setViewportSize({width,height:1000});
-    const layout=await frame.locator('.workspace-overview').evaluate(el=>({right:el.getBoundingClientRect().right,viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
-    expect(layout.right).toBeLessThanOrEqual(layout.viewport+1);
-    expect(layout.scroll).toBeLessThanOrEqual(layout.viewport+1);
-  }
-  await page.setViewportSize(testInfo.project.use.viewport);
-  await page.screenshot({path:testInfo.outputPath('approved-workspace.png'),fullPage:true});
-  await details.getByRole('button',{name:'Open job & actions →'}).click();
-  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
-  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-102');
-  await frame.getByRole('button',{name:'Show all jobs'}).click();
-  await expect(frame.locator('.ops-workflows .record')).toHaveCount(2);
-  expect(state.writes).toEqual([]);
-});
-
-test('Today preserves verified sources when one source fails and fits the viewport', async ({ page }) => {
-  const { state, frame } = await fixturePage(page);
-  await expect(frame.getByText('Connected sources loaded. Agreement and signature tracking is not connected.', { exact: true })).toBeVisible();
-  await expect(frame.getByRole('heading', { name: 'Operational Timeline' })).toBeVisible();
-  await noOverflow(page);
-  state.failedPaths.add('/api/jobs');
-  await frame.getByRole('button', { name: 'Refresh Overview' }).click();
-  await expect(frame.getByRole('alert', { name: 'Dashboard data unavailable' })).toBeVisible();
-  await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.', { exact: true })).toBeVisible();
-  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Schedule & Parts: Unavailable',exact:true})).toBeVisible();
-  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Quote: 0 quotes',exact:true})).toBeVisible();
-  await noOverflow(page);
-});
-
-test('Job flow opens the exact lifecycle and returns to its source before scheduling the same job', async ({page}) => {
-  const {frame,state}=await fixturePage(page);
-  await open(frame,'Jobs');
-  const job=frame.locator('.ops-workflows .record').filter({hasText:'FIX-101'});
-  await job.getByRole('button',{name:'View lifecycle',exact:true}).click();
-  const detail=frame.getByRole('complementary',{name:'Selected job details'});
-  await expect(detail).toContainText('FIX-101');
-  await expect(detail).not.toContainText('FIX-102');
-  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
-  expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#jobs');
-  await job.getByRole('button',{name:'View lifecycle',exact:true}).click();
-  await detail.getByRole('button',{name:'Schedule this job →',exact:true}).click();
-  expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#unscheduled?job='+jobId);
-  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
-  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-101');
-  await expect(frame.locator('.ops-workflows .record').getByRole('button',{name:'Schedule + Assign',exact:true})).toBeVisible();
-  expect(state.writes).toEqual([]);
-});
-
-test('Daily Board filters, validates scheduling and confirms persisted assignment after reload', async ({ page }) => {
-  const { state, frame } = await fixturePage(page);
+  await expect(frame.getByRole('navigation', { name: 'Company job lifecycle' })).toHaveCount(0);
+  await expect(frame.getByRole('button', { name: /Delivery · FIX-102/ })).toHaveCount(0);
+  expect(state.requests.some(item => ['/api/jobs', '/api/quotes', '/api/owner-tasks'].includes(item.path))).toBe(false);
   await open(frame, 'Daily Board');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(3);
-  await frame.getByLabel('Department', { exact: true }).selectOption('it');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(1);
-  await expect(frame.locator('.daily-board-card')).toContainText('Fixture East Gate');
-  await frame.getByLabel('Department', { exact: true }).selectOption('');
-  await frame.getByLabel('Technician', { exact: true }).selectOption('Casey Service');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(1);
-  await expect(frame.locator('.daily-board-card')).toContainText('Fixture inventory review');
-  await frame.getByLabel('Technician', { exact: true }).selectOption('');
-  await noOverflow(page);
-  const dialog = await assignmentDialog(frame);
-  await dialog.getByLabel('End time').fill('08:00');
-  await dialog.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('End time must be after start time.');
-  expect(state.writes).toHaveLength(0);
-  await noOverflow(page);
-  await dialog.getByLabel('End time').fill('11:00');
-  await dialog.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(frame.getByRole('status').filter({ hasText: 'Schedule and technician assignment saved and verified.' })).toBeVisible();
-  expect(state.writes).toHaveLength(1);
-  expect(state.writes[0].body).toEqual({ start: day + ' 09:00', end: day + ' 11:00', technician: 'Casey Service' });
-  await page.reload();
-  await open(frame, 'Daily Board');
-  const saved = frame.getByRole('region', { name: 'Casey Service', exact: true }).locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' });
-  await expect(saved).toContainText(day + ' 09:00 CT');
-  await expect(saved).toHaveClass(/daily-board-scheduled/);
-  await noOverflow(page);
-});
-
-test('Daily Board keeps the last snapshot when refresh fails and reports unverified saves', async ({ page }) => {
-  const { state, frame } = await fixturePage(page);
-  await open(frame, 'Daily Board');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(3);
+  await expect(frame.getByRole('region', { name: 'COS Daily Board' })).toBeVisible();
+  await expect(frame.getByText('FIX-101')).toHaveCount(0);
+  await expect(frame.getByText('Fixture inventory review')).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Daily truck readiness' })).toBeVisible();
+  await expect(frame.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
   state.failedPaths.add('/api/daily-board');
-  await frame.getByRole('button', { name: 'Refresh', exact:true }).click();
+  await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(frame.getByRole('alert')).toContainText('Showing the last successful snapshot.');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(3);
-  state.failedPaths.delete('/api/daily-board');
-  state.readbackMismatch = true;
-  const dialog = await assignmentDialog(frame);
-  await dialog.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(frame.getByRole('alert')).toContainText('Save accepted, but the requested assignment could not be confirmed.');
-  await expect(frame.getByText('Schedule and technician assignment saved and verified.', { exact: true })).toHaveCount(0);
-  expect(state.writes).toHaveLength(1);
-  const card = frame.locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' });
-  await card.click();
-  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
-  await frame.getByRole('button', { name: 'Close details' }).click();
-  state.failedPaths.add('/api/daily-board');
-  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
-  await expect(frame.getByRole('alert').first()).toContainText('Showing the last successful snapshot.');
-  await card.click();
-  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
-  await frame.getByRole('button', { name: 'Close details' }).click();
-  expect(state.writes).toHaveLength(1);
-  state.failedPaths.delete('/api/daily-board');
-  state.readbackMismatch = false;
-  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
-  const recovered = await assignmentDialog(frame);
-  await recovered.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(frame.getByRole('status').filter({ hasText: 'Schedule and technician assignment saved and verified.' })).toBeVisible();
-  expect(state.writes).toHaveLength(2);
-  await noOverflow(page);
-});
-
-test('Field Map selection, GPS validation and one confirmed write survive browser reload', async ({ page }) => {
-  const { state, frame } = await fixturePage(page);
-  await open(frame, 'Field Map');
-  const units = frame.getByRole('region', { name: 'Fleet units in view' });
-  // Advanced map filters include Reset filters; count only equipment entries.
-  const equipment=units.locator('.cos-fleet-unit-row');
-  await expect(equipment).toHaveCount(2);
-  expect(await equipment.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-unit-id')).sort())).toEqual([unitId,missingUnitId].sort());
-  await expect(frame.locator('.cos-fleet-map-canvas .leaflet-container, .cos-fleet-map-canvas.leaflet-container')).toBeVisible();
-  await noOverflow(page);
-  await selectLocation(frame,'FIX-RG-002');
-  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIX-RG-002');
-  await selectLocation(frame,'FIX-SN-001');
-  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('FIX-SN-001');
-  await selectLocation(frame,'FIX-RG-002');
-  await frame.getByLabel('Latitude', { exact: true }).fill('91');
-  await frame.getByLabel('Longitude', { exact: true }).fill('-95.400000');
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await frame.getByRole('button', { name: 'Save verified location' }).click();
-  await expect(frame.getByRole('alert')).toContainText('Latitude must be between -90 and 90.');
-  expect(state.writes).toHaveLength(0);
-  await frame.getByLabel('Latitude', { exact: true }).fill('29.800000');
-  await frame.getByLabel('Accuracy (meters)', { exact: true }).fill('');
-  await frame.getByRole('combobox', { name: 'Location source', exact: true }).selectOption('manual');
-  await frame.getByLabel('Verification note', { exact: true }).fill('Synthetic gate location');
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await frame.getByRole('button', { name: 'Save verified location' }).click();
-  await expect(frame.getByRole('status').filter({ hasText: 'FIX-RG-002 location saved and read back successfully.' }).first()).toBeVisible();
-  expect(state.writes).toHaveLength(1);
-  expect(state.writes[0].path).toBe('/api/field-map/' + missingUnitId + '/gps');
-  expect(state.writes[0].body).toMatchObject({ latitude: 29.8, longitude: -95.4, accuracyM: null, source: 'manual' });
-  expect(state.writes[0].body.note).toMatch(/^COS_FIELD_LOCATION_V1\|address_sha256=[a-f0-9]{64}\|confirmed=true\nSynthetic gate location$/);
-  await page.reload();
-  await open(frame, 'Field Map');
-  await selectLocation(frame,'FIX-RG-002');
-  await expect(frame.getByLabel('Latitude', { exact: true })).toHaveValue('29.8');
-  await expect(frame.getByLabel('Longitude', { exact: true })).toHaveValue('-95.4');
-  await expect(frame.locator('.field-map-history')).toContainText('Synthetic gate location');
-  expect(state.writes).toHaveLength(1);
-  await noOverflow(page);
-});
-
-
-test('Field Map blocks another GPS write until a successful manual refresh', async ({ page }) => {
-  const { state, frame } = await fixturePage(page);
-  await open(frame, 'Field Map');
-  await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
-  const editor = frame.locator('.field-map-location-editor');
-  const save = editor.getByRole('button', { name: 'Save verified location' });
-  await expect(save).toBeDisabled();
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await expect(save).toBeEnabled();
-  await frame.getByLabel('Latitude', { exact: true }).fill('29.81');
-  await frame.getByLabel('Longitude', { exact: true }).fill('-95.3698');
-  state.failedPaths.add('/api/field-map');
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await save.click();
-  await expect(editor.getByRole('alert')).toContainText('GPS may have been saved');
-  await expect(save).toBeDisabled();
-  expect(state.writes).toHaveLength(1);
-  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();
-  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');
-  await expect(frame.locator('.cos-fleet-status-strip').filter({hasText:'Supporting source update incomplete'})).toContainText('Saved equipment remains visible.');
-  await expect(save).toBeDisabled();
-  expect(state.writes).toHaveLength(1);
-  state.failedPaths.delete('/api/field-map');
-  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();
-  await expect(save).toBeDisabled();
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await expect(save).toBeEnabled();
-  await expect(frame.getByLabel('Latitude', { exact: true })).toHaveValue('29.81');
-  await frame.getByLabel('Latitude', { exact: true }).fill('29.82');
-  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
-  await save.click();
-  await expect(frame.getByRole('status').filter({ hasText: 'location saved and read back successfully.' }).first()).toBeVisible();
-  expect(state.writes).toHaveLength(2);
-});
-
-test('Overview mobile job detail preserves selection through Back, Forward, reload and resize',async({page})=>{
-  await page.setViewportSize({width:390,height:844});
-  const {frame,state}=await fixturePage(page);
-  const search=frame.getByRole('searchbox',{name:'Find an active job'});
-  await search.fill('East');
-  const selected=frame.getByRole('button',{name:/Delivery · FIX-102/});
-  await selected.click();
-  const detail=frame.getByRole('complementary',{name:'Selected job details'});
-  await expect(detail).toBeVisible();
-  await expect(frame.locator('.workspace-work')).toBeHidden();
-  await expect(detail).toContainText('East Entrance');
-  const hash=await frame.locator('body').evaluate(()=>location.hash);
-  expect(hash).toContain('job=55555555-5555-4555-8555-555555555555');
-  expect(hash).toContain('detail=1');
-  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
-  await expect(search).toHaveValue('East');
-  await expect(selected).toBeFocused();
-  await expect(selected).toHaveAttribute('aria-pressed','true');
-  await expect(detail).toBeHidden();
-  await frame.locator('body').evaluate(()=>history.forward());
-  await expect(detail).toBeVisible();
-  for(const width of [1024,390,1440,320]){
-    await page.setViewportSize({width,height:900});
-    await expect(detail).toBeVisible();
-    await expect(detail).toContainText('East Entrance');
-    await noOverflow(page);
+  await expect(frame.getByText('Fixture inventory review')).toBeVisible();
+  expect(state.writes).toEqual([]);
+  for (const hash of ['#jobs', '#unscheduled']) {
+    await frame.locator('body').evaluate((_, value) => { location.hash = value; }, hash);
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
   }
-  await frame.locator('body').evaluate(()=>location.reload());
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText('East Entrance');
-  await detail.getByRole('button',{name:'Open job & actions →'}).click();
-  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
-  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-102');
-  await frame.locator('body').evaluate(()=>history.back());
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText('East Entrance');
-  expect(state.writes).toEqual([]);
 });
-test('a stale Overview job link never substitutes another record or action',async({page})=>{
-  await page.setViewportSize({width:390,height:844});
-  const {frame,state}=await fixturePage(page);
-  await frame.locator('body').evaluate(()=>{location.hash='today?job=missing-job&detail=1';});
-  const detail=frame.getByRole('complementary',{name:'Selected job details'});
-  await expect(detail.getByRole('heading',{name:'Selected job is unavailable'})).toBeVisible();
-  await expect(detail.getByRole('button',{name:'Open job & actions →'})).toHaveCount(0);
-  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
-  await expect(frame.locator('.workspace-work')).toBeVisible();
-  await expect(detail).toBeHidden();
+
+test('Today keeps camera health when a retired jobs read is unavailable', async ({ page }) => {
+  const { state, frame } = await fixturePage(page);
+  state.failedPaths.add('/api/jobs');
+  await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
+  await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
+  await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.')).toHaveCount(0);
+  expect(state.requests.some(item => item.path === '/api/camera-health/summary-v3')).toBe(true);
   expect(state.writes).toEqual([]);
+  await noOverflow(page);
 });
 
 test('Fleet Dashboard keeps address verification explicit and hides changed-address pins',async({page},info)=>{

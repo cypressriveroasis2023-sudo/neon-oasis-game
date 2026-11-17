@@ -1,53 +1,45 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {workspaces,workspaceGroups,hiddenWorkspaces,workspaceLabel,workspaceHash,readWorkspaceRoute} from '../src/workspaceNavigation.ts';
-test('six company areas cover every shown destination, the rest deliberately hidden',()=>{
-  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Job flow','Schedule','Equipment','Customers','Team']);
+import {workspaces,workspaceGroups,hiddenWorkspaces,retiredBusinessWorkspaces,workspaceLabel,workspaceHash,readWorkspaceRoute} from '../src/workspaceNavigation.ts';
+test('kept areas cover the camera workspace and retired screens are not shown',()=>{
+  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Cameras & handoff','Equipment','Team']);
   const items=workspaceGroups.flatMap(group=>group.items);
   assert.equal(new Set(items).size,items.length);
-  // Finance and the unused Customers/Schedule entries came off the navigation
-  // at the owner's request. They stay routable; hiddenWorkspaces is the record.
-  assert.deepEqual([...items,...hiddenWorkspaces,'Invoices','Vision'].sort(),[...workspaces].sort());
-  for(const hidden of hiddenWorkspaces) assert.ok(!items.includes(hidden),hidden+' is still shown');
+  assert.deepEqual([...items,...hiddenWorkspaces,...retiredBusinessWorkspaces].sort(),[...workspaces].sort());
+  for(const retired of retiredBusinessWorkspaces) assert.ok(!items.includes(retired),retired+' is still shown');
   assert.equal(workspaceLabel('Today'),'Overview');
   assert.equal(workspaceLabel('Daily Board'),'Dispatch Board');
-  assert.equal(workspaceLabel('Invoices'),workspaceLabel('Billing'));
 });
-test('every existing workspace bookmark retains its canonical destination',()=>{
-  for(const workspace of workspaces){
-    const route={workspace,jobId:'',detail:false};
-    assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
+test('retired business bookmarks open Today and do not keep a job or ticket target',()=>{
+  for(const hash of ['#jobs','#unscheduled','#dispatch','#calendar','#quotes','#invoices','#billing','#purchasing','#crm','#customers','#sites','#work-requests','#owner-tasks','#jobs?job=42&detail=1','#today?job=42&detail=1','#daily-board?create=SERVICE']){
+    const route=readWorkspaceRoute(hash);
+    if(hash.startsWith('#daily-board')||hash.startsWith('#today')){
+      assert.equal(route.workspace,hash.startsWith('#today')?'Today':'Daily Board');
+      assert.equal(route.detail,false);
+      assert.equal(route.createType,undefined);
+      assert.equal(route.jobId,'');
+    }else assert.deepEqual(route,{workspace:'Today',jobId:'',detail:false});
   }
-  assert.equal(readWorkspaceRoute('#overview').workspace,'Today');
-  assert.equal(readWorkspaceRoute('#dispatch-board').workspace,'Daily Board');
-  assert.equal(readWorkspaceRoute('#unknown').workspace,'Fleet Dashboard');
-});
-test('job identity and mobile detail survive URL encoding without creating another destination',()=>{
-  const route={workspace:'Today',jobId:'job / 42?&',detail:true};
-  assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
-  assert.deepEqual(readWorkspaceRoute('#jobs?job=42&detail=1'),{workspace:'Jobs',jobId:'42',detail:false});
-  assert.equal(workspaceHash({workspace:'Today',jobId:'',detail:true}),'#today');
+  for(const workspace of retiredBusinessWorkspaces) assert.equal(workspaceHash({workspace,jobId:'42',detail:true}),'#today');
 });
 
-test('ticket bookmarks use only existing job types on Dispatch Board without a job target',()=>{
+test('ticket bookmarks no longer open a job-create screen',()=>{
   for(const createType of ['SERVICE','PICKUP','DELIVERY','SWAP']){
     const route={workspace:'Daily Board',jobId:'',detail:false,createType};
-    assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
-    assert.equal(workspaceHash(route),'#daily-board?create='+createType);
-  }
-  for(const hash of ['#daily-board?create=INSTALL','#jobs?create=SWAP','#today?create=SERVICE','#daily-board?job=42&create=PICKUP']){
-    assert.equal(readWorkspaceRoute(hash).createType,undefined);
+    assert.equal(workspaceHash(route),'#daily-board');
+    assert.equal(readWorkspaceRoute(workspaceHash(route)).createType,undefined);
   }
 });
 
-test('map, unit health and ticket routes retain a validated stable unit identifier',()=>{
+test('map and unit health retain a validated stable unit identifier',()=>{
  const unitId='11111111-1111-4111-8111-111111111111';
- for(const workspace of ['Fleet Dashboard','Camera Health','Unit Tracker','Daily Board']){
-  const route={workspace,jobId:'',detail:false,unitId,...(workspace==='Daily Board'?{createType:'SWAP'}:{})};
+ for(const workspace of ['Fleet Dashboard','Camera Health','Unit Tracker']){
+  const route={workspace,jobId:'',detail:false,unitId};
   assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
  }
- for(const hash of ['#today?unit='+unitId,'#jobs?unit='+unitId,'#camera-health?unit=Some%20unit','#daily-board?unit='+unitId,'#camera-health?job=42&unit='+unitId])assert.equal(readWorkspaceRoute(hash).unitId,undefined);
+ assert.equal(readWorkspaceRoute('#daily-board?unit='+unitId).unitId,undefined);
+ for(const hash of ['#today?unit='+unitId,'#jobs?unit='+unitId,'#camera-health?unit=Some%20unit','#camera-health?job=42&unit='+unitId])assert.equal(readWorkspaceRoute(hash).unitId,undefined);
 });
 
 test('legacy camera field links preserve full unit labels without treating numbers as IDs',()=>{const route=readWorkspaceRoute('#field-map?unitLabel=SNIPER%20312');assert.equal(route.unitLabel,'SNIPER 312');assert.equal(workspaceHash(route),'#fleet-dashboard?unitLabel=SNIPER+312');assert.equal(readWorkspaceRoute('#camera-health?unitLabel=312').unitLabel,undefined);});
@@ -75,7 +67,7 @@ test('advanced camera diagnostics is an explicit mode, not a new primary workspa
 test('an empty entry opens Fleet while explicit overview, job and TV bookmarks retain their intent',()=>{
   for(const hash of ['', '#', '#unrecognized'])assert.equal(readWorkspaceRoute(hash).workspace,'Fleet Dashboard');
   for(const hash of ['#today?job=42&detail=1','#overview?job=42&detail=1','#dashboard?job=42&detail=1']){
-    assert.deepEqual(readWorkspaceRoute(hash),{workspace:'Today',jobId:'42',detail:true});
+    assert.deepEqual(readWorkspaceRoute(hash),{workspace:'Today',jobId:'',detail:false});
   }
   assert.equal(readWorkspaceRoute('#daily-board').workspace,'Daily Board');
   assert.equal(readWorkspaceRoute('#tech-check').workspace,'Tech Check');

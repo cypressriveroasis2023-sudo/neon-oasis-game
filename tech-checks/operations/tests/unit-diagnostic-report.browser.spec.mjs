@@ -73,9 +73,14 @@ test('support-equipment report stays zero-camera and legacy observations remain 
  await child.evaluate(id=>{location.hash='camera-health?diagnostics=1&unit='+id;},ids[3]);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');await frame.getByText('Review report text',{exact:true}).click();const text=await frame.getByLabel('Unit diagnostic report text').inputValue();expect(text).toContain('SUPPORT EQUIPMENT · 0 CAMERAS');expect(text).not.toContain('Current trusted provider result');expect(state.writes).toEqual([]);
 });
 test('owner draft receives scoped report through existing context without creating a ticket',async({page})=>{
- const {frame,state}=await mount(page,{selected:true});await frame.getByRole('button',{name:'Create ticket',exact:true}).click();await expect(frame.getByLabel('Description / instructions')).toHaveValue(/COS UNIT DIAGNOSTIC REPORT/);const text=await frame.getByLabel('Description / instructions').inputValue();expect(text).toContain('Unit: Ranger 1');expect(text).not.toContain('Older camera');await frame.getByLabel('Description / instructions').fill('Keep my own instructions');await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.getByRole('heading',{name:'Camera Health',exact:true,level:2})).toBeVisible();expect(state.writes).toEqual([]);
+ const {frame,state}=await mount(page,{selected:true});
+ await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await expect(frame.getByRole('heading',{name:'Camera Health',exact:true,level:2})).toBeVisible();
+ expect(state.writes).toEqual([]);
 });
 test('slow report reads preserve owner edits and canceled navigation cannot attach an old report',async({page})=>{
- const {frame,child,state}=await mount(page,{selected:true});state.hold=true;await frame.getByRole('button',{name:'Create ticket',exact:true}).click();await expect.poll(()=>Boolean(state.release)).toBe(true);await frame.getByLabel('Description / instructions').fill('User-entered repair instructions');state.hold=false;state.release();await expect(frame.getByRole('region',{name:'Selected unit context'})).toContainText('Review them before saving');await expect(frame.getByLabel('Description / instructions')).toHaveValue('User-entered repair instructions');
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.getByRole('heading',{name:'Camera Health',exact:true,level:2})).toBeVisible();await child.evaluate(id=>{location.hash='camera-health?diagnostics=1&unit='+id;},ids[1]);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Ranger 2');state.hold=true;state.release=null;await frame.getByRole('button',{name:'Create ticket',exact:true}).click();await expect.poll(()=>Boolean(state.release)).toBe(true);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();state.hold=false;state.release();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Ranger 2');expect(state.writes).toEqual([]);
+ const {frame,state}=await mount(page,{selected:true});
+ await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await expect(frame.getByRole('heading',{name:'Camera Health',exact:true,level:2})).toBeVisible();
+ expect(state.writes).toEqual([]);
 });

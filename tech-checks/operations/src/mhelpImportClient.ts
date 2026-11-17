@@ -22,45 +22,21 @@ export async function fileBytesBase64(file:File) {
   for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
   return btoa(binary);
 }
-export function mhelpImportClient(api:ImportApi,current=()=>true) {
-  const post=(path:string,body:unknown)=>{if(!current())throw new Error('The import session changed. Reload COS Operations before continuing.');return api.post(path,body);};
+const unavailable = (): never => { throw new Error('mHelp ticket import is not available in COS.'); };
+export function mhelpImportClient(_api:ImportApi,_current=()=>true) {
   const adapter:MhelpImportAdapter={
-    commit:async({attachmentId,ticket})=>(await post('/api/mhelpdesk/imports/commit',{attachmentId:checkedId(attachmentId),ticket})).data,
-    readJob:async id=>(await api.get('/api/mhelpdesk/imports/jobs/'+checkedId(id))).data as SavedImport|null,
-    moveToRecoverableTrash:async(id,verifiedJobId,ticket)=>{await post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/trash',{verifiedJobId:checkedId(verifiedJobId),ticket});},
-    readAttachment:async id=>{const result=(await api.get('/api/mhelpdesk/imports/attachments/'+checkedId(id))).data;return result===null?null:checkedImportAttachment(result);},
+    commit:async()=>unavailable(),
+    readJob:async()=>unavailable(),
+    moveToRecoverableTrash:async()=>unavailable(),
+    readAttachment:async()=>unavailable(),
   };
   return {
     adapter,
-    stage:async(attemptId:string,source:ImportSource,file:File)=>checkedImportAttachment((await post('/api/mhelpdesk/imports/stage',{attemptId:checkedId(attemptId),source,bytesBase64:await fileBytesBase64(file)})).data),
-    readAttempt:async(id:string)=>{const value=(await api.get('/api/mhelpdesk/imports/attempt/'+checkedId(id))).data;if(value===null)return null;const checked=checkedImportAttachment(value);if(checked.attemptId!==id)throw new Error('The recovered attachment belongs to a different import attempt.');return checked;},
-    history:async()=>checkedImportHistory((await api.get('/api/mhelpdesk/imports')).data),
-    restore:async(id:string)=>{
-      await post('/api/mhelpdesk/imports/attachments/'+checkedId(id)+'/restore',{});
-      const value=await adapter.readAttachment(id);
-      if(!value||value.state!=='staged')throw new Error('The restored copy could not be verified. Refresh imports before retrying.');
-      return value;
-    },
-    recoverSaved:async(attachment:StagedTicketAttachment,ticket:ReviewedImportTicket)=>{
-      if(!attachment.jobId)return null;
-      if(attachment.sha256!==ticket.source.sha256||attachment.byteLength!==ticket.source.byteLength)throw new Error('The recovered attachment does not match this original file.');
-      // A confirmed duplicate points to a PRE-EXISTING job. Its attachment and
-      // reviewed fields intentionally differ from this separately retained copy.
-      if(attachment.disposition==='duplicate'){
-        if(!attachment.source||attachment.source.sourceTicketId!==ticket.source.sourceTicketId||attachment.source.filename!==ticket.source.filename||attachment.source.parserId!==ticket.source.parserId||attachment.source.parserVersion!==ticket.source.parserVersion||attachment.state!=='staged')throw new Error('Duplicate import provenance could not be verified. The source copy is retained.');
-        return {status:'duplicate' as const,jobId:attachment.jobId};
-      }
-      const saved=await adapter.readJob(attachment.jobId);
-      if(!saved||saved.jobId!==attachment.jobId||saved.organizationId!==attachment.organizationId||saved.attachmentId!==attachment.id||saved.status!=='saved'||importTicketFingerprint(saved.ticket)!==importTicketFingerprint(ticket))throw new Error('A saved job exists, but it does not match every reviewed field. Open it for review; the imported copy is retained.');
-      return {status:'saved' as const,saved};
-    },
-    download:async(row:ImportHistoryRow)=>{
-      const value=(await api.get('/api/mhelpdesk/imports/attachments/'+checkedId(row.id)+'/download')).data;
-      if(!value||value.filename!==row.filename||value.mimeType!=='application/pdf'||value.sha256!==row.sha256||typeof value.bytesBase64!=='string')throw new Error('The retained source copy could not be verified.');
-      const bytes=Uint8Array.from(atob(value.bytesBase64),(character:string)=>character.charCodeAt(0));
-      const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),byte=>byte.toString(16).padStart(2,'0')).join('');
-      if(digest!==row.sha256||bytes.length!==row.byteLength)throw new Error('The retained source bytes do not match the saved original.');
-      return new Blob([bytes],{type:'application/pdf'});
-    },
+    stage:async(..._args:unknown[]):Promise<StagedTicketAttachment>=>unavailable(),
+    readAttempt:async(..._args:unknown[]):Promise<StagedTicketAttachment|null>=>unavailable(),
+    history:async(..._args:unknown[]):Promise<ImportHistoryRow[]>=>unavailable(),
+    restore:async(..._args:unknown[]):Promise<StagedTicketAttachment>=>unavailable(),
+    recoverSaved:async(..._args:unknown[]):Promise<{status:'duplicate';jobId:string}|{status:'saved';saved:SavedImport}|null>=>unavailable(),
+    download:async(..._args:unknown[]):Promise<Blob>=>unavailable(),
   };
 }

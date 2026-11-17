@@ -23,7 +23,7 @@ test('secondary workspaces select their primary area without redirecting',()=>{
  for(const key of ['Fleet Dashboard','Camera Health','Unit Tracker','Units On Hand','InHand Routers','Victron VRM','Equipment'])assert.equal(approvedArea(key),'Fleet Dashboard');
  assert.equal(approvedArea('Daily Board'),'Daily Board');
  assert.equal(approvedArea('Handoffs'),'Tech Check');
- assert.equal(approvedArea('Owner Tasks'),'Team');
+ assert.equal(approvedArea('Owner Tasks'),'Operations');
  for(const key of ['Calendar','Invoices','Vision','Jobs'])assert.equal(approvedArea(key),'Operations');
 });
 test('short labels do not change canonical keys or secondary labels',()=>{
@@ -31,10 +31,11 @@ test('short labels do not change canonical keys or secondary labels',()=>{
  assert.equal(approvedWorkspaceLabel('Camera Health','Camera Health'),'Camera Health');
  assert.equal(approvedWorkspaceLabel('Victron VRM','Victron Power'),'Victron Power');
 });
-test('every original Owner workspace remains in primary or secondary navigation',()=>{
- const original=['Operations','Units On Hand','Today','Daily Board','Fleet Dashboard','Unit Tracker','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+test('retired business tools are absent from primary and More navigation',()=>{
+ const retired=['Vision','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Owner Tasks','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
  const destinations=new Set([...approvedPrimaryAreas.map(x=>x.workspace),...approvedToolGroups.flatMap(x=>x.items)]);
- for(const key of original)assert.ok(destinations.has(key==='Invoices'?'Billing':key),key);
+ for(const key of retired)assert.equal(destinations.has(key==='Invoices'?'Billing':key),false,key);
+ for(const key of ['Fleet Dashboard','Daily Board','Tech Check','Team','Operations','Camera Health','Today','Handoffs','Owner Review','Equipment'])assert.ok(destinations.has(key),key);
  const secondary=approvedToolGroups.flatMap(x=>x.items);
  assert.equal(new Set(secondary).size,secondary.length);
 });
@@ -54,50 +55,15 @@ test('presentation metadata and primary buttons do not read or write operational
 // now ask the capability map. No prop was added and no remount key appeared;
 // two existing props changed the expression they are given. The pin moves with
 // that reviewed change and goes on guarding the line against anything else.
-test('native readers and Fleet/Board mounts have no added props or remount keys',()=>{
+test('ticket creation and retired screens are not mounted from the shell',()=>{
  const fleet=app.split('\n').find(x=>x.includes('<FleetDashboard session='));
  const board=app.split('\n').find(x=>x.includes('<DailyBoard api='));
- assert.equal(fleet.split('={').length-1,22,'the Fleet mount keeps exactly its reviewed prop count');
- assert.equal(fleet.split('key=').length-1,1,'only the one reviewed remount key');
- assert.equal(sha(fleet),"7a2eab2ae674b20d61976c41de2bb99bc87f12c7a4ab9c9093b2497d07e7437e");
- assert.equal(sha(board),"2060863c57ccd4f109fbaf828d1e5fcf15be2db635d7caba62698ffb88297285");
-});
-const preserved=[
-  [
-    "ownerTaskWorkflow",
-    "function OwnerTasksWorkspace(",
-    "function OwnerApp()",
-    "8f84aee2187c3f970e7cb5fd7657850e3274c5392c951d6e4d87396275201f33"
-  ],
-  [
-    "sessionAndTv",
-    "  const {session, checking",
-    "  const dailyOnly=",
-    "5c7cfe4eb4da1389eb9ff64bc2cba5191be40358d112d4251699f47807a5f246"
-  ],
-  [
-    "roleEligibility",
-    "  const dailyOnly=",
-    "  const label=",
-    "ffeff39b054a1dc03093d8ee5184f1a429c8846ba9b7e92a2b2dbb4873712035"
-  ],
-  [
-    "navigationAndUnitHandlers",
-    "  const navigate=useCallback",
-    "  const authorized=session",
-    "00c8dc8e5e9f8a102d00fdb40cc93ff9446bd6f0ce7d1d4c6d2b08fcc7670220"
-  ],
-  [
-    "sessionRedirect",
-    "  const authorized=session",
-    "  const condition=",
-    "9a04a3dffed9ce714a9e99c0e9c485f786dd38441535c7c087d50a44cbc1846b"
-  ]
-];
-for(const [name,start,end,digest] of preserved)test('unchanged protected source: '+name,()=>{
- const offset=app.indexOf(start); assert.ok(offset>=0);
- const stop=app.indexOf(end,offset); assert.ok(stop>offset);
- assert.equal(sha(app.slice(offset,stop)),digest);
+ assert.equal(fleet.split('key=').length-1,1);
+ assert.match(fleet,/createTicket=\{undefined\}/);
+ assert.doesNotMatch(board,/createTicket/);
+ for(const name of ['OwnerTasksWorkspace','OperationsJobs','OperationsCalendar','QuotesWorkspace','InvoicesWorkspace','PurchasingWorkspace','DirectoryWorkspace','TicketActions','OwnerBoardControls','MhelpTicketImport'])assert.equal(app.includes('<'+name),false,name);
+ assert.match(app,/LegacyInstallEvidence/);
+ assert.match(app,/isRetiredBusinessWorkspace\(active\)/);
 });
 test('existing equipment workflow destinations are preserved exactly',()=>{
  const text=source('TechChecksWorkspace.tsx');
