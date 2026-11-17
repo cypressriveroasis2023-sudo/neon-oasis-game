@@ -12,7 +12,7 @@ import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
-import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS} from './refreshCadence';
+import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS,TV_SAVED_BOARD_STALE_MS} from './refreshCadence';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -46,7 +46,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   // `include` selects which saved reads this pass performs. Each side advances
   // only its own attempt clock, so a camera-only pass cannot postpone the router
   // deadline and a router-only pass cannot postpone the camera deadline.
-  const refresh=useCallback(async(force=false,proofUpdate=false,include:{camera?:boolean;routers?:boolean}={})=>{
+  const refresh=useCallback(async(force=false,proofUpdate=false,include:{camera?:boolean;routers?:boolean;reread?:boolean}={})=>{
     const readCamera=include.camera!==false,readRouters=include.routers!==false;
     if(running.current||!alive.current||sessionBlocked.current)return;
     if(force){cancelRetry();retryAt.current=0;}
@@ -68,7 +68,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         },
         health:health=>{nextHealth=health;},
         routers:routers=>{nextRouters=routers;}
-      },force,{camera:readCamera,routers:readRouters});
+      },force,{camera:readCamera,routers:readRouters,reread:include.reread===true});
       if(current()){
         setData(previous=>({...previous,...(readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextField:null),health:readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextHealth:previous.health,routers:nextRouters===undefined?previous.routers:nextRouters}));
         setClock(Date.now());
@@ -92,7 +92,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
     };
     void refresh();
-    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,TV_SAVED_BOARD_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
+    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,TV_SAVED_BOARD_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(false,false,{camera:cameraDue,routers:routerDue,reread:true});}};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError('Sign in again to load fleet information.');};
     // The API has already fenced and validated the late proof. Reauthorize
@@ -253,7 +253,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const sourceFacts=fleetSourceFacts({now:clock,map:data.fieldSource||undefined,connectionState:typeof data.fieldSource?.productConnectionsState==='string'?data.fieldSource.productConnectionsState:undefined,boardCheckedAt:data.readAt,trackerVerifiedAt:typeof data.fieldSource?.productConnections?.trackerVerifiedAt==='string'?data.fieldSource.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(data.fieldSource)});
   return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
     <SourceHealthStrip facts={sourceFacts}/>
-    <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{healthAvailable?census.board?census.board.counts.offline+' down units':outageCards.length+' down units':'Outage count unavailable'}</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{healthAvailable?totals.online:'—'} online</b><b className='tv-offline'>{healthAvailable?totals.offline:'—'} offline</b><b>{locationsAvailable?totals.unknown:'—'} unverified</b>{census.board?<><b>{census.board.field} Field equipment</b><b>{census.board.field-census.board.counts.support} camera-capable equipment</b><b>{census.board.counts.support} support · no cameras</b></>:<b>{locationsAvailable?rows.length+' COS diagnostic units · census unavailable':'Field equipment unavailable'}</b>}<b>{locationsAvailable?tvPins.mhelpLocated:'—'} mHelp address pins</b><b>{locationsAvailable?totals.mapped:'—'} GPS-verified</b></>}<small>Saved camera / placement read every {Math.round(TV_SAVED_BOARD_REFRESH_MS/60000)} min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}{data.readAt&&clock-data.readAt>TV_SAVED_BOARD_REFRESH_MS*2?' · last completed reading · not current':''}</small></div>
+    <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{healthAvailable?census.board?census.board.counts.offline+' down units':outageCards.length+' down units':'Outage count unavailable'}</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{healthAvailable?totals.online:'—'} online</b><b className='tv-offline'>{healthAvailable?totals.offline:'—'} offline</b><b>{locationsAvailable?totals.unknown:'—'} unverified</b>{census.board?<><b>{census.board.field} Field equipment</b><b>{census.board.field-census.board.counts.support} camera-capable equipment</b><b>{census.board.counts.support} support · no cameras</b></>:<b>{locationsAvailable?rows.length+' COS diagnostic units · census unavailable':'Field equipment unavailable'}</b>}<b>{locationsAvailable?tvPins.mhelpLocated:'—'} mHelp address pins</b><b>{locationsAvailable?totals.mapped:'—'} GPS-verified</b></>}<small>Saved camera / placement read every {Math.round(TV_SAVED_BOARD_REFRESH_MS/60000)} min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}{data.readAt&&clock-data.readAt>TV_SAVED_BOARD_STALE_MS?' · last completed reading · not current':''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {data.health?'Last completed results remain displayed with their original check times. ':''}{error}</p>}
     {!data.readAt&&<p className='tv-fleet-loading'>{error?'Fleet information is unavailable.':'Loading Camera Health and field locations…'}</p>}
     <div className='tv-fleet-map-wrap field-map-workspace cos-tv-compact-fleet-map' hidden={mode!=='map'} data-area-kind={area.kind}><div ref={mapNode} className='tv-fleet-map' aria-label='Field unit locations'/>{groupDetails&&mode==='map'&&<section className='cos-compact-group-sheet cos-tv-compact-sheet' role='dialog' aria-label='Grouped TV equipment'><button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button><div ref={groupHost} className='cos-compact-group-sheet-content'/></section>}<div className='tv-map-area' aria-label='Current map area'><strong>{area.label}</strong><span>{locationsAvailable?area.ids.length:'—'} units · <b className='tv-offline'>{healthAvailable?area.offline:'—'} down</b> · <b className='tv-online'>{healthAvailable?area.online:'—'} online</b></span></div><div className='tv-map-legend'><span className='tv-online'>● Online</span><span className='tv-offline'>● Offline</span><span>● Unverified</span><span className='tv-solar'>● Solar / support</span><span>Group ring = equipment health · red = confirmed offline</span><span>{locationsAvailable?tvPins.mhelpLocated:'—'} saved mHelp customer-address pins · {locationsAvailable?tvPins.mhelpMissing:'—'} unresolved · {locationsAvailable?totals.mapped:'—'} GPS-verified units</span></div></div>

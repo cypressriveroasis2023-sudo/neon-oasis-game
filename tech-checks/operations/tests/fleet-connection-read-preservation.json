@@ -6,7 +6,7 @@
     {
       "path": "api.ts",
       "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
-      "candidateBlob": "f86955866a7b999803834b8797defde461e1830d",
+      "candidateBlob": "edf4aabab77afe1ec53be5030707cc6f70442cfc",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -20,12 +20,12 @@
         },
         {
           "from": "        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}\n      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);fleetSnapshots.set(key,{value,at:Date.parse(value.readAt)});return value;});\n      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);\n      const reads={paired,health,fieldMap,connectionMap:fieldMap};\n      for(const part of [paired,health,fieldMap])void part.catch(()=>{});\n",
-          "to": "        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}\n      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});\n      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);\n      const reads={revision:generation,paired,health,fieldMap,connectionMap:fieldMap};\n      for(const part of [paired,health,fieldMap])void part.catch(()=>{});\n",
+          "to": "        failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}\n      },force&&!reread)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});\n      const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);\n      const reads={revision:generation,paired,health,fieldMap,connectionMap:fieldMap};\n      for(const part of [paired,health,fieldMap])void part.catch(()=>{});\n",
           "count": 1
         },
         {
           "from": "    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();\n    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};\n    // Only the newly authorized actor may see the dated complete saved pair.\n",
-          "to": "    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();\n    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};\n    // Only the newly authorized actor may see the dated complete saved pair.\n",
+          "to": "    if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();\n    if(!force&&!reread&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};\n    // Only the newly authorized actor may see the dated complete saved pair.\n",
           "count": 1
         },
         {
@@ -51,6 +51,16 @@
         {
           "from": "      response = await fetch(endpoint, {\n",
           "to": "      response = await fetch(endpointFor(path), {\n",
+          "count": 1
+        },
+        {
+          "from": "async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetReads>{",
+          "to": "async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void,reread=false):Promise<FleetReads>{",
+          "count": 1
+        },
+        {
+          "from": "fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],",
+          "to": "fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false,reread=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force,undefined,reread&&!force))[source] as FleetSnapshot[K],",
           "count": 1
         }
       ]

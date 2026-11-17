@@ -71,7 +71,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
       }finally{state.pendingDaily--;}
       return;
     }
-    if(path.startsWith('/api/fleet-saved-board')&&state.savedBoard){state.savedBoardReads=(state.savedBoardReads||0)+1;return route.fulfill({headers:cors,json:state.savedBoard});}
+    if(path.startsWith('/api/fleet-saved-board')&&state.savedBoard){state.savedBoardReads=(state.savedBoardReads||0)+1;state.boardRequests=(state.boardRequests||[]).concat({path,method});return route.fulfill({headers:cors,json:state.savedBoard});}
     if(['/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(path)){state.fleetRequests.push({path,method,at:await page.evaluate(()=>Date.now())});if(path==='/api/field-map'&&state.fieldGate)await state.fieldGate.promise;}
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
@@ -571,4 +571,23 @@ for(const age of ['current','12 hours old'])test('TV shows the saved Fleet board
  state.settings={sections:['map'],revision:1,updatedAt:time};await page.clock.runFor(60000);
  const summary=frame.locator('.tv-fleet-summary');await expect(summary).toContainText(/unverified/);
  await expect(summary).toContainText(board.counts.online+' online');await expect(summary).toContainText(board.counts.offline+' offline');await expect(summary).toContainText(board.counts.unverified+' unverified'); if(age==='current')await expect(summary).not.toContainText('not current');else await expect(summary).toContainText('last completed reading · not current');
+});
+
+test('a TV saved-board tick rereads without forcing a rebuild',async({page})=>{
+ const initial=fieldProductFixture();
+ const f=JSON.parse(JSON.stringify(initial).replaceAll(initial.fresh,time));
+ const board=completedBoard(f.health,f.field,f.connections,null,Date.parse(time));
+ const {state,frame}=await setup(page,{pausedClock:true,prepare:s=>{s.features={durableFleetBoard:true};s.boardRequests=[];s.savedBoard={contract:'COS_DURABLE_FLEET_RESPONSE_V1',latest:{id:'completed-1',payload:board},refresh:{state:'completed'},history:[]};}});
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ const posts=()=>state.writes.filter(w=>w.path==='/api/fleet-saved-board/refresh').length;
+ const gets=()=>state.boardRequests.filter(r=>r.method==='GET'&&r.path==='/api/fleet-saved-board').length;
+ await page.clock.runFor(60000);
+ await expect.poll(gets).toBeGreaterThan(0);
+ expect(posts()).toBe(0);
+ const seen=gets();
+ await page.clock.runFor(TV_SAVED_BOARD_REFRESH_MS);
+ await expect.poll(gets).toBeGreaterThan(seen);
+ expect(posts()).toBe(0);
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(posts).toBeGreaterThan(0);
 });

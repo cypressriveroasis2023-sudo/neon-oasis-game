@@ -3,7 +3,7 @@ import {checkedFieldMap} from './gpsPersistence';
 import {validateCameraHealth,type Health} from './fieldCameraHealth';
 import {readRouterSnapshot,type RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 
-type Api={fleetSource?:(source:'health'|'fieldMap',force?:boolean)=>Promise<any>;get:(path:string)=>Promise<{data:any}>};
+type Api={fleetSource?:(source:'health'|'fieldMap',force?:boolean,reread?:boolean)=>Promise<any>;get:(path:string)=>Promise<{data:any}>};
 type Callbacks={
   readFailure?:(source:'fieldMap'|'health'|'routers',status:number|null)=>void;
   healthUnavailable?:()=>void;
@@ -24,12 +24,12 @@ type Callbacks={
  * multiple, and forcing a camera read merely to carry routers would reset the
  * camera deadline. The default reads all three together, which is what a
  * manual refresh and the initial load want. */
-export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false,include:{camera?:boolean;routers?:boolean}={}):Promise<string[]> {
-  const readCamera=include.camera!==false,readRouters=include.routers!==false;
+export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false,include:{camera?:boolean;routers?:boolean;reread?:boolean}={}):Promise<string[]> {
+  const readCamera=include.camera!==false,readRouters=include.routers!==false,reread=include.reread===true&&!force;
   const errors:string[]=[];
   let field:ReturnType<typeof checkedFieldMap>|null=null,health:Health|null=null;
   const read=async<T>(label:string,path:string,check:(value:any)=>T,accept:(value:T)=>void|Promise<void>)=>{
-    try {const value=api.fleetSource&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)?await api.fleetSource(path==='/api/field-map'?'fieldMap':'health',force):(await api.get(path)).data;await accept(check(value));}
+    try {const value=api.fleetSource&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)?await api.fleetSource(path==='/api/field-map'?'fieldMap':'health',force,reread):(await api.get(path)).data;await accept(check(value));}
     catch(cause){const status=(cause as {response?:{status?:unknown}})?.response?.status;callbacks.readFailure?.(label==='Field locations'?'fieldMap':label==='Camera Health'?'health':'routers',typeof status==='number'?status:null);if(label==='Camera Health'){health=null;callbacks.healthUnavailable?.();}if(label==='Routers')callbacks.routersUnavailable?.();errors.push(label+': '+(cause instanceof Error?cause.message:'Information is unavailable.'));}
   };
   await Promise.all([
