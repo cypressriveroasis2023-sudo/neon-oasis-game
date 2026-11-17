@@ -32,7 +32,7 @@
   "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  },
  "expectedAfter": {
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
@@ -43,6 +43,6 @@
   "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  }
 }

@@ -55,6 +55,14 @@ function liveSerials(row) {
   return [row?.router_serial, row?.inhand_serial].map(text).filter(Boolean);
 }
 
+/** A saved Online/Offline label is only current inside the 3-hour window. */
+export function displayedRouterStatus(status, checkedAt, now = Date.now()) {
+  if (status !== 'Online' && status !== 'Offline') return status === 'Unknown (no feed)' ? status : 'Unknown';
+  const at = typeof checkedAt === 'string' ? Date.parse(checkedAt) : NaN;
+  if (!Number.isFinite(at) || at > now || now - at > ROUTER_BOARD_FRESH_MS) return 'Unknown';
+  return status;
+}
+
 export function boardRouterStatus(row, now = Date.now(), placement = '') {
   const shop = shopPlacement(placement);
   const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);

@@ -20,11 +20,11 @@
  "expectedBefore": {
   "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  },
  "expectedAfter": {
   "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
+  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
  }
 }

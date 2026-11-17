@@ -14,6 +14,19 @@ function patched(path){
 const oldReason='Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.';
 const verifying='One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.';
 
+test('classifier recipes are stacked on the confirmed #433 bytes',()=>{
+  const pages=load('.github/function-patches/cos-operations-pages/camera-miss-readers-v170.json');
+  const camera=load('.github/function-patches/cos-unit-camera-status/camera-miss-readers-v18.json');
+  const producer=load('.github/function-patches/cos-fleet-board-producer/camera-miss-readers-v11.json');
+  assert.equal(pages.requireLiveBeforeDeploy.version, 170);
+  assert.equal(camera.requireLiveBeforeDeploy.version, 18);
+  assert.equal(producer.requireLiveBeforeDeploy.version, 11);
+  assert.equal(pages.expectedBefore['serve.ts'], '45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79');
+  assert.equal(camera.expectedBefore['index.ts'], '60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4');
+  assert.equal(producer.expectedBefore['index.ts'], '7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e');
+  for (const patch of [pages, camera, producer]) assert.equal(patch.expectedBefore['routerBoardJoin.mjs'], 'e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4');
+});
+
 test('pages recipe keeps the 410 gate and replaces the first-miss classifier',()=>{
   const {patch, files}=patched('.github/function-patches/cos-operations-pages/camera-miss-readers-v170.json');
   assert.equal(patch.requireLiveBeforeDeploy.version, 170);
