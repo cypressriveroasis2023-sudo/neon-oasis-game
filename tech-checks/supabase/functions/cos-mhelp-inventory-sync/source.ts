@@ -5,9 +5,10 @@ const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v)?v:null;
 const text=(v:unknown,max=600)=>v==null?'':typeof v==='number'&&Number.isSafeInteger(v)?String(v):typeof v==='string'&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f<>]/.test(v)&&!/(?:password|passwd|token|secret|credential|gate[ -]*code|access[ -]*code)\s*[:=]/i.test(v)?v.trim():(()=>{throw Error('Unsafe source field');})();
 const same=(a:Row,b:Row)=>['equipmentId','name','model','equipmentTypeId','customerId','serviceLocationId','active','updatedAt'].every(k=>a[k]===b[k]);
-export async function readInventorySource(options:{review:Row;baseline:Row;read:(path:string,refresh?:boolean)=>Promise<any>;observedAt?:(path:string)=>string|undefined;readStats?:()=>{cacheHits:number;resourceCacheMisses:number};verifyEquipment:()=>Promise<any>;now?:()=>string}){
+export function sameUnitName(a:string,b:string){return a.trim().replace(/\s+/g,' ')===b.trim().replace(/\s+/g,' ');}
+export async function readInventorySource(options:{review:Row;baseline:Row;refreshEquipmentIds?:string[];read:(path:string,refresh?:boolean)=>Promise<any>;observedAt?:(path:string)=>string|undefined;readStats?:()=>{cacheHits:number;resourceCacheMisses:number};verifyEquipment:()=>Promise<any>;now?:()=>string}){
  const {review,baseline}=options;
- const requested=baseline.publisherRefreshEquipmentIds??[];
+ const requested=options.refreshEquipmentIds??baseline.publisherRefreshEquipmentIds??[];
  if(!Array.isArray(requested)||requested.length>6||requested.some(v=>!id(v))||new Set(requested).size!==requested.length)throw Error('Invalid publisher refresh selection');
  const refreshCustomers=new Set<string>(review.items.filter((e:Row)=>requested.includes(e.equipmentId)).map((e:Row)=>e.customerId));
  const refreshPaths=new Map<string,Promise<any>>();
@@ -53,7 +54,12 @@ export async function readInventorySource(options:{review:Row;baseline:Row;read:
   const category=categories.get(e.equipmentTypeId);if(!category)throw Error('Equipment category needs review');
   const customer=text(p.name,250),siteName=site?text(site.name,250):'';
   const composite=siteName&&siteName!==customer&&!customer.includes(':')?customer+': '+siteName:customer;
-  const unitNumber=e.name.trim(),exactPrior=old?.unitNumber===unitNumber;
+  // A whitespace-only difference (trailing space, doubled space) is the same
+  // name: it is not evidence that the Product now denotes different equipment,
+  // so it must not drop a reviewed binding or raise an identity hold. Measured
+  // 2026-10-31: 12 Products lost their reviewed link this way on 17 Oct.
+  // Anything beyond whitespace is still treated as a rename.
+  const unitNumber=e.name.trim(),exactPrior=typeof old?.unitNumber==='string'&&sameUnitName(old.unitNumber,unitNumber);
   const typeChanged=!!old&&(String(old.category).toLowerCase().replace(/\s/g,'')!==category.toLowerCase().replace(/\s/g,'')||old.apiAssignment?.equipmentTypeId!=null&&old.apiAssignment.equipmentTypeId!==e.equipmentTypeId);
   const binding=exactPrior&&!typeChanged&&old?.binding?.guardCurrent===true?Object.fromEntries(Object.entries(old.binding).filter(([k])=>k!=='guardCurrent')):null;
   const lifecycle=e.active===false||/\b(?:DO\s+NOT\s+USE|RETIRED|DECOMMISSIONED|STOLEN)\b/i.test(e.name)?'DO_NOT_USE':/\bMISSING\b/i.test(e.name)?'MISSING':'UNFLAGGED';

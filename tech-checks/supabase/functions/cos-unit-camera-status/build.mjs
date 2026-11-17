@@ -1,5 +1,12 @@
 // Build the deployable bundle for cos-unit-camera-status.
 //
+// Running this on current main does not reproduce production. Live v15 was
+// built from 95e3e5a4f81f0f823e7e646a01a8235da7c5f425 with esbuild 0.28.2 and
+// that rebuild matches the live archive byte for byte. The reviewed deploy
+// artifact is dist/index.ts: that v15 body plus the #405 Recon last-reported
+// status from d793f91e, with its sha256 pinned by a test. Do not deploy a
+// fresh bundle of today's operations handler in its place.
+//
 // The two functions already in production each import one bundled file pinned to
 // a commit. This builds the same shape for this function: a single ES module
 // with no remote and no npm imports, so a cold start fetches nothing. The header

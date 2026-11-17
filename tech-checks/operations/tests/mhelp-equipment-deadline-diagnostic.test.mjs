@@ -38,7 +38,7 @@ test('actual paginated pass cannot publish a partial 1001-record census at the e
  const handler=createInventoryComparisonHandler({authenticate:async()=>true,acquireRead:async()=>({allowed:true,leaseId:'00000000-0000-4000-8000-000000000001'}),releaseRead:async()=>{released++;},readEquipment:()=>read('/api/mhelpdesk/partner/preview','POST',{}),readBaseline:async()=>{baselines++;},writeSource:async()=>{writes++;},recordFailure:async code=>{recorded=code;}});
  const pending=handler(run());await lastPage;t.mock.timers.tick(40000);
  const response=await pending,body=await response.json();assert.equal(response.status,503);
- assert.deepEqual(body,{error:'Complete mHelpDesk inventory comparison unavailable',inventoryWrites:0,failureStage:'equipment',reason:'equipment_pass_deadline_exceeded'});
+ assert.deepEqual(body,{error:'Complete mHelpDesk inventory comparison unavailable',inventoryWrites:0,failureStage:'equipment',failureClass:'equipment_pass_deadline',reason:'equipment_pass_deadline_exceeded'});
  assert.equal(reads,indexBase?8:7);assert.equal(baselines,0);assert.equal(writes,0);assert.equal(released,1);assert.equal(recorded,'inventory_source_unavailable');
  }
 });
