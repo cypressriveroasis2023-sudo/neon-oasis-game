@@ -1940,10 +1940,10 @@ function directCandidates(master, devices) {
   return { selected, held };
 }
 var DEVICE_FIELDS = "id,unit_key,device_name,source,mhelp_product_id,public_ip,expected_ports,connection_revision,monitoring_profile,monitoring_enabled,activation_state,organization,last_health_checked_at";
-var SWEEP_DEADLINE_MS = 48e3;
+var SWEEP_DEADLINE_MS = 60e3;
 var SWEEP_WORKERS = 12;
 var IO_TIMEOUT_MS = 4e3;
-var PROBE_TIMEOUT_MS = 2200;
+var PROBE_TIMEOUT_MS = 5000;
 async function boundedRequest(make, deadline, now = () => Date.now(), timeout = IO_TIMEOUT_MS) {
   const remaining = Math.min(timeout, deadline - now());
   if (remaining <= 0) throw Error("Sweep deadline reached");
@@ -1975,10 +1975,84 @@ function scheduledOrder(candidates, startedAt) {
 function sameConnection(a, b) {
   return a.key === b.key && a.master.canonical_family === b.master.canonical_family && a.master.unit_tag === b.master.unit_tag && a.master.source_label === b.master.source_label && String(a.device.id) === String(b.device.id) && a.device.unit_key === b.device.unit_key && a.device.source === b.device.source && revision2(a.device.connection_revision) === revision2(b.device.connection_revision) && a.device.public_ip === b.device.public_ip && a.device.mhelp_product_id === b.device.mhelp_product_id && a.device.monitoring_profile === b.device.monitoring_profile && JSON.stringify(a.device.expected_ports) === JSON.stringify(b.device.expected_ports);
 }
+const CELLULAR_PROBE_TIMEOUT_MS = 5000;
+const SWEEP_SHARD_DEADLINE_MS = 60000;
+const SWEEP_CRON_TIMEOUT_MS = 145000;
+const HOST_ANSWERED_ERROR = "Connection refused (os error 111)";
+const PENDING_DETAIL = "Pending sweep verdict. Not a confirmed outage.";
+function sweepLockBusy(status, startedAt, now, timeoutMs = SWEEP_CRON_TIMEOUT_MS) {
+  const started = Date.parse(startedAt);
+  return status === "running" && Number.isFinite(started) && started <= now && now - started < timeoutMs;
+}
+function addressBlockKey(host) {
+  const parts = String(host || "").split(".");
+  if (parts.length !== 4 || parts.some((part) => !/^(?:0|[1-9]\d{0,2})$/.test(part) || Number(part) > 255)) return null;
+  const block = parts[0] + "." + parts[1];
+  let hash = 5381;
+  for (let i = 0; i < block.length; i++) hash = Math.imul(hash, 33) ^ block.charCodeAt(i);
+  return (hash >>> 0).toString(16);
+}
+function probeClass(ports) {
+  const values = Object.values(ports || {});
+  if (values.some((port) => port && port.online === true)) return "online";
+  if (values.some((port) => port && port.online !== true && port.error === HOST_ANSWERED_ERROR)) return "refused";
+  return "miss";
+}
+function publicationForProbe(klass, priorFailures) {
+  const prior = Number.isInteger(priorFailures) && priorFailures >= 0 ? Math.min(3, priorFailures) : 0;
+  if (klass === "online") return { status: "online", failures: 0, pending: false, confirmed: false };
+  if (klass === "refused") return { status: "unknown", failures: prior, pending: false, confirmed: false };
+  return { status: "verifying", failures: prior, pending: true, confirmed: false };
+}
+function finalizePending(priorFailures, inconclusive) {
+  const prior = Number.isInteger(priorFailures) && priorFailures >= 0 ? Math.min(3, priorFailures) : 0;
+  if (inconclusive) return { status: "unknown", failures: prior, confirmed: false };
+  const failures = Math.min(3, prior + 1);
+  return { status: failures >= 3 ? "offline" : "verifying", failures, confirmed: failures >= 3 };
+}
+function blockTallies(units) {
+  const map = new Map();
+  for (const unit of units) {
+    if (!unit || unit.klass === "online" || !unit.blockKey) continue;
+    const id = unit.klass + ":" + unit.blockKey;
+    map.set(id, (map.get(id) || 0) + 1);
+  }
+  return [...map.entries()].map(([id, count]) => ({ klass: id.slice(0, id.indexOf(":")), key: id.slice(id.indexOf(":") + 1), count }));
+}
+function mergeSweepVerdict(parts) {
+  const probed = parts.reduce((sum, part) => sum + (Number.isFinite(part?.probed) ? part.probed : 0), 0);
+  const failed = parts.reduce((sum, part) => sum + (Number.isFinite(part?.failed) ? part.failed : 0), 0);
+  const map = new Map();
+  for (const part of parts) for (const tally of part?.tallies || []) {
+    if (!tally || typeof tally.klass !== "string" || typeof tally.key !== "string" || !Number.isFinite(tally.count)) continue;
+    const id = tally.klass + ":" + tally.key;
+    map.set(id, (map.get(id) || 0) + tally.count);
+  }
+  const byKlass = new Map();
+  for (const [id, count] of map) {
+    const klass = id.slice(0, id.indexOf(":"));
+    const counts = byKlass.get(klass) || [];
+    counts.push(count);
+    byKlass.set(klass, counts);
+  }
+  let pattern = false;
+  for (const counts of byKlass.values()) {
+    counts.sort((a, b) => b - a);
+    if (counts.length >= 3 && counts[0] >= 15 && counts[1] >= 7 && counts[2] >= 4) pattern = true;
+  }
+  return { probed, failed, pattern, inconclusive: probed > 0 && (failed / probed > 0.10 || pattern) };
+}
+function sweepGuard(units) {
+  const rows = Array.isArray(units) ? units : [];
+  const failed = rows.filter((unit) => unit && unit.klass !== "online").length;
+  return { probed: rows.length, failed, tallies: blockTallies(rows), ...mergeSweepVerdict([{ probed: rows.length, failed, tallies: blockTallies(rows) }]) };
+}
 function failureCount(previous, c, observedAt) {
   const ports = previous?.port_status, proof = ports?._connection;
   const checked = Date.parse(proof?.checkedAt);
-  if (!proof || proof.revision !== revision2(c.device.connection_revision) || proof.ip !== c.host || !Number.isFinite(checked) || checked > observedAt || proof.reachable !== false || !["offline", "verifying"].includes(proof.status)) return 0;
+  if (!proof || proof.revision !== revision2(c.device.connection_revision) || proof.ip !== c.host || !Number.isFinite(checked) || checked > observedAt) return 0;
+  if (proof.status === "unknown" && Number.isInteger(proof.consecutiveFailures) && proof.consecutiveFailures >= 0) return Math.min(3, proof.consecutiveFailures);
+  if (proof.reachable !== false || !["offline", "verifying"].includes(proof.status)) return 0;
   const actual = Object.keys(ports).filter((k) => k !== "_connection").sort((a, b) => Number(a) - Number(b));
   if (actual.length !== c.ports.length || actual.some((p, i) => p !== String(c.ports[i]) || typeof ports[p]?.online !== "boolean")) return 0;
   return Number.isInteger(proof.consecutiveFailures) && proof.consecutiveFailures >= 0 ? Math.min(3, proof.consecutiveFailures) : 0;
@@ -2002,10 +2076,10 @@ async function collectScheduledDirect(db, probe, options = {}) {
   };
   const evidence = options.endpointEvidence;
   try {
-    const initial = await inventory(), allQueue = scheduledOrder(initial.selected, startedAt), shardCount = Number.isInteger(options.shardCount) && options.shardCount >= 1 && options.shardCount <= 32 ? options.shardCount : 1, shardIndex = Number.isInteger(options.shardIndex) && options.shardIndex >= 0 && options.shardIndex < shardCount ? options.shardIndex : 0, queue = shardCount > 1 ? allQueue.filter((c) => Number(c.device.id) % shardCount === shardIndex) : allQueue, results = [];
+    const initial = await inventory(), allQueue = scheduledOrder(initial.selected, startedAt), shardCount = Number.isInteger(options.shardCount) && options.shardCount >= 1 && options.shardCount <= 32 ? options.shardCount : 1, shardIndex = Number.isInteger(options.shardIndex) && options.shardIndex >= 0 && options.shardIndex < shardCount ? options.shardIndex : 0, queue = shardCount > 1 ? allQueue.filter((c) => Number(c.device.id) % shardCount === shardIndex) : allQueue, results = [], guardUnits = [];
     const transport = /* @__PURE__ */ new Map();
     let cursor = 0;
-    while (cursor < queue.length && now() + PROBE_TIMEOUT_MS + 1e3 < deadline) {
+    while (cursor < queue.length && now() + PROBE_TIMEOUT_MS * 2 + 1e3 < deadline) {
       const wave = queue.slice(cursor, cursor + SWEEP_WORKERS);
       cursor += wave.length;
       const tickets = await Promise.all(wave.map((c) => evidence ? evidence.begin(c).catch(() => null) : null));
@@ -2015,9 +2089,11 @@ async function collectScheduledDirect(db, probe, options = {}) {
         const pending = (async () => {
           const began = now();
           try {
-            const values = await Promise.all(c.ports.map(async (p) => [String(p), await boundedRequest(() => probe(c.host, p, PROBE_TIMEOUT_MS), deadline, now, PROBE_TIMEOUT_MS + 100)]));
+            const once = async () => Promise.all(c.ports.map(async (p) => [String(p), await boundedRequest(() => probe(c.host, p, PROBE_TIMEOUT_MS), deadline, now, PROBE_TIMEOUT_MS + 100)]));
+            let values = await once();
+            if (!values.some(([, v]) => v?.online) && now() + PROBE_TIMEOUT_MS + 1e3 < deadline) values = await once();
             const at = now();
-            if (at < began || at - began > PROBE_TIMEOUT_MS + 500 || values.some(([, v]) => !object8(v) || typeof v.online !== "boolean" || v.latency_ms !== null && (!Number.isFinite(v.latency_ms) || v.latency_ms < 0) || v.error && /(auth|forbidden|permission|unauthori[sz]ed)/i.test(v.error))) return null;
+            if (at < began || at - began > PROBE_TIMEOUT_MS * 2 + 500 || values.some(([, v]) => !object8(v) || typeof v.online !== "boolean" || v.latency_ms !== null && (!Number.isFinite(v.latency_ms) || v.latency_ms < 0) || v.error && /(auth|forbidden|permission|unauthori[sz]ed)/i.test(v.error))) return null;
             return { ports: Object.fromEntries(values), at, startedAt: began };
           } catch {
             return null;
@@ -2048,9 +2124,9 @@ async function collectScheduledDirect(db, probe, options = {}) {
         if (!current || !sameConnection(c, current)) return held("source_or_connection_changed");
         if (now() >= deadline || now() - observed.at > 6e4) return held("observation_expired");
         const prev = previous.find((h) => String(h.camera_device_id) === String(c.device.id)) || {}, reachable = Object.values(observed.ports).some((p) => p.online);
-        const failures = reachable ? 0 : Math.min(3, failureCount(prev, c, observed.at) + 1), status = reachable ? "online" : "offline", checked = new Date(observed.at).toISOString();
-        const health = { camera_device_id: c.device.id, port_status: observed.ports, checked_at: checked, overall_status: status, ip_reachable: reachable, consecutive_failures: failures, confirmed_outage: failures >= 3, confirmation_reason: failures >= 3 ? "3 consecutive failed checks of the saved service endpoint" : null, detail: reachable ? "Saved Avigilon service port responded; individual camera health is unverified." : "Saved Avigilon service ports did not respond; individual camera health is unverified." };
-        if (!reachable && failures === 1) health.first_failed_at = checked;
+        const klass = probeClass(observed.ports), prior = failureCount(prev, c, observed.at), decision = publicationForProbe(klass, prior), failures = decision.failures, status = decision.status, checked = new Date(observed.at).toISOString();
+        guardUnits.push({ klass, blockKey: addressBlockKey(c.host) });
+        const health = { camera_device_id: c.device.id, port_status: observed.ports, checked_at: checked, overall_status: status, ip_reachable: reachable, consecutive_failures: failures, confirmed_outage: false, confirmation_reason: null, detail: decision.pending ? PENDING_DETAIL : reachable ? "Saved Avigilon service port responded; individual camera health is unverified." : "The host answered or the probe is not a confirmed miss. Individual camera health is unverified." };
         if (reachable) {
           health.first_failed_at = null;
           health.acknowledged_at = null;
@@ -2065,13 +2141,14 @@ async function collectScheduledDirect(db, probe, options = {}) {
           const saved = await request((signal) => db.rpc("publish_camera_connection_v1", { p_device_id: c.device.id, p_revision: c.device.connection_revision, p_public_ip: c.device.public_ip, p_expected_ports: c.device.expected_ports, p_monitoring_profile: c.device.monitoring_profile, p_health: health, p_source: "automatic_tcp_sweep" }).abortSignal(signal));
           if (saved.error || saved.data?.ok !== true) return held(saved.data?.reason || "publication_unverified");
           evidence?.finish(tickets[i], observed, true);
-          results.push({ id: c.device.id, name: c.device.device_name, monitoring_profile: c.device.monitoring_profile, status, probe_status: reachable ? "online" : "offline", confirmed_outage: failures >= 3, published: true, activated: false, evidence: "service_port_only" });
+          results.push({ id: c.device.id, name: c.device.device_name, monitoring_profile: c.device.monitoring_profile, status, probe_status: reachable ? "online" : status, confirmed_outage: false, published: true, activated: false, evidence: "service_port_only" });
         } catch {
           return held("publication_unverified");
         }
       }));
     }
-    return { results, eligible: queue.length, held: initial.held, deferred: queue.length - cursor, deadlineReached: cursor < queue.length };
+    const guard = sweepGuard(guardUnits);
+    return { results, eligible: queue.length, held: initial.held, deferred: queue.length - cursor, deadlineReached: cursor < queue.length, guard: { probed: guard.probed, failed: guard.failed, tallies: guard.tallies } };
   } finally {
     await evidence?.close().catch(() => {
     });
@@ -3521,11 +3598,35 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
     const { data: valid } = await db.rpc("verify_camera_health_cron_secret", { candidate: req.headers.get("x-camera-cron-secret") });
     if (valid !== true) return json({ error: "Forbidden" }, 403);
     let endpointDiagnostic = null;
+    async function reconcilePending(database, body) {
+      const inconclusive = body.inconclusive === true;
+      const shardCount = body.shard_count, shardIndex = body.shard_index;
+      const health = await database.from("camera_health_current").select("camera_device_id,consecutive_failures,port_status,detail").eq("detail", PENDING_DETAIL).limit(1000);
+      if (health.error || !Array.isArray(health.data)) return json({ error: "reconcile_unreadable", shard: { index: shardIndex, count: shardCount } }, 503);
+      const rows = health.data.filter((row) => Number(row.camera_device_id) % shardCount === shardIndex);
+      if (!rows.length) return json({ reconciled: 0, inconclusive, shard: { index: shardIndex, count: shardCount, partial: true } });
+      const devices = await database.from("camera_devices").select("id,connection_revision,public_ip,expected_ports,monitoring_profile").in("id", rows.map((row) => row.camera_device_id));
+      if (devices.error || !Array.isArray(devices.data)) return json({ error: "reconcile_unreadable", shard: { index: shardIndex, count: shardCount } }, 503);
+      let reconciled = 0;
+      for (const row of rows) {
+        const device = devices.data.find((item) => String(item.id) === String(row.camera_device_id));
+        if (!device) continue;
+        const prior = Number.isInteger(row.consecutive_failures) && row.consecutive_failures >= 0 ? Math.min(3, row.consecutive_failures) : 0;
+        const next = finalizePending(prior, inconclusive);
+        const ports = row.port_status && typeof row.port_status === "object" ? Object.fromEntries(Object.entries(row.port_status).filter(([key]) => key !== "_connection")) : null;
+        if (!ports || !Object.keys(ports).length) continue;
+        const patch = { camera_device_id: device.id, port_status: ports, checked_at: new Date().toISOString(), overall_status: next.status, ip_reachable: false, consecutive_failures: next.failures, confirmed_outage: next.confirmed, confirmation_reason: next.confirmed ? "3 consecutive failed checks of the saved service endpoint" : null, detail: inconclusive ? "Sweep inconclusive. Status is Unknown and this check is not a miss." : next.status === "offline" ? "Three consecutive missed probes of the saved service endpoint." : "Verifying after a missed probe. Not an outage yet." };
+        const saved = await database.rpc("publish_camera_connection_v1", { p_device_id: device.id, p_revision: device.connection_revision, p_public_ip: device.public_ip, p_expected_ports: device.expected_ports, p_monitoring_profile: device.monitoring_profile, p_health: patch, p_source: "automatic_tcp_sweep" });
+        if (!saved.error && saved.data?.ok === true) reconciled++;
+      }
+      return json({ reconciled, inconclusive, shard: { index: shardIndex, count: shardCount, partial: true } });
+    }
     const runExistingSweep = async () => {
       const body = await req.json().catch(() => ({}));
       const requestedWorkers = Number(body.batch_size);
       const n = Number.isFinite(requestedWorkers) && requestedWorkers > 0 ? Math.min(Math.max(Math.floor(requestedWorkers), 1), 24) : 25;
       const isShardCall = Number.isInteger(body.shard_count) && body.shard_count >= 2 && body.shard_count <= 32 && Number.isInteger(body.shard_index) && body.shard_index >= 0 && body.shard_index < body.shard_count;
+      if (isShardCall && body.reconcile === true) return await reconcilePending(db, body);
       if (!isShardCall && body.fanout !== false) {
         // prepare() resolves false on failure; it does not throw. When it
         // fails the shards still run, because router, provider and Star4Live
@@ -3550,6 +3651,15 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
             endpointAuthorityDirective = sharedAuthority.diagnostics().blocked === "refused" ? "refused" : "unavailable";
             endpointDiagnostic = sharedAuthority.diagnostics();
           }
+        }
+        const lockStamp = new Date().toISOString();
+        const lockRow = await db.from("camera_integrations").select("provider,last_sync_status,last_sync_at").eq("provider", "avigilon").limit(1);
+        if (lockRow.error) return json({ error: "sweep_lock_unreadable" }, 503);
+        if (lockRow.data?.length) {
+          const row = lockRow.data[0];
+          if (sweepLockBusy(row.last_sync_status, row.last_sync_at, Date.now())) return json({ state: "overlap", error: "sweep_already_running" }, 409);
+          const taken = await db.from("camera_integrations").update({ last_sync_status: "running", last_sync_at: lockStamp, last_error: null }).eq("provider", "avigilon").eq("last_sync_status", row.last_sync_status).eq("last_sync_at", row.last_sync_at).select("provider");
+          if (taken.error || taken.data?.length !== 1) return json({ state: "overlap", error: "sweep_already_running" }, 409);
         }
         const shardCount = 4;
         const secret = req.headers.get("x-camera-cron-secret");
@@ -3583,12 +3693,31 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
           }
           return { index, ok: false, status: 0, error: "shard_retry_exhausted" };
         };
+        const runReconcile = async (index, inconclusive) => {
+          try {
+            const response = await fetch("https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-health-sweep", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-camera-cron-secret": secret },
+              body: JSON.stringify({ batch_size: 24, shard_index: index, shard_count: shardCount, reconcile: true, inconclusive }),
+              redirect: "error",
+              cache: "no-store",
+              signal: req.signal
+            });
+            return response.ok;
+          } catch {
+            return false;
+          }
+        };
         const shards = [];
         for (let firstIndex = 0; firstIndex < shardCount; firstIndex += 2) {
           const wave = await Promise.all(Array.from({ length: Math.min(2, shardCount - firstIndex) }, (_, n) => runShard(firstIndex + n)));
           shards.push(...wave);
         }
-        const ok = shards.filter((s) => s.ok), direct = ok.map((s) => s.result.coverage).filter(Boolean), providers = ok.map((s) => s.result.provider_coverage).filter(Boolean), routers = direct.map((c) => c.router_coverage).filter(Boolean);
+        const ok = shards.filter((s) => s.ok);
+        const guardParts = ok.map((s) => s.result?.guard).filter((guard) => guard && Number.isInteger(guard.probed));
+        const verdict = guardParts.length === shardCount ? mergeSweepVerdict(guardParts) : { probed: 0, failed: 0, pattern: false, inconclusive: true };
+        if (ok.length === shardCount) await Promise.all(Array.from({ length: shardCount }, (_, index) => runReconcile(index, verdict.inconclusive)));
+        const direct = ok.map((s) => s.result.coverage).filter(Boolean), providers = ok.map((s) => s.result.provider_coverage).filter(Boolean), routers = direct.map((c) => c.router_coverage).filter(Boolean);
         const sum = (rows, key) => rows.reduce((n, row) => n + (Number.isFinite(row?.[key]) ? row[key] : 0), 0);
         const providerEligible = providers.length ? Math.max(...providers.map((c) => c.eligible ?? 0)) : 0;
         const providerScanned = sum(providers, "scanned"), providerPublished = sum(providers, "published"), providerUnverified = sum(providers, "unverified");
@@ -3629,7 +3758,7 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
           deferred: sum(providers, "deferred"),
           complete: providers.length === shardCount && providerScanned === providerEligible && providerPublished === providerScanned && providerUnverified === 0 && sum(providers, "deferred") === 0
         };
-        const aggregate = { ...directCoverage, provider_coverage: providerCoverage, shard_count: shardCount, successful_shards: ok.length, failed_shards: shards.filter((s) => !s.ok).map((s) => s.index) };
+        const aggregate = { ...directCoverage, provider_coverage: providerCoverage, shard_count: shardCount, successful_shards: ok.length, failed_shards: shards.filter((s) => !s.ok).map((s) => s.index), sweep_inconclusive: verdict.inconclusive, sweep_probed: verdict.probed, sweep_failed: verdict.failed };
         let coverageRecorded = false;
         if (ok.length === shardCount) {
           try {
@@ -3651,7 +3780,7 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
       const endpointEvidence = endpointSourceEnabled ? scheduledEndpointFromExistingCron(db, req, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3), endpointAuthorityBlocked) : scheduledTrackerEndpointRuntime(db, endpointRuntime, req.signal, requestStarted + (completedSnapshotEnabled ? 95e3 : 48e3));
       if (endpointEvidence) await endpointEvidence.prepare();
       const star4liveRun = star4LiveTcpEnabled ? CosStar4LiveScheduledPing20261102.collectScheduledStar4Live(db, tcp, { startedAt: requestStarted, deadlineMs: 95e3, signal: req.signal, shardIndex, shardCount }).then(value => ({ value, error: null }), () => ({ value: null, error: "Star4Live saved TCP inventory unavailable" })) : Promise.resolve(null);
-      const cameraRun = collectScheduledDirect(db, tcp, { startedAt: requestStarted, deadlineMs: completedSnapshotEnabled ? 95e3 : 48e3, endpointEvidence, shardIndex, shardCount }).then((value) => ({ value, error: null }), () => ({ value: null, error: "Direct inventory unavailable" }));
+      const cameraRun = collectScheduledDirect(db, tcp, { startedAt: requestStarted, deadlineMs: completedSnapshotEnabled ? 95e3 : 60e3, endpointEvidence, shardIndex, shardCount }).then((value) => ({ value, error: null }), () => ({ value: null, error: "Direct inventory unavailable" }));
       const { data: routerMappings, error: routerQueryError } = await db.from("camera_unit_routers").select("id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,reported_status,reported_latency_ms,status_source,status_observed_at,current_status,last_checked_at,last_online_at,updated_at").or("router_public_ip.not.is.null,unit_ip.not.is.null");
       const routerReadError = routerQueryError || !Array.isArray(routerMappings) || routerMappings.length >= 1e3;
       const routerProbeIntervalMs = 5 * 60 * 1e3;
@@ -3790,7 +3919,8 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
         routers_checked: routerResults.length,
         router_results: routerResults,
         provider_coverage: star4live ? (star4live.error ? { eligible: null, scanned: null, published: null, held: null, deferred: null, unverified: null, complete: false, error: star4live.error } : { eligible: star4live.value.eligible, scanned: star4live.value.scanned, published: star4live.value.published, held: star4live.value.held, deferred: star4live.value.deferred, unverified: star4live.value.scanned - star4live.value.published, complete: star4live.value.complete }) : null,
-        shard: shardCount > 1 ? { index: shardIndex, count: shardCount, partial: true } : null
+        shard: shardCount > 1 ? { index: shardIndex, count: shardCount, partial: true } : null,
+        guard: camera.value?.guard || null
       });
     };
     if (completedSnapshotEnabled) {

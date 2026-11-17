@@ -1,0 +1,23 @@
+{
+ "description": "Pin camera-health-sweep back to the exact live v101 entry bytes. Those bytes load the pre-guard sweep at commit 91e8d520acf56e5bcfb2c7b7096826daa551cdca. Live archive sha256 bc7a26fb276334d1205de0fa5f3b2a58eb51949a427045fa47927c2f2426e4d1. Run only to undo the sweep guard, and only with an explicit instruction for that run.",
+ "authorization": "Rollback material. James Martin named this rollback: pin camera-health-sweep back to v101.",
+ "releaseStatus": "ROLLBACK_ONLY",
+ "slug": "camera-health-sweep",
+ "projectRef": "goqrnolcvqnirjmzaeyk",
+ "sourceDir": ".github/function-patches/camera-health-sweep/v101",
+ "entrypointPath": "index.ts",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE"
+ },
+ "deployedFileNames": {
+  "index.ts": "index.ts"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "d057c794a0e637c3e4b727a85f45464cd54b1175624a4d12b967095195eb34df"
+ },
+ "expectedAfter": {
+  "index.ts": "d057c794a0e637c3e4b727a85f45464cd54b1175624a4d12b967095195eb34df"
+ }
+}
