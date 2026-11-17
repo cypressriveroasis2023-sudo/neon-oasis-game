@@ -65,15 +65,16 @@ test('the producer patch keeps the live v9 bytes and gates every route except pr
 });
 
 function boot(){
+  const calls={n:0};
   const source=entry.replace(
     'await import("'+importUrl+'");',
-    'Deno.serve(async()=>new Response(JSON.stringify({served:true}),{status:200,headers:{"Content-Type":"application/json"}}));',
+    'Deno.serve(async()=>{calls.n+=1;return new Response(JSON.stringify({served:true}),{status:200,headers:{"Content-Type":"application/json"}});});',
   );
   const seen=[];
   const Deno={serve(handler){seen.push(handler);return handler;}};
-  vm.runInNewContext(source,{Deno,URL,Request,Response,JSON,TextDecoder,Uint8Array},{filename:'cos-fleet-board-producer/index.ts'});
+  vm.runInNewContext(source,{Deno,URL,Request,Response,JSON,TextDecoder,Uint8Array,calls},{filename:'cos-fleet-board-producer/index.ts'});
   assert.equal(seen.length,1);
-  return {restricted:seen[0],innerCalls:[] ,note(){}};
+  return {restricted:seen[0],calls};
 }
 
 async function call(restricted,method,path,{urlPath=false,httpMethod='POST'}={}){
@@ -100,7 +101,7 @@ test('POST /api/fleet-saved-board/produce still reaches the existing handler',as
 });
 
 test('the producer returns 404 for retired routes and other kept routes',async()=>{
-  const {restricted}=boot();
+  const {restricted,calls}=boot();
   for(const [method,path] of [...gonePaths,...keepPaths]){
     const result=await call(restricted,method,path);
     assert.equal(result.status,404,method+' '+path+' '+JSON.stringify(result.body));
@@ -117,4 +118,19 @@ test('the producer returns 404 for retired routes and other kept routes',async()
   }));
   assert.equal(bulkyResponse.status,413);
   assert.deepEqual(JSON.parse(await bulkyResponse.text()),{error:'Request body is too large.'});
+  const beforeDirect=calls.n;
+  const directBulky=await restricted(new Request('https://platform.example/functions/v1/cos-fleet-board-producer/api/fleet-saved-board/produce',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({run:true,pad:'x'.repeat(70000)}),
+  }));
+  assert.equal(directBulky.status,413);
+  assert.deepEqual(JSON.parse(await directBulky.text()),{error:'Request body is too large.'});
+  assert.equal(calls.n,beforeDirect);
+  const doubled=await call(restricted,'POST','/api/unit-tracker/cos-fleet-board-producer/api/fleet-saved-board/produce',{urlPath:true});
+  const doubledPages=await call(restricted,'POST','/api/unit-tracker/cos-operations-pages/cos-operations-pages/api/fleet-saved-board/produce',{urlPath:true});
+  assert.equal(doubled.status,404);
+  assert.deepEqual(doubled.body,{error:'COS endpoint not found.'});
+  assert.equal(doubledPages.status,404);
+  assert.equal(calls.n,beforeDirect);
 });
