@@ -9,10 +9,11 @@
     if(effective?.status==='ready')return effective.scope;
     const activation=normalized(device.activation_state),org=normalized(device.organization),unit=normalized(device.unit_key);
     if(/^STOLEN FROM RII?[-\s]*\d+ ON \d{2}\/\d{2}\/\d{4}$/.test(unit)||/^STOLEN FROM RII?[-\s]*\d+ ON \d{2}\/\d{2}\/\d{4}$/.test(org)||['RETIRED','STOLEN','NOT IN USE'].includes(org)||/^RII?[-\s]*\d+\s*-?\s*(?:NOT IN USE|RETIRED|STOLEN)$/.test(unit))return 'inactive';
-    if(effective?.status==='unresolved'||effective?.status==='stale'){return activation==='DEACTIVATED'&&normalized(device.current_location_type||device.placement)!=='SHOP'?'inactive':'unknown';}
+    if(effective?.status==='unresolved'||effective?.status==='stale'){return activation==='DEACTIVATED'&&!['ROOT','SHOP','SHOP EQUIPMENT'].includes(org)?'inactive':'unknown';}
     const located=normalized(device.current_location_type||device.placement);
     if(located==='FIELD')return 'field';
     if(located==='SHOP')return 'shop';
+    if(['ROOT','SHOP','SHOP EQUIPMENT'].includes(org)||unit==='SHOP EQUIPMENT'||/^RII?[-\s]*\d+\s*-?\s*SHOP$/.test(unit))return 'shop';
     if(activation==='DEACTIVATED')return 'inactive';
     if(activation!=='ACTIVE')return 'unknown';
     if(device.activation_source==='owner_location_override_v2'&&org)return 'field';

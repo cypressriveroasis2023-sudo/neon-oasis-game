@@ -64,7 +64,7 @@ export async function openWorkspace(frame, workspace) {
         .getByRole('button', { name: label, exact: true }).click();
     }
   } else if (primaryLabels[workspace] && workspace !== 'Operations') {
-    await nav.getByRole('button', { name: primaryLabels[workspace], exact: true }).click({ noWaitAfter: true });
+    await nav.getByRole('button', { name: primaryLabels[workspace], exact: true }).click();
   } else {
     if (!(await menu.isVisible())) await nav.getByRole('button', { name: 'More', exact: true }).click();
     if (workspace === 'Operations') {
