@@ -395,18 +395,12 @@ test('TV headline and outage cards use the same complete Field Product IDs throu
  await expect(summary).toContainText('7 Field equipment');await expect(summary).toContainText('1 offline');await expect(summary).toContainText('4 unverified');
  state.productConnections=fieldProductConnectionFixture(state.fieldMapExtras.uploadInventory,new Date(Date.parse(time)+18*60000).toISOString());
  state.fleetFailures={};state.cameraRows=f.health.rows.map(row=>({...row,evidence:{...row.evidence,observedAt:new Date(Date.parse(time)+18*60000).toISOString()}}));
- // Keep the real network's bounded timeout on real time at the scheduled
- // recovery boundary; a 15-minute virtual jump can otherwise outrun I/O.
+ // Recover on the next saved-board tick. That tick is 2 minutes, so it
+ // arrives before the 15-minute router read. Jumping to the router first
+ // would run past the recovery.
  const firstFleetRead=state.fleetRequests.find(r=>r.path==='/api/field-map').at;
- const scheduledRecovery=firstFleetRead+2*TV_SAVED_BOARD_REFRESH_MS;
- // Settle the intervening router read before advancing its request timeout.
- const routerBoundary=firstFleetRead+15*60000;
- const untilRouter=routerBoundary-await page.evaluate(()=>Date.now());
- if(untilRouter>0){
-  const routerRead=page.waitForResponse(response=>{try{return response.request().postDataJSON()?.path==='/api/routers';}catch{return false;}});
-  await page.clock.runFor(untilRouter);
-  await (await routerRead).finished();
- }
+ const elapsed=await page.evaluate(()=>Date.now())-firstFleetRead;
+ const scheduledRecovery=firstFleetRead+(Math.floor(elapsed/TV_SAVED_BOARD_REFRESH_MS)+1)*TV_SAVED_BOARD_REFRESH_MS;
  const untilRecovery=scheduledRecovery-await page.evaluate(()=>Date.now());
  expect(untilRecovery).toBeGreaterThan(1000);
  await page.clock.runFor(untilRecovery-1000);
