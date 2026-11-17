@@ -815,7 +815,7 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
       if (p && !batteryReadIssue) {
         const recent = p.measurements.filter((m) => powerTimestamp(m.observedAt, now).fresh), soc = recent.filter((m) => m.metric === "battery_soc");
         batteryPercent = soc.length ? Math.min(...soc.map((m) => m.value)) : null;
-        batteryState = recent.some((m) => m.unit === "state" && m.value > 0) || batteryPercent !== null && batteryPercent < 20 ? "offline" : batteryPercent !== null ? "online" : "unknown";
+        batteryState = batteryPercent !== null ? "online" : "unknown";
       }
     } else if (key?.startsWith("RECON2|")) {
       const batteryRows = camera.identity === "matched" ? camera.rows.filter((r) => r.evidence?.source === "Reconeyez" && r.batteryEvidence) : [];
