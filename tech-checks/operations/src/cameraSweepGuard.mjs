@@ -21,6 +21,11 @@ export function sweepLockBusy(status, startedAt, now, timeoutMs = SWEEP_CRON_TIM
   return status === "running" && Number.isFinite(started) && started <= now && now - started < timeoutMs;
 }
 
+/** One dedicated lock row. Missing means overlap protection is off, so the sweep must not start. */
+export function sweepLockAdmission(rowCount) {
+  return rowCount === 1 ? "present" : "missing";
+}
+
 export function addressBlockKey(host) {
   const parts = String(host || "").split(".");
   if (parts.length !== 4 || parts.some((part) => !/^(?:0|[1-9]\d{0,2})$/.test(part) || Number(part) > 255)) return null;

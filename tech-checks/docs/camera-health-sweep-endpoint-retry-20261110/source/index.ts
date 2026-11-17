@@ -3659,12 +3659,14 @@ function createCameraHealthSweep({ endpointRuntime, endpointSourceEnabled = fals
         const lockStamp = new Date().toISOString();
         const lockRow = await db.from("camera_integrations").select("provider,last_sync_status,last_sync_at").eq("provider", "camera_sweep_lock").limit(1);
         if (lockRow.error) return json({ error: "sweep_lock_unreadable" }, 503);
-        if (lockRow.data?.length) {
-          const row = lockRow.data[0];
-          if (sweepLockBusy(row.last_sync_status, row.last_sync_at, Date.now())) return json({ state: "overlap", error: "sweep_already_running" }, 409);
-          const taken = await db.from("camera_integrations").update({ last_sync_status: "running", last_sync_at: lockStamp, last_error: null }).eq("provider", "camera_sweep_lock").eq("last_sync_status", row.last_sync_status).eq("last_sync_at", row.last_sync_at).select("provider");
-          if (taken.error || taken.data?.length !== 1) return json({ state: "overlap", error: "sweep_already_running" }, 409);
+        if (!lockRow.data || lockRow.data.length !== 1) {
+          console.error("camera_sweep_lock_missing", JSON.stringify({ rows: lockRow.data?.length ?? null }));
+          return json({ error: "sweep_lock_missing" }, 503);
         }
+        const row = lockRow.data[0];
+        if (sweepLockBusy(row.last_sync_status, row.last_sync_at, Date.now())) return json({ state: "overlap", error: "sweep_already_running" }, 409);
+        const taken = await db.from("camera_integrations").update({ last_sync_status: "running", last_sync_at: lockStamp, last_error: null }).eq("provider", "camera_sweep_lock").eq("last_sync_status", row.last_sync_status).eq("last_sync_at", row.last_sync_at).select("provider");
+        if (taken.error || taken.data?.length !== 1) return json({ state: "overlap", error: "sweep_already_running" }, 409);
         const shardCount = 4;
         const secret = req.headers.get("x-camera-cron-secret");
         if (!secret || secret.length > 1024 || /\\s/.test(secret)) return json({ error: "Existing cron authorization required" }, 403);

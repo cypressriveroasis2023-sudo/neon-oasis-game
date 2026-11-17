@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
- publicationForProbe,finalizePending,mergeSweepVerdict,sweepLockBusy,addressBlockKey,
+ publicationForProbe,finalizePending,mergeSweepVerdict,sweepLockBusy,sweepLockAdmission,addressBlockKey,
  cleanupTargets,zeroUnitRun,phaseAllowed,
  CELLULAR_PROBE_TIMEOUT_MS,SWEEP_SHARD_DEADLINE_MS,SWEEP_CRON_TIMEOUT_MS,SWEEP_RUN_DEADLINE_MS
 } from '../src/cameraSweepGuard.mjs';
@@ -97,6 +97,23 @@ test('a single miss stays Verifying and the third conclusive miss is Offline',()
  assert.deepEqual(finalizePending(2,false),{status:'offline',failures:3,confirmed:true});
  assert.equal(publicationForProbe('refused',2).status,'unknown');
  assert.equal(publicationForProbe('online',2).failures,0);
+});
+
+test('a missing overlap lock refuses the sweep before any probe',()=>{
+ assert.equal(sweepLockAdmission(0),'missing');
+ assert.equal(sweepLockAdmission(undefined),'missing');
+ assert.equal(sweepLockAdmission(2),'missing');
+ assert.equal(sweepLockAdmission(1),'present');
+ const gate=bundle.indexOf('camera_sweep_lock_missing');
+ const shards=bundle.indexOf('const shardCount = 4;');
+ assert.ok(gate>0&&shards>gate);
+ assert.match(bundle,/console\.error\("camera_sweep_lock_missing"/);
+ assert.match(bundle,/error: "sweep_lock_missing"/);
+ const sql=readFileSync(new URL('../../supabase/migrations/20261117_camera_sweep_lock.sql',import.meta.url),'utf8');
+ assert.match(sql,/insert into public\.camera_integrations/);
+ assert.match(sql,/on conflict \(provider\) do nothing/);
+ assert.match(sql,/'camera_sweep_lock'/);
+ assert.doesNotMatch(sql,/do update/i);
 });
 
 test('an overlap lock rejects a second sweep inside the cron timeout',()=>{
