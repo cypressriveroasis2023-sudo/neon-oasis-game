@@ -7,6 +7,8 @@ const units=[unit('SPOTTER 101','star4live',fresh),unit('SNIPER 001','ip_check',
 const report={contract:'COS_STAR_UNIT_STATUS_V1',units,counts:countUnits(units),feed:{provider:'star4live',syncedAt:fresh,status:'ok',enabled:true,fresh:true,ageMs:1000},handEditsRead:true,otherSourcesRead:true,canEdit:false};
 test('separate views explain populations and original observation times without operational writes',async({page},info)=>{
  const {app,state}=await mountFleet(page);
+ const about=app.locator('.cos-phone-board-info > summary');
+ if(await about.isVisible())await about.click();
  const fleet=app.getByRole('region',{name:'Fleet sources and scope'});
  await expect(fleet).toContainText('including camera units, stands and poles');
  await expect(fleet).toContainText('Saved board time:');
