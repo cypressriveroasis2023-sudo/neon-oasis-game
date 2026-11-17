@@ -22,13 +22,16 @@ import {createHash} from 'node:crypto';
 // Finance group and the unused Customers/Schedule entries (routes kept, see
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
+// Router status moves FleetUnitHealth.tsx, fleetDashboardModel.ts and
+// fleetDashboard.css with the badge and the aged label. FleetDashboard.tsx
+// keeps its reviewed baseline through a declared reversal.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
-  "FleetUnitHealth.tsx": "6bc714cfd419d01e7b8541ccfc2142dc91fff449",
+  "FleetUnitHealth.tsx": "a8f6dfb970989d6b63e0885c6f2098bb87cc361a",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
-  "fleetDashboardModel.ts": "1c14c92829e6cbabb681b575c409bb66953337d5",
+  "fleetDashboardModel.ts": "db70ca7b326f95e7b6fd3f3bf6af5e157b65dd36",
   "fieldCameraHealth.ts": "b524d935a9f92619e5e9617e19a5b04c5a924b33",
   "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
@@ -36,7 +39,7 @@ const expected={
   "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",
   "workspaceNavigation.ts": "a8161174e7cdf3987503c927c66f37c7906c09ec",
   "App.tsx": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
-  "fleetDashboard.css": "817194345766e341303cad8e636207afbe5b71ba",
+  "fleetDashboard.css": "2e1d18350c9df9cb3608b933c836836f39312977",
   "fleetAppearance.css": "72d26de6af0f7be19268998515c953fa7d58a23f",
   "fleetSimpleCards.css": "289a23208e902651cd9f3afcf9ff7a7a9ccbc3c5",
   "fleetBoardLayout.css": "8c4962032a589287f75854b581dfc57f5d579b8f"

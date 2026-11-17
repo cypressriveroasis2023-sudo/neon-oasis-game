@@ -689,6 +689,9 @@ function readRecordedRoster(value, inventory) {
   return { roster: v, error: null };
 }
 
+// ../supabase/functions/cos-operations-pages/routerBoardJoin.mjs
+var ROUTER_BOARD_FRESH_MS = 3 * 60 * 60 * 1e3;
+
 // ../supabase/functions/cos-operations-pages/routers.ts
 var ROUTER_FRESHNESS_MS = 20 * 60 * 1e3;
 function routerStatus(row, now = Date.now()) {
@@ -803,6 +806,10 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const key = canonicalCameraUnit(unit.unitNumber), family = key?.split("|")[0] || unit.modelName || "Other equipment", support = isSupportEquipment(unit), placement = inventoryPlacement(unit);
     const camera = fieldCameraHealth(unit, units, health, now), linkedRouters = (routers || []).filter((r) => r.match === "exact_name" && r.candidateUnit?.id === unit.id);
     const routerStates = linkedRouters.map((r) => routerStatus(r, now)).map((s) => s === "reachable" ? "online" : s === "unreachable" ? "offline" : "unknown");
+    const single = linkedRouters.length === 1 ? linkedRouters[0] : null;
+    const routerLabel = typeof single?.boardStatus === "string" ? single.boardStatus : void 0;
+    const routerCheckedAt = single?.boardCheckedAt ?? null;
+    const doNotUse = linkedRouters.some((r) => r.doNotUse === true);
     const matches = key?.startsWith("HELIOS|") ? power.filter((r) => canonicalCameraUnit(r.name) === key) : [];
     const p = matches.length === 1 && vrm.items.filter((item) => canonicalCameraUnit(item.name) === key).length === 1 && units.filter((u) => canonicalCameraUnit(u.unitNumber) === key).length === 1 ? matches[0] : null;
     const installation = p ? vrm.items.find((item) => item.installationId === p.installationId && canonicalCameraUnit(item.name) === key) : null;
@@ -828,7 +835,9 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const locationVerified = isCurrentFieldPin(unit), locationNeedsReview = placement === "field" && !locationVerified;
     const review = [...placement === "unknown" ? ["Placement is unresolved. Check tracker and current mHelpDesk assignment."] : [], ...camera.state === "unknown" ? [camera.reason] : [], ...locationNeedsReview ? [locationExplanation(unit)] : [], ...unit.mhelpLocationReviewReason ? [String(unit.mhelpLocationReviewReason)] : []];
     const providers = [...new Set(camera.rows.map((r) => r.evidence?.source).filter(Boolean))];
-    return { unit, id: unit.id, name: unit.unitNumber, displayName: unit.uploadDisplayUnitNumber || unit.unitNumber, family, provider: providers.join(" / ") || "Unmatched provider", placement, retired: unit.activeInventoryEligible === false || ["retired", "decommissioned", "deleted", "stolen"].includes(String(unit.status || "")), support, camera, cameraState: camera.state, routerState: routers ? combine(routerStates) : "unknown", batteryState, batteryPercent, batteryReadIssue, batteryReadings, routers: linkedRouters, power: p, vrmInstallation, locationVerified, locationNeedsReview, review };
+    let routerState = routers ? combine(routerStates) : "unknown";
+    if (routerLabel) routerState = placement === "shop" ? "unknown" : routerLabel === "Online" ? "online" : routerLabel === "Offline" ? "offline" : "unknown";
+    return { unit, id: unit.id, name: unit.unitNumber, displayName: unit.uploadDisplayUnitNumber || unit.unitNumber, family, provider: providers.join(" / ") || "Unmatched provider", placement, retired: unit.activeInventoryEligible === false || ["retired", "decommissioned", "deleted", "stolen"].includes(String(unit.status || "")), support, camera, cameraState: camera.state, routerState, routerLabel, routerCheckedAt, doNotUse, batteryState, batteryPercent, batteryReadIssue, batteryReadings, routers: linkedRouters, power: p, vrmInstallation, locationVerified, locationNeedsReview, review };
   });
 }
 
