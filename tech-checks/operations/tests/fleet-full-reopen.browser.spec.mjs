@@ -21,7 +21,7 @@ test('cold desktop reopen restores FULL dashboard, search, map, cards and verify
  await expect(unitPanel.locator('.cos-field-product-cards > article')).toHaveCount(1);
  await expect(unitPanel.getByRole('button',{name:'Open Helios 1 Product 1001'})).toBeVisible();
  await search.fill('');
- await board.getByRole('button',{name:/^Camera units unverified /}).click();
+ await board.getByRole('button',{name:/^Camera units unverified, no reading /}).click();
  await expect(board.getByRole('button',{name:/Verify all \d+ now/})).toBeVisible();
  await app.locator('body').evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
  expect(reads(state)).toHaveLength(0);expect(state.calls.every(c=>c.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
