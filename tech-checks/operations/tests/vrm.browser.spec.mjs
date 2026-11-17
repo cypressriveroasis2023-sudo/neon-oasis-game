@@ -3,6 +3,7 @@ import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {vrmPortalConfig} from '../../supabase/functions/cos-operations-pages/vrm.ts';
 const origin=process.env.COS_VRM_TEST_ORIGIN||'http://127.0.0.1:4173';
+const heliosButton=(name,status,installationId)=>[name,'Placement unknown',installationId?'Installation '+installationId:'',status].filter(Boolean).join(' ');
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 // Auth tokens and records are synthetic. Every non-local network request is blocked or intercepted.
 async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm=false,onVrmRequest,initialHash='#victron-vrm',mode='',features={}}={}){
@@ -38,9 +39,9 @@ test('All nine verified VRM portals work with sharing disabled',async({page})=>{
  await expect(nav.getByRole('button')).toHaveCount(9);
  const layout=await nav.evaluate(el=>({display:getComputedStyle(el).display,columns:getComputedStyle(el).gridTemplateColumns.split(' ').length,width:innerWidth}));expect(layout.display).toBe('grid');expect(layout.columns).toBe(layout.width>=1200?9:3);
  for(const unit of vrmPortalConfig().items){
-  await nav.getByRole('button',{name:unit.name+' Read-only power',exact:true}).click();
+  await nav.getByRole('button',{name:heliosButton(unit.name,'Read-only power'),exact:true}).click();
   await expect(frame.getByRole('link',{name:'Open '+unit.name+' in VRM ↗',exact:true})).toHaveAttribute('href',unit.portalUrl);
-  await expect(nav.getByRole('button',{name:unit.name+' Read-only power',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(nav.getByRole('button',{name:heliosButton(unit.name,'Read-only power'),exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(frame.getByRole('definition').filter({hasText:String(unit.installationId)})).toHaveText(String(unit.installationId));
  }
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
@@ -52,8 +53,8 @@ test('Authorized embedded dashboards follow the selected installation',async({pa
  const {frame,requests}=await mount(page,{config});await openVrm(frame);
  const iframe=frame.locator('iframe.vrm-dashboard');await expect(iframe).toHaveAttribute('title','HELIOS 001 Victron dashboard');
  await expect(iframe).toHaveAttribute('src',config.items[0].embedUrl);await expect(iframe).toHaveAttribute('referrerpolicy','no-referrer');
- await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 002 Dashboard enabled',exact:true}).click();await expect(iframe).toHaveAttribute('src',config.items[1].embedUrl);
- await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 003 Read-only power',exact:true}).click();await expect(iframe).toHaveCount(0);
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:heliosButton('HELIOS 002','Dashboard enabled'),exact:true}).click();await expect(iframe).toHaveAttribute('src',config.items[1].embedUrl);
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:heliosButton('HELIOS 003','Read-only power'),exact:true}).click();await expect(iframe).toHaveCount(0);
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('An initial read failure never fabricates fleet installations or dashboards',async({page})=>{
@@ -76,7 +77,7 @@ test('Dashboard controls resize without losing the selected installation or issu
  await expect(dashboard).toHaveAttribute('title','HELIOS 002 Victron dashboard');
  await frame.getByRole('button',{name:'Compact view',exact:true}).click();
  expect(await dashboard.evaluate(el=>el.getBoundingClientRect().height)).toBe(compactHeight);
- await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 009 Dashboard enabled',exact:true}).click();
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:heliosButton('HELIOS 009','Dashboard enabled'),exact:true}).click();
  await expect(frame.getByRole('button',{name:'Next Helios unit',exact:true})).toBeDisabled();
  await frame.getByRole('button',{name:'Previous Helios unit',exact:true}).click();
  await expect(dashboard).toHaveAttribute('title','HELIOS 008 Victron dashboard');
@@ -123,14 +124,14 @@ test('Selection follows immutable installation IDs across duplicate names, gaps,
  let items=[a,b,c];
  const {frame}=await mount(page,{onVrmRequest:async()=>({data:fleet(items)})});await openVrm(frame);
  const nav=frame.getByRole('navigation',{name:'Helios installations'});
- await nav.getByRole('button',{name:'HELIOS 007 Installation 2200002 Dashboard enabled',exact:true}).click();
+ await nav.getByRole('button',{name:heliosButton('HELIOS 007','Dashboard enabled',2200002),exact:true}).click();
  await expect(selectedId(frame)).toHaveText('2200002');
  items=[{...c,name:'HELIOS 002'},{...b,name:'Renamed solar installation'},a];
  await fleetButton(frame).click();
  await expect(selectedId(frame)).toHaveText('2200002');
  await expect(frame.getByRole('heading',{name:'Renamed solar installation',exact:true})).toBeVisible();
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveAttribute('src',b.embedUrl);
- await expect(nav.getByRole('button',{name:'Renamed solar installation Dashboard enabled',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(nav.getByRole('button',{name:heliosButton('Renamed solar installation','Dashboard enabled'),exact:true})).toHaveAttribute('aria-pressed','true');
  await frame.getByRole('button',{name:'Next Helios unit',exact:true}).click();
  await expect(selectedId(frame)).toHaveText('2200001');
  await expect(frame.getByRole('button',{name:'Next Helios unit',exact:true})).toBeDisabled();
@@ -437,7 +438,7 @@ for(const role of ['owner'])test(`${role} sees read-only power for 010, 011 and 
  let items=[syntheticUnit(3000010,'HELIOS 010'),syntheticUnit(3000011,'HELIOS 011')];
  const {frame,requests}=await mount(page,{role,mode:role==='it'?'fleet':'owner',features:role==='it'?{vrmRead:true}:undefined,onVrmRequest:async()=>({data:{...fleet(items),power:items.map(item=>powerFixture(item))}})});await openVrm(frame);
  for(const item of items){
-  await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:item.name+' Read-only power',exact:true}).click();
+  await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:heliosButton(item.name,'Read-only power'),exact:true}).click();
   const panel=frame.getByRole('region',{name:item.name+' read-only power dashboard'});
   await expect(panel).toBeVisible();await expect(panel.getByRole('article',{name:'Battery charge'})).toContainText('98.5');
   await expect(panel.getByRole('article',{name:'Solar generation'})).toContainText('0 W');
@@ -446,7 +447,7 @@ for(const role of ['owner'])test(`${role} sees read-only power for 010, 011 and 
  }
  items=[...items,syntheticUnit(3000123,'HELIOS 012')];
  await frame.getByRole('button',{name:role==='it'?'Reload saved fleet':'Refresh fleet',exact:true}).click();
- await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 012 Read-only power',exact:true}).click();
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:heliosButton('HELIOS 012','Read-only power'),exact:true}).click();
  await expect(frame.getByRole('region',{name:'HELIOS 012 read-only power dashboard'})).toBeVisible();
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
