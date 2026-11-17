@@ -57,25 +57,49 @@ export function closeoutAllowed(input) {
   return assessSimCancel(input?.simCancel);
 }
 
+function keptLast4(value) {
+  const text = String(value || '');
+  return /^•••• \d{4}$/.test(text) ? text : '';
+}
+
 export function simCancelForNotes(record) {
+  const simNumber = record?.simNumber || null;
   return {
     productId: record.productId, unit: record.unit, outcome: record.outcome, carrier: record.carrier,
     canceledOn: record.canceledOn, canceledBy: record.canceledBy, confirmation: record.confirmation,
-    noSimReason: record.noSimReason, simNumber: null, simLast4: record.simNumber ? simLast4(record.simNumber) : '',
+    noSimReason: record.noSimReason, simNumber: null,
+    simLast4: simNumber ? simLast4(simNumber) : keptLast4(record?.simLast4),
   };
 }
 
-export async function recordSimCancel(db, record, userId) {
+export const PLATFORM_SIM_CANCEL_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+
+export function simCancelProject(url) {
+  try {
+    const host = new URL(url).hostname;
+    if (host === 'tughscoxralhofrckvxy.supabase.co') return 'platform';
+    if (host === 'goqrnolcvqnirjmzaeyk.supabase.co') return 'cameras-on-site';
+    return 'other';
+  } catch {
+    return 'other';
+  }
+}
+
+export async function recordSimCancel(transport, record, returnId) {
   const gate = assessSimCancel(record);
   if (!gate.ok) return gate;
-  const row = gate.record;
+  const url = typeof transport?.url === 'string' ? transport.url : PLATFORM_SIM_CANCEL_URL;
+  if (simCancelProject(url) !== 'platform' || typeof transport?.from === 'function' || !transport?.accessToken || typeof returnId !== 'string' || !returnId) {
+    return fail('The SIM step could not be saved.');
+  }
+  const send = typeof transport.fetch === 'function' ? transport.fetch : globalThis.fetch;
   try {
-    const result = await db.from('cos_sim_cancel_records').insert({
-      product_id: row.productId, unit_number: row.unit, outcome: row.outcome, carrier: row.carrier,
-      canceled_on: row.canceledOn, canceled_by: row.canceledBy, confirmation: row.confirmation,
-      sim_number: row.simNumber, no_sim_reason: row.noSimReason, recorded_by: userId,
+    const response = await send(url, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + transport.accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'POST', path: '/api/sim-cancel', body: { ...gate.record, returnId } }),
     });
-    if (result.error) return fail('The SIM step could not be saved.');
+    if (!response?.ok) return fail('The SIM step could not be saved.');
     return { ok: true };
   } catch {
     return fail('The SIM step could not be saved.');

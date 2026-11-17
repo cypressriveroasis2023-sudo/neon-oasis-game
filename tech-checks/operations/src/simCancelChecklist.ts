@@ -82,8 +82,14 @@ export function closeoutAllowed(input: { action?: string; simCancel?: unknown } 
   return result;
 }
 
+function keptLast4(value: unknown) {
+  const text = String(value || '');
+  return /^•••• \d{4}$/.test(text) ? text : '';
+}
+
 /** Notes and lists keep the last four digits. The full number is not copied. */
-export function simCancelForNotes(record: SimCancelRecord): SimCancelRecord & { simLast4: string } {
+export function simCancelForNotes(record: SimCancelRecord & { simLast4?: string }): SimCancelRecord & { simLast4: string } {
+  const simNumber = record?.simNumber || null;
   return {
     productId: record.productId,
     unit: record.unit,
@@ -94,28 +100,45 @@ export function simCancelForNotes(record: SimCancelRecord): SimCancelRecord & { 
     confirmation: record.confirmation,
     noSimReason: record.noSimReason,
     simNumber: null,
-    simLast4: record.simNumber ? simLast4(record.simNumber) : '',
+    simLast4: simNumber ? simLast4(simNumber) : keptLast4(record?.simLast4),
   };
 }
 
-export async function recordSimCancel(db: { from: (table: string) => { insert: (row: Record<string, unknown>) => Promise<{ error: unknown }> } }, record: unknown, userId: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+export const PLATFORM_SIM_CANCEL_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+
+export function simCancelProject(url: string): 'platform' | 'cameras-on-site' | 'other' {
+  try {
+    const host = new URL(url).hostname;
+    if (host === 'tughscoxralhofrckvxy.supabase.co') return 'platform';
+    if (host === 'goqrnolcvqnirjmzaeyk.supabase.co') return 'cameras-on-site';
+    return 'other';
+  } catch {
+    return 'other';
+  }
+}
+
+type SimCancelTransport = {
+  url?: string;
+  accessToken?: string;
+  from?: unknown;
+  fetch?: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok?: boolean }>;
+};
+
+export async function recordSimCancel(transport: SimCancelTransport, record: unknown, returnId: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
   const gate = assessSimCancel(record);
   if (!gate.ok) return gate;
-  const row = gate.record;
+  const url = typeof transport?.url === 'string' ? transport.url : PLATFORM_SIM_CANCEL_URL;
+  if (simCancelProject(url) !== 'platform' || typeof transport?.from === 'function' || !transport?.accessToken || typeof returnId !== 'string' || !returnId) {
+    return fail('The SIM step could not be saved.');
+  }
+  const send = typeof transport.fetch === 'function' ? transport.fetch : globalThis.fetch.bind(globalThis);
   try {
-    const result = await db.from('cos_sim_cancel_records').insert({
-      product_id: row.productId,
-      unit_number: row.unit,
-      outcome: row.outcome,
-      carrier: row.carrier,
-      canceled_on: row.canceledOn,
-      canceled_by: row.canceledBy,
-      confirmation: row.confirmation,
-      sim_number: row.simNumber,
-      no_sim_reason: row.noSimReason,
-      recorded_by: userId,
+    const response = await send(url, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + transport.accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'POST', path: '/api/sim-cancel', body: { ...gate.record, returnId } }),
     });
-    if (result.error) return fail('The SIM step could not be saved.');
+    if (!response?.ok) return fail('The SIM step could not be saved.');
     return { ok: true };
   } catch {
     return fail('The SIM step could not be saved.');

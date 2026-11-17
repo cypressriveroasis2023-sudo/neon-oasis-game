@@ -1,4 +1,5 @@
 import {savedFleetBoard,acceptFleetBatch,completedBoard} from './savedFleetBoard.mjs';
+import {assessSimCancel} from '../../../sim-cancel-checklist.mjs';
 import {projectManualShop} from './fleetShopProjection.ts';
 import {createFleetShopPlacement,FleetShopError} from './fleetShopPlacement.ts';
 import {checkSavedCamera,CameraDiagnosticError} from './cameraDiagnostics.ts';
@@ -607,6 +608,51 @@ export function createOperationsHandler(options) {
         if (method !== 'POST') fail('Use POST for a connection check.',405);
         try { return json(await checkSavedCamera({id:path.split('/')[4],body,headers:context.headers,fetcher:requestFetch,signal:request.signal})); }
         catch(error) { if(error instanceof CameraDiagnosticError)return json({error:error.message},error.status); throw error; }
+      }
+
+      if (path === '/api/sim-cancel') {
+        if (method !== 'POST') fail('Use POST to save the SIM step.', 405);
+        if (!context.actorId || !['owner', 'it'].includes(context.department)) fail('An active IT account is required.', 403);
+        let platformHost = '';
+        try { platformHost = new URL(platformUrl).hostname; } catch { platformHost = ''; }
+        if (platformHost === 'goqrnolcvqnirjmzaeyk.supabase.co') fail('The SIM step could not be saved.', 503);
+        const gate = assessSimCancel(body);
+        if (!gate.ok) fail(gate.error, 400);
+        const returnId = typeof body?.returnId === 'string' ? body.returnId : '';
+        if (!UUID.test(returnId)) fail('This cancellation is not complete.', 400);
+        const row = gate.record;
+        let response;
+        try {
+          response = await requestFetch(platformUrl + '/rest/v1/cos_sim_cancel_records', {
+            method: 'POST',
+            headers: { ...platformHeaders(), Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              product_id: row.productId,
+              unit_number: row.unit,
+              outcome: row.outcome,
+              carrier: row.carrier,
+              canceled_on: row.canceledOn,
+              canceled_by: row.canceledBy,
+              confirmation: row.confirmation,
+              sim_number: row.simNumber,
+              no_sim_reason: row.noSimReason,
+              recorded_by: context.actorId,
+              return_id: returnId.toLowerCase(),
+            }),
+            redirect: 'error',
+            cache: 'no-store',
+          });
+        } catch {
+          fail('The SIM step could not be saved.', 503);
+        }
+        if (response.status === 201 || response.status === 204) return json({ ok: true });
+        let code = '';
+        try {
+          const data = await response.json();
+          code = data && typeof data.code === 'string' ? data.code : '';
+        } catch { /* The database body is not returned to the technician. */ }
+        if (code === '23505') return json({ ok: true });
+        fail('The SIM step could not be saved.', 503);
       }
 
       if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);

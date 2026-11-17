@@ -1,13 +1,25 @@
-import {assessSimCancel, simLast4} from './sim-cancel-checklist.mjs';
+import {assessSimCancel, simCancelForNotes, simLast4} from './sim-cancel-checklist.mjs';
 // IT Intake wizard state and rendering.
 // Database transitions remain in intake-shared-v1.js.
+// The full SIM number stays in simNumbers for this page load only.
 const labels=window.TechCheckRules?.itIntakeChecklist||[];
+const simNumbers=new Map();
 let wizard={row:null,step:0,answers:Array(labels.length).fill(null),notes:'',photo:null,meta:{}};
 let intakeActionSubmitting=false;
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 function getState(){return wizard;}
 function setState(next){wizard=next;return wizard;}
 function reset(){wizard={row:null,step:0,answers:Array(labels.length).fill(null),notes:'',photo:null,meta:{}};return wizard;}
+export function intakeMetaForPage(meta){
+  const next={...(meta||{})};
+  if(next.simCancel)next.simCancel=simCancelForNotes(next.simCancel);
+  return next;
+}
+export function intakeFailureStep(message){
+  if(message!=='Enter the SIM number.')return null;
+  const step=labels.indexOf('SIM card canceled');
+  return step>=0?step:null;
+}
 function start(row){
   if(!row)return null;
   const record=window.TechCheckIntake.readRecord(row.damage_notes);
@@ -15,7 +27,11 @@ function start(row){
   const answers=Array(labels.length).fill(null).map((_,i)=>typeof saved[i]==='boolean'?saved[i]:null);
   let step=answers.findIndex(v=>v!==true);
   if(step<0)step=row.intake_photo_paths?.length?labels.length+1:labels.length;
-  return setState({row,step,answers,notes:record.notes,photo:null,meta:record.meta||{}});
+  const hadFull=typeof record.meta?.simCancel?.simNumber==='string'&&record.meta.simCancel.simNumber.length>4;
+  const meta=intakeMetaForPage(record.meta||{});
+  const state=setState({row,step,answers,notes:record.notes,photo:null,meta});
+  if(hadFull&&row.id){window.TechCheckIntake.saveProgress({returnId:row.id,notes:record.notes,meta}).then(update=>{if(wizard.row===row)row.damage_notes=update.damage_notes;}).catch(()=>{});}
+  return state;
 }
 function reviewFlags(){
   const row=wizard.row,answered=wizard.answers.filter(v=>v!==null).length,noCount=wizard.answers.filter(v=>v===false).length,remaining=wizard.answers.length-answered,flags=[],yes=i=>wizard.answers[i]===true;
@@ -30,7 +46,7 @@ function reviewFlags(){
 }
 function simStepHtml(row,saved,i,progress){
   const none=saved?.outcome==='no_sim';
-  const number=typeof saved?.simNumber==='string'?saved.simNumber:'';
+  const number=simNumbers.get(row?.id)||'';
   const ending=saved?.simLast4?`<p>On file: ending ${esc(saved.simLast4)}</p>`:'';
   return `${progress(`${row.unit_tag} · IT INTAKE`,'SIM card canceled',i+1,labels.length+2)}<form class='wl-question' data-wl-sim-form><div class='qnum'>INTAKE CHECK ${i+1} OF ${labels.length}</div><div class='qtext'>SIM card canceled</div><p>${esc(row.unit_tag)} · Product ID required</p><label>Product ID<input id='wlSimProduct' value='${esc(saved?.productId||row.product_id||row.mhelp_product_id||'')}' autocomplete='off'></label><label>Carrier<select id='wlSimCarrier' ${none?'disabled':''}><option value=''>Choose</option><option>Verizon</option><option>AT&T</option><option>T-Mobile</option><option>Other</option></select></label><label>Date canceled<input id='wlSimDate' type='date' value='${esc(saved?.canceledOn||'')}' ${none?'disabled':''}></label><label>Who canceled it<input id='wlSimWho' value='${esc(saved?.canceledBy||'')}' autocomplete='off'></label><label>SIM number<input id='wlSimNumber' value='${esc(number)}' autocomplete='off' spellcheck='false' ${none?'disabled':''}></label>${ending}<label>Confirmation number or note, optional<input id='wlSimNote' value='${esc(saved?.confirmation||'')}' autocomplete='off'></label><label><input id='wlSimNone' type='checkbox' ${none?'checked':''}> No SIM in this unit</label><label>Reason<input id='wlSimReason' value='${esc(saved?.noSimReason||'')}' autocomplete='off'></label><button type='button' data-wl-sim-save>Save this step</button></form><button class='wl-service-backstep' data-wl-intake-prev ${i===0?'disabled':''}>← PREVIOUS QUESTION</button>`;
 }
@@ -58,9 +74,11 @@ async function handleClick(event,deps={}){
     const none=document.getElementById('wlSimNone')?.checked===true;
     const result=assessSimCancel({productId:document.getElementById('wlSimProduct')?.value,unit:wizard.row?.unit_tag,outcome:none?'no_sim':'canceled',carrier:document.getElementById('wlSimCarrier')?.value,canceledOn:document.getElementById('wlSimDate')?.value,canceledBy:document.getElementById('wlSimWho')?.value,confirmation:document.getElementById('wlSimNote')?.value,simNumber:none?'':document.getElementById('wlSimNumber')?.value,noSimReason:document.getElementById('wlSimReason')?.value});
     if(!result.ok){alert(result.error);return true;}
-    wizard.meta.simCancel=result.record;wizard.answers[wizard.step]=true;
     const row=wizard.row;
-    if(row?.id){try{const update=await window.TechCheckIntake.saveProgress({returnId:row.id,notes:wizard.notes,meta:{...wizard.meta,simCancel:simLast4(result.record.simNumber)?{...result.record,simNumber:null,simLast4:simLast4(result.record.simNumber)}:result.record}});row.damage_notes=update.damage_notes;}catch{alert('The SIM step could not be saved.');return true;}}
+    if(result.record.simNumber)simNumbers.set(row?.id,result.record.simNumber);
+    else simNumbers.delete(row?.id);
+    wizard.meta.simCancel=simCancelForNotes(result.record);wizard.answers[wizard.step]=true;
+    if(row?.id){try{const update=await window.TechCheckIntake.saveProgress({returnId:row.id,notes:wizard.notes,meta:wizard.meta});row.damage_notes=update.damage_notes;}catch{alert('The SIM step could not be saved.');return true;}}
     wizard.step++;await render();return true;
   }
   const startButton=target.closest('[data-wl-intake-start]');
@@ -124,10 +142,13 @@ async function handleClick(event,deps={}){
       const paths=wizard.photo?await deps.uploadPhotos([wizard.photo],row.id,'it'):row.intake_photo_paths||[];
       if(!paths.length){alert('Take or choose the required IT Intake photo before finishing intake.');return true;}
       wizard.meta.answers=[...answers];
-      const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths});
+      const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths,simNumber:simNumbers.get(row.id)||null});
+      simNumbers.delete(row.id);
       wizard.meta=result.meta;
       reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();
     }catch(error){
+      const back=intakeFailureStep(error?.message);
+      if(back!==null){wizard.step=back;await render();}
       alert(error?.message||'Could not complete IT Intake.');
     }finally{
       intakeActionSubmitting=false;
