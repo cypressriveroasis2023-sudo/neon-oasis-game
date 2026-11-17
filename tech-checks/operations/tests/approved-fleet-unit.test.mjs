@@ -22,6 +22,8 @@ import {createHash} from 'node:crypto';
 // Finance group and the unused Customers/Schedule entries (routes kept, see
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
+// The TV saved-board clock is its own 2-minute constant. refreshCadence.ts
+// records that constant. The 10-minute camera cadence stays in place.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "6bc714cfd419d01e7b8541ccfc2142dc91fff449",
@@ -33,7 +35,7 @@ const expected={
   "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
-  "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",
+  "refreshCadence.ts": "c2332e14af3c104eb545ec61c15a6a79e6503ac7",
   "workspaceNavigation.ts": "a8161174e7cdf3987503c927c66f37c7906c09ec",
   "App.tsx": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
   "fleetDashboard.css": "817194345766e341303cad8e636207afbe5b71ba",
