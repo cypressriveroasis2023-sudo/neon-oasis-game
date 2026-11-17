@@ -6,7 +6,6 @@ import FleetVictronSummary from './FleetVictronSummary';
 import LastKnownCameraStatus from './LastKnownCameraStatus';
 import type {LastKnownCamera} from './cameraLastKnown';
 import {unitHealthLabel} from './fieldCameraHealth';
-// @ts-ignore plain module shared with the edge function
 import {displayedRouterStatus} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 
 const words:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'No cameras',not_available:'Not available'};

@@ -5,7 +5,6 @@ import {cameraColors,cameraTime,unitHealthLabel} from './fieldCameraHealth';
 import {powerTimestamp} from './cameraEvidence';
 import {healthObservationLabel} from './healthObservationTime';
 import {routerLabels,routerStatus} from '../../supabase/functions/cos-operations-pages/routers';
-// @ts-ignore plain module shared with the edge function
 import {displayedRouterStatus} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import type {FleetDashboardRow,Signal} from './fleetDashboardModel';
 import FleetBatterySummary from './FleetBatterySummary';

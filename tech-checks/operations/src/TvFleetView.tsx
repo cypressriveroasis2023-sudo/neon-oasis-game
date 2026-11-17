@@ -10,7 +10,6 @@ import './fleetCompactSheet.css';
 import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,type FieldLocation} from './fieldLocations';
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
-// @ts-ignore plain module shared with the edge function
 import {displayedRouterStatus, routerJoinKey} from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';

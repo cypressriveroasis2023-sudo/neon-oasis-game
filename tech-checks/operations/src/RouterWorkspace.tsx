@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useRouters } from './useRouters';
 import { routerLabels, routerStatus, summarizeRouters, type RouterRow } from '../../supabase/functions/cos-operations-pages/routers';
-// @ts-ignore plain module shared with the edge function
 import { displayedRouterStatus } from '../../supabase/functions/cos-operations-pages/routerBoardJoin.mjs';
 import './routers.css';
 export const routerTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded';
