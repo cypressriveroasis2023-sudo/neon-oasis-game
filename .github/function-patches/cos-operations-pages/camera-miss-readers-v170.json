@@ -67,6 +67,18 @@
    "occurrences": 1
   },
   {
+   "file": "serve.ts",
+   "needle": "platformAll(\"equipment_units?select=id,unit_number&organization_id=eq.\"+ORGANIZATION_ID+\"&order=id.asc\")]);let devices=inventory.devices||[];",
+   "replacement": "platformAll(\"equipment_units?select=id,unit_number,current_location_type&organization_id=eq.\"+ORGANIZATION_ID+\"&order=id.asc\")]);let devices=inventory.devices||[];",
+   "occurrences": 1
+  },
+  {
+   "file": "routerBoardJoin.mjs",
+   "needle": "    const reading = boardRouterStatus(raw, now, '');",
+   "replacement": "    const shopDevice = (devices || []).some((device) => routerJoinKey(device.unit_key) === routerJoinKey(item.unitKey) && ['root', 'shop', 'shop equipment'].includes(text(device.organization).toLowerCase()));\n    const reading = boardRouterStatus(raw, now, shopDevice ? 'shop' : '');",
+   "occurrences": 1
+  },
+  {
    "file": "routerBoardJoin.mjs",
    "needle": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });",
    "replacement": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  if (shop) return { status: 'In Shop', checkedAt, outage: false };\n  const finish = (status, outage) => ({ status, checkedAt, outage });",
@@ -96,9 +108,9 @@
   "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
   "productVerifyNow.ts": "235e4857a2a6712f1a670a81f8468e9430f5125b1139f70059934e6e110dd9e7",
   "savedFleetBoard.mjs": "9edb24154edfba5369a9f3bfdea8c937f592da108acc702bdaa7f4ecad56e717",
-  "serve.ts": "5ea085aae7c9700f4dcbaa1de672070101e6273ba0291423bb7cee7ddcc3489d",
+  "serve.ts": "c8dbcfd1c5b6bdd6ffceee0d318a6bf4d1325f90041de6844a27ed5fa716f0b0",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "45a0b0601fd551c79133aa88ebbcf99bf12ce67663364b9470d2f9cde408033c"
+  "routerBoardJoin.mjs": "33df91f2393304de2f47e39e18bf8c05e07b738105f1f3de53f6b04b09f74785"
  }
 }

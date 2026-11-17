@@ -207,7 +207,8 @@ export function presentRouterPage(snapshot, rawRouters, devices, role, now = Dat
         candidateUnit = null;
       }
     }
-    const reading = boardRouterStatus(raw, now, '');
+    const shopDevice = (devices || []).some((device) => routerJoinKey(device.unit_key) === routerJoinKey(item.unitKey) && ['root', 'shop', 'shop equipment'].includes(text(device.organization).toLowerCase()));
+    const reading = boardRouterStatus(raw, now, shopDevice ? 'shop' : '');
     const next = {
       ...item,
       match,

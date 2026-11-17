@@ -1247,7 +1247,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         if (path === '/api/routers') {
           const [routers, units] = await Promise.all([
             legacyAll('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc', context.headers),
-            platformAll('equipment_units?select=id,unit_number&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+            platformAll('equipment_units?select=id,unit_number,current_location_type&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
           ]);
           return json(routerSnapshot(routers, units));
         }

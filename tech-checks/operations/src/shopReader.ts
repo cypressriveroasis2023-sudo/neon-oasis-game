@@ -1,3 +1,5 @@
+import { routerStatus, type RouterRow } from '../../supabase/functions/cos-operations-pages/routers.ts';
+
 /** How a Shop unit is shown. The saved probe stays on the record. */
 export const SHOP_LABEL = 'In Shop';
 export const SHOP_COLOR = '#64748b';
@@ -17,7 +19,8 @@ export function shopLastCheck(input: {
   role?: ShopRole;
 }): string | null {
   if (input.savedReading !== 'offline') return null;
-  if (input.role !== 'Owner' && input.role !== 'IT') return null;
+  const role = String(input.role || '').toLowerCase();
+  if (role !== 'owner' && role !== 'it') return null;
   const when = input.checkedAt && Number.isFinite(Date.parse(input.checkedAt)) ? input.checkedAt : 'time not recorded';
   const reason = String(input.reason || 'The saved check did not answer.').replace(/\boffline\b/gi, 'not answering');
   return 'Last check failed. ' + when + '. ' + reason;
@@ -32,6 +35,24 @@ export function shopRouterReading(probeStatus: string, placement: unknown, check
     visibleProbe: SHOP_LABEL,
     detail: shopLastCheck({ savedReading: probeStatus === 'offline' ? 'offline' : probeStatus, checkedAt, reason: 'The saved port check did not answer.', role }),
   };
+}
+
+export function routerRowView(row: { probeStatus?: string; checkedAt?: string | null; boardStatus?: string; candidateUnit?: { placement?: string } | null }, role?: ShopRole) {
+  const placement = row.candidateUnit?.placement;
+  const shop = row.boardStatus === SHOP_LABEL || isShopPlacement(placement);
+  if (!shop) return null;
+  const failed = row.probeStatus === 'offline' || row.boardStatus === 'Offline';
+  return {
+    primary: SHOP_LABEL,
+    color: SHOP_COLOR,
+    visibleProbe: SHOP_LABEL,
+    countedUnreachable: false as const,
+    detail: failed ? shopLastCheck({ savedReading: 'offline', checkedAt: row.checkedAt, reason: 'The saved port check did not answer.', role }) : null,
+  };
+}
+
+export function portUnreachableTally(items: Array<RouterRow & { boardStatus?: string }>, now: number) {
+  return items.filter(row => !routerRowView(row) && routerStatus(row, now) === 'unreachable').length;
 }
 
 export function shopCameraLine(placement: unknown, status: string): string | null {

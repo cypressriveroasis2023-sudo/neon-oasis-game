@@ -39,6 +39,13 @@
   {
    "file": "routerBoardJoin.mjs",
    "occurrences": 1,
+   "needle": "    const reading = boardRouterStatus(raw, now, '');",
+   "replacement": "    const shopDevice = (devices || []).some((device) => routerJoinKey(device.unit_key) === routerJoinKey(item.unitKey) && ['root', 'shop', 'shop equipment'].includes(text(device.organization).toLowerCase()));\n    const reading = boardRouterStatus(raw, now, shopDevice ? 'shop' : '');",
+   "occurrences": 1
+  },
+  {
+   "file": "routerBoardJoin.mjs",
+   "occurrences": 1,
    "needle": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });",
    "replacement": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  if (shop) return { status: 'In Shop', checkedAt, outage: false };\n  const finish = (status, outage) => ({ status, checkedAt, outage });"
   },
@@ -57,6 +64,6 @@
  "expectedAfter": {
   "index.ts": "afeb07d4d7e55b327dcef8b4236a06d3a8b1b233b1da1c3aee31bb76a3ead467",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "45a0b0601fd551c79133aa88ebbcf99bf12ce67663364b9470d2f9cde408033c"
+  "routerBoardJoin.mjs": "33df91f2393304de2f47e39e18bf8c05e07b738105f1f3de53f6b04b09f74785"
  }
 }

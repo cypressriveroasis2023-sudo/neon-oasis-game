@@ -41,6 +41,7 @@ test('canonical keys join spacing and number forms; different numbers stay unmat
  assert.equal(exactUnitName(' HELIOS   001 '),'helios 001');
  const value=routerSnapshot([{...router,unit_key:' helios  001 '}],[unit],now).items[0];assert.equal(value.match,'exact_name');assert.deepEqual(value.candidateUnit,{id:unit.id,unitNumber:unit.unit_number});
  assert.equal(routerSnapshot([{...router,unit_key:'Helios 1'}],[unit],now).items[0].match,'exact_name');
+ const shop=routerSnapshot([router],[{...unit,current_location_type:'shop'}],now).items[0];assert.equal(shop.candidateUnit.placement,'shop');
  for(const name of ['HELIOS 002','SNIPER 001','H001'])assert.equal(row({unit_key:name}).match,'unmatched');
 });
 test('duplicate router names and duplicate COS names never auto-link',()=>{

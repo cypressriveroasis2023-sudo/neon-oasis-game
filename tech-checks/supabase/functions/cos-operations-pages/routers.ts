@@ -11,7 +11,7 @@ export type RouterRow = {
   probeStatus: string; checkedAt: string | null; lastRecoveredAt: string | null;
   reportedStatus: string; reportedAt: string | null; reportedSource: string;
   savedLatencyMs: number | null; match: 'exact_name' | 'ambiguous' | 'unmatched';
-  candidateUnit: { id: string; unitNumber: string } | null;
+  candidateUnit: { id: string; unitNumber: string; placement?: string } | null;
   gps: null;
   boardStatus?: BoardRouterStatus;
   boardCheckedAt?: string | null;
@@ -54,21 +54,25 @@ export function routerSnapshot(routers: Row[], units: Row[], now = new Date(), d
     const key = routerJoinKey(row.unit_key), candidates = unitGroups.get(key) || [];
     const ambiguous = candidates.length > 1 || (routerCounts.get(key) || 0) > 1;
     let match: RouterRow['match'] = ambiguous ? 'ambiguous' : candidates.length === 1 ? 'exact_name' : 'unmatched';
-    let candidateUnit = match === 'exact_name' ? { id: String(candidates[0].id), unitNumber: String(candidates[0].unit_number) } : null;
+    const placed = (unit: Row) => {
+      const location = text(unit.current_location_type || unit.placement);
+      return { id: String(unit.id), unitNumber: String(unit.unit_number), ...(location ? { placement: location } : {}) };
+    };
+    let candidateUnit = match === 'exact_name' ? placed(candidates[0]) : null;
     if (match !== 'exact_name') {
       const serials = [row.router_serial, row.inhand_serial].map(text).filter(Boolean);
       const hits = devices.filter((device) => serials.some((serial) => serial === text(device.device_serial)));
       const keys = new Set(hits.map((device) => routerJoinKey(device.unit_key)).filter(Boolean));
       if (hits.length === 1 && keys.size === 1) {
         match = 'exact_name';
-        candidateUnit = { id: 'camera-device:' + String(hits[0].id), unitNumber: text(hits[0].unit_key) };
+        const located = text(hits[0].current_location_type || hits[0].placement).toLowerCase();
+        candidateUnit = { id: 'camera-device:' + String(hits[0].id), unitNumber: text(hits[0].unit_key), ...(located ? { placement: located } : {}) };
       } else if (keys.size > 1) {
         match = 'ambiguous';
         candidateUnit = null;
       }
     }
-    const matched = match === 'exact_name' ? candidates[0] : null;
-    const unitPlacement = text(matched?.placement || matched?.current_location_type).toLowerCase();
+    const unitPlacement = text(candidateUnit?.placement).toLowerCase();
     const reading = boardRouterStatus(row, +now, unitPlacement === 'shop' ? 'shop' : '');
     const port = number(row.web_port);
     return { id, unitKey: text(row.unit_key), name: text(row.router_name) || text(row.unit_key), model: text(row.router_model),
