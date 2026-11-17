@@ -1,13 +1,17 @@
 {
- "description": "Readers show Offline only after three fresh probe misses. One or two misses show Verifying. Stale or missing data stays Unknown. Connection refused is not a miss and not Offline. A unit placed in Shop is not an outage. Preparation only. Do not deploy.",
- "authorization": "James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026. This patch is not applied by this pull request.",
+ "description": "3-miss readers on the cos-operations-pages bytes produced by draft PR #433. Live version must be 170. The #425 410 needles stay in those bytes. Refuses any other version. Do not deploy until #425 and #433 are live.",
+ "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
  "releaseStatus": "PREPARATION_ONLY",
  "slug": "cos-operations-pages",
  "projectRef": "tughscoxralhofrckvxy",
- "sourceDir": "tech-checks/docs/vision-native-preview-20261107/source",
+ "sourceDir": "tech-checks/docs/cos-operations-pages-after-433",
  "entrypointPath": "cos-operations-pages/serve.ts",
  "importMapPath": "cos-operations-pages/deno.json",
  "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE",
+  "version": 170
+ },
  "deployedFileNames": {
   "deno.json": "cos-operations-pages/deno.json",
   "productCheckSource.ts": "cos-operations-pages/productCheckSource.ts",
@@ -16,12 +20,8 @@
   "savedFleetBoard.mjs": "cos-operations-pages/savedFleetBoard.mjs",
   "serve.ts": "cos-operations-pages/serve.ts",
   "trackerEndpointProducer.mjs": "cos-operations-pages/trackerEndpointProducer.mjs",
-  "trackerEndpointRead.mjs": "cos-operations-pages/trackerEndpointRead.mjs"
- },
- "requireLiveBeforeDeploy": {
-  "status": "ACTIVE",
-  "version": 168,
-  "ezbr_sha256": "ea649429a36f21ef8272911615a802e3ccc6d2a6c21ac6ea6718eeb68ddf02af"
+  "trackerEndpointRead.mjs": "cos-operations-pages/trackerEndpointRead.mjs",
+  "routerBoardJoin.mjs": "cos-operations-pages/routerBoardJoin.mjs"
  },
  "edits": [
   {
@@ -85,9 +85,10 @@
   "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
   "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
   "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
-  "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
+  "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
-  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
  },
  "expectedAfter": {
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
@@ -95,8 +96,9 @@
   "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
   "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
   "savedFleetBoard.mjs": "eb083fbaff69b1aeea3e5264c330c20641b5d3c8ce1b27bc90051885608b276f",
-  "serve.ts": "282a1f6e45040e84c34c8325e988f7e40470229e3ac82a16565372a8defa83e8",
+  "serve.ts": "5ea085aae7c9700f4dcbaa1de672070101e6273ba0291423bb7cee7ddcc3489d",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
-  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
+  "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+  "routerBoardJoin.mjs": "6807cad6618680898dc6df999a68bb248747cfad3a727b060073518da3ae7e87"
  }
 }

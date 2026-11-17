@@ -1,0 +1,27 @@
+{
+ "description": "Redeploy the exact live cos-operations-pages v168 entry. This removes #425, #433, and the 3-miss reader patch.",
+ "authorization": "Rollback material. Exact live entry bytes from before #425. Running this also removes the #425 gate, the #433 router edits, and the 3-miss patch.",
+ "releaseStatus": "ROLLBACK_ONLY",
+ "slug": "cos-operations-pages",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-operations-pages-v168-entry",
+ "entrypointPath": "cos-operations-pages/index.ts",
+ "importMapPath": "cos-operations-pages/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE"
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-operations-pages/index.ts",
+  "deno.json": "cos-operations-pages/deno.json"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "4340eb2f772cf4e7c0bc26475f1c7ca164f2ca0e9ae321fe6f6ce21ef1fdb7c3",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ },
+ "expectedAfter": {
+  "index.ts": "4340eb2f772cf4e7c0bc26475f1c7ca164f2ca0e9ae321fe6f6ce21ef1fdb7c3",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ }
+}

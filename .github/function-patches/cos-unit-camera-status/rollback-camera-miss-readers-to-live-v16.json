@@ -1,0 +1,27 @@
+{
+ "description": "Redeploy the exact live cos-unit-camera-status v16 entry. This removes #425, #433, and the 3-miss reader patch.",
+ "authorization": "Rollback material. Exact live entry bytes from before #425. Running this also removes the #425 gate, the #433 router edits, and the 3-miss patch.",
+ "releaseStatus": "ROLLBACK_ONLY",
+ "slug": "cos-unit-camera-status",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-unit-camera-status-v16-entry",
+ "entrypointPath": "cos-unit-camera-status/index.ts",
+ "importMapPath": "cos-unit-camera-status/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE"
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-unit-camera-status/index.ts",
+  "deno.json": "cos-unit-camera-status/deno.json"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ },
+ "expectedAfter": {
+  "index.ts": "f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ }
+}
