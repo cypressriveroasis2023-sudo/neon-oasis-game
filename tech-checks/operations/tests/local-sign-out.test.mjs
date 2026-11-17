@@ -6,8 +6,9 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const techChecks = fileURLToPath(new URL('../..', import.meta.url));
-const skipDirs = new Set(['node_modules', 'dist', 'tests']);
+const repo = fileURLToPath(new URL('../../..', import.meta.url));
+const roots = ['tech-checks', 'cameras-on-site'].map(name => join(repo, name));
+const skipDirs = new Set(['node_modules', 'dist', 'tests', '.git']);
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -46,12 +47,12 @@ function callsIn(text) {
 
 const localScope = /^\{\s*scope\s*:\s*'local'\s*\}$/;
 
-test('every Tech Check signOut call is local to this device', () => {
-  const files = walk(techChecks);
+test('every served signOut call is local to this device', () => {
+  const files = roots.flatMap(root => walk(root));
   const bad = [];
   const counts = {};
   for (const file of files) {
-    const rel = relative(techChecks, file).split(sep).join('/');
+    const rel = relative(repo, file).split(sep).join('/');
     const calls = callsIn(readFileSync(file, 'utf8'));
     if (!calls.length) continue;
     counts[rel] = calls.length;
@@ -60,8 +61,11 @@ test('every Tech Check signOut call is local to this device', () => {
     }
   }
   assert.deepEqual(bad, []);
-  assert.equal(counts['app.js'], 4);
-  assert.equal(counts['camera-health.html'], 2);
-  assert.equal(counts['it-send-repair.html'], 1);
-  assert.equal(Object.values(counts).reduce((sum, n) => sum + n, 0), 7);
+  assert.equal(counts['tech-checks/app.js'], 4);
+  assert.equal(counts['tech-checks/camera-health.html'], 2);
+  assert.equal(counts['tech-checks/it-send-repair.html'], 1);
+  assert.equal(counts['cameras-on-site/tech-check-netlify/src/app.js'], 4);
+  assert.equal(counts['cameras-on-site/shared/core.js'], 3);
+  assert.equal(counts['cameras-on-site/tech-check-netlify/public/it-send-repair.html'], 1);
+  assert.equal(Object.values(counts).reduce((sum, n) => sum + n, 0), 15);
 });
