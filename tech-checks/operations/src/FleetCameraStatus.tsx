@@ -92,7 +92,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string}[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -106,7 +106,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  // router check reading Not checked, which is the truthful answer.
  // What mHelp holds about placement, for the mHelp location check. A failure
  // here leaves that check reading No current evidence, which is truthful.
- useEffect(()=>{let cancelled=false;api.get('/api/field-map').then(result=>{if(!cancelled)setFieldMap(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ useEffect(()=>{let cancelled=false;api.fleetSource('fieldMap').then(map=>{if(!cancelled)setFieldMap(map);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
   setLoading(true);
@@ -157,7 +157,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const todos=useMemo(()=>technicianTodos({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
   power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
-  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD'})),
+  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
  }),[units,victron,now,powerSettings,addressReviews]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows

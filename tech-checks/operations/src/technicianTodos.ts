@@ -1,4 +1,5 @@
 import type {CosPowerVerdict} from './cosPowerAlarms';
+import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
 
 export type TechnicianTodo = {
   id: string;
@@ -16,7 +17,17 @@ export type TodoCamera = {
   unknown?: number;
 };
 
-export type TodoAddress = { unit: string; productId?: string; placement?: string };
+export type TodoAddress = { unit: string; productId?: string; placement?: string; address?: string; bothLookupsFailed?: boolean };
+
+const FIX_IN_MHELP = 'Address cannot be placed. Fix it in mHelpDesk. COS does not write that address.';
+const CHECK_IF_WRONG = 'Address couldn\'t be mapped automatically. Check it in mHelpDesk if it looks wrong.';
+
+/** A complete street address is not a bad mHelp record. Say so until both
+ * lookups have failed. COS still does not write the address. */
+export function addressTodoDetail(address: TodoAddress): string {
+  if (address.bothLookupsFailed || !parseAddress(address.address || '')) return FIX_IN_MHELP;
+  return CHECK_IF_WRONG;
+}
 
 /** Jobs a technician can act on. Unknown, shop, and unset thresholds are not jobs. */
 export function technicianTodos(input: {
@@ -52,7 +63,7 @@ export function technicianTodos(input: {
       id: 'address:'+(address.productId || address.unit),
       kind: 'mhelp_address',
       unit: address.unit,
-      detail: 'Address cannot be placed. Fix it in mHelpDesk. COS does not write that address.',
+      detail: addressTodoDetail(address),
     });
   }
   return todos;
