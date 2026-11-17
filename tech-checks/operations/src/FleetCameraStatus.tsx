@@ -32,7 +32,7 @@ import TechnicianTodoList from './TechnicianTodoList';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-import {type Group,type StateFilter,type FamilyFilter,type UnitFamily,GROUPS,FAMILY_LABEL,familyFieldCounts,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
+import {type Group,type StateFilter,type FamilyFilter,type UnitFamily,GROUPS,FAMILY_LABEL,familyBoardCounts,familyFieldCounts,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
 export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
@@ -170,6 +170,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  // Worst first, off the same units the list shows.
  const needsYou=useMemo(()=>report?needsYouRows(units):{rows:[],total:0,unchecked:0},[report,units]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
+ const boardCounts=useMemo(()=>report?familyBoardCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
  // Keep status counts in the same make scope as the rows selected by a tile.
  const statusCounts=useMemo(()=>report?countUnits(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
  const upEvidence=useMemo(()=>report?cameraUpEvidence(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
@@ -222,6 +223,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
     <span>Down <b>{report?downCount:'—'}</b></span>
     <span>Unknown <b>{report?unknownCount:'—'}</b></span>
    </p>
+   <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>
     <small>{updatedAt?'Updated '+cameraTime(updatedAt,now):loading?'Reading…':'No reading yet'}</small>

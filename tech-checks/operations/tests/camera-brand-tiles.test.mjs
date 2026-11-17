@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {familyFieldCounts,familyOf,groupedUnits,FAMILY_LABEL} from '../src/cameraStatusFilters.ts';
+import {familyBoardCounts,familyFieldCounts,familyOf,groupedUnits,FAMILY_LABEL} from '../src/cameraStatusFilters.ts';
 
 const unit=(name,placement='FIELD',state='GREEN',extra={})=>
  ({unit:name,displayName:name,placement,state,site:'',address:'',publicIp:'',...extra});
@@ -14,6 +14,7 @@ test('the three makes COS carries are counted apart', () => {
 test('shop units never count toward a make in the field', () => {
  const units=[unit('SNIPER 302'),unit('SNIPER 208','SHOP'),unit('RECON II 025','SHOP')];
  assert.deepEqual(familyFieldCounts(units),{avigilon:1,recon:0,alibi:0});
+ assert.deepEqual(familyBoardCounts(units),{avigilon:2,recon:1,alibi:0});
 });
 
 test('the brand counts add up to the field total', () => {

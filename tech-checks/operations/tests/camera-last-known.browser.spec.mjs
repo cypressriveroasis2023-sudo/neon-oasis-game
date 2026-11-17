@@ -39,7 +39,7 @@ async function mount(page,{failed=false}={}){
  await page.goto('/camera-last-known-fixture');
  const app=page.frameLocator('iframe'),card=app.locator('.cos-fleet-unit-row[data-unit-id="'+unitId+'"]');
  await expect(card).toBeVisible();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(()=>state.active).toBe(0);
- const originalTime=await page.evaluate(value=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(value)),observedAt);
+ const originalTime=await page.evaluate(value=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(value))+' CT',observedAt);
  return {app,card,state,originalTime};
 }
 function assertReadOnly(state){expect(state.calls.length).toBeGreaterThan(0);expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect([...new Set(state.calls.map(call=>call.path))].sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map','/api/routers','/api/session']);expect(state.errors).toEqual([]);}

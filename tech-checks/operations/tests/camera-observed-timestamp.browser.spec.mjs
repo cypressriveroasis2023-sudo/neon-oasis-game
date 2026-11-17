@@ -4,7 +4,7 @@ import {resource,port,snapshot,withStatus} from './fixtures/camera-evidence-fixt
 test.use({timezoneId:'UTC',locale:'en-US'});
 const origin='http://127.0.0.1:4173';
 const now='2026-10-14T16:00:00Z',cameraAt='2026-10-14T15:45:00Z',portAt='2026-10-14T15:59:00Z';
-const cameraTime='Oct 14, 2026, 3:45:00 PM UTC',portTime='Oct 14, 2026, 3:59:00 PM UTC';
+const cameraTime='Oct 14, 2026, 10:45:00 AM CT',portTime='Oct 14, 2026, 10:59:00 AM CT';
 const id=n=>`90000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const allowedReads=new Set(['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers','/api/vrm-fleet']);
 

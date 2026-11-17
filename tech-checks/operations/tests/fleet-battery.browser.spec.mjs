@@ -2,7 +2,7 @@ import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {revealInstallationEvidence} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountFleet,field,vrm,now,fresh} from './fleet-dashboard-fixtures.mjs';
-const time=async(app,stamp)=>app.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)),stamp);
+const time=async(app,stamp)=>app.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(at))+' CT',stamp);
 const open=app=>app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
 
 test('actual charge sources and measurement time appear above installation from map, list and fleet table',async({page},info)=>{
@@ -37,5 +37,5 @@ test('direct unitless navigation cancels a draft map pick without saving or leav
 
 
 test('saved mHelp rate-limit timing stays separate from current camera and battery readings',async({page})=>{
- const custom=structuredClone(field),retry=new Date(now+2*3600000).toISOString();custom.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:fresh,lastAttemptAt:new Date(now).toISOString(),errorCode:'source_rate_limited',nextReadAt:retry,sheetsPublisher:false};const {app,state}=await mountFleet(page,false,{field:custom});await open(app);await revealInstallationEvidence(app);const note=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(note).toContainText('MHelp update delayed');await expect(note).toContainText(await time(app,fresh));await expect(note).toContainText(await time(app,retry));await expect(app.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+ const custom=structuredClone(field),retry=new Date(now+2*3600000).toISOString();custom.mhelpPlacementSync={contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:fresh,lastAttemptAt:new Date(now).toISOString(),errorCode:'source_rate_limited',nextReadAt:retry,sheetsPublisher:false};const {app,state}=await mountFleet(page,false,{field:custom});await open(app);await revealInstallationEvidence(app);const note=app.getByRole('region',{name:'mHelpDesk placement update'});await expect(note).toContainText('MHelp update delayed');await expect(note).toContainText(await time(app,fresh));await expect(note).toContainText(await app.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)),retry));await expect(app.getByRole('region',{name:'Selected unit battery charge'}).locator(':scope > strong')).toHaveText('80%');expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });
