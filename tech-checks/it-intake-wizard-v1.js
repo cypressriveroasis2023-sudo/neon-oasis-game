@@ -1,3 +1,4 @@
+import {assessSimCancel, simLast4} from './sim-cancel-checklist.mjs';
 // IT Intake wizard state and rendering.
 // Database transitions remain in intake-shared-v1.js.
 const labels=window.TechCheckRules?.itIntakeChecklist||[];
@@ -27,24 +28,41 @@ function reviewFlags(){
   if(!row?.return_photo_paths?.length)flags.push('No Service return photo is attached.');
   return {answered,noCount,remaining,flags,pct:Math.round(answered/Math.max(1,wizard.answers.length)*100)};
 }
+function simStepHtml(row,saved,i,progress){
+  const none=saved?.outcome==='no_sim';
+  const number=typeof saved?.simNumber==='string'?saved.simNumber:'';
+  const ending=saved?.simLast4?`<p>On file: ending ${esc(saved.simLast4)}</p>`:'';
+  return `${progress(`${row.unit_tag} · IT INTAKE`,'SIM card canceled',i+1,labels.length+2)}<form class='wl-question' data-wl-sim-form><div class='qnum'>INTAKE CHECK ${i+1} OF ${labels.length}</div><div class='qtext'>SIM card canceled</div><p>${esc(row.unit_tag)} · Product ID required</p><label>Product ID<input id='wlSimProduct' value='${esc(saved?.productId||row.product_id||row.mhelp_product_id||'')}' autocomplete='off'></label><label>Carrier<select id='wlSimCarrier' ${none?'disabled':''}><option value=''>Choose</option><option>Verizon</option><option>AT&T</option><option>T-Mobile</option><option>Other</option></select></label><label>Date canceled<input id='wlSimDate' type='date' value='${esc(saved?.canceledOn||'')}' ${none?'disabled':''}></label><label>Who canceled it<input id='wlSimWho' value='${esc(saved?.canceledBy||'')}' autocomplete='off'></label><label>SIM number<input id='wlSimNumber' value='${esc(number)}' autocomplete='off' spellcheck='false' ${none?'disabled':''}></label>${ending}<label>Confirmation number or note, optional<input id='wlSimNote' value='${esc(saved?.confirmation||'')}' autocomplete='off'></label><label><input id='wlSimNone' type='checkbox' ${none?'checked':''}> No SIM in this unit</label><label>Reason<input id='wlSimReason' value='${esc(saved?.noSimReason||'')}' autocomplete='off'></label><button type='button' data-wl-sim-save>Save this step</button></form><button class='wl-service-backstep' data-wl-intake-prev ${i===0?'disabled':''}>← PREVIOUS QUESTION</button>`;
+}
 async function render({view,progress,photoHtml,hideChildren,resetPosition,onEmpty}){
   const row=wizard.row;if(!row)return onEmpty?.();
   let card=document.getElementById('wlIntakeForm');if(!card){card=document.createElement('div');card.id='wlIntakeForm';card.className='card wl-it-simple-card';view.append(card);}
   const photos=await photoHtml(row.return_photo_paths);
   if(wizard.step<labels.length){
     const i=wizard.step,answer=wizard.answers[i];
+    if(labels[i]==='SIM card canceled'){card.innerHTML=simStepHtml(row,wizard.meta?.simCancel,i,progress);hideChildren(view,[card]);resetPosition();return;}
     card.innerHTML=`${progress(`${row.unit_tag} · IT INTAKE`,labels[i],i+1,labels.length+2)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type||'Unit')}</b><div>MHelpDesk #${esc(row.ticket_no)}</div><div>Returned by ${esc(row.service_tech_name)}</div>${row.return_notes?`<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>`:''}${photos?`<div class='wl-return-gallery top8'>${photos}</div>`:''}</div><div class='wl-question wl-it-intake-bool'><div class='qnum'>INTAKE CHECK ${i+1} OF ${labels.length}</div><div class='qtext'>${esc(labels[i])}</div><div class='wl-options'><button class='pass ${answer===true?'on':''}' data-wl-intake-answer='yes'>YES</button><button class='fail ${answer===false?'on':''}' data-wl-intake-answer='no'>NO</button></div>${answer===false?`<div class='wl-stop'><b>STOP — THIS UNIT CANNOT CONTINUE TO INVENTORY.</b><div>Fix the problem and tap YES. If it cannot be corrected, document it as damaged / needs replacement.</div><button class='wl-it-escalate top10' data-wl-intake-escalate>DOCUMENT DAMAGE / REPLACEMENT →</button></div>`:''}</div><button class='wl-service-backstep' data-wl-intake-prev ${i===0?'disabled':''}>← PREVIOUS QUESTION</button>`;
   }else if(wizard.step===labels.length){
     card.innerHTML=`${progress(`${row.unit_tag} · IT INTAKE`,'TAKE AN IT INTAKE PHOTO',labels.length+1,labels.length+2)}<div class='wl-review'><b>Service return evidence</b>${row.return_notes?`<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>`:''}<div class='wl-return-gallery'>${photos}</div></div><div class='wl-question'><div class='qtext'>TAKE A CURRENT PHOTO OF ${esc(row.unit_tag)} IN THE SHOP.</div><label class='wl-photo-button' for='wlIntakePhoto'>📷 TAKE / CHOOSE UNIT PHOTO</label><input id='wlIntakePhoto' class='wl-photo-input' type='file' accept='image/*'><div class='wl-return-preview ${wizard.photo?'':'hidden'}'>${wizard.photo?`<img src='${URL.createObjectURL(wizard.photo)}' alt='Selected IT intake unit photo'>`:''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><button class='wl-next' data-wl-intake-next>REVIEW →</button></div>`;
   }else{
-    const ready=wizard.answers.every(v=>v===true),noCount=wizard.answers.filter(v=>v===false).length,doc=wizard.meta?.cancellationDoc;
-    card.innerHTML=`${progress(`${row.unit_tag} · IT INTAKE`,ready?'READY FOR PENDING MHELPDESK INVENTORY':'UNIT NEEDS ATTENTION',labels.length+2,labels.length+2)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type||'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready?`✓ All ${labels.length} required intake checks are YES.`:`${noCount} failed check${noCount===1?'':'s'} — this unit cannot become Shop Inventory.`}</div>${doc?`<div class='ok top8'>SIM cancellation documentation recorded.</div>`:''}</div><label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Describe damage, missing items, repair needed, or other notes'>${esc(wizard.notes)}</textarea>${ready?`<div class='wl-it-good top10'>✓ IT INTAKE COMPLETE</div><button class='wl-it-start top10' data-wl-intake-finish>SEND TO PENDING MHELPDESK INVENTORY →</button>`:`<div class='wl-stop'><b>DO NOT RETURN THIS UNIT TO INVENTORY.</b><div>Document what is wrong and send it to the Owner as Needs Replacement.</div></div><button class='wl-it-start top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button>`}<button class='wl-service-backstep top10' data-wl-intake-prev>← BACK</button>`;
+    const ready=wizard.answers.every(v=>v===true),noCount=wizard.answers.filter(v=>v===false).length,sim=wizard.meta?.simCancel,ending=sim?.simLast4||simLast4(sim?.simNumber||''),simLine=ending?`<div class='ok top8'>SIM on file, ending ${esc(ending)}.</div>`:sim?.outcome==='no_sim'?'<div class=\'ok top8\'>No SIM in this unit.</div>':'';
+    card.innerHTML=`${progress(`${row.unit_tag} · IT INTAKE`,ready?'READY FOR PENDING MHELPDESK INVENTORY':'UNIT NEEDS ATTENTION',labels.length+2,labels.length+2)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type||'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready?`✓ All ${labels.length} required intake checks are YES.`:`${noCount} failed check${noCount===1?'':'s'} — this unit cannot become Shop Inventory.`}</div>${simLine}</div><label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Describe damage, missing items, repair needed, or other notes'>${esc(wizard.notes)}</textarea>${ready?`<div class='wl-it-good top10'>✓ IT INTAKE COMPLETE</div><button class='wl-it-start top10' data-wl-intake-finish>SEND TO PENDING MHELPDESK INVENTORY →</button>`:`<div class='wl-stop'><b>DO NOT RETURN THIS UNIT TO INVENTORY.</b><div>Document what is wrong and send it to the Owner as Needs Replacement.</div></div><button class='wl-it-start top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button>`}<button class='wl-service-backstep top10' data-wl-intake-prev>← BACK</button>`;
   }
   hideChildren(view,[card]);resetPosition();
 }
 async function handleClick(event,deps={}){
   const target=event?.target;if(!target?.closest)return false;
   const render=()=>deps.render?.();
+  const simSave=target.closest('[data-wl-sim-save]');
+  if(simSave){
+    const none=document.getElementById('wlSimNone')?.checked===true;
+    const result=assessSimCancel({productId:document.getElementById('wlSimProduct')?.value,unit:wizard.row?.unit_tag,outcome:none?'no_sim':'canceled',carrier:document.getElementById('wlSimCarrier')?.value,canceledOn:document.getElementById('wlSimDate')?.value,canceledBy:document.getElementById('wlSimWho')?.value,confirmation:document.getElementById('wlSimNote')?.value,simNumber:none?'':document.getElementById('wlSimNumber')?.value,noSimReason:document.getElementById('wlSimReason')?.value});
+    if(!result.ok){alert(result.error);return true;}
+    wizard.meta.simCancel=result.record;wizard.answers[wizard.step]=true;
+    const row=wizard.row;
+    if(row?.id){try{const update=await window.TechCheckIntake.saveProgress({returnId:row.id,notes:wizard.notes,meta:{...wizard.meta,simCancel:simLast4(result.record.simNumber)?{...result.record,simNumber:null,simLast4:simLast4(result.record.simNumber)}:result.record}});row.damage_notes=update.damage_notes;}catch{alert('The SIM step could not be saved.');return true;}}
+    wizard.step++;await render();return true;
+  }
   const startButton=target.closest('[data-wl-intake-start]');
   if(startButton){await deps.start?.(startButton.dataset.wlIntakeStart);return true;}
   const answer=target.closest('[data-wl-intake-answer]');

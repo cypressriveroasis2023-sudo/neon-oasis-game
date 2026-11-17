@@ -1,8 +1,9 @@
 import type {CosPowerVerdict} from './cosPowerAlarms';
+import {simCancelTodo} from './simCancelChecklist';
 
 export type TechnicianTodo = {
   id: string;
-  kind: 'camera_offline' | 'battery_alarm' | 'power_silent' | 'mhelp_address';
+  kind: 'camera_offline' | 'battery_alarm' | 'power_silent' | 'mhelp_address' | 'sim_cancel';
   unit: string;
   detail: string;
 };
@@ -23,6 +24,7 @@ export function technicianTodos(input: {
   cameras?: TodoCamera[];
   power?: { unit: string; placement?: string; verdict: CosPowerVerdict }[];
   addresses?: TodoAddress[];
+  simCancels?: { unit: string; productId: string; done?: boolean }[];
 }): TechnicianTodo[] {
   const todos: TechnicianTodo[] = [];
   for (const camera of input.cameras ?? []) {
@@ -45,6 +47,10 @@ export function technicianTodos(input: {
     if (power.verdict.silent === 'alarm') {
       todos.push({id: 'silent:'+power.unit, kind: 'power_silent', unit: power.unit, detail: 'Power readings have been silent longer than the configured window.'});
     }
+  }
+  for (const item of input.simCancels ?? []) {
+    if (item.done) continue;
+    todos.push(simCancelTodo(item));
   }
   for (const address of input.addresses ?? []) {
     if (address.placement === 'SHOP') continue;
