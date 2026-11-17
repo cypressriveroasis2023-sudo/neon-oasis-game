@@ -22,8 +22,11 @@ export function projectManualShop(snapshot:Row,receipt:any):Row{
   const mhelpField=String(record.placement||'').toUpperCase()==='FIELD'||record.currentLocationType==='field';
   const newer=Number.isFinite(uploaded)&&uploaded>Date.parse(move.recordedAt);
   const api=upload?.source==='mhelpdesk_api';
-  if(newer&&(!api||mhelpField)){
-   if(mhelpField)superseded.push({unitId:move.unitId,unitNumber:move.unitNumber,auditId:move.auditId,recordedAt:move.recordedAt,mhelpAt:new Date(uploaded).toISOString(),recordedBy:typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(move,new Date(uploaded).toISOString())});
+  // Only a strictly newer mHelp Field API reading can replace a hand-confirmed
+  // Shop move. An explicit upload, or any other source, leaves the move in place
+  // whether the row is Field or not. An equal time also keeps Shop.
+  if(newer&&api&&mhelpField){
+   superseded.push({unitId:move.unitId,unitNumber:move.unitNumber,auditId:move.auditId,recordedAt:move.recordedAt,mhelpAt:new Date(uploaded).toISOString(),recordedBy:typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(move,new Date(uploaded).toISOString())});
    return false;
   }
   return true;
@@ -49,7 +52,7 @@ export function manualShopInventory(upload:any,receipt:any):any{
  const moves=new Map(manualShopItems(receipt).map(r=>[r.unitId,r]));
  const observed=Date.parse(upload.receivedAt);
  const superseded:SupersededShopMove[]=[];
- let count=0;const records=upload.records.map((r:Row)=>{const m=[...moves.values()].find(m=>(m.sourceBindings||[]).some(b=>b.productId===r.productId&&(b.sourceSha256===upload.sourceSha256||upload.source==='mhelpdesk_api'&&b.sourceUnitNumber===r.unitNumber)))||(r.binding?.state==='linked'&&r.binding.unitIds?.length===1?moves.get(r.binding.unitIds[0]):null);if(!m||r.placement==='SHOP')return r;if(r.placement==='FIELD'&&Number.isFinite(observed)&&observed>Date.parse(m.recordedAt)){superseded.push({unitId:m.unitId,unitNumber:m.unitNumber,auditId:m.auditId,recordedAt:m.recordedAt,mhelpAt:new Date(observed).toISOString(),recordedBy:typeof m.recordedBy==='string'&&m.recordedBy.trim()?m.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(m,new Date(observed).toISOString())});return r;}count++;return {...r,placement:'SHOP',cosManualShopAuditId:m.auditId};});
+ let count=0;const records=upload.records.map((r:Row)=>{const m=[...moves.values()].find(m=>(m.sourceBindings||[]).some(b=>b.productId===r.productId&&(b.sourceSha256===upload.sourceSha256||upload.source==='mhelpdesk_api'&&b.sourceUnitNumber===r.unitNumber)))||(r.binding?.state==='linked'&&r.binding.unitIds?.length===1?moves.get(r.binding.unitIds[0]):null);if(!m||r.placement==='SHOP')return r;if(upload.source==='mhelpdesk_api'&&r.placement==='FIELD'&&Number.isFinite(observed)&&observed>Date.parse(m.recordedAt)){superseded.push({unitId:m.unitId,unitNumber:m.unitNumber,auditId:m.auditId,recordedAt:m.recordedAt,mhelpAt:new Date(observed).toISOString(),recordedBy:typeof m.recordedBy==='string'&&m.recordedBy.trim()?m.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(m,new Date(observed).toISOString())});return r;}count++;return {...r,placement:'SHOP',cosManualShopAuditId:m.auditId};});
  if(!count&&!superseded.length)return upload;
  const summary={...upload.summary,fieldRecords:records.filter((r:Row)=>r.placement==='FIELD').length,shopRecords:records.filter((r:Row)=>r.placement==='SHOP').length,unflaggedFieldRecords:records.filter((r:Row)=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED').length,unflaggedShopRecords:records.filter((r:Row)=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED').length};
  return {...upload,records,summary,cosManualShopCount:count,supersededShopMoves:superseded,...(count?{cosPlacementBasis:'Accepted mHelp inventory plus confirmed COS Shop moves'}:{})};
