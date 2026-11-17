@@ -1,0 +1,41 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v16-entry",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "Admit only /api/unit-camera-status and /api/unit-camera-status/edit, in either the URL path or the path-in-body envelope. Every other route returns 404 before the bundled operations handler. A body over 64 KiB is refused with 413 before that handler's sign-in. Live v16 archive sha256 47f904b7621e97c336d76b0ee7beb1d696fecda6a2f42deed8500dab837d3883. The bundled handler came from 95e3e5a4. Do not deploy from this task.",
+  "authorization": "Reviewer blocker B3. Preparation only. Camera-status routes keep the existing handler and its authorization.",
+  "releaseStatus": "PREPARATION_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v16-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 16,
+    "ezbr_sha256": "47f904b7621e97c336d76b0ee7beb1d696fecda6a2f42deed8500dab837d3883"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "Deno.serve(async (request) => {\n  if (request.method !== \"POST\") return handler(request);\n  const text21 = await request.text();\n  return handler(new Request(handlerUrl(request.url), { method: \"POST\", headers: request.headers, body: servedEnvelopeBody(text21) }));\n});\n",
+      "replacement": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\"];\nconst CAMERA_BODY_LIMIT=65536;\nfunction cameraUrlPath(url){\n  return new URL(url).pathname.replace(/^.*\\/cos-unit-camera-status(?=\\/|$)/,\"\").replace(/\\/$/,\"\");\n}\nfunction cameraNotFound(){\n  return new Response(JSON.stringify({error:\"COS endpoint not found.\"}),{status:404,headers:{\"Content-Type\":\"application/json\",\"Cache-Control\":\"no-store\"}});\n}\nasync function readCameraBody(request){\n  const reader=request.body?.getReader();\n  if(!reader)return \"\";\n  const chunks=[];\n  let size=0;\n  try{\n    while(true){\n      const next=await reader.read();\n      if(next.done)break;\n      size+=next.value.byteLength;\n      if(size>CAMERA_BODY_LIMIT){\n        await reader.cancel();\n        const error=new Error(\"too-big\");\n        error.tooBig=true;\n        throw error;\n      }\n      chunks.push(next.value);\n    }\n  }finally{try{reader.releaseLock();}catch{}}\n  const bytes=new Uint8Array(size);\n  let offset=0;\n  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}\n  return new TextDecoder(\"utf-8\",{fatal:false}).decode(bytes);\n}\nDeno.serve(async (request) => {\n  if(request.method===\"OPTIONS\")return handler(request);\n  const urlPath=cameraUrlPath(request.url);\n  const allowedUrl=CAMERA_STATUS_ROUTES.includes(urlPath);\n  if(request.method!==\"POST\")return allowedUrl?handler(request):cameraNotFound();\n  if(urlPath&&!allowedUrl)return cameraNotFound();\n  let text21;\n  try{text21=await readCameraBody(request);}\n  catch(error){\n    if(error&&error.tooBig)return new Response(JSON.stringify({error:\"Request body is too large.\"}),{status:413,headers:{\"Content-Type\":\"application/json\",\"Cache-Control\":\"no-store\"}});\n    throw error;\n  }\n  if(!urlPath){\n    let envelope=null;\n    try{envelope=JSON.parse(text21);}catch{envelope=null;}\n    const path=envelope&&typeof envelope===\"object\"&&!Array.isArray(envelope)&&typeof envelope.path===\"string\"?envelope.path.replace(/\\/$/,\"\"):\"\";\n    if(!CAMERA_STATUS_ROUTES.includes(path))return cameraNotFound();\n  }\n  return handler(new Request(handlerUrl(request.url), { method: \"POST\", headers: request.headers, body: servedEnvelopeBody(text21) }));\n});\n",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "64cb04d8b07e6c205ee9b51e9ba596a579f03968808d045b0c2feb6dffa1a98c",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/camera-routes-only-v16.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/camera-routes-only-v16.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v16-entry.json --deploy"
+}

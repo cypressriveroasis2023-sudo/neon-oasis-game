@@ -57,7 +57,8 @@ test('the producer patch keeps the live v9 bytes and gates every route except pr
   assert.equal(live.includes('producerRouteAllowed'),false);
   assert.equal(entry.includes(importUrl),true);
   assert.equal(entry.includes('await import("'+importUrl+'");'),true);
-  assert.equal(entry.split('function producerRouteAllowed').length-1,1);
+  assert.equal(entry.split('function readProducerBody').length-1,1);
+  assert.match(entry,/PRODUCER_BODY_LIMIT=65536/);
   const rolled=preparePayload(rollback,read);
   assert.equal(rollback.edits.length,0);
   assert.equal(rolled.find(file=>file.recordName==='index.ts').content.toString('utf8'),live);
@@ -70,7 +71,7 @@ function boot(){
   );
   const seen=[];
   const Deno={serve(handler){seen.push(handler);return handler;}};
-  vm.runInNewContext(source,{Deno,URL,Request,Response,JSON},{filename:'cos-fleet-board-producer/index.ts'});
+  vm.runInNewContext(source,{Deno,URL,Request,Response,JSON,TextDecoder,Uint8Array},{filename:'cos-fleet-board-producer/index.ts'});
   assert.equal(seen.length,1);
   return {restricted:seen[0],innerCalls:[] ,note(){}};
 }
@@ -109,4 +110,11 @@ test('the producer returns 404 for retired routes and other kept routes',async()
   assert.equal(urlJobs.status,404);
   const options=await restricted(new Request('https://platform.example/functions/v1/cos-fleet-board-producer',{method:'OPTIONS'}));
   assert.equal(options.status,200);
+  const bulkyResponse=await restricted(new Request('https://platform.example/functions/v1/cos-fleet-board-producer',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({path:'/api/fleet-saved-board/produce',method:'POST',body:{run:true,pad:'x'.repeat(70000)}}),
+  }));
+  assert.equal(bulkyResponse.status,413);
+  assert.deepEqual(JSON.parse(await bulkyResponse.text()),{error:'Request body is too large.'});
 });
