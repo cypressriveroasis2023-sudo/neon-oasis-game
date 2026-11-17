@@ -651,7 +651,7 @@ function manualShopInventory(upload, receipt) {
   const records = upload.records.map((r) => {
     const m = [...moves.values()].find((m2) => (m2.sourceBindings || []).some((b) => b.productId === r.productId && (b.sourceSha256 === upload.sourceSha256 || upload.source === "mhelpdesk_api" && b.sourceUnitNumber === r.unitNumber))) || (r.binding?.state === "linked" && r.binding.unitIds?.length === 1 ? moves.get(r.binding.unitIds[0]) : null);
     if (!m || r.placement === "SHOP") return r;
-    if (r.placement === "FIELD" && Number.isFinite(observed) && observed > Date.parse(m.recordedAt)) {
+    if (upload.source === "mhelpdesk_api" && r.placement === "FIELD" && Number.isFinite(observed) && observed > Date.parse(m.recordedAt)) {
       superseded.push({ unitId: m.unitId, unitNumber: m.unitNumber, auditId: m.auditId, recordedAt: m.recordedAt, mhelpAt: new Date(observed).toISOString(), recordedBy: typeof m.recordedBy === "string" && m.recordedBy.trim() ? m.recordedBy.trim() : "the saved COS account", detail: supersededShopDetail(m, new Date(observed).toISOString()) });
       return r;
     }
