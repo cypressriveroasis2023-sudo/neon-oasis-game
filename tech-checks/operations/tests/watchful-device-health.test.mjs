@@ -10,6 +10,7 @@ import ts from 'typescript';
 import {parseWatchfulCsv, presentWatchfulDevices, watchfulSourceSha256, IN_SHOP_COLOR, WatchfulCsvError} from '../../supabase/functions/cos-watchful-device-health/model.ts';
 import {createWatchfulDeviceHealthHandler} from '../../supabase/functions/cos-watchful-device-health/serve.ts';
 import {watchfulActor} from '../../supabase/functions/cos-watchful-device-health/access.ts';
+import {readLatestWatchfulRun, watchfulRunFromRead} from '../src/watchfulDeviceHealthRead.ts';
 
 const fixture = readFileSync(new URL('./fixtures/watchful-device-health.csv', import.meta.url), 'utf8');
 const NOW = Date.parse('2026-11-17T22:30:00.000Z');
@@ -129,26 +130,63 @@ test('an accepted load sends the parsed rows once and a replay keeps the same ch
   assert.equal(replayed.unchanged, 5);
 });
 
-test('the panel shows a red device on its unit, In Shop in slate, and Unknown when nothing is loaded', () => {
+function watchfulPanel() {
   const require = createRequire(import.meta.url);
   const source = readFileSync(new URL('../src/WatchfulDeviceHealthPanel.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX}}).outputText;
   const exported = {};
-  vm.runInNewContext(compiled, {exports: exported, require: name => name.endsWith('.css') ? {} : require(name)}, {filename: 'WatchfulDeviceHealthPanel.tsx'});
-  const Panel = exported.default;
-  const empty = renderToStaticMarkup(React.createElement(Panel, {units}));
+  vm.runInNewContext(compiled, {exports: exported, require: name => {
+    if (name.endsWith('.css')) return {};
+    if (name === './watchfulDeviceHealthRead') return {readLatestWatchfulRun, watchfulRunFromRead};
+    return require(name);
+  }}, {filename: 'WatchfulDeviceHealthPanel.tsx'});
+  return exported;
+}
+
+test('an empty Watchful read shows Unknown and does not call a device offline', () => {
+  const Panel = watchfulPanel().default;
+  const empty = renderToStaticMarkup(React.createElement(Panel, {units, run: null}));
   assert.match(empty, /this source is Unknown/);
-  assert.match(empty, /Offline 0/);
+  assert.match(empty, /Red 0 · Unknown 0 · Offline 0 · In Shop 0/);
   assert.doesNotMatch(empty, />Offline</);
-  const rows = parseWatchfulCsv(fixture);
-  const html = renderToStaticMarkup(React.createElement(Panel, {units, rows, now: NOW}));
-  assert.match(html, /NVR Fixture Alpha/);
-  assert.match(html, new RegExp('color:' + IN_SHOP_COLOR.replace('#', '#') ));
-  assert.match(html, /In Shop/);
-  assert.match(html, /Unmatched/);
-  assert.match(html, /Red 2 · Unknown 1 · Offline 0 · In Shop 0/);
   const screen = readFileSync(new URL('../src/FleetCameraStatus.tsx', import.meta.url), 'utf8');
   assert.equal(screen.split('<WatchfulDeviceHealthPanel units={units} now={now}/>').length - 1, 1);
+  assert.match(readFileSync(new URL('../src/WatchfulDeviceHealthPanel.tsx', import.meta.url), 'utf8'), /readLatestWatchfulRun\(\)/);
+});
+
+test('a fixture run renders each matched unit’s red devices, with shop adding nothing', async () => {
+  const rows = parseWatchfulCsv(fixture);
+  const payload = {
+    runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    runAt: '2026-11-17T22:30:00.000Z',
+    rows: rows.map(row => ({rowKey: row.rowKey, deviceName: row.deviceName, site: row.site, deviceType: row.deviceType, reportedStatus: row.reportedStatus, lastSeenAt: row.lastSeenAt})),
+  };
+  let calls = 0;
+  const run = await readLatestWatchfulRun({
+    operator: {token: 'synthetic-owner', role: 'owner'},
+    fetcher: async (url, init) => {
+      calls += 1;
+      assert.equal(url.endsWith('/cos-watchful-device-health'), true);
+      assert.equal(JSON.parse(init.body).action, 'read');
+      return new Response(JSON.stringify(payload), {status: 200});
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(run.rows.length, 5);
+  const skipped = await readLatestWatchfulRun({operator: {token: 'synthetic-service', role: 'service'}, fetcher: async () => { throw new Error('service must not read device health'); }});
+  assert.equal(skipped, null);
+  assert.equal(watchfulRunFromRead({runId: null, runAt: null, rows: []}), null);
+  const Panel = watchfulPanel().default;
+  const html = renderToStaticMarkup(React.createElement(Panel, {units, run, now: NOW}));
+  assert.match(html, /<strong>NVR Fixture Alpha<\/strong>/);
+  assert.match(html, /Red · NVR Fixture Alpha/);
+  assert.match(html, new RegExp('color:' + IN_SHOP_COLOR));
+  assert.match(html, /In Shop · Bridge Fixture Gamma/);
+  assert.match(html, /Unknown · Camera Fixture Epsilon/);
+  assert.match(html, /Unmatched/);
+  assert.match(html, /Unknown · VMS Fixture Delta/);
+  assert.match(html, /Red 2 · Unknown 1 · Offline 0 · In Shop 0/);
+  assert.match(html, /Run 2026-11-17T22:30:00.000Z/);
 });
 
 test('the recipe records the new function bytes and does not replace a pinned migration', () => {
