@@ -2,6 +2,8 @@ import {Component,type ReactNode} from 'react';
 
 export const TV_WATCHDOG_MS=30*60*1000;
 export const TV_NETWORK_BACKOFF_MS=[5_000,15_000,30_000] as const;
+/** A silent re-login must finish inside this window or the board is cleared. */
+export const TV_RELOGIN_DEADLINE_MS=30_000;
 export const TV_SIGN_IN_PROMPT='Sign in again to load fleet information.';
 
 export type TvAuthAction='keep'|'retry-sign-in'|'sign-in-prompt';

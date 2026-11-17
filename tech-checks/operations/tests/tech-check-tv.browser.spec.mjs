@@ -1,5 +1,6 @@
 import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {TV_SAVED_BOARD_REFRESH_MS} from '../src/refreshCadence.ts';
+import {TV_RELOGIN_DEADLINE_MS} from '../src/tvResilience.tsx';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import {completedBoard} from '../durable-board/project.ts';
@@ -579,6 +580,20 @@ test('session invalidation cancels an already scheduled initial retry',async({pa
  const {state,frame}=await coldFailure(page);
  await frame.locator('body').evaluate(()=>window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}})));
  await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);expect(state.writes).toEqual([]);
+});
+
+test('an idle authentication failure rereads immediately and clears the board when no good read arrives',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ await page.clock.runFor(60000);
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 COS diagnostic units');
+ const seen=savedReadCounts(state)['field-map'];
+ state.fieldGate=deferred();
+ await frame.locator('body').evaluate(()=>window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}})));
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(seen+1);
+ await page.clock.runFor(TV_RELOGIN_DEADLINE_MS);
+ expect(savedReadCounts(state)['field-map']).toBe(seen+1);
+ expect(state.writes.filter(w=>w.path==='/api/fleet-saved-board/refresh')).toEqual([]);
 });
 
 test('manual saved-data refresh stays immediate and cancels the pending initial retry',async({page})=>{

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {tvAuthDecision,tvNetworkBackoff,isTvTransportFailure,TV_WATCHDOG_MS,TV_SIGN_IN_PROMPT,TvFleetErrorBoundary} from '../src/tvResilience.tsx';
+import {tvAuthDecision,tvNetworkBackoff,isTvTransportFailure,TV_WATCHDOG_MS,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT,TvFleetErrorBoundary} from '../src/tvResilience.tsx';
 
 test('a token refresh keeps the board',()=>{
   assert.equal(tvAuthDecision('token-renewed',false),'keep');
@@ -30,6 +30,11 @@ test('network blips back off and then stop',()=>{
 
 test('the TV watchdog reloads after 30 minutes',()=>{
   assert.equal(TV_WATCHDOG_MS,30*60*1000);
+});
+
+test('a silent re-login must produce a good read within 30 seconds',()=>{
+  assert.equal(TV_RELOGIN_DEADLINE_MS,30_000);
+  assert.ok(TV_RELOGIN_DEADLINE_MS>=15_000&&TV_RELOGIN_DEADLINE_MS<=30_000);
 });
 
 test('a render failure shows the sign-in prompt and no fleet data',()=>{

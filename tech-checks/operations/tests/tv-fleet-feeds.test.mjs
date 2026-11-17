@@ -62,10 +62,12 @@ test('schema rejection reports no retryable HTTP status',async()=>{
 });
 
 test('a fetch that cannot connect is a transport failure and an HTTP 546 is not',async()=>{
- const transport=[],http=[];
+ const transport=[],named=[],http=[];
  await loadTvFleetFeeds({get:async()=>{throw Object.assign(new Error('Operations could not connect. Retry to verify the current records.'),{response:{status:503}});}},{...callbacks({}),readFailure:(source,status,kind)=>transport.push({source,status,kind})});
+ await loadTvFleetFeeds({get:async()=>{throw Object.assign(new Error('different wording'),{name:'OperationsTransportError',response:{status:503},transportFailure:'timeout'});}},{...callbacks({}),readFailure:(source,status,kind)=>named.push({source,status,kind})});
  await loadTvFleetFeeds({get:async path=>{if(path==='/api/field-map')throw Object.assign(new Error('Connection unavailable'),{response:{status:546}});return {data:values[path]};}},{...callbacks({}),readFailure:(source,status,kind)=>http.push({source,status,kind})});
  assert.deepEqual(transport.filter(row=>row.source==='fieldMap'),[{source:'fieldMap',status:503,kind:'rejected'}]);
+ assert.deepEqual(named.filter(row=>row.source==='fieldMap'),[{source:'fieldMap',status:503,kind:'timeout'}]);
  assert.deepEqual(http,[{source:'fieldMap',status:546,kind:undefined}]);
 });
 

@@ -14,6 +14,15 @@ export class OperationsApiError extends Error {
     this.response = { status, data: { error: message } };
   }
 }
+/** A fetch rejected or the request timer aborted it. Callers classify this by name, not by the message text. */
+export class OperationsTransportError extends OperationsApiError {
+  transportFailure: 'rejected' | 'timeout';
+  constructor(message: string, transportFailure: 'rejected' | 'timeout') {
+    super(message, 503);
+    this.name = 'OperationsTransportError';
+    this.transportFailure = transportFailure;
+  }
+}
 const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 // Unit camera status is served by its own function, so the board's own
 // function - a frozen, hash-pinned artifact - is left exactly as it is.
@@ -170,9 +179,11 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     } catch (cause) {
       if (preparation) throw preparationFailure(abortKind || 'upstream_failure');
       if(scopedRead)throw Object.assign(new OperationsApiError('Saved connection source could not be verified.',503),{diagnostic:{stage:'connection_transport',code:abortKind==='timeout'?'timeout':abortKind==='cancelled'?'cancelled':'request_failed'}});
-      throw new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
+      const disconnected=connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
-        : 'Operations could not connect. Retry to verify the current records.', 503);
+        : 'Operations could not connect. Retry to verify the current records.';
+      if(method==='GET'&&!connectionCheck)throw new OperationsTransportError(disconnected,abortKind==='timeout'?'timeout':'rejected');
+      throw new OperationsApiError(disconnected, 503);
     }
     // An obsolete request still fails, but cannot revoke a newer session. No
     // data (including a late successful body) may cross this private-view fence.

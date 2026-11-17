@@ -13,7 +13,7 @@ import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
 import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS,TV_SAVED_BOARD_STALE_MS} from './refreshCadence';
-import {isTvTransportFailure,tvAuthDecision,tvNetworkBackoff,TV_SIGN_IN_PROMPT} from './tvResilience';
+import {isTvTransportFailure,tvAuthDecision,tvNetworkBackoff,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT} from './tvResilience';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -43,8 +43,10 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const lastErrors=useRef<{camera:string[];routers:string[]}>({camera:[],routers:[]});
   const retryAt=useRef(0),retryTimer=useRef<number|null>(null),retryUsed=useRef(false),sessionBlocked=useRef(false),retryRead=useRef(()=>{});
   const cancelRetry=()=>{if(retryTimer.current!==null)window.clearTimeout(retryTimer.current);retryTimer.current=null;};
-  const proofUpdatePending=useRef(false),reloginUsed=useRef(false),signInRetry=useRef(false),networkAttempt=useRef(0),networkTimer=useRef<number|null>(null);
+  const proofUpdatePending=useRef(false),reloginUsed=useRef(false),signInRetry=useRef(false),networkAttempt=useRef(0),networkTimer=useRef<number|null>(null),reloginTimer=useRef<number|null>(null);
   const clearNetworkTimer=()=>{if(networkTimer.current!==null)window.clearTimeout(networkTimer.current);networkTimer.current=null;};
+  const clearReloginTimer=()=>{if(reloginTimer.current!==null)window.clearTimeout(reloginTimer.current);reloginTimer.current=null;};
+  const savedReread=()=>{void refresh(false,false,{reread:true});};
   // `include` selects which saved reads this pass performs. Each side advances
   // only its own attempt clock, so a camera-only pass cannot postpone the router
   // deadline and a router-only pass cannot postpone the camera deadline.
@@ -86,14 +88,14 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
           retryAt.current=Date.now()+INITIAL_READ_RETRY_MS;
           retryTimer.current=window.setTimeout(()=>retryRead.current(),INITIAL_READ_RETRY_MS);
         }
-        if(nextField){networkAttempt.current=0;reloginUsed.current=false;clearNetworkTimer();}
+        if(nextField){networkAttempt.current=0;reloginUsed.current=false;clearNetworkTimer();clearReloginTimer();}
         else if(!shortRetry&&networkFailure&&!sessionBlocked.current){
           const delay=tvNetworkBackoff(networkAttempt.current);
-          if(delay!==null){cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)void refresh(true);},delay);}
+          if(delay!==null){cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)savedReread();},delay);}
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){lastErrors.current={camera:[],routers:[]};setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
-    finally{if(request===generation.current){running.current=false;if(signInRetry.current&&alive.current&&!sessionBlocked.current){signInRetry.current=false;void refresh(true);}else if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true,{routers:false});}}}
+    finally{if(request===generation.current){running.current=false;if(signInRetry.current&&alive.current&&!sessionBlocked.current){signInRetry.current=false;savedReread();}else if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true,{routers:false});}}}
   },[api]);
   useEffect(()=>{
     if(!enabled){setData(empty);return;}
@@ -105,18 +107,27 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     void refresh();
     const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,TV_SAVED_BOARD_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(false,false,{camera:cameraDue,routers:routerDue,reread:true});}};
     const timer=window.setInterval(tick,60000);
+    const clearForSignIn=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();clearNetworkTimer();clearReloginTimer();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError(TV_SIGN_IN_PROMPT);};
     const invalid=(event:Event)=>{
       const reason=(event as CustomEvent<{reason?:string}>).detail?.reason;
       const decision=tvAuthDecision(reason,reloginUsed.current);
-      if(decision==='keep')return;
-      if(decision==='retry-sign-in'){reloginUsed.current=true;signInRetry.current=true;return;}
-      generation.current++;sessionBlocked.current=true;cancelRetry();clearNetworkTimer();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError(TV_SIGN_IN_PROMPT);
+      if(decision==='keep'){if(reloginTimer.current!==null&&!running.current)savedReread();return;}
+      if(decision==='retry-sign-in'){
+        const pending=retryAt.current!==0||networkTimer.current!==null;
+        cancelRetry();clearNetworkTimer();retryAt.current=0;reloginUsed.current=true;
+        clearReloginTimer();
+        reloginTimer.current=window.setTimeout(()=>{reloginTimer.current=null;if(!sessionBlocked.current)clearForSignIn();},TV_RELOGIN_DEADLINE_MS);
+        if(running.current)signInRetry.current=true;
+        else if(!pending)savedReread();
+        return;
+      }
+      clearForSignIn();
     };
     // The API has already fenced and validated the late proof. Reauthorize
     // and adopt its cached pair without moving the automatic refresh clock.
     const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true,{routers:false});};
     document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
-    return()=>{alive.current=false;proofUpdatePending.current=false;signInRetry.current=false;generation.current++;running.current=false;cancelRetry();clearNetworkTimer();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
+    return()=>{alive.current=false;proofUpdatePending.current=false;signInRetry.current=false;generation.current++;running.current=false;cancelRetry();clearNetworkTimer();clearReloginTimer();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
   },[enabled,refresh]);
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const snapshotClock=data.readAt||clock;
