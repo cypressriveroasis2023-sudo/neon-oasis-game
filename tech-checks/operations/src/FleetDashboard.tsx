@@ -73,7 +73,7 @@ import FleetFieldProductList from './FleetFieldProductList';
 import FleetCardIcon from './FleetCardIcon';
 const FleetCameraStatus = lazy(() => import('./FleetCameraStatus'));
 type Props={openMhelpConnection?:()=>void;entryRevision?:number;openAdvancedDiagnostics?:()=>void;initialView?:'map'|'fleet';session:Record<string,any>;navigate:(name:string)=>void;initialUnitId?:string;initialUnitLabel?:string;onSelectUnit:(id:string)=>void;openUnitHealth:(id:string)=>void;show:(message:string)=>void;historyReadEnabled:boolean;locationWritesEnabled:boolean;ownerManagementEnabled:boolean;ownerCensusEnabled:boolean;registerEquipment:(name:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void};
-const labels:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support',not_available:'Not available'};
+const labels:Record<Signal,string>={online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support',not_available:'Not available',shop:'In Shop'};
 const plainTitle={map:'Fleet Dashboard',fleet:'Fleet health',camerastatus:'Camera status',cameras:'Camera units',helios:'Helios power & cameras',stands:'Stands & support equipment',verify:'Location verification',setup:'Needs setup',sources:'Data sources'};
 type View=keyof typeof plainTitle;
 function Badge({state,label}:{state:Signal;label?:string}){return <span className={'cos-fleet-badge cos-signal-'+state}><i aria-hidden='true'>●</i>{label||labels[state]}</span>;}

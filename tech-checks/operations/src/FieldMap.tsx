@@ -4,7 +4,8 @@ import {canonicalCameraUnit} from './fieldCameraHealth';
 import HeliosPowerDetails from './HeliosPowerDetails';
 import MhelpUnitRefresh from './MhelpUnitRefresh';
 import {itDailyCameraUrl} from '../../it-feature-availability';
-import {clusterMapPoints,mapReticleMarkup,clusterReticleMarkup,expandedGroupOffsets,fieldReticleColors as cameraColors} from './fieldMapMarkers';
+import {clusterMapPoints,mapReticleMarkup,clusterReticleMarkup,expandedGroupOffsets,fieldReticleColors as cameraColors,type ReticleState} from './fieldMapMarkers';
+const pinTone=(state?:string):ReticleState=>state==='online'||state==='offline'||state==='support'?state:'unknown';
 import {fieldMapLabelMatches} from './fieldMapNavigation';
 import {automaticRefreshDue} from './refreshCadence';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -343,7 +344,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
         const first=points[0];
-        const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[healthById.get(item.id)?.state||'unknown']++);
+        const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[pinTone(healthById.get(item.id)?.state)]++);
         const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap'+(offsets.length?' cos-field-cluster-expanded':''),html:clusterReticleMarkup(counts,group.filter(({item})=>Boolean(estimateFor(item))&&!recordedPoint(estimateFor(item))).length,group.filter(({item})=>!hasCoords(item)&&!estimateFor(item)).length,group.filter(({item})=>recordedPoint(estimateFor(item))).length),iconSize:[44,44],iconAnchor:[22,22]})});
         const popup=document.createElement('div');popup.className='field-cluster-list';
         const heading=document.createElement('strong');heading.textContent=group.length+' units here';popup.append(heading);const summary=document.createElement('p');summary.className='field-cluster-summary';popup.append(summary);
@@ -367,7 +368,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
         title:unit.unitNumber+(estimate?' · '+pointTitle(estimate):historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
-          html:mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?(recordedPoint(estimate)?'recorded':'estimate'):historic?'historical':'current'),
+          html:mapReticleMarkup(unit.unitNumber,pinTone(healthById.get(unit.id)?.state),estimate?(recordedPoint(estimate)?'recorded':'estimate'):historic?'historical':'current'),
           iconSize:[44,44],
           iconAnchor:[22,22]
         })
@@ -420,19 +421,19 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
   // Updating health observations must not clear an open popup or recenter a map the owner panned.
   useEffect(()=>{
     for(const {marker,ids} of clusterMarkers.current){
-      const counts={online:0,offline:0,unknown:0,support:0};ids.forEach(id=>counts[healthById.get(id)?.state||'unknown']++);
+      const counts={online:0,offline:0,unknown:0,support:0};ids.forEach(id=>counts[pinTone(healthById.get(id)?.state)]++);
       const content=marker.getPopup()?.getContent();if(content instanceof HTMLElement){const summary=content.querySelector('.field-cluster-summary');if(summary)summary.textContent=counts.online+' online · '+counts.offline+' offline · '+counts.unknown+' unknown · '+counts.support+' support. Colors represent camera, recorder or IP/port observations, not verified video.';}
       const element=marker.getElement();if(element){element.title=ids.length+' units · '+counts.online+' online observations · '+counts.offline+' offline observations · '+counts.unknown+' unknown · '+counts.support+' support. Open unit list.';element.setAttribute('aria-label',element.title);const groupUnits=ids.map(id=>items.find(unit=>unit.id===id)).filter((unit):unit is FieldUnit=>Boolean(unit));element.innerHTML=clusterReticleMarkup(counts,groupUnits.filter(unit=>Boolean(estimateFor(unit))&&!recordedPoint(estimateFor(unit))).length,groupUnits.filter(unit=>!hasCoords(unit)&&!estimateFor(unit)).length,groupUnits.filter(unit=>recordedPoint(estimateFor(unit))).length);}
     }
     for(const unit of filtered){
-      const clusterButton=clusterButtons.current.get(unit.id);if(clusterButton){clusterButton.textContent=unit.unitNumber+' · '+unitHealthLabel(healthById.get(unit.id))+' · '+tag(unit)+(isSupportEquipment(unit)?'':' · Observation '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now));clusterButton.dataset.health=healthById.get(unit.id)?.state||'unknown';clusterButton.style.setProperty('--unit-status',cameraColors[healthById.get(unit.id)?.state||'unknown']);}
+      const clusterButton=clusterButtons.current.get(unit.id);if(clusterButton){clusterButton.textContent=unit.unitNumber+' · '+unitHealthLabel(healthById.get(unit.id))+' · '+tag(unit)+(isSupportEquipment(unit)?'':' · Observation '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now));clusterButton.dataset.health=healthById.get(unit.id)?.state||'unknown';clusterButton.style.setProperty('--unit-status',cameraColors[pinTone(healthById.get(unit.id)?.state)]);}
       const marker=markersRef.current.get(unit.id);
       if(!marker)continue;
       const estimate=estimateFor(unit);
       const element=marker.getElement();if(element)element.title=unit.unitNumber+(estimate?' · '+pointTitle(estimate):!hasCoords(unit)?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id)));
       const popup=gpsPopup(document,unit);
       popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(tag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
-      if(element){element.setAttribute('aria-label',element.title);element.innerHTML=mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?(recordedPoint(estimate)?'recorded':'estimate'):!hasCoords(unit)?'historical':'current');}
+      if(element){element.setAttribute('aria-label',element.title);element.innerHTML=mapReticleMarkup(unit.unitNumber,pinTone(healthById.get(unit.id)?.state),estimate?(recordedPoint(estimate)?'recorded':'estimate'):!hasCoords(unit)?'historical':'current');}
       popup.append(document.createElement('br'),document.createTextNode(estimate?addressEstimateLabel(estimate)+' · '+routerTime(addressEstimateTimestamp(estimate))+' · '+estimate.matchedAddress:'Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
       if(estimate)popup.append(document.createElement('br'),document.createTextNode(recordedPoint(estimate)?'SOURCE RECORDED - unverified. Measurement time unknown; not live GPS; excluded from nearby results.':'ADDRESS ESTIMATE - needs verification. Approximate site location, not live GPS; excluded from nearby results.'));
       else if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
@@ -612,7 +613,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
         {!data?<div className='loading' role='status'>{error?'Map data unavailable. Retry loading your field units.':'Loading production field units… Pins appear after locations are verified.'}</div>:filtered.length?filtered.map(unit=><button key={unit.id} data-unit-id={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
           <span className={hasCoords(unit)?'mapped':'missing'}>{tag(unit)}</span>
-          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))}{!isSupportEquipment(unit)&&<> · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}</>}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
+          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[pinTone(healthById.get(unit.id)?.state)]}}>{unitHealthLabel(healthById.get(unit.id))}{!isSupportEquipment(unit)&&<> · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}</>}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
         </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>}
 
@@ -630,7 +631,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
         {!detailsOnly&&selected&&<button className='secondary field-map-close-detail' disabled={busy||automaticReadPaused.current} onClick={()=>{dismissedDeepLink.current=deepLinkKey;restoreViewport.current=true;(workspaceNode.current?.querySelector<HTMLElement>('.field-map-list [data-unit-id="'+CSS.escape(selected.id)+'"]')||workspaceNode.current?.querySelector<HTMLElement>('[aria-label="Search field units"]'))?.focus({preventScroll:true});setSelectedId('');setFocusSelected(false);mapRef.current?.closePopup();}}>Close unit details</button>}
         {selected?<><small>FIELD UNIT</small><h2>{selected.unitNumber}</h2>
           <p>{selected.modelName||'Equipment'} · <b>{selected.status.replaceAll('_',' ')}</b></p>
-          <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[selectedHealth?.state||'unknown']}}>{unitHealthLabel(selectedHealth)}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}{!isSupportEquipment(selected)&&<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>}{openUnitHealth&&!isSupportEquipment(selected)&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
+          <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[pinTone(selectedHealth?.state)]}}>{unitHealthLabel(selectedHealth)}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}{!isSupportEquipment(selected)&&<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>}{openUnitHealth&&!isSupportEquipment(selected)&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
           <dl>
             <div><dt>Customer</dt><dd>{selected.customer||'—'}</dd></div>
             <div><dt>Site</dt><dd>{selected.site||'—'}</dd></div>
