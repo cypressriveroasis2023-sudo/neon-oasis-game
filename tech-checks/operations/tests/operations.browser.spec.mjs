@@ -140,55 +140,33 @@ test('retired business bookmarks open Today', async ({ page }) => {
   }
 });
 
-test('Today preserves verified sources when one source fails and fits the viewport', async ({ page }) => {
+test('Today keeps good camera and router sources when one source fails', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
-  await expect(frame.getByText('Connected sources loaded. Agreement and signature tracking is not connected.', { exact: true })).toBeVisible();
-  await expect(frame.getByRole('heading', { name: 'Operational Timeline' })).toBeVisible();
-  await noOverflow(page);
-  state.failedPaths.add('/api/jobs');
-  await frame.getByRole('button', { name: 'Refresh Overview' }).click();
-  await expect(frame.getByRole('alert', { name: 'Dashboard data unavailable' })).toBeVisible();
-  await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.', { exact: true })).toBeVisible();
-  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Schedule & Parts: Unavailable',exact:true})).toBeVisible();
-  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Quote: 0 quotes',exact:true})).toBeVisible();
+  const systems = frame.getByRole('navigation', { name: 'Equipment systems' });
+  await expect(systems.getByRole('button', { name: 'Camera status & troubleshooting', exact: true })).toBeVisible();
+  await expect(systems.getByRole('button', { name: 'Router connections', exact: true })).toBeVisible();
+  await expect(systems.getByRole('button', { name: 'Battery & solar', exact: true })).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Router summary' })).toContainText('0 routers');
+  state.failedPaths.add('/api/camera-health/summary-v3');
+  await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
+  await expect(frame.getByRole('region', { name: 'Camera health summary' })).toContainText('Unknown');
+  await expect(frame.getByRole('region', { name: 'Router summary' })).toContainText('0 routers');
+  expect(state.requests.some(item => ['/api/jobs', '/api/quotes', '/api/ar', '/api/purchasing', '/api/owner-tasks'].includes(item.path))).toBe(false);
+  expect(state.writes).toEqual([]);
   await noOverflow(page);
 });
 
-test('Daily Board keeps the last snapshot when refresh fails and reports unverified saves', async ({ page }) => {
+test('Daily Board keeps the last snapshot when refresh fails', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Daily Board');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(3);
+  await expect(frame.getByText('Fixture inventory review')).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Daily truck readiness' })).toBeVisible();
   state.failedPaths.add('/api/daily-board');
-  await frame.getByRole('button', { name: 'Refresh', exact:true }).click();
+  await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(frame.getByRole('alert')).toContainText('Showing the last successful snapshot.');
-  await expect(frame.locator('.daily-board-card')).toHaveCount(3);
-  state.failedPaths.delete('/api/daily-board');
-  state.readbackMismatch = true;
-  const dialog = await assignmentDialog(frame);
-  await dialog.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(frame.getByRole('alert')).toContainText('Save accepted, but the requested assignment could not be confirmed.');
-  await expect(frame.getByText('Schedule and technician assignment saved and verified.', { exact: true })).toHaveCount(0);
-  expect(state.writes).toHaveLength(1);
-  const card = frame.locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' });
-  await card.click();
-  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
-  await frame.getByRole('button', { name: 'Close details' }).click();
-  state.failedPaths.add('/api/daily-board');
-  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
-  await expect(frame.getByRole('alert').first()).toContainText('Showing the last successful snapshot.');
-  await card.click();
-  await frame.getByRole('dialog', { name: 'Work details' }).getByText('Manage this work', { exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
-  await frame.getByRole('button', { name: 'Close details' }).click();
-  expect(state.writes).toHaveLength(1);
-  state.failedPaths.delete('/api/daily-board');
-  state.readbackMismatch = false;
-  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
-  const recovered = await assignmentDialog(frame);
-  await recovered.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
-  await expect(frame.getByRole('status').filter({ hasText: 'Schedule and technician assignment saved and verified.' })).toBeVisible();
-  expect(state.writes).toHaveLength(2);
+  await expect(frame.getByText('Fixture inventory review')).toBeVisible();
+  await expect(frame.getByRole('button', { name: 'Save Schedule & Assignment' })).toHaveCount(0);
+  expect(state.writes).toEqual([]);
   await noOverflow(page);
 });
 

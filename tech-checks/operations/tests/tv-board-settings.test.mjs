@@ -13,6 +13,22 @@ test('only supported TV sections are saved, including intentionally turning ever
  for(const value of [['today','today'],['secret'],null,{},['camera',null]])assert.throws(()=>checkedTvSections(value));
  assert.throws(()=>checkedTvSettings({sections:['map'],revision:-1,updatedAt:null}));
 });
+test('equipment handoff TV rotation keeps pickup, swap, delivery and service from the Daily Board read',()=>{
+ const now=new Date('2026-10-12T15:00:00Z');
+ const jobs=['PICKUP','SWAP','DELIVERY','SERVICE'].map((jobType,index)=>({id:'handoff-'+index,jobType,status:'scheduled',scheduled:index%2?'':'2026-11-01 08:00'}));
+ const cards=dailyBoardCards(jobs,[],now,'day',true);
+ const pages=configuredTvPages(cards,[],[],['pickup','swap','delivery','service'],1440,900,'2026-10-12');
+ const ids=section=>pages.filter(page=>page.section===section).flatMap(page=>page.kind==='work'?page.lanes.flatMap(lane=>lane.cards.map(card=>card.record.jobType)):[]);
+ assert.deepEqual(ids('pickup'),['PICKUP']);
+ assert.deepEqual(ids('swap'),['SWAP']);
+ assert.deepEqual(ids('delivery'),['DELIVERY']);
+ assert.deepEqual(ids('service'),['SERVICE']);
+ return readFile(new URL('../src/DailyBoard.tsx',import.meta.url),'utf8').then(source=>{
+  assert.match(source,/dailyBoardCards\(snapshot\.jobs,snapshot\.tasks,now,scope,true\)/);
+  assert.equal(source.includes('/api/jobs/'),false);
+  assert.match(source,/dailyBoardCards\(\[\],snapshot\.tasks/);
+ });
+});
 test('today jobs and all pending type queues remain distinct and hidden sections never rotate',()=>{
  const now=new Date('2026-10-12T15:00:00Z');
  const jobs=[{id:'today',jobType:'SERVICE',scheduled:'2026-10-12 08:00',status:'scheduled'},{id:'future',jobType:'PICKUP',scheduled:'2026-11-01 08:00',status:'scheduled'},{id:'none',jobType:'SWAP',status:'unscheduled'},{id:'done',jobType:'PICKUP',status:'completed',completedAt:'2026-10-12T14:00:00Z'},{id:'cancelled',jobType:'DELIVERY',status:'cancelled'}];
