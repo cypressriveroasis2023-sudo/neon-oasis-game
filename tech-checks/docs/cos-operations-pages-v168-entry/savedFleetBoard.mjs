@@ -242,12 +242,7 @@ async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUnti
 
 // src/cameraEvidence.ts
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
-var POWER_FRESH_MS = 45 * 60 * 1e3;
 var normalized = (value) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : "";
-function powerTimestamp(value, now = Date.now()) {
-  const stamp2 = cameraTimestamp(value, now);
-  return stamp2.at === null ? stamp2 : { at: stamp2.at, fresh: now - Date.parse(stamp2.at) <= POWER_FRESH_MS };
-}
 function cameraTimestamp(value, now = Date.now()) {
   if (typeof value !== "string") return { at: null, fresh: false };
   const p = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.exec(value);
@@ -410,14 +405,7 @@ function linkedUnitObservation(rows, now = Date.now()) {
 }
 
 // ../it-feature-availability.js
-var IT_DAILY_WORKSPACES = Object.freeze([
-  "Fleet Dashboard",
-  "Camera Health",
-  "InHand Routers",
-  "Victron VRM",
-  "Unit Tracker",
-  "Tech Check"
-]);
+var IT_DAILY_WORKSPACES = Object.freeze(["Fleet Dashboard", "Camera Health"]);
 
 // src/fieldRecorderObservation.ts
 var object2 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
@@ -811,19 +799,19 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const batteryReadIssue = key?.startsWith("HELIOS|") ? p?.errorCode || vrm?.sync?.error || vrm?.sync?.state === "error" ? "Latest Victron read unavailable" : vrm?.sync?.state === "stale" ? "Victron sync is stale" : null : null;
     if (key?.startsWith("HELIOS|")) {
       batteryState = "unknown";
-      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => ({ source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: powerTimestamp(m.observedAt, now).at, fresh: powerTimestamp(m.observedAt, now).fresh }));
+      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => ({ source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: cameraTimestamp(m.observedAt, now).at, fresh: cameraTimestamp(m.observedAt, now).fresh }));
       if (p && !batteryReadIssue) {
-        const recent = p.measurements.filter((m) => powerTimestamp(m.observedAt, now).fresh), soc = recent.filter((m) => m.metric === "battery_soc");
+        const recent = p.measurements.filter((m) => cameraTimestamp(m.observedAt, now).fresh), soc = recent.filter((m) => m.metric === "battery_soc");
         batteryPercent = soc.length ? Math.min(...soc.map((m) => m.value)) : null;
         batteryState = recent.some((m) => m.unit === "state" && m.value > 0) || batteryPercent !== null && batteryPercent < 20 ? "offline" : batteryPercent !== null ? "online" : "unknown";
       }
     } else if (key?.startsWith("RECON2|")) {
       const batteryRows = camera.identity === "matched" ? camera.rows.filter((r) => r.evidence?.source === "Reconeyez" && r.batteryEvidence) : [];
       const readings = batteryRows.map((r) => r.batteryEvidence).filter(Boolean);
-      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => ({ source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: powerTimestamp(r.batteryEvidence.percentObservedAt, now).at, fresh: powerTimestamp(r.batteryEvidence.percentObservedAt, now).fresh }));
+      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => ({ source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: cameraTimestamp(r.batteryEvidence.percentObservedAt, now).at, fresh: cameraTimestamp(r.batteryEvidence.percentObservedAt, now).fresh }));
       const values = readings.filter((b) => b?.percent !== null && cameraTimestamp(b?.percentObservedAt, now).fresh).map((b) => b.percent);
       batteryPercent = values.length ? Math.min(...values) : null;
-      batteryState = combine(readings.map((b) => powerTimestamp(b?.statusObservedAt, now).fresh && b?.status ? b.status === "normal" ? "online" : "offline" : powerTimestamp(b?.percentObservedAt, now).fresh && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
+      batteryState = combine(readings.map((b) => cameraTimestamp(b?.statusObservedAt, now).fresh && b?.status ? b.status === "normal" ? "online" : "offline" : cameraTimestamp(b?.percentObservedAt, now).fresh && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
     }
     const locationVerified = isCurrentFieldPin(unit), locationNeedsReview = placement === "field" && !locationVerified;
     const review = [...placement === "unknown" ? ["Placement is unresolved. Check tracker and current mHelpDesk assignment."] : [], ...camera.state === "unknown" ? [camera.reason] : [], ...locationNeedsReview ? [locationExplanation(unit)] : [], ...unit.mhelpLocationReviewReason ? [String(unit.mhelpLocationReviewReason)] : []];
@@ -1234,7 +1222,7 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
     const row = unitRows.length === 1 ? unitRows[0] : null;
     const power = row?.power;
     const available = config?.items.filter((i) => i.installationId === power?.installationId && i.name === power?.name) || [];
-    const recent = power?.measurements.some((m) => powerTimestamp(m.observedAt, now).fresh) === true;
+    const recent = power?.measurements.some((m) => cameraTimestamp(m.observedAt, now).fresh) === true;
     const unique = Boolean(power && available.length === 1 && !seenInstallations.has(power.installationId));
     if (unique && power) seenInstallations.add(power.installationId);
     const status = unique && recent && !power?.errorCode && config?.sync.state === "current" ? "online" : "unverified";
