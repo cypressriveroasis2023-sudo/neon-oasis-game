@@ -12,8 +12,10 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('packaged durable Fleet backend is rebuilt exactly from the reviewed source',()=>{
  const result=buildSync({absWorkingDir:fileURLToPath(new URL('../',import.meta.url)),entryPoints:['durable-board/index.ts'],bundle:true,platform:'neutral',format:'esm',resolveExtensions:['.ts','.mjs','.js','.tsx','.json'],write:false});
  const rebuilt=Buffer.from(result.outputFiles[0].contents);
- assert.deepEqual(readFileSync(new URL('../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs',import.meta.url)),rebuilt);
+ const executable=readFileSync(new URL('../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs',import.meta.url));
  const preview=readFileSync(new URL('../../docs/vision-native-preview-20261107/source/savedFleetBoard.mjs',import.meta.url));
+ assert.deepEqual(executable,rebuilt);
+ assert.equal(createHash('sha256').update(executable).digest('hex'),'714a05cca061274ebb932fc211a47eff9da15d8daa594fce1062ab89336fc331');
  assert.equal(createHash('sha256').update(preview).digest('hex'),'963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
 });
 
