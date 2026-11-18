@@ -22,6 +22,7 @@ on:
         options:
           - exact-origin-cors-a711192b
           - rollback-original-v134
+          - business-screens-410-v168
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
         required: true
@@ -43,6 +44,9 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+      - name: Pin the reviewed v168 patch file
+        if: inputs.patch == 'business-screens-410-v168'
+        run: printf '%s  %s\n' '903755678df3e2207c0edb8e2a9ab8f4a2a6e2df3dae10b991d89ae1f52479c5' '.github/function-patches/cos-operations-pages/business-screens-410-v168.json' | sha256sum -c -
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
