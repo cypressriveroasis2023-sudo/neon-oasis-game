@@ -13,9 +13,13 @@ export const DATA_DAILY_CAP = COS_DAILY_LIMIT - ESSENTIAL_RESERVE;
 export const ACCOUNT_RATE_PER_SECOND = 6;
 export const ACCOUNT_BURST = 3;
 export const SHARED_SPACING_MS = 400;
-/** Frequent end of the 30–60 minute cadence. Not installed by this change. */
+/** Frequent end of the 30–60 minute cadence. The schedule is not installed.
+ * The reader enforces both limits before each vendor call. */
 export const TICKET_RUNS_PER_DAY = 48;
 export const TICKET_RUN_CAP = 24;
+export const TICKET_DAILY_CAP = TICKET_RUN_CAP * TICKET_RUNS_PER_DAY;
+/** A longer wait than this would outlive the function and drop rows already read. */
+export const CENSUS_WAIT_CAP_MS = 5_000;
 /** Half-hour inventory assertion in mhelp-budget-roster.test.mjs is strictly under 2600. */
 export const INVENTORY_DAY_RESERVE = 2600;
 
@@ -27,9 +31,10 @@ export function ticketBudgetPlan() {
   return {ticketDailyMax, combined, dataCap: DATA_DAILY_CAP, accountCap: ACCOUNT_DAILY_CAP, fits: combined <= DATA_DAILY_CAP && combined <= ACCOUNT_DAILY_CAP && spacingFits && burstFits};
 }
 
-/** Local wait after a provider 429. Never shorter than Retry-After.
- * Attempt 0 waits 1s, then 2s, 4s, capped at 60s. The shared gate remains
- * the authority: a deferred or budget 429 is not retried by the caller.
+/** Full wait after a provider 429. Never shorter than Retry-After.
+ * Attempt 0 is 1s, then 2s, 4s, capped at 60s before the header is applied.
+ * censusWaitAllowed refuses a wait that would exceed the function lifetime;
+ * the caller then stops and keeps rows already stored.
  */
 export function censusBackoffMs(attempt: number, retryAfter: string | null, now = Date.now()): number {
   if (!Number.isSafeInteger(attempt) || attempt < 0 || attempt > 8) throw new Error('invalid_backoff');
@@ -37,4 +42,7 @@ export function censusBackoffMs(attempt: number, retryAfter: string | null, now 
   const at = mhelpRetryAt(retryAfter, now);
   const headerMs = at ? Date.parse(at) - now : 0;
   return Math.max(exponential, headerMs > 0 ? headerMs : 0);
+}
+export function censusWaitAllowed(waitMs: number): boolean {
+  return Number.isFinite(waitMs) && waitMs >= 0 && waitMs <= CENSUS_WAIT_CAP_MS;
 }

@@ -1,13 +1,27 @@
 import {emptyCursor, type CensusCursor, type CensusRow} from './read.ts';
 import {CensusRequestError} from './allowlist.ts';
 
-type RunResult = {state: 'completed' | 'stopped'; reason: string | null; vendorReads: number; rows: CensusRow[]; cursor: CensusCursor; recentTruncated: boolean};
+type RunResult = {state: 'completed' | 'stopped'; reason: string | null; vendorReads: number; rows: CensusRow[]; cursor: CensusCursor; recentTruncated: boolean; equipmentTruncated: boolean; flushed?: boolean};
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const reply = (body: unknown, status = 200) => Response.json(body, {status, headers: {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}});
+export const UPSERT_LIMIT = 200;
+
+/** Save at most 200 rows per upsert, and save the cursor after each chunk. */
+export async function persistCensusChunk(rows: CensusRow[], cursor: CensusCursor, saveRows: (rows: CensusRow[]) => Promise<unknown>, saveCursor: (cursor: CensusCursor) => Promise<unknown>) {
+  if (rows.length > UPSERT_LIMIT) {
+    for (let index = 0; index < rows.length; index += UPSERT_LIMIT) {
+      await saveRows(rows.slice(index, index + UPSERT_LIMIT));
+      await saveCursor(cursor);
+    }
+    return;
+  }
+  if (rows.length) await saveRows(rows);
+  await saveCursor(cursor);
+}
 
 export function createTicketCensusHandler(options: {
   authenticate: (req: Request) => Promise<boolean>;
-  run: () => Promise<RunResult>;
+  run: (persist: (rows: CensusRow[], cursor: CensusCursor) => Promise<void>) => Promise<RunResult>;
   saveRows: (rows: CensusRow[]) => Promise<unknown>;
   saveCursor: (cursor: CensusCursor) => Promise<unknown>;
   status: () => Promise<unknown>;
@@ -31,11 +45,13 @@ export function createTicketCensusHandler(options: {
         if (!object(status)) throw new CensusRequestError('cursor_unavailable');
         return reply({state: 'idle', censusRows: count(status.censusRows), cursor: status.cursor ?? emptyCursor(), mhelpWrites: 0, jobCreates: 0, jobEdits: 0});
       }
-      const result = await options.run();
-      if (result.rows.length) await options.saveRows(result.rows);
-      await options.saveCursor(result.cursor);
+      const persist = (rows: CensusRow[], cursor: CensusCursor) => persistCensusChunk(rows, cursor, options.saveRows, options.saveCursor);
+      const result = await options.run(persist);
+      if (!result.flushed) await persist(result.rows, result.cursor);
       if (result.state === 'stopped') console.error('ticket_census_stopped', result.reason);
-      return reply({state: result.state, reason: result.reason, vendorReads: result.vendorReads, censusRows: result.rows.length, recentTruncated: result.recentTruncated, mhelpWrites: 0, jobCreates: 0, jobEdits: 0});
+      if (result.recentTruncated) console.error('ticket_census_recent_truncated');
+      if (result.equipmentTruncated) console.error('ticket_census_equipment_truncated');
+      return reply({state: result.state, reason: result.reason, vendorReads: result.vendorReads, censusRows: result.rows.length, recentTruncated: result.recentTruncated, equipmentTruncated: result.equipmentTruncated, mhelpWrites: 0, jobCreates: 0, jobEdits: 0});
     } catch (cause) {
       console.error('ticket_census_failed', cause instanceof CensusRequestError ? cause.message : 'unclassified');
       return reply({error: 'Ticket census unavailable', mhelpWrites: 0, jobCreates: 0, jobEdits: 0}, 503);

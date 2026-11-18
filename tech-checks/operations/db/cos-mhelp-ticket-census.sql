@@ -40,22 +40,33 @@ revoke all on cos_mhelp_placement_private.census_mhelp_ticket, cos_mhelp_placeme
 create function cos_mhelp_placement_private.census_ticket_cursor_ok(p_cursor jsonb)
 returns boolean language sql immutable set search_path = '' as $$
   select jsonb_typeof(p_cursor) = 'object'
-    and (select array_agg(item order by item) from jsonb_object_keys(p_cursor) as item) = array['equipmentOrdinal','recentBase','recentBoundaryChecked','recentLastTicketId','recentSeen','statusBase','statusBoundaryChecked','statusLastTicketId','statusOrdinal','statusSeen']::text[]
+    and (select array_agg(item order by item) from jsonb_object_keys(p_cursor) as item) = array['budgetDay','equipmentBase','equipmentBoundaryChecked','equipmentLastTicketId','equipmentOrdinal','equipmentSeen','equipmentSweepCount','equipmentTruncated','readsToday','recentBase','recentBoundaryChecked','recentLastTicketId','recentSeen','runsToday','statusBase','statusBoundaryChecked','statusLastTicketId','statusOrdinal','statusSeen']::text[]
+    and (p_cursor->'budgetDay' = 'null'::jsonb or (p_cursor->>'budgetDay') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
     and (p_cursor->>'statusOrdinal') ~ '^(0|[1-9][0-9]{0,4})$'
     and (p_cursor->>'statusSeen') ~ '^(0|[1-9][0-9]{0,5})$'
     and (p_cursor->>'recentSeen') ~ '^(0|[1-9][0-9]{0,5})$'
     and (p_cursor->>'equipmentOrdinal') ~ '^(0|[1-9][0-9]{0,5})$'
+    and (p_cursor->>'equipmentSeen') ~ '^(0|[1-9][0-9]{0,5})$'
+    and (p_cursor->>'equipmentSweepCount') ~ '^(0|[1-9][0-9]{0,5})$'
+    and (p_cursor->>'readsToday') ~ '^(0|[1-9][0-9]{0,4})$'
+    and (p_cursor->>'readsToday')::integer between 0 and 1152
+    and (p_cursor->>'runsToday') ~ '^(0|[1-9][0-9]{0,2})$'
+    and (p_cursor->>'runsToday')::integer between 0 and 48
     and (p_cursor->>'statusBase') in ('0', '1')
     and (p_cursor->>'recentBase') in ('0', '1')
+    and (p_cursor->>'equipmentBase') in ('0', '1')
     and (p_cursor->>'statusBoundaryChecked') in ('true', 'false')
     and (p_cursor->>'recentBoundaryChecked') in ('true', 'false')
+    and (p_cursor->>'equipmentBoundaryChecked') in ('true', 'false')
+    and (p_cursor->>'equipmentTruncated') in ('true', 'false')
     and (p_cursor->'statusLastTicketId' = 'null'::jsonb or (p_cursor->>'statusLastTicketId') ~ '^[1-9][0-9]{0,14}$')
     and (p_cursor->'recentLastTicketId' = 'null'::jsonb or (p_cursor->>'recentLastTicketId') ~ '^[1-9][0-9]{0,14}$')
+    and (p_cursor->'equipmentLastTicketId' = 'null'::jsonb or (p_cursor->>'equipmentLastTicketId') ~ '^[1-9][0-9]{0,14}$')
 $$;
 revoke all on function cos_mhelp_placement_private.census_ticket_cursor_ok(jsonb) from public, anon, authenticated, service_role;
 
 insert into cos_mhelp_placement_private.census_mhelp_ticket_cursor(singleton, cursor)
-values (true, '{"equipmentOrdinal":0,"recentBase":0,"recentBoundaryChecked":false,"recentLastTicketId":null,"recentSeen":0,"statusBase":0,"statusBoundaryChecked":false,"statusLastTicketId":null,"statusOrdinal":0,"statusSeen":0}'::jsonb);
+values (true, '{"budgetDay":null,"equipmentBase":0,"equipmentBoundaryChecked":false,"equipmentLastTicketId":null,"equipmentOrdinal":0,"equipmentSeen":0,"equipmentSweepCount":0,"equipmentTruncated":false,"readsToday":0,"recentBase":0,"recentBoundaryChecked":false,"recentLastTicketId":null,"recentSeen":0,"runsToday":0,"statusBase":0,"statusBoundaryChecked":false,"statusLastTicketId":null,"statusOrdinal":0,"statusSeen":0}'::jsonb);
 
 create function public.cos_mhelp_census_ticket_upsert(p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
@@ -184,7 +195,36 @@ begin
   return jsonb_build_object('equipmentIds', ids);
 end $$;
 
-revoke all on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer) from public, anon, authenticated;
-grant execute on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer) to service_role;
+create function public.cos_mhelp_census_ticket_refresh(p_limit integer)
+returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
+declare ids jsonb;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then raise exception 'Service role required' using errcode = '42501'; end if;
+  if p_limit is null or p_limit < 1 or p_limit > 4 then raise exception 'Invalid refresh page' using errcode = '22023'; end if;
+  select coalesce(jsonb_agg(ticket_id order by fetched_at, ticket_id), '[]'::jsonb) into ids
+  from (
+    select ticket_id, fetched_at from cos_mhelp_placement_private.census_mhelp_ticket
+    where created_at < clock_timestamp() - interval '48 hours'
+      and status_label is not null
+      and status_label !~* '(^|[^[:alpha:]])(closed|complete|completed|cancelled|canceled|invoiced|void|voided)([^[:alpha:]]|$)'
+    order by fetched_at, ticket_id
+    limit p_limit
+  ) due;
+  return jsonb_build_object('ticketIds', ids);
+end $$;
+
+create function public.cos_mhelp_census_ticket_touch(p_ticket_id text)
+returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
+declare touched integer;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then raise exception 'Service role required' using errcode = '42501'; end if;
+  if p_ticket_id is null or p_ticket_id !~ '^[1-9][0-9]{0,14}$' then raise exception 'Invalid census rows' using errcode = '22023'; end if;
+  update cos_mhelp_placement_private.census_mhelp_ticket set fetched_at = clock_timestamp() where ticket_id = p_ticket_id;
+  get diagnostics touched = row_count;
+  return jsonb_build_object('touched', touched);
+end $$;
+
+revoke all on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_touch(text) from public, anon, authenticated;
+grant execute on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_touch(text) to service_role;
 notify pgrst, 'reload schema';
 commit;

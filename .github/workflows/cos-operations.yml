@@ -191,6 +191,8 @@ jobs:
       - run: npm run typecheck
       - name: Strictly typecheck the isolated MHelp address geocoder
         run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-address-geocodio/index.ts
+      - name: Strictly typecheck the mHelp ticket census
+        run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM,DOM.Iterable --skipLibCheck ../supabase/functions/cos-mhelp-ticket-census/index.ts ../supabase/functions/cos-mhelp-ticket-census/serve.ts
       - run: npm run build
         id: build
       - name: Verify reviewed frontend bytes and unchanged lockfile

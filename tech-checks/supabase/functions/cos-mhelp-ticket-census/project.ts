@@ -48,8 +48,8 @@ export type CensusRow = {
 export type StatusLabel = {statusId: string; label: string; open: boolean};
 export type TypeLabel = {typeId: string; label: string};
 
-export function projectCustomerName(value: unknown, customerId: string): string {
-  if (!plain(value) || normalizeMhelpId(value.customerId) !== customerId || normalizeMhelpId(value.portalId) !== '224643') throw new Error('customer_name_unavailable');
+export function projectCustomerName(value: unknown, customerId: string, portalId: string): string {
+  if (!plain(value) || normalizeMhelpId(value.customerId) !== customerId || normalizeMhelpId(value.portalId) !== portalId) throw new Error('customer_name_unavailable');
   const name = censusLabel(value.name);
   if (!name) throw new Error('customer_name_unavailable');
   return name;
@@ -61,19 +61,20 @@ export function projectStatusLabels(value: unknown): StatusLabel[] {
     const statusId = normalizeStatusId(item.statusId);
     const label = censusLabel(item.displayText) || censusLabel(item.statusText);
     if (!statusId || !label) throw new Error('incomplete_dictionary');
-    return {statusId, label, open: !closedStatusLabel(label) && !closedStatusLabel(censusLabel(item.statusText) || '')};
+    const statusText = censusLabel(item.statusText) || '';
+    return {statusId, label, open: !closedStatusLabel(label) && !closedStatusLabel(statusText)};
   });
   if (new Set(rows.map(row => row.statusId)).size !== rows.length) throw new Error('incomplete_dictionary');
   return rows.sort((a, b) => Number(a.statusId) - Number(b.statusId));
 }
-export function projectTypeLabels(value: unknown): TypeLabel[] {
+export function projectTypeLabels(value: unknown, portalId: string): TypeLabel[] {
   if (!plain(value)) throw new Error('incomplete_dictionary');
   const hasData = Object.hasOwn(value, 'data'), hasResults = Object.hasOwn(value, 'results');
   if (hasData === hasResults || !Number.isSafeInteger(value.totalRows)) throw new Error('incomplete_dictionary');
   const collection = hasData ? value.data : value.results;
   if (!Array.isArray(collection) || collection.length > 500 || value.totalRows !== collection.length) throw new Error('incomplete_dictionary');
   const rows = collection.map(item => {
-    if (!plain(item) || normalizeMhelpId(item.portalId) !== '224643') throw new Error('incomplete_dictionary');
+    if (!plain(item) || normalizeMhelpId(item.portalId) !== portalId) throw new Error('incomplete_dictionary');
     const typeId = normalizeMhelpId(item.typeId), label = censusLabel(item.typeName);
     if (!typeId || !label) throw new Error('incomplete_dictionary');
     return {typeId, label};
@@ -93,8 +94,8 @@ export function ticketPage(value: unknown): {total: number; rows: Record<string,
 /** Copies only the census columns. Descriptions, notes, contacts, staff,
  * addresses, items and custom fields are never returned.
  */
-export function projectCensusTicket(value: Record<string, unknown>, labels: {status: Map<string, string>; type: Map<string, string>}, equipmentFromPath: string | null): {row: CensusRow; customerId: string | null} | null {
-  if (normalizeMhelpId(value.portalId) !== '224643') throw new Error('incomplete_ticket_page');
+export function projectCensusTicket(value: Record<string, unknown>, labels: {status: Map<string, string>; type: Map<string, string>}, equipmentFromPath: string | null, portalId: string): {row: CensusRow; customerId: string | null} | null {
+  if (normalizeMhelpId(value.portalId) !== portalId) throw new Error('incomplete_ticket_page');
   const ticketId = normalizeMhelpId(value.ticketId), ticketNumber = normalizeMhelpId(value.ticketNumber);
   const createdAt = zoned(value.creationDate);
   if (!ticketId || !ticketNumber || !createdAt) return null;
