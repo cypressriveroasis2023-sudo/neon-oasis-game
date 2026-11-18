@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256} from './deploy-recorded-function.mjs';
+import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile} from './deploy-recorded-function.mjs';
 
 const ROOT=new URL('../../',import.meta.url).pathname;
 const PATCHES=join(ROOT,'.github/function-patches/cos-operations-pages');
@@ -105,6 +105,22 @@ test('the committed CORS patch reproduces Vision\'s expected hashes from the rec
   assert.equal(files.find(f=>f.recordName==='deno.json').sha256,'c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be');
   assert.equal(countOccurrences(serve.content,Buffer.from('a711192b.cos-vision-integration-preview.pages.dev')),1);
   assert.equal(countOccurrences(serve.content,Buffer.from('preview-vision-command-james')),0,'branch alias must not be allowed');
+});
+
+test('the routers address patch removes only the router response fields and the rollback restores v168',()=>{
+  const forward=JSON.parse(readFileSync(join(PATCHES,'routers-without-addresses-v168.json'),'utf8'));
+  const back=JSON.parse(readFileSync(join(PATCHES,'rollback-routers-without-addresses-to-v168.json'),'utf8'));
+  const files=preparePayload(forward,name=>readPatchFile(forward,name,ROOT));
+  const serve=files.find(f=>f.recordName==='serve.ts').content.toString('utf8');
+  assert.equal(files.find(f=>f.recordName==='serve.ts').sha256,'5469fa955b45deeae7179bbfdcdf905ca599f45d2df94390a11c59d92950c260');
+  assert.equal(serve.includes('publicIp:text6(row2.router_public_ip)'),false);
+  assert.equal(serve.includes('unitIp:text6(row2.unit_ip)'),false);
+  assert.equal(serve.includes('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip'),false);
+  assert.equal(serve.includes('camera_unit_routers?select=id,unit_key,router_name,router_model,web_port'),true);
+  assert.equal(serve.includes('if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16("An active COS Owner account is required.",403)'),true);
+  const restored=preparePayload(back,readRecorded(back));
+  assert.equal(restored.find(f=>f.recordName==='index.ts').sha256,'4340eb2f772cf4e7c0bc26475f1c7ca164f2ca0e9ae321fe6f6ce21ef1fdb7c3');
+  assert.equal(restored.find(f=>f.recordName==='deno.json').sha256,'c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be');
 });
 
 test('the committed rollback patch reproduces the original v134 bytes unchanged',()=>{

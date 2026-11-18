@@ -7,14 +7,14 @@ const records=frame=>frame.getByLabel('Router records',{exact:true});
 const routerWorkspace=frame=>frame.getByRole('region',{name:'InHand Routers workspace',exact:true});
 const openRouters=frame=>frame.getByRole('navigation',{name:'Equipment systems'}).getByRole('button',{name:'Router connections',exact:true}).click();
 async function openMap(frame){await openWorkspace(frame,'Field Map');await revealMapFilters(frame);await frame.getByLabel('Fleet status').selectOption('all');await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();}
-test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
+test('router overview, filtering, and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
  await openRouters(frame);
  await expect(frame.locator('.router-workspace .panelhead')).toContainText('4 Camera Health router records');
  await expect(frame.getByText('InHand GPS feed not connected',{exact:true})).toBeVisible();
  await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toBeVisible();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
- await frame.getByRole('textbox',{name:'Search routers'}).fill('192.0.2.3');
+ await frame.getByRole('textbox',{name:'Search routers'}).fill('Duplicate fixture');
  await expect(records(frame).getByRole('button')).toHaveCount(1);
  await expect(frame.getByLabel('Selected router details')).toContainText('This name is duplicated');
  await expect(frame.getByRole('button',{name:'View same-name COS unit'})).toHaveCount(0);
@@ -23,7 +23,8 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(records(frame).getByRole('button')).toHaveCount(1);
  await expect(records(frame)).toContainText('SS 039');
  await frame.getByRole('combobox',{name:'Router status filter'}).selectOption('reachable');
- await expect(frame.getByLabel('Selected router details')).toContainText('192.0.2.1/32');
+ await expect(frame.getByLabel('Selected router details')).toContainText('IR302');
+ await expect(frame.getByLabel('Selected router details')).not.toContainText('Router public IP');
  await expect(frame.getByLabel('Selected router details')).toContainText('Last recorded recovery');
  await frame.getByRole('button',{name:'View same-name COS unit'}).click();
  await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
@@ -68,7 +69,7 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
  await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toHaveCount(0);
  await expect(frame.getByRole('button',{name:'Refresh routers',exact:true})).toHaveCount(0);
  await expect(records(frame)).toHaveCount(0);
- await expect(frame.getByText('192.0.2.1/32',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('Fixture InHand',{exact:true})).toHaveCount(0);
  expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 

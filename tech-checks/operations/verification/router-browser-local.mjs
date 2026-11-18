@@ -4,7 +4,7 @@ const server=createServer(async(req,res)=>{try{const path=new URL(req.url,origin
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 try{for(const width of [390,1024,1440]){
  const page=await browser.newPage({viewport:{width,height:900}});const {frame,state}=await mountRouterFixture(page,{origin});
- await frame.getByLabel('InHand router overview').waitFor({timeout:15000});await frame.getByText('View routers & IPs',{exact:true}).click();await frame.getByText('Router inventory & reachability',{exact:true}).waitFor();
+ await frame.getByLabel('InHand router overview').waitFor({timeout:15000});await frame.getByText('View routers',{exact:true}).click();await frame.getByText('Router inventory & reachability',{exact:true}).waitFor();
  const records=frame.getByLabel('Router records',{exact:true});assert.equal(await records.getByRole('button').count(),4);
  await frame.getByLabel('Search routers').fill('192.0.2.3');assert.equal(await records.getByRole('button').count(),1);assert.match(await frame.getByLabel('Selected router details').textContent(),/This name is duplicated/);
  await frame.getByLabel('Search routers').fill('');await frame.getByLabel('Router status filter').selectOption('stale');assert.match(await records.textContent(),/SS 039/);assert.equal(await records.getByRole('button').count(),1);

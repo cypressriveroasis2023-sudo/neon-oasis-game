@@ -5,7 +5,7 @@ import {routerEvidenceByUnit,routerEvidenceFor} from '../src/routerEvidence.ts';
 const now=Date.parse('2026-11-15T20:00:00Z');
 const fresh='2026-11-15T19:55:00Z', old='2026-11-10T19:55:00Z';
 const row=(unitKey,probeStatus,checkedAt=fresh)=>({id:unitKey,unitKey,name:unitKey,model:'',
- publicIp:null,unitIp:null,port:null,protocol:null,probeStatus,checkedAt,lastRecoveredAt:null,
+ port:null,protocol:null,probeStatus,checkedAt,lastRecoveredAt:null,
  reportedStatus:'',reportedAt:null,reportedSource:'',savedLatencyMs:null,match:'exact_name',
  candidateUnit:null,gps:null});
 const unit=u=>({unit:u});

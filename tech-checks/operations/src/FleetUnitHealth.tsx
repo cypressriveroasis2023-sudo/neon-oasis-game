@@ -32,9 +32,9 @@ export default function FleetUnitHealth({row,now,editing=false,lastKnown=null}:{
    {row.routers.length?<div className="cos-router-readable">{row.routers.map(router=><article key={router.id}>
     <strong>{router.name}{router.model?' · '+router.model:''}</strong>
     <p>{routerLabels[routerStatus(router,now)]} · {cameraTime(router.checkedAt,now)}</p>
-    <dl><div><dt>Saved public IP</dt><dd>{router.publicIp||'Not recorded'}</dd></div><div><dt>Management port</dt><dd>{router.port??'Not recorded'} {router.protocol||''}</dd></div></dl>
+    <dl><div><dt>Management port</dt><dd>{router.port??'Not recorded'} {router.protocol||''}</dd></div></dl>
     <small>Unique same-name record; the router-to-unit link is not independently verified.</small>
-    <details><summary>Router source evidence</summary><p>Last recorded recovery: {cameraTime(router.lastRecoveredAt,now)}. This is not last seen.</p><p>Imported provider status: {router.reportedStatus||'Unknown'} · {cameraTime(router.reportedAt,now)}</p><p>The saved IP is not a verified current WAN address. Management-port checks do not establish cellular, camera or video health, and supply no GPS.</p></details>
+    <details><summary>Router source evidence</summary><p>Last recorded recovery: {cameraTime(router.lastRecoveredAt,now)}. This is not last seen.</p><p>Imported provider status: {router.reportedStatus||'Unknown'} · {cameraTime(router.reportedAt,now)}</p><p>A missing check stays unverified. Management-port checks do not establish cellular, camera or video health, and supply no GPS.</p></details>
    </article>)}</div>:<p>Router not linked. No exact, unique router association is available.</p>}
   </section>
   <section className='cos-fleet-unit-health-section cos-fleet-power-card' aria-label='Selected unit power'>

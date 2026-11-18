@@ -3,8 +3,8 @@
 export const ROUTER_FRESHNESS_MS = 20 * 60 * 1000;
 export type RouterStatus = 'reachable' | 'unreachable' | 'stale' | 'unknown';
 export type RouterRow = {
-  id: string; unitKey: string; name: string; model: string; publicIp: string | null;
-  unitIp: string | null; port: number | null; protocol: string | null;
+  id: string; unitKey: string; name: string; model: string;
+  port: number | null; protocol: string | null;
   probeStatus: string; checkedAt: string | null; lastRecoveredAt: string | null;
   reportedStatus: string; reportedAt: string | null; reportedSource: string;
   savedLatencyMs: number | null; match: 'exact_name' | 'ambiguous' | 'unmatched';
@@ -24,7 +24,8 @@ export function routerStatus(row: Pick<RouterRow, 'probeStatus' | 'checkedAt'>, 
   if (now - observed > ROUTER_FRESHNESS_MS) return 'stale';
   return row.probeStatus === 'online' ? 'reachable' : row.probeStatus === 'offline' ? 'unreachable' : 'unknown';
 }
-/** All fields are allowlisted. Raw metadata, credentials, and guessed GPS never reach the browser. */
+const networkField = (key: string) => /ip|wan|lan/i.test(key);
+/** All fields are allowlisted. Network addresses, raw metadata, credentials, and guessed GPS never reach the browser. */
 export function routerSnapshot(routers: Row[], units: Row[], now = new Date()): RouterSnapshot {
   if (!Array.isArray(routers) || !Array.isArray(units)) throw new Error('Router source returned an incomplete collection.');
   const unitGroups = new Map<string, Row[]>(), routerCounts = new Map<string, number>();
@@ -44,7 +45,6 @@ export function routerSnapshot(routers: Row[], units: Row[], now = new Date()): 
     const candidateUnit = match === 'exact_name' ? { id: String(candidates[0].id), unitNumber: String(candidates[0].unit_number) } : null;
     const port = number(row.web_port);
     return { id, unitKey: text(row.unit_key), name: text(row.router_name) || text(row.unit_key), model: text(row.router_model),
-      publicIp: text(row.router_public_ip) || null, unitIp: text(row.unit_ip) || null,
       port: port !== null && Number.isInteger(port) && port > 0 && port <= 65535 ? port : null,
       protocol: ['http', 'https'].includes(text(row.web_protocol).toLowerCase()) ? text(row.web_protocol).toLowerCase() : null,
       probeStatus: ['online', 'offline'].includes(text(row.current_status).toLowerCase()) ? text(row.current_status).toLowerCase() : 'unknown',
@@ -61,6 +61,7 @@ export function readRouterSnapshot(value: unknown): RouterSnapshot {
   if (!data || data.source !== 'camera_health' || data.gpsAvailable !== false || !stamp(data.generatedAt) || !Array.isArray(data.items)) throw new Error('Router inventory returned an incomplete response.');
   const ids = new Set<string>();
   for (const row of data.items) {
+    for (const key of Object.keys(row)) if (networkField(key)) delete (row as Record<string, unknown>)[key];
     if (!row || typeof row.id !== 'string' || !row.id || ids.has(row.id) || typeof row.unitKey !== 'string' || typeof row.name !== 'string' ||
       !['online', 'offline', 'unknown'].includes(row.probeStatus) || !['exact_name', 'ambiguous', 'unmatched'].includes(row.match) || row.gps !== null ||
       (row.checkedAt !== null && !stamp(row.checkedAt)) ||
