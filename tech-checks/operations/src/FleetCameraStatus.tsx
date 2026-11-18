@@ -210,7 +210,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
     <small>{feed?.syncedAt?'Star4Live reading '+cameraTime(feed.syncedAt,now):loading?'Reading Star4Live…':'No Star4Live reading'}</small>
    </div>
   </header>
-  <WatchfulDeviceHealthPanel units={units} now={now}/>
+  <WatchfulDeviceHealthPanel units={units}/>
   <section className='cos-reading-scope' aria-label='Camera status sources and scope'>
    <h3>Separate provider readings, not the Fleet inventory snapshot</h3>
    <p>Camera units only; camera-less stands and poles excluded. Totals and map coverage may differ from the mHelp-based Fleet view.</p>

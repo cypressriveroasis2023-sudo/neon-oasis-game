@@ -3,19 +3,20 @@ import {presentWatchfulDevices, type WatchfulUnit} from '../../supabase/function
 import {readLatestWatchfulRun, type WatchfulRun} from './watchfulDeviceHealthRead';
 import './watchfulDeviceHealth.css';
 
-type Props = {units: readonly WatchfulUnit[]; now?: number; run?: WatchfulRun | null};
+type Props = {units: readonly WatchfulUnit[]; run?: WatchfulRun | null; clock?: () => number};
 
-function emptyReading() {
+function unavailable() {
   return <section className='cos-watchful-health' aria-label='Watchful device health'>
     <h3>Watchful device health</h3>
-    <p>No Watchful reading is loaded, so this source is Unknown. Missing data is not an outage.</p>
-    <p className='cos-watchful-counts'>Red 0 · Unknown 0 · Offline 0 · In Shop 0</p>
+    <p>Unknown. Watchful is unavailable.</p>
   </section>;
 }
 
-/** One matched unit, then the devices from the latest run. Shop adds nothing to the counts. */
-export function WatchfulDeviceHealthView({units, run, now = Date.now()}: {units: readonly WatchfulUnit[]; run: WatchfulRun | null; now?: number}) {
-  if (!run) return emptyReading();
+/** One matched unit, then the devices from the latest run. Shop adds nothing to the counts.
+ * Freshness uses the clock argument, which production sets to Date.now. The board clock is not used. */
+export function WatchfulDeviceHealthView({units, run, clock = Date.now}: {units: readonly WatchfulUnit[]; run: WatchfulRun | null; clock?: () => number}) {
+  if (!run) return unavailable();
+  const now = clock();
   const view = presentWatchfulDevices(run.rows, units, now);
   const matched = view.devices.filter(device => device.match === 'exact');
   const unmatched = view.devices.filter(device => device.match === 'unmatched');
@@ -45,8 +46,8 @@ export function WatchfulDeviceHealthView({units, run, now = Date.now()}: {units:
   </section>;
 }
 
-/** Loads the latest watchful_device_health run for Owner and verified IT. */
-export default function WatchfulDeviceHealthPanel({units, now = Date.now(), run}: Props) {
+/** One quiet read for Owner and verified IT. A missing function stays Unknown: no spinner and no retry. */
+export default function WatchfulDeviceHealthPanel({units, run, clock = Date.now}: Props) {
   const [loaded, setLoaded] = useState<WatchfulRun | null>(run === undefined ? null : run);
   useEffect(() => {
     if (run !== undefined) {
@@ -54,8 +55,8 @@ export default function WatchfulDeviceHealthPanel({units, now = Date.now(), run}
       return;
     }
     let cancel = false;
-    readLatestWatchfulRun().then(value => { if (!cancel) setLoaded(value); });
+    readLatestWatchfulRun().then(value => { if (!cancel) setLoaded(value); }, () => { if (!cancel) setLoaded(null); });
     return () => { cancel = true; };
   }, [run]);
-  return <WatchfulDeviceHealthView units={units} run={loaded} now={now}/>;
+  return <WatchfulDeviceHealthView units={units} run={loaded} clock={clock}/>;
 }

@@ -143,15 +143,17 @@ function watchfulPanel() {
   return exported;
 }
 
-test('an empty Watchful read shows Unknown and does not call a device offline', () => {
+test('an empty Watchful read shows Unknown and does not render empty counts', () => {
   const Panel = watchfulPanel().default;
   const empty = renderToStaticMarkup(React.createElement(Panel, {units, run: null}));
-  assert.match(empty, /this source is Unknown/);
-  assert.match(empty, /Red 0 · Unknown 0 · Offline 0 · In Shop 0/);
-  assert.doesNotMatch(empty, />Offline</);
+  assert.match(empty, /Unknown\. Watchful is unavailable\./);
+  assert.doesNotMatch(empty, /Red 0|Offline|Reading|spinner/);
   const screen = readFileSync(new URL('../src/FleetCameraStatus.tsx', import.meta.url), 'utf8');
-  assert.equal(screen.split('<WatchfulDeviceHealthPanel units={units} now={now}/>').length - 1, 1);
-  assert.match(readFileSync(new URL('../src/WatchfulDeviceHealthPanel.tsx', import.meta.url), 'utf8'), /readLatestWatchfulRun\(\)/);
+  assert.equal(screen.split('<WatchfulDeviceHealthPanel units={units}/>').length - 1, 1);
+  assert.doesNotMatch(screen, /WatchfulDeviceHealthPanel units=\{units\} now=/);
+  const source = readFileSync(new URL('../src/WatchfulDeviceHealthPanel.tsx', import.meta.url), 'utf8');
+  assert.equal(source.split('readLatestWatchfulRun()').length - 1, 1);
+  assert.doesNotMatch(source, /setInterval/);
 });
 
 test('a fixture run renders each matched unit’s red devices, with shop adding nothing', async () => {
@@ -177,7 +179,7 @@ test('a fixture run renders each matched unit’s red devices, with shop adding 
   assert.equal(skipped, null);
   assert.equal(watchfulRunFromRead({runId: null, runAt: null, rows: []}), null);
   const Panel = watchfulPanel().default;
-  const html = renderToStaticMarkup(React.createElement(Panel, {units, run, now: NOW}));
+  const html = renderToStaticMarkup(React.createElement(Panel, {units, run, clock: () => NOW}));
   assert.match(html, /<strong>NVR Fixture Alpha<\/strong>/);
   assert.match(html, /Red · NVR Fixture Alpha/);
   assert.match(html, new RegExp('color:' + IN_SHOP_COLOR));
@@ -187,6 +189,29 @@ test('a fixture run renders each matched unit’s red devices, with shop adding 
   assert.match(html, /Unknown · VMS Fixture Delta/);
   assert.match(html, /Red 2 · Unknown 1 · Offline 0 · In Shop 0/);
   assert.match(html, /Run 2026-11-17T22:30:00.000Z/);
+  const aged = renderToStaticMarkup(React.createElement(Panel, {units, run, clock: () => NOW + 2 * 60 * 60 * 1000}));
+  assert.match(aged, /Unknown · NVR Fixture Alpha/);
+  assert.doesNotMatch(aged, /Red · NVR Fixture Alpha|>Offline</);
+});
+
+test('an undeployed Watchful read fails once to Unknown and does not retry', async () => {
+  let calls = 0;
+  const missing = await readLatestWatchfulRun({
+    operator: {token: 'synthetic-owner', role: 'owner'},
+    fetcher: async () => { calls += 1; return new Response('missing', {status: 404}); },
+  });
+  assert.equal(missing, null);
+  assert.equal(calls, 1);
+  let throws = 0;
+  const failed = await readLatestWatchfulRun({
+    operator: {token: 'synthetic-it', role: 'it'},
+    fetcher: async () => { throws += 1; throw new Error('function is not deployed'); },
+  });
+  assert.equal(failed, null);
+  assert.equal(throws, 1);
+  const html = renderToStaticMarkup(React.createElement(watchfulPanel().default, {units, run: failed}));
+  assert.match(html, /Unknown\. Watchful is unavailable\./);
+  assert.doesNotMatch(html, /Red 0|Offline|Reading|spinner/);
 });
 
 test('the recipe records the new function bytes and does not replace a pinned migration', () => {
