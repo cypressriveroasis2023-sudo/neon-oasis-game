@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {cameraState} from '../src/cameraEvidence.ts';
 import {technicianTodos} from '../src/technicianTodos.ts';
 import {
   aboutHeadline, applyExactRecorderLinks, cameraStatusHeadline, censusFromCameraUnits, censusFromCommandProducts, censusFromDashboardRows,
@@ -30,6 +31,19 @@ test('camera status, the map and about this board read one selector', () => {
   assert.deepEqual(camera.units, {online: 1, offline: 1, unknown: 2});
   assert.deepEqual(camera.cameras, {online: 2, offline: 2, unknown: 2});
   assert.equal(selectFleetCounts(census, now).inShopUnits, 1);
+});
+
+test('a stale camera stays unverified before the inventory census stamps a fresh time', () => {
+  const evidence = {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'offline', observedAt: stale, lastOnlineAt: null};
+  const row = {id: '1', name: 'Quiet', unit: 'Sniper 1', type: 'ipc', activationState: 'ACTIVE', status: 'offline', evidence};
+  assert.equal(cameraState(row, now), 'verifying');
+  const freshRow = {...row, evidence: {...evidence, observedAt: fresh, status: 'online'}};
+  assert.equal(cameraState(freshRow, now), 'online');
+  const staleProducts = selectFleetCounts(censusFromCommandProducts([
+    {productId: '1001', unitNumber: 'Sniper 1', status: 'unverified'},
+  ], now), now);
+  assert.deepEqual(staleProducts.units, {online: 0, offline: 0, unknown: 1});
+  assert.equal(staleProducts.cameras.offline, 0);
 });
 
 test('field product inventory counts go through the same selector', () => {

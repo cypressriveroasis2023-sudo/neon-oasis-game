@@ -26,7 +26,7 @@
 .cos-todo-copy strong{font-size:.95rem}
 .cos-todo-copy span{font-size:.8rem;line-height:1.35;color:#334155}
 .cos-todo-card button{min-height:44px;padding:8px 12px;border-radius:8px;border:1px solid #0f172a;background:#0f172a;color:#fff;font:inherit;font-size:.82rem;cursor:pointer;text-decoration:none}
-.cos-in-shop{color:#64748b}
+.cos-in-shop{color:#64748b;background:#fff;border-radius:4px;padding:0 4px;font-weight:700}
 @media(max-width:700px){
  .cos-todo-card{grid-template-columns:8px minmax(0,1fr)}
  .cos-todo-card button{grid-column:2;justify-self:start}

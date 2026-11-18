@@ -175,7 +175,9 @@ export type CommandCountProduct = { status: string; unitNumber?: string | null; 
 /**
  * Field Product IDs already classified by the command center.
  * Support equipment is left out, so it adds 0 and raises no alert.
- * Known online and offline readings are stamped at `now` because the command center already applied freshness.
+ * Online and offline are stamped at `now` only because the command center already
+ * dropped stale and missing readings. fieldCameraHealth and the exact TCP check
+ * admit online or offline only inside the freshness window. Anything else stays unverified.
  */
 export function censusFromCommandProducts(items: readonly CommandCountProduct[], now = Date.now()): CountUnit[] {
   const fresh = new Date(now).toISOString();

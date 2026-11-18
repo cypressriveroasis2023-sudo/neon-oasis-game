@@ -8,7 +8,7 @@
 .cos-camera-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
 .cos-camera-counts span{display:flex;flex-direction:column;gap:2px;padding:8px;border:1px solid rgba(128,128,128,.28);border-radius:10px}
 .cos-camera-counts b{font-size:1.4rem;margin:0}
-.cos-in-shop{color:#64748b}
+.cos-in-shop{color:#64748b;background:#fff;border-radius:4px;padding:0 4px;font-weight:700}
 .cos-camera-status>header h2{margin:0;font-size:1.25rem}
 .cos-camera-status>header p{margin:4px 0 0;font-size:.8rem;opacity:.75;max-width:46ch}
 .cos-camera-status-read{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
