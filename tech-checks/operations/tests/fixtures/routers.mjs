@@ -2,7 +2,7 @@ const defaultOrigin='http://127.0.0.1:4173';
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 export const fixtureUnit='11111111-1111-4111-8111-111111111111';
 export function routerFixture(){
- const fresh=new Date(Date.now()-60000).toISOString(),old=new Date(Date.now()-50*60*1000).toISOString();
+ const fresh=new Date(Date.now()-60000).toISOString(),old=new Date(Date.now()-(75*60*1000+1000)).toISOString();
  const row={id:'r1',unitKey:'HELIOS 001',name:'Fixture InHand',model:'InHand IR302',probeStatus:'online',checkedAt:fresh,reportedStatus:'online',reportedAt:fresh,reportedSource:'InHand live pull',match:'exact_name',candidateUnit:{id:fixtureUnit,unitNumber:'HELIOS 001'},gps:null};
  return {source:'camera_health',gpsAvailable:false,generatedAt:new Date().toISOString(),items:[row,{...row,id:'r2',unitKey:'SS 019',name:'Duplicate fixture',reportedStatus:'offline',match:'ambiguous',candidateUnit:null},{...row,id:'r3',unitKey:'SS 039',name:'Stale fixture',reportedAt:old,reportedStatus:'offline',match:'unmatched',candidateUnit:null},{...row,id:'r4',unitKey:'RANGER 001',name:'Unchecked fixture',reportedStatus:'online',reportedAt:fresh,match:'unmatched',candidateUnit:null}]};
 }

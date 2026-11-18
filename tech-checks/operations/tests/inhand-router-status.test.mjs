@@ -9,6 +9,7 @@ import {
   inhandRouterOutage,
   inhandRouterReading,
   matchRouterByExactUnitKey,
+  routerLiveReading,
 } from '../src/inhandRouterStatus.ts';
 import {fleetDashboardRows} from '../src/fleetDashboardModel.ts';
 
@@ -26,10 +27,11 @@ const live = (patch = {}) => ({
   ...patch,
 });
 
-test('the freshness window is one named 45 minute constant', () => {
-  assert.equal(INHAND_ROUTER_FRESHNESS_MS, 45 * 60 * 1000);
+test('the freshness window is one named 75 minute constant', () => {
+  assert.equal(INHAND_ROUTER_FRESHNESS_MS, 75 * 60 * 1000);
   const source = readFileSync(new URL('../src/inhandRouterStatus.ts', import.meta.url), 'utf8');
-  assert.equal(source.split('45 * 60 * 1000').length - 1, 1);
+  assert.equal(source.split('75 * 60 * 1000').length - 1, 1);
+  assert.equal(source.includes('45 * 60 * 1000'), false);
 });
 
 test('a fresh InHand online field unit is online and raises nothing', () => {
@@ -95,6 +97,14 @@ test('no exact InHand match is Unknown and partial names are not a match', () =>
   assert.equal(matchRouterByExactUnitKey('H001', [{unitKey: 'Helios 001'}]), null);
   assert.equal(matchRouterByExactUnitKey('Helios 001', routers), null);
   assert.deepEqual(matchRouterByExactUnitKey('  HELIOS   001 ', [{unitKey: 'Helios 001', id: 'only'}]), {unitKey: 'Helios 001', id: 'only'});
+});
+
+test('an omitted match is Unknown, so a bare offline reading cannot count', () => {
+  const reading = inhandRouterReading(live({matched: undefined}), now);
+  assert.equal(reading.label, 'Unknown');
+  assert.equal(reading.state, 'unknown');
+  assert.equal(reading.outageCount, 0);
+  assert.notEqual(reading.label, 'Offline');
 });
 
 test('missing feed data is Unknown and never Offline', () => {
@@ -165,6 +175,27 @@ test('the fleet board uses the same reading for a linked unit', () => {
   const mofi = fleetDashboardRows([unit], null, [{...router, model: 'Mofi 4500V2', routerType: 'mofi'}], null, at)[0];
   assert.equal(mofi.routerLabel, 'Unknown');
   assert.equal(mofi.routerState, 'unknown');
+});
+
+test('the Routers page shows Unknown unless the unit key and placement both resolve', () => {
+  const row = (patch = {}) => ({
+    id: 'r', unitKey: 'Helios 001', name: 'Helios 001', model: 'InHand IR302',
+    reportedStatus: 'offline', reportedAt: fresh, reportedSource: INHAND_LIVE_STATUS_SOURCE,
+    match: 'exact_name', candidateUnit: {id: 'unit', unitNumber: 'Helios 001'}, gps: null,
+    ...patch,
+  });
+  assert.equal(routerLiveReading(row(), 'FIELD', now).label, 'Offline');
+  assert.equal(routerLiveReading(row(), 'shop', now).label, 'In Shop');
+  assert.equal(routerLiveReading(row(), 'SHOP', now).outageCount, 0);
+  for (const placement of [null, undefined, '', 'unknown', 'INACTIVE']) {
+    const reading = routerLiveReading(row(), placement, now);
+    assert.equal(reading.label, 'Unknown', String(placement));
+    assert.notEqual(reading.label, 'Offline', String(placement));
+    assert.equal(reading.outageCount, 0);
+  }
+  assert.equal(routerLiveReading(row({match: 'ambiguous', candidateUnit: null}), 'FIELD', now).label, 'Unknown');
+  assert.equal(routerLiveReading(row({match: 'unmatched', candidateUnit: null}), 'FIELD', now).label, 'Unknown');
+  assert.equal(routerLiveReading(row({match: 'ambiguous', candidateUnit: null}), null, now).label, 'Unknown');
 });
 
 test('the router status module does not carry network or SIM identifiers', () => {

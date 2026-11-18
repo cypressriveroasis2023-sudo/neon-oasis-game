@@ -801,7 +801,7 @@ function readVrmFleetConfig(value) {
 }
 
 // src/inhandRouterStatus.ts
-var INHAND_ROUTER_FRESHNESS_MS = 45 * 60 * 1e3;
+var INHAND_ROUTER_FRESHNESS_MS = 75 * 60 * 1e3;
 var INHAND_LIVE_STATUS_SOURCE = "InHand live pull";
 var IN_SHOP_LABEL = "In Shop";
 var IN_SHOP_COLOR = "#64748b";
@@ -846,7 +846,7 @@ function inhandRouterReading(input, now = Date.now()) {
       routerOfflineTodo: false
     };
   }
-  if (input?.matched === false) return unknownReading();
+  if (input?.matched !== true) return unknownReading();
   const brand = inhandRouterBrand(input?.routerType, input?.model);
   if (brand === "mofi" || brand === "cradlepoint") return unknownReading();
   if (text3(input?.statusSource) !== INHAND_LIVE_STATUS_SOURCE) return unknownReading();

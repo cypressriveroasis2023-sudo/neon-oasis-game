@@ -3,19 +3,10 @@ import { useRouters } from './useRouters';
 import { type RouterRow } from '../../supabase/functions/cos-operations-pages/routers';
 import { api } from './api';
 import { inventoryPlacement } from './fleetSnapshot';
-import { INHAND_ROUTER_FRESHNESS_MS, inhandRouterReading, type InhandRouterReading } from './inhandRouterStatus';
+import { INHAND_ROUTER_FRESHNESS_MS, routerLiveReading } from './inhandRouterStatus';
 import './routers.css';
 export const routerTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded';
-export function routerLiveReading(row: RouterRow, placement: string | null | undefined, now: number): InhandRouterReading {
-  return inhandRouterReading({
-    placement,
-    routerType: (row as {routerType?: string | null}).routerType,
-    model: row.model,
-    reportedStatus: row.reportedStatus,
-    reportedAt: row.reportedAt,
-    statusSource: row.reportedSource,
-  }, now);
-}
+export { routerLiveReading };
 export function RouterBadge({ row, now, placement }: { row: RouterRow; now: number; placement?: string | null }) {
   const reading = routerLiveReading(row, placement, now);
   return <span className={'router-badge router-' + reading.state} style={reading.color ? {color: reading.color} : undefined}>{reading.label}</span>;
@@ -33,7 +24,7 @@ function useExactPlacements() {
       for (const row of rows) if (row && typeof row.id === 'string' && !next.has(row.id)) next.set(row.id, inventoryPlacement(row));
       setById(next);
       setReady(true);
-    }).catch(clear);
+    }).catch(() => { if (live) { setById(new Map()); setReady(true); } });
     window.addEventListener('cos-private-data-invalidated', clear);
     return () => { live = false; window.removeEventListener('cos-private-data-invalidated', clear); };
   }, []);

@@ -20,8 +20,12 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(frame.getByRole('button',{name:'View same-name COS unit'})).toHaveCount(0);
  await frame.getByRole('textbox',{name:'Search routers'}).fill('');
  await frame.getByRole('combobox',{name:'Router status filter'}).selectOption('unknown');
- await expect(records(frame).getByRole('button')).toHaveCount(1);
+ await expect(records(frame).getByRole('button')).toHaveCount(3);
+ await expect(records(frame).getByText('Unknown',{exact:true})).toHaveCount(3);
+ await expect(records(frame).getByText('Offline',{exact:true})).toHaveCount(0);
+ await expect(records(frame)).toContainText('SS 019');
  await expect(records(frame)).toContainText('SS 039');
+ await expect(records(frame)).toContainText('RANGER 001');
  await frame.getByRole('combobox',{name:'Router status filter'}).selectOption('online');
  await expect(frame.getByLabel('Selected router details')).toContainText('Online');
  await expect(frame.getByLabel('Selected router details')).not.toContainText('192.0.2');

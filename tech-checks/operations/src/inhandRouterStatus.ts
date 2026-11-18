@@ -16,8 +16,8 @@
  */
 import {exactUnitName} from '../../supabase/functions/cos-operations-pages/routers';
 
-/** The feed lands about every 30 minutes. Older than this is Unknown. */
-export const INHAND_ROUTER_FRESHNESS_MS = 45 * 60 * 1000;
+/** The feed lands about every 30 minutes. A reading older than this is Unknown. */
+export const INHAND_ROUTER_FRESHNESS_MS = 75 * 60 * 1000;
 
 /** Exact status_source written by the live InHand pull. */
 export const INHAND_LIVE_STATUS_SOURCE = 'InHand live pull';
@@ -52,7 +52,8 @@ export type InhandRouterInput = {
   statusSource?: string | null;
   /**
    * False when this unit has no single exact unit_key match.
-   * Omit it when the row is the router itself, not a unit join.
+   * The Routers page passes row.match === 'exact_name'. An omitted value is
+   * not a match, so a bare offline reading cannot become Offline.
    */
   matched?: boolean;
 };
@@ -110,7 +111,7 @@ export function inhandRouterReading(input: InhandRouterInput, now = Date.now()):
       routerOfflineTodo: false,
     };
   }
-  if (input?.matched === false) return unknownReading();
+  if (input?.matched !== true) return unknownReading();
   const brand = inhandRouterBrand(input?.routerType, input?.model);
   if (brand === 'mofi' || brand === 'cradlepoint') return unknownReading();
   if (text(input?.statusSource) !== INHAND_LIVE_STATUS_SOURCE) return unknownReading();
@@ -131,6 +132,36 @@ export function inhandRouterReading(input: InhandRouterInput, now = Date.now()):
     };
   }
   return unknownReading();
+}
+
+export type RouterPageRow = {
+  match?: string | null;
+  model?: string | null;
+  routerType?: string | null;
+  reportedStatus?: string | null;
+  reportedAt?: string | null;
+  reportedSource?: string | null;
+};
+
+/**
+ * Routers page label. An unmatched or ambiguous row is Unknown.
+ * A fresh offline reading is Offline only when the unit key is an exact match
+ * and the placement resolved to field. Shop is In Shop. A missing placement,
+ * including a failed field-map read, is Unknown and never Offline.
+ */
+export function routerLiveReading(row: RouterPageRow, placement: string | null | undefined, now = Date.now()): InhandRouterReading {
+  const matched = row?.match === 'exact_name';
+  const place = inhandPlacement(placement);
+  const resolved = matched && (place === 'field' || place === 'shop');
+  return inhandRouterReading({
+    placement: resolved ? placement : null,
+    matched: resolved ? row.match === 'exact_name' : false,
+    routerType: row?.routerType,
+    model: row?.model,
+    reportedStatus: row?.reportedStatus,
+    reportedAt: row?.reportedAt,
+    statusSource: row?.reportedSource,
+  }, now);
 }
 
 /**
