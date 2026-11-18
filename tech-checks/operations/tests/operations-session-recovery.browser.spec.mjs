@@ -33,7 +33,7 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
    return route.fulfill({status,headers,json:status===200?data:{error:'Synthetic authorization denied'}});
   }
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
-  if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
+  if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;gate.resolveAfterHold?.();await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
   const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
@@ -68,12 +68,13 @@ for(const [label,patch] of [['changed actor',{productionOwnerUserId:'22222222-22
 });
 for(const status of [401,403])test('true source '+status+' stays blocked without automatic revalidation',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred();
- // Hold the denial until the pointer action is underway, then release it on a
- // timer. Releasing only after click() returns deadlocks when the click is
- // waiting on this same response. Later router reads stay denied too.
- state.routerStatus=status;state.routerGate={promise:gate.promise,status};
- const release=setTimeout(()=>gate.resolve(),250);
- try{await refresh(app).click();}finally{clearTimeout(release);gate.resolve();}
+ // Start the release only once the click has reached the page and opened the
+ // read. A timer started with click() can expire during actionability and
+ // remove the button while the pointer action is still being sent. Releasing
+ // only after click() returns deadlocks when the click is waiting on this
+ // same response. Later router reads stay denied too.
+ state.routerStatus=status;state.routerGate={promise:gate.promise,status,resolveAfterHold(){setTimeout(()=>gate.resolve(),250);}};
+ await refresh(app).click();
  await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions);expect(await reasons(app)).toContain('authentication-denied');readOnly(state);
  await page.screenshot({path:testInfo.outputPath('owner-source-'+status+'-reload-required.png')});
 });
