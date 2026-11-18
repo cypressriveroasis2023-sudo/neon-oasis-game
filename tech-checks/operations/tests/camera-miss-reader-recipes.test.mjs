@@ -24,7 +24,8 @@ test('classifier recipes are stacked on the confirmed #433 bytes',()=>{
   assert.equal(pages.expectedBefore['serve.ts'], '45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79');
   assert.equal(camera.expectedBefore['index.ts'], '60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4');
   assert.equal(producer.expectedBefore['index.ts'], '7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e');
-  for (const patch of [pages, camera, producer]) assert.equal(patch.expectedBefore['routerBoardJoin.mjs'], 'e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4');
+  assert.equal(pages.expectedBefore['savedFleetBoard.mjs'], '963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
+  for (const patch of [pages, camera, producer]) assert.equal(patch.expectedBefore['routerBoardJoin.mjs'], 'a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638');
 });
 
 test('pages recipe keeps the 410 gate and replaces the first-miss classifier',()=>{
@@ -58,7 +59,7 @@ test('producer recipe keeps the router wrap and points at the patched handler',(
   const {patch, files}=patched('.github/function-patches/cos-fleet-board-producer/camera-miss-readers-v11.json');
   assert.equal(patch.requireLiveBeforeDeploy.version, 11);
   assert.match(files['index.ts'], /routerBoardAuth\.run/);
-  assert.match(files['index.ts'], /cee1d65a73ad45cc86b26863d7703a340f0b9802\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
+  assert.match(files['index.ts'], /e838c132d539b9f6ca177fac2825112a27c8a366\/tech-checks\/docs\/cos-fleet-board-producer-handler\/serve\.ts/);
   assert.equal(files['index.ts'].includes('b5b188229346182d9a4e29da42415a1b9d3b9d53'), false);
   assert.match(files['routerBoardJoin.mjs'], /if \(shop\) return \{ status: 'In Shop', checkedAt, outage: false \}/);
 });

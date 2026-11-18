@@ -1,5 +1,5 @@
 {
- "description": "3-miss classifier stacked on draft PR #433 head 8626d69a. The camera-status entry before this patch is 60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4. Live version must be 18; any other version is refused. Do not deploy until #425 and #433 are live.",
+ "description": "3-miss classifier stacked on draft PR #433 head 167b4ba0. The camera-status entry before this patch is 60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4. Live version must be 18; any other version is refused. Do not deploy until #425 and #433 are live.",
  "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
  "releaseStatus": "PREPARATION_ONLY",
  "slug": "cos-unit-camera-status",
@@ -40,14 +40,7 @@
    "file": "routerBoardJoin.mjs",
    "occurrences": 1,
    "needle": "    const reading = boardRouterStatus(raw, now, '');",
-   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));",
-   "occurrences": 1
-  },
-  {
-   "file": "routerBoardJoin.mjs",
-   "occurrences": 1,
-   "needle": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });",
-   "replacement": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  if (shop) return { status: 'In Shop', checkedAt, outage: false };\n  const finish = (status, outage) => ({ status, checkedAt, outage });"
+   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));"
   },
   {
    "file": "index.ts",
@@ -59,11 +52,11 @@
  "expectedBefore": {
   "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
  },
  "expectedAfter": {
   "index.ts": "afeb07d4d7e55b327dcef8b4236a06d3a8b1b233b1da1c3aee31bb76a3ead467",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "236a3adf412d4043c120fb5437d685c9f48d402120b6848490642aabd133483c"
+  "routerBoardJoin.mjs": "d705a95523538c7bb90aadb86c5d1011c0ca5aa94e01846a1aeeed4f0a6843ad"
  }
 }

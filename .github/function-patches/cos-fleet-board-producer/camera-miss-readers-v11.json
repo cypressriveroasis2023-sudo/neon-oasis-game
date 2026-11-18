@@ -1,5 +1,5 @@
 {
- "description": "3-miss handler pin stacked on draft PR #433 head 8626d69a. The producer entry before this patch is 7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e. One needle replaces the old serve.ts import. Live version must be 11; any other version is refused. Do not deploy until #425 and #433 are live.",
+ "description": "3-miss handler pin stacked on draft PR #433 head 167b4ba0. The producer entry before this patch is 7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e. One needle replaces the old serve.ts import. Live version must be 11; any other version is refused. Do not deploy until #425 and #433 are live.",
  "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
  "releaseStatus": "PREPARATION_ONLY",
  "slug": "cos-fleet-board-producer",
@@ -22,30 +22,23 @@
    "file": "routerBoardJoin.mjs",
    "occurrences": 1,
    "needle": "    const reading = boardRouterStatus(raw, now, '');",
-   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));",
-   "occurrences": 1
-  },
-  {
-   "file": "routerBoardJoin.mjs",
-   "occurrences": 1,
-   "needle": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });",
-   "replacement": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  if (shop) return { status: 'In Shop', checkedAt, outage: false };\n  const finish = (status, outage) => ({ status, checkedAt, outage });"
+   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));"
   },
   {
    "file": "index.ts",
    "occurrences": 1,
    "needle": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/b5b188229346182d9a4e29da42415a1b9d3b9d53/tech-checks/docs/vision-native-preview-20261107/source/serve.ts\");",
-   "replacement": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/cee1d65a73ad45cc86b26863d7703a340f0b9802/tech-checks/docs/cos-fleet-board-producer-handler/serve.ts\");"
+   "replacement": "await import(\"https://raw.githubusercontent.com/cypressriveroasis2023-sudo/neon-oasis-game/e838c132d539b9f6ca177fac2825112a27c8a366/tech-checks/docs/cos-fleet-board-producer-handler/serve.ts\");"
   }
  ],
  "expectedBefore": {
   "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
  },
  "expectedAfter": {
-  "index.ts": "ff4932861402c6889d3f3c1f2f3965a0808cc6840a54851d3dd8d31229a4a7db",
+  "index.ts": "5f7be12834d5aad7a35c721d013e5f41a94233022c375436b5a2200e9edc1f23",
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
-  "routerBoardJoin.mjs": "236a3adf412d4043c120fb5437d685c9f48d402120b6848490642aabd133483c"
+  "routerBoardJoin.mjs": "d705a95523538c7bb90aadb86c5d1011c0ca5aa94e01846a1aeeed4f0a6843ad"
  }
 }

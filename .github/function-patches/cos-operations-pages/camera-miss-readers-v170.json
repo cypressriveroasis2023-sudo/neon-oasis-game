@@ -1,5 +1,5 @@
 {
- "description": "3-miss readers stacked on draft PR #433 head 8626d69a. serve.ts before this patch is 45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79. Live version must be 170; any other version is refused. The #425 410 needles stay. Do not deploy until #425 and #433 are live.",
+ "description": "3-miss readers stacked on draft PR #433 head 167b4ba0. serve.ts before this patch is 45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79. Live version must be 170; any other version is refused. The #425 410 needles stay. Do not deploy until #425 and #433 are live.",
  "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
  "releaseStatus": "PREPARATION_ONLY",
  "slug": "cos-operations-pages",
@@ -79,12 +79,6 @@
    "occurrences": 1
   },
   {
-   "file": "routerBoardJoin.mjs",
-   "needle": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });",
-   "replacement": "  const shop = shopPlacement(placement);\n  const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);\n  if (shop) return { status: 'In Shop', checkedAt, outage: false };\n  const finish = (status, outage) => ({ status, checkedAt, outage });",
-   "occurrences": 1
-  },
-  {
    "file": "productVerifyNow.ts",
    "needle": "['online','offline']",
    "replacement": "['online','offline','verifying']",
@@ -96,21 +90,21 @@
   "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
   "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
   "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-  "savedFleetBoard.mjs": "909870005deface4a596be4d6ba2f2b3ff5fb53822aa7c13b3d1250402c77d3b",
+  "savedFleetBoard.mjs": "963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299",
   "serve.ts": "45a6ffce48b4803ea91c9f160c702312c07af91a3618c7087f45216468b6ba79",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "e01f4c1370bc3d2acd6e5db7f69951470e02db1f78b533ae11520bbeead41dc4"
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
  },
  "expectedAfter": {
   "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
   "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
   "productTcpRuntime.ts": "c4c75bd601df1a0d71f356f660aed1417169c4f1bc17982850b19249913cc0c0",
   "productVerifyNow.ts": "235e4857a2a6712f1a670a81f8468e9430f5125b1139f70059934e6e110dd9e7",
-  "savedFleetBoard.mjs": "e0795e5fe75c85dd2864436b3e213559f435707b47bf727287399616e70a00b5",
+  "savedFleetBoard.mjs": "d06d13a166b18ad77daa6c8fc83d2eca76a2313f323d814b7394f40dc713e33a",
   "serve.ts": "c8dbcfd1c5b6bdd6ffceee0d318a6bf4d1325f90041de6844a27ed5fa716f0b0",
   "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
   "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
-  "routerBoardJoin.mjs": "236a3adf412d4043c120fb5437d685c9f48d402120b6848490642aabd133483c"
+  "routerBoardJoin.mjs": "d705a95523538c7bb90aadb86c5d1011c0ca5aa94e01846a1aeeed4f0a6843ad"
  }
 }

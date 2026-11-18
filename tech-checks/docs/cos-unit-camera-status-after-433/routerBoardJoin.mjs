@@ -56,8 +56,15 @@ function liveSerials(row) {
 }
 
 /** A saved Online/Offline label is only current inside the 3-hour window. */
+export function shownBoardRouterLabel(status, checkedAt, now = Date.now(), placement = '') {
+  if (shopPlacement(placement) && status) return 'In Shop';
+  if (!status) return undefined;
+  return displayedRouterStatus(status, checkedAt, now);
+}
+
 export function displayedRouterStatus(status, checkedAt, now = Date.now()) {
-  if (status !== 'Online' && status !== 'Offline') return status === 'Unknown (no feed)' ? status : 'Unknown';
+  if (status === 'In Shop' || status === 'Unknown (no feed)') return status;
+  if (status !== 'Online' && status !== 'Offline') return 'Unknown';
   const at = typeof checkedAt === 'string' ? Date.parse(checkedAt) : NaN;
   if (!Number.isFinite(at) || at > now || now - at > ROUTER_BOARD_FRESH_MS) return 'Unknown';
   return status;
@@ -66,7 +73,8 @@ export function displayedRouterStatus(status, checkedAt, now = Date.now()) {
 export function boardRouterStatus(row, now = Date.now(), placement = '') {
   const shop = shopPlacement(placement);
   const checkedAt = stamp(row?.last_checked_at ?? row?.checkedAt);
-  const finish = (status, outage) => ({ status, checkedAt, outage: shop ? false : outage });
+  if (shop) return { status: 'In Shop', checkedAt, outage: false };
+  const finish = (status, outage) => ({ status, checkedAt, outage });
   const typeInfo = routerTypeOf(row);
   if (typeInfo.type === 'mofi' || typeInfo.type === 'cradlepoint') return finish('Unknown (no feed)', false);
   if (typeInfo.type === 'unknown') return finish('Unknown', false);
@@ -124,11 +132,14 @@ export function applyBoardRouterFields(rows, { savedUnits = [], doNotUseKeys = [
     const key = routerJoinKey(row?.name);
     const fromSaved = saved.get(key);
     const doNotUse = row?.doNotUse === true || flags.has(key) || fromSaved?.doNotUse === true;
-    const routerLabel = row?.routerLabel || fromSaved?.routerStatus;
-    if (!doNotUse && !fromSaved) return row;
+    let routerLabel = row?.routerLabel || fromSaved?.routerStatus;
+    if (!doNotUse && !fromSaved && row?.placement !== 'shop') return row;
     let routerState = row.routerState;
-    if (!row?.routerLabel && routerLabel) {
-      routerState = row.placement === 'shop' ? 'unknown' : routerLabel === 'Online' ? 'online' : routerLabel === 'Offline' ? 'offline' : 'unknown';
+    if (row.placement === 'shop' && routerLabel) {
+      routerLabel = 'In Shop';
+      routerState = 'unknown';
+    } else if (!row?.routerLabel && routerLabel) {
+      routerState = routerLabel === 'Online' ? 'online' : routerLabel === 'Offline' ? 'offline' : 'unknown';
     }
     return { ...row, doNotUse, routerLabel, routerState, routerCheckedAt: row.routerCheckedAt ?? fromSaved?.routerCheckedAt ?? null };
   });
@@ -222,6 +233,9 @@ export function presentRouterPage(snapshot, rawRouters, devices, role, now = Dat
 }
 
 const COS_REST = 'https://goqrnolcvqnirjmzaeyk.supabase.co/rest/v1/';
+/** Same publishable key the operations pages function sends on COS reads. */
+export const COS_PUBLISHABLE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
+const COS_READ_TIMEOUT_MS = 5000;
 
 function headerValue(headers, name) {
   if (!headers) return '';
@@ -229,13 +243,18 @@ function headerValue(headers, name) {
   return headers[name] || headers[name.toLowerCase()] || '';
 }
 
+function cosReadHeaders(headers) {
+  return {
+    apikey: COS_PUBLISHABLE_KEY,
+    Authorization: headerValue(headers, 'Authorization'),
+    Accept: 'application/json',
+  };
+}
+
 async function restGet(fetchImpl, headers, path) {
   const response = await fetchImpl(COS_REST + path, {
-    headers: {
-      apikey: headerValue(headers, 'apikey'),
-      Authorization: headerValue(headers, 'Authorization'),
-      Accept: 'application/json',
-    },
+    headers: cosReadHeaders(headers),
+    signal: AbortSignal.timeout(COS_READ_TIMEOUT_MS),
   });
   const bodyText = await response.text();
   let body = null;
