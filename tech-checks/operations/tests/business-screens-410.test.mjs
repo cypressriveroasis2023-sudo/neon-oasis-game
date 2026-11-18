@@ -8,12 +8,12 @@ import {fileURLToPath} from 'node:url';
 import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {buildSync} from 'esbuild';
-import {preparePayload} from '../../../.github/scripts/deploy-recorded-function.mjs';
+import {preparePayload,readPatchFile} from '../../../.github/scripts/deploy-recorded-function.mjs';
 
 const root=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
 const patch=JSON.parse(readFileSync(join(root,'.github/function-patches/cos-operations-pages/business-screens-410-v168.json'),'utf8'));
 const rollback=JSON.parse(readFileSync(join(root,'.github/function-patches/cos-operations-pages/rollback-business-410-to-v168.json'),'utf8'));
-const read=name=>readFileSync(join(root,patch.sourceDir,name));
+const read=name=>readPatchFile(patch,name,root);
 const prepared=preparePayload(patch,read);
 const serve=prepared.find(file=>file.recordName==='serve.ts').content.toString('utf8');
 const original=read('serve.ts').toString('utf8');
@@ -111,6 +111,10 @@ const keepPaths=[
 test('the deployed entry is the patched serve.ts and the 410 sits after sign-in and the Owner gate',()=>{
   assert.equal(patch.entrypointPath,'cos-operations-pages/serve.ts');
   assert.equal(patch.requireLiveBeforeDeploy.version,168);
+  assert.equal(patch.requireLiveBeforeDeploy.ezbr_sha256,'ea649429a36f21ef8272911615a802e3ccc6d2a6c21ac6ea6718eeb68ddf02af');
+  assert.equal(patch.expectedBefore['savedFleetBoard.mjs'],'40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd');
+  assert.equal(patch.expectedAfter['savedFleetBoard.mjs'],patch.expectedBefore['savedFleetBoard.mjs']);
+  assert.equal(prepared.find(file=>file.recordName==='savedFleetBoard.mjs').content.includes('supersededShopDetail'),false);
   assert.equal(patch.sourceCommit,'b5b188229346182d9a4e29da42415a1b9d3b9d53');
   const entry=prepared.find(file=>file.name===patch.entrypointPath);
   assert.ok(entry);

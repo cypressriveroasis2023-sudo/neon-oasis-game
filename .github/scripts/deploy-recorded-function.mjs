@@ -32,6 +32,10 @@ import {pathToFileURL} from 'node:url';
 
 export const sha256=buffer=>createHash('sha256').update(buffer).digest('hex');
 
+export function readPatchFile(patch,name,root='.'){
+  return readFileSync(join(root,patch.sourceOverrides?.[name]??join(patch.sourceDir,name)));
+}
+
 // Stages 1-3. Pure: takes the patch definition and a byte reader, returns the
 // exact payload or throws. Never touches the network.
 export function preparePayload(patch,readBytes){
@@ -119,7 +123,7 @@ async function main(){
   const patch=JSON.parse(readFileSync(patchPath,'utf8'));
 
   let files;
-  try{files=preparePayload(patch,name=>readFileSync(join(patch.sourceDir,name)));}
+  try{files=preparePayload(patch,name=>readPatchFile(patch,name));}
   catch(error){console.error(`PRECONDITION FAILED: ${error.message}`);process.exit(1);}
   console.log(`Payload prepared from ${patch.sourceDir} (${(patch.edits||[]).length} edit(s)):`);
   for(const file of files) console.log(`  ${file.name}  ${file.bytes} bytes  ${file.sha256}`);
