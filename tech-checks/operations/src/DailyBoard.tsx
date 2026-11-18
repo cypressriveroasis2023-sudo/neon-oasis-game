@@ -195,8 +195,11 @@ export default function DailyBoard({api,session,openWorkspace,onTvChange,initial
   };
   const saveAssignment = () => { setAssigning(null); };
 
+  // The TV already reads fleet through TvFleetView. Mounting the dashboard here
+  // would publish that first read into the shared fleet cache and hide the
+  // sample TvFleetView takes when Camera Health or the map actually opens.
+  if(tv)return <TechCheckTvBoard counts={null} cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
   const fleetCounts=<FleetDashboard countsOnly session={session} navigate={openWorkspace} onSelectUnit={()=>undefined} openUnitHealth={()=>undefined} show={()=>undefined} historyReadEnabled={false} locationWritesEnabled={false} ownerManagementEnabled={false} ownerCensusEnabled={false} registerEquipment={()=>undefined}/>;
-  if(tv)return <TechCheckTvBoard counts={fleetCounts} cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>

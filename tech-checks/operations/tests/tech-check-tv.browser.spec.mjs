@@ -426,8 +426,10 @@ test('Owner saves rotation time and a remote timing update changes the TV interv
  await page.clock.fastForward(30000);await expect(board).toContainText('Page rotation 5s');
  await expect(board).toHaveAttribute('data-page','1');
  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','1');
- await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','2');
- expect(state.fleetReads).toBe(3);
+  await page.clock.fastForward(3000);await expect(board).toHaveAttribute('data-page','2');
+  // Exit TV shows the office count tiles, one fleet read. TV View reads the map once.
+  // The rotation changes above do not add another read.
+  expect(state.fleetReads).toBe(6);
 });
 
 
