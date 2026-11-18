@@ -39,6 +39,14 @@ export function familyFieldCounts(units:UnitCameraStatus[]):Record<UnitFamily,nu
  return totals;
 }
 
+/** Every unit of each make on this board, shop included. The field tiles stay
+ * on familyFieldCounts so a shop unit is never added to the field number. */
+export function familyBoardCounts(units:UnitCameraStatus[]):Record<UnitFamily,number>{
+ const totals:Record<UnitFamily,number>={avigilon:0,recon:0,alibi:0};
+ for(const unit of units)totals[familyOf(unit)]+=1;
+ return totals;
+}
+
 export const GROUPS:{id:Group;label:string;note:string}[]=[
  {id:'field',label:'In the field',note:'Units with a camera reporting from a customer site.'},
  {id:'attention',label:'Needs attention',note:'Field units with at least one camera not reporting as online.'},

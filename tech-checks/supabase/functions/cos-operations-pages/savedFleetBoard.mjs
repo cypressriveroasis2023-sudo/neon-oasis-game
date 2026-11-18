@@ -632,24 +632,35 @@ function reconcileFleetSnapshot(rawHealth, rawMap, now = Date.now()) {
 }
 
 // ../supabase/functions/cos-operations-pages/fleetShopProjection.ts
+var chicago = (at) => new Date(at).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+function supersededShopDetail(move, mhelpAt) {
+  const who = typeof move.recordedBy === "string" && move.recordedBy.trim() ? move.recordedBy.trim() : "the saved COS account";
+  return "mHelp says Field since " + chicago(mhelpAt) + ", app move to Shop on " + chicago(move.recordedAt) + " by " + who + " was overridden; confirm";
+}
 var uuid2 = (v) => typeof v === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
 function manualShopItems(value) {
-  if (value?.contract !== "COS_FLEET_SHOP_OVERRIDES_V1" || !Array.isArray(value.items) || value.items.length > 1e4 || value.items.some((r) => !uuid2(r.unitId) || !uuid2(r.auditId) || typeof r.unitNumber !== "string" || !r.unitNumber.trim() || r.placement !== "SHOP" || !Number.isFinite(Date.parse(r.recordedAt))) || value.items.some((r) => r.sourceBindings !== void 0 && (!Array.isArray(r.sourceBindings) || r.sourceBindings.length > 1e4 || r.sourceBindings.some((b) => !/^(?:[1-9]\d*)$/.test(b.productId) || !/^(?:[a-f0-9]{64})$/.test(b.sourceSha256)))) || new Set(value.items.map((r) => r.unitId)).size !== value.items.length) throw Error("Manual Shop placement is unavailable.");
+  if (value?.contract !== "COS_FLEET_SHOP_OVERRIDES_V1" || !Array.isArray(value.items) || value.items.length > 1e4 || value.items.some((r) => !uuid2(r.unitId) || !uuid2(r.auditId) || typeof r.unitNumber !== "string" || !r.unitNumber.trim() || r.placement !== "SHOP" || !Number.isFinite(Date.parse(r.recordedAt)) || r.recordedBy !== void 0 && (typeof r.recordedBy !== "string" || !r.recordedBy.trim() || r.recordedBy.length > 200)) || value.items.some((r) => r.sourceBindings !== void 0 && (!Array.isArray(r.sourceBindings) || r.sourceBindings.length > 1e4 || r.sourceBindings.some((b) => !/^(?:[1-9]\d*)$/.test(b.productId) || !/^(?:[a-f0-9]{64})$/.test(b.sourceSha256)))) || new Set(value.items.map((r) => r.unitId)).size !== value.items.length) throw Error("Manual Shop placement is unavailable.");
   return value.items;
 }
 function manualShopInventory(upload, receipt) {
   if (!upload?.records || !receipt) return upload;
   const moves = new Map(manualShopItems(receipt).map((r) => [r.unitId, r]));
+  const observed = Date.parse(upload.receivedAt);
+  const superseded = [];
   let count = 0;
   const records = upload.records.map((r) => {
     const m = [...moves.values()].find((m2) => (m2.sourceBindings || []).some((b) => b.productId === r.productId && (b.sourceSha256 === upload.sourceSha256 || upload.source === "mhelpdesk_api" && b.sourceUnitNumber === r.unitNumber))) || (r.binding?.state === "linked" && r.binding.unitIds?.length === 1 ? moves.get(r.binding.unitIds[0]) : null);
     if (!m || r.placement === "SHOP") return r;
+    if (upload.source === "mhelpdesk_api" && r.placement === "FIELD" && Number.isFinite(observed) && observed > Date.parse(m.recordedAt)) {
+      superseded.push({ unitId: m.unitId, unitNumber: m.unitNumber, auditId: m.auditId, recordedAt: m.recordedAt, mhelpAt: new Date(observed).toISOString(), recordedBy: typeof m.recordedBy === "string" && m.recordedBy.trim() ? m.recordedBy.trim() : "the saved COS account", detail: supersededShopDetail(m, new Date(observed).toISOString()) });
+      return r;
+    }
     count++;
     return { ...r, placement: "SHOP", cosManualShopAuditId: m.auditId };
   });
-  if (!count) return upload;
+  if (!count && !superseded.length) return upload;
   const summary = { ...upload.summary, fieldRecords: records.filter((r) => r.placement === "FIELD").length, shopRecords: records.filter((r) => r.placement === "SHOP").length, unflaggedFieldRecords: records.filter((r) => r.placement === "FIELD" && r.uploadLifecycle === "UNFLAGGED").length, unflaggedShopRecords: records.filter((r) => r.placement === "SHOP" && r.uploadLifecycle === "UNFLAGGED").length };
-  return { ...upload, records, summary, cosManualShopCount: count, cosPlacementBasis: "Accepted mHelp inventory plus confirmed COS Shop moves" };
+  return { ...upload, records, summary, cosManualShopCount: count, supersededShopMoves: superseded, ...count ? { cosPlacementBasis: "Accepted mHelp inventory plus confirmed COS Shop moves" } : {} };
 }
 
 // src/fleetDisplayAddress.ts
@@ -881,12 +892,17 @@ function readMhelpInventoryAuthority(value, now = Date.now()) {
 
 // src/fieldProductEvidence.ts
 function fieldProductEvidence(row, state, now = Date.now(), exact = null, requiredConnectionUnavailable = false) {
+  const providerReadingFresh = Boolean(row?.camera?.rows?.some((resource) => {
+    const stamps = [resource.evidence?.observedAt, resource.serviceEvidence?.observedAt];
+    return stamps.some((at) => cameraTimestamp(at, now).fresh);
+  }));
   if (exact && exact.status !== "unknown" && exact.status === state && exact.resourceId && cameraTimestamp(exact.checkedAt, now).fresh) {
     return {
       gap: null,
       association: "exact_product_id_tracker_endpoint",
       basis: "connection",
       observedAt: exact.checkedAt,
+      providerReadingFresh,
       video: "not_verified",
       observations: [{ resourceId: exact.resourceId, source: "Saved TCP/service-port check", kind: "connection", observedAt: exact.checkedAt, fresh: true, reportedStatus: exact.status, currentState: exact.status }]
     };
@@ -897,6 +913,7 @@ function fieldProductEvidence(row, state, now = Date.now(), exact = null, requir
       association: "exact_product_id_tracker_endpoint",
       basis: "connection",
       observedAt: null,
+      providerReadingFresh,
       video: "not_verified",
       observations: []
     };
@@ -907,6 +924,7 @@ function fieldProductEvidence(row, state, now = Date.now(), exact = null, requir
       association: "product_id_connection_unavailable",
       basis: "connection",
       observedAt: null,
+      providerReadingFresh,
       video: "not_verified",
       observations: []
     };
@@ -936,6 +954,7 @@ function fieldProductEvidence(row, state, now = Date.now(), exact = null, requir
     association: linked ? camera.association.kind : null,
     basis: linked ? basis : null,
     observedAt: linked ? cameraTimestamp(camera.checkedAt, now).at : null,
+    providerReadingFresh,
     video: "not_verified",
     observations
   };

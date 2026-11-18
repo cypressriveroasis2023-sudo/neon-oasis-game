@@ -20,7 +20,7 @@ export default function UnitTroubleshoot({unit,evidence,supported,onAction}:{
  const [ranAt,setRanAt]=useState('');
  const run=()=>{
   setResult(troubleshootUnit(unit,evidence||{}));
-  setRanAt(new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'}));
+  setRanAt(new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT');
  };
  return <section className='cos-troubleshoot' aria-label={'Troubleshoot '+unit.unit}>
   <button type='button' className='cos-troubleshoot-run cos-motion-sweep' onClick={run}>

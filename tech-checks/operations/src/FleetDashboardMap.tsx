@@ -14,9 +14,12 @@ import {readFieldMapView,saveFieldMapView} from './fieldMapViewState';
 import {useFieldMapDisplay} from './fieldMapDisplay';
 import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
+import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
+import {retryAddressMapPin} from './addressMapPinRetry';
 import 'leaflet/dist/leaflet.css';
 type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;};
 export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters}:Props){
+ const [pinRetry,setPinRetry]=useState<Record<string,'pin'|'both'|string>>({});
  const node=useRef<HTMLDivElement>(null),groupHost=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0);
@@ -169,7 +172,9 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    <p>These equipment records are still in mHelpDesk Field. Their recorded service addresses still need usable coordinates; no guessed marker is placed.</p>
    <ul>{mhelpAddressReviews.map(item=><li key={item.id}>
     <strong>{item.unitNumber}</strong> · Product {item.productId} · {item.customer} · {item.address||'Address incomplete'}
-    <small>{item.state==='no_match'?'Census did not match the recorded street address':item.reason}</small>
+    <small>{pinRetry[item.productId]==='both'?'Address cannot be placed. Fix it in mHelpDesk. COS does not write that address.':item.address&&parseAddress(item.address)?'Address couldn\'t be mapped automatically. Check it in mHelpDesk if it looks wrong.':'Address cannot be placed. Fix it in mHelpDesk. COS does not write that address.'}</small>
+    {typeof pinRetry[item.productId]==='string'&&pinRetry[item.productId]!=='both'&&pinRetry[item.productId]!=='pin'&&<small>Map pin only {pinRetry[item.productId]}. Not written to mHelp. Placement is unchanged.</small>}
+    {item.address&&parseAddress(item.address)&&<button type='button' onClick={()=>void retryAddressMapPin(item.address).then(result=>setPinRetry(current=>({...current,[item.productId]:result.pin?result.pin.join(', '):result.bothFailed?'both':'pin'})))}>Retry map pin</button>}
     <button type='button' onClick={()=>onSelectMhelpAddress?.(item.productId)}>Open unit record</button>
     {item.address&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.address)} target='_blank' rel='noopener noreferrer'>Search address on map ↗</a>}
    </li>)}</ul>
