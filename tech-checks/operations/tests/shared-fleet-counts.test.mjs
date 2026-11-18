@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {technicianTodos} from '../src/technicianTodos.ts';
 import {
-  aboutHeadline, applyExactRecorderLinks, cameraStatusHeadline, censusFromCameraUnits,
+  aboutHeadline, applyExactRecorderLinks, cameraStatusHeadline, censusFromCameraUnits, censusFromCommandProducts,
   exactEquipmentLinks, inventoryUnverifiedBreakdown, mapHeadline, routerOfflineFact, selectFleetCounts,
 } from '../src/sharedFleetCounts.ts';
 
@@ -30,6 +30,20 @@ test('camera status, the map and about this board read one selector', () => {
   assert.deepEqual(camera.units, {online: 1, offline: 1, unknown: 2});
   assert.deepEqual(camera.cameras, {online: 2, offline: 2, unknown: 2});
   assert.equal(selectFleetCounts(census, now).inShopUnits, 1);
+});
+
+test('field product inventory counts go through the same selector', () => {
+  const items = [
+    {productId: '1001', unitNumber: 'Sniper 1', status: 'online'},
+    {productId: '1002', unitNumber: 'Sniper 2', status: 'offline'},
+    {productId: '1003', unitNumber: 'Sniper 3', status: 'unverified'},
+    {productId: '1004', unitNumber: 'Stand 4', status: 'not_applicable'},
+    {productId: '1005', unitNumber: '', status: 'unverified'},
+  ];
+  const snapshot = selectFleetCounts(censusFromCommandProducts(items, now), now);
+  assert.deepEqual(snapshot.units, {online: 1, offline: 1, unknown: 2});
+  assert.deepEqual(mapHeadline(censusFromCommandProducts(items, now), now).units, snapshot.units);
+  assert.equal(snapshot.inShopUnits, 0);
 });
 
 test('a shop unit adds nothing and a stale miss stays unknown', () => {

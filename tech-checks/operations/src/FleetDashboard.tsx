@@ -37,7 +37,7 @@ import PhoneTechLanding from './PhoneTechLanding';
 import {phoneBoardCounts, phoneTechnicianTodos} from './phoneTechLanding';
 import FleetCountReadout from './FleetCountReadout';
 import InventoryUnverifiedList from './InventoryUnverifiedList';
-import {applyExactRecorderLinks,censusFromCameraUnits,censusFromDashboardRows,recorderLinksFromHealth,routerOfflineFact,selectFleetCounts} from './sharedFleetCounts';
+import {applyExactRecorderLinks,censusFromCameraUnits,censusFromCommandProducts,censusFromDashboardRows,recorderLinksFromHealth,routerOfflineFact,selectFleetCounts} from './sharedFleetCounts';
 import {STAR_UNIT_STATUS_CONTRACT,type UnitCameraStatus} from '../shared/starUnitStatus';
 import {readMhelpInventoryAuthority,showMhelpProductHeadline} from './mhelpInventoryAuthority';
 import {mhelpFieldHealth} from './mhelpFieldHealth';
@@ -299,7 +299,8 @@ function FleetDashboardLive({readingKey,initialPresentation,openMhelpConnection,
  const healthUnavailable=!connectionSourceReady;
  const heldHealth=(live:number|undefined,retained:number|undefined)=>
   healthUnavailable?(retained??'—'):(live??retained??'—');
- const sharedCounts=selectFleetCounts(applyExactRecorderLinks(cameraUnits?censusFromCameraUnits(cameraUnits,snapshotNow):censusFromDashboardRows(scope.map(row=>({name:row.displayName||row.name,placement:row.placement,support:row.support,cameraState:row.cameraState,checkedAt:row.camera.checkedAt})),snapshotNow),recorderLinksFromHealth(cameras.data?.rows),snapshotNow),snapshotNow);
+ const inventoryCensus=wholeSourceHeadline&&boardData?censusFromCommandProducts(boardData.items,snapshotNow):null;
+ const sharedCounts=selectFleetCounts(applyExactRecorderLinks(inventoryCensus??(cameraUnits?censusFromCameraUnits(cameraUnits,snapshotNow):censusFromDashboardRows(scope.map(row=>({name:row.displayName||row.name,placement:row.placement,support:row.support,cameraState:row.cameraState,checkedAt:row.camera.checkedAt})),snapshotNow)),inventoryCensus?[]:recorderLinksFromHealth(cameras.data?.rows),snapshotNow),snapshotNow);
  const headlineCounts=wholeSourceHeadline&&mhelpPhysical?{field:mhelpPhysical.field,
   online:heldHealth(sharedCounts.units.online,savedReading?.online),
   offline:heldHealth(sharedCounts.units.offline,savedReading?.offline),

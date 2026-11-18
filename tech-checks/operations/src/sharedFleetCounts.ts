@@ -157,6 +157,27 @@ export type DashboardCountRow = {
 };
 
 /** Linked fleet rows. One row is one camera unit. Channel rows are preferred when they are present. */
+export type CommandCountProduct = { status: string; unitNumber?: string | null; productId: string };
+
+/**
+ * Field Product IDs already classified by the command center.
+ * Support equipment is left out, so it adds 0 and raises no alert.
+ * Known online and offline readings are stamped at `now` because the command center already applied freshness.
+ */
+export function censusFromCommandProducts(items: readonly CommandCountProduct[], now = Date.now()): CountUnit[] {
+  const fresh = new Date(now).toISOString();
+  return items.filter(item => item.status !== 'not_applicable').map(item => {
+    const state = item.status === 'online' || item.status === 'offline' ? item.status : 'unknown';
+    return {
+      name: item.unitNumber || item.productId,
+      placement: 'field',
+      cameras: [cameraFromStatus(state, state === 'unknown' ? null : fresh)],
+      newestOnlineAt: state === 'online' ? now : null,
+      unverifiedReason: state === 'unknown' ? 'no_reading' : null,
+    };
+  });
+}
+
 export function censusFromDashboardRows(rows: readonly DashboardCountRow[], now = Date.now()): CountUnit[] {
   const fresh = new Date(now).toISOString();
   return rows.filter(row => !row.support).map(row => {
