@@ -204,7 +204,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
 }
 /** Dashboard sources can settle separately; complete views still require the pair.
  * Every source completion carries the same actor and invalidation checks. */
-async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetReads>{
+async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void,reread=false):Promise<FleetReads>{
     // Match the camera hook's attempt clock, including parent-auth and response
     // latency. Dating the cache at completion can skip the next scheduled read.
     const requestedAt=Date.now();
@@ -224,7 +224,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
         read:async refresh=>(await sendRequest<any>(refresh?'POST':'GET',refresh?'/api/fleet-saved-board/refresh':'/api/fleet-saved-board',session.token,refresh?{}:undefined)).data,
         current,status:value=>{if(current())publishDurableStatus(value);},publish,
         failed:()=>{if(current())window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}
-      },force)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});
+      },force&&!reread)).then(value=>{if(!current())throw new OperationsApiError('Your fleet session changed.',409);const accepted={...value,readRevision:generation};fleetSnapshots.set(key,{value:accepted,at:Date.parse(value.readAt)});return accepted;});
       const health=paired.then(value=>value.health),fieldMap=paired.then(value=>value.fieldMap);
       const reads={revision:generation,paired,health,fieldMap,connectionMap:fieldMap};
       for(const part of [paired,health,fieldMap])void part.catch(()=>{});
@@ -233,7 +233,7 @@ async function readFleet(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Pr
     }
     const saved=fleetSnapshots.get(key);
     if(force&&!pendingFleetSnapshots.has(key))clearSharedReads();
-    if(!force&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
+    if(!force&&!reread&&saved&&Date.now()-saved.at<CAMERA_AUTO_REFRESH_MS)return {revision:saved.value.readRevision??0,health:Promise.resolve(saved.value.health),fieldMap:Promise.resolve(saved.value.fieldMap),connectionMap:Promise.resolve(saved.value.fieldMap),paired:Promise.resolve(saved.value)};
     // Only the newly authorized actor may see the dated complete saved pair.
     // This callback does not renew the cache or any observation timestamps.
     if(saved)onSaved?.(saved.value);
@@ -361,7 +361,7 @@ export const api = {
   fleet: async(force=false,onSaved?:(snapshot:FleetSnapshot)=>void):Promise<FleetSnapshot>=>(await readFleet(force,onSaved)).paired,
   fleetConnectionMap:async(force=false,expectedSourceSha?:string):Promise<FleetSnapshot['fieldMap']>=>(await readFleetConnectionMap(force,expectedSourceSha)).map,
   fleetConnectionMapRead:readFleetConnectionMap,
-  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],
+  fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false,reread=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force,undefined,reread&&!force))[source] as FleetSnapshot[K],
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);
 export function openLegacy(route: string) {

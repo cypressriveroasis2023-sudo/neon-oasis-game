@@ -15,6 +15,15 @@ export const CONNECTION_AUTO_REFRESH_MS=2*60*1000;
 // health/map pair, never vendor probes, and this value is also the saved-pair
 // cache TTL in api.ts.
 export const CAMERA_AUTO_REFRESH_MS=10*60*1000;
+// The TV rereads the saved board on its own clock. James approved 2 minutes
+// on 2026-11-17. The dashboard cache and the 10-minute camera cadence above
+// stay where they are.
+export const TV_SAVED_BOARD_REFRESH_MS=2*60*1000;
+// The server publishes a saved board on a 5-minute cadence. A 2-minute TV
+// reread can still be holding that board, and a build can still be in flight,
+// so "not current" means a whole server cycle was missed: two intervals.
+export const TV_SERVER_BOARD_MS=5*60*1000;
+export const TV_SAVED_BOARD_STALE_MS=2*TV_SERVER_BOARD_MS;
 export function automaticRefreshDue(lastAttemptAt:number,now:number,hidden:boolean,intervalMs=AUTO_REFRESH_MS) {
   return !hidden && Number.isFinite(now) && (lastAttemptAt===0 || now-lastAttemptAt>=intervalMs);
 }

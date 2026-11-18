@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS,automaticRefreshDue} from '../src/refreshCadence.ts';
+import {AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS,TV_SAVED_BOARD_REFRESH_MS,TV_SERVER_BOARD_MS,TV_SAVED_BOARD_STALE_MS,automaticRefreshDue} from '../src/refreshCadence.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 test('automatic refresh waits fifteen minutes and never runs while hidden',()=>{const start=1_000_000;assert.equal(AUTO_REFRESH_MS,900_000);for(const age of [0,1_000,60_000,899_999])assert.equal(automaticRefreshDue(start,start+age,false),false);assert.equal(automaticRefreshDue(start,start+900_000,false),true);assert.equal(automaticRefreshDue(start,start+900_000,true),false);assert.equal(automaticRefreshDue(start,start+3600_000,true),false);});
 test('returning to a recent tab and backwards clock movement do not force reads',()=>{assert.equal(automaticRefreshDue(1000,2000,false),false);assert.equal(automaticRefreshDue(2000,1000,false),false);assert.equal(automaticRefreshDue(0,1000,true),false);});
@@ -14,6 +14,10 @@ test('camera saved-data reads have their own visible-tab interval, shorter than 
  // value is asserted as well as the relationships it has to satisfy. The
  // relational checks alone would let the requirement drift silently.
  assert.equal(CAMERA_AUTO_REFRESH_MS,600_000,'approved camera saved-read cadence is 10 minutes');
+ assert.equal(TV_SAVED_BOARD_REFRESH_MS,120_000,'the TV rereads the saved board every 2 minutes');
+ assert.equal(TV_SERVER_BOARD_MS,300_000,'the server publishes a saved board every 5 minutes');
+ assert.equal(TV_SAVED_BOARD_STALE_MS,2*TV_SERVER_BOARD_MS,'not current means a whole server cycle was missed, not the 2-minute reread');
+ assert.ok(TV_SAVED_BOARD_STALE_MS>TV_SAVED_BOARD_REFRESH_MS*2,'a 4-minute label would mark a normal 5-minute board stale');
  assert.equal(AUTO_REFRESH_MS,900_000,'the default interval for routers, power and other consumers is unchanged');
  assert.ok(CAMERA_AUTO_REFRESH_MS<AUTO_REFRESH_MS,'camera evidence is read more often than default consumers');
  for(const age of [0,60_000,CAMERA_AUTO_REFRESH_MS-1])assert.equal(automaticRefreshDue(start,start+age,false,CAMERA_AUTO_REFRESH_MS),false);

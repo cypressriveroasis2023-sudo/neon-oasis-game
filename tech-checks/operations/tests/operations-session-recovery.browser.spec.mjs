@@ -46,7 +46,7 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
 const refresh=app=>app.getByRole('button',{name:'↻ Refresh data',exact:true});
 const privateView=app=>app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
 async function reasons(app){return app.locator('body').evaluate(()=>window.recoveryInvalidations.map(event=>event.reason));}
-async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click();await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
+async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click({noWaitAfter:true});await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
 async function blocked(app){await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');await expect(app.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);}
 function readOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);}
 
@@ -60,7 +60,7 @@ test('same Owner token renewal clears private views and restores camera, map and
 });
 
 test('one ten-second parent timeout revalidates only the same Owner and restores Refresh',async({page})=>{
- const {app,state,initialSessions}=await mount(page);await page.evaluate(()=>window.dropNextHandshake=true);await refresh(app).click();await page.clock.runFor(10000);await expect.poll(()=>reasons(app)).toEqual(['parent-timeout']);await page.clock.runFor(1);
+ const {app,state,initialSessions}=await mount(page);await page.evaluate(()=>window.dropNextHandshake=true);await refresh(app).click({noWaitAfter:true});await page.clock.runFor(10000);await expect.poll(()=>reasons(app)).toEqual(['parent-timeout']);await page.clock.runFor(1);
  await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);await expect(refresh(app)).toBeEnabled();await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('1');readOnly(state);
 });
 for(const [label,patch] of [['changed actor',{productionOwnerUserId:'22222222-2222-4222-8222-222222222222'}],['permission downgrade',{features:{...owner.features,vrmRead:false}}],['changed role',{legacyOwner:false,role:'IT',productionOwnerUserId:null}]])test(label+' cannot recover the prior Owner private views',async({page})=>{
@@ -137,7 +137,7 @@ test('GPS draft waiting for an address digest cannot submit after session invali
 
 for(const status of [401,403])for(const timing of ['during','after'])test(`obsolete source ${status} ${timing} verified renewal keeps Owner Fleet available`,async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),old=deferred(),verification=deferred();old.status=status;state.routerGate=old;
- await refresh(app).click();await expect.poll(()=>state.routerGate).toBe(null);await expect(refresh(app)).toBeEnabled();
+ await refresh(app).click({noWaitAfter:true});await expect.poll(()=>state.routerGate).toBe(null);await expect(refresh(app)).toBeEnabled();
  state.sessionGate=verification;await renewal(page,app);await expect.poll(()=>state.sessionReads).toBe(initialSessions+1);
  if(timing==='after'){verification.resolve();await expect(refresh(app)).toBeEnabled();}
  old.resolve();await expect.poll(()=>state.oldRouterDelivered).toBe(true);
