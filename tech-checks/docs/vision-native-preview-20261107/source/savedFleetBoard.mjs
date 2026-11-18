@@ -441,7 +441,7 @@ function fieldRecorderObservation(unit, identity, rows, health, now = Date.now()
 }
 
 // src/fieldCameraHealth.ts
-var cameraLabels = { online: "Camera records online", offline: "Camera outage observed", unknown: "Camera status unverified", shop: "In Shop" };
+var cameraLabels = { online: "Camera records online", offline: "Camera outage observed", unknown: "Camera status unverified" };
 function validateCameraHealth(value) {
   const object5 = (v) => v && typeof v === "object" && !Array.isArray(v);
   if (!object5(value) || ["totalDevices", "online", "offline", "review", "shopRoot", "healthRows", "fieldDevices"].some((key) => !Number.isSafeInteger(value[key]) || value[key] < 0) || !Array.isArray(value.rows) || value.rows.some((r) => !object5(r) || typeof r.id !== "string" && typeof r.id !== "number" || String(r.id).trim() === "" || typeof r.name !== "string" || typeof r.unit !== "string" || !["online", "offline", "review"].includes(r.status)) || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt))) throw new Error("Camera Health returned an incomplete summary.");
@@ -511,7 +511,7 @@ function fieldCameraHealth(unit, units, health, now = Date.now()) {
     const detail = association.identity.kind === "reconeyez_area" ? "Reviewed provider-area group: " + detectorStates.filter((state3) => state3 === "online").length + " of " + rows2.length + " detector records recently online; " + detectorStates.filter((state3) => state3 === "offline").length + " offline; " + detectorStates.filter((state3) => !["online", "offline"].includes(state3)).length + " unverified. Bridge contact is shown separately." : observation.basis === "recorder" ? "This observation describes the recorder. Individual camera channels and video are not verified." : observation.basis === "connection" ? "The saved IP / port observation describes service reachability. Camera video is not verified." : "Expected camera channel coverage is unknown; reported records do not verify every camera or video.";
     const freshness = state2 === "unknown" ? " Source records are mixed, stale, missing, or unverified; silence is not a confirmed outage." : "";
     const placement = fieldRecorder ? " Current Field installation and exact recorder identity are verified. Legacy provider folder/activation remains recorded separately; this observation does not move equipment." : classification2.scope === "unknown" ? " LOCATION REVIEW: saved placement is unresolved." : ["shop", "inactive"].includes(classification2.scope) ? " PLACEMENT CONFLICT: source inventory says " + classification2.scope.toUpperCase() + " while this record is in the field map. The source observation does not move equipment." : "";
-    return presentShop({ state: state2, reason: detail + freshness + placement, rows: rows2, unitKey: association.identity.unitKeys[0], checkedAt: observation.checkedAt, identity: "matched", classification: classification2, basis: observation.basis, observation, association: association.identity }, unit);
+    return { state: state2, reason: detail + freshness + placement, rows: rows2, unitKey: association.identity.unitKeys[0], checkedAt: observation.checkedAt, identity: "matched", classification: classification2, basis: observation.basis, observation, association: association.identity };
   }
   const key = scopedFieldIdentity(unit);
   if (!key) return unknown2("No verified equipment-to-resource association is available for this saved identifier. Review its identity; source status is not inferred from a similar name.");
@@ -531,23 +531,12 @@ function fieldCameraHealth(unit, units, health, now = Date.now()) {
   const checkedAt = healthObservationTime(direct ? safeRows : cameras, direct ? "connection" : "camera", state, now);
   const location = classification.scope === "unknown" ? " LOCATION REVIEW: saved placement is unresolved." : ["shop", "inactive"].includes(classification.scope) ? " PLACEMENT CONFLICT: camera inventory says " + (classification.scope === "shop" ? "SHOP / ROOT" : "INACTIVE") + " while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit." : "";
   const reason = health.evidenceVersion !== 2 ? "Source-separated observations are not available in this response." : !operational ? "Shop/root or inactive inventory is excluded from operational camera colors." : state === "offline" ? "At least one matched camera/detector has a recent provider OFFLINE observation." : state === "online" ? "Reported camera/detector records are recently ONLINE. Expected channel coverage is unknown; this does not verify every camera." : cameras.length ? "Camera/detector observations are older, missing, or unverified. Silence is not a confirmed outage." : "Camera channel status unavailable. Recorder and service observations remain separate.";
-  return presentShop({ state, identity: "matched", rows, unitKey: rows[0].unit, checkedAt, classification, basis: direct ? "connection" : "camera", reason: (direct ? (state === "online" ? "The saved IP / port check responded." : state === "offline" ? "The saved IP / port checks confirmed no response." : "No recent definitive IP / port result is available.") + " This is connection status; camera video is not verified. Location confidence does not change this connection result." : reason) + location }, unit);
-}
-function unitPlacedInShop(unit) {
-  const extra = unit;
-  const value = String(extra.placement || extra.currentLocationType || "").toLowerCase();
-  return value === "shop" || value === "root" || value === "warehouse" || value === "yard";
-}
-function presentShop(result, unit) {
-  if (!unitPlacedInShop(unit) || result.state !== "online" && result.state !== "offline") return result;
-  return { ...result, state: "shop", savedReading: result.state, reason: result.reason.replace(/\boffline\b/gi, "not answering") };
+  return { state, identity: "matched", rows, unitKey: rows[0].unit, checkedAt, classification, basis: direct ? "connection" : "camera", reason: (direct ? (state === "online" ? "The saved IP / port check responded." : state === "offline" ? "The saved IP / port checks confirmed no response." : "No recent definitive IP / port result is available.") + " This is connection status; camera video is not verified. Location confidence does not change this connection result." : reason) + location };
 }
 function unitHealthLabel(info) {
-  if (info?.state === "shop") return "In Shop";
   if (info?.state === "support") return "SUPPORT EQUIPMENT \xB7 0 CAMERAS";
   if (info?.observation) return info.observation.label;
-  const shown = info?.state === "online" || info?.state === "offline" || info?.state === "unknown" ? info.state : "unknown";
-  return info?.basis === "connection" ? { online: "IP / PORT ONLINE", offline: "IP / PORT OFFLINE", unknown: "IP / PORT UNKNOWN" }[shown] : cameraLabels[shown];
+  return info?.basis === "connection" ? { online: "IP / PORT ONLINE", offline: "IP / PORT OFFLINE", unknown: "IP / PORT UNKNOWN" }[info.state] : cameraLabels[info?.state || "unknown"];
 }
 
 // shared/gpsValidation.ts
@@ -984,7 +973,7 @@ function readExactProductConnections(value, sourceSha256, expectedFieldIds, now 
   if (expected.size !== expectedFieldIds.length) return null;
   const result = /* @__PURE__ */ new Map(), seen = /* @__PURE__ */ new Set();
   for (const raw of value.items) {
-    if (!object4(raw) || !ID.test(raw.productId) || seen.has(raw.productId) || !["online", "offline", "verifying", "unknown"].includes(raw.status) || raw.basis !== "tcp_service_port" || typeof raw.reason !== "string" || raw.reason.length > 300 || !(raw.resourceId === null || deviceId(raw.resourceId) === raw.resourceId)) return null;
+    if (!object4(raw) || !ID.test(raw.productId) || seen.has(raw.productId) || !["online", "offline", "unknown"].includes(raw.status) || raw.basis !== "tcp_service_port" || typeof raw.reason !== "string" || raw.reason.length > 300 || !(raw.resourceId === null || deviceId(raw.resourceId) === raw.resourceId)) return null;
     if (raw.status === "unknown" && (raw.resourceId !== null || raw.checkedAt !== null)) return null;
     const observed = raw.status === "unknown" ? null : cameraTimestamp(raw.checkedAt, now);
     if (raw.status !== "unknown" && (!raw.resourceId || !observed?.at)) return null;
@@ -1071,7 +1060,7 @@ function fieldProductFollowUp(state, reason, exactUnknownReason, directSourceUna
 var PROVIDER_REPORTED = "Provider-reported, not direct-connection verified. ";
 var DIRECT_SOURCE_GAP = "No direct connection check is available (the Product-ID connection source is unavailable, stale or does not match the current inventory). ";
 var CURRENT_SOURCE_CONFLICT = "Current direct connection and verified provider status disagree. No outage is assigned until the sources agree. ";
-var fieldHealthLabels = { online: "Online", offline: "Offline", verifying: "Verifying", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive", shop: "In Shop" };
+var fieldHealthLabels = { online: "Online", offline: "Offline", unverified: "Health unverified", support: "Solar / support \u2014 no cameras", unlinked: "Health not linked", review: "Identity / placement review", inactive: "Do Not Use / Missing / inactive" };
 function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnectionReceipt = void 0) {
   const authority = readMhelpInventoryAuthority(value, now);
   if (!authority || !roster || !readRecordedRoster(roster).roster) return null;
@@ -1095,9 +1084,6 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
     if (product2.uploadLifecycle !== "UNFLAGGED") {
       state = "inactive";
       reason = product2.uploadLifecycle === "MISSING" ? "Marked Missing in the reviewed mHelpDesk source." : "Marked Do Not Use in the reviewed mHelpDesk source.";
-    } else if (record2?.placement === "shop" || row?.placement === "shop") {
-      state = "shop";
-      reason = "A unit placed in Shop is not an outage.";
     } else if (record2?.kind === "identity_review" || record2 && record2.placement !== "field" || binding?.state === "held" || binding?.placementHeld === true || binding?.candidateUnitIds?.length) {
       state = "review";
       reason = record2?.reviewReason || "The saved identity or physical placement needs review. Health from a possible match is not assigned to this product.";
@@ -1119,17 +1105,11 @@ function mhelpFieldHealth(value, roster, rows, now = Date.now(), exactConnection
         reason = directSourceUnavailable ? "The exact Product-ID TCP source is unavailable, stale or does not match the current inventory. Connection status is Unknown." : exact.reason;
       }
     } else if (exactAllowed && exact) {
-      if (exact.status === "verifying") {
-        state = "verifying";
-        reason = exact.reason;
-      } else if (reviewedProvider && row.cameraState !== exact.status) {
+      if (reviewedProvider && row.cameraState !== exact.status) {
         state = "unverified";
         reason = CURRENT_SOURCE_CONFLICT + "Direct: " + exact.reason + " Provider: " + unitHealthLabel(row.camera) + ".";
-      } else if (exact.status === "online") {
-        state = "online";
-        reason = exact.reason;
       } else {
-        state = "offline";
+        state = exact.status === "online" ? "online" : "offline";
         reason = exact.reason;
       }
     } else if (!record2) {
@@ -1184,7 +1164,7 @@ function mhelpProviderFleet(upload, health, healthReadSucceeded, now = Date.now(
   for (const product2 of products) {
     const provider = mhelpProviderFamily(product2.category, product2.unitNumber);
     const linked = healthById.get(product2.productId) || null;
-    const healthStatus = provider === "support" || linked?.state === "shop" ? "not_applicable" : usable && (linked?.state === "online" || linked?.state === "offline") ? linked.state : "unverified";
+    const healthStatus = provider === "support" ? "not_applicable" : usable && (linked?.state === "online" || linked?.state === "offline") ? linked.state : "unverified";
     const reason = provider === "support" ? "Support equipment has no camera-health requirement. Verify its power separately." : !usable ? "Latest Field camera health is unavailable. No offline condition is inferred." : product2.uploadLifecycle && product2.uploadLifecycle !== "UNFLAGGED" ? "Source is marked Do Not Use / Missing. Do not activate from a saved connection." : linked?.reason || "No verified Product-ID-to-camera association. Not counted as an outage.";
     const group = groupByProvider.get(provider);
     group.count++;
@@ -1233,16 +1213,15 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
   if (items.length !== authority.field || new Set(items.map((p) => p.productId)).size !== authority.field)
     throw Error("Field inventory violates unique Product-ID accounting.");
   const count = (status) => items.filter((p) => p.status === status).length;
-  const shopCount = items.filter((p) => p.linked?.state === "shop").length;
   const counts = {
     online: count("online"),
     offline: count("offline"),
     unverified: count("unverified"),
-    support: count("not_applicable") - shopCount,
-    attention: items.filter((p) => p.linked?.state !== "shop" && (p.status === "offline" || p.status === "unverified" || p.mappingIssue)).length,
+    support: count("not_applicable"),
+    attention: items.filter((p) => p.status === "offline" || p.status === "unverified" || p.mappingIssue).length,
     unmapped: validAddresses ? validAddresses.unlocated : 0
   };
-  if (counts.online + counts.offline + counts.unverified + counts.support + shopCount !== authority.field || authority.field + authority.shop !== authority.total) throw Error("Fleet accounting does not reconcile.");
+  if (counts.online + counts.offline + counts.unverified + counts.support !== authority.field || authority.field + authority.shop !== authority.total) throw Error("Fleet accounting does not reconcile.");
   const panels = ["star4live", "avigilon", "reconeyez"].map((key) => {
     const group = provider.groups.find((g) => g.provider === key);
     return {

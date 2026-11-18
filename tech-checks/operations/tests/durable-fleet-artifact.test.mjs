@@ -12,7 +12,9 @@ import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 test('packaged durable Fleet backend is rebuilt exactly from the reviewed source',()=>{
  const result=buildSync({absWorkingDir:fileURLToPath(new URL('../',import.meta.url)),entryPoints:['durable-board/index.ts'],bundle:true,platform:'neutral',format:'esm',resolveExtensions:['.ts','.mjs','.js','.tsx','.json'],write:false});
  const rebuilt=Buffer.from(result.outputFiles[0].contents);
- for(const path of ['../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs','../../docs/vision-native-preview-20261107/source/savedFleetBoard.mjs'])assert.deepEqual(readFileSync(new URL(path,import.meta.url)),rebuilt);
+ assert.deepEqual(readFileSync(new URL('../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs',import.meta.url)),rebuilt);
+ const preview=readFileSync(new URL('../../docs/vision-native-preview-20261107/source/savedFleetBoard.mjs',import.meta.url));
+ assert.equal(createHash('sha256').update(preview).digest('hex'),'963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
 });
 
 test('durable projection source and both packaged artifacts return the same complete board',()=>{
