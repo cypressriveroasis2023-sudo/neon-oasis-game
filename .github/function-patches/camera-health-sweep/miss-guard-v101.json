@@ -1,0 +1,26 @@
+{
+ "description": "Replace the live camera-health-sweep v101 entry with a pin to the guarded sweep. Same probe-ready set. One retry per unit, 5 second cellular connect timeout, 60 second per-shard deadline, overlap lock, and a mass-failure guard. Preparation only. Do not deploy until the 3-miss readers are live.",
+ "authorization": "James Martin approved this at 3:12 PM CT on Nov 17, 2026, after the 3-miss rule and the mass-failure guards. This pull request does not deploy it.",
+ "releaseStatus": "PREPARATION_ONLY",
+ "slug": "camera-health-sweep",
+ "projectRef": "goqrnolcvqnirjmzaeyk",
+ "sourceDir": ".github/function-patches/camera-health-sweep/guarded",
+ "entrypointPath": "index.ts",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE",
+  "version": 101,
+  "ezbr_sha256": "bc7a26fb276334d1205de0fa5f3b2a58eb51949a427045fa47927c2f2426e4d1"
+ },
+ "deployedFileNames": {
+  "index.ts": "index.ts"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "9f48200ca7e6e791722074d65e144504362efd23870ace1626d13df22f823734"
+ },
+ "expectedAfter": {
+  "index.ts": "9f48200ca7e6e791722074d65e144504362efd23870ace1626d13df22f823734"
+ },
+ "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/camera-health-sweep/rollback-to-v101.json --deploy"
+}
