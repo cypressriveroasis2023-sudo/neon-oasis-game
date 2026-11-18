@@ -17,6 +17,7 @@ test('separate views explain populations and original observation times without 
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:fail?503:200,headers:cors,json:fail?{error:'Synthetic read failed'}:report}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const scope=app.getByRole('region',{name:'Camera status sources and scope'});
  await expect(scope).toContainText('Separate provider readings');
  await expect(scope).toContainText('This sync time does not date the other sources');
@@ -38,6 +39,7 @@ test('unavailable sources are unknown coverage, not zero healthy units',async({p
  const partial={...report,units:[units[0]],counts:countUnits([units[0]]),otherSourcesRead:false,feed:{...report.feed,fresh:false}};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:partial}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const scope=app.getByRole('region',{name:'Camera status sources and scope'});
  await expect(scope).toContainText('Not current');
  await scope.getByText('Sources, coverage and reading times',{exact:true}).click();
@@ -51,6 +53,7 @@ test('up evidence stays make-scoped and never labels a connection as verified vi
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:{...report,units:upUnits,counts:countUnits(upUnits)}}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const explanation=app.getByLabel('What the up count proves',{exact:true});
  await expect(explanation).toContainText('1 unit connections reachable · 1 camera groups reported up · 1 detector groups reported up');
  await expect(explanation).toContainText('These checks do not verify live video or recording');
@@ -72,5 +75,5 @@ test('stale offline history stays visible without claiming a current outage',asy
  const row=app.locator('.cos-camera-status-row').filter({hasText:'Historic detector'});
  await expect(row).toContainText('Not verified: Historic detector (not verified; last reported offline');
  await expect(row).not.toContainText('Down: Historic detector');
- await expect(app.getByRole('button',{name:'DOWN 0',exact:true})).toBeVisible();
+ await expect(app.getByRole('group',{name:'Field cameras up, down and unknown'})).toContainText('Down 0');
 });

@@ -35,6 +35,10 @@ test('Camera status lists Avigilon, Reconeyez and Star4Live units with their sou
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
  await openFleetView(app,'Camera status');
+ await expect(app.getByRole('button',{name:'↻ Refresh data'})).toHaveCount(0);
+ await expect(app.locator('.cos-camera-status-read').getByRole('button',{name:'↻ Refresh'})).toHaveCount(1);
+ await expect(app.locator('.cos-camera-status-read')).toContainText('12:55:00 PM CT');
+ await expect(app.getByText('All Avigilon on board: 3')).toBeVisible();
  await expect(app.locator('.cos-camera-status-row')).toHaveCount(9);
  await expect(row(app,'SNIPER 004').locator('.cos-camera-status-detail')).toContainText('AvigilonDown');
  await expect(row(app,'SNIPER 004')).toContainText('The unit did not answer.');
@@ -107,6 +111,7 @@ test('clicking a count tile shows exactly the units it counts, and the list says
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const rows=app.locator('.cos-camera-status-row');
  await expect(rows).toHaveCount(9);
  await app.getByRole('button',{name:/^DOWN/}).click();
@@ -184,30 +189,55 @@ test('a unit the provider names wrong can be renamed, and then reads as Avigilon
   down:[{name:'Sniper Alibi 243',status:'offline'}],cameraList:[{name:'Sniper Alibi 243',status:'offline',atSite:false}]});
  const one={...report,units:[recorder],counts:countUnits([recorder])};
  const sent=[];
+ let holdNextRead=false;
+ let releaseStaleRead=()=>{};
+ let markStaleDelivered=()=>{};
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
- await page.route('**/functions/v1/cos-unit-camera-status',route=>{
+ await page.route('**/functions/v1/cos-unit-camera-status',async route=>{
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
   const body=JSON.parse(route.request().postData()||'{}');
-  if(body.path&&body.path.endsWith('/edit')){
+  const editing=Boolean(body.path&&body.path.endsWith('/edit'));
+  if(editing){
    sent.push(body.body);
-   const renamed={...recorder,displayName:body.body.action==='clear'?undefined:body.body.value};
+   const renamed={...recorder,displayName:body.body.value};
    return route.fulfill({status:200,headers:cors,json:{...one,units:[renamed],counts:countUnits([renamed]),
     recorded:{unit:'Sniper Alibi 243',field:'name',action:body.body.action||'set',value:body.body.value??null,by:'Fixture Owner',role:'owner',duplicate:false}}});
+  }
+  // A later status read keeps the provider's old name. It must not be copied
+  // back onto the screen when that read started before the save.
+  if(holdNextRead){
+   holdNextRead=false;
+   await new Promise(resolve=>{releaseStaleRead=resolve;});
+   await route.fulfill({status:200,headers:cors,json:one});
+   markStaleDelivered();
+   return;
   }
   return route.fulfill({status:200,headers:cors,json:one});
  });
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  await app.getByRole('button',{name:/^In the shop/}).first().click();
  const before=app.locator('.cos-camera-status-row').filter({hasText:'Sniper Alibi 243'});
  await expect(before.locator('.cos-camera-status-source')).toHaveText('Alibi');
  await before.getByRole('button',{name:'Open →'}).click();
  const panel=app.getByRole('form',{name:'Unit panel for Sniper Alibi 243'});
  await panel.getByLabel('Name').fill('Sniper 243');
+ holdNextRead=true;
+ const staleDelivered=new Promise(resolve=>{markStaleDelivered=resolve;});
+ const followUp=page.waitForRequest(request=>request.url().includes('/functions/v1/cos-unit-camera-status')&&!(JSON.parse(request.postData()||'{}').path||'').endsWith('/edit'));
+ await app.locator('.cos-camera-status-read').getByRole('button',{name:'↻ Refresh',exact:true}).click();
+ await followUp;
  await panel.getByRole('button',{name:'Save name'}).click();
+ await expect(app.locator('.cos-camera-status-saved')).toContainText('name set to Sniper 243');
  expect(sent[0]).toMatchObject({unitKey:'Sniper Alibi 243',field:'name',value:'Sniper 243'});
  const after=app.locator('.cos-camera-status-row').filter({hasText:'Sniper 243'});
  await expect(after.locator('strong')).toContainText('Sniper 243');
  await expect(after.locator('.cos-camera-status-source')).toHaveText('Avigilon');
+ releaseStaleRead();
+ await staleDelivered;
+ await expect(after.locator('strong')).toContainText('Sniper 243');
+ await expect(after.locator('.cos-camera-status-source')).toHaveText('Avigilon');
+ await expect(app.locator('.cos-camera-status-row strong').filter({hasText:'Sniper Alibi 243'})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('camera-status-rename.png')});
 });
 
@@ -217,6 +247,7 @@ test('make-filtered status totals match the rows and map selection reveals anoth
  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST,OPTIONS'};
  await page.route('**/functions/v1/cos-unit-camera-status',route=>route.request().method()==='OPTIONS'?route.fulfill({status:204,headers:cors}):route.fulfill({status:200,headers:cors,json:report}));
  await openFleetView(app,'Camera status');
+ await app.locator('.cos-camera-about > summary').click();
  const rows=app.locator('.cos-camera-status-row');
  await app.getByRole('button',{name:/^AVIGILON/}).click();
  await expect(rows).toHaveCount(3);

@@ -47,3 +47,12 @@ test('an ungeocodable address is a read-only mHelp fix, and a shop address is no
   assert.match(todos[0].detail, /Fix it in mHelpDesk/);
   assert.match(todos[0].detail, /does not write/);
 });
+
+test('a complete address stays off the fix-mHelp wording until both lookups fail', () => {
+  const address = '2850 Twinwood Pkwy, Brookshire, TX 77423';
+  const open = technicianTodos({addresses: [{unit: 'SOLAR SPOTTER 12', productId: 'p9', placement: 'FIELD', address}]});
+  assert.match(open[0].detail, /couldn't be mapped automatically/);
+  assert.doesNotMatch(open[0].detail, /Fix it in mHelpDesk/);
+  const failed = technicianTodos({addresses: [{unit: 'SOLAR SPOTTER 12', productId: 'p9', placement: 'FIELD', address, bothLookupsFailed: true}]});
+  assert.match(failed[0].detail, /Fix it in mHelpDesk/);
+});
