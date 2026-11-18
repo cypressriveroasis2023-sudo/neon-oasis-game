@@ -18,8 +18,14 @@ function fitDailyFrame() {
   const viewportTop = viewport?.offsetTop || 0, viewportHeight = viewport?.height || window.innerHeight;
   const frameTop = frame.getBoundingClientRect().top;
   if (![viewportTop,viewportHeight,frameTop].every(Number.isFinite) || viewportHeight <= 0) return;
-  const remaining = viewportTop + viewportHeight - Math.max(frameTop,viewportTop) - 12;
-  const height = Math.max(1, Math.floor(Math.min(viewportHeight,remaining))) + 'px';
+  // The phone nav is the next sibling of the board. Keep its height inside the
+  // viewport: a scroll-into-view otherwise grows the frame over Check out / Check in
+  // and the click lands on the fleet frame.
+  const nav = frame.parentElement?.parentElement?.querySelector(':scope > nav.cos-it-handoff-actions');
+  const navHeight = nav?.getBoundingClientRect?.().height;
+  const reserved = Number.isFinite(navHeight) ? Math.ceil(navHeight) : 0;
+  const remaining = viewportTop + viewportHeight - Math.max(frameTop,viewportTop) - 12 - reserved;
+  const height = Math.max(1, Math.floor(Math.min(viewportHeight - reserved, remaining))) + 'px';
   if (frame.style.height !== height) frame.style.height = height;
 }
 function mainWorkspaceLink(href){

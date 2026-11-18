@@ -56,6 +56,10 @@ test('daily frame follows available viewport height without resizing fullscreen 
   frame.getBoundingClientRect=()=>({top:NaN});fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
   frame.style.position='fixed';fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
   frame.style.position='';frame.isConnected=false;fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
+  const nav={getBoundingClientRect:()=>({height:116.2})};
+  frame.parentElement={parentElement:{querySelector:selector=>selector===':scope > nav.cos-it-handoff-actions'?nav:null}};
+  frame.getBoundingClientRect=()=>({top:142});frame.style.position='';frame.isConnected=true;
+  fit(frame,{innerHeight:844});assert.equal(frame.style.height,'573px');
   assert.doesNotMatch(host,/min-height:(500|560)px/);
 });
 
