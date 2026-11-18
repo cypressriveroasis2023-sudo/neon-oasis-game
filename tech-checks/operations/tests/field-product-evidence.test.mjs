@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductEvidence,fieldProductEvidenceCsv} from '../src/fieldProductEvidence.ts';
+import {unverifiedTile} from '../src/fleetEquipmentTotalsModel.ts';
 import {fleetAddressHealth} from '../src/fleetStatusPins.ts';
 import {buildExactProductConnections,VERIFIED_TRACKER_IP_CONTRACT,TRACKER_IP_WORKBOOK} from '../src/exactProductConnection.ts';
 
@@ -12,6 +13,9 @@ test('a legacy name match cannot give a Product ID positive health or a green ad
  const view=mhelpFieldHealth(f.upload,f.roster,f.rows,f.now),item=view.items[0];
  assert.equal(item.state,'unlinked');assert.equal(item.unitId,f.units[0].id);
  assert.equal(item.evidence.gap,'device_link_needed');assert.deepEqual(item.evidence.observations,[]);
+ assert.equal(item.evidence.providerReadingFresh,true);assert.notEqual(item.state,'online');
+ assert.equal(unverifiedTile({status:'unverified',linked:item}),'device_link');
+ assert.equal(unverifiedTile({status:'unverified',linked:{...item,evidence:{...item.evidence,providerReadingFresh:false}}}),'no_reading');
  assert.equal(fleetAddressHealth(view.items,f.rows,'camera').get(item.productId),'unknown');
  assert.equal(view.total,7);assert.equal(Object.values(view.counts).reduce((a,b)=>a+b),7);
 });

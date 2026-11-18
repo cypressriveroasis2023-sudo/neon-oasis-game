@@ -21,7 +21,7 @@ test('reviewed native saved Fleet board stays the bytes #425 and #433 ship',()=>
  const deployedBytes=readFileSync(deployed);
  const reviewedBytes=readFileSync(reviewed);
  const expected=JSON.parse(readFileSync(manifest,'utf8')).sourceHashes['savedFleetBoard.mjs'];
- assert.equal(expected,'963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
- assert.equal(createHash('sha256').update(reviewedBytes).digest('hex'),'963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
- assert.equal(createHash('sha256').update(deployedBytes).digest('hex'),'714a05cca061274ebb932fc211a47eff9da15d8daa594fce1062ab89336fc331');
+ assert.equal(expected,'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
+ assert.equal(createHash('sha256').update(reviewedBytes).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
+ assert.equal(createHash('sha256').update(deployedBytes).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
 });

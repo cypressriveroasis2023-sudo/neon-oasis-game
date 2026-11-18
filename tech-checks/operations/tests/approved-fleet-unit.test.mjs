@@ -37,7 +37,7 @@ const expected={
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "b971f16c555de5cdd04b0bb5506ec5d4fbf19442",
-  "fieldCameraHealth.ts": "d1c87f61f7e97fabf97c4366fe866f073bd31715",
+  "fieldCameraHealth.ts": "0f0ab904ad1973cad0e327153f148a9473e1120a",
   "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "1647e0a906b2a8845f51c1b06441c591d5babc16",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",

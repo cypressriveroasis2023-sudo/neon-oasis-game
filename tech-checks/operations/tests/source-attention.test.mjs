@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {loudSourceAlerts, sourceHealth} from '../src/sourceAttention.ts';
+import {cameraSourceNotice, loudSourceAlerts, sourceHealth} from '../src/sourceAttention.ts';
 
 const NOW = Date.parse('2026-11-16T22:00:00Z');
 const ago = (ms) => new Date(NOW - ms).toISOString();
@@ -62,4 +62,10 @@ test('the strip shows every source, including one this view does not read', () =
   assert.deepEqual(rows.map(row => row.id), ['mhelp_auth', 'mhelp_inventory', 'connections', 'star4live', 'victron', 'tracker']);
   assert.equal(rows.find(row => row.id === 'star4live').state, 'absent');
   assert.equal(loudSourceAlerts({now: NOW, mhelp: {authState: 'verified', lastSuccess: ago(5 * 60 * 1000), live: true}}).some(row => row.state === 'absent'), false);
+});
+
+test('a verified tracker stays quiet, and a delayed tracker is one short line', () => {
+  assert.equal(cameraSourceNotice({now: NOW, tracker: {verifiedAt: ago(6 * 60 * 1000)}}), null);
+  assert.equal(cameraSourceNotice({now: NOW, tracker: {verifiedAt: null}}), null);
+  assert.equal(cameraSourceNotice({now: NOW, tracker: {verifiedAt: ago(2 * 60 * 60 * 1000)}}), 'Tracker readings delayed — status may be out of date');
 });

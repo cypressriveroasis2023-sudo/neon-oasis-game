@@ -137,3 +137,20 @@ export function sourceHealth(facts: SourceFacts): SourceAttention[] {
 export function loudSourceAlerts(facts: SourceFacts): SourceAttention[] {
   return sourceHealth(facts).filter(row => row.state !== 'current' && row.state !== 'absent');
 }
+
+const NOTICE_NAME: Partial<Record<SourceAttention['id'], string>> = {
+  tracker: 'Tracker',
+  star4live: 'Star4Live',
+  connections: 'Connection',
+  victron: 'Victron',
+  mhelp_inventory: 'mHelp inventory',
+  mhelp_auth: 'mHelpDesk',
+};
+
+/** One short line when a source this view reads has actually failed or gone stale.
+ * A current tracker, or a source with no time yet, stays quiet. */
+export function cameraSourceNotice(facts: SourceFacts): string | null {
+  const failing = sourceHealth(facts).find(row => row.state === 'failed' || row.state === 'stale');
+  if (!failing) return null;
+  return (NOTICE_NAME[failing.id] || failing.source)+' readings delayed — status may be out of date';
+}

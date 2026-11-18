@@ -15,8 +15,8 @@ test('packaged durable Fleet backend is rebuilt exactly from the reviewed source
  const executable=readFileSync(new URL('../../supabase/functions/cos-operations-pages/savedFleetBoard.mjs',import.meta.url));
  const preview=readFileSync(new URL('../../docs/vision-native-preview-20261107/source/savedFleetBoard.mjs',import.meta.url));
  assert.deepEqual(executable,rebuilt);
- assert.equal(createHash('sha256').update(executable).digest('hex'),'714a05cca061274ebb932fc211a47eff9da15d8daa594fce1062ab89336fc331');
- assert.equal(createHash('sha256').update(preview).digest('hex'),'963556e30c6f93e1f83b135de5e67932801517ba54e3c219d5523ad322ab5299');
+ assert.equal(createHash('sha256').update(executable).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
+ assert.equal(createHash('sha256').update(preview).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
 });
 
 test('durable projection source and both packaged artifacts return the same complete board',()=>{

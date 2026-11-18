@@ -143,7 +143,7 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-statuses b{grid-column:2;font-size:20px;font-variant-numeric:tabular-nums;text-align:left}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563}
-#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified,.cos-total-status-device-link{color:#b5c0d2}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer{display:flex;justify-content:space-between;align-items:center;gap:8px;letter-spacing:0;padding-top:10px;margin-top:auto;border-color:#303c4d}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer small{font-size:10px;line-height:1.5}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card footer button{font-size:11px;background:transparent!important;border:0!important;padding:6px;white-space:nowrap}
@@ -200,7 +200,7 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-refresh{color:#121a26!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-online{color:#2bff35!important}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-offline{color:#ff5563!important}
-#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified{color:#b5c0d2!important}
+#root#root .cos-fleet-board.cos-fleet-dashboard .cos-total-status-unverified,.cos-total-status-device-link{color:#b5c0d2!important}
 @media(max-width:750px){
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-tabs>button{width:100%!important;flex:initial!important}
  #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-heading{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:10px}
