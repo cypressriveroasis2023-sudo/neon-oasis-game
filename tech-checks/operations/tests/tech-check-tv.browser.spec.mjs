@@ -200,6 +200,24 @@ test('Daily Board and TV render only pickup, swap, delivery and service',async({
  await expect(board.getByRole('link',{name:/Jobs|Owner Tasks/})).toHaveCount(0);
 });
 
+test('TV pages omit pickup, swap, delivery and service cards',async({page})=>{
+ const types=['PICKUP','SWAP','DELIVERY','SERVICE'];
+ const {frame}=await setup(page,{prepare(state){
+  state.jobs=types.map((jobType,index)=>({id:'handoff-'+index,customer:jobType+' customer',technician:'Tech 1',department:'service',status:'assigned',jobType,instructions:jobType+' instructions'}));
+  state.settings={sections:['pickup','swap','delivery','service','camera','map'],revision:0,updatedAt:null,rotationSeconds:15};
+ }});
+ const tv=frame.getByRole('region',{name:'Tech Check TV Board'});
+ for(let index=0;index<6;index++){
+  if(index)await page.clock.fastForward(15000);
+  await expect(tv.locator('.daily-board-card')).toHaveCount(0);
+  for(const label of types)await expect(tv.getByText(label,{exact:true})).toHaveCount(0);
+ }
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ const board=frame.getByRole('region',{name:'COS Daily Board'});
+ await expect(board.locator('.daily-board-card')).toHaveCount(0);
+ for(const label of types)await expect(board.getByText(label,{exact:true})).toHaveCount(0);
+});
+
 test('remote choices rotate all pending types, including future and unscheduled jobs',async({page})=>{
  const {state,frame}=await setup(page);
  state.jobs=['PICKUP','SWAP','DELIVERY','SERVICE'].map((jobType,index)=>({id:'pending-'+index,customer:'Pending '+jobType,jobType,status:'scheduled',scheduled:index%2?'':'2026-11-01 08:00',instructions:'Saved '+jobType+' instructions'}));
