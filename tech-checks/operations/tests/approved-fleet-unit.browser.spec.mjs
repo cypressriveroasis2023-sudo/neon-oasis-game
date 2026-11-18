@@ -3,7 +3,7 @@ import {mountFleet,units,field,vrm,fresh} from './fleet-dashboard-fixtures.mjs';
 
 // Actual complete App with the repository's synthetic saved-read fixture.
 // Never sign in, contact providers, perform live checks, or change operational records.
-const router={id:'synthetic-router',unitKey:'Helios 1',name:'Fixture InHand',model:'IR615',publicIp:'192.0.2.10',unitIp:null,port:443,protocol:'https',probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh,reportedSource:'Synthetic fixture',savedLatencyMs:23,match:'exact_name',candidateUnit:{id:units[0].id,unitNumber:'Helios 1'},gps:null};
+const router={id:'synthetic-router',unitKey:'Helios 1',name:'Fixture InHand',model:'IR615',port:443,protocol:'https',probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh,reportedSource:'Synthetic fixture',savedLatencyMs:23,match:'exact_name',candidateUnit:{id:units[0].id,unitNumber:'Helios 1'},gps:null};
 function power(){const value=structuredClone(vrm);value.power[0].measurements.push(...[['solar_power',190,'system',0,'W'],['solar_power',180,'solarcharger',1,'W'],['load_power',75,'system',0,'W'],['battery_voltage',12.6,'battery',278,'V']].map(([metric,value,source,instance,unit])=>({metric,value,source,instance,unit,observedAt:fresh})));return value;}
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.calls.every(c=>c.method==='GET')).toBe(true);};
 async function banner(page){await page.evaluate(()=>{const h=document.createElement('header');h.textContent='SYNTHETIC TEST — NOT LIVE OPERATIONS';h.style.cssText='height:24px;line-height:24px;font:12px/24px sans-serif;background:#fff;color:#111;text-align:center';document.body.prepend(h);const f=document.querySelector('iframe');f.style.height='calc(100vh - 24px)';f.style.display='block';});}
@@ -22,7 +22,8 @@ test('Owner exact unit keeps saved evidence and links while phone cards stack an
  await expect.poll(()=>app.locator('body').evaluate(()=>new URLSearchParams(location.hash.split('?')[1]).get('unit'))).toBe(units[0].id);
  await expect(drawer.getByRole('region',{name:'Unit recorded address'})).toContainText(units[0].address);
  await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('Management check; camera health is separate.');
- await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('192.0.2.10');
+ await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('Reachable');
+ await expect(drawer.getByRole('region',{name:'Selected unit router health'})).not.toContainText(/\b\d{1,3}(?:\.\d{1,3}){3}\b/);
  await expect(drawer.locator('.cos-fleet-power-metrics')).toContainText('190 W');await expect(drawer.locator('.cos-fleet-power-metrics')).toContainText('180 W');await expect(drawer.locator('.cos-fleet-power-metrics')).not.toContainText('370 W');
  await expect(drawer.getByRole('link',{name:'Open Victron'})).toHaveAttribute('href','https://vrm.victronenergy.com/installation/1001/dashboard');
  const g=await geometry(drawer);expect(g.overflow).toBeLessThanOrEqual(1);expect(g.drawer.x).toBeGreaterThanOrEqual(0);expect(g.drawer.right).toBeLessThanOrEqual(g.viewport+1);expect(g.close.height).toBeGreaterThanOrEqual(48);expect(g.checkFont).toBeGreaterThanOrEqual(15);expect(g.addressFont).toBeGreaterThanOrEqual(17);expect(Math.abs(g.power.width-g.grid.width)).toBeLessThanOrEqual(1);

@@ -22,9 +22,11 @@ import {createHash} from 'node:crypto';
 // Finance group and the unused Customers/Schedule entries (routes kept, see
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
+// FleetUnitHealth.tsx no longer prints a router address. Its pin moves with
+// that removal. Reachable and unverified router status stay in place.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
-  "FleetUnitHealth.tsx": "6bc714cfd419d01e7b8541ccfc2142dc91fff449",
+  "FleetUnitHealth.tsx": "8428d1c20c214d9cc1b1028b03cfd3c60438ef24",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
