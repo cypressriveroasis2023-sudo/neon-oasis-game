@@ -56,15 +56,17 @@ export async function openWorkspace(frame, workspace) {
     // this helper never mounts an Owner tool to get around a denied route.
     const label = restrictedLabels[workspace] || workspace;
     const direct = nav.getByRole('button', { name: label, exact: true });
-    if (await direct.isVisible()) await direct.click();
+    if (await direct.isVisible()) await direct.click({noWaitAfter:true});
     else {
       if (!(await menu.isVisible())) await nav.getByRole('button', { name: 'More', exact: true }).click();
       await expect(menu).toBeVisible();
       await menu.getByRole('navigation', { name: 'COS Operations', exact: true })
-        .getByRole('button', { name: label, exact: true }).click();
+        .getByRole('button', { name: label, exact: true }).click({noWaitAfter:true});
     }
   } else if (primaryLabels[workspace] && workspace !== 'Operations') {
-    await nav.getByRole('button', { name: primaryLabels[workspace], exact: true }).click();
+    // The fleet chunks load with this click. Waiting for them inside the click
+    // stalls when that load cannot finish until the click returns.
+    await nav.getByRole('button', { name: primaryLabels[workspace], exact: true }).click({noWaitAfter:true});
   } else {
     if (!(await menu.isVisible())) await nav.getByRole('button', { name: 'More', exact: true }).click();
     if (workspace === 'Operations') {
@@ -81,7 +83,7 @@ export async function openWorkspace(frame, workspace) {
       await directory.getByRole('searchbox', { name: 'Find a tool', exact: true }).fill(label);
       const destination = directory.getByRole('button', { name: label, exact: true });
       await expect(destination).toHaveCount(1);
-      await destination.click();
+      await destination.click({noWaitAfter:true});
     }
   }
   await expect(menu).toHaveCount(0);
