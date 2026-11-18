@@ -10,7 +10,7 @@ async function mount(page,{goBack=false}={}) {
  const state={calls:[],writes:[],errors:[]};page.on('pageerror',e=>state.errors.push(e.message));
  const at=new Date().toISOString();
  const job={id:jobId,jobNumber:'COS-FIXTURE-3001',customer:'Example Builder',site:'Recorded site',siteAddress:'100 Example Road',status:'Unscheduled',department:'service',technician:'Fixture Technician',jobType:'SERVICE',equipment:'Spotter',equipmentUnitTag:'Fixture 260',notes:[{text:'Saved note: inspect the enclosure.',by:'Fixture Technician',at}],...(goBack?{goBack:{required:true}}:{})};
- const completed={...job,id:`${jobId}:visit:${visitId}`,jobId,visitId,completionKind:'visit',customer:'Completed Example Builder',jobNumber:'COS-FIXTURE-3002',status:'Completed',completedAt:at};
+ const completed={...job,id:`${jobId}:visit:${visitId}`,jobId,visitId,completionKind:'visit',customer:'Completed Example Builder',jobNumber:'COS-FIXTURE-3002',status:'Completed',completedAt:at,jobType:'INSTALL'};
  const task={id:taskId,title:'Recorded inspection follow-up',status:'Not started',assignedTo:'Fixture Technician',assignedDepartment:'service',instructions:'Review the saved inspection photos before the next visit.',ownerNotes:'No additional service job is requested.'};
  const board={jobs:[job,completed],tasks:[task],readiness:[{userId:'44444444-4444-4444-8444-444444444444',name:'Fixture Technician',department:'service',status:'not_started',result:{}}],asOf:at};
  await page.route('**/*',route=>{
@@ -40,11 +40,12 @@ async function open(app,title='Example Builder') {
 const management=dialog=>dialog.locator('summary').filter({hasText:'Manage this work'});
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.writes).toEqual([]);};
 
-test('Daily Board hides job cards and does not open a job record',async({page})=>{
+test('Daily Board shows the service handoff and does not open a job record',async({page})=>{
  const {app,state}=await mount(page);
- await expect(app.getByText('Example Builder',{exact:true})).toHaveCount(0);
- await expect(app.getByText('Recorded inspection follow-up',{exact:true})).toBeVisible();
+ await expect(app.getByText('Example Builder',{exact:true})).toBeVisible();
+ await expect(app.getByText('Recorded inspection follow-up',{exact:true})).toHaveCount(0);
  await expect(app.getByRole('link',{name:'Open job record'})).toHaveCount(0);
+ await expect(app.getByText('OWNER TASK')).toHaveCount(0);
  expect(state.calls.includes('/api/jobs')).toBe(false);
  safe(state);
 });
