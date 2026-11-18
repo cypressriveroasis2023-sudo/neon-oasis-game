@@ -50,7 +50,7 @@ const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeplo
 const descriptions: Record<string,string> = {
   'IT Dashboard':'Your field, connectivity, power, tracker and ticket information in one place.',
   MHelp:'Your existing Tech Check MHelpDesk ticket references and operational details.',
-  'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
+  'Daily Board':'Fleet count tiles for the shop TV: camera units, cameras, units in the field, and stands. Same numbers as the map.',
   'Unit Tracker':'Review current COS units and their 2027 tracker information.',
   'Fleet Dashboard':'Find field units using recorded GPS, installed-site coordinates or their site address.',
   'Units On Hand':'Shop and yard inventory, availability and preparation status.',

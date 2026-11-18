@@ -2,6 +2,7 @@ import { useCallback,useEffect, useMemo, useState, type ReactNode } from 'react'
 import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import { boardDateLabel,chicagoDay, readinessSummary, type BoardCard, type ReadinessRow, type BoardScope } from './dailyBoardData';
 import {configuredTvPages,type FleetPages} from './tvBoardData';
+import {tvSettingsNotice} from './tvSessionHold';
 import type {TvSection} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
 import TvFleetView from './TvFleetView';
@@ -18,6 +19,7 @@ export default function TechCheckTvBoard({ counts, cards, names, readiness, scop
   const updateFleetPages=useCallback((next:FleetPages)=>setFleetPages(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next),[]);
   useEffect(() => { const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize); }, []);
   const pages = useMemo(() => configuredTvPages(cards,names,readiness,sections,size.width,size.height,chicagoDay(now),fleetPages), [cards,names,readiness,sections,size,chicagoDay(now),fleetPages]);
+  const settingsNotice = tvSettingsNotice(settingsError);
   const pageIndex = rotation % pages.length, page = pages[pageIndex];
   const summaryCards=Array.from(new Map(pages.flatMap(page=>page.kind==='work'?page.lanes.flatMap(lane=>lane.cards):[]).map(card=>[card.id,card])).values());
   const attention = summaryCards.filter(card => card.lane === 'attention').length;
@@ -35,7 +37,7 @@ export default function TechCheckTvBoard({ counts, cards, names, readiness, scop
     {page.kind==='work'&&<div className='tech-check-tv-fleet-counts' aria-label='TV fleet counts'>{counts}</div>}
     {reconnecting&&<p className='tech-check-tv-reconnecting' role='status'>Reconnecting</p>}
     {(error || stale) && <div className='tech-check-tv-warning' role='alert'>{lastSuccess ? 'UPDATES DELAYED · Showing the last saved snapshot.' : 'BOARD UNAVAILABLE · Waiting for live records.'} {error}</div>}
-    {settingsError&&<p className='tv-settings-notice' role='status'>TV settings: {settingsError}</p>}
+    {settingsNotice&&<p className='tv-settings-notice' role='status'>TV settings: {settingsNotice}</p>}
     <div className='tech-check-tv-page-title'><h2>{page.kind==='work'?'Fleet counts':page.title}</h2><span>{page.kind==='work'?'SAME TILES AS THE MAP':page.section==='today'?'TODAY':page.section==='shop'?'TODAY + OVERDUE':'LIVE VIEW'} · {pageIndex + 1} / {pages.length}</span></div>
     <main className={'tech-check-tv-content' + (size.height < 900 ? ' tv-short' : '')}>
       {!lastSuccess ? <div className='tech-check-tv-empty' role='status'>{error ? 'Check the connection and Tech Check sign-in, then refresh.' : 'Loading fleet counts…'}</div> : page.kind === 'work' ? null : page.kind==='readiness'?<div className='tech-check-tv-readiness'>{page.rows.map(row => { const summary = readinessSummary(row),exempt=vehicleInspectionExempt(row); return <article key={row.userId}><h3>{row.name}<span>{row.department.toUpperCase()}</span></h3>{exempt?<p>No company vehicle · truck and trailer inspections do not apply.</p>:(['truck','trailer'] as const).map(key => <div key={key}><span>{key === 'truck' ? 'Truck inspection' : 'Trailer inspection'}</span><b className={'tv-readiness-' + summary[key].state}>{summary[key].label}</b></div>)}<div><span>{exempt?'IT shop inventory':'Inventory record'}</span><b className={'tv-readiness-'+summary.inventory.state}>{summary.inventory.label}</b></div><small>{row.completedAt ? 'Completed ' + boardDateLabel(row.completedAt) : row.startedAt ? 'Started ' + boardDateLabel(row.startedAt) : 'No check recorded today'}</small></article>; })}</div>:page.kind==='empty'?<div className='tech-check-tv-empty'>Exit TV and turn on a section in TV board settings.</div>:null}

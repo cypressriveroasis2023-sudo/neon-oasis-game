@@ -4,10 +4,23 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {checkedTvSections,checkedTvSettings} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index.ts';
 import {configuredTvPages,tvSectionsForDisplay} from '../src/tvBoardData.ts';
+import {TV_SHARED_VIEW_RELOAD,tvSettingsNotice} from '../src/tvSessionHold.ts';
 import {dailyBoardCards,equipmentHandoffJobs,readinessSummary} from '../src/dailyBoardData.ts';
 import {vehicleInspectionExempt} from '../src/vehicleInspectionPolicy.ts';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 const org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',owner='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',tech='d0757b64-9623-4adc-afff-21cc7853e88a';
+test('a held TV replaces the shared-view reload line and the Boards subtitle names counts',async()=>{
+ assert.equal(tvSettingsNotice(TV_SHARED_VIEW_RELOAD,true),'Reconnecting…');
+ assert.equal(tvSettingsNotice(TV_SHARED_VIEW_RELOAD,false),TV_SHARED_VIEW_RELOAD);
+ assert.equal(tvSettingsNotice('Sign in again to load TV settings.',true),'Sign in again to load TV settings.');
+ const app=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
+ const subtitle=app.match(/'Daily Board':'([^']*)'/)?.[1]||'';
+ assert.equal(subtitle,'Fleet count tiles for the shop TV: camera units, cameras, units in the field, and stands. Same numbers as the map.');
+ assert.equal(/tasks|jobs|readiness/i.test(subtitle),false);
+ assert.match(app,/setTvSessionHold\(tvDisplay&&active==='Daily Board'\)/);
+ const tv=await readFile(new URL('../src/TechCheckTvBoard.tsx',import.meta.url),'utf8');
+ assert.match(tv,/tvSettingsNotice\(settingsError\)/);
+});
 test('only supported TV sections are saved, including intentionally turning every section off',()=>{
  assert.deepEqual(checkedTvSections(['map','today']),['today','map']);assert.deepEqual(checkedTvSections([]),[]);
  for(const value of [['today','today'],['secret'],null,{},['camera',null]])assert.throws(()=>checkedTvSections(value));
