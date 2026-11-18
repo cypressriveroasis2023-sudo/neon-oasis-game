@@ -2,6 +2,7 @@ import {type WatchfulDeviceType, type WatchfulRow} from '../../supabase/function
 
 /** Same project the power-alarm panel already calls. Not a new secret. */
 export const WATCHFUL_HEALTH_URL = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-watchful-device-health';
+export const WATCHFUL_READ_TIMEOUT_MS = 8_000;
 
 export type WatchfulRun = { runAt: string | null; rows: WatchfulRow[] };
 
@@ -57,24 +58,48 @@ export function readWatchfulOperator(): Promise<{ token: string; role: 'owner' |
   });
 }
 
-/** Owner and verified IT only. Any other account, or a failed read, is not a reading. */
-export async function readLatestWatchfulRun(options: {
+type WatchfulReadOptions = {
   operator?: { token: string; role: string } | null;
   fetcher?: typeof fetch;
-} = {}): Promise<WatchfulRun | null> {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+};
+
+/** Owner and verified IT only. Any other account, a failed read, or a slow read is not a reading. */
+async function readLatestWatchfulRunOnce(options: WatchfulReadOptions): Promise<WatchfulRun | null> {
   const operator = options.operator === undefined ? await readWatchfulOperator() : options.operator;
   const role = operator?.role?.toLowerCase();
   if (!operator?.token || (role !== 'owner' && role !== 'it')) return null;
+  const response = await (options.fetcher || fetch)(WATCHFUL_HEALTH_URL, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + operator.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'read' }),
+    cache: 'no-store',
+    signal: options.signal,
+  });
+  if (!response.ok) return null;
+  return watchfulRunFromRead(await response.json());
+}
+
+/** One attempt. After about 8 seconds the board shows Unknown and does not try again. */
+export async function readLatestWatchfulRun(options: WatchfulReadOptions = {}): Promise<WatchfulRun | null> {
+  const timeoutMs = options.timeoutMs ?? WATCHFUL_READ_TIMEOUT_MS;
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  options.signal?.addEventListener('abort', onAbort);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>(resolve => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve(null);
+    }, timeoutMs);
+  });
   try {
-    const response = await (options.fetcher || fetch)(WATCHFUL_HEALTH_URL, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + operator.token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'read' }),
-      cache: 'no-store',
-    });
-    if (!response.ok) return null;
-    return watchfulRunFromRead(await response.json());
+    return await Promise.race([timeout, readLatestWatchfulRunOnce({ ...options, signal: controller.signal })]);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
   }
 }

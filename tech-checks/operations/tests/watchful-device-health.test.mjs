@@ -10,7 +10,7 @@ import ts from 'typescript';
 import {parseWatchfulCsv, presentWatchfulDevices, watchfulSourceSha256, IN_SHOP_COLOR, WatchfulCsvError} from '../../supabase/functions/cos-watchful-device-health/model.ts';
 import {createWatchfulDeviceHealthHandler} from '../../supabase/functions/cos-watchful-device-health/serve.ts';
 import {watchfulActor} from '../../supabase/functions/cos-watchful-device-health/access.ts';
-import {readLatestWatchfulRun, watchfulRunFromRead} from '../src/watchfulDeviceHealthRead.ts';
+import {readLatestWatchfulRun, watchfulRunFromRead, WATCHFUL_READ_TIMEOUT_MS} from '../src/watchfulDeviceHealthRead.ts';
 
 const fixture = readFileSync(new URL('./fixtures/watchful-device-health.csv', import.meta.url), 'utf8');
 const NOW = Date.parse('2026-11-17T22:30:00.000Z');
@@ -210,6 +210,23 @@ test('an undeployed Watchful read fails once to Unknown and does not retry', asy
   assert.equal(failed, null);
   assert.equal(throws, 1);
   const html = renderToStaticMarkup(React.createElement(watchfulPanel().default, {units, run: failed}));
+  assert.match(html, /Unknown\. Watchful is unavailable\./);
+  assert.doesNotMatch(html, /Red 0|Offline|Reading|spinner/);
+});
+
+test('a Watchful read that does not answer within 8 seconds becomes Unknown once', async () => {
+  assert.equal(WATCHFUL_READ_TIMEOUT_MS, 8000);
+  let calls = 0;
+  const started = Date.now();
+  const result = await readLatestWatchfulRun({
+    operator: {token: 'synthetic-owner', role: 'owner'},
+    timeoutMs: 40,
+    fetcher: () => new Promise(() => { calls += 1; }),
+  });
+  assert.equal(result, null);
+  assert.equal(calls, 1);
+  assert.ok(Date.now() - started < 1000);
+  const html = renderToStaticMarkup(React.createElement(watchfulPanel().default, {units, run: result}));
   assert.match(html, /Unknown\. Watchful is unavailable\./);
   assert.doesNotMatch(html, /Red 0|Offline|Reading|spinner/);
 });
