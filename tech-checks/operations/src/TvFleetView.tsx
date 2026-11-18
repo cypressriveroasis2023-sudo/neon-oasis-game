@@ -94,12 +94,19 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     void refresh();
     const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
     const timer=window.setInterval(tick,60000);
-    const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError('Sign in again to load fleet information.');};
+    const invalid=(event:Event)=>{
+      const detail=(event as CustomEvent<{reason?:string;path?:string}>).detail;
+      const keep=detail?.reason==='authentication-denied'&&typeof detail.path==='string'&&detail.path!=='/api/session';
+      generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;
+      if(keep)return;
+      lastErrors.current={camera:[],routers:[]};setData(empty);setError('Sign in again to load fleet information.');
+    };
+    const resumed=()=>{if(!alive.current)return;sessionBlocked.current=false;};
     // The API has already fenced and validated the late proof. Reauthorize
     // and adopt its cached pair without moving the automatic refresh clock.
     const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true,{routers:false});};
-    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
-    return()=>{alive.current=false;proofUpdatePending.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
+    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-tv-session-resumed',resumed);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
+    return()=>{alive.current=false;proofUpdatePending.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-tv-session-resumed',resumed);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
   },[enabled,refresh]);
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const snapshotClock=data.readAt||clock;

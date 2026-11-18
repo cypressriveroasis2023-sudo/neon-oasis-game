@@ -8,9 +8,9 @@ import TvFleetView from './TvFleetView';
 import AnimatedEye from './AnimatedEye';
 import './techCheckTvBoard.css';
 
-type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; scope: BoardScope; now: Date; lastSuccess: Date | null; error: string; stale: boolean; busy: boolean; rotation: number;rotationSeconds:number; exit: () => void; refresh: () => void;sections:TvSection[];settingsError:string;api:{get:(path:string)=>Promise<{data:any}>} };
+type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; scope: BoardScope; now: Date; lastSuccess: Date | null; error: string; stale: boolean; busy: boolean; rotation: number;rotationSeconds:number; exit: () => void; refresh: () => void;sections:TvSection[];settingsError:string;reconnecting?:boolean;api:{get:(path:string)=>Promise<{data:any}>} };
 const normalized = (status: string) => status.toLowerCase().replaceAll('_', ' ');
-export default function TechCheckTvBoard({ cards, names, readiness, scope, now, lastSuccess, error, stale, busy, rotation,rotationSeconds, exit, refresh,sections,settingsError,api }: Props) {
+export default function TechCheckTvBoard({ cards, names, readiness, scope, now, lastSuccess, error, stale, busy, rotation,rotationSeconds, exit, refresh,sections,settingsError,reconnecting=false,api }: Props) {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const [fullscreenError, setFullscreenError] = useState('');
   const [fleetRefreshId,setFleetRefreshId]=useState(0);
@@ -33,8 +33,9 @@ export default function TechCheckTvBoard({ cards, names, readiness, scope, now, 
       <div className='tech-check-tv-clock'><b>{now.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' })}</b><span>{now.toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'short', day: 'numeric' })} · CT</span></div>
     </header>
     {page.kind==='work'&&<div className='tech-check-tv-totals' aria-label='TV work summary'>
-      <div><b>{summaryCards.filter(card => card.kind === 'job').length}</b><span>JOBS</span></div><div><b>{summaryCards.filter(card => card.kind === 'task').length}</b><span>SHOP TASKS</span></div><div><b>{summaryCards.filter(card => card.assignee === 'Unassigned').length}</b><span>UNASSIGNED</span></div><div><b>{working}</b><span>WORKING</span></div><div className={attention ? 'tv-attention' : ''}><b>{attention}</b><span>NEEDS ATTENTION</span></div><div><b>{summaryCards.filter(card => card.lane === 'complete').length}</b><span>DONE TODAY</span></div>
+      <div><b>{summaryCards.filter(card => card.kind === 'job').length}</b><span>HANDOFFS</span></div><div><b>{summaryCards.filter(card => card.assignee === 'Unassigned').length}</b><span>UNASSIGNED</span></div><div><b>{working}</b><span>WORKING</span></div><div className={attention ? 'tv-attention' : ''}><b>{attention}</b><span>NEEDS ATTENTION</span></div><div><b>{summaryCards.filter(card => card.lane === 'complete').length}</b><span>DONE TODAY</span></div>
     </div>}
+    {reconnecting&&<p className='tech-check-tv-reconnecting' role='status'>Reconnecting</p>}
     {(error || stale) && <div className='tech-check-tv-warning' role='alert'>{lastSuccess ? 'UPDATES DELAYED · Showing the last saved snapshot.' : 'BOARD UNAVAILABLE · Waiting for live records.'} {error}</div>}
     {settingsError&&<p className='tv-settings-notice' role='status'>TV settings: {settingsError}</p>}
     <div className='tech-check-tv-page-title'><h2>{page.title}</h2><span>{['pickup','swap','delivery','service'].includes(page.section||'')?'ALL PENDING':page.section==='today'?'TODAY':page.section==='shop'?'TODAY + OVERDUE':'LIVE VIEW'} · {pageIndex + 1} / {pages.length}</span></div>

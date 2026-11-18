@@ -17,7 +17,7 @@ async function mount(page,{mode='valid'}={}){
  await page.evaluate(()=>{const h=document.createElement('header');h.textContent='SYNTHETIC TEST — NOT LIVE OPERATIONS';h.style.cssText='height:24px;font:12px/24px sans-serif;background:#fff;color:#111;text-align:center';document.body.prepend(h);document.querySelector('iframe').style.height='calc(100vh - 24px)';});
  const job={id:JOB,jobNumber:'COS-SAMPLE-9001',customer:'Board sample customer',site:'Recorded service site',status:'Unscheduled',department:'service',technician:'Example technician',jobType:'SERVICE',equipment:'Spotter',equipmentUnitTag:'An unrelated display alias',notes:[{text:'Saved inspection note; do not create another ticket.',by:'Example technician',at:fresh}]};
  job.unitLink=verified(job);
- const visit={...job,id:`${JOB}:visit:${VISIT}`,jobId:JOB,visitId:VISIT,completionKind:'visit',customer:'Completed sample customer',jobNumber:'COS-SAMPLE-9002',status:'Completed',completedAt:asOf};visit.unitLink=verified(visit);
+ const visit={...job,id:`${JOB}:visit:${VISIT}`,jobId:JOB,visitId:VISIT,completionKind:'visit',customer:'Completed sample customer',jobNumber:'COS-SAMPLE-9002',status:'Completed',completedAt:asOf,jobType:'INSTALL'};visit.unitLink=verified(visit);
  const task={id:TASK,title:'Inspect the saved issue',relatedJobId:JOB,status:'Not started',assignedTo:'Example technician',assignedDepartment:'service',instructions:'Review the recorded inspection note.'};task.unitLink=verified(task,'task');
  if(mode==='missing')delete job.unitLink;
  if(mode==='held')job.unitLink={contract:'COS_BOARD_UNIT_LINK_V1',state:'not_linked',reason:'product_binding_held'};
@@ -40,21 +40,22 @@ async function open(app,title='Board sample customer'){
  await app.locator('.daily-board-card').filter({hasText:title}).click();
  const dialog=app.getByRole('dialog',{name:'Work details',exact:true});await expect(dialog).toBeVisible();return dialog;
 }
-test('job cards stay off the Daily Board while the assigned task remains',async({page})=>{
+test('only the equipment handoff job renders and the owner task stays off the Daily Board',async({page})=>{
  const {app,state}=await mount(page);
- await expect(app.getByText('Board sample customer')).toHaveCount(0);
- await expect(app.getByText('Completed sample customer')).toHaveCount(0);
- await expect(app.getByText('Inspect the saved issue')).toBeVisible();
+ await expect(app.getByText('Board sample customer')).toBeVisible();
+ await expect(app.getByText('Inspect the saved issue')).toHaveCount(0);
+ await expect(app.getByText('OWNER TASK')).toHaveCount(0);
  expect(state.calls.some(item=>String(item.path||'').startsWith('/api/jobs'))).toBe(false);
  safe(state);
 });
 test('failed Board refresh suppresses a formerly valid unit shortcut without altering saved records',async({page})=>{
  const {app,state,control}=await mount(page);control.fail=true;
  await app.getByRole('button',{name:'Refresh',exact:true}).click();await expect(app.locator('.daily-board-error')).toContainText('Showing the last successful snapshot.');
- const dialog=await open(app,'Inspect the saved issue');
+ const dialog=await open(app,'Board sample customer');
  await expect(dialog.locator('a[href*="unit="]')).toHaveCount(0);
  await expect(dialog).toContainText('Board refresh is unavailable or delayed.');
- await expect(dialog).toContainText('Review the recorded inspection note.');
+ await expect(dialog).toContainText('Saved inspection note; do not create another ticket.');
+ await expect(dialog).toContainText('Jobs and Owner Tasks are not opened from this board.');
  expect(state.calls.some(item=>item.method!=='GET')).toBe(false);
  safe(state);
 });

@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {api} from './api';
 import {createOperationsSessionRecovery, guardSessionCallback, type SessionRecoveryState} from './operationsSessionRecovery';
+import {tvSessionHold} from './tvSessionHold';
 
-export function useOperationsSession(onInvalidated: (reason?: unknown) => void) {
+export function useOperationsSession(onInvalidated: (reason?: unknown, detail?: {path?: string}) => void) {
   const [state, setState] = useState<SessionRecoveryState>({session:null, checking:true, error:'', reloadRequired:false, generation:0});
   const controller = useRef<ReturnType<typeof createOperationsSessionRecovery> | null>(null);
   const clearView = useRef(onInvalidated);
@@ -15,9 +16,16 @@ export function useOperationsSession(onInvalidated: (reason?: unknown) => void) 
     });
     controller.current = current;
     const invalidate = (event: Event) => {
-      const reason=(event as CustomEvent<{reason?: unknown}>).detail?.reason;
+      const detail=(event as CustomEvent<{reason?: unknown; path?: string}>).detail;
+      const reason=detail?.reason;
+      const path=typeof detail?.path==='string'?detail.path:'';
+      if(tvSessionHold()&&reason==='authentication-denied'&&path&&path!=='/api/session'){
+        current.quietRefresh();
+        clearView.current(reason, detail);
+        return;
+      }
       current.invalidate(reason);
-      clearView.current(reason);
+      clearView.current(reason, detail);
     };
     const leave = () => { current.invalidate('security-hide'); clearView.current('security-hide'); };
     // A bfcache restore retains the terminal security-hide controller. Start a

@@ -39,8 +39,8 @@ export function savedFleetStatus(){return durableFleetStatus;}
 export function usesDurableFleetBoard(){return durableFleetEnabled;}
 const publishDurableStatus=(value:any)=>{durableFleetStatus=value;window.dispatchEvent?.(new Event('cos-durable-fleet-status'));};
 // Reasons contain no token or identity. Missing/unknown reasons remain hard stops.
-function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide') {
- window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason}}));
+function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide', path?: string) {
+ window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason, ...(path?{path}:{})}}));
 }
 function clearSharedReads(){pendingReads.clear();fleetSnapshots.clear();pendingFleetSnapshots.clear();fleetRevision++;}
 if(typeof window!=='undefined'){
@@ -177,7 +177,7 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
     // data (including a late successful body) may cross this private-view fence.
     if (obsolete()) { void response.body?.cancel().catch(() => {}); requireCurrent(); }
     const authenticationDenied = !response.ok && [401,403].includes(response.status);
-    if (authenticationDenied) invalidatePrivateData('authentication-denied');
+    if (authenticationDenied) invalidatePrivateData('authentication-denied', path);
     if (preparation && !response.ok) {
       // Only bounded categories escape this read-only path; do not parse or expose raw errors.
       void response.body?.cancel().catch(() => {});

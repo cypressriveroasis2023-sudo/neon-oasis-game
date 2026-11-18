@@ -44,6 +44,7 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
   let active = true, epoch = 0, baseline: string | null = null, verifiedMode: string | null = null;
   let verificationTimer: ReturnType<typeof setTimeout> | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let quietTimer: ReturnType<typeof setTimeout> | undefined;
   let renewalRestarted = false;
   let phase: 'idle' | 'queued' | 'verifying' | 'waiting' = 'idle';
   let state: SessionRecoveryState = {session:null, checking:true, error:'', reloadRequired:false, generation:0};
@@ -134,8 +135,47 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
       phase = 'queued';
       defer(() => { if (active && phase === 'queued' && !state.reloadRequired) void verify(true); });
     },
-    stop() { clearTimeout(retryTimer); retryTimer = undefined; active = false; epoch++; phase = 'idle'; clearTimeout(verificationTimer); verificationTimer = undefined; },
+    /** Re-read the signed-in session without clearing the TV or accepting a new actor. */
+    quietRefresh() {
+      if (!active || state.reloadRequired) return;
+      if (!baseline || verifiedMode !== mode()) { blocked(); return; }
+      if (phase === 'verifying' || phase === 'queued') return;
+      epoch++;
+      phase = 'queued';
+      publish({...state, checking:true, error:''});
+      defer(() => { if (active && phase === 'queued' && !state.reloadRequired) void verifyQuiet(); });
+    },
+    stop() { clearTimeout(retryTimer); retryTimer = undefined; clearTimeout(quietTimer); quietTimer = undefined; active = false; epoch++; phase = 'idle'; clearTimeout(verificationTimer); verificationTimer = undefined; },
   };
+  async function verifyQuiet() {
+    phase = 'verifying';
+    const requestEpoch = epoch, requestMode = mode();
+    try {
+      const data = await read();
+      if (!active || requestEpoch !== epoch) return;
+      if (requestMode !== mode()) { blocked(); return; }
+      const fingerprint = ownerSessionFingerprint(data, requestMode);
+      if (!baseline || fingerprint !== baseline) { blocked(); return; }
+      phase = 'idle';
+      publish({...state, session:data, checking:false, error:'', reloadRequired:false});
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('cos-tv-session-resumed'));
+    } catch (cause) {
+      if (!active || requestEpoch !== epoch) return;
+      phase = 'idle';
+      // A newer denial supersedes this read before it can identify the actor. Read again; do not keep an unverified board as proof.
+      if ((cause as {response?: {status?: unknown}})?.response?.status === 409) {
+        defer(() => { if (active && phase === 'idle' && !state.reloadRequired) controller.quietRefresh(); });
+        return;
+      }
+      publish({...state, checking:false, error:''});
+      if (!temporaryFailure(cause)) return;
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => {
+        quietTimer = undefined;
+        if (active && !state.reloadRequired) controller.quietRefresh();
+      }, SESSION_RECOVERY_RETRY_MS);
+    }
+  }
   return controller;
 }
 

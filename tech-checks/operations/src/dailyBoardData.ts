@@ -58,6 +58,10 @@ const addIsoDays=(day:string,days:number)=>{
   const value=new Date(Date.UTC(year,month-1,date+days));
   return value.toISOString().slice(0,10);
 };
+export const EQUIPMENT_HANDOFF_TYPES = ['pickup', 'swap', 'delivery', 'service'] as const;
+export function equipmentHandoffJobs(jobs: BoardRecord[]): BoardRecord[] {
+  return jobs.filter(job => EQUIPMENT_HANDOFF_TYPES.includes(String(job.jobType || '').trim().toLowerCase() as typeof EQUIPMENT_HANDOFF_TYPES[number]));
+}
 export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now = new Date(), scope:BoardScope='day', includeFuture=false): BoardCard[] {
   const today = chicagoDay(now);
   const horizon=addIsoDays(today,6);

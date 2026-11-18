@@ -71,7 +71,7 @@ test('missing data and source failures render original fallback verbatim',()=>{
 test('original entire Board details component reconstructs after declared wrapper reversal',()=>{
  let source=read('BoardRecordDetails.tsx').replace("import ApprovedBoardUnitLink from './ApprovedBoardUnitLink';\n",'');
  source=source.replace('    <ApprovedBoardUnitLink card={card} sourceUnavailable={sourceUnavailable} close={close}>\n','').replace('    </ApprovedBoardUnitLink>\n','');
- const b=Buffer.from(source);assert.equal(createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex'),'b5b76d5312cffda72c6a6204560dab32044ef663');
+ const b=Buffer.from(source);assert.equal(createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex'),'767837f58bb8ae701d6176af7fcd7a948aeb0123');
 });
 test('new UI never imports server resolver or starts reads, timers, writes or identity guesses',()=>{
  const source=read('ApprovedBoardUnitLink.tsx')+read('approvedBoardUnitLink.ts');

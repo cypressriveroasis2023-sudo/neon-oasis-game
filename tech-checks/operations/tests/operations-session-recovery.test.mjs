@@ -31,6 +31,23 @@ for(const [label,change] of [
 for(const session of [{...owner,legacyOwner:false,role:'IT',productionOwnerUserId:null},{...owner,productionOwnerUserId:undefined},{...owner,features:{}}])test('a session without a complete verified Owner identity never automatically revalidates',async()=>{
  const f=await fixture(session);f.controller.invalidate('token-renewed');f.run();assert.equal(f.requests.length,1);assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
 });
+test('a TV data denial re-reads the same signed-in session and does not require reload',async()=>{
+ const f=await fixture(),generation=f.state.generation;
+ f.controller.quietRefresh();assert.equal(f.state.session.productionOwnerUserId,owner.productionOwnerUserId);assert.equal(f.state.reloadRequired,false);assert.equal(f.state.checking,true);
+ f.run();assert.equal(f.requests.length,2);f.requests[1].resolve(structuredClone(owner));await flush();
+ assert.equal(f.state.reloadRequired,false);assert.equal(f.state.checking,false);assert.equal(f.state.generation,generation);assert.equal(f.state.session.role,'Owner');
+});
+test('a TV session re-read that is a different actor still requires reload',async()=>{
+ const f=await fixture();f.controller.quietRefresh();f.run();f.requests[1].resolve({...owner,productionOwnerUserId:'22222222-2222-4222-8222-222222222222'});await flush();
+ assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
+});
+test('a superseded TV session re-read checks the actor again and still drops a different actor',async()=>{
+ const f=await fixture();f.controller.quietRefresh();f.run();
+ f.requests[1].reject(Object.assign(new Error('Your session changed. Reload the shared view.'),{response:{status:409}}));await flush();
+ f.run();f.run();assert.equal(f.requests.length,3);assert.equal(f.state.reloadRequired,false);assert.equal(f.state.session.productionOwnerUserId,owner.productionOwnerUserId);
+ f.requests[2].resolve({...owner,productionOwnerUserId:'22222222-2222-4222-8222-222222222222'});await flush();
+ assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
+});
 for(const reason of [undefined,'unknown','authentication-denied','security-hide',{},''])test('hard or unrecognized reason '+JSON.stringify(reason)+' requires reload without another read',async()=>{
  const f=await fixture();f.controller.invalidate(reason);f.run();assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);assert.equal(f.requests.length,1);
 });

@@ -33,13 +33,14 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
    return route.fulfill({status,headers,json:status===200?data:{error:'Synthetic authorization denied'}});
   }
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
-  if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
+  if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;gate.resolveAfterHold?.();await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
-  const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
+  const tvJob={id:'job-pickup',customer:'Pickup customer',technician:'Tech 1',department:'it',status:'assigned',jobType:'PICKUP',instructions:'Inspect the return rack'};
+  const data=body.path==='/api/daily-board'?{jobs:tv?[tvJob]:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:tv?['pickup']:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
- if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();}
+ if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();await expect(app.getByText('Inspect the return rack',{exact:true})).toBeVisible();}
  else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
  return {app,state,initialSessions:state.sessionReads};
 }
@@ -68,11 +69,13 @@ for(const [label,patch] of [['changed actor',{productionOwnerUserId:'22222222-22
 });
 for(const status of [401,403])test('true source '+status+' stays blocked without automatic revalidation',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred();
- // The denial has to wait until the pointer action returns. Fulfilling it inside
- // the click removes the button while Chromium is still dispatching that input,
- // and the click never comes back. Later router reads stay denied too.
- state.routerStatus=status;state.routerGate={promise:gate.promise,status};
- await refresh(app).click();gate.resolve();
+ // Start the release only once the click has reached the page and opened the
+ // read. A timer started with click() can expire during actionability and
+ // remove the button while the pointer action is still being sent. Releasing
+ // only after click() returns deadlocks when the click is waiting on this
+ // same response. Later router reads stay denied too.
+ state.routerStatus=status;state.routerGate={promise:gate.promise,status,resolveAfterHold(){setTimeout(()=>gate.resolve(),250);}};
+ await refresh(app).click();
  await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions);expect(await reasons(app)).toContain('authentication-denied');readOnly(state);
  await page.screenshot({path:testInfo.outputPath('owner-source-'+status+'-reload-required.png')});
 });
@@ -205,8 +208,10 @@ test('button-launched TV survives repeated verified renewal and continues automa
  expect(await app.locator('body').evaluate(()=>location.search)).toBe('');
  for(let i=0;i<3;i++){
   const gate=deferred();state.sessionGate=gate;await renewTv(page,app,'synthetic-tv-'+i);
-  await expect.poll(()=>state.sessionReads).toBe(initialSessions+i+1);await expect(tvBoard(app)).toHaveCount(0);
-  gate.resolve();await expect(tvBoard(app)).toBeVisible();
+  await expect.poll(()=>state.sessionReads).toBe(initialSessions+i+1);await expect(tvBoard(app)).toBeVisible();
+  await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+  await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);
+  gate.resolve();await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toHaveCount(0);
   const reads=state.calls.filter(c=>c.path==='/api/daily-board').length;
   await page.clock.runFor(60000);await expect.poll(()=>state.calls.filter(c=>c.path==='/api/daily-board').length).toBeGreaterThan(reads);
  }
@@ -232,11 +237,13 @@ for(const boundary of ['actor','permissions','role','mode','logout','security-hi
  if(boundary==='mode')await app.locator('body').evaluate(()=>history.replaceState(null,'','?mode=fleet#daily-board'));
  if(['logout','security-hide'].includes(boundary))await app.locator('body').evaluate((_,reason)=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason}})),boundary==='logout'?'authentication-denied':'security-hide');
  else await renewTv(page,app,'synthetic-blocked-tv');
- await expect(tvBoard(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');
- await page.clock.runFor(60000);await expect(tvBoard(app)).toHaveCount(0);readOnly(state);
+ await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Sign in again on Tech Check to resume'})).toBeVisible();
+ await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);await expect(app.getByRole('alert')).toHaveCount(0);
+ await page.clock.runFor(60000);await expect(tvBoard(app)).toBeVisible();await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);readOnly(state);
 });
 test('TV remains quarantined during temporary verification failure then restores only after same-Owner proof',async({page})=>{
  const {app,state}=await mount(page,{tv:true});state.sessionStatus=503;await renewTv(page,app,'synthetic-retrying-tv');
- await expect(app.getByRole('status').filter({hasText:'Connection interrupted.'})).toContainText('reconnect automatically');await expect(tvBoard(app)).toHaveCount(0);
- state.sessionStatus=200;await page.clock.runFor(30000);await expect(tvBoard(app)).toBeVisible();readOnly(state);
+ await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+ await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);
+ state.sessionStatus=200;await page.clock.runFor(30000);await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toHaveCount(0);readOnly(state);
 });
