@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {assertCensusMethod, assertCensusPath, customerNamePath, ticketListPath} from '../../supabase/functions/cos-mhelp-ticket-census/allowlist.ts';
+import {assertTcpProject} from '../../supabase/functions/cos-mhelp-ticket-census/projectGuard.ts';
 import {ticketBudgetPlan, censusBackoffMs, DATA_DAILY_CAP, INVENTORY_DAY_RESERVE, TICKET_DAILY_CAP, TICKET_RUN_CAP, TICKET_RUNS_PER_DAY} from '../../supabase/functions/cos-mhelp-ticket-census/budget.ts';
 import {normalizeMhelpId, projectCensusTicket, closedStatusLabel} from '../../supabase/functions/cos-mhelp-ticket-census/project.ts';
 import {emptyCursor, readTicketCensus} from '../../supabase/functions/cos-mhelp-ticket-census/read.ts';
@@ -262,8 +263,8 @@ test('the sibling reuses the token manager and does not embed a credential', asy
   assert.match(source, /nativeMhelpTokens/);
   assert.match(source, /fetch: tokens\.fetch/);
   assert.equal(source.includes('connect.mhelpdesk.com'), false);
-  assert.equal(source.includes('tughscoxralhofrckvxy'), false);
-  assert.match(source, /SUPABASE_URL/);
+  assert.match(source, /assertTcpProject\(Deno\.env\.get\('SUPABASE_URL'\)\)/);
+  assert.equal(source.includes('[a-z0-9]+\\.supabase\\.co'), false);
   assert.match(source, /goqrnolcvqnirjmzaeyk/);
   assert.equal(source.includes('COS_MHELP_ACCESS_TOKEN'), false);
   assert.equal(/Bearer [A-Za-z0-9_-]{20,}/.test(source), false);
@@ -392,5 +393,104 @@ test('applying the census SQL and its rollback returns the database to the start
     assert.equal((await db.query(`select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='cos_mhelp_placement_private' and c.relname='census_mhelp_ticket'`)).rows[0].n, 1);
     await db.exec(await readFile(new URL('../db/cos-mhelp-ticket-census-rollback.sql', import.meta.url), 'utf8'));
     assert.deepEqual(await catalog(), before);
+  } finally { await db.close(); }
+});
+
+test('SUPABASE_URL must be the TCP project or the census refuses to run', () => {
+  assert.equal(assertTcpProject('https://tughscoxralhofrckvxy.supabase.co'), 'https://tughscoxralhofrckvxy.supabase.co');
+  for (const url of [undefined, '', 'https://other.supabase.co', 'https://tughscoxralhofrckvxy.supabase.co.evil.test', 'http://tughscoxralhofrckvxy.supabase.co']) {
+    assert.throws(() => assertTcpProject(url), error => error.message === 'Backend unavailable');
+  }
+});
+
+test('a denied daily reservation is not followed by a vendor read', async () => {
+  let fetches = 0;
+  const stopped = await readTicketCensus({
+    fetch: async () => { fetches += 1; return json(statuses); },
+    portalId: String(portal), accessToken: 'synthetic-census-token', equipmentIds: [],
+    claimRun: async () => ({allowed: false, runs: 48, reads: 10}),
+    claimReads: async () => { throw new Error('read claimed after a denied run'); },
+    now: () => Date.parse('2026-11-18T18:00:00.000Z'),
+  });
+  assert.equal(stopped.reason, 'daily_budget');
+  assert.equal(fetches, 0);
+  assert.equal(stopped.cursor.runsToday, 48);
+  const deniedRead = await readTicketCensus({
+    fetch: async () => { fetches += 1; return json(statuses); },
+    portalId: String(portal), accessToken: 'synthetic-census-token', equipmentIds: [],
+    claimRun: async () => ({allowed: true, runs: 1, reads: 1151}),
+    claimReads: async () => ({allowed: false, runs: 1, reads: 1152}),
+    now: () => Date.parse('2026-11-18T18:00:00.000Z'),
+  });
+  assert.equal(deniedRead.reason, 'daily_budget');
+  assert.equal(fetches, 0);
+});
+
+test('an equipment page that ignores sort is skipped and the next unit is read', async () => {
+  const fetch = async (url, init = {}) => {
+    assert.equal(init.method || 'GET', 'GET');
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/ticketstatus')) return json(statuses);
+    if (parsed.pathname.endsWith('/tickettypes')) return json(types);
+    if (parsed.pathname.includes('/Equipment/1001/')) return json({totalRows: 3, data: [ticket({ticketId: 1, customerId: null}), ticket({ticketId: 2, customerId: null}), ticket({ticketId: 3, customerId: null})]});
+    if (parsed.pathname.includes('/Equipment/1002/')) return json({totalRows: 1, data: [ticket({ticketId: 9, ticketNumber: 90, customerId: null})]});
+    return json({totalRows: 0, data: []});
+  };
+  const result = await readTicketCensus({fetch, portalId: String(portal), accessToken: 'synthetic-census-token', equipmentIds: ['1001', '1002'], now: () => Date.parse('2026-11-18T18:00:00.000Z')});
+  assert.equal(result.state, 'completed');
+  assert.equal(result.equipmentSortUnverified, true);
+  assert.equal(result.rows.some(row => row.equipmentId === '1001'), false);
+  assert.equal(result.rows.some(row => row.ticketId === '9' && row.equipmentId === '1002'), true);
+});
+
+test('two parallel budget claims at 47 let only one run through, and a 404 becomes Unknown without a fresh check time', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create schema if not exists cos_mhelp_placement_private;
+      create table cos_mhelp_placement_private.links(equipment_id text primary key);
+      drop schema if exists auth cascade; create schema auth;
+      create function auth.role() returns text language sql stable as $$select nullif(current_setting('request.jwt.claim.role', true), '')$$;
+      do $$ begin
+        if not exists(select 1 from pg_roles where rolname='anon') then create role anon; end if;
+        if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
+        if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role bypassrls; end if;
+      end $$;`);
+    await db.exec(await readFile(new URL('../db/cos-mhelp-ticket-census.sql', import.meta.url), 'utf8'));
+    await db.exec(`insert into cos_mhelp_placement_private.census_mhelp_ticket_budget(utc_day, runs, reads) values ('2026-11-18', 47, 1151)`);
+    const claim = () => db.transaction(async tx => {
+      await tx.exec('set local role service_role');
+      await tx.query("select set_config('request.jwt.claim.role','service_role',true)");
+      return (await tx.query(`select public.cos_mhelp_census_ticket_claim_run('2026-11-18'::date) result`)).rows[0].result;
+    });
+    const claimed = await Promise.all([claim(), claim()]);
+    assert.equal(claimed.filter(row => row.allowed === true).length, 1);
+    assert.equal(claimed.filter(row => row.allowed === false).length, 1);
+    assert.equal((await db.query('select runs, reads from cos_mhelp_placement_private.census_mhelp_ticket_budget')).rows[0].runs, 48);
+    const readClaim = () => db.transaction(async tx => {
+      await tx.exec('set local role service_role');
+      await tx.query("select set_config('request.jwt.claim.role','service_role',true)");
+      return (await tx.query(`select public.cos_mhelp_census_ticket_claim_reads('2026-11-18'::date, 1) result`)).rows[0].result;
+    });
+    const reads = await Promise.all([readClaim(), readClaim()]);
+    assert.equal(reads.filter(row => row.allowed === true).length, 1);
+    assert.equal((await db.query('select reads from cos_mhelp_placement_private.census_mhelp_ticket_budget')).rows[0].reads, 1152);
+    await db.exec(`insert into cos_mhelp_placement_private.census_mhelp_ticket(ticket_id, ticket_number, status_label, type_label, created_at, equipment_id, fetched_at)
+      values ('10','100','New','Install','2026-01-01T00:00:00Z','1001','2026-01-01T00:00:00Z'),
+             ('12','120','New','Install','2026-01-02T00:00:00Z','1001','2026-01-02T00:00:00Z')`);
+    const marked = await db.transaction(async tx => {
+      await tx.exec('set local role service_role');
+      await tx.query("select set_config('request.jwt.claim.role','service_role',true)");
+      return (await tx.query(`select public.cos_mhelp_census_ticket_missing('10') result`)).rows[0].result;
+    });
+    assert.equal(marked.status, 'Unknown');
+    const stored = (await db.query(`select status_label, fetched_at from cos_mhelp_placement_private.census_mhelp_ticket where ticket_id='10'`)).rows[0];
+    assert.equal(stored.status_label, 'Unknown');
+    assert.equal(new Date(stored.fetched_at).toISOString(), '2026-01-01T00:00:00.000Z');
+    const refresh = await db.transaction(async tx => {
+      await tx.exec('set local role service_role');
+      await tx.query("select set_config('request.jwt.claim.role','service_role',true)");
+      return (await tx.query(`select public.cos_mhelp_census_ticket_refresh(4) result`)).rows[0].result;
+    });
+    assert.deepEqual(refresh.ticketIds, ['12']);
   } finally { await db.close(); }
 });

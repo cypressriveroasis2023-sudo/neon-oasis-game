@@ -1,7 +1,7 @@
 import {emptyCursor, type CensusCursor, type CensusRow} from './read.ts';
 import {CensusRequestError} from './allowlist.ts';
 
-type RunResult = {state: 'completed' | 'stopped'; reason: string | null; vendorReads: number; rows: CensusRow[]; cursor: CensusCursor; recentTruncated: boolean; equipmentTruncated: boolean; flushed?: boolean};
+type RunResult = {state: 'completed' | 'stopped'; reason: string | null; vendorReads: number; rows: CensusRow[]; cursor: CensusCursor; recentTruncated: boolean; equipmentTruncated: boolean; equipmentSortUnverified?: boolean; flushed?: boolean};
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const reply = (body: unknown, status = 200) => Response.json(body, {status, headers: {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}});
 export const UPSERT_LIMIT = 200;
@@ -51,7 +51,8 @@ export function createTicketCensusHandler(options: {
       if (result.state === 'stopped') console.error('ticket_census_stopped', result.reason);
       if (result.recentTruncated) console.error('ticket_census_recent_truncated');
       if (result.equipmentTruncated) console.error('ticket_census_equipment_truncated');
-      return reply({state: result.state, reason: result.reason, vendorReads: result.vendorReads, censusRows: result.rows.length, recentTruncated: result.recentTruncated, equipmentTruncated: result.equipmentTruncated, mhelpWrites: 0, jobCreates: 0, jobEdits: 0});
+      if (result.equipmentSortUnverified) console.error('ticket_census_equipment_sort_unverified');
+      return reply({state: result.state, reason: result.reason, vendorReads: result.vendorReads, censusRows: result.rows.length, recentTruncated: result.recentTruncated, equipmentTruncated: result.equipmentTruncated, equipmentSortUnverified: result.equipmentSortUnverified === true, mhelpWrites: 0, jobCreates: 0, jobEdits: 0});
     } catch (cause) {
       console.error('ticket_census_failed', cause instanceof CensusRequestError ? cause.message : 'unclassified');
       return reply({error: 'Ticket census unavailable', mhelpWrites: 0, jobCreates: 0, jobEdits: 0}, 503);

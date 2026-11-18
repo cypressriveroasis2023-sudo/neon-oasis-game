@@ -1,18 +1,16 @@
 /// <reference path="./deno.d.ts" />
 import {createTicketCensusHandler} from './index.ts';
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
-import {readTicketCensus, type CensusCursor, type CensusRow} from './read.ts';
+import {readTicketCensus, type BudgetClaim, type CensusCursor, type CensusRow} from './read.ts';
+import {assertTcpProject} from './projectGuard.ts';
 
-// The data project comes from SUPABASE_URL. The readiness host is the existing
-// cron authenticator used by the inventory worker; it is a different project
-// and is not a ticket or customer endpoint.
+// SUPABASE_URL is read and must be the TCP project. The readiness host is the
+// existing cron authenticator used by the inventory worker.
 const READINESS = 'https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-mhelp-readiness';
 const tokens = nativeMhelpTokens(name => Deno.env.get(name));
 
 function projectUrl(): string {
-  const url = Deno.env.get('SUPABASE_URL') || '';
-  if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(url)) throw new Error('Backend unavailable');
-  return url;
+  return assertTcpProject(Deno.env.get('SUPABASE_URL'));
 }
 async function json(response: Response, max = 65536): Promise<Record<string, unknown>> {
   if (!response.ok || !response.body || Number(response.headers.get('content-length')) > max) throw new Error('Read unavailable');
@@ -40,6 +38,11 @@ async function rpc(name: string, body: unknown) {
 function ids(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
 }
+function claim(value: Record<string, unknown>): BudgetClaim {
+  const runs = Number(value.runs), reads = Number(value.reads);
+  if ((value.allowed !== true && value.allowed !== false) || !Number.isSafeInteger(runs) || !Number.isSafeInteger(reads)) throw new Error('Budget unavailable');
+  return {allowed: value.allowed === true, runs, reads};
+}
 
 Deno.serve(createTicketCensusHandler({
   authenticate: async req => {
@@ -60,7 +63,9 @@ Deno.serve(createTicketCensusHandler({
       fetch: tokens.fetch, accessToken: config.accessToken, portalId: config.portalId, cursor,
       equipmentIds: ids(equipment.equipmentIds), refreshTicketIds: ids(refresh.ticketIds),
       onProgress: persist,
-      onMissingTicket: async ticketId => { await rpc('cos_mhelp_census_ticket_touch', {p_ticket_id: ticketId}); },
+      claimRun: async day => claim(await rpc('cos_mhelp_census_ticket_claim_run', {p_day: day})),
+      claimReads: async (day, count) => claim(await rpc('cos_mhelp_census_ticket_claim_reads', {p_day: day, p_count: count})),
+      onMissingTicket: async ticketId => { await rpc('cos_mhelp_census_ticket_missing', {p_ticket_id: ticketId}); },
     });
   },
   saveRows: (rows: CensusRow[]) => rpc('cos_mhelp_census_ticket_upsert', {p_rows: rows}),

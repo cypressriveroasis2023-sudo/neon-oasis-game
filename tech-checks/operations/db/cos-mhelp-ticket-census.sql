@@ -206,6 +206,7 @@ begin
     select ticket_id, fetched_at from cos_mhelp_placement_private.census_mhelp_ticket
     where created_at < clock_timestamp() - interval '48 hours'
       and status_label is not null
+      and status_label is distinct from 'Unknown'
       and status_label !~* '(^|[^[:alpha:]])(closed|complete|completed|cancelled|canceled|invoiced|void|voided)([^[:alpha:]]|$)'
     order by fetched_at, ticket_id
     limit p_limit
@@ -213,18 +214,64 @@ begin
   return jsonb_build_object('ticketIds', ids);
 end $$;
 
-create function public.cos_mhelp_census_ticket_touch(p_ticket_id text)
+create table cos_mhelp_placement_private.census_mhelp_ticket_budget (
+  utc_day date primary key,
+  runs integer not null default 0 check (runs between 0 and 48),
+  reads integer not null default 0 check (reads between 0 and 1152)
+);
+alter table cos_mhelp_placement_private.census_mhelp_ticket_budget enable row level security;
+revoke all on cos_mhelp_placement_private.census_mhelp_ticket_budget from public, anon, authenticated, service_role;
+
+create function public.cos_mhelp_census_ticket_claim_run(p_day date)
 returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
-declare touched integer;
+declare v_runs integer; v_reads integer;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then raise exception 'Service role required' using errcode = '42501'; end if;
+  if p_day is null then raise exception 'Invalid census budget' using errcode = '22023'; end if;
+  insert into cos_mhelp_placement_private.census_mhelp_ticket_budget(utc_day) values (p_day) on conflict do nothing;
+  update cos_mhelp_placement_private.census_mhelp_ticket_budget
+    set runs = runs + 1
+    where utc_day = p_day and runs < 48
+    returning runs, reads into v_runs, v_reads;
+  if v_runs is null then
+    select runs, reads into v_runs, v_reads from cos_mhelp_placement_private.census_mhelp_ticket_budget where utc_day = p_day;
+    return jsonb_build_object('allowed', false, 'reason', 'daily_budget', 'runs', v_runs, 'reads', v_reads);
+  end if;
+  return jsonb_build_object('allowed', true, 'reason', null, 'runs', v_runs, 'reads', v_reads);
+end $$;
+
+create function public.cos_mhelp_census_ticket_claim_reads(p_day date, p_count integer)
+returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
+declare v_runs integer; v_reads integer;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then raise exception 'Service role required' using errcode = '42501'; end if;
+  if p_day is null or p_count is null or p_count < 1 or p_count > 24 then raise exception 'Invalid census budget' using errcode = '22023'; end if;
+  insert into cos_mhelp_placement_private.census_mhelp_ticket_budget(utc_day) values (p_day) on conflict do nothing;
+  update cos_mhelp_placement_private.census_mhelp_ticket_budget
+    set reads = reads + p_count
+    where utc_day = p_day and reads + p_count <= 1152
+    returning runs, reads into v_runs, v_reads;
+  if v_reads is null then
+    select runs, reads into v_runs, v_reads from cos_mhelp_placement_private.census_mhelp_ticket_budget where utc_day = p_day;
+    return jsonb_build_object('allowed', false, 'reason', 'daily_budget', 'runs', v_runs, 'reads', v_reads);
+  end if;
+  return jsonb_build_object('allowed', true, 'reason', null, 'runs', v_runs, 'reads', v_reads);
+end $$;
+
+create function public.cos_mhelp_census_ticket_missing(p_ticket_id text)
+returns jsonb language plpgsql security definer set search_path = '' set lock_timeout = '2s' as $$
+declare marked integer;
 begin
   if coalesce(auth.role(), '') <> 'service_role' then raise exception 'Service role required' using errcode = '42501'; end if;
   if p_ticket_id is null or p_ticket_id !~ '^[1-9][0-9]{0,14}$' then raise exception 'Invalid census rows' using errcode = '22023'; end if;
-  update cos_mhelp_placement_private.census_mhelp_ticket set fetched_at = clock_timestamp() where ticket_id = p_ticket_id;
-  get diagnostics touched = row_count;
-  return jsonb_build_object('touched', touched);
+  update cos_mhelp_placement_private.census_mhelp_ticket
+    set status_label = 'Unknown'
+    where ticket_id = p_ticket_id and status_label is distinct from 'Unknown';
+  get diagnostics marked = row_count;
+  return jsonb_build_object('marked', marked, 'status', 'Unknown');
 end $$;
 
-revoke all on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_touch(text) from public, anon, authenticated;
-grant execute on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_touch(text) to service_role;
+revoke all on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_claim_run(date), public.cos_mhelp_census_ticket_claim_reads(date, integer), public.cos_mhelp_census_ticket_missing(text) from public, anon, authenticated;
+grant execute on function public.cos_mhelp_census_ticket_upsert(jsonb), public.cos_mhelp_census_ticket_duplicates(text), public.cos_mhelp_census_ticket_cursor(text, jsonb), public.cos_mhelp_census_ticket_equipment(integer), public.cos_mhelp_census_ticket_refresh(integer), public.cos_mhelp_census_ticket_claim_run(date), public.cos_mhelp_census_ticket_claim_reads(date, integer), public.cos_mhelp_census_ticket_missing(text) to service_role;
 notify pgrst, 'reload schema';
 commit;
