@@ -68,11 +68,12 @@ for(const [label,patch] of [['changed actor',{productionOwnerUserId:'22222222-22
 });
 for(const status of [401,403])test('true source '+status+' stays blocked without automatic revalidation',async({page},testInfo)=>{
  const {app,state,initialSessions}=await mount(page),gate=deferred();
- // The denial has to wait until the pointer action returns. Fulfilling it inside
- // the click removes the button while Chromium is still dispatching that input,
- // and the click never comes back. Later router reads stay denied too.
+ // Hold the denial until the pointer action is underway, then release it on a
+ // timer. Releasing only after click() returns deadlocks when the click is
+ // waiting on this same response. Later router reads stay denied too.
  state.routerStatus=status;state.routerGate={promise:gate.promise,status};
- await refresh(app).click();gate.resolve();
+ const release=setTimeout(()=>gate.resolve(),250);
+ try{await refresh(app).click();}finally{clearTimeout(release);gate.resolve();}
  await blocked(app);await page.clock.runFor(20*60000);expect(state.sessionReads).toBe(initialSessions);expect(await reasons(app)).toContain('authentication-denied');readOnly(state);
  await page.screenshot({path:testInfo.outputPath('owner-source-'+status+'-reload-required.png')});
 });
