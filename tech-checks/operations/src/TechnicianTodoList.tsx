@@ -14,7 +14,7 @@ function card(todo: TechnicianTodo, onOpen?: (todo: TechnicianTodo) => void) {
       <strong>{title}</strong>
       <span>{reason}</span>
     </span>
-    <button type='button' onClick={() => onOpen?.(todo)}>{todo.action || (todo.kind === 'sim_cancel' ? todo.detail : 'Open')}</button>
+    <button type='button' onClick={() => onOpen?.(todo)}>{todo.action || (todo.kind === 'sim_cancel' ? 'Cancel SIM' : 'Open')}</button>
   </li>;
 }
 
