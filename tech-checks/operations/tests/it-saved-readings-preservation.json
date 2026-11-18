@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
-      "candidateBlob": "8328033240bffea2f7b662b5c73fe116de4d30cb",
+      "candidateBlob": "e533c715305975b14831fd211b91c0e66f025c96",
       "replacements": [
         {
           "from": "",
@@ -49,7 +49,7 @@
         },
         {
           "from": "  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);",
-          "to": "  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);\n  useEffect(()=>{if(tvIntent.current)return;if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);\n  setTvSessionHold(tvDisplay);",
+          "to": "  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);\n  useEffect(()=>{if(active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);return;}if(reloadRequired&&!tvIntent.current){setTvDisplay(false);}},[reloadRequired,active]);\n  setTvSessionHold(tvDisplay&&active==='Daily Board');",
           "count": 1
         },
         {

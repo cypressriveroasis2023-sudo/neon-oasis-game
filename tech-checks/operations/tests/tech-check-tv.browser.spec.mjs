@@ -77,6 +77,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
     if(path==='/api/product-connections'){state.proofReads=(state.proofReads||0)+1;if(state.proofGate)await state.proofGate.promise;}
     if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
+    if(path==='/api/session')state.sessionReads=(state.sessionReads||0)+1;
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,legacyOwner:true,role:'Owner',name:'Fixture Owner',productionOwnerUserId:state.sessionActor||'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,...(state.features||{})}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
@@ -138,6 +139,21 @@ test('network failure marks delayed data and authentication failure clears priva
   await expect(page.locator('#hostToolbar')).toBeHidden();
   expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
   expect(state.writes).toEqual([]);
+});
+
+test('leaving the Daily Board turns TV off and a fleet denial requires reload without a session re-read',async({page})=>{
+ const {state,frame}=await setup(page);
+ await expect(page.locator('#hostToolbar')).toBeHidden();
+ expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
+ const sessions=state.sessionReads;
+ state.fleetFailures['/api/routers']=401;
+ await frame.locator('body').evaluate(()=>{location.hash='#fleet-dashboard';});
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);
+ await expect(page.locator('#hostToolbar')).toBeVisible();
+ expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
+ await expect(frame.getByRole('alert')).toContainText('Reload COS Operations');
+ await expect(frame.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);
+ expect(state.sessionReads).toBe(sessions);
 });
 
 test('a denied data read that returns a different actor keeps the TV without cards or pins',async({page})=>{

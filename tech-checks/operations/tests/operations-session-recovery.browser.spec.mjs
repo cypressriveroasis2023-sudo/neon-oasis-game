@@ -35,11 +35,12 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
   if(body.path==='/api/camera-health/summary-v3'&&state.healthGate){const gate=state.healthGate;state.healthGate=null;await gate.promise;}
   if(body.path==='/api/routers'&&state.routerGate){const gate=state.routerGate;state.routerGate=null;gate.resolveAfterHold?.();await gate.promise;state.oldRouterDelivered=true;return route.fulfill({status:gate.status,headers,json:{error:'Synthetic obsolete denial'}});}
   if(body.path==='/api/routers'&&state.routerStatus!==200)return route.fulfill({status:state.routerStatus,headers,json:{error:'Synthetic source authorization denied'}});
-  const data=body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
+  const tvJob={id:'job-pickup',customer:'Pickup customer',technician:'Tech 1',department:'it',status:'assigned',jobType:'PICKUP',instructions:'Inspect the return rack'};
+  const data=body.path==='/api/daily-board'?{jobs:tv?[tvJob]:[],tasks:[],readiness:[],asOf:fresh}:body.path==='/api/tv-board/settings'?{sections:tv?['pickup']:['shop'],revision:0,updatedAt:null}:body.path==='/api/camera-health/summary-v3'?health:body.path==='/api/field-map'?field:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:fresh}:body.path==='/api/vrm-fleet'?{items:[],power:[]}:{items:[]};
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
- if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();}
+ if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();await expect(app.getByText('Inspect the return rack',{exact:true})).toBeVisible();}
  else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
  return {app,state,initialSessions:state.sessionReads};
 }

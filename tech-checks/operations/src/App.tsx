@@ -173,8 +173,8 @@ function OwnerApp() {
   // stable within this session so an ordinary shell render cannot simulate exit.
   const onTvChange=useCallback(guardCurrent((enabled:boolean)=>{tvIntent.current=enabled;setTvDisplay(enabled);}),[guardCurrent]);
   const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);
-  useEffect(()=>{if(tvIntent.current)return;if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);
-  setTvSessionHold(tvDisplay);
+  useEffect(()=>{if(active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);return;}if(reloadRequired&&!tvIntent.current){setTvDisplay(false);}},[reloadRequired,active]);
+  setTvSessionHold(tvDisplay&&active==='Daily Board');
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
   const fleetWorkspaces = useMemo(()=>(dailyOnly?[...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
