@@ -1,17 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { api } from './api';
 import { type Row } from './directoryData.js';
 import { readTicketDirectory } from './ticketDirectoryData';
 import CustomerContactPicker from './CustomerContactPicker';
 import DirectoryWorkspace from './DirectoryWorkspace';
 
-type Props = { siteId:string; setSiteId:(id:string)=>void; disabled:boolean; onValidityChange:(valid:boolean)=>void; onSiteBusyChange:(busy:boolean)=>void;contactInstructions:string;onContactInstructionsChange:(value:string)=>void; show:(message:string)=>void };
+type Props = { siteId:string; setSiteId:(id:string)=>void; disabled:boolean; onValidityChange:(valid:boolean)=>void; onSiteBusyChange:(busy:boolean)=>void;contactInstructions:string;onContactInstructionsChange:(value:string)=>void; show:(message:string)=>void; previewDirectory?:{customers:Row[];sites:Row[]} };
 const active = (row:Row) => row.status === 'active';
+const previewCustomerId='11111111-1111-4111-8111-111111111111';
+const previewSiteId='22222222-2222-4222-8222-222222222222';
 export function TicketSitePickerPreview() {
   const [siteId,setSiteId]=useState('');
-  return <TicketSitePicker siteId={siteId} setSiteId={setSiteId} disabled={false} onValidityChange={()=>{}} onSiteBusyChange={()=>{}} contactInstructions="" onContactInstructionsChange={()=>{}} show={()=>{}}/>;
+  return <TicketSitePicker siteId={siteId} setSiteId={setSiteId} disabled={false} onValidityChange={()=>{}} onSiteBusyChange={()=>{}} contactInstructions="" onContactInstructionsChange={()=>{}} show={()=>{}} previewDirectory={{customers:[{id:previewCustomerId,name:'Fixture Customer',legalName:'Fixture Customer LLC',customerNumber:'FX-01',status:'active'}],sites:[{id:previewSiteId,name:'Fixture Site',customerId:previewCustomerId,status:'active',addressLine1:'100 Fixture Street',city:'Katy',stateRegion:'TX',postalCode:'77494',country:'US'}]}}/>;
 }
-export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityChange,onSiteBusyChange,contactInstructions,onContactInstructionsChange,show}:Props) {
+export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityChange,onSiteBusyChange,contactInstructions,onContactInstructionsChange,show,previewDirectory}:Props) {
   const [customers,setCustomers]=useState<Row[]|null>(null),[sites,setSites]=useState<Row[]|null>(null);
   const [customerId,setCustomerId]=useState(''),[query,setQuery]=useState(''),[siteQuery,setSiteQuery]=useState('');
   const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(false),[highlight,setHighlight]=useState(-1),[adding,setAdding]=useState(false);
@@ -21,12 +22,10 @@ export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityCh
   const load=async()=>{
     const request=++revision.current;setLoading(true);setError('');
     try {
-      const [people,locations]=await Promise.all([api.get('/api/customers'),api.get('/api/sites')]);
-      const {customers:nextCustomers,sites:nextSites}=readTicketDirectory(people.data,locations.data);
+      if(!previewDirectory)throw new Error('Customers and sites are not available in COS.');
+      const {customers:nextCustomers,sites:nextSites}=readTicketDirectory({items:previewDirectory.customers},{items:previewDirectory.sites});
       if(request!==revision.current)return;
       setCustomers(nextCustomers);setSites(nextSites);
-      if(siteId){const selected=nextSites.find(site=>site.id===siteId),customer=nextCustomers.find(item=>item.id===selected?.customerId);
-        if(selected&&customer){setCustomerId(customer.id);setQuery(customer.name);}else setSiteId('');}
     }catch(cause){if(request===revision.current)setError(cause instanceof Error?cause.message:'Customers and sites could not be loaded.');}
     finally{if(request===revision.current)setLoading(false);}
   };
