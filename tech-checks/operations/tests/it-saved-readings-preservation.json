@@ -4,8 +4,8 @@
   "files": [
     {
       "path": "App.tsx",
-      "baselineBlob": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
-      "candidateBlob": "ea667bb9b83cb65b2ad1eeb0a052f6e94211152e",
+      "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
+      "candidateBlob": "030ea4e2e7c52f6913489b86ed6a0488029824fd",
       "replacements": [
         {
           "from": "",
@@ -24,7 +24,7 @@
         },
         {
           "from": "createTicket={fleetOnly?undefined:createTicket} canEditPlacement=",
-          "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} canEditPlacement=",
+          "to": "createTicket={undefined} canEditPlacement=",
           "count": 1
         },
         {
@@ -34,7 +34,7 @@
         },
         {
           "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
-          "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} initialUnitId={route.unitId}",
+          "to": "createTicket={undefined} initialUnitId={route.unitId}",
           "count": 1
         }
       ]
@@ -50,8 +50,8 @@
           "count": 1
         },
         {
-          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
+          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -70,8 +70,8 @@
           "count": 1
         },
         {
-          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
+          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -109,8 +109,8 @@
           "count": 1
         },
         {
-          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
-          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
           "count": 1
         },
         {

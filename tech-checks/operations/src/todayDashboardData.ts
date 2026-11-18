@@ -2,9 +2,14 @@ import { validateCameraHealth } from './fieldCameraHealth';
 import { readRouterSnapshot, type RouterSnapshot } from '../../supabase/functions/cos-operations-pages/routers';
 
 export type DashboardRow = Record<string, unknown>;
-export type SourceKey = 'jobs' | 'quotes' | 'invoices' | 'pos' | 'tasks';
-/** Business collections are not requested. Camera health and routers stay on loadCompanyEquipment. */
-export const dashboardSources: readonly (readonly [SourceKey, string, string])[] = [];
+export const dashboardSources = [
+  ['jobs', '/api/jobs', 'Jobs'],
+  ['quotes', '/api/quotes', 'Quotes'],
+  ['invoices', '/api/ar', 'Invoices'],
+  ['pos', '/api/purchasing', 'Purchasing'],
+  ['tasks', '/api/owner-tasks', 'Owner Tasks'],
+] as const;
+export type SourceKey = typeof dashboardSources[number][0];
 export type DashboardData = Record<SourceKey, DashboardRow[] | null> & { errors: Partial<Record<SourceKey, string>> };
 export type DashboardApi = { fleetSource?:(source:'health',force?:boolean)=>Promise<unknown>;fleet?:(force?:boolean)=>Promise<{health:unknown}>;get: (path: string) => Promise<{ data: unknown }> };
 export const emptyTodayDashboard = (): DashboardData => ({ jobs: null, quotes: null, invoices: null, pos: null, tasks: null, errors: {} });

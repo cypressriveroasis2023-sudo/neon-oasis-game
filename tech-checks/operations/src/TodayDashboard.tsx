@@ -1,24 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
+import WorkspaceOverview from './WorkspaceOverview';
+import CompanyOverview from './CompanyOverview';
 import { api } from './api';
 import { cameraDashboardSummary } from './cameraDashboardSummary';
-import { loadCompanyEquipment, type CompanyEquipmentData } from './todayDashboardData';
+import { dashboardSources, emptyTodayDashboard, loadCompanyEquipment, loadTodayDashboard, type CompanyEquipmentData, type DashboardData } from './todayDashboardData';
+import type { CompanyStageId } from './companyLifecycle';
 
-type Props = { setActive: (workspace: string) => void };
+type Props = { setActive: (workspace: string) => void; openJob?: (id:string, workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
 
-const emptyEquipment = (): CompanyEquipmentData => ({ camera: null, routers: null, errors: {} });
-
-/** Today keeps camera health and routers. Job, quote, invoice, purchasing and owner-task tiles are not loaded. */
-export default function LiveTodayDashboard({ setActive }: Props) {
-  const [equipment, setEquipment] = useState<CompanyEquipmentData>(emptyEquipment);
+export default function LiveTodayDashboard({ setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
+  const [data, setData] = useState<DashboardData>(emptyTodayDashboard);
+  const [equipment, setEquipment] = useState<CompanyEquipmentData>({ camera: null, routers: null, errors: {} });
   const [loading, setLoading] = useState(true);
+  const [stageFilter, setStageFilter] = useState<CompanyStageId | null>(null);
   const revision = useRef(0), running = useRef(false);
+  const jobsSection = useRef<HTMLDivElement>(null);
   const refresh = async () => {
     if (running.current) return;
     running.current = true;
     const request = ++revision.current;
     setLoading(true);
-    setEquipment(emptyEquipment());
-    await loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(next); });
+    setData(emptyTodayDashboard());
+    setEquipment({ camera: null, routers: null, errors: {} });
+    await Promise.all([
+      loadTodayDashboard(api, next => { if (request === revision.current) setData(next); }),
+      loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(next); }),
+    ]);
     if (request !== revision.current) return;
     running.current = false;
     setLoading(false);
@@ -27,39 +34,41 @@ export default function LiveTodayDashboard({ setActive }: Props) {
     void refresh();
     return () => { revision.current += 1; running.current = false; };
   }, []);
-  const summary = cameraDashboardSummary(equipment.camera);
-  const cameraText = summary.available
-    ? summary.headline
-    : equipment.camera
-      ? equipment.camera.online + ' online · ' + equipment.camera.offline + ' offline · ' + equipment.camera.review + ' need review'
-      : equipment.errors.camera || (loading ? 'Checking camera health…' : 'Camera health is unavailable.');
-  const routerText = equipment.routers
-    ? equipment.routers.items.length + (equipment.routers.items.length === 1 ? ' router' : ' routers')
-    : equipment.errors.routers || (loading ? 'Checking routers…' : 'Router inventory is unavailable.');
-  return <div className='owner-command-home company-command-home' aria-busy={loading}>
-    <section className='company-overview' aria-label='Company overview'>
-      <header className='company-overview-heading'>
-        <div><h1>Company overview</h1><p>Cameras, locations, troubleshooting and equipment handoff.</p></div>
-      </header>
+
+  const failed = dashboardSources.filter(([key]) => Boolean(data.errors[key]));
+  const complete = !loading && failed.length === 0;
+  const browseStage = (stage: CompanyStageId | null) => {
+    setStageFilter(stage);
+    window.requestAnimationFrame(() => {
+      jobsSection.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      jobsSection.current?.focus({ preventScroll: true });
+    });
+  };
+  const cameraSummary = cameraDashboardSummary(equipment.camera);
+  const cameraText = cameraSummary.available ? cameraSummary.headline : equipment.errors.camera && !equipment.camera ? equipment.errors.camera : 'Health unavailable';
+  const cameraScope = cameraSummary.available ? cameraSummary.systems : 'Unknown';
+  return <div className={'owner-command-home company-command-home'+(detailOpen?' overview-detail-open':'')} aria-busy={loading}>
+    {!detailOpen && <>
       <section aria-label='Camera health summary'>
         <h2>Camera health</h2>
-        <p>{cameraText}</p>
-        {summary.available && <p>{summary.systems}</p>}
-        <p>{summary.note}</p>
-        <button type='button' onClick={() => setActive('Camera Health')}>Open Camera Health</button>
+        <p>{loading && !equipment.camera && !equipment.errors.camera ? 'Checking camera health…' : cameraText}</p>
+        <p>{cameraScope}</p>
       </section>
-      <section aria-label='Router summary'>
-        <h2>Routers</h2>
-        <p>{routerText}</p>
-        <button type='button' onClick={() => setActive('InHand Routers')}>Open routers</button>
-      </section>
-      {(equipment.errors.camera || equipment.errors.routers) && <section className='company-source-error' role='alert' aria-label='Dashboard data unavailable'>
-        {equipment.errors.camera && <p>{equipment.errors.camera}</p>}
-        {equipment.errors.routers && <p>{equipment.errors.routers}</p>}
-      </section>}
+      <CompanyOverview data={data} equipment={null} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
-        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : 'Refresh Overview'}</button>
+        <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
+        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
       </div>
-    </section>
+      {failed.length > 0 && <section className='company-source-error' role='alert' aria-label='Dashboard data unavailable'>
+        <h2>Some dashboard information is unavailable</h2>
+        <p>Available sections remain visible. A dash means unverified information, not no work.</p>
+        {failed.map(([key]) => <p key={key}>{data.errors[key]}</p>)}
+        <button className='secondary' onClick={() => setActive('Daily Board')}>Open Dispatch Board</button>
+      </section>}
+    </>}
+    <div className='company-jobs-section' ref={jobsSection} tabIndex={-1}>
+      {!detailOpen && stageFilter && <div className='company-job-filter'><span>Showing jobs for the selected stage</span><button className='secondary' onClick={() => setStageFilter(null)}>Show all active jobs</button></div>}
+      {data.jobs === null && !data.errors.jobs ? <p className='loading' role='status'>Checking job records…</p> : <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit} selectedJobId={selectedJobId} detailOpen={detailOpen} selectJob={selectJob} backToJobs={backToJobs} stageFilter={stageFilter}/>}
+    </div>
   </div>;
 }

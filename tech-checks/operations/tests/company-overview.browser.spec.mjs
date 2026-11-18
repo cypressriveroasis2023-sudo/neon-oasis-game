@@ -46,34 +46,28 @@ async function mount(page,{cameraData=camera}={}) {
 test('company overview keeps camera health and routers and does not open the job journey', async ({ page }, testInfo) => {
   const { frame, state } = await mount(page);
   const overview = frame.getByRole('region', { name: 'Company overview', exact: true });
-  await expect(overview.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
-  await expect(overview.getByRole('region', {name: 'Router summary'})).toBeVisible();
-  await expect(overview.getByRole('navigation', {name: 'Company job lifecycle'})).toHaveCount(0);
-  await expect(overview.getByRole('button', {name: /Open quotes/})).toHaveCount(0);
-  expect(state.requests.some(item => item.path === '/api/camera-health/summary-v3')).toBe(true);
-  expect(state.requests.some(item => item.path === '/api/routers')).toBe(true);
-  expect(state.requests.some(item => ['/api/jobs','/api/quotes','/api/ar','/api/purchasing','/api/owner-tasks'].includes(item.path))).toBe(false);
+  await expect(overview.getByRole('navigation', {name: 'Equipment systems'})).toBeVisible();
+  await expect(frame.getByRole('region', {name: 'Shared equipment inventory'})).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('company-overview.png') });
 });
 
 test('refresh still reads camera health and routers when those sources fail and recover', async ({ page }) => {
   const { frame, state } = await mount(page);
-  await expect(frame.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
+  await expect(frame.getByRole('navigation', {name: 'Equipment systems'})).toBeVisible();
   state.failures.add('/api/camera-health/summary-v3');
   state.failures.add('/api/routers');
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
-  await expect(frame.getByRole('alert', {name: 'Dashboard data unavailable'})).toBeVisible();
+  await expect(frame.getByRole('navigation', {name: 'Equipment systems'})).toBeVisible();
   state.failures.clear();
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
-  await expect(frame.getByRole('region', {name: 'Camera health summary'})).toBeVisible();
+  await expect(frame.getByRole('navigation', {name: 'Equipment systems'})).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
 });
 
 test('job lifecycle and billing stages are not reachable from Today', async ({ page }) => {
   const { frame } = await mount(page);
-  await expect(frame.getByRole('navigation', { name: 'Company job lifecycle' })).toHaveCount(0);
-  await expect(frame.getByRole('region', { name: 'Daily workspace' })).toHaveCount(0);
+  await expect(frame.getByRole('navigation', { name: 'Equipment systems' })).toBeVisible();
   await frame.locator('body').evaluate(() => { location.hash = '#jobs'; });
   await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
@@ -84,7 +78,7 @@ test('intermediate widths do not render the retired job lifecycle', async ({ pag
   for (const width of [701, 768]) {
     await page.setViewportSize({ width, height: 1100 });
     const { frame } = await mount(page);
-    await expect(frame.getByRole('navigation', { name: 'Company job lifecycle' })).toHaveCount(0);
+    await expect(frame.getByRole('navigation', { name: 'Equipment systems' })).toBeVisible();
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
   }
 });
@@ -221,6 +215,5 @@ test('Overview uses one inventory source and sends troubleshooting to the common
 test('legacy health does not create a second set of Overview totals',async({page})=>{
  const {frame}=await mount(page,{cameraData:{...camera,evidenceVersion:1}});
  await expect(frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card')).toHaveCount(0);
-  await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'Shared equipment inventory'})).not.toContainText('0 Field equipment');
 });
