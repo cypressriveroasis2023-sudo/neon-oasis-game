@@ -61,7 +61,9 @@ test('a Shop unit says In Shop on the fleet card, details, equipment cards and r
   const row = app.locator('.cos-fleet-unit-row').filter({hasText: 'Sniper 44'});
   await expect(row.locator('.cos-fleet-router-text')).toContainText('In Shop');
   await expect(row.locator('.cos-fleet-router-text')).not.toContainText('Offline');
-  expect(await row.locator('.cos-signal-shop').evaluate(node => getComputedStyle(node).color)).toBe('rgb(100, 116, 139)');
+  const marks = row.locator('.cos-signal-shop');
+  await expect(marks).toHaveCount(2);
+  for (const mark of await marks.all()) expect(await mark.evaluate(node => getComputedStyle(node).color)).toBe('rgb(100, 116, 139)');
   await row.click();
   const card = app.locator('.cos-fleet-router-card');
   await expect(card.locator('.cos-signal-shop')).toContainText('In Shop');

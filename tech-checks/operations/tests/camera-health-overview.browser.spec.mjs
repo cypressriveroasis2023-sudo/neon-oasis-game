@@ -125,7 +125,7 @@ test('provider diagnostics exclude stored outages and never synthesize units fro
  await page.locator('.provider-count-details > summary').click();await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('Location unverified');expect(await page.evaluate(()=>reads.some(row=>row.table==='equipment_master'))).toBe(false);
  await page.locator('.compact-unit[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
  await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('.compact-unit[data-unit="SPOTTER 904"]')).toHaveCount(0);await expect(page.locator('.compact-unit[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
- await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="SHOP 001"] .statuspill')).toHaveText('SHOP / ROOT');await expect(page.locator('[data-unit="INACTIVE 001"] .statuspill')).toHaveText('INACTIVE');
+ await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="SHOP 001"] .statuspill')).toHaveText('In Shop');await expect(page.locator('[data-unit="INACTIVE 001"] .statuspill')).toHaveText('INACTIVE');
  await page.locator('[data-scope-filter="Deactivated"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('INACTIVE');
 });
 test('current evidence expires in both overview and open details without fresh reads',async({page})=>{
@@ -204,7 +204,7 @@ test('visible folders and global search include deactivated ROOT units without f
  await mount(page);await page.evaluate(async()=>{fixtureDevices.push({id:999,unit_key:'SNIPER 312',device_name:'Shop camera 312',organization:'ROOT',activation_state:'deactivated',device_type:'Sniper',source:'2026_unit_tracker'});await load();});
  await page.getByRole('button',{name:'Shop / ROOT folder',exact:true}).click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 312');
  await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await page.getByLabel('Search units').fill('312');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('#boardTitle')).toContainText('Search all inventory');const card=page.locator('.compact-unit');
- await expect(card.locator('.statuspill')).toHaveText('SHOP');await expect(card.locator('.compact-unit-site')).toHaveText('SHOP');
+ await expect(card.locator('.statuspill')).toHaveText('In Shop');await expect(card.locator('.compact-unit-site')).toHaveText('SHOP');
  await expect(card.locator('.effective-placement')).toContainText('Provider organization: ROOT');await expect(card.locator('.effective-placement')).toContainText('Activation: deactivated');
  await expect(card.locator('.effective-placement')).toContainText(/No verified equipment link|physical placement unavailable/i);
  await expect(card.locator('.compact-unit-summary')).toContainText('Shop inventory; excluded from operational outage totals');

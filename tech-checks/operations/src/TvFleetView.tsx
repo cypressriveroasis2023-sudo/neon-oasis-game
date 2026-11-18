@@ -163,6 +163,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     &&product.linked?.evidence?.basis==='connection'&&!alreadyShown.has(product.productId));
   const outageCards=[...outages.map(row=>({kind:'native' as const,row})),
     ...sourceOnlyOutages.map(product=>({kind:'source' as const,product}))];
+  const shopRows=rows.filter(row=>row.health.state==='shop'&&!outages.some(item=>item.unit.id===row.unit.id));
   const count=tvCameraPageSize(width,height),parts=Math.max(1,Math.ceil(outageCards.length/count));
   const shown=outageCards.slice((page%parts)*count,(page%parts+1)*count),area=areas[page%areas.length];
   useEffect(()=>onPages({camera:parts,map:areas.map(area=>area.label)}),[parts,areas,onPages]);
@@ -268,6 +269,6 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       <article key={entry.row.productId||entry.row.unit.id} data-product-id={entry.row.productId} className='tv-fleet-record tv-state-offline'><div><h3>{entry.row.unit.unitNumber}</h3>{entry.row.productId&&<small>Product {entry.row.productId}</small>}<b>OFFLINE</b></div><p>{entry.row.unit.site||entry.row.unit.customer||'Site not linked'}</p><p>{entry.row.unit.address||'Address not recorded'}</p><div><span className={entry.row.routerLabel==='In Shop'?'cos-signal-shop':undefined}>{entry.row.routerLabel||fieldReachabilityLabels[entry.row.router]}</span>{entry.row.doNotUse&&<b className='cos-do-not-use-badge'>DO NOT USE</b>}<span>{locationTag(entry.row.unit)}</span></div><small>{entry.row.unit.activeJobNumber||'No linked job'} · {entry.row.health.basis==='connection'?'IP / port observation':entry.row.health.basis==='recorder'?'Recorder observation':'Camera / detector observation'} · {cameraTime(entry.row.health.checkedAt,clock)}</small></article>
     ):(
       <article key={entry.product.productId} data-product-id={entry.product.productId} className='tv-fleet-record tv-state-offline'><div><h3>{entry.product.unitNumber}</h3><small>Product {entry.product.productId}</small><b>OFFLINE</b></div><p>{entry.product.site||entry.product.customer||'Site not linked'}</p><p>{entry.product.address||'Customer address not recorded'}</p><div><span>Router status unknown</span><span>mHelp customer address · location not GPS verified</span></div><small>Exact Product-ID saved TCP/service-port nonresponse · {cameraTime(entry.product.linked?.evidence?.observedAt,clock)} · video not verified</small></article>
-    ))}{!outageCards.length&&<p>{data.health?'No confirmed red outages in the available records.':'Camera Health is unavailable. Waiting for outage records.'}</p>}</div>}
+    ))}{shopRows.map(row=><article key={'shop-'+row.unit.id} className='tv-fleet-record'><div><h3>{row.unit.unitNumber}</h3><span className='cos-signal-shop'>In Shop</span></div><p>{row.unit.site||row.unit.customer||'Site not linked'}</p><p>{row.unit.address||'Address not recorded'}</p></article>)}{!outageCards.length&&!shopRows.length&&<p>{data.health?'No confirmed red outages in the available records.':'Camera Health is unavailable. Waiting for outage records.'}</p>}</div>}
   </div>;
 }
