@@ -36,7 +36,7 @@ test('Daily Board no longer assigns jobs or opens Owner Tasks',()=>{
  assert.equal(source.includes('/api/jobs/'),false);
  assert.equal(source.includes('+ Assign Task'),false);
  assert.equal(source.includes('Add or schedule a job'),false);
- assert.match(source,/Daily truck readiness|daily-board-readiness/);
+ assert.doesNotMatch(source,/Daily truck readiness|daily-board-readiness|Daily Team Readiness/);
 });
 test('presentation cannot fetch, persist, dispatch, enable, or clone an action',()=>{
  assert.doesNotMatch(source,/fetch\s*\(|\bapi\.|setInterval|setTimeout|localStorage|sessionStorage|dispatchEvent|cloneElement|\.props\.onClick|Date\.|location\.|history\./);

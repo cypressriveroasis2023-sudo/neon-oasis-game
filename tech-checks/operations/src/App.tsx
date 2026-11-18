@@ -14,6 +14,8 @@ import './approvedCosNavigation.css';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 import {useOperationsSession} from './useOperationsSession';
+import TvSignedOutBoard from './TvSignedOutBoard';
+import {setTvSessionHold} from './tvSessionHold';
 import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
@@ -158,11 +160,11 @@ function OwnerApp() {
     window.addEventListener('message',returnToChecks);
     return()=>window.removeEventListener('message',returnToChecks);
   },[setRouteLocation]);
-  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason, detail)=>{
-    const holdTv=tvIntent.current&&reason==='authentication-denied'&&typeof detail?.path==='string'&&detail.path!=='/api/session';
-    if(!holdTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;
+  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason)=>{
+    const keepTv=tvIntent.current;
+    if(!keepTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;
     setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);
-    if(!holdTv)setTvDisplay(false);
+    if(!keepTv)setTvDisplay(false);
     setRouteLocation({workspace:active,jobId:'',detail:false},true);
     // Discard selection/history payloads as well as the mounted private views.
     history.replaceState(null,'',location.href);
@@ -170,7 +172,9 @@ function OwnerApp() {
   // DailyBoard owns the host display lifecycle. Keep its guarded notification
   // stable within this session so an ordinary shell render cannot simulate exit.
   const onTvChange=useCallback(guardCurrent((enabled:boolean)=>{tvIntent.current=enabled;setTvDisplay(enabled);}),[guardCurrent]);
-  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);
+  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);
+  useEffect(()=>{if(tvIntent.current)return;if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);
+  setTvSessionHold(tvDisplay);
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
   const fleetWorkspaces = useMemo(()=>(dailyOnly?[...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
@@ -277,7 +281,7 @@ function OwnerApp() {
       </section>
 
       {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&(active!=='Camera Health'||route.diagnostics)&&!route.createType&&<header className='command-page-header'><div><label>{active==='Fleet Dashboard'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
-      {checking&&!session?<section className='panel module' role='status'><p>{sessionError||'Verifying your current Operations account…'}</p><button type='button' onClick={()=>window.location.reload()}>Reload app</button></section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p>{!reloadRequired&&<div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>}{!dailyOnly&&<TechChecksWorkspace/>}</section>
+      {tvDisplay&&(reloadRequired||!authorized||(checking&&!session))?<TvSignedOutBoard note={reloadRequired?'Sign in again on Tech Check to resume':'Reconnecting'} exit={leaveTv}/>:checking&&!session?<section className='panel module' role='status'><p>{sessionError||'Verifying your current Operations account…'}</p><button type='button' onClick={()=>window.location.reload()}>Reload app</button></section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p>{!reloadRequired&&<div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>}{!dailyOnly&&<TechChecksWorkspace/>}</section>
         :<Fragment key={sessionGeneration}>{fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Fleet Dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<FleetInventoryOverview navigate={navigate}/><nav className='cos-daily-shortcuts' aria-label='Daily work shortcuts'><button onClick={()=>navigate('Daily Board')}>Today’s work</button><button onClick={()=>navigate('Units On Hand')}>Shop / ROOT</button><button onClick={()=>openLegacy('it')}>IT check out / check in</button><button onClick={()=>openLegacy('service')}>Service work & returns</button>{trackerAccess(session)&&<button onClick={()=>navigate('Unit Tracker')}>2027 Unit Tracker</button>}</nav>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate} trackerVisible={trackerAccess(session)}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate} openUnit={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>

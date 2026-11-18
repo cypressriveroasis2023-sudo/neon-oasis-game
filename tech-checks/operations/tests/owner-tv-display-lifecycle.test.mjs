@@ -7,6 +7,7 @@ import * as navigation from '../src/workspaceNavigation.ts';
 import * as approvedNavigation from '../src/approvedCosNavigation.ts';
 import {primaryAreas} from '../src/visionAreas.ts';
 import {createOperationsSessionRecovery,guardSessionCallback} from '../src/operationsSessionRecovery.ts';
+import * as tvSessionHoldModule from '../src/tvSessionHold.ts';
 
 // Execute OwnerApp's actual JSX/callback wiring and DailyBoard's actual display
 // effect. The hook host supplies only state/memo semantics, not a DOM or browser.
@@ -52,9 +53,10 @@ async function fixture(){
   './approvedCosNavigation':approvedNavigation,
   './visionAreas':{primaryAreas},'./VisionAreas':{default:'VisionAreas',AreaIcon:'AreaIcon',primaryWorkspace:active=>active},
   './unitTracker':{trackerAccess:()=>false},'../../it-feature-availability':{IT_DAILY_ONLY:false},
+  './tvSessionHold':tvSessionHoldModule,
  };
  const exports={};vm.runInNewContext(appCode,{exports,window,location,history,URLSearchParams,Date,Event,require:name=>modules[name]||{default:name.slice(2)}},{filename:'App.tsx'});
- const context={window,location,history,URL,URLSearchParams};vm.createContext(context);vm.runInContext(displayCode,context,{filename:'DailyBoard display effect'});
+ const context={window,location,history,URL,URLSearchParams,tvSessionHold:tvSessionHoldModule.tvSessionHold};vm.createContext(context);vm.runInContext(displayCode,context,{filename:'DailyBoard display effect'});
  let cleanup=null,lastCallback=null,lastTv=null;
  function display(callback,tv=true){if(callback===lastCallback&&tv===lastTv)return;cleanup?.();lastCallback=callback;lastTv=tv;cleanup=context.display(tv,callback);}
  function unmount(){cleanup?.();cleanup=null;lastCallback=null;lastTv=null;}
@@ -76,9 +78,12 @@ test('explicit TV exit still notifies the host and removes both launch URLs',asy
  assert.equal(nodes(f.render(),'OwnerBoardControls').length,0);
 });
 
-test('actual TV unmount exits the host even though a quarantined callback cannot update shell state',async()=>{
+test('a blocked session keeps a bare TV and drops the private board',async()=>{
  const f=await fixture(),callback=f.callback();f.display(callback);f.invalidate();
- assert.equal(nodes(f.render(),'DailyBoard').length,0,'quarantine unmounts the private board');
+ const frame=nodes(f.render(),'TvSignedOutBoard');
+ assert.equal(frame.length,1,'the TV frame stays mounted');
+ assert.equal(frame[0].props.note,'Sign in again on Tech Check to resume');
+ assert.equal(nodes(f.render(),'DailyBoard').length,0,'no private cards remain');
  const writes=f.hooks.writes.length;callback(true);callback(false);assert.equal(f.hooks.writes.length,writes,'retained callback remains generation-fenced');
- f.unmount();assert.deepEqual(f.messages,[{type:'COS_TV_BOARD_DISPLAY_MODE',active:true},{type:'COS_TV_BOARD_DISPLAY_MODE',active:false}]);assert.equal(f.host.searchParams.has('tvBoard'),false);
+ f.unmount();assert.deepEqual(f.messages,[{type:'COS_TV_BOARD_DISPLAY_MODE',active:true}]);assert.equal(f.host.searchParams.get('tvBoard'),'1');
 });

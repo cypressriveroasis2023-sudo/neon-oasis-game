@@ -206,8 +206,10 @@ test('button-launched TV survives repeated verified renewal and continues automa
  expect(await app.locator('body').evaluate(()=>location.search)).toBe('');
  for(let i=0;i<3;i++){
   const gate=deferred();state.sessionGate=gate;await renewTv(page,app,'synthetic-tv-'+i);
-  await expect.poll(()=>state.sessionReads).toBe(initialSessions+i+1);await expect(tvBoard(app)).toHaveCount(0);
-  gate.resolve();await expect(tvBoard(app)).toBeVisible();
+  await expect.poll(()=>state.sessionReads).toBe(initialSessions+i+1);await expect(tvBoard(app)).toBeVisible();
+  await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+  await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);
+  gate.resolve();await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toHaveCount(0);
   const reads=state.calls.filter(c=>c.path==='/api/daily-board').length;
   await page.clock.runFor(60000);await expect.poll(()=>state.calls.filter(c=>c.path==='/api/daily-board').length).toBeGreaterThan(reads);
  }
@@ -233,11 +235,13 @@ for(const boundary of ['actor','permissions','role','mode','logout','security-hi
  if(boundary==='mode')await app.locator('body').evaluate(()=>history.replaceState(null,'','?mode=fleet#daily-board'));
  if(['logout','security-hide'].includes(boundary))await app.locator('body').evaluate((_,reason)=>dispatchEvent(new CustomEvent('cos-private-data-invalidated',{detail:{reason}})),boundary==='logout'?'authentication-denied':'security-hide');
  else await renewTv(page,app,'synthetic-blocked-tv');
- await expect(tvBoard(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');
- await page.clock.runFor(60000);await expect(tvBoard(app)).toHaveCount(0);readOnly(state);
+ await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Sign in again on Tech Check to resume'})).toBeVisible();
+ await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);await expect(app.getByRole('alert')).toHaveCount(0);
+ await page.clock.runFor(60000);await expect(tvBoard(app)).toBeVisible();await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);readOnly(state);
 });
 test('TV remains quarantined during temporary verification failure then restores only after same-Owner proof',async({page})=>{
  const {app,state}=await mount(page,{tv:true});state.sessionStatus=503;await renewTv(page,app,'synthetic-retrying-tv');
- await expect(app.getByRole('status').filter({hasText:'Connection interrupted.'})).toContainText('reconnect automatically');await expect(tvBoard(app)).toHaveCount(0);
- state.sessionStatus=200;await page.clock.runFor(30000);await expect(tvBoard(app)).toBeVisible();readOnly(state);
+ await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+ await expect(app.locator('.tech-check-tv-card,.leaflet-marker-icon')).toHaveCount(0);
+ state.sessionStatus=200;await page.clock.runFor(30000);await expect(tvBoard(app)).toBeVisible();await expect(app.getByRole('status').filter({hasText:'Reconnecting'})).toHaveCount(0);readOnly(state);
 });

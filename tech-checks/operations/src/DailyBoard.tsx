@@ -2,7 +2,7 @@ import ApprovedBoardActions from './ApprovedBoardActions';
 import { DeliveryGoBackSummary } from './DeliveryGoBack';
 import { hasOpenGoBack } from './deliveryGoBackData';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { boardDateLabel, chicagoDay, dailyBoardCards, equipmentHandoffJobs, isTestRecord, readinessSummary, type BoardCard, type BoardScope } from './dailyBoardData';
+import { boardDateLabel, chicagoDay, dailyBoardCards, equipmentHandoffJobs, isTestRecord, type BoardCard, type BoardScope } from './dailyBoardData';
 import './dailyBoard.css';
 import BoardRecordDetails from './BoardRecordDetails';
 import {captureBoardSelection} from './boardRecordDetails';
@@ -12,8 +12,7 @@ import TechCheckTvBoard from './TechCheckTvBoard';
 import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
-import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
-import {setTvSessionHold} from './tvSessionHold';
+import {setTvSessionHold,tvSessionHold} from './tvSessionHold';
 
 type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
@@ -114,7 +113,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
     return()=>{mounted.current=false;generation.current+=1;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('cos-board-updated',focus);window.removeEventListener('cos-private-data-invalidated',invalidated);window.removeEventListener('cos-tv-session-resumed',resumed);document.removeEventListener('visibilitychange',visible);};
   },[load]);
 
-  useEffect(()=>{setTvSessionHold(tv);return()=>setTvSessionHold(false);},[tv]);
+  useEffect(()=>{setTvSessionHold(tv);},[tv]);
   useEffect(()=>{
     if(tv||!sessionStale.current)return;
     sessionStale.current=false;
@@ -126,7 +125,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
       const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
     }
     if(window.parent!==window)window.parent.postMessage({type:'COS_TV_BOARD_DISPLAY_MODE',active:tv},location.origin);
-    return()=>{if(tv&&window.parent!==window)window.parent.postMessage({type:'COS_TV_BOARD_DISPLAY_MODE',active:false},location.origin);};
+    return()=>{if(tv&&window.parent!==window&&!tvSessionHold())window.parent.postMessage({type:'COS_TV_BOARD_DISPLAY_MODE',active:false},location.origin);};
   },[tv,onTvChange]);
 
   useEffect(()=>{
@@ -202,13 +201,13 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
       <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(true);setRotation(0);setSelected(null);}}>TV View</button><button className='secondary' onClick={()=>void copyTvLink()}>Copy TV link</button></div>
     </header>
 
-    <details className='cos-workspace-settings'><summary>TV display & settings</summary><div className='daily-board-tv-setup'><strong>Update here. Show it on the TV.</strong><p>The TV refreshes saved camera and readiness changes every minute. Open this link on the TV computer, sign in to Tech Check, then select Full screen.</p><a href={tvLink} target='_blank' rel='noopener'>Open Tech Check TV Board</a></div>
+    <details className='cos-workspace-settings'><summary>TV display & settings</summary><div className='daily-board-tv-setup'><strong>Update here. Show it on the TV.</strong><p>The TV refreshes saved camera changes every minute. Open this link on the TV computer, sign in to Tech Check, then select Full screen.</p><a href={tvLink} target='_blank' rel='noopener'>Open Tech Check TV Board</a></div>
     <TvBoardControls control={tvSettings}/></details>
     <div className='daily-board-range' aria-label='Board range'><button className={scope==='day'?'active':''} onClick={()=>setScope('day')}>Day</button><button className={scope==='week'?'active':''} onClick={()=>setScope('week')}>Week</button><span>{scope==='day'?'Today + overdue / unscheduled work':'Next 7 days + overdue / unscheduled work'}</span></div>
 
     <div className='daily-board-toolbar'>
       <label>Technician<select aria-label='Technician' value={person} onChange={e=>{setPerson(e.target.value);setRotation(0);}}><option value=''>Everyone</option>{allPeople.map(p=><option key={p}>{p}</option>)}</select></label>
-      <label>Department<select aria-label='Department' value={department} onChange={e=>{setDepartment(e.target.value);setRotation(0);}}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option><option value='owner'>Owner</option></select></label>
+      <label>Department<select aria-label='Department' value={department} onChange={e=>{setDepartment(e.target.value);setRotation(0);}}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option></select></label>
       <label className='daily-board-test-toggle'><input type='checkbox' checked={showTest} onChange={e=>setShowTest(e.target.checked)}/>Show test records{hiddenTests>0?' ('+hiddenTests+' hidden)':''}</label>
       <span>{visible.length} equipment handoffs · Refreshes every minute<br/>{lastSuccess?'Last successful refresh '+lastSuccess.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT':'Waiting for live records'}</span>
     </div>
@@ -226,9 +225,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
     {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Refresh before another assignment</button>}</div>}
     {notice&&<div className='daily-board-notice' role='status'>{notice}</div>}
 
-    {lastSuccess&&<section className='daily-board-readiness' aria-label='Daily truck readiness'><h3>Daily Team Readiness <small>Today’s recorded checks</small></h3><div>{readiness.map(row=>{const summary=readinessSummary(row),exempt=vehicleInspectionExempt(row);return <article key={row.userId}><strong>{row.name} <small>{row.department.toUpperCase()}</small></strong>{exempt?<p>No company vehicle · truck and trailer inspections do not apply.</p>:(['truck','trailer'] as const).map(key=><p key={key}><span>{key==='truck'?'Truck inspection':'Trailer inspection'}</span><b className={'daily-readiness-'+summary[key].state}>{summary[key].label}</b></p>)}<p><span>{exempt?'IT shop inventory':'Inventory record'}</span><b className={'daily-readiness-'+summary.inventory.state}>{summary.inventory.label}</b></p><small>{row.completedAt?'Completed '+boardDateLabel(row.completedAt):row.startedAt?'Started '+boardDateLabel(row.startedAt):'No check recorded today'}</small></article>;})}</div>{!readiness.length&&<p>{sameDay?'No technicians match these filters.':'Refresh required before showing today’s readiness.'}</p>}</section>}
-
-    {!lastSuccess&&!error?<p role='status'>Loading camera readiness…</p>:<div className='daily-board-people'>{laneNames.map(name=>{
+    {!lastSuccess&&!error?<p role='status'>Loading equipment handoffs…</p>:<div className='daily-board-people'>{laneNames.map(name=>{
       const items=visible.filter(c=>c.assignee===name);
       const pages=Math.max(1,Math.ceil(items.length/3));
       const page=rotation%pages;

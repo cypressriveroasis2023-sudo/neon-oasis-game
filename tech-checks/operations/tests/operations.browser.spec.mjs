@@ -161,7 +161,7 @@ test('Daily Board keeps the last snapshot when refresh fails', async ({ page }) 
   await open(frame, 'Daily Board');
   await expect(frame.getByText('Fixture North Yard')).toBeVisible();
   await expect(frame.getByText('Fixture inventory review')).toHaveCount(0);
-  await expect(frame.getByRole('region', { name: 'Daily truck readiness' })).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Daily truck readiness' })).toHaveCount(0);
   state.failedPaths.add('/api/daily-board');
   await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(frame.getByRole('alert')).toContainText('Showing the last successful snapshot.');

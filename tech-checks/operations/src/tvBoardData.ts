@@ -25,9 +25,9 @@ export type TvLane = { name: string; cards: BoardCard[] };
 export type TvPage = { kind: 'work'; lanes: TvLane[] } | { kind: 'readiness'; rows: ReadinessRow[] };
 export type FleetPages={camera:number;map:string[]};
 export type ConfiguredTvPage = (TvPage | {kind:'camera'|'map'|'empty';fleetPage?:number}) & {section:TvSection|null;title:string};
-/** Saved all-jobs and shop pages stay in old settings and are treated as off. */
+/** Saved all-jobs, shop, and team-readiness pages stay in old settings and are treated as off. */
 export function tvSectionsForDisplay(sections: readonly TvSection[]): TvSection[] {
-  return sections.filter(section => section !== 'today' && section !== 'shop');
+  return sections.filter(section => section !== 'today' && section !== 'shop' && section !== 'readiness');
 }
 export function configuredTvPages(cards:BoardCard[],names:string[],readiness:ReadinessRow[],sections:TvSection[],width:number,height:number,today:string,fleet:FleetPages={camera:1,map:['All field units']}):ConfiguredTvPage[]{
   const pages:ConfiguredTvPage[]=[];

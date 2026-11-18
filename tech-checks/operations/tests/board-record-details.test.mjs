@@ -110,7 +110,7 @@ test('new view has no network, polling, write actions or automatic ticket creati
  assert.match(source,/Jobs and Owner Tasks are not opened from this board/);
  assert.match(source,/Unit not linked/);assert.match(source,/not a camera check time/);
 });
-test('Daily Board hides job assignment writes and keeps readiness',()=>{
+test('Daily Board hides job assignment writes and still reads the board',()=>{
  const source=read('DailyBoard.tsx');
  assert.equal(source.includes('/api/jobs/'),false);
  assert.match(source,/dailyBoardCards\(handoffJobs,\[\]/);

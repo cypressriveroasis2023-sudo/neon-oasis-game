@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
-      "candidateBlob": "05e71a36c0e74d317cce81b1ae03c14752ca0703",
+      "candidateBlob": "8328033240bffea2f7b662b5c73fe116de4d30cb",
       "replacements": [
         {
           "from": "",
@@ -39,7 +39,22 @@
         },
         {
           "from": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{\n    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);",
-          "to": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason, detail)=>{\n    const holdTv=tvIntent.current&&reason==='authentication-denied'&&typeof detail?.path==='string'&&detail.path!=='/api/session';\n    if(!holdTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);\n    if(!holdTv)setTvDisplay(false);",
+          "to": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason)=>{\n    const keepTv=tvIntent.current;\n    if(!keepTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);\n    if(!keepTv)setTvDisplay(false);",
+          "count": 1
+        },
+        {
+          "from": "import {useOperationsSession} from './useOperationsSession';\n",
+          "to": "import {useOperationsSession} from './useOperationsSession';\nimport TvSignedOutBoard from './TvSignedOutBoard';\nimport {setTvSessionHold} from './tvSessionHold';\n",
+          "count": 1
+        },
+        {
+          "from": "  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);",
+          "to": "  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);\n  useEffect(()=>{if(tvIntent.current)return;if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);\n  setTvSessionHold(tvDisplay);",
+          "count": 1
+        },
+        {
+          "from": "{checking&&!session?<section className='panel module' role='status'>",
+          "to": "{tvDisplay&&(reloadRequired||!authorized||(checking&&!session))?<TvSignedOutBoard note={reloadRequired?'Sign in again on Tech Check to resume':'Reconnecting'} exit={leaveTv}/>:checking&&!session?<section className='panel module' role='status'>",
           "count": 1
         }
       ]

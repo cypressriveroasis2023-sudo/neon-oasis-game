@@ -41,6 +41,13 @@ test('a TV session re-read that is a different actor still requires reload',asyn
  const f=await fixture();f.controller.quietRefresh();f.run();f.requests[1].resolve({...owner,productionOwnerUserId:'22222222-2222-4222-8222-222222222222'});await flush();
  assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
 });
+test('a superseded TV session re-read checks the actor again and still drops a different actor',async()=>{
+ const f=await fixture();f.controller.quietRefresh();f.run();
+ f.requests[1].reject(Object.assign(new Error('Your session changed. Reload the shared view.'),{response:{status:409}}));await flush();
+ f.run();f.run();assert.equal(f.requests.length,3);assert.equal(f.state.reloadRequired,false);assert.equal(f.state.session.productionOwnerUserId,owner.productionOwnerUserId);
+ f.requests[2].resolve({...owner,productionOwnerUserId:'22222222-2222-4222-8222-222222222222'});await flush();
+ assert.equal(f.state.session,null);assert.equal(f.state.reloadRequired,true);
+});
 for(const reason of [undefined,'unknown','authentication-denied','security-hide',{},''])test('hard or unrecognized reason '+JSON.stringify(reason)+' requires reload without another read',async()=>{
  const f=await fixture();f.controller.invalidate(reason);f.run();assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);assert.equal(f.requests.length,1);
 });

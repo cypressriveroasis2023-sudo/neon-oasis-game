@@ -55,6 +55,7 @@ test('today jobs and all pending type queues remain distinct and hidden sections
  const ids=section=>pages.filter(p=>p.section===section).flatMap(p=>p.kind==='work'?p.lanes.flatMap(l=>l.cards.map(c=>c.record.id)):[]);
  assert.deepEqual(ids('today'),[]);assert.deepEqual(ids('pickup'),['future']);assert.deepEqual(ids('swap'),['none']);
  assert.equal(pages.some(p=>p.kind==='camera'||p.kind==='map'||p.kind==='readiness'),false);
+ assert.deepEqual(tvSectionsForDisplay(['readiness','today','shop','pickup']),['pickup']);
  assert.equal(configuredTvPages(cards,[],[],[],390,844,'2026-10-12')[0].kind,'empty');
 });
 test('Teddy and Victor have no vehicle requirements without marking checks complete or exempting others',()=>{

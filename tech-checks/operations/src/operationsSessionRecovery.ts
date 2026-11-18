@@ -162,6 +162,11 @@ export function createOperationsSessionRecovery({read, mode, changed, defer = ca
     } catch (cause) {
       if (!active || requestEpoch !== epoch) return;
       phase = 'idle';
+      // A newer denial supersedes this read before it can identify the actor. Read again; do not keep an unverified board as proof.
+      if ((cause as {response?: {status?: unknown}})?.response?.status === 409) {
+        defer(() => { if (active && phase === 'idle' && !state.reloadRequired) controller.quietRefresh(); });
+        return;
+      }
       publish({...state, checking:false, error:''});
       if (!temporaryFailure(cause)) return;
       clearTimeout(quietTimer);

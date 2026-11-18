@@ -33,7 +33,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
   // Pause at a future instant while the page is still blank, before app timers exist.
   await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
   if(pausedClock)await page.clock.pauseAt(new Date(time));
-  state.settings={sections:['pickup','shop','today'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
+  state.settings={sections:['pickup','shop','today'],revision:0,updatedAt:null};if(prepare)prepare(state);state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   state.fleetUnits=[unit];state.cameraRows=[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
   await page.route('**/*', async route => {
@@ -77,7 +77,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
     if(path==='/api/product-connections'){state.proofReads=(state.proofReads||0)+1;if(state.proofGate)await state.proofGate.promise;}
     if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
-    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,legacyOwner:true,role:'Owner',name:'Fixture Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,...(state.features||{})}}:{items:[]}});
+    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,legacyOwner:true,role:'Owner',name:'Fixture Owner',productionOwnerUserId:state.sessionActor||'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,...(state.features||{})}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
   const frame=page.frameLocator('#cosOperationsFrame');
@@ -140,6 +140,27 @@ test('network failure marks delayed data and authentication failure clears priva
   expect(state.writes).toEqual([]);
 });
 
+test('a denied data read that returns a different actor keeps the TV without cards or pins',async({page})=>{
+ const {state,frame}=await setup(page);
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ state.settings={sections:['pickup','map'],revision:1,updatedAt:time};
+ await page.clock.fastForward(60000);
+ await page.clock.fastForward(15000);
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
+ state.sessionActor='22222222-2222-4222-8222-222222222222';
+ state.fail=401;
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.getByRole('status').filter({hasText:'Sign in again on Tech Check to resume'})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('Pickup customer',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('Sniper 312',{exact:true})).toHaveCount(0);
+ await expect(frame.locator('.leaflet-marker-icon')).toHaveCount(0);
+ await expect(page.locator('#hostToolbar')).toBeHidden();
+ expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
+ expect(state.writes).toEqual([]);
+});
+
 test('Daily Board and TV render only pickup, swap, delivery and service',async({page})=>{
  const {frame}=await setup(page);
  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
@@ -192,8 +213,8 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  const {state,frame}=await setup(page,{pausedClock:true});
  state.readiness=['Teddy Hopper','Victor Garcia'].map((name,index)=>({userId:'staff-'+index,name,department:'it',status:'not_started',result:{}}));
  state.settings={sections:['readiness'],revision:1,updatedAt:time};await page.clock.fastForward(60000);
- await expect(frame.getByText('No company vehicle · truck and trailer inspections do not apply.').first()).toBeVisible();
- await expect(frame.getByText('Truck inspection',{exact:true})).toHaveCount(0);await expect(frame.getByText('Trailer inspection',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('No company vehicle · truck and trailer inspections do not apply.')).toHaveCount(0);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).not.toHaveAttribute('data-section','readiness');
  state.settings={sections:['camera','map'],revision:2,updatedAt:time};await page.clock.fastForward(60000);
  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','camera');
  await expect(frame.getByText('No confirmed red outages in the available records.',{exact:true})).toBeVisible();
