@@ -24,8 +24,8 @@ test('phone first screen, desktop inventory card, and TV-sized inventory card', 
   const sentence = app.getByText('This board is inventory, not live health.');
   if (phone) {
     await expect(landing).toBeVisible();
-    await expect(landing.getByRole('group', {name: 'Field units up, down and unknown'})).toBeVisible();
-    await expect(landing.locator('.cos-phone-counts b')).toHaveText(['7', '1', '3']);
+    await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'})).toBeVisible();
+    await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['7', '1', '3']);
     await expect(landing).toContainText('not current');
     await expect(landing).toContainText('Unknown is not offline');
     await expect(landing.getByRole('region', {name: 'Technician to-do'})).toBeVisible();
@@ -35,7 +35,7 @@ test('phone first screen, desktop inventory card, and TV-sized inventory card', 
     await expect(identity).toBeVisible();
     await expect(sentence).toBeVisible();
     state.releaseField();
-    await expect(landing.locator('.cos-phone-counts b')).toHaveText(['1', '1', '1']);
+    await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['1', '1', '1']);
     await expect(landing).not.toContainText('not current');
     await expect(landing.getByRole('listitem')).toContainText(['Spotter 1']);
     await expect(landing).not.toContainText('Sniper 44');

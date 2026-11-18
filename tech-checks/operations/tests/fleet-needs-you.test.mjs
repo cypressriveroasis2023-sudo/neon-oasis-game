@@ -94,9 +94,9 @@ test('a unit with no site recorded still gets a readable line', () => {
 
 test('a present board keeps its last counts and labels them not current', () => {
  const source=readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8');
- assert.match(source,/UNITS ONLINE',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.online:'—'/);
- assert.match(source,/UNITS OFFLINE',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.offline:'—'/);
- assert.match(source,/UNITS UNVERIFIED',boardVisible&&!durableWaiting\?headlineCounts\.unknown:'—'/);
+ assert.match(source,/Camera units online',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.online:'—'/);
+ assert.match(source,/Camera units offline',boardVisible&&!failed&&!durableWaiting\?headlineCounts\.offline:'—'/);
+ assert.match(source,/Camera units unknown',boardVisible&&!durableWaiting\?headlineCounts\.unknown:'—'/);
  assert.match(source,/healthCurrent=\{boardVisible\}/);
  assert.match(source,/Last completed reading '\+boardReadingTime\+' · not current\./);
  assert.doesNotMatch(source,/savedOnly\?savedOnly\.online/);

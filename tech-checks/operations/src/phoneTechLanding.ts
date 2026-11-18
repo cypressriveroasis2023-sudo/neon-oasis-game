@@ -1,5 +1,6 @@
 import type {SavedFleetReading} from './savedFleetReading';
-import {technicianTodos, type TechnicianTodo} from './technicianTodos';
+import type {CountTriple} from './sharedFleetCounts';
+import {technicianTodos, type TechnicianTodo, type TodoRouter} from './technicianTodos';
 
 export type PhoneCount = number | '—';
 
@@ -7,11 +8,12 @@ export type PhoneBoardCounts = {
   up: PhoneCount;
   down: PhoneCount;
   unknown: PhoneCount;
+  cameras: CountTriple | null;
   note: string;
   stale: boolean;
 };
 
-type LiveCounts = { online: number; offline: number; unknown: number; checkedAt: number };
+type LiveCounts = { online: number; offline: number; unknown: number; checkedAt: number; cameras?: CountTriple | null };
 
 /** Field camera counts only. Shop is not an input to down, and unknown stays
  * its own number. A saved reading paints immediately and is labeled not current
@@ -29,18 +31,27 @@ export function phoneBoardCounts(input: {
     : input.saved
       ? { online: input.saved.online, offline: input.saved.offline, unknown: input.saved.unverified, checkedAt: input.saved.checkedAt }
       : null;
-  if (!source) return { up: '—', down: '—', unknown: '—', note: 'No completed reading yet.', stale: false };
+  if (!source) return { up: '—', down: '—', unknown: '—', cameras: null, note: 'No completed reading yet.', stale: false };
   const time = new Date(source.checkedAt).toLocaleString('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return {
     up: source.online,
     down: source.offline,
     unknown: source.unknown,
+    cameras: liveCurrent && input.live?.cameras ? input.live.cameras : null,
     stale: !liveCurrent,
     note: liveCurrent ? 'Reading ' + time + '.' : 'Last completed reading ' + time + ' · not current.',
   };
 }
 
-type PhoneRow = { name: string; placement: 'field' | 'shop' | 'unknown' | string; cameraState: 'online' | 'offline' | 'unknown' | 'support' | string; support?: boolean };
+type PhoneRow = {
+  name: string;
+  placement: 'field' | 'shop' | 'unknown' | string;
+  cameraState: 'online' | 'offline' | 'unknown' | 'support' | string;
+  support?: boolean;
+  routerOffline?: boolean;
+  routerObservedAt?: number | null;
+  cameraOnlineAt?: number | null;
+};
 
 /** Same evidence rules as the technician list. Unknown is not a job. Shop is not an outage. */
 export function phoneTechnicianTodos(rows: PhoneRow[], addresses: { unit: string; productId?: string; placement?: string }[] = []): TechnicianTodo[] {
@@ -52,5 +63,12 @@ export function phoneTechnicianTodos(rows: PhoneRow[], addresses: { unit: string
       offline: row.cameraState === 'offline' ? 1 : 0,
     })),
     addresses,
+    routers: rows.filter((row): row is PhoneRow & { routerOffline: true } => row.routerOffline === true).map((row): TodoRouter => ({
+      unit: row.name,
+      placement: row.placement === 'shop' ? 'SHOP' : row.placement === 'field' ? 'FIELD' : 'UNKNOWN',
+      routerOffline: true,
+      routerObservedAt: row.routerObservedAt ?? null,
+      cameraOnlineAt: row.cameraOnlineAt ?? null,
+    })),
   });
 }

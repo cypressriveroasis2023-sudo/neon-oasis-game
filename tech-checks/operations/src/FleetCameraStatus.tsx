@@ -29,6 +29,8 @@ import {CosPowerChecks} from './CosPowerAlarmPanel';
 import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
 import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
+import FleetCountReadout from './FleetCountReadout';
+import {censusFromCameraUnits, routerOfflineFact, selectFleetCounts, IN_SHOP_LABEL} from './sharedFleetCounts';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -159,11 +161,26 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const units=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
+ const sharedCounts=useMemo(()=>selectFleetCounts(censusFromCameraUnits(units,now),now),[units,now]);
+ const routerTodos=useMemo(()=>{
+  const items=Array.isArray(routers?.items)?routers.items:[];
+  return items.flatMap((row: {unitKey?: string; probeStatus: string; checkedAt: string | null; reportedStatus: string; reportedAt: string | null})=>{
+   const fact=routerOfflineFact(row,now);
+   if(!fact.offline)return [];
+   const key=canonicalCameraUnit(String(row.unitKey||''));
+   const matches=key?units.filter(unit=>canonicalCameraUnit(unit.unit)===key):[];
+   if(matches.length!==1)return [];
+   const unit=matches[0];
+   const cameraAt=unit.state==='GREEN'&&unit.observedAt?Date.parse(unit.observedAt):NaN;
+   return [{unit:unit.unit,placement:unit.placement,routerOffline:true,routerObservedAt:fact.at,cameraOnlineAt:Number.isFinite(cameraAt)?cameraAt:null}];
+  });
+ },[routers,units,now]);
  const todos=useMemo(()=>technicianTodos({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
+  routers:routerTodos,
   power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
   addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
- }),[units,victron,now,powerSettings,addressReviews]);
+ }),[units,routerTodos,victron,now,powerSettings,addressReviews]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
@@ -183,7 +200,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   {label:'SOME CAMERAS DOWN',count:statusCounts.field.yellow,kind:'offline',group:'field',state:'YELLOW'},
   {label:'DOWN',count:statusCounts.field.red,kind:'offline',group:'field',state:'RED'},
   {label:'NOT VERIFIED',count:statusCounts.field.unknown,kind:'unknown',group:'field',state:'UNKNOWN'},
-  {label:'ONLINE IN THE SHOP',count:statusCounts.shop.onlineInShop,kind:'shop',group:'shop-online',state:'all'},
+  {label:'IN SHOP',count:statusCounts.shop.units,kind:'shop',group:'shop',state:'all'},
  ]:[];
  // The three makes COS carries, counted in the field. Each narrows the list the
  // same way a count tile does.
@@ -210,19 +227,12 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   setSaveError('');setSaved('');setFixStep(null);
   setDraft(unit?draftOf(unit):null);
  };
- const upCount=statusCounts?.field.green??0;
- const downCount=(statusCounts?.field.red??0)+(statusCounts?.field.yellow??0);
- const unknownCount=statusCounts?.field.unknown??0;
  const updatedAt=report?.refreshedAt||feed?.syncedAt||null;
  const sourceNotice=cameraSourceNotice(sourceFacts)||(report?.otherSourcesRead===false?'Avigilon and Reconeyez readings delayed — status may be out of date':null);
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header className='cos-camera-status-simple'>
    <h2 className='sr-only'>Camera status</h2>
-   <p className='cos-camera-counts' role='group' aria-label='Field cameras up, down and unknown'>
-    <span>Up <b>{report?upCount:'—'}</b></span>
-    <span>Down <b>{report?downCount:'—'}</b></span>
-    <span>Unknown <b>{report?unknownCount:'—'}</b></span>
-   </p>
+   <FleetCountReadout units={report?sharedCounts.units:null} cameras={report?sharedCounts.cameras:null}/>
    <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>
@@ -298,7 +308,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
     <div className='cos-camera-status-main'>
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unitName(unit)}</strong>
-      <small>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):unit.onlineInShop?'ONLINE IN THE SHOP'+(sourceOf(unit)==='star4live'?' · root':''):'SHOP'+(sourceOf(unit)==='star4live'?' · root':'')}</small>
+      <small className={unit.placement==='SHOP'?'cos-in-shop':undefined}>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):IN_SHOP_LABEL+(sourceOf(unit)==='star4live'?' · root':'')}</small>
       {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}

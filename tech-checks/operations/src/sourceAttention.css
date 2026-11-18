@@ -12,8 +12,25 @@
 .cos-source-strip-absent{color:#475569}
 .cos-power-alarms{margin:8px 0;padding:8px;border:1px solid #cbd5e1;border-radius:8px}
 .cos-power-alarm{color:#9f1239;font-weight:700}
-.cos-tech-todos{margin:12px 0}
-.cos-tech-todos li{margin:6px 0}
+.cos-tech-todos{display:grid;gap:12px;margin:12px 0}
+.cos-tech-todos h2{margin:0;font-size:1.05rem}
+.cos-todo-group{display:grid;gap:8px}
+.cos-todo-group h3{margin:0;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#475569}
+.cos-todo-cards{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cos-todo-card{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#0f172a}
+.cos-todo-severity{display:block;width:8px;height:100%;min-height:36px;border-radius:999px;background:#64748b}
+.cos-todo-offline .cos-todo-severity{background:#b42318}
+.cos-todo-alarm .cos-todo-severity{background:#9f1239}
+.cos-todo-cleanup .cos-todo-severity{background:#92400e}
+.cos-todo-copy{display:grid;gap:2px;min-width:0}
+.cos-todo-copy strong{font-size:.95rem}
+.cos-todo-copy span{font-size:.8rem;line-height:1.35;color:#334155}
+.cos-todo-card button{min-height:44px;padding:8px 12px;border-radius:8px;border:1px solid #0f172a;background:#0f172a;color:#fff;font:inherit;font-size:.82rem;cursor:pointer;text-decoration:none}
+.cos-in-shop{color:#64748b}
+@media(max-width:700px){
+ .cos-todo-card{grid-template-columns:8px minmax(0,1fr)}
+ .cos-todo-card button{grid-column:2;justify-self:start}
+}
 .cos-phone-landing{display:none}
 .cos-phone-board-info>summary{display:none}
 .cos-phone-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
