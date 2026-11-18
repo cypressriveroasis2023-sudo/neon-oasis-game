@@ -1,11 +1,14 @@
 .cos-camera-status{display:flex;flex-direction:column;gap:12px}
 .cos-camera-status>header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
-.cos-camera-counts{display:flex;gap:16px;margin:0;font-size:1rem}
-.cos-camera-counts b{font-size:1.6rem;margin-left:4px}
 .cos-camera-board-total{margin:0;font-size:.9rem}
 .cos-camera-source-note{margin:0;font-size:.85rem}
 .cos-camera-about>summary{display:inline-flex;cursor:pointer;font-size:.8rem;min-height:32px;align-items:center}
-.cos-tech-todos button{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline}
+.cos-shared-counts{display:grid;gap:10px}
+.cos-shared-count-block h3{margin:0 0 4px;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.cos-camera-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.cos-camera-counts span{display:flex;flex-direction:column;gap:2px;padding:8px;border:1px solid rgba(128,128,128,.28);border-radius:10px}
+.cos-camera-counts b{font-size:1.4rem;margin:0}
+.cos-in-shop{color:#64748b;background:#fff;border-radius:4px;padding:0 4px;font-weight:700}
 .cos-camera-status>header h2{margin:0;font-size:1.25rem}
 .cos-camera-status>header p{margin:4px 0 0;font-size:.8rem;opacity:.75;max-width:46ch}
 .cos-camera-status-read{display:flex;flex-direction:column;align-items:flex-end;gap:4px}

@@ -48,5 +48,6 @@ test('online and offline are held; unverified is not', () => {
   assert.match(board,new RegExp(field+':heldHealth\\('),field+' bypasses the hold');
  // With no evidence every field unit really is unknown. That count is the
  // honest answer, so holding it back would replace a fact with a gap.
- assert.match(board,/unknown:boardData\?\.counts\.unverified\?\?savedReading\?\.unverified\?\?'—'/);
+ assert.match(board,/unknown:sharedCounts\.units\.unknown/);
+ assert.doesNotMatch(board,/unknown:heldHealth\(/);
 });
