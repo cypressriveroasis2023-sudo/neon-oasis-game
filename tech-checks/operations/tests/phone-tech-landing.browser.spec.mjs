@@ -35,8 +35,8 @@ test('phone first screen, desktop inventory card, and TV-sized inventory card', 
     await expect(identity).toBeVisible();
     await expect(sentence).toBeVisible();
     state.releaseField();
-    await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['7', '1', '3']);
-    await expect(landing).toContainText('not current');
+    await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['1', '1', '1']);
+    await expect(landing).not.toContainText('not current');
     await expect(landing.getByRole('listitem')).toContainText(['Spotter 1']);
     await expect(landing).not.toContainText('Sniper 44');
   } else {
