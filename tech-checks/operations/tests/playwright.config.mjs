@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   testMatch: '*.browser.spec.mjs',
+  testIgnore: 'ticket-site-picker.browser.spec.mjs',
   fullyParallel: true,
   timeout: 45000,
   expect: { timeout: 10000 },

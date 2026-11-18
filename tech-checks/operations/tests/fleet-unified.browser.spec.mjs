@@ -1,5 +1,6 @@
 import {openWorkspace} from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
+import {clickAfterTrial} from './helpers/click-after-trial.mjs';
 import {mountFleet,units,field,fresh} from './fleet-dashboard-fixtures.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';
@@ -22,7 +23,7 @@ for(const alias of ['field-map','field-view'])for(const it of [false,true])test(
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
  expect(await app.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+units[0].id);
  await app.getByRole('button',{name:'Close unit details',exact:true}).click();
- if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();
+ if(it)await nextScheduledFleetRead(page,app,state);else await clickAfterTrial(app.getByRole('button',{name:'↻ Refresh data',exact:true})); // Headless mouseReleased stalls on this Refresh click. Trial still checks the hit target.
  await expect(app.getByRole('dialog')).toHaveCount(0);
  expect(state.errors).toEqual([]);
 });
@@ -78,7 +79,7 @@ test('map-only fullscreen isolates navigation, preserves unit cards and restores
 
 test('installation workflows share the same canvas and retain unsaved pin coordinates until confirmation',async({page})=>{
  const {app,state}=await mountFleet(page,false,{features:{fieldLocationVerification:true}});
- await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+ await clickAfterTrial(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'})); // Headless mouseReleased stalls on this unit-row click. Trial still checks the hit target.
  await app.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();
  await expect(app.getByRole('heading',{name:'GPS history'})).toBeVisible();
  await expect(app.getByRole('button',{name:'Refresh mHelpDesk location'})).toBeVisible();
@@ -109,7 +110,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Camera Health and Field Vi
  await openWorkspace(app,'Fleet Dashboard');
  await expect(app.locator('.cos-fleet-map-canvas')).toHaveCount(1);
  await expect(app.locator('.cos-fleet-table-wrap')).toHaveCount(0);
- await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
+ await clickAfterTrial(app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'})); // Headless mouseReleased stalls on this unit-row click. Trial still checks the hit target.
  await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
  await expect(app.locator('.cos-fleet-dashboard')).toHaveCount(1);
  await expect(app.locator('.camera-overview')).toHaveCount(0);
@@ -200,10 +201,12 @@ test('expanded cluster survives pending location revalidation but settled member
  const expected=catalog.slice(0,3).map(unit=>unit.id).sort();await expect.poll(ids).toEqual(expected);
  const viewport=()=>app.locator('body').evaluate(()=>({center:history.state.cosFieldMapView.center,zoom:history.state.cosFieldMapView.zoom}));const before=await viewport();
  await page.clock.runFor(60_000);await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
- await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
+ await clickAfterTrial(app.getByRole('button',{name:'↻ Refresh data',exact:true})); // Headless mouseReleased stalls on this Refresh click. Trial still checks the hit target.
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();await expect.poll(ids).toEqual(expected);await expect.poll(viewport).toEqual(before);
  const removed=catalog[1].id;for(const unit of state.field.inventoryItems)if(unit.id===removed)Object.assign(unit,{placement:'SHOP',currentLocationType:'shop',status:'available'});
  state.field.items=state.field.items.filter(unit=>unit.id!==removed);state.field.summary={fieldUnits:2,mappedUnits:2,unitGps:0,missingGps:0};
- await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
+ await clickAfterTrial(app.getByRole('button',{name:'↻ Refresh data',exact:true})); // Headless mouseReleased stalls on this Refresh click. Trial still checks the hit target.
+ await expect(app.getByRole('button',{name:'↻ Refresh data',exact:true})).toBeEnabled();
  await expect(app.locator('.cos-dashboard-cluster')).toHaveCount(0);await expect.poll(ids).toEqual([catalog[0].id,catalog[2].id].sort());
  expect(state.calls.every(call=>call.method==='GET')).toBeTruthy();expect(state.errors).toEqual([]);
 });
