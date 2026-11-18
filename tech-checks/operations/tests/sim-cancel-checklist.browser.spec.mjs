@@ -6,7 +6,8 @@ test('the cancellation stays blocked until the SIM step is saved, and lists keep
   await page.goto('/?simCancelPreview=1');
   const step = page.getByRole('main', {name: 'SIM card canceled'});
   await expect(step.getByRole('button', {name: 'Mark cancellation complete'})).toBeDisabled();
-  await expect(step.getByRole('button', {name: 'Cancel SIM: SNIPER 014'})).toBeVisible();
+  await expect(step.getByRole('button', {name: 'Cancel SIM', exact: true})).toBeVisible();
+  await expect(step.getByText('Cancel SIM: SNIPER 014', {exact: true})).toBeVisible();
   await expect(step).toContainText('This cancellation is not complete.');
   await expect(step.getByText(EXAMPLE)).toHaveCount(0);
   await step.locator('select').selectOption('Verizon');
@@ -21,6 +22,6 @@ test('the cancellation stays blocked until the SIM step is saved, and lists keep
   await expect(board).toContainText('•••• 0007');
   await expect(board).not.toContainText(EXAMPLE);
   await step.getByRole('button', {name: 'Mark cancellation complete'}).click();
-  await expect(step.getByRole('button', {name: 'Cancel SIM: SNIPER 014'})).toHaveCount(0);
+  await expect(step.getByRole('button', {name: 'Cancel SIM', exact: true})).toHaveCount(0);
   await expect(step).toContainText('Cancellation complete.');
 });
