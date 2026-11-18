@@ -32,8 +32,8 @@ export function resolveTicketUnitContext(unitId:string,equipmentData:unknown,map
   return {...base,state:'linked',siteId:site.id,siteName:site.name,customerId:customer.id,customerName:customer.name,message:'Customer and site were verified from this equipment record’s installed-site and customer IDs. Review them before saving.'};
 }
 export async function loadTicketUnitContext(client:{get:(path:string)=>Promise<{data:unknown}>},unitId:string) {
-  const [equipment,map,customers,sites]=await Promise.all(['/api/equipment','/api/field-map','/api/customers','/api/sites'].map(path=>client.get(path)));
-  const context=resolveTicketUnitContext(unitId,equipment.data,map.data,customers.data,sites.data);
+  const [equipment,map]=await Promise.all(['/api/equipment','/api/field-map'].map(path=>client.get(path)));
+  const context=resolveTicketUnitContext(unitId,equipment.data,map.data,{items:[]},{items:[]});
   // Read through the existing owner route. The caller's untouched-field guard owns draft application.
   const units=checkedFieldMap(map.data).items as unknown as FieldHealthUnit[];
   const unit:FieldHealthUnit={id:context.unitId,unitNumber:context.unitNumber,modelName:context.modelName};

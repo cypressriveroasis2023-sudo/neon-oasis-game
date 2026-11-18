@@ -24,19 +24,15 @@ async function mount(page,{role='owner',failJobs=false}={}){
 test('old VISION links open only the approved workspace and keep native navigation working',async({page},testInfo)=>{
  const {frame,requests}=await mount(page);
  await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
- await expect(frame.getByRole('region',{name:'Daily workspace'})).toBeVisible();
+ await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'Daily workspace'})).toHaveCount(0);
  await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
  await expect(frame.locator('.vision-header,.vision-shell')).toHaveCount(0);
  expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('theme'))).toBe(false);
- const expectedHash={'Jobs':'#jobs',Team:'#team',Equipment:'#equipment',Billing:'#billing',Today:'#today'};
+ const expectedHash={Team:'#team',Equipment:'#equipment',Today:'#today'};
  for(const [name,hash] of Object.entries(expectedHash)){
   await openWorkspace(frame,name);
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
-  if(name==='Jobs'){
-   const search=frame.getByRole('searchbox',{name:'Find a job'});
-   await search.fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();
-   await search.fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();
-  }
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));
   expect(size.content).toBeLessThanOrEqual(size.width);
  }
@@ -53,10 +49,10 @@ test('old VISION links open only the approved workspace and keep native navigati
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('missing data remains unavailable in the single workspace',async({page})=>{
- const {frame}=await mount(page,{failJobs:true});
- await expect(frame.getByRole('heading',{name:'Some dashboard information is unavailable'})).toBeVisible();
- await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.')).toBeVisible();
- await expect(frame.getByText('No active jobs in the loaded records.')).toHaveCount(0);
+ const {frame,requests}=await mount(page,{failJobs:true});
+ await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
+ await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.')).toHaveCount(0);
+ expect(requests.some(item=>item.path==='/api/jobs')).toBe(false);
 });
 test('technician token cannot unlock owner Operations through an old VISION link',async({page})=>{
  const {frame,requests}=await mount(page,{role:'service'});

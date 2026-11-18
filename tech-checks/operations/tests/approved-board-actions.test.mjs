@@ -31,10 +31,12 @@ test('disabled scheduling and original destructive-button styling survive groupi
  assert.doesNotMatch(html,/Close Job/);
 });
 test('component tolerates an empty action group without a false management control',()=>assert.doesNotMatch(render([]),/<details|<button/));
-test('complete prior DailyBoard reconstructs exactly, including all eligibility and callbacks',()=>{
- const original=originalBoardActionsMarkup(readFileSync(new URL('../src/DailyBoard.tsx',import.meta.url),'utf8'));
- assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(original)+'\0').update(original).digest('hex'),'0734601d3a4e5d0f18128c1cfb8197d1f50ee834');
- assert.match(original,/Open \{selected.kind==='job'\?'Jobs':'Owner Tasks'\} workspace<\/button><\/div>/);
+test('Daily Board no longer assigns jobs or opens Owner Tasks',()=>{
+ const source=readFileSync(new URL('../src/DailyBoard.tsx',import.meta.url),'utf8');
+ assert.equal(source.includes('/api/jobs/'),false);
+ assert.equal(source.includes('+ Assign Task'),false);
+ assert.equal(source.includes('Add or schedule a job'),false);
+ assert.match(source,/Daily truck readiness|daily-board-readiness/);
 });
 test('presentation cannot fetch, persist, dispatch, enable, or clone an action',()=>{
  assert.doesNotMatch(source,/fetch\s*\(|\bapi\.|setInterval|setTimeout|localStorage|sessionStorage|dispatchEvent|cloneElement|\.props\.onClick|Date\.|location\.|history\./);

@@ -20,11 +20,8 @@ export function checkedOwnerSnapshot(jobs: unknown, control: unknown): OwnerSnap
   }
   return { jobs: rows, control: value };
 }
-export function ownerActionRequest(action: OwnerAction) {
-  if (action.kind === 'create') return { path: '/api/owner/jobs/manual', body: action.body };
-  if (action.kind === 'truck') return { path: '/api/owner/truck-checks/' + action.check.id + '/approve', body: action.body };
-  if (action.kind === 'advance') return { path: '/api/owner/jobs/' + action.job.id + '/advance-it', body: action.body };
-  return { path: '/api/jobs/' + action.job.id + '/' + action.kind, body: action.body };
+export function ownerActionRequest(_action: OwnerAction): never {
+  throw new Error('Owner job controls and truck-check approval are not available in COS.');
 }
 const equalText = (a: unknown, b: unknown) => typeof a === 'string' && typeof b === 'string' && a.trim() === b.trim();
 /** Confirm authoritative identifiers and resulting state, never just a 2xx response. */
@@ -70,22 +67,7 @@ export function createOwnerActionSaver(api: { post(path: string, body: unknown):
     async save(action: OwnerAction): Promise<OwnerSaveResult> {
       if (running) return { status: 'busy' };
       if (refreshRequired) return { status: 'refresh_required' };
-      running = true;
-      try {
-        let response: Row;
-        try { const request = ownerActionRequest(action); response = (await api.post(request.path, request.body)).data; }
-        catch (cause) {
-          refreshRequired = true;
-          const message = cause instanceof Error ? cause.message + ' ' : '';
-          return { status: 'unconfirmed', message: message + 'The action could not be confirmed. Refresh Owner Controls before trying again.' };
-        }
-        try {
-          const snapshot = await readFresh();
-          if (hasConfirmedOwnerAction(snapshot, action, response)) return { status: 'confirmed', snapshot, response };
-        } catch { /* Never repeat an accepted or uncertain write. */ }
-        refreshRequired = true;
-        return { status: 'accepted_unverified', message: 'Action accepted, but the saved result could not be verified. Refresh Owner Controls before trying again.' };
-      } finally { running = false; }
+      return ownerActionRequest(action);
     },
   };
 }

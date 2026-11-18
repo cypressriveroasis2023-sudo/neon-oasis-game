@@ -22,7 +22,7 @@ test('selection remains presentation only and retains all original primary desti
  assert.deepEqual(approvedPrimaryAreas.map(x=>x.workspace),['Fleet Dashboard','Daily Board','Tech Check','Team','Operations']);
  assert.equal(approvedArea('Camera Health'),'Fleet Dashboard');
  assert.equal(approvedArea('Daily Board'),'Daily Board');
- assert.equal(approvedArea('Owner Tasks'),'Team');
+ assert.equal(approvedArea('Owner Tasks'),'Operations');
 });
 
 test('work dialog layout is selected by its existing record view, not by altering Board behavior',()=>{

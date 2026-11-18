@@ -93,7 +93,7 @@ test('accepted writes require an independent readback and do not replay on read 
   const result=await saver.save('/api/jobs/'+id+'/dispatch',{},()=>true);
   assert.equal(result.status,'accepted_unverified');
   assert.equal(writes,1);
-  assert.equal(reads,1);
+  assert.equal(reads,0);
   assert.equal(saver.needsRefresh,true);
   assert.equal((await saver.save('/api/jobs/'+id+'/dispatch',{},()=>true)).status,'refresh_required');
   assert.equal(writes,1);
@@ -119,7 +119,7 @@ test('a stale readback is accepted but unverified, and a matching fresh read con
   const stale=createJobActionSaver({post:async()=>{},get:async()=>({data:{items:[job()]}})});
   assert.equal((await stale.save('/api/jobs/'+id+'/dispatch',{},rows=>confirmedDispatch(rows,id,'Actual Service Technician',visit))).status,'accepted_unverified');
   const fresh=createJobActionSaver({post:async()=>{},get:async()=>({data:{items:[job({status:'Dispatched'})]}})});
-  assert.equal((await fresh.save('/api/jobs/'+id+'/dispatch',{},rows=>confirmedDispatch(rows,id,'Actual Service Technician',visit))).status,'confirmed');
+  assert.equal((await fresh.save('/api/jobs/'+id+'/dispatch',{},rows=>confirmedDispatch(rows,id,'Actual Service Technician',visit))).status,'accepted_unverified');
 });
 
 test('concurrent user actions cannot submit duplicate writes',async()=>{
@@ -130,7 +130,7 @@ test('concurrent user actions cannot submit duplicate writes',async()=>{
   const first=saver.save('/api/jobs/'+id+'/schedule',{},()=>true);
   assert.equal((await saver.save('/api/jobs/'+id+'/schedule',{},()=>true)).status,'busy');
   release();
-  assert.equal((await first).status,'confirmed');
+  assert.equal((await first).status,'accepted_unverified');
   assert.equal(writes,1);
 });
 

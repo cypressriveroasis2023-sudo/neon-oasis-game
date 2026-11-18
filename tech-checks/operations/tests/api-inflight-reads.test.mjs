@@ -96,14 +96,14 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
 
 test('identical safe reads share only their complete in-flight response, then refresh freshly', async () => {
   const f = fixture();
-  const first = f.api.get('/api/jobs'), second = f.api.get('/api/jobs');
+  const first = f.api.get('/api/vrm-portal'), second = f.api.get('/api/vrm-portal');
   await flush();
   assert.equal(f.requests.length, 1);
   assert.equal(f.handshakes.length, 1, 'only the already-pending parent handshake is shared');
   const parse = deferred();
   f.requests[0].result.resolve({ ok: true, status: 200, json: () => parse.promise });
   await flush();
-  const third = f.api.get('/api/jobs');
+  const third = f.api.get('/api/vrm-portal');
   await flush();
   assert.equal(f.handshakes.length, 2, 'a later caller rechecks the current parent session');
   assert.equal(f.requests.length, 1, 'the read stays pending through JSON parsing');
@@ -111,7 +111,7 @@ test('identical safe reads share only their complete in-flight response, then re
   const results = await Promise.all([first, second, third]);
   for (const result of results) assert.deepEqual(result.data, { items: [{ id: 'synthetic-job-a' }] });
   assert.equal(f.timers.size, 0);
-  const refresh = f.api.get('/api/jobs');
+  const refresh = f.api.get('/api/vrm-portal');
   await flush();
   assert.equal(f.handshakes.length, 3);
   assert.equal(f.requests.length, 2, 'settled values are never cached');
@@ -121,7 +121,7 @@ test('identical safe reads share only their complete in-flight response, then re
     assert.equal(init.method, 'POST');
     assert.equal(init.cache, 'no-store');
     assert.equal(init.headers.Authorization, 'Bearer synthetic-session-a');
-    assert.deepEqual(envelope, { path: '/api/jobs', method: 'GET', body: null });
+    assert.deepEqual(envelope, { path: '/api/vrm-portal', method: 'GET', body: null });
   }
 });
 
@@ -137,10 +137,10 @@ test('different paths stay independent while repeated health snapshots coalesce'
 
 test('bearer rollover never shares the preceding account or session response', async () => {
   const f = fixture();
-  const oldRead = f.api.get('/api/jobs');
+  const oldRead = f.api.get('/api/vrm-portal');
   await flush();
   f.state.token = 'synthetic-session-b';
-  const newRead = f.api.get('/api/jobs');
+  const newRead = f.api.get('/api/vrm-portal');
   await flush();
   assert.equal(f.handshakes.length, 2);
   assert.equal(f.requests.length, 2);
@@ -179,7 +179,7 @@ test('mode is part of read identity even with the same valid role, bearer and pa
 
 test('a mode change while parent authorization is pending fails closed', async () => {
   const f = fixture({ autoReply: false });
-  const denied = assert.rejects(f.api.get('/api/jobs'), status(401));
+  const denied = assert.rejects(f.api.get('/api/vrm-portal'), status(401));
   f.location.search = '?mode=production-assignments';
   f.reply(undefined, { role: 'it', accessToken: 'synthetic-it-session' });
   await denied;
@@ -189,11 +189,11 @@ test('a mode change while parent authorization is pending fails closed', async (
 
 test('an in-flight read cannot bypass a newly unavailable parent session', async () => {
   const f = fixture();
-  const first = f.api.get('/api/jobs');
+  const first = f.api.get('/api/vrm-portal');
   await flush();
   for (const [role, token] of [['service', 'synthetic-service'], ['owner', ''], ['owner', '   '], ['owner', null]]) {
     Object.assign(f.state, { role, token });
-    await assert.rejects(f.api.get('/api/jobs'), status(401));
+    await assert.rejects(f.api.get('/api/vrm-portal'), status(401));
     assert.equal(f.requests.length, 1);
   }
   assert.equal(f.handshakes.length, 5);
@@ -203,10 +203,10 @@ test('an in-flight read cannot bypass a newly unavailable parent session', async
 
 test('parent origin, source and request identity are still required before any shared read', async () => {
   const f = fixture();
-  const first = f.api.get('/api/jobs');
+  const first = f.api.get('/api/vrm-portal');
   await flush();
   f.state.autoReply = false;
-  const second = f.api.get('/api/jobs');
+  const second = f.api.get('/api/vrm-portal');
   await flush();
   f.reply(undefined, undefined, { origin: 'https://untrusted.example' });
   f.reply(undefined, undefined, { source: {} });
@@ -224,15 +224,15 @@ test('parent origin, source and request identity are still required before any s
 
 test('parent timeout is not bypassed by a pending read, and later authorization can retry', async () => {
   const f = fixture();
-  const first = f.api.get('/api/jobs');
+  const first = f.api.get('/api/vrm-portal');
   await flush();
   f.state.autoReply = false;
-  const denied = assert.rejects(f.api.get('/api/jobs'), status(401));
+  const denied = assert.rejects(f.api.get('/api/vrm-portal'), status(401));
   f.expire(10000);
   await denied;
   assert.equal(f.requests.length, 1);
   f.state.autoReply = true;
-  const retry = f.api.get('/api/jobs');
+  const retry = f.api.get('/api/vrm-portal');
   await flush();
   assert.equal(f.handshakes.length, 3);
   assert.equal(f.requests.length, 2, 'authorization interruption invalidates earlier shared entries');
@@ -242,14 +242,14 @@ test('parent timeout is not bypassed by a pending read, and later authorization 
 
 test('standalone and opaque-origin callers cannot join an authenticated read', async () => {
   const f = fixture();
-  const first = f.api.get('/api/jobs');
+  const first = f.api.get('/api/vrm-portal');
   await flush();
   const parent = f.window.parent;
   f.window.parent = f.window;
-  await assert.rejects(f.api.get('/api/jobs'), status(401));
+  await assert.rejects(f.api.get('/api/vrm-portal'), status(401));
   f.window.parent = parent;
   f.location.origin = 'null';
-  await assert.rejects(f.api.get('/api/jobs'), status(401));
+  await assert.rejects(f.api.get('/api/vrm-portal'), status(401));
   assert.equal(f.requests.length, 1);
   f.answer(0);
   await assert.rejects(first,status(409));
@@ -260,7 +260,7 @@ test('path and assignment-mode guards run before deduplication or network access
   for (const path of ['/api/jobs?actor=other', '/api/jobs#other', '/api/../jobs', 'https://untrusted.example/api/jobs']) {
     await assert.rejects(f.api.get(path), status(400));
   }
-  await assert.rejects(f.api.get('/api/jobs'), status(403));
+  await assert.rejects(f.api.get('/api/vrm-portal'), status(403));
   const claim = '/api/tech/it-queue/11111111-1111-4111-8111-111111111111/claim';
   await assert.rejects(f.api.post(claim, { actorId: 'other' }), status(403));
   assert.equal(f.handshakes.length, 0);
@@ -282,7 +282,7 @@ test('unknown and non-opted-in GET routes never acquire deduplication by method 
 for (const failure of ['HTTP authorization', 'HTTP unavailable', 'network', 'incomplete JSON', 'timeout']) {
   test(`${failure} failures reject all shared callers, evict the entry, and never replay automatically`, async () => {
     const f = fixture();
-    const readA = f.api.get('/api/jobs'), readB = f.api.get('/api/jobs');
+    const readA = f.api.get('/api/vrm-portal'), readB = f.api.get('/api/vrm-portal');
     const rejected = Promise.all([readA, readB].map(read => assert.rejects(read, status(failure === 'HTTP authorization' ? 403 : failure === 'incomplete JSON' ? 200 : 503))));
     await flush();
     assert.equal(f.requests.length, 1);
@@ -295,7 +295,7 @@ for (const failure of ['HTTP authorization', 'HTTP unavailable', 'network', 'inc
     await flush();
     assert.equal(f.requests.length, 1, 'no automatic request replay');
     assert.equal(f.timers.size, 0);
-    const retry = f.api.get('/api/jobs');
+    const retry = f.api.get('/api/vrm-portal');
     await flush();
     assert.equal(f.requests.length, 2);
     f.answer(1, { items: [{ id: 'synthetic-recovered-job' }] });
@@ -325,24 +325,24 @@ test('POST operations remain independent, preserve their bodies, and never repla
 for (const saveFails of [false, true]) {
   test(`reads before or during a ${saveFails ? 'failed' : 'successful'} save cannot satisfy its fresh readback`, async () => {
     const f = fixture();
-    const before = f.api.get('/api/owner-tasks');
+    const before = f.api.get('/api/vrm-portal');
     await flush();
-    const save = f.api.post('/api/owner-tasks', { title: 'Synthetic task' });
+    const save = f.api.post('/api/equipment', { title: 'Synthetic task' });
     const saveResult = saveFails ? assert.rejects(save, status(503)) : save;
     await flush();
-    const during = f.api.get('/api/owner-tasks');
+    const during = f.api.get('/api/vrm-portal');
     await flush();
     assert.equal(f.requests.length, 3, 'save start removes pre-save reads from the lookup');
     if (saveFails) f.requests[1].result.reject(new Error('Synthetic uncertain save'));
     else f.answer(1, { saved: true });
     await saveResult;
-    const after = f.api.get('/api/owner-tasks');
+    const after = f.api.get('/api/vrm-portal');
     await flush();
     assert.equal(f.requests.length, 4, 'save settlement also removes reads started during the save');
     f.answer(0, { stage: 'before' });
     f.answer(2, { stage: 'during' });
     await Promise.all([before, during]);
-    const afterAgain = f.api.get('/api/owner-tasks');
+    const afterAgain = f.api.get('/api/vrm-portal');
     await flush();
     assert.equal(f.requests.length, 4, 'old read cleanup cannot remove a newer pending entry');
     f.answer(3, { stage: 'after' });
@@ -373,14 +373,11 @@ test('legacy Victron snapshots retain separate same-session deduplication', asyn
 });
 
 
-test('pending schedule opt-in is the only allowed query path and never shares status reads',async()=>{
+test('mHelp intake status is not a reachable frontend request',async()=>{
  const path='/api/mhelpdesk/intake/status?capability=pending_schedule_v1',f=fixture();
- const first=f.api.get(path),second=f.api.get(path);await flush();assert.equal(f.requests.length,2);
- for(const entry of f.requests)assert.deepEqual(entry.envelope,{path,method:'GET',body:null});
- f.answer(0,{saved:true});f.answer(1,{saved:true});await Promise.all([first,second]);
- for(const invalid of ['/api/jobs?capability=pending_schedule_v1','/api/mhelpdesk/intake/status?capability=other',path+'&portalId=17',path+'&capability=pending_schedule_v1',path+'#ignored','/api/mhelpdesk/intake/status?evidenceCapability=pending_schedule_v1'])await assert.rejects(f.api.get(invalid),status(400));
- await assert.rejects(f.api.post(path,{}),status(400));assert.equal(f.requests.length,2);
- const tech=fixture({mode:'production-assignments',role:'it'});await assert.rejects(tech.api.get(path),status(403));assert.equal(tech.requests.length,0);assert.equal(tech.handshakes.length,0);
+ await assert.rejects(f.api.get(path),status(400));
+ await assert.rejects(f.api.post(path,{}),status(400));
+ assert.equal(f.requests.length,0);
 });
 
 test('explicit private read cancellation prevents a late handshake from starting transport',async()=>{
@@ -391,19 +388,19 @@ test('explicit private read cancellation prevents a late handshake from starting
 });
 test('private read abort cancels only its own transport and does not share or replay results',async()=>{
  const f=fixture(),controller=new AbortController(),pending=f.api.post('/api/mhelpdesk/partner/tickets/preview',{}, {signal:controller.signal});await flush();
- const other=f.api.get('/api/jobs');await flush();assert.equal(f.requests.length,2);
+ const other=f.api.get('/api/vrm-portal');await flush();assert.equal(f.requests.length,2);
  const rejected=assert.rejects(pending,status(503));controller.abort();await rejected;assert(f.requests[0].init.signal.aborted);assert(!f.requests[1].init.signal.aborted);
  f.answer(1);await other;assert.equal(f.requests.length,2);assert.equal(f.timers.size,0);
 });
 
 test('observed session and HTTP auth failures invalidate private views without source data',async()=>{
- const denied=fixture(),read=denied.api.get('/api/jobs');await flush();denied.answer(0,{error:'private'},403);await assert.rejects(read,status(403));assert.deepEqual(denied.invalidations,['cos-private-data-invalidated']);
+ const denied=fixture(),read=denied.api.get('/api/vrm-portal');await flush();denied.answer(0,{error:'private'},403);await assert.rejects(read,status(403));assert.deepEqual(denied.invalidations,['cos-private-data-invalidated']);
  const expired=fixture({role:'it'});await assert.rejects(expired.api.post('/api/mhelpdesk/partner/tickets/preview',{}),status(401));assert.deepEqual(expired.invalidations,['cos-private-data-invalidated']);assert.equal(expired.requests.length,0);
 });
 test('verified parent credential changes and malformed auth responses still invalidate private data',async()=>{
- const f=fixture(),first=f.api.get('/api/jobs');await flush();f.answer(0);await first;assert.deepEqual(f.invalidations,[]);
- f.state.token='synthetic-session-b';const second=f.api.get('/api/jobs');await flush();assert.deepEqual(f.invalidations,['cos-private-data-invalidated']);f.answer(1);await second;
- const third=f.api.get('/api/jobs');await flush();f.requests[2].result.resolve({ok:false,status:401,json:async()=>{throw Error('synthetic malformed response');}});await assert.rejects(third,status(401));assert.deepEqual(f.invalidations,['cos-private-data-invalidated','cos-private-data-invalidated']);
+ const f=fixture(),first=f.api.get('/api/vrm-portal');await flush();f.answer(0);await first;assert.deepEqual(f.invalidations,[]);
+ f.state.token='synthetic-session-b';const second=f.api.get('/api/vrm-portal');await flush();assert.deepEqual(f.invalidations,['cos-private-data-invalidated']);f.answer(1);await second;
+ const third=f.api.get('/api/vrm-portal');await flush();f.requests[2].result.resolve({ok:false,status:401,json:async()=>{throw Error('synthetic malformed response');}});await assert.rejects(third,status(401));assert.deepEqual(f.invalidations,['cos-private-data-invalidated','cos-private-data-invalidated']);
 });
 
 const fleetHealth={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:'2026-10-12T18:00:00Z',rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
@@ -515,7 +512,7 @@ test('source-only fleet completions cannot cross an account change or a save inv
  for(const action of ['account','save']){
   const f=fixture(),source=f.api.fleetSource('fieldMap');const denied=assert.rejects(source,status(409));await flush();
   let other;
-  if(action==='account'){f.state.token='synthetic-session-b';other=f.api.get('/api/jobs');}
+  if(action==='account'){f.state.token='synthetic-session-b';other=f.api.get('/api/vrm-portal');}
   else other=f.api.post('/api/owner-tasks',{});
   await flush();f.answer(2,{saved:true});await other;f.answer(1,fleetMap);f.answer(0,fleetHealth);await denied;
  }
@@ -562,7 +559,7 @@ for(const [method,path,deadline] of [
  ['POST',preparedPath.replace('prepare','prepare-extra'),30000],['POST',preparedPath+'/',30000],
  ['POST',preparedPath.replace('11111111-1111-4111-8111-111111111111','not-a-uuid'),30000],
  ['POST',preparedPath.replace('prepare','Prepare'),30000],['POST',preparedPath.replace('owner-census-prepare','gps'),30000],
- ['POST','/api/field-map',30000],['GET','/api/jobs',30000],['GET','/api/camera-health/summary-v3',30000],
+ ['POST','/api/field-map',30000],['GET','/api/vrm-portal',30000],['GET','/api/camera-health/summary-v3',30000],
 ])test(`bounded observation ${method} ${path} uses only ${deadline}ms`,async()=>{
  const f=fixture(),pending=method==='POST'?f.api.post(path,{}):f.api.get(path);await flush();
  assert.equal(f.requests.length,1);assert.deepEqual([...f.timers.values()].map(t=>t.delay),[deadline]);
@@ -715,14 +712,14 @@ for(const code of [200,401,403])for(const timing of ['during','after'])test(`obs
 });
 for(const patch of [{productionOwnerUserId:'22222222-2222-4222-8222-222222222222'},{features:{fleetAccess:true,vrmRead:false}},{authorized:false}])test('obsolete denial cannot make changed identity or revoked permissions recoverable',async()=>{
  const f=await recoveryFixture(),old=assert.rejects(f.api.get('/api/routers'),status(409));await flush();
- f.state.token='synthetic-session-b';const read=f.api.get('/api/jobs');await recoveryTurn();f.answer(2);await read;
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/vrm-portal');await recoveryTurn();f.answer(2);await read;
  f.answer(1,{error:'Synthetic old denial'},401);await old;f.answer(3,{...recoveryOwner,...patch});await flush();
  assert.equal(f.sessionState.session,null);assert.equal(f.sessionState.reloadRequired,true);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
 });
 test('successful headers cannot admit an old body after a session boundary during parsing',async()=>{
  const f=await recoveryFixture(),old=assert.rejects(f.api.get('/api/routers'),status(409)),body=deferred();await flush();
  f.requests[1].result.resolve({ok:true,status:200,json:()=>body.promise});await flush();
- f.state.token='synthetic-session-b';const read=f.api.get('/api/jobs');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();
+ f.state.token='synthetic-session-b';const read=f.api.get('/api/vrm-portal');await recoveryTurn();f.answer(2);f.answer(3,recoveryOwner);await read;await flush();
  body.resolve({privateOldData:true});await old;assert.ok(f.sessionState.session);assert.deepEqual(f.reasons,['token-renewed']);f.current.stop();
 });
 for(const code of [200,401,403])test('submitted old write HTTP '+code+' stays uncertain and is never replayed',async()=>{
@@ -834,8 +831,8 @@ for(const boundary of ['logout','pagehide','hide','actor','role','mode'])test('l
  if(boundary==='pagehide')f.window.dispatchEvent(new Event('pagehide'));
  if(boundary==='hide')f.reply(undefined,undefined,{data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}});
  if(boundary==='mode')f.location.search='?mode=fleet';
- if(boundary==='actor'){f.state.token='synthetic-actor-b';const read=f.api.get('/api/jobs');await flush();f.answer(f.requests.length-1);await read;}
- if(boundary==='role'){f.state.role='it';await assert.rejects(f.api.get('/api/jobs'),status(401));}
+ if(boundary==='actor'){f.state.token='synthetic-actor-b';const read=f.api.get('/api/vrm-portal');await flush();f.answer(f.requests.length-1);await read;}
+ if(boundary==='role'){f.state.role='it';await assert.rejects(f.api.get('/api/vrm-portal'),status(401));}
  f.answer(old.index,exactReceipt(f));await flush();assert.equal(f.invalidations.filter(v=>v==='cos-fleet-snapshot-updated').length,before);
 });
 test('failed paired health cannot be revived by later successful proof',async()=>{

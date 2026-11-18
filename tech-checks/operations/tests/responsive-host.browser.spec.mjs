@@ -150,15 +150,15 @@ test('the same app link gives the embedded Operations app the full device viewpo
 
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
   const { frame } = await mount(page);
-  await openWorkspace(frame,'Jobs');
-  const search = frame.getByRole('searchbox', { name:'Find a job' });
+  await openWorkspace(frame,'Team');
+  const search = frame.getByRole('textbox', { name:'Search production team' });
   await search.fill('keep this filter');
   await frame.locator('body').evaluate(() => { window.responsiveFrameMarker = 'same-frame'; });
   for (const [width, height] of [[1440,900], [390,844], [844,390], [320,568], [900,650], [901,650], [1024,768], [1920,1080], [2560,1440]]) {
     await page.setViewportSize({ width, height });
     await responsiveLayout(page, frame);
     await expect(search).toHaveValue('keep this filter');
-    expect(await frame.locator('body').evaluate(() => location.hash)).toBe('#jobs');
+    expect(await frame.locator('body').evaluate(() => location.hash)).toBe('#team');
     expect(await frame.locator('body').evaluate(() => window.responsiveFrameMarker)).toBe('same-frame');
   }
 });
@@ -167,14 +167,14 @@ test('old VISION bookmarks preserve route and query parameters under the approve
   const { frame, requests } = await mount(page);
   await expect(frame.getByRole('button',{name:/Switch to (light|dark) mode/})).toHaveCount(0);
   await frame.locator('body').evaluate(()=>{location.href=location.pathname+'?theme=vision&source=saved-link#jobs';});
-  await expect(frame.getByRole('heading',{name:'Job flow',exact:true})).toBeVisible();
+  await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
   expect(await frame.locator('html').getAttribute('data-theme')).toBe('dark');
   await responsiveLayout(page,frame);
-  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
+  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#today');
   await frame.locator('body').evaluate(()=>location.reload());
-  await expect(frame.getByRole('heading',{name:'Job flow',exact:true})).toBeVisible();
+  await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
   await responsiveLayout(page,frame);
-  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
+  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#today');
   expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 

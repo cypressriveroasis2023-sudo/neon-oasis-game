@@ -41,9 +41,7 @@ export default function MhelpIntakeReview({ session }: { session: unknown }) {
     pending.current = true; const request = ++sequence.current;
     setBusy(true); setStatus(null); setCheckedAt(null); setError('');
     try {
-      const result = checkedIntakeStatus((await api.get('/api/mhelpdesk/intake/status?capability=pending_schedule_v1')).data);
-      if (request !== sequence.current) return;
-      const readAt = Date.now(); setStatus(result); setCheckedAt(readAt); setNow(readAt);
+      throw new Error('Ticket intake is not available in COS.');
     } catch (cause) {
       if (request === sequence.current) { setStatus(null); setCheckedAt(null); setError(intakeReviewErrorMessage(cause)); }
     } finally { if (request === sequence.current) { pending.current = false; setBusy(false); } }

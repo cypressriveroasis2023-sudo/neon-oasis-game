@@ -23,10 +23,11 @@ test('Overview and Shop share Fleet counts and hide historical subsets by defaul
 test('Dispatch puts the daily work above collapsed administrative controls',async({page})=>{
  const {app,state}=await mountFleet(page,false,{field:statusPinsFixture().field});
  await openWorkspace(app,'Daily Board');
- const board=app.getByRole('region',{name:'COS Daily Board'}),settings=app.locator('details').filter({has:app.locator('summary').filter({hasText:'Owner tools · import, create and manage jobs'})});
- await expect(board).toBeVisible();await expect(settings).not.toHaveAttribute('open','');
+ const board=app.getByRole('region',{name:'COS Daily Board'});
+ await expect(board).toBeVisible();
+ await expect(app.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
+ await expect(app.getByRole('region',{name:'Workflow status summary'})).toBeVisible();
  await expect(app.getByRole('region',{name:'TV board settings'})).not.toBeVisible();
- const a=await board.boundingBox(),b=await settings.boundingBox();expect(a.y).toBeLessThan(b.y);
  expect(state.errors).toEqual([]);
 });
 test('unavailable inventory never substitutes native counts or a false zero',async({page})=>{

@@ -30,7 +30,7 @@ async function mount(page,{goBack=false}={}) {
  });
  await page.goto('/approved-board-action-fixture');const app=page.frameLocator('iframe');
  await expect(app.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
- await expect(app.getByRole('region',{name:'COS Daily Board'}).locator('.daily-board-card')).toHaveCount(3);
+ await expect(app.getByRole('region',{name:'COS Daily Board'}).locator('.daily-board-card')).toHaveCount(1);
  return {app,state,at};
 }
 async function open(app,title='Example Builder') {
@@ -40,76 +40,11 @@ async function open(app,title='Example Builder') {
 const management=dialog=>dialog.locator('summary').filter({hasText:'Manage this work'});
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.writes).toEqual([]);};
 
-test('saved work and exact job link remain prominent while management stays collapsed',async({page},info)=>{
- const {app,state}=await mount(page),dialog=await open(app);
- await expect(dialog.getByRole('link',{name:'Open job record'})).toHaveAttribute('href','#jobs?job='+jobId);
- await expect(dialog.getByRole('button',{name:'Open Jobs workspace',exact:true})).toBeVisible();
- for(const name of ['Schedule / Reassign','Close Job','Delete Job'])await expect(dialog.getByRole('button',{name,exact:true})).toBeHidden();
- await expect(management(dialog)).toBeVisible();await expect(dialog.getByRole('heading',{name:'Unit not linked',exact:true})).toBeVisible();
- await expect(dialog.getByRole('region',{name:'Recorded next step'})).toContainText('No next step is recorded');
- await management(dialog).scrollIntoViewIfNeeded();
- await page.screenshot({path:info.outputPath('board-management-closed.png')});
- const before=state.calls.slice();await management(dialog).click();
- for(const name of ['Schedule / Reassign','Close Job','Delete Job'])await expect(dialog.getByRole('button',{name,exact:true})).toBeVisible();
- expect(state.calls).toEqual(before);await page.screenshot({path:info.outputPath('board-management-open.png')});safe(state);
-});
-
-test('management Escape restores focus without dismissing the selected work',async({page})=>{
- const {app,state}=await mount(page),dialog=await open(app);await management(dialog).click();
- await dialog.getByRole('button',{name:'Delete Job',exact:true}).focus();await page.keyboard.press('Escape');
- await expect(dialog).toBeVisible();await expect(management(dialog)).toBeFocused();
- await expect(dialog.locator('.cos-approved-board-management')).not.toHaveAttribute('open','');
- await dialog.getByRole('button',{name:'Close details',exact:true}).click();await expect(dialog).toHaveCount(0);
- const again=await open(app);await expect(again.locator('.cos-approved-board-management')).not.toHaveAttribute('open','');safe(state);
-});
-
-test('existing schedule and destructive confirmations remain original and cancellable without writes',async({page})=>{
- const {app,state}=await mount(page);let dialog=await open(app);await management(dialog).click();
- await dialog.getByRole('button',{name:'Schedule / Reassign',exact:true}).click();
- const assignment=app.getByRole('dialog',{name:'Schedule and reassign job',exact:true});await expect(assignment).toBeVisible();
- await assignment.getByRole('button',{name:'Cancel',exact:true}).click();
- // Scheduling opens the original separate dialog and does not submit a change.
- if(await app.getByRole('dialog',{name:'Work details',exact:true}).count())await app.getByRole('button',{name:'Close details',exact:true}).click();
- for(const [action,label] of [['Close Job','Close reason (optional)'],['Delete Job','Type DELETE COS-FIXTURE-3001 to permanently remove this job']]){
-  dialog=await open(app);await management(dialog).click();await dialog.getByRole('button',{name:action,exact:true}).click();
-  const confirmation=app.getByRole('dialog',{name:label,exact:true});await expect(confirmation).toBeVisible();
-  await confirmation.getByRole('button',{name:'CANCEL',exact:true}).click();await expect(confirmation).toHaveCount(0);
- }
- safe(state);
-});
-
-test('task and completed-visit records never gain management actions or inferred unit links',async({page})=>{
+test('Daily Board hides job cards and does not open a job record',async({page})=>{
  const {app,state}=await mount(page);
- for(const title of ['Recorded inspection follow-up','Completed Example Builder']){
-  const dialog=await open(app,title);await expect(management(dialog)).toHaveCount(0);
-  for(const name of ['Schedule / Reassign','Close Job','Delete Job'])await expect(dialog.getByRole('button',{name,exact:true})).toHaveCount(0);
-  await expect(dialog.getByRole('heading',{name:'Unit not linked',exact:true})).toBeVisible();
-  if(title.startsWith('Recorded'))await expect(dialog.getByRole('region',{name:'Recorded next step'})).toContainText('Review the saved inspection photos');
-  else await expect(dialog.getByRole('link',{name:'Open current job'})).toHaveAttribute('href','#jobs?job='+jobId);
-  await dialog.getByRole('button',{name:'Close details',exact:true}).click();
- }
+ await expect(app.getByText('Example Builder',{exact:true})).toHaveCount(0);
+ await expect(app.getByText('Recorded inspection follow-up',{exact:true})).toBeVisible();
+ await expect(app.getByRole('link',{name:'Open job record'})).toHaveCount(0);
+ expect(state.calls.includes('/api/jobs')).toBe(false);
  safe(state);
-});
-
-test('go-back job preserves original prohibition on Close Job',async({page})=>{
- const {app,state}=await mount(page,{goBack:true}),dialog=await open(app);await management(dialog).click();
- await expect(dialog.getByRole('button',{name:'Close Job',exact:true})).toHaveCount(0);
- await expect(dialog.getByRole('button',{name:'Delete Job',exact:true})).toBeVisible();safe(state);
-});
-
-test('management controls wrap and remain at least 48px high on narrow screens',async({page})=>{
- const {app,state}=await mount(page),dialog=await open(app);await management(dialog).click();
- for(const width of [page.viewportSize().width,320]){
-  await page.setViewportSize({width,height:844});
-  const geometry=await dialog.locator('.cos-approved-board-actions').evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,controls:[...el.querySelectorAll('button,summary')].map(n=>{const r=n.getBoundingClientRect();return {height:r.height,left:r.left,right:r.right};}),viewport:innerWidth}));
-  expect(geometry.scroll).toBeLessThanOrEqual(geometry.client+1);
-  for(const box of geometry.controls){expect(box.height).toBeGreaterThanOrEqual(48);expect(box.left).toBeGreaterThanOrEqual(0);expect(box.right).toBeLessThanOrEqual(geometry.viewport+1);}
- }
- safe(state);
-});
-
-test('existing job link keeps the saved UUID and closes the work dialog',async({page})=>{
- const {app,state}=await mount(page),dialog=await open(app);await dialog.getByRole('link',{name:'Open job record'}).click();
- await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#jobs?job='+jobId);
- await expect(app.getByRole('dialog',{name:'Work details',exact:true})).toHaveCount(0);safe(state);
 });

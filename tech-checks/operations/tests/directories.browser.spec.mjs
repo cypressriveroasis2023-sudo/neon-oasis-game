@@ -78,39 +78,15 @@ async function noOverflow(page){
   expect(metrics.width).toBeLessThanOrEqual(metrics.viewport+1);
 }
 
-test('Customer edit saves once, reads back, and remains after reload',async({page})=>{
+test('Customers and Sites are not reachable and make no directory calls',async({page})=>{
   const{state,frame}=await setup(page);
-  const workspace=await open(frame,'Customers');
-  await expect(workspace.getByText('Fixture Customer',{exact:true})).toBeVisible();
-  await workspace.getByRole('button',{name:'Edit',exact:true}).click();
-  await workspace.getByLabel('Notes',{exact:true}).fill('Updated fixture note');
-  await workspace.getByRole('button',{name:'SAVE',exact:true}).click();
-  await expect(frame.getByRole('status').filter({hasText:'Customer saved and verified.'})).toBeVisible();
-  expect(state.writes).toHaveLength(1);
-  expect(state.writes[0].body).not.toHaveProperty('id');
-  expect(state.writes[0].body).not.toHaveProperty('p_actor_user_id');
-  await page.reload();
-  const restored=await open(frame,'Customers');
-  await restored.getByRole('button',{name:'Edit',exact:true}).click();
-  await expect(restored.getByLabel('Notes',{exact:true})).toHaveValue('Updated fixture note');
-  await noOverflow(page);
-});
-
-test('Site instructions save and persist after reload without changing the customer',async({page})=>{
-  const{state,frame}=await setup(page);
-  const workspace=await open(frame,'Sites');
-  await expect(workspace.getByText('Fixture Site',{exact:true})).toBeVisible();
-  await workspace.getByRole('button',{name:'Edit',exact:true}).click();
-  await workspace.getByLabel('Access Instructions',{exact:true}).fill('Call fixture contact at arrival');
-  await workspace.getByLabel('Safety Notes',{exact:true}).fill('Wear fixture safety vest');
-  await workspace.getByRole('button',{name:'SAVE',exact:true}).click();
-  await expect(frame.getByRole('status').filter({hasText:'Site saved and verified.'})).toBeVisible();
-  expect(state.writes).toHaveLength(1);
-  expect(state.writes[0].body.customerId).toBe(customerId);
-  await page.reload();
-  const restored=await open(frame,'Sites');
-  await expect(restored.getByText('Access: Call fixture contact at arrival',{exact:true})).toBeVisible();
-  await expect(restored.getByText('Safety: Wear fixture safety vest',{exact:true})).toBeVisible();
+  for (const hash of ['#customers','#sites']) {
+    await frame.locator('body').evaluate((_,value)=>{location.hash=value;},hash);
+    await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#today');
+  }
+  await expect(frame.getByRole('region',{name:'Customers Workspace',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('region',{name:'Sites Workspace',exact:true})).toHaveCount(0);
+  expect(state.writes).toEqual([]);
   await noOverflow(page);
 });
 
@@ -135,37 +111,12 @@ test('Equipment create validates production model and verifies the new unit afte
   await noOverflow(page);
 });
 
-test('Directory failure retains records and mismatch blocks duplicate save until refresh',async({page})=>{
-  const{state,frame}=await setup(page);
-  const workspace=await open(frame,'Customers');
-  await expect(workspace.getByText('Fixture Customer',{exact:true})).toBeVisible();
-  state.failed.add('/api/customers');
-  await workspace.getByRole('button',{name:'REFRESH RECORDS',exact:true}).click();
-  await expect(workspace.getByRole('alert')).toContainText('Showing the last successful records.');
-  await expect(workspace.getByText('Fixture Customer',{exact:true})).toBeVisible();
-  state.failed.clear();
-  await workspace.getByRole('button',{name:'Edit',exact:true}).click();
-  await workspace.getByLabel('Notes',{exact:true}).fill('Mismatch fixture note');
-  state.mismatch=true;
-  await workspace.getByRole('button',{name:'SAVE',exact:true}).click();
-  await expect(workspace.getByRole('alert').filter({hasText:'fresh record does not match'})).toBeVisible();
-  await expect(workspace.getByRole('button',{name:'SAVE',exact:true})).toBeDisabled();
-  expect(state.writes).toHaveLength(1);
-  await workspace.getByRole('button',{name:'Cancel',exact:true}).click();
-  await expect(workspace.getByRole('button',{name:'+ NEW CUSTOMER',exact:true})).toBeDisabled();
-  await expect(workspace.getByRole('button',{name:'Edit',exact:true})).toBeDisabled();
-  state.mismatch=false;
-  await workspace.getByRole('button',{name:'REFRESH RECORDS',exact:true}).click();
-  await expect(workspace.getByRole('region',{name:'Edit Customer',exact:true})).toHaveCount(0);
-  expect(state.writes).toHaveLength(1);
-  await noOverflow(page);
-});
-
 test('Team shows only actual roster, exact assignment and readiness without provisioning writes',async({page})=>{
   const{state,frame}=await setup(page);
   const workspace=await open(frame,'Team');
   await expect(workspace.getByText('Fixture IT',{exact:true})).toBeVisible();
-  await expect(workspace.getByText('IT Technician · 1 active assigned jobs',{exact:true})).toBeVisible();
+  await expect(workspace.getByText('IT Technician',{exact:true})).toBeVisible();
+  await expect(workspace.getByRole('link')).toHaveCount(0);
   await expect(workspace.getByText('Readiness: Ready',{exact:true})).toBeVisible();
   await workspace.getByLabel('Department',{exact:true}).selectOption('service');
   await expect(workspace.locator('.record.op-record')).toHaveCount(1);

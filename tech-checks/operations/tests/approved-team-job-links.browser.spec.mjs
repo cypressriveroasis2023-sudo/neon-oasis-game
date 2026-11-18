@@ -31,44 +31,15 @@ async function mount(page,{bad=false,missing=false}={}){
 }
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.writes).toEqual([]);};
 const member=hub=>hub.locator('.record.op-record').filter({hasText:'Example IT technician'});
-test('two identical display numbers retain different saved job IDs and original assignment counts',async({page},info)=>{
- const {hub,state}=await mount(page),row=member(hub),links=row.getByRole('link');
- await expect(row.getByText('IT Technician · 2 active assigned jobs',{exact:true})).toBeVisible();await expect(row).toContainText('Readiness: Ready');
- await expect(links).toHaveCount(2);await expect(links.nth(0)).toHaveAttribute('href','#jobs?job='+first);await expect(links.nth(1)).toHaveAttribute('href','#jobs?job='+second);
- await expect(row).not.toContainText('Other site');await expect(row).not.toContainText('Closed work');
- expect(state.calls.filter(p=>p==='/api/jobs')).toHaveLength(1);await row.scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath('team-saved-jobs.png')});safe(state);
-});
-test('normal click opens only the selected saved job and browser Back returns to Team',async({page})=>{
- const {app,hub,state}=await mount(page);await member(hub).getByRole('link').nth(1).click();
- const jobs=app.locator('.ops-workflows[aria-label="COS Jobs"]');await expect(jobs).toBeVisible();
- await expect(jobs.locator('.record.op-record')).toHaveCount(1);await expect(jobs).toContainText('Second saved customer');await expect(jobs).not.toContainText('First saved customer');
- expect(await jobs.evaluate(()=>location.hash)).toBe('#jobs?job='+second);await page.evaluate(()=>history.back());await expect(hub).toBeVisible();expect(await hub.evaluate(()=>location.hash)).toBe('#team');await expect(member(hub).getByRole('link')).toHaveCount(2);safe(state);
-});
-test('missing saved identifier remains visible but cannot become a job or unit link',async({page})=>{
- const {hub,state}=await mount(page,{missing:true}),row=member(hub);
- await expect(row.getByRole('link')).toHaveCount(1);await expect(row).toContainText('Job link unavailable');await expect(row).toContainText('First recorded site');
- await expect(row.getByRole('link')).toHaveAttribute('href','#jobs?job='+second);await expect(row.locator('a[href*="unit="]')).toHaveCount(0);safe(state);
-});
-test('malformed job response keeps existing unavailable state without inventing assignments',async({page})=>{
- const {hub,state}=await mount(page,{bad:true});await expect(hub.getByRole('alert')).toContainText('Jobs returned an incomplete record list');
- await expect(hub.getByRole('link')).toHaveCount(0);await expect(hub).toContainText('Assigned jobs unavailable');safe(state);
-});
-test('failed refresh preserves saved links with the original stale-source warning',async({page})=>{
- const {hub,state}=await mount(page);state.failJobs=true;await hub.getByRole('button',{name:'REFRESH TEAM',exact:true}).click();
- await expect(hub.getByRole('alert')).toContainText('Showing the last successful jobs records.');
- await expect(member(hub).getByRole('link').nth(1)).toHaveAttribute('href','#jobs?job='+second);safe(state);
-});
-test('search and department filters keep original assignments without extra reads',async({page})=>{
- const {hub,state}=await mount(page);const before=state.calls.slice();
- await hub.getByLabel('Department',{exact:true}).selectOption('service');await expect(hub.locator('.record.op-record')).toHaveCount(1);await expect(hub).toContainText('Example Service technician');
- await hub.getByLabel('Search production team').fill('no-such-person');await expect(hub).toContainText('No team members match this view.');
- await hub.getByLabel('Search production team').fill('');await hub.getByLabel('Department',{exact:true}).selectOption('it');await expect(member(hub).getByRole('link')).toHaveCount(2);expect(state.calls).toEqual(before);safe(state);
-});
-test('job links have readable contrast, phone touch targets and keyboard navigation',async({page})=>{
- await page.setViewportSize({width:320,height:812});const {hub,app,state}=await mount(page);const link=member(hub).getByRole('link').first();
- const metric=await link.evaluate(el=>{const rect=el.getBoundingClientRect(),c=getComputedStyle(el);return {height:rect.height,left:rect.left,right:rect.right,width:innerWidth,color:c.color,bg:c.backgroundColor,scroll:document.documentElement.scrollWidth};});
- expect(metric.height).toBeGreaterThanOrEqual(48);expect(metric.left).toBeGreaterThanOrEqual(0);expect(metric.right).toBeLessThanOrEqual(metric.width+1);expect(metric.scroll).toBeLessThanOrEqual(metric.width+1);
- const lum=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((v,n,i)=>v+n*[.2126,.7152,.0722][i],0);
- const fg=lum(metric.color),bg=lum(metric.bg);expect((Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05)).toBeGreaterThanOrEqual(4.5);
- await link.focus();await page.keyboard.press('Enter');await expect(app.locator('.ops-workflows')).toContainText('First saved customer');safe(state);
+test('Team shows roster and readiness without job links or a jobs read',async({page})=>{
+ const {hub,state}=await mount(page),row=member(hub);
+ await expect(row.getByText('IT Technician',{exact:true})).toBeVisible();
+ await expect(row).toContainText('Readiness: Ready');
+ await expect(row.getByRole('link')).toHaveCount(0);
+ await expect(hub.getByRole('link')).toHaveCount(0);
+ expect(state.calls.filter(path=>path==='/api/jobs')).toEqual([]);
+ await hub.getByLabel('Department',{exact:true}).selectOption('service');
+ await expect(hub.locator('.record.op-record')).toHaveCount(1);
+ await expect(hub).toContainText('Example Service technician');
+ safe(state);
 });

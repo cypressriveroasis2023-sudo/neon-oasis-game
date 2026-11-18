@@ -63,10 +63,10 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.cos-field-pin').nth(0)).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-field-pin').nth(1)).toHaveAttribute('data-health','offline');await expect(frame.locator('.cos-field-pin').nth(2)).toHaveAttribute('data-health','unknown');
  await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await expect(frame.getByLabel('Nearby radius miles')).toBeVisible();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await revealUnitTroubleshooting(frame);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);
- await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
- await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');
+ await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await expect(frame.getByLabel('Camera unit ticket type')).toHaveCount(0);
+ await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
 test('a uniquely resolved label deep link returns a cancelled ticket to the same map unit',async({page})=>{
@@ -74,10 +74,7 @@ test('a uniquely resolved label deep link returns a cancelled ticket to the same
  const {frame,state}=await mount(page,{entryLabel:label});
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
  await revealUnitTroubleshooting(frame);await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText(label);
- await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=SERVICE&unit='+id2);
- expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
+ await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
  await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();
  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(label);
@@ -111,31 +108,26 @@ test('native Camera Health shows units and individual cameras separately with fi
  const stats=frame.locator('.camera-unit-kpis');await expect(stats.locator('button b')).toHaveText(['—','—','—','—']);await expect(stats.locator('.camera-status-online')).toHaveCSS('color','rgb(43, 255, 53)');await expect(stats.locator('.camera-status-offline')).toHaveCSS('color','rgb(255, 39, 52)');await expect(frame.locator('.camera-actual-count>b')).toHaveText('3');await expect(frame.locator('.camera-record-breakdown')).toContainText('Reported camera records');
  await frame.getByLabel('Camera Health unit filter').selectOption('provider-offline');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);const card=frame.locator('.camera-overview-card');await expect(card).toContainText('SOLARSPOTTER 52');await card.locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('Fixture camera 2');await expect(detail.locator('.camera-device-cards article')).toHaveCount(1);await page.keyboard.press('Escape');await expect(detail).toHaveCount(0);await expect(card.locator('.camera-card-main')).toBeFocused();await card.locator('.camera-card-main').click();await detail.getByRole('button',{name:'Back to units',exact:true}).click();await expect(detail).toHaveCount(0);await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.getByLabel('Search Camera Health units').fill('53');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Camera status unverified');await frame.getByLabel('Search Camera Health units').fill('');await frame.locator('body').evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:testInfo.outputPath('camera-health-unit-overview.png'),fullPage:true});await frame.locator('.camera-record-breakdown > summary').click();await frame.locator('.camera-record-breakdown').evaluate(el=>el.scrollIntoView({block:'start'}));await page.screenshot({path:testInfo.outputPath('camera-health-reconciliation.png'),fullPage:true});expect(state.writes).toHaveLength(0);
 });
-test('native unit details can open Install Delivery draft without guessing record identity',async({page})=>{
- const {frame,state}=await mount(page,{nativeOverview:true});await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 52'}).locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await detail.getByLabel('Unit detail ticket type').selectOption('DELIVERY');await detail.getByRole('button',{name:'Create ticket',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=DELIVERY&unit='+id2);await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);expect(state.writes).toHaveLength(0);
+test('native unit details do not open an Install Delivery job draft',async({page})=>{
+ const {frame,state}=await mount(page,{nativeOverview:true});await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 52'}).locator('.camera-card-main').click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
+ await expect(detail.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
+ await expect(detail.getByLabel('Unit detail ticket type')).toHaveCount(0);
+ expect(state.writes).toHaveLength(0);
+ expect(state.requests?.some?.(item=>item.path==='/api/customers'||item.path==='/api/sites')||false).toBe(false);
 });
 
 
-test('unified Dispatch Board preserves import access without mixing a unit ticket context',async({page})=>{
+test('Camera Health and the Daily Board do not open ticket import or job creation',async({page})=>{
  const {frame,state}=await mount(page);
  await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await frame.locator('.cos-field-pin').nth(1).click();
- await revealUnitTroubleshooting(frame);await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
- await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);
- await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
+ await revealUnitTroubleshooting(frame);
+ await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');
  const child=page.frames().find(child=>child.parentFrame());
  await child.evaluate(()=>{location.hash='daily-board';});
- const settings=frame.locator('details.cos-workspace-settings').filter({has:frame.locator('summary').filter({hasText:'Owner tools · import, create and manage jobs'})});
- await expect(settings).not.toHaveAttribute('open','');
- await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).not.toBeVisible();
- await settings.getByText('Owner tools · import, create and manage jobs',{exact:true}).click();
- await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toBeVisible();
- await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toBeVisible();
- await expect(frame.getByLabel('Title',{exact:true})).toHaveValue('');
- await child.evaluate(()=>{location.hash='tech-check';});
- await expect(frame.getByRole('heading',{name:'Tech Check',exact:true})).toBeVisible();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board');
+ await expect(frame.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
  expect(state.writes).toHaveLength(0);
 });

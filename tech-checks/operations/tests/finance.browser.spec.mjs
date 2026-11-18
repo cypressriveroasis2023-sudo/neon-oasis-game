@@ -96,84 +96,14 @@ async function noOverflow(page) {
   }));
   expect(size.content, JSON.stringify(size)).toBeLessThanOrEqual(size.width + 1);
 }
-test('native Quotes show real detail and require a return reason; one decision persists after reload', async ({ page }) => {
+test('quotes, invoices and purchasing are not reachable', async ({ page }) => {
   const { frame, state } = await start(page);
-  await navigate(frame, 'Quotes');
-  await frame.getByRole('button', { name: 'Return to Sales', exact: true }).click();
-  const dialog = frame.getByRole('dialog', { name: 'Quotes record', exact: true });
-  await expect(dialog.getByText('Fixture equipment readiness', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Return to Sales', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('A return reason is required.');
-  expect(state.writes).toHaveLength(0);
-  await dialog.getByLabel('Return reason').fill('Synthetic scope needs clarification');
-  await dialog.getByRole('button', { name: 'Return to Sales', exact: true }).click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Return to Sales saved and verified.' })).toBeVisible();
-  expect(state.writes).toHaveLength(1);
-  expect(state.writes[0].body).toEqual({ action: 'return', reason: 'Synthetic scope needs clarification' });
-  expect(state.quotes[0].revision).toBe(4);
-  await noOverflow(page);
-  await page.reload();
-  await navigate(frame, 'Quotes');
-  await expect(frame.locator('.finance-records .record').filter({ hasText: 'FIX-Q-101' })).toContainText('Draft');
-  expect(state.writes).toHaveLength(1);
-  await expect(frame.getByRole('link', { name: 'Quote builder ↗', exact: true })).toBeVisible();
-});
-test('Invoices approve and issue with fresh list/detail confirmation at both viewport sizes', async ({ page }) => {
-  const { frame, state } = await start(page);
-  await navigate(frame, 'Invoices');
-  await frame.getByRole('button', { name: 'Approve Invoice', exact: true }).click();
-  const dialog = frame.getByRole('dialog', { name: 'Invoices record', exact: true });
-  await expect(dialog.getByText('Fixture equipment readiness', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Approve Invoice', exact: true }).click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Approve Invoice saved and verified.' })).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Owner decision', exact: true }).selectOption('issue_invoice');
-  await dialog.getByRole('button', { name: 'Issue Invoice', exact: true }).click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Issue Invoice saved and verified.' })).toBeVisible();
-  expect(state.writes).toHaveLength(2);
-  expect(state.writes.map(write => write.body.action)).toEqual(['approve', 'issue']);
-  await noOverflow(page);
-  await page.reload();
-  await navigate(frame, 'Invoices');
-  await expect(frame.locator('.finance-records .record')).toContainText('Issued');
-  await expect(frame.getByRole('link', { name: 'Customer payments ↗', exact: true })).toBeVisible();
-});
-test('Purchasing preserves native PO and AP decision paths and three-way match details', async ({ page }) => {
-  const { frame, state } = await start(page);
-  await navigate(frame, 'Purchasing');
-  await frame.getByRole('button', { name: 'Owner Approve PO', exact: true }).click();
-  let dialog = frame.getByRole('dialog', { name: 'Purchasing record', exact: true });
-  await expect(dialog.getByText('Fixture equipment readiness', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Owner Approve PO', exact: true }).click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Owner Approve PO saved and verified.' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Close record', exact: true }).click();
-  await frame.getByRole('button', { name: 'AP Approvals', exact: true }).click();
-  await frame.getByRole('button', { name: 'Approve for Payment', exact: true }).click();
-  dialog = frame.getByRole('dialog', { name: 'Purchasing record', exact: true });
-  await expect(dialog.getByText('Fixture equipment readiness', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Approve for Payment', exact: true }).click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Approve for Payment saved and verified.' })).toBeVisible();
-  expect(state.writes.map(write => write.path)).toEqual(['/api/purchasing/' + poId + '/po-review', '/api/purchasing/' + apId + '/approve']);
-  await noOverflow(page);
-  await dialog.getByRole('button', { name: 'Close record', exact: true }).click();
-  await frame.getByRole('button', { name: '3-Way Match', exact: true }).click();
-  await expect(frame.locator('.finance-match').filter({ hasText: 'FIX-VI-101' })).toContainText('Received in full');
-  await expect(frame.getByRole('link', { name: 'Vendor payments and documents ↗', exact: true })).toBeVisible();
-});
-test('unverified finance save blocks repeat writes until a successful explicit refresh', async ({ page }) => {
-  const { frame, state } = await start(page);
-  await navigate(frame, 'Invoices');
-  await frame.getByRole('button', { name: 'Approve Invoice', exact: true }).click();
-  const dialog = frame.getByRole('dialog', { name: 'Invoices record', exact: true });
-  await expect(dialog.getByText('Fixture equipment readiness', { exact: true })).toBeVisible();
-  state.mismatch = true;
-  await dialog.getByRole('button', { name: 'Approve Invoice', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('Decision accepted, but the saved record could not be verified.');
-  await expect(dialog.getByRole('button', { name: 'Approve Invoice', exact: true })).toBeDisabled();
-  expect(state.writes).toHaveLength(1);
-  await dialog.getByRole('button', { name: 'Close record', exact: true }).click();
-  state.mismatch = false;
-  await frame.getByRole('button', { name: 'Refresh Invoices', exact: true }).click();
-  await expect(frame.getByRole('button', { name: 'Issue Invoice', exact: true })).toBeEnabled();
-  expect(state.writes).toHaveLength(1);
+  for (const hash of ['#quotes', '#invoices', '#billing', '#purchasing']) {
+    await frame.locator('body').evaluate((_, value) => { location.hash = value; }, hash);
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#today');
+    await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
+  }
+  expect(state.requests.some(item => ['/api/quotes', '/api/ar', '/api/purchasing', '/api/financial-summary'].includes(item.path))).toBe(false);
+  expect(state.writes).toEqual([]);
   await noOverflow(page);
 });

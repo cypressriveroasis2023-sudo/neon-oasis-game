@@ -45,22 +45,22 @@ test('the complete browser fixture bundle resolves the real session lease throug
  const js=full.outputFiles.find(file=>file.path.endsWith('.js'));assert.ok(js);assert.match(js.text,/captureSession/);assert.ok(full.outputFiles.some(file=>file.path.endsWith('.css')));
 });
 
-test('the flow fixture supplies the real lease contract needed to load the customer/site directory',async()=>{
- const f=fixture();assert.equal(typeof f.api.captureSession,'function');await f.directory();
- assert.deepEqual(f.calls.map(({path,method})=>({path,method})),[{path:'/api/customers',method:'GET'},{path:'/api/sites',method:'GET'}]);
- assert.deepEqual(f.updates,[['customers',[]],['sites',[]],['ready',true]]);
+test('mHelp ticket import no longer loads the customer and site directory',async()=>{
+ const f=fixture();assert.equal(typeof f.api.captureSession,'function');
+ await assert.rejects(f.directory(),/not available/);
+ assert.deepEqual(f.calls,[]);
 });
 for(const boundary of ['invalidation','trusted-hide','pagehide'])test('the exact flow fixture lease blocks deferred import bytes after '+boundary,async()=>{
  const f=fixture(),bytes=deferred(),action=f.captureAction();assert.equal(action.current(),true);
  const pending=action.client.stage(attachment.id,{}, {arrayBuffer:()=>bytes.promise});
  if(boundary==='trusted-hide')f.hide();else f.event(boundary==='pagehide'?'pagehide':'cos-private-data-invalidated');
- assert.equal(action.current(),false);bytes.resolve(new Uint8Array([1]).buffer);await assert.rejects(pending,/session changed/);assert.deepEqual(f.calls,[]);
+ assert.equal(action.current(),false);bytes.resolve(new Uint8Array([1]).buffer);await assert.rejects(pending,/not available/);assert.deepEqual(f.calls,[]);
 });
 test('healthy hide permits a new explicit import action, but hard invalidation stays blocked by the component',async()=>{
  const f=fixture(),old=f.captureAction();f.hide();f.revision.current++;assert.equal(old.current(),false);
- const fresh=f.captureAction();assert.equal(fresh.current(),true);await fresh.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer});assert.equal(f.calls.length,1);
+ const fresh=f.captureAction();assert.equal(fresh.current(),true);await assert.rejects(fresh.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/not available/);assert.equal(f.calls.length,0);
  f.valid.current=false;f.event('cos-private-data-invalidated');const blocked=f.captureAction();assert.equal(blocked.current(),false);
- await assert.rejects(blocked.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/session changed/);assert.equal(f.calls.length,1);
+ await assert.rejects(blocked.client.stage(attachment.id,{}, {arrayBuffer:async()=>new Uint8Array([1]).buffer}),/not available/);assert.equal(f.calls.length,0);
 });
 test('untrusted or sibling hide messages cannot invalidate the fixture lease',()=>{
  const f=fixture(),lease=f.api.captureSession();f.hide('https://untrusted.example');f.hide('https://synthetic.example',{});assert.equal(lease(),true);assert.deepEqual(f.calls,[]);

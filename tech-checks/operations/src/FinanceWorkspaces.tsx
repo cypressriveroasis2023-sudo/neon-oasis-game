@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api as operationsApi } from './api';
-import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionLabels, financeDetailMatchesRow, financeMoney, financePath, financeStatus, type FinanceApi, type FinanceDecision, type FinanceKind, type FinanceRecord } from './financePersistence';
+import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionLabels, financeDetailMatchesRow, financeMoney, financeStatus, type FinanceApi, type FinanceDecision, type FinanceKind, type FinanceRecord } from './financePersistence';
 import './financeWorkspaces.css';
 
 type Props = { show: (message: string) => void; api?: FinanceApi; referenceUrl?: string };
@@ -59,11 +59,7 @@ function FinanceWorkspace({ kind, show, api = operationsApi, referenceUrl = defa
     setLoading(true); setError('');
     if (selectedId) setDetail(null);
     try {
-      const response = await api.get(financePath[kind]);
-      const next = checkedFinanceList(response.data);
-      if (!mounted.current || request !== revision.current) return;
-      setRows(next); setSelectedId(current => next.some(row => row.id === current) ? current : '');
-      saver.acknowledgeRefresh(response.data); setNeedsRefresh(false); setNotice('');
+      throw new Error('Quotes, invoices and purchasing are not available in COS.');
     } catch (cause) {
       if (mounted.current && request === revision.current) setError(cause instanceof Error ? cause.message : labels[kind] + ' could not be loaded.');
     } finally { if (mounted.current && request === revision.current) setLoading(false); }
@@ -78,10 +74,7 @@ function FinanceWorkspace({ kind, show, api = operationsApi, referenceUrl = defa
     if (!selected) { setDetail(null); setDetailError(''); return; }
     let current = true;
     setDetail(null); setDetailError(''); setDetailLoading(true);
-    api.get(financePath[kind] + '/' + selected.id).then(response => {
-      const value = checkedFinanceDetail(response.data, selected.id);
-      if (current) setDetail(value);
-    }).catch(cause => {
+    Promise.reject(new Error('Quotes, invoices and purchasing are not available in COS.')).catch(cause => {
       if (current) setDetailError(cause instanceof Error ? cause.message : 'Record details could not be loaded.');
     }).finally(() => { if (current) setDetailLoading(false); });
     return () => { current = false; };

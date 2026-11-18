@@ -17,33 +17,13 @@ const board = (jobs = []) => ({ jobs, tasks: [], readiness: [], asOf: stamp });
 const job = { id, visitId, technician: 'Casey Service', status: 'scheduled', scheduled: '2026-10-04 08:00', scheduledEnd: '2026-10-04 10:00' };
 const expectation = { jobId: id, visitId, technician: 'Casey Service', start: job.scheduled, end: job.scheduledEnd };
 
-test('Today loads independent sources and never invents zero for unavailable information', async t => {
-  for (const [failedKey, failedPath] of dashboardSources) {
-    await t.test(failedKey + ' failure leaves other sources visible', async () => {
-      const seen = [];
-      const api = { get: async path => { seen.push(path); if (path === failedPath) throw new Error('Offline'); return { data: { items: [{ id: path, status: 'scheduled' }] } }; } };
-      const result = await loadTodayDashboard(api);
-      assert.equal(result[failedKey], null);
-      assert.equal(Object.keys(result.errors).length, 1);
-      assert.equal(seen.length, dashboardSources.length);
-      for (const [key] of dashboardSources) if (key !== failedKey) assert.equal(result[key].length, 1);
-      const summary = summarizeTodayDashboard(result);
-      if (failedKey === 'jobs') { assert.equal(summary.activeJobs, null); assert.equal(summary.inField, null); assert.equal(summary.unscheduled, null); }
-      if (failedKey === 'tasks') assert.equal(summary.openTasks, null);
-      assert.equal(summary.attention, failedKey === 'tasks' ? 0 : null);
-    });
-  }
-});
-
-test('Today distinguishes malformed records and access failure from an empty verified list', async () => {
-  const result = await loadTodayDashboard({ get: async path => {
-    if (path === '/api/jobs') return { data: { items: [null] } };
-    if (path === '/api/owner-tasks') throw { response: { status: 403 } };
-    return { data: { items: [] } };
-  } });
+test('Today does not load job, quote, invoice, purchasing or owner-task sources', async () => {
+  const seen = [];
+  const result = await loadTodayDashboard({ get: async path => { seen.push(path); return { data: { items: [] } }; } });
+  assert.deepEqual(dashboardSources, []);
+  assert.deepEqual(seen, []);
   assert.equal(result.jobs, null);
-  assert.match(result.errors.tasks, /Owner access/);
-  assert.deepEqual(result.quotes, []);
+  assert.equal(result.quotes, null);
   assert.equal(summarizeTodayDashboard(result).attention, null);
 });
 

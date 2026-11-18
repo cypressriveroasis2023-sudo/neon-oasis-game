@@ -49,9 +49,11 @@ test('read errors never expose arbitrary response or exception text',()=>{
 });
 test('panel has one fixed read-only backend path and no direct RPC, vendor read, run, or mutation controls',()=>{
  const source=readFileSync(new URL('../src/MhelpIntakeReview.tsx',import.meta.url),'utf8');
- assert.deepEqual([...source.matchAll(/api\.get\('([^']+)'\)/g)].map(x=>x[1]),['/api/mhelpdesk/intake/status?capability=pending_schedule_v1']);
+ assert.deepEqual([...source.matchAll(/api\.get\('([^']+)'\)/g)].map(x=>x[1]),[]);
+ assert.match(source,/Ticket intake is not available in COS/);
+ assert.doesNotMatch(source,/\/api\/mhelpdesk\/intake\/status/);
  assert.doesNotMatch(source,/api\.post|fetch\(|\.rpc\(|connect\.mhelpdesk|service_role|accessToken|localStorage/);
- assert.match(source,/request !== sequence\.current/);assert.match(source,/setStatus\(null\)/);
+ assert.match(source,/request === sequence\.current/);assert.match(source,/setStatus\(null\)/);
  const workspace=readFileSync(new URL('../src/UnitTrackerWorkspace.tsx',import.meta.url),'utf8');assert.match(workspace,/<MhelpIntakeReview session=\{session\}/);
 });
 

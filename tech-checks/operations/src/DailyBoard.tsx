@@ -12,11 +12,9 @@ import TechCheckTvBoard from './TechCheckTvBoard';
 import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
-import TicketActions from './TicketActions';
-import type {TicketType} from './ticketTypes';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
 
-type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:(type:TicketType)=>void };
+type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
 const statusKey=(value:unknown)=>String(value||'').trim().toLowerCase().replaceAll('_',' ');
 const plusTwoHours=(value:string)=>{
@@ -30,7 +28,7 @@ const jobNotes=(card:BoardCard)=>{
   return String(notes.at(-1)?.text||card.record.instructions||card.record.siteAddress||'');
 };
 
-export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,createTicket}:Props) {
+export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Props) {
   const launch = useMemo(() => tvBoardOptions(location.search), []);
   const tvSettings=useTvBoardSettings(api);
   const [snapshot,setSnapshot]=useState<BoardSnapshot>({jobs:[],tasks:[],readiness:[]});
@@ -123,7 +121,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
   },[tv,tvSettings.settings.rotationSeconds]);
 
   const today=chicagoDay(now);
-  const cards=useMemo(()=>dailyBoardCards(snapshot.jobs,snapshot.tasks,now,scope),[snapshot,today,scope]);
+  const cards=useMemo(()=>dailyBoardCards([],snapshot.tasks,now,scope),[snapshot,today,scope]);
   const tvCards=useMemo(()=>dailyBoardCards(snapshot.jobs,snapshot.tasks,now,scope,true).filter(c=>!isTestRecord(c.record)&&(!department||c.department===department)),[snapshot,today,scope,department]);
   const technicians=useMemo(()=>snapshot.readiness.map(r=>({name:r.name,department:String(r.department||'').toLowerCase()})).sort((a,b)=>a.name.localeCompare(b.name)),[snapshot.readiness]);
   const technicianMap=useMemo(()=>new Map(technicians.map(t=>[t.name,t])),[technicians]);
@@ -174,55 +172,19 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
       setActionError(`${card.department.toUpperCase()} work must be assigned to a ${card.department.toUpperCase()} technician.`);
       return;
     }
-    setSaving(true); setActionError(''); setNotice('');
-    try {
-      const result = await assignmentSaver.save('/api/jobs/' + card.record.id + '/assign', { technician: name }, {
-        jobId: card.record.id, technician: name, visitId: card.record.visitId,
-      });
-      if (result.status === 'confirmed') {
-        setNotice((card.reference || 'COS Job') + ' assignment saved and verified.');
-        window.dispatchEvent(new Event('cos-board-updated'));
-      } else if (result.status !== 'busy' && result.status !== 'refresh_required') setActionError(result.message);
-    } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
+    setDragged(null);
   };
-  const saveAssignment = async () => {
-    if (assignmentSaver.busy || assignmentSaver.needsRefresh || running.current>0) return;
-    if (!assigning || !assignment.date || !assignment.startTime || !assignment.endTime || !assignment.technician) {
-      setActionError('Date, start time, end time and technician are required.'); return;
-    }
-    const schedule = validateLocalSchedule(assignment.date + ' ' + assignment.startTime, assignment.date + ' ' + assignment.endTime);
-    if (!schedule.valid) { setActionError(schedule.error); return; }
-    const card = assigning;
-    setSaving(true); setActionError(''); setNotice('');
-    try {
-      const result = await assignmentSaver.save('/api/jobs/' + card.record.id + '/schedule', {
-        start: schedule.start, end: schedule.end, technician: assignment.technician,
-      }, {
-        jobId: card.record.id, visitId: card.record.visitId, technician: assignment.technician,
-        start: schedule.start || undefined, end: schedule.end || undefined,
-      });
-      if (result.status === 'confirmed') {
-        setAssigning(null);
-        setNotice('Schedule and technician assignment saved and verified.');
-        window.dispatchEvent(new Event('cos-board-updated'));
-      } else if (result.status !== 'busy' && result.status !== 'refresh_required') {
-        if (result.status === 'accepted_unverified') setAssigning(null);
-        setActionError(result.message);
-      }
-    } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
-  };
+  const saveAssignment = () => { setAssigning(null); };
 
   if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
-      <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(true);setRotation(0);setSelected(null);}}>TV View</button><button className='secondary' onClick={()=>void copyTvLink()}>Copy TV link</button><button onClick={()=>open('Owner Tasks')}>+ Assign Task</button></div>
+      <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(true);setRotation(0);setSelected(null);}}>TV View</button><button className='secondary' onClick={()=>void copyTvLink()}>Copy TV link</button></div>
     </header>
 
-    <details className='cos-workspace-settings'><summary>TV display & settings</summary><div className='daily-board-tv-setup'><strong>Update here. Show it on the TV.</strong><p>Save job changes in Jobs, or add shop work and instructions in Owner Tasks. The TV refreshes saved changes every minute. Open this link on the TV computer, sign in to Tech Check, then select Full screen.</p><a href={tvLink} target='_blank' rel='noopener'>Open Tech Check TV Board</a><button className='secondary' onClick={()=>open('Owner Tasks')}>Update shop tasks</button></div>
+    <details className='cos-workspace-settings'><summary>TV display & settings</summary><div className='daily-board-tv-setup'><strong>Update here. Show it on the TV.</strong><p>The TV refreshes saved camera and readiness changes every minute. Open this link on the TV computer, sign in to Tech Check, then select Full screen.</p><a href={tvLink} target='_blank' rel='noopener'>Open Tech Check TV Board</a></div>
     <TvBoardControls control={tvSettings}/></details>
-    {createTicket&&<details className='cos-workspace-settings'><summary>Add or schedule a job</summary><section className='daily-board-add-jobs' aria-label='Add jobs for the day'><h3>Add jobs for the day</h3><p>Create the pickup, swap, delivery or service job, then use Schedule / Reassign to set today’s service date and technician.</p><TicketActions createTicket={createTicket}/><button className='secondary' onClick={()=>open('Unscheduled')}>Schedule existing jobs for today</button></section></details>}
-
     <div className='daily-board-range' aria-label='Board range'><button className={scope==='day'?'active':''} onClick={()=>setScope('day')}>Day</button><button className={scope==='week'?'active':''} onClick={()=>setScope('week')}>Week</button><span>{scope==='day'?'Today + overdue / unscheduled work':'Next 7 days + overdue / unscheduled work'}</span></div>
 
     <div className='daily-board-toolbar'>
@@ -247,9 +209,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
 
     {lastSuccess&&<section className='daily-board-readiness' aria-label='Daily truck readiness'><h3>Daily Team Readiness <small>Today’s recorded checks</small></h3><div>{readiness.map(row=>{const summary=readinessSummary(row),exempt=vehicleInspectionExempt(row);return <article key={row.userId}><strong>{row.name} <small>{row.department.toUpperCase()}</small></strong>{exempt?<p>No company vehicle · truck and trailer inspections do not apply.</p>:(['truck','trailer'] as const).map(key=><p key={key}><span>{key==='truck'?'Truck inspection':'Trailer inspection'}</span><b className={'daily-readiness-'+summary[key].state}>{summary[key].label}</b></p>)}<p><span>{exempt?'IT shop inventory':'Inventory record'}</span><b className={'daily-readiness-'+summary.inventory.state}>{summary.inventory.label}</b></p><small>{row.completedAt?'Completed '+boardDateLabel(row.completedAt):row.startedAt?'Started '+boardDateLabel(row.startedAt):'No check recorded today'}</small></article>;})}</div>{!readiness.length&&<p>{sameDay?'No technicians match these filters.':'Refresh required before showing today’s readiness.'}</p>}</section>}
 
-    {!tv&&<p className='daily-board-drag-hint'>Owner: drag an active COS Job onto a technician to assign it immediately. Click the job to schedule it. Once it is scheduled under a technician, the card turns green.</p>}
-
-    {!lastSuccess&&!error?<p role='status'>Loading jobs and assigned tasks…</p>:<div className='daily-board-people'>{laneNames.map(name=>{
+    {!lastSuccess&&!error?<p role='status'>Loading camera readiness…</p>:<div className='daily-board-people'>{laneNames.map(name=>{
       const items=visible.filter(c=>c.assignee===name);
       const pages=Math.max(1,Math.ceil(items.length/3));
       const page=rotation%pages;
@@ -273,7 +233,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
     })}</div>}
 
     <p className='daily-board-note'>Unfinished and overdue work stays visible until management reschedules or completes it. Completed visits stay visible after a handoff. Truck, trailer and inventory readiness remain controlled through Tech Check.</p>
-    {!tv&&<div className='daily-board-actions'><button className='secondary' onClick={()=>open('Jobs')}>Jobs workspace</button><button className='secondary' onClick={()=>open('Tech Check')}>Truck / trailer readiness</button><button className='secondary' onClick={()=>open('Calendar')}>Calendar</button></div>}
+    {!tv&&<div className='daily-board-actions'><button className='secondary' onClick={()=>open('Tech Check')}>Truck / trailer readiness</button></div>}
 
     {selected&&<dialog ref={detail} className='daily-board-detail' aria-label='Work details' onCancel={()=>setSelected(null)}><section>
       <button className='secondary' onClick={()=>setSelected(null)}>Close details</button>
@@ -282,7 +242,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv,creat
       <p>{[selected.reference,selected.site].filter(Boolean).join(' · ')}</p>
       <BoardRecordDetails card={selected} sourceUnavailable={Boolean(error||stale)} close={()=>setSelected(null)}/>
       {selected.record.completionKind!=='visit'&&<DeliveryGoBackSummary job={selected.record}/>}
-      <ApprovedBoardActions>{canManage(selected)&&<button disabled={busy||refreshRequired} onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&!hasOpenGoBack(selected.record)&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></ApprovedBoardActions>
+      <ApprovedBoardActions><button className='secondary' onClick={()=>open('Tech Check')}>Truck / trailer readiness</button></ApprovedBoardActions>
     </section></dialog>}
 
     {assigning&&<dialog ref={assignDialog} className='daily-board-detail daily-board-assignment' aria-label='Schedule and reassign job' onCancel={event=>{if(saving)event.preventDefault();else setAssigning(null);}}><section>

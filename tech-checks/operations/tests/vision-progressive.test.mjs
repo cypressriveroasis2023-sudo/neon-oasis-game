@@ -32,31 +32,13 @@ test('initial dashboard shells show checking and unknown values rather than prem
   assert.doesNotMatch(company, /0 review items|Nothing currently needs Owner attention|No provider systems flagged|0 stored router records/);
 });
 
-test('each company source publishes a new independent snapshot without waiting for the slowest source', async () => {
-  const sources = new Map(dashboardSources.map(([, path]) => [path, deferred()]));
-  const updates = [];
-  const pending = loadTodayDashboard({ get: path => sources.get(path).promise }, value => updates.push(value));
-  assert.deepEqual(updates, []);
-  assert.equal(summarizeTodayDashboard(emptyTodayDashboard()).attention, null);
-
-  sources.get('/api/quotes').resolve({ data: { items: [{ id: 'synthetic-quote' }] } });
-  await tick();
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].quotes.length, 1);
-  assert.equal(updates[0].jobs, null);
-  assert.equal(summarizeTodayDashboard(updates[0]).attention, null);
-
-  sources.get('/api/jobs').reject({ response: { status: 403 } });
-  await tick();
-  assert.equal(updates.length, 2);
-  assert.match(updates[1].errors.jobs, /Owner access/);
-  assert.deepEqual(updates[0].errors, {}, 'previously delivered snapshots do not acquire later errors');
-  for (const [, path] of dashboardSources) if (!['/api/jobs', '/api/quotes'].includes(path)) sources.get(path).resolve({ data: { items: [] } });
-  const result = await pending;
-  assert.equal(updates.length, dashboardSources.length);
+test('Today no longer waits on job, quote, invoice, purchasing or owner-task sources', async () => {
+  const seen = [];
+  const result = await loadTodayDashboard({ get: async path => { seen.push(path); throw new Error('not called'); } });
+  assert.deepEqual(dashboardSources, []);
+  assert.deepEqual(seen, []);
   assert.equal(result.jobs, null);
-  assert.deepEqual(result.tasks, []);
-  assert.equal(updates[0].tasks, null, 'later settlement does not mutate earlier null placeholders');
+  assert.equal(summarizeTodayDashboard(emptyTodayDashboard()).attention, null);
 });
 
 test('company equipment publishes camera and router results separately and isolates malformed sources', async () => {

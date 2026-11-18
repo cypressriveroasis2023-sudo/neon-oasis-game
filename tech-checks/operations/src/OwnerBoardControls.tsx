@@ -45,13 +45,8 @@ export default function OwnerBoardControls({show,createType,unitId,cancelCreate,
     const revision=++loadRevision.current;
     activeReads.current++;
     try {
-    const [jobResponse,controlResponse]=await Promise.all([api.get('/api/jobs'),api.get('/api/owner/control-data')]);
-    const snapshot=checkedOwnerSnapshot(jobResponse.data,controlResponse.data);
-    if(revision!==loadRevision.current||!mounted.current)throw new Error('Owner controls changed while the result was loading. Refresh before another action.');
-    snapshotRef.current=snapshot;
-    setJobs(snapshot.jobs);setControl(snapshot.control);setLoaded(true);
-    setSelectedJobId(current=>ownerJobSelection(snapshot.jobs,current).selectedId);
-    return snapshot;
+    void revision;
+    throw new Error('Owner job controls are not available in COS.');
     } finally { activeReads.current--; }
   };
   const saver=useRef<ReturnType<typeof createOwnerActionSaver>|null>(null);

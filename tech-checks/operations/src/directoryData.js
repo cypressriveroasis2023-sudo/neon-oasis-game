@@ -1,9 +1,9 @@
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const equipmentStatuses = Object.freeze(['new','available','prep','ready','assigned','in_transit','installed','returning','intake','repair','quarantine','retired']);
 const definitions = Object.freeze({
-  Customers: { endpoint: '/api/customers', title: 'Customer', primary: 'name',
+  Customers: { endpoint: '', title: 'Customer', primary: 'name',
     fields: ['name', 'legalName', 'notes', 'status'], required: ['name'] },
-  Sites: { endpoint: '/api/sites', title: 'Site', primary: 'name',
+  Sites: { endpoint: '', title: 'Site', primary: 'name',
     fields: ['customerId', 'name', 'addressLine1', 'addressLine2', 'city', 'stateRegion', 'postalCode', 'country', 'accessInstructions', 'parkingInstructions', 'safetyNotes', 'operationalNotes', 'status'],
     required: ['customerId', 'name'] },
   Equipment: { endpoint: '/api/equipment', title: 'Equipment unit', primary: 'unitNumber',
@@ -70,6 +70,7 @@ export class DirectorySaveError extends Error {
 /** Issue exactly one write. Only a new authoritative snapshot can confirm success. */
 export async function saveDirectory(client, kind, draft) {
   const spec = definition(kind);
+  if (!spec.endpoint) throw new DirectorySaveError('Customers and sites are not available in COS.', 'rejected');
   const payload = payloadFor(kind, draft);
   const previousId = draft.id || null;
   let result;

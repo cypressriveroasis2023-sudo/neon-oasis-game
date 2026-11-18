@@ -1,8 +1,7 @@
-import ApprovedTeamJobLink from './ApprovedTeamJobLink';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api,openLegacy} from './api';
 import './directoryWorkspace.css';
-import {records,teamJobCount,teamRecords} from './directoryData.js';
+import {teamRecords} from './directoryData.js';
 import type {Row} from './directoryData.js';
 const errorText=(cause:unknown,fallback:string)=>cause instanceof Error?cause.message:fallback;
 function readiness(data:any):Row[] {
@@ -10,21 +9,19 @@ function readiness(data:any):Row[] {
   return data.readiness;
 }
 export default function TeamWorkspace({show,openWorkspace}:{show:(message:string)=>void;openWorkspace?:(name:string)=>void}) {
-  const[members,setMembers]=useState<Row[]|null>(null),[jobs,setJobs]=useState<Row[]|null>(null),[checks,setChecks]=useState<Row[]|null>(null);
-  const[loading,setLoading]=useState(true),[errors,setErrors]=useState<{team?:string;jobs?:string;checks?:string}>({});
+  const[members,setMembers]=useState<Row[]|null>(null),[checks,setChecks]=useState<Row[]|null>(null);
+  const[loading,setLoading]=useState(true),[errors,setErrors]=useState<{team?:string;checks?:string}>({});
   const[query,setQuery]=useState(''),[department,setDepartment]=useState('');
   const revision=useRef(0);
   const load=useCallback(async()=>{
     const request=++revision.current;setLoading(true);
     const result=await Promise.allSettled([
       api.get('/api/team-production').then(response=>teamRecords(response.data)),
-      api.get('/api/jobs').then(response=>records(response.data,'Jobs','jobNumber')),
       api.get('/api/daily-board').then(response=>readiness(response.data)),
     ]);
     if(request!==revision.current)return;
-    const[team,work,ready]=result,failed:{team?:string;jobs?:string;checks?:string}={};
+    const[team,ready]=result,failed:{team?:string;checks?:string}={};
     if(team.status==='fulfilled')setMembers(team.value);else failed.team=errorText(team.reason,'Production team could not be loaded.');
-    if(work.status==='fulfilled')setJobs(work.value);else failed.jobs=errorText(work.reason,'Assigned jobs could not be loaded.');
     if(ready.status==='fulfilled')setChecks(ready.value);else failed.checks=errorText(ready.reason,'Readiness could not be loaded.');
     setErrors(failed);setLoading(false);
   },[]);
@@ -39,19 +36,13 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
       <label>Department<select aria-label='Department' value={department} onChange={event=>setDepartment(event.target.value)}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option></select></label>
       {members&&<span>{members.length} active production profiles</span>}
     </div>
-    {Object.values(errors).length>0&&<div className='operations-error' role='alert'>{Object.entries(errors).map(([source,error])=><p key={source}>{error}{(source==='team'?members:source==='jobs'?jobs:checks)&&' Showing the last successful '+(source==='checks'?'readiness':source)+' records.'}</p>)}</div>}
+    {Object.values(errors).length>0&&<div className='operations-error' role='alert'>{Object.entries(errors).map(([source,error])=><p key={source}>{error}{(source==='team'?members:checks)&&' Showing the last successful '+(source==='checks'?'readiness':'team')+' records.'}</p>)}</div>}
     {!members&&!errors.team&&<div className='loading' role='status'>Loading live team…</div>}
     {members&&<div className='records'>{rows.length?rows.map(member=>{
       const check=checks?.find(row=>row.userId===member.userId);
-      // Details and readiness must use the same authoritative UUID/status rule as the count.
-      const assigned=(jobs||[]).filter(job=>teamJobCount(member,[job])===1);
-      const blocked=assigned.filter(job=>['scheduled','assigned'].includes(String(job.status||'').toLowerCase())&&!job.equipmentUnitTag);
-      const inProgress=assigned.filter(job=>['dispatched','in progress','en route'].includes(String(job.status||'').toLowerCase()));
-      const techChecks=assigned.filter(job=>job.techCheck&&!job.techCheck.complete);
       return <div className='record op-record' key={member.userId}>
-        <div><strong>{member.displayName}</strong><small>{String(member.department).toUpperCase()} Technician · {jobs?teamJobCount(member,jobs)+' active assigned jobs':'Assigned jobs unavailable'}</small>
-          <div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span><span>Dispatch blockers: {jobs?blocked.length:'—'}</span><span>Tech Checks in progress: {jobs?techChecks.length:'—'}</span><span>Field work active: {jobs?inProgress.length:'—'}</span></div>
-          {jobs&&assigned.length>0&&<div className='team-readiness-jobs'>{assigned.slice(0,6).map(job=><div key={job.id}><ApprovedTeamJobLink jobId={job.id} jobNumber={job.jobNumber}/><span>{job.site||job.customer} · {job.status}</span><small>{job.techCheck?(job.techCheck.complete?'Tech Check complete':'Tech Check step '+(Number(job.techCheck.step||0)+1)):blocked.includes(job)?'Waiting for physical unit identification':'Workflow ready for current stage'}</small></div>)}{assigned.length>6&&<small>+ {assigned.length-6} more assigned jobs</small>}</div>}
+        <div><strong>{member.displayName}</strong><small>{String(member.department).toUpperCase()} Technician</small>
+          <div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span></div>
         </div>
         <em>{member.active?'ACTIVE PROFILE':'INACTIVE PROFILE'}</em>
       </div>;

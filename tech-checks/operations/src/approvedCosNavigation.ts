@@ -13,7 +13,7 @@ export function approvedArea(workspace:string):string {
   if(fleetAreas.has(workspace))return 'Fleet Dashboard';
   if(workspace==='Daily Board')return 'Daily Board';
   if(workspace==='Tech Check'||workspace==='Handoffs')return 'Tech Check';
-  if(workspace==='Team'||workspace==='Owner Tasks')return 'Team';
+  if(workspace==='Team')return 'Team';
   return 'Operations';
 }
 export function approvedWorkspaceLabel(workspace:string, fallback=workspace):string {
@@ -23,10 +23,7 @@ export function approvedWorkspaceLabel(workspace:string, fallback=workspace):str
 // These are the original workspace keys, not replacement pages or data sources.
 export const approvedToolGroups = [
   {label:'Fleet tools', items:['Camera Health','Units On Hand','Unit Tracker','InHand Routers','Victron VRM','Equipment']},
-  {label:'Daily review & calendar', items:['Today','Owner Tasks','Needs Attention','Calendar','Handoffs','History','Activity','Reports']},
-  {label:'Customers & sites', items:['Customers','Sites','Work Requests','CRM']},
-  {label:'Finance & purchasing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments']},
-  {label:'Existing workflows & assistant', items:['Jobs','Unscheduled','Dispatch','Owner Review','Vision']},
+  {label:'Daily review', items:['Today','Handoffs','Owner Review']},
 ] as const;
 export function visibleApprovedTools(items:readonly string[],trackerVisible:boolean):string[] {
   return items.filter(workspace=>workspace!=='Unit Tracker'||trackerVisible);

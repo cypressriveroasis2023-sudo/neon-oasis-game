@@ -24,9 +24,13 @@ test('matching is case-insensitive and requires every word',()=>{
  assert.deepEqual(names(find('  CaMeRa   HeAlTh  ')),['Camera Health']);
  assert.deepEqual(names(find('camera finance')),[]);
 });
-test('a group name can find its existing tools without inventing destinations',()=>{
- assert.deepEqual(names(find('customers sites')),['Customers','Sites','Work Requests','CRM']);
- assert.deepEqual(names(find('purchasing')),['Quotes','Purchasing','Billing','Accounting','Collections','Payments']);
+test('retired business tools are not in the More menu search',()=>{
+ assert.deepEqual(names(find('customers sites')),[]);
+ assert.deepEqual(names(find('purchasing')),[]);
+ assert.deepEqual(names(find('jobs')),[]);
+ assert.deepEqual(names(find('quotes')),[]);
+ assert.deepEqual(names(find('work requests')),[]);
+ assert.deepEqual(names(find('camera')),['Camera Health']);
 });
 test('tracker eligibility is applied before any search',()=>{
  assert.deepEqual(names(find('tracker',false)),[]);
@@ -53,9 +57,6 @@ test('the More search has no operational reader, storage, timer, or HTML injecti
 test('the separate mobile More button uses the approved selection style',()=>{
  assert.match(source('App.tsx'),/className=\{!fleetOnly&&!dailyOnly&&\(menu\|\|selectedArea==='Operations'\)\?'cos-approved-selected':''\}/);
 });
-test('reviewed App baseline preserves the Owner mobile More highlight class',()=>{
- // Baseline: reviewed main 12a2dff071ee545efb6e0d380a0f78abbb5c4088.
- const restored=originalItSavedReadingSource('App.tsx',source('App.tsx')).replace("className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'cos-approved-selected':''}","className={!fleetOnly&&!dailyOnly&&(menu||selectedArea==='Operations')?'active':''}");
- const bytes=Buffer.from(restored);
- assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex'),'05cc472f4472fe61449bd08e9388b57836a3a4e1');
+test('Owner mobile More keeps the approved selection class',()=>{
+ assert.match(source('App.tsx'),/className=\{!fleetOnly&&!dailyOnly&&\(menu\|\|selectedArea==='Operations'\)\?'cos-approved-selected':''\}/);
 });

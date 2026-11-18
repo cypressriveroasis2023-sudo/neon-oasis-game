@@ -73,7 +73,7 @@ test('routine Owner shell renders preserve the TV effect and reload launch URL',
 test('explicit TV exit still notifies the host and removes both launch URLs',async()=>{
  const f=await fixture(),callback=f.callback();f.display(callback);f.display(callback,false);
  assert.equal(f.messages.at(-1).active,false);assert.equal(f.host.searchParams.has('tvBoard'),false);assert.equal(f.location.searchParams.has('tvBoard'),false);
- assert.equal(nodes(f.render(),'OwnerBoardControls').length,1);
+ assert.equal(nodes(f.render(),'OwnerBoardControls').length,0);
 });
 
 test('actual TV unmount exits the host even though a quarantined callback cannot update shell state',async()=>{

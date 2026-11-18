@@ -8,9 +8,7 @@ export default function CustomerContactPicker({customerId,disabled=false,value='
   const revision=useRef(0);
   const load=useCallback(async()=>{
     const request=++revision.current;setLoading(true);setError('');setContacts(null);setSelectedId('');onChange?.('');
-    try{const next=readCustomerContacts((await api.get('/api/customers/'+customerId+'/contacts')).data,customerId);if(request===revision.current)setContacts(next);}
-    catch(cause){if(request===revision.current)setError(cause instanceof Error?cause.message:'Customer contacts could not be loaded.');}
-    finally{if(request===revision.current)setLoading(false);}
+    if(request===revision.current){setContacts(null);setError('Customer contacts are not available in COS.');setLoading(false);}
   },[customerId,onChange]);
   useEffect(()=>{void load();return()=>{revision.current++;onChange?.('');};},[load,onChange]);
   const selected=contacts?.find(contact=>contact.id===selectedId);

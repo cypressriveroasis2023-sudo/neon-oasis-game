@@ -45,29 +45,9 @@ test('truck approval requires completed and ownerApproved; nested shortages rema
  assert.equal(hasConfirmedOwnerAction(snapshot([],{truckChecks:[{id:'check',ownerApproved:false,status:'completed'}]}),action,{}),false);
  assert.deepEqual(truckApprovalDetails({result:{owner_override:true,owner_override_missing_fields:['battery identifier',null]}}),{override:true,missing:['battery identifier']});
 });
-test('owner uncertainty locks retries until a validated explicit refresh',async()=>{
- let writes=0,reads=0;
- const saver=createOwnerActionSaver({post:async()=>{writes++;throw Error('lost response');}},async()=>{reads++;return snapshot();});
- assert.equal((await saver.save(assign)).status,'unconfirmed');
- assert.equal((await saver.save(assign)).status,'refresh_required');
- assert.equal(writes,1);assert.equal(reads,0);
- assert.throws(()=>saver.acknowledgeRefresh({jobs:[],control:{}}));assert.equal(saver.needsRefresh,true);
- saver.acknowledgeRefresh(snapshot());assert.equal(saver.needsRefresh,false);
- await saver.save(assign);assert.equal(writes,2);
-});
-test('accepted unchanged reads do not become success and cannot replay',async()=>{
- let writes=0,reads=0;
- const saver=createOwnerActionSaver({post:async()=>{writes++;return {data:{}};}},async()=>{reads++;return snapshot();});
- assert.equal((await saver.save(assign)).status,'accepted_unverified');
- assert.equal((await saver.save(assign)).status,'refresh_required');assert.equal(writes,1);assert.equal(reads,1);
-});
-test('owner read failure remains accepted unverified, never a failed-write claim',async()=>{
- const saver=createOwnerActionSaver({post:async()=>({data:{}})},async()=>{throw Error('read unavailable');});
- assert.equal((await saver.save(assign)).status,'accepted_unverified');assert.equal(saver.needsRefresh,true);
-});
-test('owner concurrent clicks send one write and only fresh matching read confirms',async()=>{
- let release,writes=0;const gate=new Promise(resolve=>release=resolve);
- const saver=createOwnerActionSaver({post:async()=>{writes++;await gate;return {data:{}};}},async()=>snapshot([{...old,technician:'Casey Service'}]));
- const first=saver.save(assign);assert.equal((await saver.save(assign)).status,'busy');release();
- assert.equal((await first).status,'confirmed');assert.equal(writes,1);assert.equal(saver.needsRefresh,false);
+test('owner job and truck-check actions are not reachable',async()=>{
+ let writes=0;
+ const saver=createOwnerActionSaver({post:async()=>{writes++;return {data:{}};}},async()=>{throw Error('read unavailable');});
+ await assert.rejects(saver.save(assign),/not available/);
+ assert.equal(writes,0);
 });

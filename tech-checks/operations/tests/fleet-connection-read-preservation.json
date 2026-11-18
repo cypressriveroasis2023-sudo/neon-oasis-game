@@ -5,8 +5,8 @@
   "files": [
     {
       "path": "api.ts",
-      "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
-      "candidateBlob": "f86955866a7b999803834b8797defde461e1830d",
+      "baselineBlob": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
+      "candidateBlob": "31643c14c09afe8bfbdf8d6f54c25cd8d34a313c",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
