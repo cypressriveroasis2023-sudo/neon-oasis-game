@@ -46,7 +46,7 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
 const refresh=app=>app.getByRole('button',{name:'↻ Refresh data',exact:true});
 const privateView=app=>app.getByRole('region',{name:'COS Fleet Dashboard',exact:true});
 async function reasons(app){return app.locator('body').evaluate(()=>window.recoveryInvalidations.map(event=>event.reason));}
-async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click();await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
+async function renewal(page,app,scheduled=false){await page.evaluate(()=>window.syntheticSession='synthetic-session-b');if(scheduled)await advanceToScheduledFleetRead(page,app,async()=> (await reasons(app)).includes('token-renewed'));else await refresh(app).click({noWaitAfter:true});await expect.poll(()=>reasons(app)).toContain('token-renewed');await page.clock.runFor(1);}
 async function blocked(app){await expect(privateView(app)).toHaveCount(0);await expect(app.getByRole('alert')).toContainText('Reload COS Operations');await expect(app.getByRole('button',{name:'Retry Operations access'})).toHaveCount(0);}
 function readOnly(state){expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);}
 
