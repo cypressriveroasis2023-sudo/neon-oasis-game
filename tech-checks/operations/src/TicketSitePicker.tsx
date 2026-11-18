@@ -7,6 +7,10 @@ import DirectoryWorkspace from './DirectoryWorkspace';
 
 type Props = { siteId:string; setSiteId:(id:string)=>void; disabled:boolean; onValidityChange:(valid:boolean)=>void; onSiteBusyChange:(busy:boolean)=>void;contactInstructions:string;onContactInstructionsChange:(value:string)=>void; show:(message:string)=>void };
 const active = (row:Row) => row.status === 'active';
+export function TicketSitePickerPreview() {
+  const [siteId,setSiteId]=useState('');
+  return <TicketSitePicker siteId={siteId} setSiteId={setSiteId} disabled={false} onValidityChange={()=>{}} onSiteBusyChange={()=>{}} contactInstructions="" onContactInstructionsChange={()=>{}} show={()=>{}}/>;
+}
 export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityChange,onSiteBusyChange,contactInstructions,onContactInstructionsChange,show}:Props) {
   const [customers,setCustomers]=useState<Row[]|null>(null),[sites,setSites]=useState<Row[]|null>(null);
   const [customerId,setCustomerId]=useState(''),[query,setQuery]=useState(''),[siteQuery,setSiteQuery]=useState('');
@@ -17,7 +21,12 @@ export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityCh
   const load=async()=>{
     const request=++revision.current;setLoading(true);setError('');
     try {
-      throw new Error('Customers and sites are not available in COS.');
+      const [people,locations]=await Promise.all([api.get('/api/customers'),api.get('/api/sites')]);
+      const {customers:nextCustomers,sites:nextSites}=readTicketDirectory(people.data,locations.data);
+      if(request!==revision.current)return;
+      setCustomers(nextCustomers);setSites(nextSites);
+      if(siteId){const selected=nextSites.find(site=>site.id===siteId),customer=nextCustomers.find(item=>item.id===selected?.customerId);
+        if(selected&&customer){setCustomerId(customer.id);setQuery(customer.name);}else setSiteId('');}
     }catch(cause){if(request===revision.current)setError(cause instanceof Error?cause.message:'Customers and sites could not be loaded.');}
     finally{if(request===revision.current)setLoading(false);}
   };

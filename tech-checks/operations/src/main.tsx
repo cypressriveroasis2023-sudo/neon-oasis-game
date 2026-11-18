@@ -4,6 +4,7 @@ import App from './App';
 import ViewErrorBoundary from './ViewErrorBoundary';
 import MhelpLocationImport from './MhelpLocationImport';
 import SimCancelChecklist from './SimCancelChecklist';
+import {TicketSitePickerPreview} from './TicketSitePicker';
 import './index.css';
 import './shell.css';
 import './companyTheme.css';
@@ -24,7 +25,7 @@ ReactDOM.createRoot(root).render(
         <button type="button" onClick={retry}>Reopen workspace</button>
       </main>
     )}>
-      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : new URLSearchParams(location.search).get('simCancelPreview') === '1' ? <SimCancelChecklist /> : <App />}
+      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : new URLSearchParams(location.search).get('simCancelPreview') === '1' ? <SimCancelChecklist /> : new URLSearchParams(location.search).get('ticketSitePicker') === '1' ? <TicketSitePickerPreview /> : <App />}
     </ViewErrorBoundary>
   </React.StrictMode>
 );
