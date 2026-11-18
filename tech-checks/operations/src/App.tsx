@@ -158,9 +158,11 @@ function OwnerApp() {
     window.addEventListener('message',returnToChecks);
     return()=>window.removeEventListener('message',returnToChecks);
   },[setRouteLocation]);
-  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{
-    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;
-    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);
+  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason, detail)=>{
+    const holdTv=tvIntent.current&&reason==='authentication-denied'&&typeof detail?.path==='string'&&detail.path!=='/api/session';
+    if(!holdTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;
+    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);
+    if(!holdTv)setTvDisplay(false);
     setRouteLocation({workspace:active,jobId:'',detail:false},true);
     // Discard selection/history payloads as well as the mounted private views.
     history.replaceState(null,'',location.href);

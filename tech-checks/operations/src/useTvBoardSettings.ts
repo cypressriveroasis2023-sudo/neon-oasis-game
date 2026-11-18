@@ -1,18 +1,24 @@
 import { useCallback,useEffect,useRef,useState } from 'react';
 import { checkedTvSettings,checkedTvSections,checkedTvRotationSeconds,tvTimingSaveRevision,DEFAULT_TV_ROTATION_SECONDS,DEFAULT_TV_SECTIONS,type TvSettings,type TvSection } from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
+import {tvSectionsForDisplay} from './tvBoardData';
+import {tvSessionHold} from './tvSessionHold';
 type Api={get:(path:string)=>Promise<{data:any}>;post:(path:string,body:any)=>Promise<{data:any}>};
 export function useTvBoardSettings(api:Api){
-  const [settings,setSettings]=useState<TvSettings>({sections:[...DEFAULT_TV_SECTIONS],revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});
+  const [settings,setSettings]=useState<TvSettings>({sections:tvSectionsForDisplay(DEFAULT_TV_SECTIONS),revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});
   const [verified,setVerified]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState(false),[needsRefresh,setNeedsRefresh]=useState(false);
   const revision=useRef(0),alive=useRef(false),running=useRef(false);
   const refresh=useCallback(async()=>{
     const request=++revision.current;
-    try{const next=checkedTvSettings((await api.get('/api/tv-board/settings')).data);if(alive.current&&request===revision.current){setSettings(next);setVerified(true);setError('');setNeedsRefresh(false);}return next;}
+    try{const next=checkedTvSettings((await api.get('/api/tv-board/settings')).data);next.sections=tvSectionsForDisplay(next.sections);if(alive.current&&request===revision.current){setSettings(next);setVerified(true);setError('');setNeedsRefresh(false);}return next;}
     catch(cause){if(alive.current&&request===revision.current)setError(cause instanceof Error?cause.message:'TV settings are unavailable.');return null;}
   },[api]);
   useEffect(()=>{
     alive.current=true;void refresh();const timer=window.setInterval(()=>{if(!running.current)void refresh();},60000);
-    const invalid=()=>{revision.current++;setVerified(false);setSettings({sections:[],revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});setError('Sign in again to load TV settings.');};
+    const invalid=(event:Event)=>{
+      const detail=(event as CustomEvent<{reason?:string;path?:string}>).detail;
+      if(tvSessionHold()&&detail?.reason==='authentication-denied'&&typeof detail.path==='string'&&detail.path!=='/api/session')return;
+      revision.current++;setVerified(false);setSettings({sections:[],revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});setError('Sign in again to load TV settings.');
+    };
     window.addEventListener('cos-private-data-invalidated',invalid);
     return()=>{alive.current=false;revision.current++;window.clearInterval(timer);window.removeEventListener('cos-private-data-invalidated',invalid);};
   },[refresh]);
@@ -20,7 +26,7 @@ export function useTvBoardSettings(api:Api){
     if(running.current||!verified||needsRefresh)return false;
     running.current=true;revision.current++;setSaving(true);
     try{
-      const chosen=checkedTvSections(sections);
+      const chosen=tvSectionsForDisplay(checkedTvSections(sections));
       const seconds=checkedTvRotationSeconds(rotationSeconds);
       const saveRevision=seconds===settings.rotationSeconds?expectedRevision:tvTimingSaveRevision(expectedRevision,seconds);
       await api.post('/api/tv-board/settings',{sections:chosen,expectedRevision:saveRevision});

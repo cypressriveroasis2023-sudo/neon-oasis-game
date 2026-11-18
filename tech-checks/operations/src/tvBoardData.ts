@@ -25,9 +25,14 @@ export type TvLane = { name: string; cards: BoardCard[] };
 export type TvPage = { kind: 'work'; lanes: TvLane[] } | { kind: 'readiness'; rows: ReadinessRow[] };
 export type FleetPages={camera:number;map:string[]};
 export type ConfiguredTvPage = (TvPage | {kind:'camera'|'map'|'empty';fleetPage?:number}) & {section:TvSection|null;title:string};
+/** Saved all-jobs and shop pages stay in old settings and are treated as off. */
+export function tvSectionsForDisplay(sections: readonly TvSection[]): TvSection[] {
+  return sections.filter(section => section !== 'today' && section !== 'shop');
+}
 export function configuredTvPages(cards:BoardCard[],names:string[],readiness:ReadinessRow[],sections:TvSection[],width:number,height:number,today:string,fleet:FleetPages={camera:1,map:['All field units']}):ConfiguredTvPage[]{
   const pages:ConfiguredTvPage[]=[];
-  for(const {key,label} of TV_SECTIONS.filter(section=>sections.includes(section.key))){
+  const visible=tvSectionsForDisplay(sections);
+  for(const {key,label} of TV_SECTIONS.filter(section=>visible.includes(section.key))){
     if(key==='camera'){for(let index=0;index<Math.max(1,fleet.camera);index++)pages.push({kind:key,section:key,title:'Camera Health · Down units',fleetPage:index});continue;}
     if(key==='map'){for(const [index,area] of (fleet.map.length?fleet.map:['All field units']).entries())pages.push({kind:key,section:key,title:'Field Map · '+area,fleetPage:index});continue;}
     const chosen=key==='shop'?cards.filter(card=>card.kind==='task'&&(!chicagoDay(card.date)||chicagoDay(card.date)<=today||card.lane==='complete')):

@@ -6,7 +6,7 @@
     {
       "path": "api.ts",
       "baselineBlob": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
-      "candidateBlob": "31643c14c09afe8bfbdf8d6f54c25cd8d34a313c",
+      "candidateBlob": "a3ff3f5d12316fd687616a2b9b72eec5ee51c353",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -51,6 +51,16 @@
         {
           "from": "      response = await fetch(endpoint, {\n",
           "to": "      response = await fetch(endpointFor(path), {\n",
+          "count": 1
+        },
+        {
+          "from": "function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide') {\n window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason}}));",
+          "to": "function invalidatePrivateData(reason:'token-renewed'|'parent-timeout'|'authentication-denied'|'security-hide', path?: string) {\n window.dispatchEvent?.(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason, ...(path?{path}:{})}}));",
+          "count": 1
+        },
+        {
+          "from": "    if (authenticationDenied) invalidatePrivateData('authentication-denied');",
+          "to": "    if (authenticationDenied) invalidatePrivateData('authentication-denied', path);",
           "count": 1
         }
       ]

@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
-      "candidateBlob": "030ea4e2e7c52f6913489b86ed6a0488029824fd",
+      "candidateBlob": "05e71a36c0e74d317cce81b1ae03c14752ca0703",
       "replacements": [
         {
           "from": "",
@@ -35,6 +35,11 @@
         {
           "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
           "to": "createTicket={undefined} initialUnitId={route.unitId}",
+          "count": 1
+        },
+        {
+          "from": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{\n    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);",
+          "to": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason, detail)=>{\n    const holdTv=tvIntent.current&&reason==='authentication-denied'&&typeof detail?.path==='string'&&detail.path!=='/api/session';\n    if(!holdTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);\n    if(!holdTv)setTvDisplay(false);",
           "count": 1
         }
       ]

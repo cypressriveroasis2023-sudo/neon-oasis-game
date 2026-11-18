@@ -106,13 +106,15 @@ test('new view has no network, polling, write actions or automatic ticket creati
  const source=read('BoardRecordDetails.tsx')+'\n'+read('boardRecordDetails.ts');
  assert.doesNotMatch(source,/\b(fetch|setInterval|setTimeout|localStorage|sessionStorage|dispatchEvent)\s*\(/);
  assert.doesNotMatch(source,/api\.(get|post)|createTicket|dangerouslySetInnerHTML/);
- assert.match(source,/workspaceHash\(\{workspace:'Jobs',jobId:detail.jobId,detail:false\}\)/);
+ assert.doesNotMatch(source,/workspaceHash\(\{workspace:'Jobs'/);
+ assert.match(source,/Jobs and Owner Tasks are not opened from this board/);
  assert.match(source,/Unit not linked/);assert.match(source,/not a camera check time/);
 });
 test('Daily Board hides job assignment writes and keeps readiness',()=>{
  const source=read('DailyBoard.tsx');
  assert.equal(source.includes('/api/jobs/'),false);
- assert.match(source,/dailyBoardCards\(\[\],snapshot\.tasks/);
+ assert.match(source,/dailyBoardCards\(handoffJobs,\[\]/);
+ assert.equal(source.includes('OWNER TASK'),false);
  assert.match(source,/api\.get\('\/api\/daily-board'\)|createBoardReader/);
 });
 test('style changes are scoped and do not target Fleet or TV',()=>{

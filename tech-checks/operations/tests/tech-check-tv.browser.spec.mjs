@@ -1,6 +1,5 @@
 import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {CAMERA_AUTO_REFRESH_MS} from '../src/refreshCadence.ts';
-import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import {completedBoard} from '../durable-board/project.ts';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -23,7 +22,7 @@ test.afterEach(async({page},testInfo)=>{
   await testInfo.attach('tv-session-lifecycle',{path,contentType:'application/json'});
 });
 async function setup(page, { many = false, pausedClock = false, prepare = null } = {}) {
-  const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
+  const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Owner task stays off the board',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned',jobType:'PICKUP',instructions:'Pickup '+index})) : [{id:'job-pickup',customer:'Pickup customer',technician:'Tech 1',department:'it',status:'assigned',jobType:'PICKUP',instructions:'Inspect the return rack'},{id:'job-install',customer:'Install customer',technician:'Tech 1',department:'it',status:'assigned',jobType:'INSTALL',instructions:'Do not show install'}], readiness: [] };
   state.pendingDaily=0;state.dailyResults=[];state.dailyGate=null;diagnostics.set(page,state);if(prepare)prepare(state);
   await page.addInitScript(()=>{
     window.tvLifecycleEvents=[];
@@ -34,8 +33,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
   // Pause at a future instant while the page is still blank, before app timers exist.
   await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
   if(pausedClock)await page.clock.pauseAt(new Date(time));
-  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
-  if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
+  state.settings={sections:['pickup','shop','today'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   state.fleetUnits=[unit];state.cameraRows=[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
   await page.route('**/*', async route => {
@@ -79,12 +77,14 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;if(state.cameraGate)await state.cameraGate.promise;const total=state.cameraRows.length;return route.fulfill({headers:cors,json:{totalDevices:total,online:state.cameraRows.filter(row=>row.status==='online').length,offline:state.cameraRows.filter(row=>row.status==='offline').length,review:state.cameraRows.filter(row=>row.status==='review').length,shopRoot:0,healthRows:total,fieldDevices:total,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:total,activeFieldRecords:total,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:state.cameraRows,...(state.cameraExtras||{})}});}
     if(path==='/api/product-connections'){state.proofReads=(state.proofReads||0)+1;if(state.proofGate)await state.proofGate.promise;}
     if(path==='/api/product-connections')return route.fulfill({headers:cors,status:state.productConnections?200:503,json:state.productConnections||{error:'Synthetic exact TCP source unavailable'}});
-    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:state.features||{}}:{items:[]}});
+    return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,legacyOwner:true,role:'Owner',name:'Fixture Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true,...(state.features||{})}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
   const frame=page.frameLocator('#cosOperationsFrame');
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByText(many?'Pickup 0':'Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
+  if(!many)await expect(frame.getByText('Do not show install',{exact:true})).toHaveCount(0);
   return {state,frame};
 }
 
@@ -94,7 +94,7 @@ test('TV link fills the host and sees a saved update without a remote desktop co
   await expect(frame.locator('.tech-check-tv-footer')).toContainText('Jobs/tasks updated');
   await expect(frame.locator('.tech-check-tv-footer')).toContainText('Work board refresh 60s · Saved camera reads 10 min · Page rotation');
   await expect(frame.getByRole('button',{name:'Save Schedule & Assignment'})).toHaveCount(0);
-  state.tasks[0].instructions='The return rack is ready';
+  state.jobs[0].instructions='The return rack is ready';
   await page.clock.fastForward(60000);
   await expect(frame.getByText('The return rack is ready',{exact:true})).toBeVisible();
   expect(state.reads).toBeGreaterThanOrEqual(2);
@@ -131,13 +131,29 @@ test('network failure marks delayed data and authentication failure clears priva
   await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
   state.fail=401;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
-  await expectOperationsReloadRequired(frame);
-  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);
-  await expect(frame.getByRole('button',{name:'Refresh',exact:true})).toHaveCount(0);
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
-  await expect(page.locator('#hostToolbar')).toBeVisible();
-  expect(new URL(page.url()).searchParams.has('tvBoard')).toBe(false);
+  await expect(frame.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Refresh',exact:true})).toBeVisible();
+  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(page.locator('#hostToolbar')).toBeHidden();
+  expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
   expect(state.writes).toEqual([]);
+});
+
+test('Daily Board and TV render only pickup, swap, delivery and service',async({page})=>{
+ const {frame}=await setup(page);
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ await expect(frame.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('Do not show install',{exact:true})).toHaveCount(0);
+ await expect(frame.getByText('OWNER TASK',{exact:true})).toHaveCount(0);
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ const board=frame.getByRole('region',{name:'COS Daily Board'});
+ await expect(board).toBeVisible();
+ await expect(board.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ await expect(board.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
+ await expect(board.getByText('Do not show install',{exact:true})).toHaveCount(0);
+ await expect(board.getByText('OWNER TASK',{exact:true})).toHaveCount(0);
+ await expect(board.getByRole('link',{name:/Jobs|Owner Tasks/})).toHaveCount(0);
 });
 
 test('remote choices rotate all pending types, including future and unscheduled jobs',async({page})=>{
@@ -158,11 +174,13 @@ test('Owner saves switches and can turn every TV section off without changing wo
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
  await frame.getByText('TV display & settings',{exact:true}).click();
  const controls=frame.getByRole('region',{name:'TV board settings'});
- await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).check();
+ await expect(controls.getByRole('checkbox',{name:'Shop updates',exact:true})).toHaveCount(0);
+ await expect(controls.getByRole('checkbox',{name:'Today’s jobs',exact:true})).toHaveCount(0);
+ await controls.getByRole('checkbox',{name:'Camera Health',exact:true}).check();
  await controls.getByRole('button',{name:'Save TV settings',exact:true}).click();
  await expect(controls.getByText('TV settings saved and verified.',{exact:true})).toBeVisible();
- expect(state.settings.sections).toEqual(['pickup','shop']);
- await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).uncheck();await controls.getByRole('checkbox',{name:'Shop updates',exact:true}).uncheck();
+ expect(state.settings.sections).toEqual(['pickup','camera']);
+ await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).uncheck();await controls.getByRole('checkbox',{name:'Camera Health',exact:true}).uncheck();
  await controls.getByRole('button',{name:'Save TV settings',exact:true}).click();
  await expect(controls.getByText('TV settings saved and verified.',{exact:true})).toBeVisible();
  await frame.getByRole('button',{name:'TV View',exact:true}).click();
@@ -216,9 +234,11 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  expect(state.reads).toBe(dailyReads+1);expect(state.fleetReads).toBe(reads+3);expect((await focusState()).events-beforeFocus.events).toBe(focusDelta);
  expect(await frame.locator('body').evaluate(()=>window.tvLifecycleEvents.filter(event=>event.type==='invalidated'))).toEqual([]);expect(state.writes).toEqual([]);
  state.fail=401;await refreshButton.click();
- await expectOperationsReloadRequired(frame);
- await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
- await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveCount(0);await expect(refreshButton).toHaveCount(0);
+ await expect(frame.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();await expect(refreshButton).toBeVisible();
+ await expect(page.locator('#hostToolbar')).toBeHidden();
+ expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
  await expect.poll(()=>state.dailyResults.at(-1)).toEqual({read:dailyReads+2,status:401});expect(state.reads).toBe(dailyReads+2);expect(state.writes).toEqual([]);
 });
 
@@ -343,7 +363,7 @@ test('Owner saves rotation time and a remote timing update changes the TV interv
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
  await frame.getByText('TV display & settings',{exact:true}).click();
  const controls=frame.getByRole('region',{name:'TV board settings'});
- await controls.getByRole('checkbox',{name:'Shop updates',exact:true}).uncheck();
+ await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).uncheck();
  await controls.getByRole('checkbox',{name:'Field Map',exact:true}).check();
  await controls.getByRole('spinbutton',{name:'Rotation time (seconds)',exact:true}).fill('30');
  await controls.getByRole('button',{name:'Save TV settings',exact:true}).click();
@@ -494,9 +514,9 @@ test('hidden initial-recovery deadline waits for visibility and never overlaps a
 
 test('disabling TV fleet cancels the pending cold-load retry',async({page})=>{
  const {state,frame}=await coldFailure(page);
- state.settings={sections:['shop'],revision:2,updatedAt:time};
+ state.settings={sections:['pickup'],revision:2,updatedAt:time};
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','shop');
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','pickup');
  const count=savedReadCounts(state)['field-map'];await page.clock.runFor(60000);
  expect(savedReadCounts(state)['field-map']).toBe(count);expect(state.writes).toEqual([]);
 });

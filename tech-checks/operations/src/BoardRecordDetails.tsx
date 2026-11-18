@@ -2,7 +2,6 @@ import ApprovedBoardUnitLink from './ApprovedBoardUnitLink';
 import type {BoardCard} from './dailyBoardData';
 import {boardDateLabel} from './dailyBoardData';
 import {boardRecordDetail,boardRecordTime} from './boardRecordDetails';
-import {workspaceHash} from './workspaceNavigation';
 import './boardRecordDetails.css';
 
 type Props = {
@@ -14,7 +13,6 @@ type Props = {
 /** Read-only detail presentation inside the existing authenticated Board dialog. */
 export default function BoardRecordDetails({card,sourceUnavailable,close}: Props) {
   const detail = boardRecordDetail(card);
-  const jobHref = detail.jobId ? workspaceHash({workspace:'Jobs',jobId:detail.jobId,detail:false}) : null;
   return <div className='cos-board-record' aria-label='Saved work record'>
     <div className='cos-board-record-snapshot' role='status'>
       <strong>{sourceUnavailable?'Board refresh is unavailable or delayed.':'Opened record snapshot'}</strong>
@@ -50,6 +48,6 @@ export default function BoardRecordDetails({card,sourceUnavailable,close}: Props
       <dl><div><dt>Recorded start</dt><dd>{boardRecordTime(detail.startedAt)}</dd></div><div><dt>Recorded completion</dt><dd>{boardRecordTime(detail.completedAt)}</dd></div></dl>
     </section>}
     {detail.completedVisit&&<p className='cos-board-record-visit'>Visit completed: {boardRecordTime(detail.completedAt)}. Equipment and job notes above belong to the current job snapshot, not verified historical visit evidence.</p>}
-    {jobHref?<a className='cos-board-record-link' href={jobHref} onClick={close}>{detail.jobLinkLabel} <span aria-hidden='true'>→</span></a>:<p className='cos-board-record-link-missing'>An exact job link is not available. The original workspace remains accessible below.</p>}
+    <p className='cos-board-record-link-missing'>Jobs and Owner Tasks are not opened from this board.</p>
   </div>;
 }

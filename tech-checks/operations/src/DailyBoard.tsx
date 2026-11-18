@@ -2,7 +2,7 @@ import ApprovedBoardActions from './ApprovedBoardActions';
 import { DeliveryGoBackSummary } from './DeliveryGoBack';
 import { hasOpenGoBack } from './deliveryGoBackData';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { boardDateLabel, chicagoDay, dailyBoardCards, isTestRecord, readinessSummary, type BoardCard, type BoardScope } from './dailyBoardData';
+import { boardDateLabel, chicagoDay, dailyBoardCards, equipmentHandoffJobs, isTestRecord, readinessSummary, type BoardCard, type BoardScope } from './dailyBoardData';
 import './dailyBoard.css';
 import BoardRecordDetails from './BoardRecordDetails';
 import {captureBoardSelection} from './boardRecordDetails';
@@ -13,6 +13,7 @@ import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
+import {setTvSessionHold} from './tvSessionHold';
 
 type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
@@ -45,6 +46,10 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
   const [scope,setScope]=useState<BoardScope>(launch.scope);
   const [showTest,setShowTest]=useState(false);
   const [tv,setTv]=useState(initialTv??launch.enabled);
+  const [reconnecting,setReconnecting]=useState(false);
+  const sessionStale=useRef(false);
+  const tvRef=useRef(tv);
+  tvRef.current=tv;
   const [rotation,setRotation]=useState(0);
   useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(','),tvSettings.settings.rotationSeconds]);
   const [selected,setSelected]=useState<(BoardCard & {detailAsOf:string|null})|null>(null);
@@ -63,6 +68,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
 
   const readBoard = useMemo(() => createBoardReader(api), [api]);
   const load = useCallback(async (fresh = false): Promise<BoardSnapshot | null> => {
+    if(sessionStale.current)return null;
     const currentGeneration = generation.current;
     running.current += 1;
     if (mounted.current) setBusy(true);
@@ -70,7 +76,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
       const data = await readBoard(fresh || requireFreshRead.current);
       if (currentGeneration !== generation.current) return null;
       requireFreshRead.current = false;
-      if (mounted.current) { setSnapshot(data); setLastSuccess(new Date()); setError(''); }
+      if (mounted.current) { setSnapshot(data); setLastSuccess(new Date()); setError(''); setReconnecting(false); }
       return data;
     } catch (cause) {
       if (mounted.current && currentGeneration === generation.current) setError(cause instanceof Error ? cause.message : 'The daily board could not refresh.');
@@ -97,11 +103,23 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
     const clock=window.setInterval(()=>setNow(new Date()),10000);
     const focus=()=>void load(true);
     const visible=()=>{if(!document.hidden)focus();};
-    const invalidated=()=>{generation.current+=1;requireFreshRead.current=true;setSnapshot({jobs:[],tasks:[],readiness:[]});setLastSuccess(null);setSelected(null);setAssigning(null);setError('Return to Tech Check and sign in again.');};
-    window.addEventListener('focus',focus);window.addEventListener('online',focus);window.addEventListener('cos-board-updated',focus);window.addEventListener('cos-private-data-invalidated',invalidated);document.addEventListener('visibilitychange',visible);
-    return()=>{mounted.current=false;generation.current+=1;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('cos-board-updated',focus);window.removeEventListener('cos-private-data-invalidated',invalidated);document.removeEventListener('visibilitychange',visible);};
+    const invalidated=(event:Event)=>{
+      const detail=(event as CustomEvent<{reason?:string;path?:string}>).detail;
+      const dataDenial=detail?.reason==='authentication-denied'&&typeof detail.path==='string'&&detail.path!=='/api/session';
+      if(tvRef.current&&dataDenial){generation.current+=1;sessionStale.current=true;setReconnecting(true);return;}
+      generation.current+=1;requireFreshRead.current=true;sessionStale.current=false;setReconnecting(false);setSnapshot({jobs:[],tasks:[],readiness:[]});setLastSuccess(null);setSelected(null);setAssigning(null);setError('Return to Tech Check and sign in again.');
+    };
+    const resumed=()=>{sessionStale.current=false;};
+    window.addEventListener('focus',focus);window.addEventListener('online',focus);window.addEventListener('cos-board-updated',focus);window.addEventListener('cos-private-data-invalidated',invalidated);window.addEventListener('cos-tv-session-resumed',resumed);document.addEventListener('visibilitychange',visible);
+    return()=>{mounted.current=false;generation.current+=1;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('cos-board-updated',focus);window.removeEventListener('cos-private-data-invalidated',invalidated);window.removeEventListener('cos-tv-session-resumed',resumed);document.removeEventListener('visibilitychange',visible);};
   },[load]);
 
+  useEffect(()=>{setTvSessionHold(tv);return()=>setTvSessionHold(false);},[tv]);
+  useEffect(()=>{
+    if(tv||!sessionStale.current)return;
+    sessionStale.current=false;
+    window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}}));
+  },[tv]);
   useEffect(()=>{
     onTvChange?.(tv);
     if(!tv&&new URLSearchParams(location.search).get('tvBoard')==='1'){
@@ -121,8 +139,9 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
   },[tv,tvSettings.settings.rotationSeconds]);
 
   const today=chicagoDay(now);
-  const cards=useMemo(()=>dailyBoardCards([],snapshot.tasks,now,scope),[snapshot,today,scope]);
-  const tvCards=useMemo(()=>dailyBoardCards(snapshot.jobs,snapshot.tasks,now,scope,true).filter(c=>!isTestRecord(c.record)&&(!department||c.department===department)),[snapshot,today,scope,department]);
+  const handoffJobs=useMemo(()=>equipmentHandoffJobs(snapshot.jobs),[snapshot.jobs]);
+  const cards=useMemo(()=>dailyBoardCards(handoffJobs,[],now,scope),[handoffJobs,now,scope]);
+  const tvCards=useMemo(()=>dailyBoardCards(handoffJobs,[],now,scope,true).filter(c=>!isTestRecord(c.record)&&(!department||c.department===department)),[handoffJobs,now,scope,department]);
   const technicians=useMemo(()=>snapshot.readiness.map(r=>({name:r.name,department:String(r.department||'').toLowerCase()})).sort((a,b)=>a.name.localeCompare(b.name)),[snapshot.readiness]);
   const technicianMap=useMemo(()=>new Map(technicians.map(t=>[t.name,t])),[technicians]);
   const allPeople=useMemo(()=>Array.from(new Set(['Unassigned',...technicians.map(t=>t.name),...cards.map(c=>c.assignee)])).filter(Boolean),[cards,technicians]);
@@ -176,7 +195,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
   };
   const saveAssignment = () => { setAssigning(null); };
 
-  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
+  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
@@ -191,7 +210,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
       <label>Technician<select aria-label='Technician' value={person} onChange={e=>{setPerson(e.target.value);setRotation(0);}}><option value=''>Everyone</option>{allPeople.map(p=><option key={p}>{p}</option>)}</select></label>
       <label>Department<select aria-label='Department' value={department} onChange={e=>{setDepartment(e.target.value);setRotation(0);}}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option><option value='owner'>Owner</option></select></label>
       <label className='daily-board-test-toggle'><input type='checkbox' checked={showTest} onChange={e=>setShowTest(e.target.checked)}/>Show test records{hiddenTests>0?' ('+hiddenTests+' hidden)':''}</label>
-      <span>{visible.length} jobs / tasks · Refreshes every minute<br/>{lastSuccess?'Last successful refresh '+lastSuccess.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT':'Waiting for live records'}</span>
+      <span>{visible.length} equipment handoffs · Refreshes every minute<br/>{lastSuccess?'Last successful refresh '+lastSuccess.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT':'Waiting for live records'}</span>
     </div>
 
     <section className='daily-board-status' aria-label='Workflow status summary'>
@@ -220,7 +239,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
         <h3><span>{name}</span><b>{items.length}</b>{technician&&<small>{technician.department.toUpperCase()}</small>}</h3>
         {tv&&pages>1&&<small className='daily-board-page'>Page {page+1} of {pages} · Rotates every 15 seconds</small>}
         {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(captureBoardSelection(card,snapshot.asOf))}>
-          <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.kind==='job'?(card.record.completionKind==='visit'?'COMPLETED VISIT':'COS JOB'):'ASSIGNED TASK'}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
+          <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.record.completionKind==='visit'?'COMPLETED VISIT':String(card.record.jobType||'HANDOFF').toUpperCase()}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
           <strong>{card.title}</strong>
           {hasOpenGoBack(card.record)&&<b className='daily-board-card-note'>GO-BACK REQUIRED · Ticket open</b>}
           <span>{[card.reference,card.site].filter(Boolean).join(' · ')||'General work'}</span>
@@ -237,7 +256,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
 
     {selected&&<dialog ref={detail} className='daily-board-detail' aria-label='Work details' onCancel={()=>setSelected(null)}><section>
       <button className='secondary' onClick={()=>setSelected(null)}>Close details</button>
-      <small>{selected.kind==='job'?'COS JOB':'OWNER TASK'} · {selected.priority.toUpperCase()}</small>
+      <small>{String(selected.record.jobType||'HANDOFF').toUpperCase()} · {selected.priority.toUpperCase()}</small>
       <h3>{selected.title}</h3>
       <p>{[selected.reference,selected.site].filter(Boolean).join(' · ')}</p>
       <BoardRecordDetails card={selected} sourceUnavailable={Boolean(error||stale)} close={()=>setSelected(null)}/>

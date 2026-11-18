@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {checkedTvSections,checkedTvSettings} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index.ts';
-import {configuredTvPages} from '../src/tvBoardData.ts';
-import {dailyBoardCards,readinessSummary} from '../src/dailyBoardData.ts';
+import {configuredTvPages,tvSectionsForDisplay} from '../src/tvBoardData.ts';
+import {dailyBoardCards,equipmentHandoffJobs,readinessSummary} from '../src/dailyBoardData.ts';
 import {vehicleInspectionExempt} from '../src/vehicleInspectionPolicy.ts';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 const org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',owner='3f073784-96e7-43d8-b9e0-33ab31c3c8b1',tech='d0757b64-9623-4adc-afff-21cc7853e88a';
@@ -24,10 +24,28 @@ test('equipment handoff TV rotation keeps pickup, swap, delivery and service fro
  assert.deepEqual(ids('delivery'),['DELIVERY']);
  assert.deepEqual(ids('service'),['SERVICE']);
  return readFile(new URL('../src/DailyBoard.tsx',import.meta.url),'utf8').then(source=>{
-  assert.match(source,/dailyBoardCards\(snapshot\.jobs,snapshot\.tasks,now,scope,true\)/);
+  assert.match(source,/equipmentHandoffJobs\(snapshot\.jobs\)/);
+  assert.match(source,/dailyBoardCards\(handoffJobs,\[\],now,scope,true\)/);
+  assert.match(source,/dailyBoardCards\(handoffJobs,\[\],now,scope\)/);
   assert.equal(source.includes('/api/jobs/'),false);
-  assert.match(source,/dailyBoardCards\(\[\],snapshot\.tasks/);
+  assert.equal(source.includes('OWNER TASK'),false);
+  assert.equal(source.includes('snapshot.tasks'),false);
  });
+});
+test('only pickup, swap, delivery and service render, and saved shop or all-jobs pages stay off',()=>{
+ const now=new Date('2026-10-12T15:00:00Z');
+ const jobs=['PICKUP','SWAP','DELIVERY','SERVICE','INSTALL','SHOP'].map((jobType,index)=>({id:'type-'+index,jobType,customer:jobType+' customer',status:'scheduled',scheduled:'2026-10-12 08:00'}));
+ const tasks=[{id:'task-1',title:'Owner task',status:'assigned',assignedTo:'Owner',assignedDepartment:'owner'}];
+ const handoff=equipmentHandoffJobs(jobs);
+ assert.deepEqual(handoff.map(job=>job.jobType),['PICKUP','SWAP','DELIVERY','SERVICE']);
+ const cards=dailyBoardCards(handoff,[],now,'day',true);
+ assert.deepEqual(cards.map(card=>card.kind),['job','job','job','job']);
+ assert.deepEqual(cards.map(card=>card.record.jobType).sort(),['DELIVERY','PICKUP','SERVICE','SWAP']);
+ assert.equal(dailyBoardCards(handoff,tasks,now,'day',true).some(card=>card.kind==='task'),true);
+ assert.equal(cards.some(card=>card.kind==='task'),false);
+ const pages=configuredTvPages(cards,[],[],['today','shop','pickup','camera','map'],1440,900,'2026-10-12');
+ assert.deepEqual(pages.map(page=>page.section),['pickup','camera','map']);
+ assert.deepEqual(tvSectionsForDisplay(['today','shop','pickup','service']),['pickup','service']);
 });
 test('today jobs and all pending type queues remain distinct and hidden sections never rotate',()=>{
  const now=new Date('2026-10-12T15:00:00Z');
@@ -35,7 +53,7 @@ test('today jobs and all pending type queues remain distinct and hidden sections
  const cards=dailyBoardCards(jobs,[],now,'day',true);
  const pages=configuredTvPages(cards,[],[],['today','pickup','swap'],1440,900,'2026-10-12');
  const ids=section=>pages.filter(p=>p.section===section).flatMap(p=>p.kind==='work'?p.lanes.flatMap(l=>l.cards.map(c=>c.record.id)):[]);
- assert.deepEqual(ids('today').sort(),['done','today']);assert.deepEqual(ids('pickup'),['future']);assert.deepEqual(ids('swap'),['none']);
+ assert.deepEqual(ids('today'),[]);assert.deepEqual(ids('pickup'),['future']);assert.deepEqual(ids('swap'),['none']);
  assert.equal(pages.some(p=>p.kind==='camera'||p.kind==='map'||p.kind==='readiness'),false);
  assert.equal(configuredTvPages(cards,[],[],[],390,844,'2026-10-12')[0].kind,'empty');
 });
