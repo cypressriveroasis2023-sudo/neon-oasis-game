@@ -205,6 +205,9 @@ jobs:
         run: node node_modules/@playwright/test/cli.js install --with-deps chromium
         timeout-minutes: 15
         id: browser_install
+      - name: Verify the site picker keeps focus on a real pointer click
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' }}
+        run: npx playwright test --config tests/playwright.picker.config.mjs --workers=1 --retries=0
       - name: Verify legacy camera saved reads and guarded placement
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser_install.outcome == 'success' }}
         run: npm run test:browser -- tests/camera-health-overview.browser.spec.mjs tests/camera-shop-field-restore.browser.spec.mjs tests/camera-placement-prefill.browser.spec.mjs tests/camera-effective-placement.browser.spec.mjs

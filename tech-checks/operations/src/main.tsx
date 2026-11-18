@@ -1,10 +1,9 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import ViewErrorBoundary from './ViewErrorBoundary';
 import MhelpLocationImport from './MhelpLocationImport';
 import SimCancelChecklist from './SimCancelChecklist';
-import {TicketSitePickerPreview} from './TicketSitePicker';
 import './index.css';
 import './shell.css';
 import './companyTheme.css';
@@ -13,6 +12,13 @@ import './visionAreas.css';
 import './mhelpTicketPrivateSample.css';
 // The approved company workspace is dark, including technician assignment mode.
 document.documentElement.dataset.theme = 'dark';
+function DevTicketSitePicker() {
+  const [node, setNode] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    void import('./TicketSitePicker').then(({TicketSitePickerPreview}) => setNode(<TicketSitePickerPreview />));
+  }, []);
+  return node;
+}
 const root = document.getElementById('root');
 if (!root) throw new Error('Operations root is missing.');
 ReactDOM.createRoot(root).render(
@@ -25,7 +31,7 @@ ReactDOM.createRoot(root).render(
         <button type="button" onClick={retry}>Reopen workspace</button>
       </main>
     )}>
-      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : new URLSearchParams(location.search).get('simCancelPreview') === '1' ? <SimCancelChecklist /> : new URLSearchParams(location.search).get('ticketSitePicker') === '1' ? <TicketSitePickerPreview /> : <App />}
+      {new URLSearchParams(location.search).get('locationImport') === '1' ? <MhelpLocationImport /> : new URLSearchParams(location.search).get('simCancelPreview') === '1' ? <SimCancelChecklist /> : import.meta.env.DEV && new URLSearchParams(location.search).get('ticketSitePicker') === '1' ? <DevTicketSitePicker /> : <App />}
     </ViewErrorBoundary>
   </React.StrictMode>
 );
