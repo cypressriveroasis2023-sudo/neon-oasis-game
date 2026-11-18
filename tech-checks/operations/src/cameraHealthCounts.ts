@@ -6,7 +6,7 @@ import { cameraRecord,providerRecord,unitEvidenceLabel,cameraState,providerState
 import {validateCameraHealth,canonicalCameraUnit,isSupportEquipment,type FieldHealthUnit,type Health,fieldCameraHealth,unitHealthLabel} from './fieldCameraHealth';
 import {healthObservationTime,healthObservationLabel,type HealthObservationBasis} from './healthObservationTime';
 export {resourceKind};export type {ResourceKind};
-export type CameraUnitGroup=UnitEvidence&{key:string;name:string;site:string;rows:CameraRow[];online:number;offline:number;unknown:number;lastObservedAt:string|null;lastObservedLabel:string;linkedIdentity:boolean;unitIdentity?:VerifiedUnitIdentity;observation?:LinkedUnitObservation;identityConflict?:string;sharedState?:'online'|'offline'|'unknown'|'support';sharedLabel?:string;reviewReason?:string};
+export type CameraUnitGroup=UnitEvidence&{key:string;name:string;site:string;rows:CameraRow[];online:number;offline:number;unknown:number;lastObservedAt:string|null;lastObservedLabel:string;linkedIdentity:boolean;unitIdentity?:VerifiedUnitIdentity;observation?:LinkedUnitObservation;identityConflict?:string;sharedState?:'online'|'offline'|'unknown'|'support'|'shop';sharedLabel?:string;reviewReason?:string};
 export function cameraOverview(health:Health,now=Date.now(),fieldUnits:FieldHealthUnit[]=[]){
   const records=new Map<string,CameraRow>();let duplicates=0;
   for(const raw of health.rows){const row=health.evidenceVersion===2?raw:{...raw,scope:'unknown' as const,activationState:'',evidence:undefined,serviceEvidence:undefined};const id=String(row.id);if(records.has(id)){duplicates++;records.set(id,{...row,unit:'',name:'Conflicting resource identity '+id,status:'review',scope:'unknown',activationState:'',evidence:undefined,serviceEvidence:undefined});continue;}records.set(id,row);}
@@ -77,7 +77,7 @@ export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];obs
 }
 export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
   if(group.identityConflict)return 'EQUIPMENT LINK UNVERIFIED';
-  if(sniperShopGroup(group))return 'SHOP';
+  if(sniperShopGroup(group))return 'In Shop';
   if((group as CameraUnitGroup).sharedState&&group.scope==='shop')return 'SHOP / ROOT';if((group as CameraUnitGroup).sharedState&&group.scope==='inactive')return 'INACTIVE';
   if((group as CameraUnitGroup).sharedLabel)return (group as CameraUnitGroup).sharedLabel!;
   if(group.observation)return group.observation.label;

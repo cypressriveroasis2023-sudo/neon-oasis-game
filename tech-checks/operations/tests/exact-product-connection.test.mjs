@@ -38,13 +38,20 @@ const run=(a=accepted(),t=tracker(),devices=[endpoint(41,'8.8.8.8'),endpoint(42,
 
 test('a verified exact Product-ID endpoint with separately admitted membership is ONLINE',()=>{
  const results=run();assert.equal(results.contract,EXACT_PRODUCT_CONNECTION_CONTRACT);
- assert.deepEqual(results.items.map(x=>x.status),['online','offline','unknown']);
+ assert.deepEqual(results.items.map(x=>x.status),['online','verifying','unknown']);
  assert.equal(results.items[0].productId,'1001');assert.equal(results.items[0].resourceId,'41');
  assert.equal(results.items[0].basis,'tcp_service_port');assert.match(results.items[0].reason,/video is not verified/i);
  assert.doesNotMatch(JSON.stringify(results),/8\.8\.8\.8|9\.9\.9\.9/);
 });
-test('one complete valid no-response scan is OFFLINE regardless of outage/failure counter',()=>{
- const result=completedSavedTcpCheck(endpoint(42,'9.9.9.9',false),now);
+test('one fresh miss is Verifying and three fresh misses are Offline',()=>{
+ const once=completedSavedTcpCheck(endpoint(42,'9.9.9.9',false),now);
+ assert.equal(once.status,'verifying');
+ assert.equal(once.checkedAt,current);
+ const thrice=endpoint(42,'9.9.9.9',false);
+ thrice.portStatus._connection.consecutiveFailures=3;
+ thrice.portStatus._connection.status='offline';
+ for(const port of [80,443])thrice.portStatus[port].error='timeout';
+ const result=completedSavedTcpCheck(thrice,now);
  assert.equal(result.status,'offline');
  assert.equal(result.checkedAt,current);
 });
@@ -110,7 +117,7 @@ test('browser-facing source receipt must cover every exact Product ID and retain
  const value=run();const ids=['1001','1002','1003'];
  const map=readExactProductConnections(value,sha,ids,now);
  assert.deepEqual([...map.keys()],ids);
- assert.equal(map.get('1002').status,'offline');
+ assert.equal(map.get('1002').status,'verifying');
  assert.equal(map.get('1002').checkedAt,current);
  assert.equal(readExactProductConnections(value,'b'.repeat(64),ids,now),null);
  assert.deepEqual([...readExactProductConnections(value,sha,['1001','1002'],now).keys()],['1001','1002']);
@@ -121,17 +128,24 @@ test('browser-facing source receipt must cover every exact Product ID and retain
  assert.equal(readExactProductConnections(future,sha,ids,now),null);
 });
 
-test('a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not',()=>{
- const d=endpoint(42,'9.9.9.9',false);
- d.portStatus[80].error='timeout';
- d.portStatus[443].error='Connection refused (os error 111)';
- d.portStatus._connection.status='verifying';
- assert.equal(completedSavedTcpCheck(d,now)?.status,'offline');
- assert.equal(run(accepted(),tracker(),[endpoint(41,'8.8.8.8'),d]).items[1].status,'offline');
- const route=structuredClone(d);route.portStatus[443].error='No route to host (os error 113)';
+test('connection refused is not a miss and not Offline; a timeout miss is Verifying until the third',()=>{
+ const refused=endpoint(42,'9.9.9.9',false);
+ refused.portStatus[80].error='Connection refused (os error 111)';
+ refused.portStatus[443].error='Connection refused (os error 111)';
+ refused.portStatus._connection.consecutiveFailures=3;
+ refused.portStatus._connection.status='offline';
+ assert.equal(completedSavedTcpCheck(refused,now)?.status,'unknown');
+ assert.notEqual(run(accepted(),tracker(),[endpoint(41,'8.8.8.8'),refused]).items[1].status,'offline');
+ const mixed=endpoint(42,'9.9.9.9',false);
+ mixed.portStatus[80].error='timeout';
+ mixed.portStatus[443].error='Connection refused (os error 111)';
+ assert.equal(completedSavedTcpCheck(mixed,now)?.status,'unknown');
+ const once=endpoint(42,'9.9.9.9',false);
+ once.portStatus[80].error='timeout';
+ once.portStatus[443].error='Connection timed out (os error 110)';
+ assert.equal(completedSavedTcpCheck(once,now)?.status,'verifying');
+ const route=structuredClone(once);route.portStatus[443].error='No route to host (os error 113)';
  assert.equal(completedSavedTcpCheck(route,now),null);
- const unknown=structuredClone(d);unknown.portStatus[443].error='unknown transport exception';
- assert.equal(completedSavedTcpCheck(unknown,now),null);
 });
 
 test('live saved port schema requires measured attempt evidence, not invented Boolean port state',()=>{
@@ -141,7 +155,7 @@ test('live saved port schema requires measured attempt evidence, not invented Bo
  for(const port of [80,443]){delete negative.portStatus[port].attempted;negative.portStatus[port].latency_ms=null;}
  negative.portStatus[80].error='timeout';
  negative.portStatus[443].error='Connection refused (os error 111)';
- assert.equal(completedSavedTcpCheck(negative,now)?.status,'offline');
+ assert.equal(completedSavedTcpCheck(negative,now)?.status,'unknown');
  const forged=structuredClone(negative);
  delete forged.portStatus[443].error; // false without a socket outcome is not a probe
  assert.equal(completedSavedTcpCheck(forged,now),null);
@@ -182,10 +196,24 @@ test('cached pre-attribution V1 positives and negatives are rejected without ren
  assert.ok([...readExactProductConnections(current,sha,['1001','1002','1003'],now+20*60_000).values()].every(r=>r.status==='unknown'));
 });
 
+test('a unit placed in Shop is never an outage',()=>{
+ const a=accepted();
+ a.records[1].placement='SHOP';
+ a.summary.fieldRecords=2;a.summary.shopRecords=2;a.summary.unflaggedFieldRecords=2;a.summary.unflaggedShopRecords=2;
+ const t=tracker();t.records[1].placement='SHOP';
+ const missed=endpoint(42,'9.9.9.9',false);
+ missed.portStatus._connection.consecutiveFailures=3;
+ missed.portStatus._connection.status='offline';
+ for(const port of [80,443])missed.portStatus[port].error='timeout';
+ const result=run(a,t,[endpoint(41,'8.8.8.8'),missed]);
+ assert.equal(result.items.some(item=>item.productId==='1002'),false);
+ assert.equal(result.items.some(item=>item.status==='offline'),false);
+});
+
 test('one result expiring in transit does not erase another fresh Product ID',()=>{
  const receipt=run();receipt.items[0].checkedAt=new Date(now-20*60_000-1).toISOString();
  const map=readExactProductConnections(receipt,sha,['1001','1002','1003'],now);
  assert.equal(map.get('1001').status,'unknown');assert.equal(map.get('1001').checkedAt,null);
- assert.equal(map.get('1002').status,'offline');assert.equal(map.get('1002').checkedAt,current);
+ assert.equal(map.get('1002').status,'verifying');assert.equal(map.get('1002').checkedAt,current);
  assert.equal(receipt.items[0].status,'online');
 });

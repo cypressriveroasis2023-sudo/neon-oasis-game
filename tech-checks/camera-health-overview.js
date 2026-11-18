@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  const statusLabel=value=>({verifying:'NOT VERIFIED',mapping:'STATUS UNVERIFIED',service:'SERVICE REACHABLE',placement:'LOCATION REVIEW',shop:'SHOP / ROOT',inactive:'INACTIVE'})[value]||String(value||'unknown').toUpperCase();
+  const statusLabel=value=>({verifying:'NOT VERIFIED',mapping:'STATUS UNVERIFIED',service:'SERVICE REACHABLE',placement:'LOCATION REVIEW',shop:'In Shop',inactive:'INACTIVE'})[value]||String(value||'unknown').toUpperCase();
   const normalized=value=>typeof value==='string'?value.trim().replace(/\s+/g,' ').toUpperCase():'';
   function placement(device,tracker=[]){
     const effective=root.CameraEffectivePlacement?.get(device);
@@ -10,6 +10,9 @@
     const activation=normalized(device.activation_state),org=normalized(device.organization),unit=normalized(device.unit_key);
     if(/^STOLEN FROM RII?[-\s]*\d+ ON \d{2}\/\d{2}\/\d{4}$/.test(unit)||/^STOLEN FROM RII?[-\s]*\d+ ON \d{2}\/\d{2}\/\d{4}$/.test(org)||['RETIRED','STOLEN','NOT IN USE'].includes(org)||/^RII?[-\s]*\d+\s*-?\s*(?:NOT IN USE|RETIRED|STOLEN)$/.test(unit))return 'inactive';
     if(effective?.status==='unresolved'||effective?.status==='stale'){return activation==='DEACTIVATED'&&!['ROOT','SHOP','SHOP EQUIPMENT'].includes(org)?'inactive':'unknown';}
+    const located=normalized(device.current_location_type||device.placement);
+    if(located==='FIELD')return 'field';
+    if(located==='SHOP')return 'shop';
     if(['ROOT','SHOP','SHOP EQUIPMENT'].includes(org)||unit==='SHOP EQUIPMENT'||/^RII?[-\s]*\d+\s*-?\s*SHOP$/.test(unit))return 'shop';
     if(activation==='DEACTIVATED')return 'inactive';
     if(activation!=='ACTIVE')return 'unknown';
@@ -83,7 +86,7 @@
     const site=auditShop?'SHOP':root.CameraEffectivePlacement?.get(g.ds[0])?root.CameraEffectivePlacement.locationText(g.ds[0]):g.scope==='inactive'?'Inactive inventory':g.scope==='shop'?'SHOP / ROOT':g.scope==='unknown'?'Location unverified · saved site: '+(active[0]?.organization||'not linked'):active[0]?.organization||'Site not linked';
     const direct=g.ds.some(d=>['Sniper','CAM V'].includes(cameraGroup(d)))&&['field','unknown'].includes(g.scope)&&g.providerState==='verifying';
     const displayState=direct?g.serviceState:g.state;
-    const primary=auditShop?'SHOP':direct?'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED',verifying:'UNVERIFIED'}[g.serviceState]||'UNVERIFIED'):(g.systemKind==='recorder'?'RECORDER ':g.systemKind==='detector'?'DETECTOR ':'')+statusLabel(g.state);
+    const primary=g.scope==='shop'||auditShop?'In Shop':direct?'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED',verifying:'UNVERIFIED'}[g.serviceState]||'UNVERIFIED'):(g.systemKind==='recorder'?'RECORDER ':g.systemKind==='detector'?'DETECTOR ':'')+statusLabel(g.state);
     const frontAction=canManage&&['field','unknown'].includes(g.scope)&&g.ds.some(d=>!d.__trackerOnly)?'<button type="button" class="mini send-root-unit front-shop-action" data-unit="'+esc(g.k)+'" '+(movePending?'disabled':'')+'>Move to ROOT / SHOP</button><span class="unit-move-status" role="status">'+esc(moveMessage)+'</span>':'';
     const real=g.ds.filter(d=>!d.__trackerOnly),destinations=new Map();
     for(const d of real){
@@ -99,13 +102,22 @@
       '<span class="compact-unit-site">'+esc(site)+'</span><span class="compact-unit-meta">'+esc(sources)+' · '+esc(g.systemKind==='recorder'?'Provider recorder observation':count?count+' camera/detector resource'+(count===1?'':'s'):g.state==='service'?'Service-port observation':'Provider status not verified')+'</span>'+
       '<span class="compact-unit-summary">'+(!auditShop&&providerSummary?'<span class="system-evidence-summary">'+esc(providerSummary)+'</span>':'')+'<span class="camera-evidence-badge">'+esc(g.state==='shop'?'Shop inventory; excluded from operational outage totals':g.state==='inactive'?'Deactivated or retired; excluded from operational outage totals':cameraSummary)+'</span><span class="compact-unit-open">View unit details <span aria-hidden="true">→</span></span></span></button>'+(root.CameraEffectivePlacement?.markup(g.ds[0],{includeLocation:false})||'')+(auditShop?'':root.CameraHealthHistory.strip(real,health,cameraGroup))+quick+frontAction+(canManage&&['shop','inactive'].includes(g.scope)&&g.ds.some(d=>!d.__trackerOnly)?'<button type="button" class="mini move-field-unit" data-unit="'+esc(g.k)+'">Move to Field</button>':'')+'</article>';
   }
-  function details(g,{health,cameraGroup,effectiveHealth,reconBatteryBadge,canManage=false}){
+  function shopReaderRole(role){const value=String(role||'').toLowerCase();return value==='owner'||value==='it';}
+  function details(g,{health,cameraGroup,effectiveHealth,reconBatteryBadge,canManage=false,role}={}){
     const ds=g.ds.filter(d=>!d.__trackerOnly);
     const components=g.ds.map(d=>{
+      const shopUnit=g.scope==='shop';
+      if(shopUnit){
+        const shown=effectiveHealth(d);
+        const when=d.source_last_seen_at&&root.CameraHealthHistory?.format?root.CameraHealthHistory.format(d.source_last_seen_at):'time not recorded';
+        const shopNote=shown==='offline'&&shopReaderRole(role)?'<p class="small">Last check failed. '+esc(when)+'. The saved reading stays on the record.</p>':'';
+        return '<article class="unit-component"><div class="unit-component-heading"><h3>'+esc(d.device_name||g.k)+'</h3><span class="statuspill shop">In Shop</span></div><p class="small">'+esc(cameraGroup(d)||'Camera')+'</p>'+shopNote+'<a class="btn" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'">Open resource & ports →</a></article>';
+      }
       const recorder=normalized(d.device_type)==='NVR',state=recorder?providerState(d):effectiveHealth(d),provider=cameraGroup(d),service=serviceState(d,health);
       if(d.__trackerOnly){const observation=d.__evidence;return '<article class="unit-component"><h3>'+esc(d.device_name||g.k)+'</h3><p>'+esc(d.__reason)+' Camera health and physical location are not verified.</p><p class="small">Service evidence: '+esc(service==='online'?'Reachable':service==='offline'?'Check failed':'Unverified')+(observation?.checked_at?' · '+esc(root.CameraHealthHistory.format(observation.checked_at)):'')+'</p></article>'}
       const diagnostic=recorder?'<p>Camera channel status unavailable. Last reported recorder status: <b>'+esc(String(d.source_status||'unknown').toUpperCase())+'</b> · '+esc(root.CameraHealthHistory.format(d.source_last_seen_at))+(root.CameraHealthHistory.timestamp(d.source_last_seen_at).state==='fresh'?' · Current provider observation':' · Stale or invalid observation; current recorder status unverified')+'</p>':!providerRecord(d)?'<p>Service-port evidence: '+esc(service==='online'?'Reachable':service==='offline'?'Check failed':'Unverified')+'. Provider and camera status are unverified.</p>':'';
-      return '<article class="unit-component"><div class="unit-component-heading"><h3>'+esc(d.device_name||'Camera')+'</h3><span class="statuspill '+esc(state)+'">'+esc((recorder?'RECORDER ':'')+statusLabel(state))+'</span></div><p class="small">'+esc(provider)+(provider==='Reconeyez'?' · DETECTOR · '+esc(reconBatteryBadge(d)):' · '+esc(d.device_type||'Camera resource'))+'</p>'+(provider==='Reconeyez'?'<p class="small">'+esc(root.ReconBattery.text(d.source_metadata))+'</p>':'')+diagnostic+root.CameraHealthHistory.strip([d],health,cameraGroup)+'<a class="btn" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'">'+(provider==='Reconeyez'?'Open Recon details & history':'Open resource & ports')+' →</a></article>';
+      const pill=(recorder?'RECORDER ':'')+statusLabel(state);
+      return '<article class="unit-component"><div class="unit-component-heading"><h3>'+esc(d.device_name||'Camera')+'</h3><span class="statuspill '+esc(state)+'">'+esc(pill)+'</span></div><p class="small">'+esc(provider)+(provider==='Reconeyez'?' · DETECTOR · '+esc(reconBatteryBadge(d)):' · '+esc(d.device_type||'Camera resource'))+'</p>'+(provider==='Reconeyez'?'<p class="small">'+esc(root.ReconBattery.text(d.source_metadata))+'</p>':'')+diagnostic+root.CameraHealthHistory.strip([d],health,cameraGroup)+'<a class="btn" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'">'+(provider==='Reconeyez'?'Open Recon details & history':'Open resource & ports')+' →</a></article>';
     }).join('');
     return (root.CameraEffectivePlacement?.markup(g.ds[0])||'')+'<section class="unit-components" aria-label="Camera and detector components">'+components+'</section>'+(ds.length&&canManage?'<details class="unit-manage"><summary>Unit management</summary><button type="button" class="mini '+(['shop','inactive'].includes(g.scope)?'move-field-unit':'send-root-unit')+'" data-unit="'+esc(g.k)+'">'+(['shop','inactive'].includes(g.scope)?'Move to Field':'Move to ROOT / SHOP')+'</button>'+(!['shop','inactive'].includes(g.scope)?'<button type="button" class="mini move-field-unit" data-unit="'+esc(g.k)+'">Edit field address</button>':'')+'</details>':'');
   }

@@ -15,7 +15,7 @@ test('plain status circles use safe unit identifiers and distinct health colors'
   assert.match(mapReticleMarkup('Helios 014','unknown'),/cos-map-status-dot/);assert.match(mapReticleMarkup('Helios 014','unknown'),/>014<\/b>/);
   assert.match(mapReticleMarkup('Solar Stand 044','support'),/data-health="support"/);assert.match(mapReticleMarkup('Solar Stand 044','support'),/--pin:#15a8ff/);
   assert.match(mapReticleMarkup('Helios 014','online','estimate'),/>EST<\/em>/);assert.match(mapReticleMarkup('Helios 014','online','historical'),/>OLD<\/em>/);
-  assert.deepEqual(fieldReticleColors,{online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff'});
+  assert.deepEqual(fieldReticleColors,{online:'#2bff35',offline:'#ff2734',unknown:'#94a3b8',support:'#15a8ff',shop:'#64748b'});
 });
 test('mixed camera observations and support counts never become a false all-online group',()=>{
   assert.equal(clusterReticleState({online:2,offline:0,unknown:0,support:1}),'online');

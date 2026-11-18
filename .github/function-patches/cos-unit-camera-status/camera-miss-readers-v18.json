@@ -1,0 +1,62 @@
+{
+ "description": "3-miss classifier stacked on draft PR #433 head 167b4ba0. The camera-status entry before this patch is 60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4. Live version must be 18; any other version is refused. Do not deploy until #425 and #433 are live.",
+ "authorization": "Preparation only. Do not deploy from this pull request. James Martin approved the 3-miss rule at 3:12 PM CT on Nov 17, 2026.",
+ "releaseStatus": "PREPARATION_ONLY",
+ "slug": "cos-unit-camera-status",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-unit-camera-status-after-433",
+ "entrypointPath": "cos-unit-camera-status/index.ts",
+ "importMapPath": "cos-unit-camera-status/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE",
+  "version": 18
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-unit-camera-status/index.ts",
+  "deno.json": "cos-unit-camera-status/deno.json",
+  "routerBoardJoin.mjs": "cos-unit-camera-status/routerBoardJoin.mjs"
+ },
+ "edits": [
+  {
+   "file": "index.ts",
+   "occurrences": 1,
+   "needle": "  if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) return {\n    status: \"offline\",\n    basis: \"tcp_service_port\",\n    checkedAt,\n    resourceId: deviceId2(device.deviceId),\n    reason: \"Completed saved TCP/service-port check had no response on all configured ports. Camera video is not verified.\"\n  };",
+   "replacement": "  if (!responded && [\"offline\", \"verifying\"].includes(proof.status) && proof.reachable === false) {\n    if (states2.some((v) => v && v.online !== true && v.error === \"Connection refused (os error 111)\")) return {\n      status: \"unknown\", basis: \"tcp_service_port\", checkedAt: null, resourceId: null,\n      reason: \"The host answered with connection refused. That is not a missed probe and not an outage.\"\n    };\n    const misses = Number.isInteger(proof.consecutiveFailures) && proof.consecutiveFailures >= 3;\n    return {\n      status: misses ? \"offline\" : \"verifying\",\n      basis: \"tcp_service_port\",\n      checkedAt,\n      resourceId: deviceId2(device.deviceId),\n      reason: misses ? \"Three fresh probe misses in a row. The host did not answer. Camera video is not verified.\" : \"One or two fresh probe misses. Status is Verifying, not an outage. Camera video is not verified.\"\n    };\n  }"
+  },
+  {
+   "file": "index.ts",
+   "occurrences": 1,
+   "needle": "![\"online\", \"offline\", \"unknown\"].includes(raw.status)",
+   "replacement": "![\"online\", \"offline\", \"verifying\", \"unknown\"].includes(raw.status)"
+  },
+  {
+   "file": "index.ts",
+   "occurrences": 1,
+   "needle": "offline: \"Offline\", unverified: \"Health unverified\"",
+   "replacement": "offline: \"Offline\", verifying: \"Verifying\", unverified: \"Health unverified\""
+  },
+  {
+   "file": "routerBoardJoin.mjs",
+   "occurrences": 1,
+   "needle": "    const reading = boardRouterStatus(raw, now, '');",
+   "replacement": "    const reading = boardRouterStatus(raw, now, text(item.candidateUnit && item.candidateUnit.placement));"
+  },
+  {
+   "file": "index.ts",
+   "occurrences": 1,
+   "needle": "exactAllowed && exact8) {\n      if (reviewedProvider && row2.cameraState !== exact8.status) {",
+   "replacement": "exactAllowed && exact8) {\n      if (exact8.status === \"verifying\") {\n        state2 = \"verifying\";\n        reason = exact8.reason;\n      } else if (reviewedProvider && row2.cameraState !== exact8.status) {"
+  }
+ ],
+ "expectedBefore": {
+  "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
+ },
+ "expectedAfter": {
+  "index.ts": "afeb07d4d7e55b327dcef8b4236a06d3a8b1b233b1da1c3aee31bb76a3ead467",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "d705a95523538c7bb90aadb86c5d1011c0ca5aa94e01846a1aeeed4f0a6843ad"
+ }
+}

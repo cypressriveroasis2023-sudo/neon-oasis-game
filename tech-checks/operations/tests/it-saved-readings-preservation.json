@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "dc18ebf3a71b80fee56c7e66b4c111faff734beb",
-      "candidateBlob": "ea667bb9b83cb65b2ad1eeb0a052f6e94211152e",
+      "candidateBlob": "c8c62139381739eb819ffbe052c9e23db2f0e1cb",
       "replacements": [
         {
           "from": "",
@@ -35,6 +35,11 @@
         {
           "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
           "to": "createTicket={can(session,'equipment.ticket')?createTicket:undefined} initialUnitId={route.unitId}",
+          "count": 1
+        },
+        {
+          "from": ":active==='InHand Routers'?<RouterWorkspace openMap=",
+          "to": ":active==='InHand Routers'?<RouterWorkspace role={session?.role} openMap=",
           "count": 1
         }
       ]

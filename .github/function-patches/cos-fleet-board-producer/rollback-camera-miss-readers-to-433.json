@@ -1,0 +1,30 @@
+{
+ "description": "Step the producer 3-miss patch back to the #433 router entry. The handler import stays on the pre-patch pinned serve.ts. This keeps the #425 produce gate and the #433 router wrap.",
+ "authorization": "Rollback material. Run only with an explicit instruction for that run.",
+ "releaseStatus": "ROLLBACK_ONLY",
+ "slug": "cos-fleet-board-producer",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-fleet-board-producer-after-433",
+ "entrypointPath": "cos-fleet-board-producer/index.ts",
+ "importMapPath": "cos-fleet-board-producer/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE"
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-fleet-board-producer/index.ts",
+  "deno.json": "cos-fleet-board-producer/deno.json",
+  "routerBoardJoin.mjs": "cos-fleet-board-producer/routerBoardJoin.mjs"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
+ },
+ "expectedAfter": {
+  "index.ts": "7d57a8e33fc3b4c4b0099920758770687840e3d719b22ba2971a2dbe1cc11e2e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+  "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
+ }
+}

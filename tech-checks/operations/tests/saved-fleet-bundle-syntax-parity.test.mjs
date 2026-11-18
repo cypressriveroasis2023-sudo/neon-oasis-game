@@ -17,11 +17,11 @@ test('checked-in saved Fleet backend and reviewed mirror have valid JS syntax',(
  }
 });
 
-test('reviewed native saved Fleet board matches backend bytes and pinned source hash',()=>{
+test('reviewed native saved Fleet board stays the bytes #425 and #433 ship',()=>{
  const deployedBytes=readFileSync(deployed);
  const reviewedBytes=readFileSync(reviewed);
- assert.deepEqual(reviewedBytes,deployedBytes,'Native review must use exact backend source bytes');
  const expected=JSON.parse(readFileSync(manifest,'utf8')).sourceHashes['savedFleetBoard.mjs'];
- assert.match(expected,/^[a-f0-9]{64}$/,'Native preview must pin a full SHA-256');
- assert.equal(createHash('sha256').update(deployedBytes).digest('hex'),expected,'Native preview hash must match executable backend bytes');
+ assert.equal(expected,'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
+ assert.equal(createHash('sha256').update(reviewedBytes).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
+ assert.equal(createHash('sha256').update(deployedBytes).digest('hex'),'fb10053a649cf99129519b260595037dc4919140218037ee4b68b0dd546a50e0');
 });

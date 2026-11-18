@@ -20,13 +20,29 @@ test('stale, absent, malformed and future probe timestamps cannot manufacture on
 test('freshness ages without another API response',()=>{
  const value=row();assert.equal(routerStatus(value,+now),'reachable');assert.equal(routerStatus(value,+now+21*60*1000),'stale');
 });
+test('a Shop placement adds 0 to every router count and a ROOT device on a field unit does not',()=>{
+ const shop={id:'11111111-1111-4111-8111-111111111112',unit_number:'SNIPER 80',placement:'shop',current_location_type:'shop'};
+ const field={id:'11111111-1111-4111-8111-111111111113',unit_number:'SNIPER 81',placement:'field',current_location_type:'field'};
+ const offline={...router,current_status:'offline',inhand_serial:'SERIAL-80'};
+ const device={id:9,unit_key:'SNIPER 81',device_serial:'SERIAL-81',organization:'ROOT',scope:'shop'};
+ const snap=routerSnapshot([{...offline,id:1,unit_key:'SNIPER 80'},{...offline,id:2,unit_key:'SNIPER 81',inhand_serial:'SERIAL-81'}],[shop,field],now,[device]);
+ const shopRow=snap.items.find(item=>item.unitKey==='SNIPER 80');
+ const fieldRow=snap.items.find(item=>item.unitKey==='SNIPER 81');
+ assert.equal(shopRow.boardStatus,'In Shop');
+ assert.equal(shopRow.boardOutage,false);
+ assert.equal(fieldRow.boardStatus,'Offline');
+ assert.deepEqual(summarizeRouters([shopRow],+now),{reachable:0,unreachable:0,stale:0,unknown:0});
+ assert.deepEqual(summarizeRouters(snap.items,+now),{reachable:0,unreachable:1,stale:0,unknown:0});
+});
 test('summary keeps stale, unknown, reachability distinct',()=>{
  assert.deepEqual(summarizeRouters([row(),row({current_status:'offline'}),row({last_checked_at:null}),row({last_checked_at:'2026-09-22T00:00:00Z'})],+now),{reachable:1,unreachable:1,stale:1,unknown:1});
 });
-test('exact names tolerate only case and whitespace and remain suggestions',()=>{
+test('canonical keys join spacing and number forms; different numbers stay unmatched',()=>{
  assert.equal(exactUnitName(' HELIOS   001 '),'helios 001');
  const value=routerSnapshot([{...router,unit_key:' helios  001 '}],[unit],now).items[0];assert.equal(value.match,'exact_name');assert.deepEqual(value.candidateUnit,{id:unit.id,unitNumber:unit.unit_number});
- for(const name of ['Helios 1','Helios-001','H001'])assert.equal(row({unit_key:name}).match,'unmatched');
+ assert.equal(routerSnapshot([{...router,unit_key:'Helios 1'}],[unit],now).items[0].match,'exact_name');
+ const shop=routerSnapshot([router],[{...unit,current_location_type:'shop'}],now).items[0];assert.equal(shop.candidateUnit.placement,'shop');
+ for(const name of ['HELIOS 002','SNIPER 001','Ranger 9'])assert.equal(row({unit_key:name}).match,'unmatched');
 });
 test('duplicate router names and duplicate COS names never auto-link',()=>{
  const duplicates=routerSnapshot([router,{...router,id:2}],[unit],now);assert.ok(duplicates.items.every(row=>row.match==='ambiguous'&&row.candidateUnit===null));

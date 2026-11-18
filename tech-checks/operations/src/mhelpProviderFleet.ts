@@ -59,7 +59,7 @@ export function mhelpProviderFleet(
  for(const product of products){
   const provider=mhelpProviderFamily(product.category,product.unitNumber);
   const linked=healthById.get(product.productId)||null;
-  const healthStatus:ProviderHealthStatus=provider==='support'?'not_applicable':
+  const healthStatus:ProviderHealthStatus=provider==='support'||linked?.state==='shop'?'not_applicable':
    usable&&(linked?.state==='online'||linked?.state==='offline')?linked.state:'unverified';
   const reason=provider==='support'?'Support equipment has no camera-health requirement. Verify its power separately.':
     !usable?'Latest Field camera health is unavailable. No offline condition is inferred.':

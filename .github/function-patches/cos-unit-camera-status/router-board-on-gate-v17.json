@@ -1,0 +1,67 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-gated-v16",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json",
+    "routerBoardJoin.mjs": "cos-unit-camera-status/routerBoardJoin.mjs"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "Add router status to the saved-board builder and the unit camera status read, on top of the #425 route gate. Only /api/unit-camera-status and /api/unit-camera-status/edit reach the handler. Deploy PR #425 first. Do not deploy from this task.",
+  "authorization": "Preparation only. The #425 gate stays. Precheck is the gated entry sha256 64cb04d8. Live version must already be 17, the deploy after that gate.",
+  "releaseStatus": "PREPARATION_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-gated-v16/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 17
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "var FLEET_LEASE_MS = 18e4;\n",
+      "replacement": "import { routerJoinKey, presentRouterPage, loadRouterInventory, loadRouterBoardSources, attachCameraUnits, projectBoard } from \"./routerBoardJoin.mjs\";\nvar FLEET_LEASE_MS = 18e4;\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "exactUnitName(",
+      "replacement": "routerJoinKey(",
+      "occurrences": 3
+    },
+    {
+      "file": "index.ts",
+      "needle": "if (path === \"/api/routers\") {\n          const [routers, units] = await Promise.all([\n            legacyAll(\"camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc\", context.headers),\n            platformAll(\"equipment_units?select=id,unit_number&organization_id=eq.\" + ORGANIZATION_ID + \"&order=id.asc\")\n          ]);\n          return json(routerSnapshot(routers, units));\n        }",
+      "replacement": "if (path === \"/api/routers\") {\n          const [inventory, units] = await Promise.all([\n            loadRouterInventory(fetch, context.headers),\n            platformAll(\"equipment_units?select=id,unit_number&organization_id=eq.\" + ORGANIZATION_ID + \"&order=id.asc\")\n          ]);\n          const devices = inventory.devices || [];\n          const extra = devices.filter((device) => !units.some((unit) => routerJoinKey(unit.unit_number) === routerJoinKey(device.unit_key))).map((device) => ({ id: \"camera-device:\" + String(device.id), unit_number: String(device.unit_key || \"\") })).filter((unit) => unit.unit_number.trim());\n          return json(presentRouterPage(routerSnapshot(inventory.routers, units.concat(extra)), inventory.routers, devices, context.legacyOwner ? \"owner\" : \"it\"));\n        }",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "const value2 = await step(\"project\", async () => project(values.health, values.map, values.connections, null, capturedAt));",
+      "replacement": "const value2 = await step(\"project\", async () => projectBoard(project, [values.health, values.map, values.connections, null, capturedAt], context.headers, fetch));",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "...applyHandEdits({ ...star, units, counts: countUnits(units) }, handEdits),",
+      "replacement": "...applyHandEdits({ ...star, units: attachCameraUnits(units, await loadRouterBoardSources(fetch, context.headers).catch(() => ({ routers: [], devices: [] })), Date.now()), counts: countUnits(units) }, handEdits),",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "7ed24bbae2e2d4d62a49a2b647393126afe07290926261e79e24f71493b852fc",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
+  },
+  "expectedAfter": {
+    "index.ts": "60e2634386c2963c1aa5aeb67c2335e10fa3e5f974ab5505eed0c80bcb007ae4",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be",
+    "routerBoardJoin.mjs": "a4d7cbd58f42c20859f6594b369b0539f6611c847043d16769862dc80aa24638"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-board-on-gate-v17.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-board-on-gate-v17.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-router-board-to-gate.json --deploy"
+}

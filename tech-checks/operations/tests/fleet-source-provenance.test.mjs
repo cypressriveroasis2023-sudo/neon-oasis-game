@@ -42,7 +42,7 @@ test('actual API pull provenance is accepted without inventing a CSV filename',a
  const f=apiFixture(),proof=await verify(f);
  assert.equal(proof.sourceExport,apiLabel);assert.equal(proof.records.length,4);
  const result=buildExactProductConnections(f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
- assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','offline']]);
+ assert.deepEqual(result.items.map(p=>[p.productId,p.status]),[['11','online'],['12','unknown'],['13','verifying']]);
  assert.deepEqual(proof.records[1].reviewReasons,['placement_mismatch','customer_mismatch']);
 });
 test('legacy CSV labels continue to be accepted',async()=>{
@@ -61,7 +61,7 @@ test('API label does not weaken exact Product ID and row/column guards',async()=
 test('shared-IP ownership remains held for API provenance',async()=>{
  const f=apiFixture();f.values[6].values[2]=['8.8.8.8'];
  const result=buildExactProductConnections(f.accepted,await verify(f),devices,now,new Map([['11',['101']],['13',['103']]]));
- assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'offline');
+ assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'verifying');
 });
 test('API label never bypasses stale timestamps or source-hash mismatch',async()=>{
  const f=apiFixture(),proof=await verify(f),members=new Map([['11',['101']],['13',['103']]]);

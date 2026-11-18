@@ -3,7 +3,7 @@ import {cameraUnitDisplayState,cameraUnitStatusLabel} from '../src/cameraHealthC
 import {sniperShopDisplay} from '../src/sniperShopDisplay.ts';
 test('Shop wins only targeted card presentation while saved observations and identity warnings remain intact',()=>{
  const group={scope:'shop',state:'shop',providerState:'online',serviceState:'offline',cameraState:'online',rows:[{unit:'Sniper 80'}],observation:{state:'online',label:'ONLINE'}};const before=structuredClone(group);
- assert.equal(cameraUnitDisplayState(group),'shop');assert.equal(cameraUnitStatusLabel(group),'SHOP');assert.deepEqual(group,before);assert.equal(cameraUnitStatusLabel({...group,identityConflict:'unverified'}),'EQUIPMENT LINK UNVERIFIED');assert.equal(cameraUnitStatusLabel({...group,rows:[{unit:'Helios 80'}]}),'ONLINE');assert.equal(cameraUnitStatusLabel({...group,scope:'field'}),'ONLINE');assert(sniperShopDisplay('shop','Thermal Sniper 80'));assert(!sniperShopDisplay('field','Sniper 80'));assert(!sniperShopDisplay('shop','Recon II 80'));
+ assert.equal(cameraUnitDisplayState(group),'shop');assert.equal(cameraUnitStatusLabel(group),'In Shop');assert.deepEqual(group,before);assert.equal(cameraUnitStatusLabel({...group,identityConflict:'unverified'}),'EQUIPMENT LINK UNVERIFIED');assert.equal(cameraUnitStatusLabel({...group,rows:[{unit:'Helios 80'}]}),'ONLINE');assert.equal(cameraUnitStatusLabel({...group,scope:'field'}),'ONLINE');assert(sniperShopDisplay('shop','Thermal Sniper 80'));assert(!sniperShopDisplay('field','Sniper 80'));assert(!sniperShopDisplay('shop','Recon II 80'));
 });
 test('legacy Shop card hides online/offline summaries without changing source records',()=>{
  const context=vm.createContext({Intl,Date});for(const file of ['camera-health-history.js','camera-health-overview.js'])vm.runInContext(readFileSync(new URL('../../'+file,import.meta.url),'utf8'),context);
@@ -27,7 +27,7 @@ test('Shop inventory presentation preserves resolved, stale and unresolved physi
  const check=(status,evidence)=>{
   assert.equal(view.get(d).status,status);
   const html=context.CameraHealthOverview.card(g,{esc:String,effectiveHealth:()=> 'online',cameraGroup:()=> 'Sniper',health:{}});
-  assert.match(html,/class="compact-unit-site">SHOP<\/span>/);assert.match(html,/class="statuspill[^\"]*">SHOP<\/span>/);
+  assert.match(html,/class="compact-unit-site">SHOP<\/span>/);assert.match(html,/class="statuspill[^\"]*">In Shop<\/span>/);
   assert.match(html,evidence);assert.match(html,/Provider organization: ROOT · Activation: deactivated/);
   assert.doesNotMatch(html,/online|offline|Active shop inventory/i);assert.equal(JSON.stringify(g),before);
  };

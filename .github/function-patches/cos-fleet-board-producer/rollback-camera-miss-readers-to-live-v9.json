@@ -1,0 +1,27 @@
+{
+ "description": "Redeploy the exact live cos-fleet-board-producer v9 entry. This removes #425, #433, and the 3-miss reader patch.",
+ "authorization": "Rollback material. Exact live entry bytes from before #425. Running this also removes the #425 gate, the #433 router edits, and the 3-miss patch.",
+ "releaseStatus": "ROLLBACK_ONLY",
+ "slug": "cos-fleet-board-producer",
+ "projectRef": "tughscoxralhofrckvxy",
+ "sourceDir": "tech-checks/docs/cos-fleet-board-producer-v9-entry",
+ "entrypointPath": "cos-fleet-board-producer/index.ts",
+ "importMapPath": "cos-fleet-board-producer/deno.json",
+ "verifyJwt": false,
+ "requireLiveBeforeDeploy": {
+  "status": "ACTIVE"
+ },
+ "deployedFileNames": {
+  "index.ts": "cos-fleet-board-producer/index.ts",
+  "deno.json": "cos-fleet-board-producer/deno.json"
+ },
+ "edits": [],
+ "expectedBefore": {
+  "index.ts": "12e1c91640809fcb9f2cd74d26d24970d875d12b55482885b3eab40d0b6a330e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ },
+ "expectedAfter": {
+  "index.ts": "12e1c91640809fcb9f2cd74d26d24970d875d12b55482885b3eab40d0b6a330e",
+  "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+ }
+}
