@@ -30,7 +30,8 @@ async function mount(page,{goBack=false}={}) {
  });
  await page.goto('/approved-board-action-fixture');const app=page.frameLocator('iframe');
  await expect(app.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
- await expect(app.getByRole('region',{name:'COS Daily Board'}).locator('.daily-board-card')).toHaveCount(1);
+ await expect(app.getByRole('region',{name:'COS Daily Board'}).getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(app.locator('.daily-board-card')).toHaveCount(0);
  return {app,state,at};
 }
 async function open(app,title='Example Builder') {
@@ -42,7 +43,8 @@ const safe=state=>{expect(state.errors).toEqual([]);expect(state.writes).toEqual
 
 test('Daily Board shows the service handoff and does not open a job record',async({page})=>{
  const {app,state}=await mount(page);
- await expect(app.getByText('Example Builder',{exact:true})).toBeVisible();
+ await expect(app.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(app.getByText('Example Builder',{exact:true})).toHaveCount(0);
  await expect(app.getByText('Recorded inspection follow-up',{exact:true})).toHaveCount(0);
  await expect(app.getByRole('link',{name:'Open job record'})).toHaveCount(0);
  await expect(app.getByText('OWNER TASK')).toHaveCount(0);

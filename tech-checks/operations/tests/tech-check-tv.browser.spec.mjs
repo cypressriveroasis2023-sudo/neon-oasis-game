@@ -83,7 +83,8 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
   await page.goto('/tv-harness?tvBoard=1');
   const frame=page.frameLocator('#cosOperationsFrame');
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
-  await expect(frame.getByText(many?'Pickup 0':'Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+  await expect(frame.getByText(many?'Pickup 0':'Inspect the return rack',{exact:true})).toHaveCount(0);
   await expect(frame.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
   if(!many)await expect(frame.getByText('Do not show install',{exact:true})).toHaveCount(0);
   return {state,frame};
@@ -92,12 +93,13 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
 test('TV link fills the host and sees a saved update without a remote desktop connection', async ({page}, testInfo) => {
   const {state,frame}=await setup(page);
   await expect(page.locator('#hostToolbar')).toBeHidden();
-  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Jobs/tasks updated');
-  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Work board refresh 60s · Saved camera reads 10 min · Page rotation');
+  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Fleet counts checked');
+  await expect(frame.locator('.tech-check-tv-footer')).toContainText('Board refresh 60s · Saved camera reads 10 min · Page rotation');
   await expect(frame.getByRole('button',{name:'Save Schedule & Assignment'})).toHaveCount(0);
   state.jobs[0].instructions='The return rack is ready';
   await page.clock.fastForward(60000);
-  await expect(frame.getByText('The return rack is ready',{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+  await expect(frame.getByText('The return rack is ready',{exact:true})).toHaveCount(0);
   expect(state.reads).toBeGreaterThanOrEqual(2);
   // A routine shell clock render must not run a false TV exit cleanup.
   expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
@@ -105,7 +107,8 @@ test('TV link fills the host and sees a saved update without a remote desktop co
   expect(await page.evaluate(()=>window.tvLifecycleEvents.filter(event=>event.type==='display'&&!event.active))).toEqual([]);
   await page.reload();
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
-  await expect(frame.getByText('The return rack is ready',{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+  await expect(frame.getByText('The return rack is ready',{exact:true})).toHaveCount(0);
   expect(state.writes).toEqual([]);
   await page.screenshot({path:testInfo.outputPath('tech-check-tv.png')});
   await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
@@ -129,13 +132,14 @@ test('network failure marks delayed data and authentication failure clears priva
   state.fail=503;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expect(frame.getByRole('alert')).toContainText('UPDATES DELAYED');
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+  await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
   state.fail=401;
   await frame.getByRole('button',{name:'Refresh',exact:true}).click();
   await expect(frame.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();
   await expect(frame.getByRole('button',{name:'Refresh',exact:true})).toBeVisible();
-  await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+  await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
   await expect(page.locator('#hostToolbar')).toBeHidden();
   expect(new URL(page.url()).searchParams.get('tvBoard')).toBe('1');
   expect(state.writes).toEqual([]);
@@ -158,7 +162,8 @@ test('leaving the Daily Board turns TV off and a fleet denial requires reload wi
 
 test('a denied data read that returns a different actor keeps the TV without cards or pins',async({page})=>{
  const {state,frame}=await setup(page);
- await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
  state.settings={sections:['pickup','map'],revision:1,updatedAt:time};
  await page.clock.fastForward(60000);
  await page.clock.fastForward(15000);
@@ -179,14 +184,16 @@ test('a denied data read that returns a different actor keeps the TV without car
 
 test('Daily Board and TV render only pickup, swap, delivery and service',async({page})=>{
  const {frame}=await setup(page);
- await expect(frame.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
  await expect(frame.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
  await expect(frame.getByText('Do not show install',{exact:true})).toHaveCount(0);
  await expect(frame.getByText('OWNER TASK',{exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
  const board=frame.getByRole('region',{name:'COS Daily Board'});
  await expect(board).toBeVisible();
- await expect(board.getByText('Inspect the return rack',{exact:true})).toBeVisible();
+ await expect(board.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(board.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
  await expect(board.getByText('Owner task stays off the board',{exact:true})).toHaveCount(0);
  await expect(board.getByText('Do not show install',{exact:true})).toHaveCount(0);
  await expect(board.getByText('OWNER TASK',{exact:true})).toHaveCount(0);
@@ -201,7 +208,8 @@ test('remote choices rotate all pending types, including future and unscheduled 
  for(const [index,key] of ['pickup','swap','delivery','service'].entries()){
   if(index)await page.clock.fastForward(15000);
   await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section',key);
-  await expect(frame.getByText('Pending '+key.toUpperCase(),{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+  await expect(frame.getByText('Pending '+key.toUpperCase(),{exact:true})).toHaveCount(0);
  }
  expect(state.writes).toEqual([]);
 });

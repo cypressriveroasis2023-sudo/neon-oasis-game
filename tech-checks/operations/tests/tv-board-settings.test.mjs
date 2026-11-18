@@ -24,9 +24,9 @@ test('equipment handoff TV rotation keeps pickup, swap, delivery and service fro
  assert.deepEqual(ids('delivery'),['DELIVERY']);
  assert.deepEqual(ids('service'),['SERVICE']);
  return readFile(new URL('../src/DailyBoard.tsx',import.meta.url),'utf8').then(source=>{
+  assert.match(source,/countsOnly/);
   assert.match(source,/equipmentHandoffJobs\(snapshot\.jobs\)/);
-  assert.match(source,/dailyBoardCards\(handoffJobs,\[\],now,scope,true\)/);
-  assert.match(source,/dailyBoardCards\(handoffJobs,\[\],now,scope\)/);
+  assert.equal(source.includes('daily-board-card'),false);
   assert.equal(source.includes('/api/jobs/'),false);
   assert.equal(source.includes('OWNER TASK'),false);
   assert.equal(source.includes('snapshot.tasks'),false);
