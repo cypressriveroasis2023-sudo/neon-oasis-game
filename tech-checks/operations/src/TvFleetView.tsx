@@ -13,6 +13,7 @@ import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
 import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS,TV_SAVED_BOARD_STALE_MS} from './refreshCadence';
+import {isTvTransportFailure,tvAuthDecision,tvSavedReadRetry,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT} from './tvResilience';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -27,7 +28,6 @@ type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
 type Api={get:(path:string)=>Promise<{data:any}>};
 const INITIAL_READ_RETRY_MS=30000;
-const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546].includes(status);
 // A saved Fleet board is judged at its own completion time, exactly as the
 // Fleet dashboard does. Using the moment this browser fetched it would expire
 // every reading in an older board and print zeros instead of its real totals.
@@ -42,7 +42,10 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const lastErrors=useRef<{camera:string[];routers:string[]}>({camera:[],routers:[]});
   const retryAt=useRef(0),retryTimer=useRef<number|null>(null),retryUsed=useRef(false),sessionBlocked=useRef(false),retryRead=useRef(()=>{});
   const cancelRetry=()=>{if(retryTimer.current!==null)window.clearTimeout(retryTimer.current);retryTimer.current=null;};
-  const proofUpdatePending=useRef(false);
+  const proofUpdatePending=useRef(false),reloginUsed=useRef(false),signInRetry=useRef(false),networkAttempt=useRef(0),networkTimer=useRef<number|null>(null),reloginTimer=useRef<number|null>(null);
+  const clearNetworkTimer=()=>{if(networkTimer.current!==null)window.clearTimeout(networkTimer.current);networkTimer.current=null;};
+  const clearReloginTimer=()=>{if(reloginTimer.current!==null)window.clearTimeout(reloginTimer.current);reloginTimer.current=null;};
+  const savedReread=()=>{void refresh(false,false,{reread:true});};
   // `include` selects which saved reads this pass performs. Each side advances
   // only its own attempt clock, so a camera-only pass cannot postpone the router
   // deadline and a router-only pass cannot postpone the camera deadline.
@@ -56,9 +59,9 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       const current=()=>alive.current&&request===generation.current;
       // Stage each response until this read settles. A new placement response
       // must never be displayed with the preceding read's health claims.
-      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,transientFieldFailure=false,recoveryBlocked=false;
+      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,retryStatus:number|null=null,transportKind:'rejected'|'timeout'|undefined,recoveryBlocked=false;
       const errors=await loadTvFleetFeeds(api,{
-        readFailure:(source,status)=>{if(source==='fieldMap')transientFieldFailure=transientReadStatus(status);if(!transientReadStatus(status))recoveryBlocked=true;},
+        readFailure:(source,status,transport)=>{if(isTvTransportFailure(transport))transportKind=transport;const gateway=typeof status==='number'&&[502,503,504].includes(status)&&!isTvTransportFailure(transport);if(gateway)retryStatus=status;else if(source==='fieldMap'&&retryStatus===null)retryStatus=typeof status==='number'?status:null;if(!isTvTransportFailure(transport)&&status!==546&&!gateway)recoveryBlocked=true;},
         healthUnavailable:()=>{nextHealth=null;},
         routersUnavailable:()=>{nextRouters=null;},
         field:async field=>{
@@ -76,17 +79,27 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         setError(sourceErrorText(lastErrors.current));
         // One cold-load recovery only, after the complete initial read settles.
         // This reads saved records and never schedules a provider probe.
-        if(initialAttempt&&!nextField&&transientFieldFailure&&!recoveryBlocked&&!retryUsed.current&&!sessionBlocked.current){
-          retryAt.current=Date.now()+INITIAL_READ_RETRY_MS;
-          retryTimer.current=window.setTimeout(()=>retryRead.current(),INITIAL_READ_RETRY_MS);
+        // HTTP 546 stays on its single 30-second retry. A plain 502, 503 or 504
+        // waits on the jittered cap instead, and a dropped fetch uses 5/15/30.
+        // Those waits never run together.
+        const retryWait=tvSavedReadRetry({status:retryStatus,transport:transportKind,initial:initialAttempt,retryUsed:retryUsed.current,hasField:Boolean(nextField),recoveryBlocked,attempt:networkAttempt.current});
+        const shortRetry=retryWait===INITIAL_READ_RETRY_MS&&retryStatus===546&&!transportKind;
+        if(shortRetry){
+          clearNetworkTimer();
+          retryAt.current=Date.now()+retryWait;
+          retryTimer.current=window.setTimeout(()=>retryRead.current(),retryWait);
+        }
+        if(nextField){networkAttempt.current=0;reloginUsed.current=false;clearNetworkTimer();clearReloginTimer();}
+        else if(!shortRetry&&retryWait!==null&&!sessionBlocked.current){
+          cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)savedReread();},retryWait);
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){lastErrors.current={camera:[],routers:[]};setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
-    finally{if(request===generation.current){running.current=false;if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true,{routers:false});}}}
+    finally{if(request===generation.current){running.current=false;if(signInRetry.current&&alive.current&&!sessionBlocked.current){signInRetry.current=false;savedReread();}else if(proofUpdatePending.current){proofUpdatePending.current=false;void refresh(false,true,{routers:false});}}}
   },[api]);
   useEffect(()=>{
     if(!enabled){setData(empty);return;}
-    alive.current=true;sessionBlocked.current=false;lastAttempt.current=0;lastRouterAttempt.current=0;retryUsed.current=false;retryAt.current=0;lastErrors.current={camera:[],routers:[]};
+    alive.current=true;sessionBlocked.current=false;reloginUsed.current=false;signInRetry.current=false;networkAttempt.current=0;lastAttempt.current=0;lastRouterAttempt.current=0;retryUsed.current=false;retryAt.current=0;lastErrors.current={camera:[],routers:[]};
     retryRead.current=()=>{
       if(!alive.current||sessionBlocked.current||document.hidden||running.current||retryUsed.current||!retryAt.current||Date.now()<retryAt.current)return;
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
@@ -94,12 +107,27 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     void refresh();
     const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,TV_SAVED_BOARD_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(false,false,{camera:cameraDue,routers:routerDue,reread:true});}};
     const timer=window.setInterval(tick,60000);
-    const invalid=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError('Sign in again to load fleet information.');};
+    const clearForSignIn=()=>{generation.current++;sessionBlocked.current=true;cancelRetry();clearNetworkTimer();clearReloginTimer();retryAt.current=0;lastErrors.current={camera:[],routers:[]};setData(empty);setError(TV_SIGN_IN_PROMPT);};
+    const invalid=(event:Event)=>{
+      const reason=(event as CustomEvent<{reason?:string}>).detail?.reason;
+      const decision=tvAuthDecision(reason,reloginUsed.current);
+      if(decision==='keep'){if(reloginTimer.current!==null&&!running.current)savedReread();return;}
+      if(decision==='retry-sign-in'){
+        const pending=retryAt.current!==0||networkTimer.current!==null;
+        cancelRetry();clearNetworkTimer();retryAt.current=0;reloginUsed.current=true;
+        clearReloginTimer();
+        reloginTimer.current=window.setTimeout(()=>{reloginTimer.current=null;if(!sessionBlocked.current)clearForSignIn();},TV_RELOGIN_DEADLINE_MS);
+        if(running.current)signInRetry.current=true;
+        else if(!pending)savedReread();
+        return;
+      }
+      clearForSignIn();
+    };
     // The API has already fenced and validated the late proof. Reauthorize
     // and adopt its cached pair without moving the automatic refresh clock.
     const proofUpdated=()=>{if(running.current)proofUpdatePending.current=true;else void refresh(false,true,{routers:false});};
     document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-fleet-proof-updated',proofUpdated);
-    return()=>{alive.current=false;proofUpdatePending.current=false;generation.current++;running.current=false;cancelRetry();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
+    return()=>{alive.current=false;proofUpdatePending.current=false;signInRetry.current=false;generation.current++;running.current=false;cancelRetry();clearNetworkTimer();clearReloginTimer();retryAt.current=0;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-fleet-proof-updated',proofUpdated);};
   },[enabled,refresh]);
   useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const snapshotClock=data.readAt||clock;

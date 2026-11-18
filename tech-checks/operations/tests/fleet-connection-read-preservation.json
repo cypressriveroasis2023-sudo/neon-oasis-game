@@ -6,7 +6,7 @@
     {
       "path": "api.ts",
       "baselineBlob": "1647e0a906b2a8845f51c1b06441c591d5babc16",
-      "candidateBlob": "edf4aabab77afe1ec53be5030707cc6f70442cfc",
+      "candidateBlob": "62e7e670bc54a204ea9843aafe736c513ef864ec",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -61,6 +61,16 @@
         {
           "from": "fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force))[source] as FleetSnapshot[K],",
           "to": "fleetSource:async<K extends 'health'|'fieldMap'>(source:K,force=false,reread=false):Promise<FleetSnapshot[K]>=>await (await readFleet(force,undefined,reread&&!force))[source] as FleetSnapshot[K],",
+          "count": 1
+        },
+        {
+          "from": "}\nconst endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';\n",
+          "to": "}\n/** A fetch rejected or the request timer aborted it. Callers classify this by name, not by the message text. */\nexport class OperationsTransportError extends OperationsApiError {\n  transportFailure: 'rejected' | 'timeout';\n  constructor(message: string, transportFailure: 'rejected' | 'timeout') {\n    super(message, 503);\n    this.name = 'OperationsTransportError';\n    this.transportFailure = transportFailure;\n  }\n}\nconst endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';\n",
+          "count": 1
+        },
+        {
+          "from": "      throw new OperationsApiError(connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'\n        ? 'The save could not be confirmed. Refresh this workspace before trying again.'\n        : 'Operations could not connect. Retry to verify the current records.', 503);\n",
+          "to": "      const disconnected=connectionCheck ? 'The connection check could not be completed. No new result is confirmed.' : method === 'POST'\n        ? 'The save could not be confirmed. Refresh this workspace before trying again.'\n        : 'Operations could not connect. Retry to verify the current records.';\n      if(method==='GET'&&!connectionCheck)throw new OperationsTransportError(disconnected,abortKind==='timeout'?'timeout':'rejected');\n      throw new OperationsApiError(disconnected, 503);\n",
           "count": 1
         }
       ]

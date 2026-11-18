@@ -5,7 +5,7 @@ import {readRouterSnapshot,type RouterSnapshot} from '../../supabase/functions/c
 
 type Api={fleetSource?:(source:'health'|'fieldMap',force?:boolean,reread?:boolean)=>Promise<any>;get:(path:string)=>Promise<{data:any}>};
 type Callbacks={
-  readFailure?:(source:'fieldMap'|'health'|'routers',status:number|null)=>void;
+  readFailure?:(source:'fieldMap'|'health'|'routers',status:number|null,transport?:'rejected'|'timeout')=>void;
   healthUnavailable?:()=>void;
   routersUnavailable?:()=>void;
   field:(snapshot:ReturnType<typeof checkedFieldMap>)=>void|Promise<void>;
@@ -30,7 +30,7 @@ export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false,i
   let field:ReturnType<typeof checkedFieldMap>|null=null,health:Health|null=null;
   const read=async<T>(label:string,path:string,check:(value:any)=>T,accept:(value:T)=>void|Promise<void>)=>{
     try {const value=api.fleetSource&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)?await api.fleetSource(path==='/api/field-map'?'fieldMap':'health',force,reread):(await api.get(path)).data;await accept(check(value));}
-    catch(cause){const status=(cause as {response?:{status?:unknown}})?.response?.status;callbacks.readFailure?.(label==='Field locations'?'fieldMap':label==='Camera Health'?'health':'routers',typeof status==='number'?status:null);if(label==='Camera Health'){health=null;callbacks.healthUnavailable?.();}if(label==='Routers')callbacks.routersUnavailable?.();errors.push(label+': '+(cause instanceof Error?cause.message:'Information is unavailable.'));}
+    catch(cause){const status=(cause as {response?:{status?:unknown}})?.response?.status;const named=typeof cause==='object'&&cause!==null&&(cause as {name?:string}).name==='OperationsTransportError';const marked=(cause as {transportFailure?:unknown})?.transportFailure;const transport=named||marked==='timeout'||marked==='rejected'?marked==='timeout'?'timeout':'rejected':cause instanceof Error&&cause.message==='Operations could not connect. Retry to verify the current records.'?'rejected':undefined;callbacks.readFailure?.(label==='Field locations'?'fieldMap':label==='Camera Health'?'health':'routers',typeof status==='number'?status:null,transport);if(label==='Camera Health'){health=null;callbacks.healthUnavailable?.();}if(label==='Routers')callbacks.routersUnavailable?.();errors.push(label+': '+(cause instanceof Error?cause.message:'Information is unavailable.'));}
   };
   await Promise.all([
     ...(readCamera?[

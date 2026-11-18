@@ -1,5 +1,6 @@
 import {fieldProductFixture,fieldProductConnectionFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
 import {TV_SAVED_BOARD_REFRESH_MS} from '../src/refreshCadence.ts';
+import {TV_RELOGIN_DEADLINE_MS} from '../src/tvResilience.tsx';
 import {expectOperationsReloadRequired} from './helpers/operationsAccess.mjs';
 import { test, expect } from '@playwright/test';
 import {completedBoard} from '../durable-board/project.ts';
@@ -34,7 +35,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
   // Pause at a future instant while the page is still blank, before app timers exist.
   await page.clock.install({ time: new Date(Date.parse(time)-(pausedClock?60000:0)) });
   if(pausedClock)await page.clock.pauseAt(new Date(time));
-  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};
+  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetRequests=[];state.fleetFailures={};state.fleetTransport={};state.fleetSettled=0;
   if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   state.fleetUnits=[unit];state.cameraRows=[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}];
@@ -72,7 +73,7 @@ async function setup(page, { many = false, pausedClock = false, prepare = null }
       return;
     }
     if(path.startsWith('/api/fleet-saved-board')&&state.savedBoard){state.savedBoardReads=(state.savedBoardReads||0)+1;state.boardRequests=(state.boardRequests||[]).concat({path,method});return route.fulfill({headers:cors,json:state.savedBoard});}
-    if(['/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(path)){state.fleetRequests.push({path,method,at:await page.evaluate(()=>Date.now())});if(path==='/api/field-map'&&state.fieldGate)await state.fieldGate.promise;}
+    if(['/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(path)){state.fleetRequests.push({path,method,at:await page.evaluate(()=>Date.now())});if(path==='/api/field-map'&&state.fieldGate)await state.fieldGate.promise;const transport=state.fleetTransport?.[path];if(transport==='rejected'||transport==='timeout'){await route.abort(transport==='timeout'?'timedout':'failed');await page.evaluate(()=>{});state.fleetSettled++;return;}}
     if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:state.fleetUnits,summary:{fieldUnits:state.fleetUnits.length,mappedUnits:state.fleetUnits.length,unitGps:state.fleetUnits.length,missingGps:0},generatedAt:time,...(state.fieldMapExtras||{})}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
@@ -473,6 +474,60 @@ test('persistent initial HTTP546 has only one short retry and never displays zer
  expect(state.writes).toEqual([]);
 });
 
+async function settledTransportRead(page,state,reads){
+ await expect.poll(()=>state.fleetSettled).toBe(reads);
+ const summary=page.frameLocator('#cosOperationsFrame').locator('.tv-fleet-summary');
+ await expect(summary).toContainText('1 COS diagnostic units');
+ await expect(summary).toContainText('1 online');
+ await expect(summary).not.toContainText('0 COS diagnostic units');
+ await expect(page.frameLocator('#cosOperationsFrame').locator('.tv-fleet-loading')).toHaveCount(0);
+}
+
+test('a rejected or timed-out fetch backs off at 5, 15 and 30 seconds while HTTP 546 still retries once',async({page})=>{
+ const {state,frame}=await coldFailure(page);
+ const summary=frame.locator('.tv-fleet-summary');
+ await page.clock.runFor(4999);expect(savedReadCounts(state)['field-map']).toBe(1);
+ await page.clock.runFor(25001);
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(2);
+ await expect(frame.locator('.tv-fleet-loading')).toHaveText('Fleet information is unavailable.');
+ await expect(summary).toContainText('Field equipment unavailable');
+ await expect(summary).not.toContainText('0 COS diagnostic units');
+ await page.clock.runFor(5_000+15_000+30_000);
+ expect(savedReadCounts(state)['field-map']).toBe(2);
+ state.fleetFailures={};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(3);
+ await expect(summary).toContainText('1 online');
+ await expect(summary).toContainText('1 COS diagnostic units');
+ state.fleetTransport={'/api/field-map':'rejected'};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await settledTransportRead(page,state,1);
+ expect(savedReadCounts(state)['field-map']).toBe(4);
+ for(const delay of [5_000,15_000,30_000]){
+  const seen=savedReadCounts(state)['field-map'];
+  const settled=state.fleetSettled;
+  await page.clock.runFor(delay-1);
+  expect(savedReadCounts(state)['field-map']).toBe(seen);
+  expect(state.fleetSettled).toBe(settled);
+  await page.clock.runFor(1);
+  await settledTransportRead(page,state,settled+1);
+ }
+ const stopped=savedReadCounts(state)['field-map'];
+ await page.clock.runFor(30_000);
+ expect(savedReadCounts(state)['field-map']).toBe(stopped);
+ expect(state.fleetSettled).toBe(4);
+ state.fleetTransport={};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(stopped+1);
+ await expect(summary).toContainText('1 COS diagnostic units');
+ state.fleetTransport={'/api/field-map':'timeout'};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await settledTransportRead(page,state,5);
+ await page.clock.runFor(4999);expect(state.fleetSettled).toBe(5);
+ await page.clock.runFor(1);await settledTransportRead(page,state,6);
+ expect(state.writes).toEqual([]);
+});
+
 test('hidden initial-recovery deadline waits for visibility and never overlaps a slow retry',async({page})=>{
  const {state,frame}=await coldFailure(page);
  await frame.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
@@ -525,6 +580,20 @@ test('session invalidation cancels an already scheduled initial retry',async({pa
  const {state,frame}=await coldFailure(page);
  await frame.locator('body').evaluate(()=>window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}})));
  await page.clock.runFor(60000);expect(savedReadCounts(state)['field-map']).toBe(1);expect(state.writes).toEqual([]);
+});
+
+test('an idle authentication failure rereads immediately and clears the board when no good read arrives',async({page})=>{
+ const {state,frame}=await setup(page,{pausedClock:true});
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ await page.clock.runFor(60000);
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 COS diagnostic units');
+ const seen=savedReadCounts(state)['field-map'];
+ state.fieldGate=deferred();
+ await frame.locator('body').evaluate(()=>window.dispatchEvent(Object.assign(new Event('cos-private-data-invalidated'),{detail:{reason:'authentication-denied'}})));
+ await expect.poll(()=>savedReadCounts(state)['field-map']).toBe(seen+1);
+ await page.clock.runFor(TV_RELOGIN_DEADLINE_MS);
+ expect(savedReadCounts(state)['field-map']).toBe(seen+1);
+ expect(state.writes.filter(w=>w.path==='/api/fleet-saved-board/refresh')).toEqual([]);
 });
 
 test('manual saved-data refresh stays immediate and cancels the pending initial retry',async({page})=>{

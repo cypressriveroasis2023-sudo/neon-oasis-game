@@ -1,5 +1,6 @@
 import { useCallback,useEffect, useMemo, useState } from 'react';
 import {TV_SAVED_BOARD_REFRESH_MS} from './refreshCadence';
+import {TvFleetErrorBoundary,TV_WATCHDOG_MS} from './tvResilience';
 import { boardDateLabel,chicagoDay, readinessSummary, type BoardCard, type ReadinessRow, type BoardScope } from './dailyBoardData';
 import {configuredTvPages,type FleetPages} from './tvBoardData';
 import type {TvSection} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
@@ -12,6 +13,7 @@ type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; s
 const normalized = (status: string) => status.toLowerCase().replaceAll('_', ' ');
 export default function TechCheckTvBoard({ cards, names, readiness, scope, now, lastSuccess, error, stale, busy, rotation,rotationSeconds, exit, refresh,sections,settingsError,api }: Props) {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  useEffect(()=>{const timer=window.setTimeout(()=>window.location.reload(),TV_WATCHDOG_MS);return()=>window.clearTimeout(timer);},[]);
   const [fullscreenError, setFullscreenError] = useState('');
   const [fleetRefreshId,setFleetRefreshId]=useState(0);
   const [fleetPages,setFleetPages]=useState<FleetPages>({camera:1,map:['All field units']});
@@ -50,7 +52,7 @@ export default function TechCheckTvBoard({ cards, names, readiness, scope, now, 
         </article>)}</div></section>)}
         {!page.lanes.length && <div className='tech-check-tv-empty'>No jobs or shop tasks in this view.</div>}
       </div> : page.kind==='readiness'?<div className='tech-check-tv-readiness'>{page.rows.map(row => { const summary = readinessSummary(row),exempt=vehicleInspectionExempt(row); return <article key={row.userId}><h3>{row.name}<span>{row.department.toUpperCase()}</span></h3>{exempt?<p>No company vehicle · truck and trailer inspections do not apply.</p>:(['truck','trailer'] as const).map(key => <div key={key}><span>{key === 'truck' ? 'Truck inspection' : 'Trailer inspection'}</span><b className={'tv-readiness-' + summary[key].state}>{summary[key].label}</b></div>)}<div><span>{exempt?'IT shop inventory':'Inventory record'}</span><b className={'tv-readiness-'+summary.inventory.state}>{summary.inventory.label}</b></div><small>{row.completedAt ? 'Completed ' + boardDateLabel(row.completedAt) : row.startedAt ? 'Started ' + boardDateLabel(row.startedAt) : 'No check recorded today'}</small></article>; })}</div>:page.kind==='empty'?<div className='tech-check-tv-empty'>Exit TV and turn on a section in TV board settings.</div>:null}
-      <TvFleetView api={api} enabled={Boolean(lastSuccess)&&sections.some(section=>section==='camera'||section==='map')} mode={lastSuccess&&(page.kind==='camera'||page.kind==='map')?page.kind:null} page={page.kind==='camera'||page.kind==='map'?page.fleetPage||0:0} width={size.width} height={size.height} refreshId={fleetRefreshId} onPages={updateFleetPages}/>
+      <TvFleetErrorBoundary><TvFleetView api={api} enabled={Boolean(lastSuccess)&&sections.some(section=>section==='camera'||section==='map')} mode={lastSuccess&&(page.kind==='camera'||page.kind==='map')?page.kind:null} page={page.kind==='camera'||page.kind==='map'?page.fleetPage||0:0} width={size.width} height={size.height} refreshId={fleetRefreshId} onPages={updateFleetPages}/></TvFleetErrorBoundary>
     </main>
     <footer className='tech-check-tv-footer'><div><span className={'tech-check-tv-live' + (error || stale ? ' delayed' : '')} /><b>{error || stale ? 'UPDATES DELAYED' : lastSuccess ? 'LIVE BOARD' : 'CONNECTING'}</b><span>{lastSuccess ? 'Jobs/tasks updated ' + lastSuccess.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }) + ' CT' : 'Waiting for jobs/tasks'} · Work board refresh 60s · Saved camera reads {Math.round(TV_SAVED_BOARD_REFRESH_MS/60000)} min · Page rotation {rotationSeconds}s</span></div><nav aria-label='TV controls'><button type='button' onClick={()=>{refresh();setFleetRefreshId(value=>value+1);}} aria-busy={busy}>Refresh</button><button type='button' onClick={() => void fullscreen()}>Full screen</button><button type='button' onClick={leave}>Exit TV</button></nav></footer>
     {fullscreenError && <p className='tech-check-tv-fullscreen-note' role='status'>{fullscreenError}</p>}
