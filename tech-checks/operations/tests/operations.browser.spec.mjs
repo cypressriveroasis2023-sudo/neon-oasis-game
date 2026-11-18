@@ -190,6 +190,7 @@ test('Daily Board renders no pickup, swap, delivery or service cards', async ({ 
   const { frame } = await fixturePage(page, { jobs });
   await open(frame, 'Daily Board');
   const board = frame.getByRole('region', { name: 'COS Daily Board' });
+  await expect(board).toBeVisible();
   await expect(board.locator('.daily-board-card')).toHaveCount(0);
   for (const label of ['PICKUP','SWAP','DELIVERY','SERVICE']) {
     await expect(board.getByText(label, { exact: true })).toHaveCount(0);

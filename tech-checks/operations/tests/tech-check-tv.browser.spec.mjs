@@ -182,7 +182,7 @@ test('a denied data read that returns a different actor keeps the TV without car
  expect(state.writes).toEqual([]);
 });
 
-test('Daily Board and TV render only pickup, swap, delivery and service',async({page})=>{
+test('Daily Board and TV show no job cards',async({page})=>{
  const {frame}=await setup(page);
  await expect(frame.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
  await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
@@ -207,13 +207,16 @@ test('TV pages omit pickup, swap, delivery and service cards',async({page})=>{
   state.settings={sections:['pickup','swap','delivery','service','camera','map'],revision:0,updatedAt:null,rotationSeconds:15};
  }});
  const tv=frame.getByRole('region',{name:'Tech Check TV Board'});
+ await expect(tv).toBeVisible();
  for(let index=0;index<6;index++){
   if(index)await page.clock.fastForward(15000);
+  await expect(tv).toBeVisible();
   await expect(tv.locator('.daily-board-card')).toHaveCount(0);
   for(const label of types)await expect(tv.getByText(label,{exact:true})).toHaveCount(0);
  }
  await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
  const board=frame.getByRole('region',{name:'COS Daily Board'});
+ await expect(board).toBeVisible();
  await expect(board.locator('.daily-board-card')).toHaveCount(0);
  for(const label of types)await expect(board.getByText(label,{exact:true})).toHaveCount(0);
 });

@@ -437,7 +437,7 @@
     {
       "path": "operations.browser.spec.mjs",
       "baselineBlob": "f1266d21dace939b48f9eccab78e9d61c69c0cf1",
-      "candidateBlob": "4d87936de36ccb848ff91372698267cfa2fef9f2",
+      "candidateBlob": "8af768e818bc9cd6992bf6d0771dc7bc6d012a2d",
       "replacements": [
         {
           "from": "  expect(state.writes).toHaveLength(1);\n  await frame.getByRole('button', { name:'Refresh installation evidence',exact:true }).click();\n  await expect(editor.getByRole('alert')).toContainText('Synthetic source unavailable');\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('Last completed results remain displayed with their original check times.');\n  await expect(save).toBeDisabled();\n  expect(state.writes).toHaveLength(1);\n  state.failedPaths.delete('/api/field-map');\n",
@@ -472,6 +472,11 @@
         {
           "from": "  await noOverflow(page);\n});\n\ntest('Field Map selection, GPS validation and one confirmed write survive browser reload', async ({ page }) => {",
           "to": "  await noOverflow(page);\n});\n\ntest('Daily Board renders no pickup, swap, delivery or service cards', async ({ page }) => {\n  const jobs = ['PICKUP','SWAP','DELIVERY','SERVICE'].map((jobType, index) => ({\n    id: `10000000-0000-4000-8000-00000000000${index + 1}`,\n    jobNumber: 'FIX-20' + index,\n    customer: jobType + ' customer',\n    site: 'Fixture site',\n    department: 'service',\n    technician: 'Unassigned',\n    status: 'assigned',\n    priority: 'high',\n    jobType,\n    scheduled: day + ' 08:00',\n  }));\n  const { frame } = await fixturePage(page, { jobs });\n  await open(frame, 'Daily Board');\n  const board = frame.getByRole('region', { name: 'COS Daily Board' });\n  await expect(board.locator('.daily-board-card')).toHaveCount(0);\n  for (const label of ['PICKUP','SWAP','DELIVERY','SERVICE']) {\n    await expect(board.getByText(label, { exact: true })).toHaveCount(0);\n  }\n});\n\ntest('Field Map selection, GPS validation and one confirmed write survive browser reload', async ({ page }) => {",
+          "count": 1
+        },
+        {
+          "from": "  const board = frame.getByRole('region', { name: 'COS Daily Board' });\n  await expect(board.locator('.daily-board-card')).toHaveCount(0);",
+          "to": "  const board = frame.getByRole('region', { name: 'COS Daily Board' });\n  await expect(board).toBeVisible();\n  await expect(board.locator('.daily-board-card')).toHaveCount(0);",
           "count": 1
         }
       ]
