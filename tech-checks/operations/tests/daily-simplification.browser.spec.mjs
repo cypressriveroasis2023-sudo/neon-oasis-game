@@ -25,8 +25,9 @@ test('Dispatch puts the daily work above collapsed administrative controls',asyn
  await openWorkspace(app,'Daily Board');
  const board=app.getByRole('region',{name:'COS Daily Board'});
  await expect(board).toBeVisible();
- await expect(app.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
- await expect(app.getByRole('region',{name:'Workflow status summary'})).toBeVisible();
+  await expect(app.getByText('Owner tools · import, create and manage jobs')).toHaveCount(0);
+  await expect(app.getByRole('region',{name:'Workflow status summary'})).toHaveCount(0);
+  await expect(app.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
  await expect(app.getByRole('region',{name:'TV board settings'})).not.toBeVisible();
  expect(state.errors).toEqual([]);
 });

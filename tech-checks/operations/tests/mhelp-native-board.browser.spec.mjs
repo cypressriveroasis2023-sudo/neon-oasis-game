@@ -20,6 +20,7 @@ async function mount(page,authorized=true,importEnabled=true){
     if(path==='/api/tv-board/settings')return answer({sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null});
     if(path==='/api/owner/control-data')return answer({sites:[],truckChecks:[],itTechnicians:[],serviceTechnicians:[]});
     if(path==='/api/daily-board')return answer({jobs:[],tasks:[],readiness:[],asOf:new Date().toISOString()});
+    if(['/api/field-map','/api/camera-health/summary-v3','/api/routers','/api/vrm-fleet','/api/product-connections','/api/fleet-saved-board'].includes(path))return answer({items:[],generatedAt:new Date().toISOString()});
     if(path==='/api/customers')return answer({items:[{id:customer,name:'Fixture Builders',status:'active'}]});
     if(path==='/api/sites')return answer({items:[{id:site,customerId:customer,name:'Fixture Site',addressLine1:'300 Service Road',city:'Example',stateRegion:'TX',postalCode:'77001',status:'active'}]});
     throw new Error('Unexpected synthetic GET '+path);
