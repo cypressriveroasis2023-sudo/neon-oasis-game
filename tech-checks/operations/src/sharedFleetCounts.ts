@@ -1,5 +1,4 @@
 import {CAMERA_FRESH_MS, cameraTimestamp, resourceKind, type CameraRow} from './cameraEvidence';
-import {canonicalCameraUnit} from './fieldCameraHealth';
 import {exactUnitName, ROUTER_FRESHNESS_MS, type RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import {unitVerdict, type UnitCameraStatus} from '../shared/starUnitStatus';
 
@@ -110,6 +109,20 @@ export function cameraStatusHeadline(units: readonly CountUnit[], now = Date.now
   return { cameras: snapshot.cameras, units: snapshot.units };
 }
 
+/**
+ * The only camera headline. Camera status, the map, and About pass this result through.
+ * A missing or failed camera-status feed is not replaced with map rows.
+ * Recorder names attach only inside this call, and only by exact normalized unit name.
+ */
+export function fleetCountsFromCameraFeed(
+  units: readonly UnitCameraStatus[] | null,
+  recorders: readonly RecorderLink[] = [],
+  now = Date.now(),
+): FleetCountSnapshot | null {
+  if (!units) return null;
+  return selectFleetCounts(applyExactRecorderLinks(censusFromCameraUnits(units, now), recorders, now), now);
+}
+
 export function mapHeadline(units: readonly CountUnit[], now = Date.now()): ViewHeadlines {
   return cameraStatusHeadline(units, now);
 }
@@ -179,11 +192,11 @@ export function censusFromCommandProducts(items: readonly CommandCountProduct[],
 }
 
 export function censusFromDashboardRows(rows: readonly DashboardCountRow[], now = Date.now()): CountUnit[] {
-  const fresh = new Date(now).toISOString();
   return rows.filter(row => !row.support).map(row => {
     const placement = row.placement === 'shop' ? 'shop' : row.placement === 'field' ? 'field' : 'unknown';
     const state = row.cameraState === 'online' || row.cameraState === 'offline' ? row.cameraState : 'unknown';
-    const observedAt = state === 'unknown' ? row.checkedAt || null : row.checkedAt || fresh;
+    // No check time is not a fresh reading. Stamping `now` would turn a missing miss into Offline.
+    const observedAt = row.checkedAt || null;
     const onlineAt = state === 'online' && observedAt && presentedCameraState({ state: 'online', observedAt }, now) === 'online' ? Date.parse(observedAt) : NaN;
     return {
       name: row.name,
@@ -230,65 +243,30 @@ export function inventoryUnverifiedBreakdown(items: readonly InventoryUnverified
 
 export type LinkSide = { name: string; deviceId?: string | null; serial?: string | null };
 
-const cleanId = (value: string | null | undefined) => {
-  const text = typeof value === 'string' ? value.trim() : '';
-  return text.length > 0 && text.length <= 80 ? text : '';
-};
-
 /**
- * Exact device id, exact serial, or the board's existing exact unit name.
- * A shared number with a different family is not a match.
+ * Recorder matching is an exact normalized unit name only.
+ * Device ids, serials, family keys, and partial numbers are not links.
+ * A name that does not match stays unmatched. Nothing is guessed.
  */
 export function exactEquipmentLinks(units: readonly LinkSide[], devices: readonly LinkSide[]) {
-  const matched: { unit: string; device: string; by: 'device' | 'serial' | 'name' }[] = [];
+  const matched: { unit: string; device: string; by: 'name' }[] = [];
   const needsDataFix: { unit: string; device: string; reason: string }[] = [];
   const usedUnits = new Set<string>();
   const usedDevices = new Set<string>();
-  const take = (by: 'device' | 'serial' | 'name', unitName: string, deviceName: string, unitHits: LinkSide[], deviceHits: LinkSide[]) => {
-    if (unitHits.length !== 1 || deviceHits.length !== 1) return false;
-    if (usedUnits.has(unitHits[0].name) || usedDevices.has(deviceHits[0].name)) return false;
-    matched.push({ unit: unitHits[0].name, device: deviceHits[0].name, by });
+  for (const device of devices) {
+    const plain = exactUnitName(device.name);
+    if (!plain || usedDevices.has(device.name)) continue;
+    const unitHits = units.filter(unit => !usedUnits.has(unit.name) && exactUnitName(unit.name) === plain);
+    const deviceHits = devices.filter(item => !usedDevices.has(item.name) && exactUnitName(item.name) === plain);
+    if (unitHits.length !== 1 || deviceHits.length !== 1) continue;
+    matched.push({ unit: unitHits[0].name, device: deviceHits[0].name, by: 'name' });
     usedUnits.add(unitHits[0].name);
     usedDevices.add(deviceHits[0].name);
-    return true;
-  };
-  for (const device of devices) {
-    const deviceId = cleanId(device.deviceId);
-    if (!deviceId) continue;
-    const unitHits = units.filter(unit => cleanId(unit.deviceId) === deviceId);
-    const deviceHits = devices.filter(item => cleanId(item.deviceId) === deviceId);
-    take('device', device.name, device.name, unitHits, deviceHits);
-  }
-  for (const device of devices) {
-    const serial = cleanId(device.serial);
-    if (!serial || usedDevices.has(device.name)) continue;
-    const unitHits = units.filter(unit => !usedUnits.has(unit.name) && cleanId(unit.serial) === serial);
-    const deviceHits = devices.filter(item => cleanId(item.serial) === serial);
-    take('serial', device.name, device.name, unitHits, deviceHits);
-  }
-  for (const device of devices) {
-    if (usedDevices.has(device.name)) continue;
-    const key = canonicalCameraUnit(device.name);
-    const plain = exactUnitName(device.name);
-    const unitHits = units.filter(unit => !usedUnits.has(unit.name) && (key ? canonicalCameraUnit(unit.name) === key : exactUnitName(unit.name) === plain));
-    const deviceHits = devices.filter(item => !usedDevices.has(item.name) && (key ? canonicalCameraUnit(item.name) === key : exactUnitName(item.name) === plain));
-    if (take('name', device.name, device.name, unitHits, deviceHits.length ? deviceHits : [device])) continue;
-    const number = /(\d{1,6})$/.exec(device.name.trim());
-    if (!number || !key) continue;
-    const stem = units.filter(unit => {
-      const unitKey = canonicalCameraUnit(unit.name);
-      return Boolean(unitKey && unitKey !== key && unitKey.endsWith('|' + Number(number[1])));
-    });
-    if (stem.length === 1) needsDataFix.push({
-      unit: stem[0].name,
-      device: device.name,
-      reason: 'The number matches a different family name. Store the recorder or router name as the unit name before COS can use it.',
-    });
   }
   return { matched, needsDataFix };
 }
 
-type RecorderLink = LinkSide & { state: 'online' | 'offline' | 'unknown'; observedAt: string | null };
+export type RecorderLink = LinkSide & { state: 'online' | 'offline' | 'unknown'; observedAt: string | null };
 
 /** Replace an empty or unknown unit with one exact fresh recorder reading. Ambiguous names are left unknown. */
 export function applyExactRecorderLinks(units: readonly CountUnit[], recorders: readonly RecorderLink[], now = Date.now()): CountUnit[] {

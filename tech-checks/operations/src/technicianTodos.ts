@@ -45,6 +45,7 @@ export type TodoRouter = {
 };
 
 const shop = (placement?: string) => placement === 'SHOP' || placement === 'shop';
+const fieldUnit = (placement?: string) => placement === 'FIELD';
 
 /** Jobs a technician can act on. Unknown, shop, and unset thresholds are not jobs. */
 export function technicianTodos(input: {
@@ -70,7 +71,7 @@ export function technicianTodos(input: {
     });
   }
   for (const router of input.routers ?? []) {
-    if (shop(router.placement) || !router.routerOffline) continue;
+    if (!fieldUnit(router.placement) || !router.routerOffline) continue;
     const provedUp = cameraProvesRouterUp(router.cameraOnlineAt, router.routerObservedAt);
     todos.push({
       id: 'router:'+router.unit,

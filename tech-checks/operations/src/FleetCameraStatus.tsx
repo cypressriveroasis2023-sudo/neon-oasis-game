@@ -30,7 +30,7 @@ import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerA
 import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
 import FleetCountReadout from './FleetCountReadout';
-import {censusFromCameraUnits, routerOfflineFact, selectFleetCounts, IN_SHOP_LABEL} from './sharedFleetCounts';
+import {routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -94,7 +94,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews,fleetCounts,onCameraUnits}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null;fleetCounts:FleetCountSnapshot|null;onCameraUnits?:(units:UnitCameraStatus[])=>void}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -117,7 +117,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   try{
    const result=await api.get<Report>('/api/unit-camera-status');
    if(signal?.cancelled||generation!==readGeneration.current)return;
-   setReport(checkedReport(result.data));setError('');return true;
+   const next=checkedReport(result.data);setReport(next);setError('');onCameraUnits?.(next.units);return true;
   }catch(failure:any){
    if(signal?.cancelled||generation!==readGeneration.current)return;
    // The previous reading stays on screen under its own time; it is never relabelled as current.
@@ -161,7 +161,6 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const units=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
- const sharedCounts=useMemo(()=>selectFleetCounts(censusFromCameraUnits(units,now),now),[units,now]);
  const routerTodos=useMemo(()=>{
   const items=Array.isArray(routers?.items)?routers.items:[];
   return items.flatMap((row: {unitKey?: string; probeStatus: string; checkedAt: string | null; reportedStatus: string; reportedAt: string | null})=>{
@@ -232,7 +231,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header className='cos-camera-status-simple'>
    <h2 className='sr-only'>Camera status</h2>
-   <FleetCountReadout units={report?sharedCounts.units:null} cameras={report?sharedCounts.cameras:null}/>
+   <FleetCountReadout units={fleetCounts?.units??null} cameras={fleetCounts?.cameras??null}/>
    <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>

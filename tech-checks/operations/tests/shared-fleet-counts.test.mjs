@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {technicianTodos} from '../src/technicianTodos.ts';
 import {
-  aboutHeadline, applyExactRecorderLinks, cameraStatusHeadline, censusFromCameraUnits, censusFromCommandProducts,
-  exactEquipmentLinks, inventoryUnverifiedBreakdown, mapHeadline, routerOfflineFact, selectFleetCounts,
+  aboutHeadline, applyExactRecorderLinks, cameraStatusHeadline, censusFromCameraUnits, censusFromCommandProducts, censusFromDashboardRows,
+  exactEquipmentLinks, fleetCountsFromCameraFeed, inventoryUnverifiedBreakdown, mapHeadline, routerOfflineFact, selectFleetCounts,
 } from '../src/sharedFleetCounts.ts';
 
 const now = Date.parse('2026-11-18T13:10:00Z');
@@ -79,43 +79,62 @@ test('inventory unverified reasons add up to the unverified rows', () => {
   assert.equal(breakdown.counts.identity_hold, 1);
 });
 
-test('an exact device id or serial links a recorder and a different family name does not', () => {
+test('a near-miss recorder name does not link', () => {
   const units = [
     {name: 'Sniper 168', deviceId: '16801'},
-    {name: 'Sniper 227', serial: 'REC-227'},
-    {name: 'Solar Spotter 239'},
     {name: 'Sniper 4 100'},
+    {name: 'Solar Spotter 239'},
   ];
   const devices = [
-    {name: 'NVR SNIPER 168', deviceId: '16801'},
-    {name: 'Recorder 227', serial: 'REC-227'},
-    {name: 'Spotter 239'},
+    {name: 'NVR SNIPER 168', deviceId: '16801', serial: 'REC-168'},
     {name: 'Sniper4 100'},
+    {name: 'Sniper 1680'},
+    {name: 'Spotter 239'},
   ];
   const links = exactEquipmentLinks(units, devices);
-  assert.deepEqual(links.matched.map(link => [link.unit, link.by]), [
-    ['Sniper 168', 'device'],
-    ['Sniper 227', 'serial'],
-    ['Sniper 4 100', 'name'],
-  ]);
-  assert.deepEqual(links.needsDataFix.map(item => item.unit), ['Solar Spotter 239']);
+  assert.deepEqual(links.matched, []);
+  assert.deepEqual(links.needsDataFix, []);
   const census = applyExactRecorderLinks([
-    unit('Sniper 168', 'field', []),
-    unit('Solar Spotter 239', 'field', []),
+    unit('Sniper 168', 'field', [{state: 'unknown', observedAt: null}]),
+    unit('Sniper 4 100', 'field', [{state: 'unknown', observedAt: null}]),
   ], [
     {name: 'NVR SNIPER 168', deviceId: '16801', state: 'offline', observedAt: fresh},
+    {name: 'Sniper4 100', state: 'offline', observedAt: fresh},
+    {name: 'Sniper 1680', state: 'offline', observedAt: fresh},
+  ], now);
+  assert.deepEqual(selectFleetCounts(census, now).units, {online: 0, offline: 0, unknown: 2});
+});
+
+test('a recorder with no exact unit name stays unknown', () => {
+  const census = applyExactRecorderLinks([
+    unit('Solar Spotter 239', 'field', []),
+    unit('Sniper 227', 'field', [{state: 'unknown', observedAt: null}]),
+  ], [
     {name: 'Spotter 239', state: 'offline', observedAt: fresh},
+    {name: 'Recorder 227', serial: 'REC-227', state: 'online', observedAt: fresh},
   ], now);
   const counts = selectFleetCounts(census, now);
   assert.equal(counts.units.offline, 0);
+  assert.equal(counts.units.online, 0);
   assert.equal(counts.units.unknown, 2);
+  const exact = applyExactRecorderLinks([
+    unit('Sniper 168', 'field', [{state: 'unknown', observedAt: null}]),
+  ], [{name: '  sniper   168  ', state: 'offline', observedAt: fresh}], now);
+  assert.equal(selectFleetCounts(exact, now).units.offline, 1);
 });
 
-test('exact recorder device id on the unit name is not guessed from a different family', () => {
-  const linked = applyExactRecorderLinks([
-    unit('Sniper 168', 'field', [{state: 'unknown', observedAt: null}], 'no_reading'),
-  ], [{name: 'Sniper 168', deviceId: '42', state: 'offline', observedAt: fresh}], now);
-  assert.equal(selectFleetCounts(linked, now).units.offline, 1);
+test('a missing camera-status feed is not replaced and a timeless offline stays unknown', () => {
+  assert.equal(fleetCountsFromCameraFeed(null, [{name: 'Sniper 168', state: 'offline', observedAt: fresh}], now), null);
+  const rows = censusFromDashboardRows([{name: 'Quiet', placement: 'field', cameraState: 'offline'}], now);
+  assert.equal(rows[0].cameras[0].observedAt, null);
+  assert.deepEqual(selectFleetCounts(rows, now).units, {online: 0, offline: 0, unknown: 1});
+  const feed = fleetCountsFromCameraFeed([
+    {unit: 'Sniper 168', placement: 'FIELD', site: null, siteNamePending: false, state: 'UNKNOWN', cameras: 1, online: 0, offline: 0, unknown: 1, down: [], onlineInShop: false, publicIp: null, observedAt: null},
+  ], [{name: 'Sniper 168', state: 'offline', observedAt: fresh}], now);
+  assert.equal(feed.units.offline, 1);
+  assert.deepEqual(cameraStatusHeadline(censusFromCameraUnits([
+    {unit: 'Sniper 168', placement: 'FIELD', site: null, siteNamePending: false, state: 'RED', cameras: 1, online: 0, offline: 1, unknown: 0, down: [], onlineInShop: false, publicIp: null, observedAt: fresh},
+  ], now), now).units, {online: 0, offline: 1, unknown: 0});
 });
 
 const inhandOffline = ['Sniper 168', 'Sniper 190', 'Sniper 227', 'Sniper 335', 'Sniper 4 100', 'Spotter 239', 'Spotter 264', 'Spotter 269', 'Spotter 302'];
@@ -148,6 +167,10 @@ test('a fresh router outage is a to-do and a strictly newer camera shows both fa
   assert.match(newerCamera[0].detail, /newer camera reading/);
   const shop = technicianTodos({routers: [{unit: 'Sniper 44', placement: 'SHOP', routerOffline: true, routerObservedAt: routerAt, cameraOnlineAt: null}]});
   assert.deepEqual(shop, []);
+  const unplaced = technicianTodos({routers: [{unit: 'Solar Spotter 023.1', routerOffline: true, routerObservedAt: routerAt, cameraOnlineAt: null}]});
+  assert.deepEqual(unplaced, []);
+  const unknownPlacement = technicianTodos({routers: [{unit: 'Solar Spotter 023.1', placement: 'UNKNOWN', routerOffline: true, routerObservedAt: routerAt, cameraOnlineAt: null}]});
+  assert.deepEqual(unknownPlacement, []);
 });
 
 test('offline cards stay above address cleanup', () => {
