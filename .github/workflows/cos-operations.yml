@@ -159,7 +159,8 @@ jobs:
           timeout_migration='tech-checks/supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql'
           settings_migration='tech-checks/supabase/migrations/20261116_cos_power_alarm_settings.sql'
           sim_migration='tech-checks/supabase/migrations/20261117_cos_sim_cancel_records.sql'
-          test "$(git diff --name-only f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../supabase/migrations | sort)" = "$(printf '%s\n%s\n%s' "$settings_migration" "$sim_migration" "$timeout_migration" | sort)"
+          router_grants_migration='tech-checks/supabase/migrations/20261118_camera_unit_routers_read_grants.sql'
+          test "$(git diff --name-only f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../supabase/migrations | sort)" = "$(printf '%s\n%s\n%s\n%s' "$settings_migration" "$sim_migration" "$timeout_migration" "$router_grants_migration" | sort)"
           timeout_blob='be212be3ca031febc644d6d2a23816b9e7a12d91'
           test "$(git rev-parse HEAD:$timeout_migration)" = "$timeout_blob"
           test "$(git hash-object ../supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql)" = "$timeout_blob"
@@ -169,6 +170,9 @@ jobs:
           sim_blob='377799dc204046dcb390594324e6fbd1163fc2d1'
           test "$(git rev-parse HEAD:$sim_migration)" = "$sim_blob"
           test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records.sql)" = "$sim_blob"
+          router_grants_blob='5a865f56c4069673de33a523d3bec5c6155173ce'
+          test "$(git rev-parse HEAD:$router_grants_migration)" = "$router_grants_blob"
+          test "$(git hash-object ../supabase/migrations/20261118_camera_unit_routers_read_grants.sql)" = "$router_grants_blob"
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Verify real PostgreSQL intake concurrency
