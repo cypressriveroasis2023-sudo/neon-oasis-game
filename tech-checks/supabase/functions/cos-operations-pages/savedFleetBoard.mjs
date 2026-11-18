@@ -49,12 +49,12 @@ async function savedFleetResponse({ rpc, payloadText }) {
       return JSON.stringify(status);
     }
     if (completed?.id !== id) {
-      const text4 = String(await payloadText(id) ?? "").trim();
-      if (!text4.startsWith("{") || !text4.endsWith("}")) continue;
-      completed = { id, text: text4 };
+      const text5 = String(await payloadText(id) ?? "").trim();
+      if (!text5.startsWith("{") || !text5.endsWith("}")) continue;
+      completed = { id, text: text5 };
     }
-    const text3 = completed.text;
-    return JSON.stringify({ ...status, latest: { ...status.latest, payload: "@@COS_SAVED_FLEET_BOARD_PAYLOAD@@" } }).replace(PAYLOAD_MARK, () => text3);
+    const text4 = completed.text;
+    return JSON.stringify({ ...status, latest: { ...status.latest, payload: "@@COS_SAVED_FLEET_BOARD_PAYLOAD@@" } }).replace(PAYLOAD_MARK, () => text4);
   }
   throw Error("saved_board_unavailable");
 }
@@ -702,12 +702,6 @@ function readRecordedRoster(value, inventory) {
 
 // ../supabase/functions/cos-operations-pages/routers.ts
 var ROUTER_FRESHNESS_MS = 20 * 60 * 1e3;
-function routerStatus(row, now = Date.now()) {
-  const observed = row.checkedAt ? Date.parse(row.checkedAt) : NaN;
-  if (!Number.isFinite(observed) || observed > now) return "unknown";
-  if (now - observed > ROUTER_FRESHNESS_MS) return "stale";
-  return row.probeStatus === "online" ? "reachable" : row.probeStatus === "offline" ? "unreachable" : "unknown";
-}
 
 // src/fieldLocations.ts
 function isCurrentFieldPin(unit) {
@@ -806,6 +800,75 @@ function readVrmFleetConfig(value) {
   } };
 }
 
+// src/inhandRouterStatus.ts
+var INHAND_ROUTER_FRESHNESS_MS = 45 * 60 * 1e3;
+var INHAND_LIVE_STATUS_SOURCE = "InHand live pull";
+var IN_SHOP_LABEL = "In Shop";
+var IN_SHOP_COLOR = "#64748b";
+var text3 = (value) => typeof value === "string" ? value.trim() : "";
+var unknownReading = () => ({
+  state: "unknown",
+  label: "Unknown",
+  color: null,
+  outageCount: 0,
+  alert: false,
+  routerOfflineTodo: false
+});
+function inhandPlacement(value) {
+  const raw = text3(value).toLowerCase();
+  if (raw === "shop" || raw === "root") return "shop";
+  if (raw === "field") return "field";
+  return "other";
+}
+function inhandRouterBrand(routerType, model) {
+  const type = text3(routerType).toLowerCase();
+  if (type === "mofi") return "mofi";
+  if (type === "cradlepoint") return "cradlepoint";
+  const name = text3(model).toLowerCase();
+  if (/(^|[^a-z0-9])mofi([^a-z0-9]|$)/.test(name)) return "mofi";
+  if (/(^|[^a-z0-9])cradlepoint([^a-z0-9]|$)/.test(name)) return "cradlepoint";
+  return "other";
+}
+function freshReportedAt(value, now) {
+  if (typeof value !== "string") return false;
+  const at = Date.parse(value);
+  if (!Number.isFinite(at) || at > now) return false;
+  return now - at <= INHAND_ROUTER_FRESHNESS_MS;
+}
+function inhandRouterReading(input, now = Date.now()) {
+  if (inhandPlacement(input?.placement) === "shop") {
+    return {
+      state: "in_shop",
+      label: IN_SHOP_LABEL,
+      color: IN_SHOP_COLOR,
+      outageCount: 0,
+      alert: false,
+      routerOfflineTodo: false
+    };
+  }
+  if (input?.matched === false) return unknownReading();
+  const brand = inhandRouterBrand(input?.routerType, input?.model);
+  if (brand === "mofi" || brand === "cradlepoint") return unknownReading();
+  if (text3(input?.statusSource) !== INHAND_LIVE_STATUS_SOURCE) return unknownReading();
+  if (!freshReportedAt(input?.reportedAt, now)) return unknownReading();
+  const status = text3(input?.reportedStatus).toLowerCase();
+  if (status === "online") {
+    return { state: "online", label: "Online", color: null, outageCount: 0, alert: false, routerOfflineTodo: false };
+  }
+  if (status === "offline") {
+    const field = inhandPlacement(input?.placement) === "field";
+    return {
+      state: "offline",
+      label: "Offline",
+      color: null,
+      outageCount: field ? 1 : 0,
+      alert: field,
+      routerOfflineTodo: field
+    };
+  }
+  return unknownReading();
+}
+
 // src/fleetDashboardModel.ts
 var combine = (states) => states.includes("offline") ? "offline" : states.length && states.every((x) => x === "online") ? "online" : "unknown";
 function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
@@ -813,7 +876,17 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
   return units.map((unit) => {
     const key = canonicalCameraUnit(unit.unitNumber), family = key?.split("|")[0] || unit.modelName || "Other equipment", support = isSupportEquipment(unit), placement = inventoryPlacement(unit);
     const camera = fieldCameraHealth(unit, units, health, now), linkedRouters = (routers || []).filter((r) => r.match === "exact_name" && r.candidateUnit?.id === unit.id);
-    const routerStates = linkedRouters.map((r) => routerStatus(r, now)).map((s) => s === "reachable" ? "online" : s === "unreachable" ? "offline" : "unknown");
+    const linked = linkedRouters.length === 1 ? linkedRouters[0] : null;
+    const routerReading = inhandRouterReading({
+      placement,
+      matched: routers ? Boolean(linked) : false,
+      routerType: linked && "routerType" in linked ? String(linked.routerType ?? "") : null,
+      model: linked?.model,
+      reportedStatus: linked?.reportedStatus,
+      reportedAt: linked?.reportedAt,
+      statusSource: linked?.reportedSource
+    }, now);
+    const routerState = routerReading.state === "online" ? "online" : routerReading.state === "offline" ? "offline" : "unknown";
     const matches = key?.startsWith("HELIOS|") ? power.filter((r) => canonicalCameraUnit(r.name) === key) : [];
     const p = matches.length === 1 && vrm.items.filter((item) => canonicalCameraUnit(item.name) === key).length === 1 && units.filter((u) => canonicalCameraUnit(u.unitNumber) === key).length === 1 ? matches[0] : null;
     const installation = p ? vrm.items.find((item) => item.installationId === p.installationId && canonicalCameraUnit(item.name) === key) : null;
@@ -839,7 +912,7 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const locationVerified = isCurrentFieldPin(unit), locationNeedsReview = placement === "field" && !locationVerified;
     const review = [...placement === "unknown" ? ["Placement is unresolved. Check tracker and current mHelpDesk assignment."] : [], ...camera.state === "unknown" ? [camera.reason] : [], ...locationNeedsReview ? [locationExplanation(unit)] : [], ...unit.mhelpLocationReviewReason ? [String(unit.mhelpLocationReviewReason)] : []];
     const providers = [...new Set(camera.rows.map((r) => r.evidence?.source).filter(Boolean))];
-    return { unit, id: unit.id, name: unit.unitNumber, displayName: unit.uploadDisplayUnitNumber || unit.unitNumber, family, provider: providers.join(" / ") || "Unmatched provider", placement, retired: unit.activeInventoryEligible === false || ["retired", "decommissioned", "deleted", "stolen"].includes(String(unit.status || "")), support, camera, cameraState: camera.state, routerState: routers ? combine(routerStates) : "unknown", batteryState, batteryPercent, batteryReadIssue, batteryReadings, routers: linkedRouters, power: p, vrmInstallation, locationVerified, locationNeedsReview, review };
+    return { unit, id: unit.id, name: unit.unitNumber, displayName: unit.uploadDisplayUnitNumber || unit.unitNumber, family, provider: providers.join(" / ") || "Unmatched provider", placement, retired: unit.activeInventoryEligible === false || ["retired", "decommissioned", "deleted", "stolen"].includes(String(unit.status || "")), support, camera, cameraState: camera.state, routerState, routerLabel: routerReading.label, routerColor: routerReading.color, routerOutageCount: routerReading.outageCount, routerOfflineTodo: routerReading.routerOfflineTodo, batteryState, batteryPercent, batteryReadIssue, batteryReadings, routers: linkedRouters, power: p, vrmInstallation, locationVerified, locationNeedsReview, review };
   });
 }
 

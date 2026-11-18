@@ -10,13 +10,13 @@ const unit={id:'00000000-0000-4000-8000-000000000001',unitNumber:'Helios 1',mode
 const health=snapshot([resource(1,'Helios 1')]);
 const observation=(metric,value,source='system',instance=0,unit=metric==='battery_soc'?'%':metric==='battery_voltage'?'V':metric==='battery_current'?'A':'W')=>({metric,value,source,instance,unit,observedAt:fresh});
 const vrm={items:[{name:'HELIOS 001',installationId:1001}],power:[{name:'HELIOS 001',installationId:1001,errorCode:null,lastAttemptAt:new Date(now).toISOString(),measurements:[observation('battery_soc',92.7,'battery',278),observation('battery_soc',100),observation('solar_power',190),observation('solar_power',180,'solarcharger',1),observation('load_power',0),observation('battery_power',-75,'battery',278),observation('battery_voltage',12.6,'battery',278),observation('battery_current',-5.9,'battery',278)]}]};
-const router={id:'router-fixture',unitKey:'Helios 1',name:'Fixture InHand',model:'IR615',publicIp:'192.0.2.10',match:'exact_name',candidateUnit:{id:unit.id,unitNumber:'Helios 1'},probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh};
+const router={id:'router-fixture',unitKey:'Helios 1',name:'Fixture InHand',model:'InHand IR615',match:'exact_name',candidateUnit:{id:unit.id,unitNumber:'Helios 1'},probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh,reportedSource:'InHand live pull'};
 const row=(power=vrm,routers=[router],at=now,units=[unit])=>fleetDashboardRows(units,health,routers,power,at)[0];
 const render=(value,at=now)=>renderToStaticMarkup(React.createElement(FleetUnitHealth,{row:value,now:at}));
 const currentMetrics=html=>html.split('aria-label="Recent power measurements"')[1]?.split('</dl>')[0]||'';
 
 test('the unit top card groups camera, exact InHand and Victron evidence without additional reads',()=>{
- const html=render(row());assert(html.indexOf('Camera health')<html.indexOf('Router &amp; connection'));assert(html.indexOf('Router &amp; connection')<html.indexOf('Battery · Victron'));assert.match(html,/Fixture InHand · IR615/);assert.match(html,/192\.0\.2\.10/);assert.match(html,/Port reachable/);assert.match(html,/92\.7%/);assert.match(html,/https:\/\/vrm\.victronenergy\.com\/installation\/1001\/dashboard/);assert.match(html,/Lowest reported charge/);assert.match(html,/2 reported charge sources/);
+ const html=render(row());assert(html.indexOf('Camera health')<html.indexOf('Router &amp; connection'));assert(html.indexOf('Router &amp; connection')<html.indexOf('Battery · Victron'));assert.match(html,/Fixture InHand · InHand IR615/);assert.doesNotMatch(html,/192\.0\.2\.10|public IP|IMSI|ICCID|IMEI/i);assert.match(html,/Online/);assert.match(html,/92\.7%/);assert.match(html,/https:\/\/vrm\.victronenergy\.com\/installation\/1001\/dashboard/);assert.match(html,/Lowest reported charge/);assert.match(html,/2 reported charge sources/);
  const source=readFileSync(new URL('../src/FleetUnitHealth.tsx',import.meta.url),'utf8');assert.doesNotMatch(source,/from ['"]\.\/api|fetch\(|useEffect\(/);
 });
 test('power preserves source instances, signed raw readings and verified zero without summing or runtime claims',()=>{
@@ -27,7 +27,7 @@ for(const kind of ['stale','provider failure','sync failure','missing'])test('cu
  const html=render(row(power,[router],at),at),metrics=currentMetrics(html);assert.doesNotMatch(metrics,/190 W|180 W|-75 W|0 W/);assert.equal((metrics.match(/Unverified/g)||[]).length,5);assert.doesNotMatch(html.split('aria-label="Selected unit battery charge"')[1]?.split('</strong>')[0]||'',/92\.7%/);
 });
 test('duplicate unit identity and mismatched router UUID cannot donate associated source data',()=>{
- const html=render(row(vrm,[{...router,candidateUnit:{id:'00000000-0000-4000-8000-999999999999',unitNumber:'Helios 1'}}],now,[unit,{...unit,id:'00000000-0000-4000-8000-000000000002'}]));assert.doesNotMatch(html,/192\.0\.2\.10|92\.7%|190 W/);assert.match(html,/No exact, unique router association/);
+ const html=render(row(vrm,[{...router,candidateUnit:{id:'00000000-0000-4000-8000-999999999999',unitNumber:'Helios 1'}}],now,[unit,{...unit,id:'00000000-0000-4000-8000-000000000002'}]));assert.doesNotMatch(html,/92\.7%|190 W/);assert.match(html,/No exact InHand router is linked/);
 });
 test('unsupported families keep power unavailable instead of borrowing Helios values',()=>{
  const other={...unit,unitNumber:'Spotter 1',modelName:'Spotter'},html=render(fleetDashboardRows([other],health,[router],vrm,now)[0]);assert.match(html,/Power measurements are not available for this unit family/);assert.doesNotMatch(html,/92\.7%|Recent power measurements/);
