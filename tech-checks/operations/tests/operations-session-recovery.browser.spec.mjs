@@ -41,7 +41,7 @@ async function mount(page,{it=false,locationWrites=false,tv=false}={}){
   return route.fulfill({headers,json:data});
  });
  await page.goto('/session-recovery-fixture');const app=page.frameLocator('iframe');
- if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();await expect(app.getByText('Inspect the return rack',{exact:true})).toBeVisible();}
+ if(tv){await expect(app.getByRole('button',{name:'TV View',exact:true})).toBeVisible();await app.getByRole('button',{name:'TV View',exact:true}).click();await expect(app.getByRole('region',{name:'Tech Check TV Board'})).toBeVisible();await expect(app.getByRole('region',{name:'COS fleet counts'})).toBeVisible();await expect(app.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);}
  else {const button=app.getByRole('button',{name:'↻ Refresh data',exact:true});if(it)await expect(button).toHaveCount(0);else await expect(button).toBeEnabled();await expect(app.locator('.cos-fleet-stat-field strong')).toHaveText('1');}
  return {app,state,initialSessions:state.sessionReads};
 }

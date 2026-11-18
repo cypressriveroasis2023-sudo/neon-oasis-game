@@ -32,7 +32,7 @@ async function mount(page,{mode='valid'}={}){
   if(control.fail&&request.path==='/api/daily-board')return route.fulfill({status:503,headers,json:{error:'Synthetic Board refresh unavailable'}});
   return route.fulfill({headers,json:request.path==='/api/daily-board'?board:{sections:['today'],revision:0,updatedAt:null}});
  });
- await openWorkspace(app,'Daily Board');await expect(app.locator('.daily-board-card')).toHaveCount(1);
+ await openWorkspace(app,'Daily Board');await expect(app.getByRole('region',{name:'COS fleet counts'})).toBeVisible();await expect(app.locator('.daily-board-card')).toHaveCount(0);
  return {app,state,control};
 }
 const safe=state=>{expect(state.errors).toEqual([]);expect(state.calls.every(c=>c.method==='GET')).toBe(true);};
@@ -42,7 +42,8 @@ async function open(app,title='Board sample customer'){
 }
 test('only the equipment handoff job renders and the owner task stays off the Daily Board',async({page})=>{
  const {app,state}=await mount(page);
- await expect(app.getByText('Board sample customer')).toBeVisible();
+ await expect(app.getByRole('region',{name:'COS fleet counts'})).toBeVisible();
+ await expect(app.getByText('Board sample customer')).toHaveCount(0);
  await expect(app.getByText('Inspect the saved issue')).toHaveCount(0);
  await expect(app.getByText('OWNER TASK')).toHaveCount(0);
  expect(state.calls.some(item=>String(item.path||'').startsWith('/api/jobs'))).toBe(false);
@@ -51,11 +52,8 @@ test('only the equipment handoff job renders and the owner task stays off the Da
 test('failed Board refresh suppresses a formerly valid unit shortcut without altering saved records',async({page})=>{
  const {app,state,control}=await mount(page);control.fail=true;
  await app.getByRole('button',{name:'Refresh',exact:true}).click();await expect(app.locator('.daily-board-error')).toContainText('Showing the last successful snapshot.');
- const dialog=await open(app,'Board sample customer');
- await expect(dialog.locator('a[href*="unit="]')).toHaveCount(0);
- await expect(dialog).toContainText('Board refresh is unavailable or delayed.');
- await expect(dialog).toContainText('Saved inspection note; do not create another ticket.');
- await expect(dialog).toContainText('Jobs and Owner Tasks are not opened from this board.');
+ await expect(app.locator('.daily-board-card')).toHaveCount(0);
+ await expect(app.getByRole('dialog',{name:'Work details',exact:true})).toHaveCount(0);
  expect(state.calls.some(item=>item.method!=='GET')).toBe(false);
  safe(state);
 });
