@@ -22,17 +22,17 @@ import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
 import {needsYouRows} from './fleetNeedsYou';
-import SourceAttentionBanner from './SourceAttentionBanner';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
-import {CosPowerAlarmSettings, CosPowerChecks} from './CosPowerAlarmPanel';
+import {cameraSourceNotice} from './sourceAttention';
+import {CosPowerChecks} from './CosPowerAlarmPanel';
 import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
 import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
-import {type Group,type StateFilter,type FamilyFilter,type UnitFamily,GROUPS,FAMILY_LABEL,familyFieldCounts,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
+import {type Group,type StateFilter,type FamilyFilter,type UnitFamily,GROUPS,FAMILY_LABEL,familyBoardCounts,familyFieldCounts,familyOf,sourceOf,unitName,groupedUnits} from './cameraStatusFilters';
 export {groupedUnits};
 type Draft={unit:string;placement:'FIELD'|'SHOP';site:string;address:string;publicIp:string;name:string;reason:string};
 
@@ -92,7 +92,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string}[]|null}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -106,19 +106,21 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  // router check reading Not checked, which is the truthful answer.
  // What mHelp holds about placement, for the mHelp location check. A failure
  // here leaves that check reading No current evidence, which is truthful.
- useEffect(()=>{let cancelled=false;api.get('/api/field-map').then(result=>{if(!cancelled)setFieldMap(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ useEffect(()=>{let cancelled=false;api.fleetSource('fieldMap').then(map=>{if(!cancelled)setFieldMap(map);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
  useEffect(()=>{let cancelled=false;api.get('/api/routers').then(result=>{if(!cancelled)setRouters(result.data);}).catch(()=>{});return ()=>{cancelled=true;};},[]);
+ const readGeneration=useRef(0);
  const read=useCallback(async(signal?:{cancelled:boolean})=>{
+  const generation=++readGeneration.current;
   setLoading(true);
   try{
    const result=await api.get<Report>('/api/unit-camera-status');
-   if(signal?.cancelled)return;
+   if(signal?.cancelled||generation!==readGeneration.current)return;
    setReport(checkedReport(result.data));setError('');return true;
   }catch(failure:any){
-   if(signal?.cancelled)return;
+   if(signal?.cancelled||generation!==readGeneration.current)return;
    // The previous reading stays on screen under its own time; it is never relabelled as current.
    setError(failure?.response?.data?.error||failure?.message||'The Star4Live unit status is unavailable.');return false;
-  }finally{if(!signal?.cancelled)setLoading(false);}
+  }finally{if(!signal?.cancelled&&generation===readGeneration.current)setLoading(false);}
  },[]);
  useEffect(()=>{const signal={cancelled:false};read(signal);return ()=>{signal.cancelled=true;};},[read]);
 
@@ -133,7 +135,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    if(field==='address')body.expectedAddressRevision=unit.addressRevision??null;
    if(value===null){body.action=pinOnly?'clear_pin':'clear';if(clearValue)body.value=clearValue;}else body.value=value;
    if(reason.trim())body.reason=reason.trim();
+   // A slow status read that started before this save must not replace it.
+   readGeneration.current++;
    const result=await api.post<Report>('/api/unit-camera-status/edit',body);
+   readGeneration.current++;
    const next=checkedReport(result.data);
    setReport(next);setDraft(null);
    setSaved(next.recorded?(field==='camera'?(value===null?(clearValue?clearValue+' is back on '+unit.unit:'Every camera is back on '+unit.unit):value+' is no longer on '+unit.unit)
@@ -157,7 +162,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const todos=useMemo(()=>technicianTodos({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
   power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
-  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD'})),
+  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
  }),[units,victron,now,powerSettings,addressReviews]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
@@ -165,6 +170,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  // Worst first, off the same units the list shows.
  const needsYou=useMemo(()=>report?needsYouRows(units):{rows:[],total:0,unchecked:0},[report,units]);
  const familyCounts=useMemo(()=>report?familyFieldCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
+ const boardCounts=useMemo(()=>report?familyBoardCounts(units):{avigilon:0,recon:0,alibi:0},[report,units]);
  // Keep status counts in the same make scope as the rows selected by a tile.
  const statusCounts=useMemo(()=>report?countUnits(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
  const upEvidence=useMemo(()=>report?cameraUpEvidence(units.filter(unit=>family==='all'||familyOf(unit)===family)):null,[report,units,family]);
@@ -197,19 +203,39 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    if(field){field.scrollIntoView({block:'center',behavior:'smooth'});(field as HTMLElement).focus();}},0);
  };
  const pick=(nextGroup:Group,nextState:StateFilter,nextFamily:FamilyFilter='all')=>{setGroup(nextGroup);setStateFilter(nextState);setFamily(nextFamily);setQuery('');};
+ const openTodo=(todo:{unit:string})=>{
+  const unit=units.find(item=>item.unit===todo.unit||unitName(item)===todo.unit);
+  pick('field','all','all');
+  setQuery(todo.unit);
+  setSaveError('');setSaved('');setFixStep(null);
+  setDraft(unit?draftOf(unit):null);
+ };
+ const upCount=statusCounts?.field.green??0;
+ const downCount=(statusCounts?.field.red??0)+(statusCounts?.field.yellow??0);
+ const unknownCount=statusCounts?.field.unknown??0;
+ const updatedAt=report?.refreshedAt||feed?.syncedAt||null;
+ const sourceNotice=cameraSourceNotice(sourceFacts)||(report?.otherSourcesRead===false?'Avigilon and Reconeyez readings delayed — status may be out of date':null);
  return <section className='cos-camera-status' aria-label='Unit camera status'>
-  <header>
-   <div>
-    <h2>Camera status</h2>
-    <p className='cos-board-identity'><strong>This board is live camera evidence, not inventory.</strong> What the cameras are doing right now. For what is owned and where it is placed, use the Fleet board.</p>
-    <p>Every camera unit, one line each. Stands and poles without a camera are not counted here. Only you and IT can change where a unit is; nothing moves on its own.</p>
-   </div>
+  <header className='cos-camera-status-simple'>
+   <h2 className='sr-only'>Camera status</h2>
+   <p className='cos-camera-counts' role='group' aria-label='Field cameras up, down and unknown'>
+    <span>Up <b>{report?upCount:'—'}</b></span>
+    <span>Down <b>{report?downCount:'—'}</b></span>
+    <span>Unknown <b>{report?unknownCount:'—'}</b></span>
+   </p>
+   <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>
-    <small>{feed?.syncedAt?'Star4Live reading '+cameraTime(feed.syncedAt,now):loading?'Reading Star4Live…':'No Star4Live reading'}</small>
+    <small>{updatedAt?'Updated '+cameraTime(updatedAt,now):loading?'Reading…':'No reading yet'}</small>
    </div>
   </header>
+  {sourceNotice&&<p className='cos-camera-source-note' role='status'>{sourceNotice}</p>}
+  <TechnicianTodoList todos={todos} onOpen={openTodo}/>
+  <details className='cos-camera-about'>
+   <summary>About this data</summary>
   <section className='cos-reading-scope' aria-label='Camera status sources and scope'>
+   <p className='cos-board-identity'><strong>This board is live camera evidence, not inventory.</strong> What the cameras are doing right now. For what is owned and where it is placed, use the Fleet board.</p>
+   <p>Every camera unit, one line each. Stands and poles without a camera are not counted here. Only you and IT can change where a unit is; nothing moves on its own.</p>
    <h3>Separate provider readings, not the Fleet inventory snapshot</h3>
    <p>Camera units only; camera-less stands and poles excluded. Totals and map coverage may differ from the mHelp-based Fleet view.</p>
    <p><strong>Star4Live sync:</strong> {feed?.syncedAt?cameraTime(feed.syncedAt,now):'Not provided'} · {feed?feed.fresh?'Recent sync; individual reading times are below':'Not current':'Freshness unknown'}. This sync time does not date the other sources.</p>
@@ -223,23 +249,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    </div>)}</dl>}
    <p>Source coverage above is for all makes before list filters, with saved COS edits where available. A recent observation does not make every unit current; use each row’s status and time. Map pins are separate address evidence, not measured equipment GPS.</p></details>
   </section>
-  {feed&&!feed.fresh&&<p className='cos-camera-status-stale' role='status'>
-   <strong>Star4Live has not reported recently.</strong> Every Star4Live unit reads Not verified until the next good sync. No unit is called offline on an old reading.
-   {feed.status&&feed.status!=='ok'?' Last sync status: '+feed.status+'.':''}
-  </p>}
-  {report&&report.handEditsRead===false&&<p className='cos-camera-status-stale' role='status'>
-   <strong>Saved hand edits could not be read.</strong> The readings below are the provider's own. Editing is off until they can be read again.
-  </p>}
-  {report&&report.otherSourcesRead===false&&<p className='cos-camera-status-stale' role='status'>
-   <strong>Avigilon and Reconeyez readings could not be read.</strong> Only Star4Live units are listed until they can be.
-  </p>}
-  {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
-  {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
-  {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
-  <SourceAttentionBanner facts={sourceFacts}/>
+  {feed&&!feed.fresh&&<p className='cos-camera-status-stale'>Star4Live has not reported recently. Every Star4Live unit reads Not verified until the next good sync. No unit is called offline on an old reading.{feed.status&&feed.status!=='ok'?' Last sync status: '+feed.status+'.':''}</p>}
+  {report&&report.handEditsRead===false&&<p className='cos-camera-status-stale'>Saved hand edits could not be read. The readings below are the provider's own. Editing is off until they can be read again.</p>}
+  {report&&report.otherSourcesRead===false&&<p className='cos-camera-status-stale'>Avigilon and Reconeyez readings could not be read. Only Star4Live units are listed until they can be.</p>}
   <SourceHealthStrip facts={sourceFacts}/>
-  <CosPowerAlarmSettings/>
-  <TechnicianTodoList todos={todos}/>
   {counts&&<FleetNeedsYou rows={needsYou.rows} total={needsYou.total} unchecked={needsYou.unchecked}
    onPick={unit=>{pick('attention','all','all');setQuery(unit);}}/>}
   {counts&&<div className='cos-camera-brand-tiles' role='group' aria-label='Equipment makes in the field'>
@@ -269,6 +282,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
   <p className='cos-camera-status-note'>{GROUPS.find(item=>item.id===group)!.note}
    {family!=='all'&&<> Showing {FAMILY_LABEL[family]} only.</>}
    {stateFilter!=='all'&&<> Showing only {STATE_LABEL[stateFilter].toLowerCase()}. <button type='button' className='cos-camera-status-clear-filter' onClick={()=>setStateFilter('all')}>Show all</button></>}</p>
+  </details>
+  {error&&<p className='cos-camera-status-error' role='alert'>{error}{report?' The readings below are from the time above.':''}</p>}
+  {uncertain&&<p role='alert'>The save could not be confirmed. Refresh and review the saved address before making another edit.</p>}
+  {saved&&<p className='cos-camera-status-saved' role='status'>{saved}</p>}
   {report&&(group==='field'||group==='attention')&&<UnitStatusMap savedAddresses={savedAddresses} units={group==='attention'?report.units.filter(unit=>unit.state!=='GREEN'):report.units}
    onSelect={unit=>{setStateFilter('all');setFamily('all');setQuery(unit);}}/>}
   <div className='cos-camera-status-search'>

@@ -109,7 +109,9 @@ export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],h
 }
 export function cameraTime(value?:string|null,now=Date.now()) {
   const {at}=cameraTimestamp(value,now);
-  return at?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)):'Not recorded / invalid';
+  if(!at)return 'Not recorded / invalid';
+  const formatted=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(at));
+  return formatted+' CT';
 }
 
 export function unitHealthLabel(info:UnitCameraHealth|null|undefined){

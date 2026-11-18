@@ -161,7 +161,7 @@ async function waitForNewFleetPair(frame,state,beforeHealth,beforeMap){
  await expect.poll(()=>state.mapReads).toBeGreaterThan(beforeMap);
 }
 async function waitForRenderedFleet(page,frame){
- const refreshed=await frame.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'}).format(new Date(at)),fleetRefreshTime);
+ const refreshed=await frame.locator('body').evaluate((_body,at)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(at))+' CT',fleetRefreshTime);
  await expect(frame.locator('.cos-fleet-heading')).toContainText(refreshed);
  // Give the committed health update its normal subsequent frames/passive effects
  // before releasing the POST; route fulfillment alone is not a render barrier.

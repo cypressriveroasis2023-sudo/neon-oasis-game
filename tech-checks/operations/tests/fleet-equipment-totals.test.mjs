@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fleetEquipmentTotals} from '../src/fleetEquipmentTotalsModel.ts';
+import {fleetEquipmentTotals,unverifiedTile} from '../src/fleetEquipmentTotalsModel.ts';
 import {buildFleetCommandCenter} from '../src/fleetCommandCenterModel.ts';
 import {mhelpFieldHealth} from '../src/mhelpFieldHealth.ts';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
@@ -21,6 +21,18 @@ test('missing and mismatched health cannot turn units online or offline',()=>{
  const f=fixture();for(const data of [null,{...f.data,items:f.data.items.slice(1)}]){
   const totals=fleetEquipmentTotals(f.upload,data,f.now),c=totals.find(x=>x.key==='cameras');assert.equal(c.online,0);assert.equal(c.offline,0);assert.equal(c.unverified,c.field);
  }
+});
+test('the no-reading tile counts the same product rows its list opens',()=>{
+ const f=fixture(),partial=fleetEquipmentTotals(f.upload,{...f.data,items:f.data.items.slice(1)},f.now).find(x=>x.key==='cameras');
+ const opened=rows=>rows.filter(p=>p.status==='unverified'&&unverifiedTile(p)==='no_reading');
+ assert.equal(partial.unverified,partial.field);
+ assert.equal(partial.unverifiedNoReading,0);
+ assert.equal(opened(partial.products).length,partial.unverifiedNoReading);
+ const data=structuredClone(f.data);data.items[0].status='not_applicable';
+ const totals=fleetEquipmentTotals(f.upload,data,f.now).find(x=>x.key==='cameras');
+ const list=opened(totals.products);
+ assert.equal(totals.unverifiedNoReading,list.length);
+ assert.notEqual(totals.unverifiedNoReading,totals.field-totals.online-totals.offline-totals.unverifiedDeviceLink);
 });
 test('malformed or duplicate Product-ID source never supplies totals',()=>{
  const f=fixture();f.upload.records[1].productId=f.upload.records[0].productId;assert.equal(fleetEquipmentTotals(f.upload,f.data,f.now),null);
