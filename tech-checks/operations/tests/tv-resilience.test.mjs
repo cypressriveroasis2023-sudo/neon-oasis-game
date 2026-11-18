@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {tvAuthDecision,tvNetworkBackoff,isTvTransportFailure,TV_WATCHDOG_MS,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT,TvFleetErrorBoundary} from '../src/tvResilience.tsx';
+import {tvAuthDecision,tvNetworkBackoff,tvGatewayBackoff,tvSavedReadRetry,isTvTransportFailure,TV_WATCHDOG_MS,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT,TvFleetErrorBoundary} from '../src/tvResilience.tsx';
 
 test('a token refresh keeps the board',()=>{
   assert.equal(tvAuthDecision('token-renewed',false),'keep');
@@ -17,6 +17,24 @@ test('a 401 after the silent re-login clears the board and asks for sign-in',()=
   assert.equal(tvAuthDecision('authentication-denied',true),'sign-in-prompt');
   assert.equal(tvAuthDecision('security-hide',false),'sign-in-prompt');
   assert.equal(tvAuthDecision(undefined,false),'sign-in-prompt');
+});
+
+test('a 503 waits before retrying',()=>{
+  assert.equal(tvGatewayBackoff(0,()=>0),2_500);
+  assert.equal(tvGatewayBackoff(0,()=>1),5_000);
+  assert.equal(tvGatewayBackoff(1,()=>0),7_500);
+  assert.equal(tvGatewayBackoff(2,()=>1),30_000);
+  assert.equal(tvGatewayBackoff(3,()=>0.5),null);
+  for(const status of [502,503,504]){
+    const wait=tvSavedReadRetry({status,initial:false,retryUsed:false,hasField:false,recoveryBlocked:false,attempt:0,random:()=>0});
+    assert.equal(wait,2_500);
+    assert.ok(wait>0);
+  }
+  assert.equal(tvSavedReadRetry({status:503,initial:true,retryUsed:false,hasField:false,recoveryBlocked:false,attempt:0,random:()=>1}),5_000);
+  assert.equal(tvSavedReadRetry({status:503,initial:false,retryUsed:false,hasField:true,recoveryBlocked:false,attempt:0,random:()=>0}),null);
+  assert.equal(tvSavedReadRetry({status:546,initial:true,retryUsed:false,hasField:false,recoveryBlocked:false,attempt:0}),30_000);
+  assert.equal(tvSavedReadRetry({status:546,initial:false,retryUsed:true,hasField:false,recoveryBlocked:false,attempt:0}),null);
+  assert.equal(tvSavedReadRetry({status:503,transport:'rejected',initial:false,retryUsed:false,hasField:false,recoveryBlocked:false,attempt:0}),5_000);
 });
 
 test('network blips back off and then stop',()=>{

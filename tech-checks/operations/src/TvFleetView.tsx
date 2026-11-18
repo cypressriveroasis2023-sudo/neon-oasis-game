@@ -13,7 +13,7 @@ import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
 import {automaticRefreshDue,TV_SAVED_BOARD_REFRESH_MS,TV_SAVED_BOARD_STALE_MS} from './refreshCadence';
-import {isTvTransportFailure,tvAuthDecision,tvNetworkBackoff,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT} from './tvResilience';
+import {isTvTransportFailure,tvAuthDecision,tvSavedReadRetry,TV_RELOGIN_DEADLINE_MS,TV_SIGN_IN_PROMPT} from './tvResilience';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -28,7 +28,6 @@ type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
 type Api={get:(path:string)=>Promise<{data:any}>};
 const INITIAL_READ_RETRY_MS=30000;
-const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546].includes(status);
 // A saved Fleet board is judged at its own completion time, exactly as the
 // Fleet dashboard does. Using the moment this browser fetched it would expire
 // every reading in an older board and print zeros instead of its real totals.
@@ -60,9 +59,9 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       const current=()=>alive.current&&request===generation.current;
       // Stage each response until this read settles. A new placement response
       // must never be displayed with the preceding read's health claims.
-      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,transientFieldFailure=false,recoveryBlocked=false,networkFailure=false;
+      let nextField:Partial<Snapshot>|null=null,nextHealth:Health|null=null,nextRouters:RouterSnapshot|null|undefined=readRouters?null:undefined,retryStatus:number|null=null,transportKind:'rejected'|'timeout'|undefined,recoveryBlocked=false;
       const errors=await loadTvFleetFeeds(api,{
-        readFailure:(source,status,transport)=>{if(isTvTransportFailure(transport))networkFailure=true;else if(source==='fieldMap')transientFieldFailure=transientReadStatus(status);if(!isTvTransportFailure(transport)&&!transientReadStatus(status))recoveryBlocked=true;},
+        readFailure:(source,status,transport)=>{if(isTvTransportFailure(transport))transportKind=transport;const gateway=typeof status==='number'&&[502,503,504].includes(status)&&!isTvTransportFailure(transport);if(gateway)retryStatus=status;else if(source==='fieldMap'&&retryStatus===null)retryStatus=typeof status==='number'?status:null;if(!isTvTransportFailure(transport)&&status!==546&&!gateway)recoveryBlocked=true;},
         healthUnavailable:()=>{nextHealth=null;},
         routersUnavailable:()=>{nextRouters=null;},
         field:async field=>{
@@ -80,18 +79,19 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         setError(sourceErrorText(lastErrors.current));
         // One cold-load recovery only, after the complete initial read settles.
         // This reads saved records and never schedules a provider probe.
-        // HTTP 546 stays on this single 30-second retry. A fetch that rejects
-        // or times out uses the 5/15/30 backoff instead, never both.
-        const shortRetry=initialAttempt&&!nextField&&transientFieldFailure&&!recoveryBlocked&&!networkFailure&&!retryUsed.current&&!sessionBlocked.current;
+        // HTTP 546 stays on its single 30-second retry. A plain 502, 503 or 504
+        // waits on the jittered cap instead, and a dropped fetch uses 5/15/30.
+        // Those waits never run together.
+        const retryWait=tvSavedReadRetry({status:retryStatus,transport:transportKind,initial:initialAttempt,retryUsed:retryUsed.current,hasField:Boolean(nextField),recoveryBlocked,attempt:networkAttempt.current});
+        const shortRetry=retryWait===INITIAL_READ_RETRY_MS&&retryStatus===546&&!transportKind;
         if(shortRetry){
           clearNetworkTimer();
-          retryAt.current=Date.now()+INITIAL_READ_RETRY_MS;
-          retryTimer.current=window.setTimeout(()=>retryRead.current(),INITIAL_READ_RETRY_MS);
+          retryAt.current=Date.now()+retryWait;
+          retryTimer.current=window.setTimeout(()=>retryRead.current(),retryWait);
         }
         if(nextField){networkAttempt.current=0;reloginUsed.current=false;clearNetworkTimer();clearReloginTimer();}
-        else if(!shortRetry&&networkFailure&&!sessionBlocked.current){
-          const delay=tvNetworkBackoff(networkAttempt.current);
-          if(delay!==null){cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)savedReread();},delay);}
+        else if(!shortRetry&&retryWait!==null&&!sessionBlocked.current){
+          cancelRetry();retryAt.current=0;networkAttempt.current+=1;clearNetworkTimer();networkTimer.current=window.setTimeout(()=>{networkTimer.current=null;if(alive.current&&!sessionBlocked.current)savedReread();},retryWait);
         }
       }
     }catch(cause){if(alive.current&&request===generation.current){lastErrors.current={camera:[],routers:[]};setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}}
