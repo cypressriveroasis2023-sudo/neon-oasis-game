@@ -18,10 +18,23 @@ const stamp = (value: unknown) => typeof value === 'string' && Number.isFinite(D
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 /** Deliberately no aliases, punctuation stripping, family inference or zero padding. */
 export const exactUnitName = (value: unknown) => text(value).replace(/\s+/g, ' ').toLowerCase();
-export function routerStatus(row: Pick<RouterRow, 'probeStatus' | 'checkedAt'>, now = Date.now()): RouterStatus {
-  const observed = row.checkedAt ? Date.parse(row.checkedAt) : NaN;
-  if (!Number.isFinite(observed) || observed > now) return 'unknown';
-  if (now - observed > ROUTER_FRESHNESS_MS) return 'stale';
+export function routerStatus(row: Pick<RouterRow, 'probeStatus' | 'checkedAt'> & { reportedAt?: string | null }, now = Date.now()): RouterStatus {
+  // A future probe is not evidence. It must not fall through to an older import.
+  if (row.checkedAt) {
+    const raw = Date.parse(row.checkedAt);
+    if (Number.isFinite(raw) && raw > now) return 'unknown';
+  }
+  const usable = (value: string | null | undefined) => {
+    const at = value ? Date.parse(value) : NaN;
+    return Number.isFinite(at) && at <= now ? at : null;
+  };
+  // The board ages from the newer of the probe check and the InHand reported
+  // time. The file load time is not an input and is not read here.
+  const checked = usable(row.checkedAt);
+  const reported = usable(row.reportedAt);
+  const newest = checked == null ? reported : reported == null ? checked : Math.max(checked, reported);
+  if (newest == null) return 'unknown';
+  if (now - newest > ROUTER_FRESHNESS_MS) return checked == null ? 'unknown' : 'stale';
   return row.probeStatus === 'online' ? 'reachable' : row.probeStatus === 'offline' ? 'unreachable' : 'unknown';
 }
 /** All fields are allowlisted. Raw metadata, credentials, and guessed GPS never reach the browser. */

@@ -17,6 +17,19 @@ test('stale, absent, malformed and future probe timestamps cannot manufacture on
  assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:44:00Z'}),+now),'reachable');
  for(const value of [null,'nonsense','2026-10-05T21:00:01Z'])assert.equal(routerStatus(row({last_checked_at:value}),+now),'unknown');
 });
+test('a fresh InHand reported time counts, and a stale or missing one stays Not verified',()=>{
+ const fresh='2026-10-05T20:50:00Z';
+ assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:55:00Z',current_status:'online',status_observed_at:'2026-10-05T20:00:00Z'}),+now),'reachable');
+ assert.equal(routerStatus(row({last_checked_at:null,status_observed_at:fresh,current_status:'online'}),+now),'reachable');
+ assert.equal(routerStatus(row({last_checked_at:null,status_observed_at:fresh,current_status:'offline'}),+now),'unreachable');
+ assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:00:00Z',status_observed_at:fresh,current_status:'offline'}),+now),'unreachable');
+ assert.equal(routerStatus(row({last_checked_at:null,status_observed_at:'2026-10-05T20:00:00Z',current_status:'offline',updated_at:now.toISOString()}),+now),'unknown');
+ assert.equal(routerStatus(row({last_checked_at:null,status_observed_at:null,current_status:'offline',updated_at:now.toISOString()}),+now),'unknown');
+ assert.deepEqual(summarizeRouters([
+  row({last_checked_at:null,status_observed_at:fresh,current_status:'online'}),
+  row({last_checked_at:null,status_observed_at:'2026-10-04T20:00:00Z',current_status:'offline'}),
+ ],+now),{reachable:1,unreachable:0,stale:0,unknown:1});
+});
 test('freshness ages without another API response',()=>{
  const value=row();assert.equal(routerStatus(value,+now),'reachable');assert.equal(routerStatus(value,+now+21*60*1000),'stale');
 });
