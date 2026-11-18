@@ -153,9 +153,7 @@ jobs:
           test "$(git hash-object ../it-intake-wizard-v1.js)" = "$intake_blob"
           # James authorized the shared COS power-alarm settings table on
           # 2026-11-16. The SIM cancellation table was added on 2026-11-17 and
-          # is not applied by this workflow. The router-table grant migration
-          # is allowlisted below and is not applied by this workflow. The pin
-          # still fails closed for every other migration.
+          # is not applied by this workflow. The pin still fails closed.
           timeout_migration='tech-checks/supabase/migrations/20261107_extend_internal_fleet_snapshot_read_timeout.sql'
           settings_migration='tech-checks/supabase/migrations/20261116_cos_power_alarm_settings.sql'
           sim_migration='tech-checks/supabase/migrations/20261117_cos_sim_cancel_records.sql'
@@ -170,7 +168,7 @@ jobs:
           sim_blob='377799dc204046dcb390594324e6fbd1163fc2d1'
           test "$(git rev-parse HEAD:$sim_migration)" = "$sim_blob"
           test "$(git hash-object ../supabase/migrations/20261117_cos_sim_cancel_records.sql)" = "$sim_blob"
-          router_grants_blob='071c13f93e3651f2fd68b84bb5785a409844b24f'
+          router_grants_blob='5a865f56c4069673de33a523d3bec5c6155173ce'
           test "$(git rev-parse HEAD:$router_grants_migration)" = "$router_grants_blob"
           test "$(git hash-object ../supabase/migrations/20261118_camera_unit_routers_read_grants.sql)" = "$router_grants_blob"
       - run: npm install --no-audit --no-fund
