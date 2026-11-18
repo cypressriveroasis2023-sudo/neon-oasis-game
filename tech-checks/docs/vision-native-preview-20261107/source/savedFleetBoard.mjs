@@ -692,9 +692,19 @@ function readRecordedRoster(value, inventory) {
 // ../supabase/functions/cos-operations-pages/routers.ts
 var ROUTER_FRESHNESS_MS = 20 * 60 * 1e3;
 function routerStatus(row, now = Date.now()) {
-  const observed = row.checkedAt ? Date.parse(row.checkedAt) : NaN;
-  if (!Number.isFinite(observed) || observed > now) return "unknown";
-  if (now - observed > ROUTER_FRESHNESS_MS) return "stale";
+  if (row.checkedAt) {
+    const raw = Date.parse(row.checkedAt);
+    if (Number.isFinite(raw) && raw > now) return "unknown";
+  }
+  const usable = (value) => {
+    const at = value ? Date.parse(value) : NaN;
+    return Number.isFinite(at) && at <= now ? at : null;
+  };
+  const checked = usable(row.checkedAt);
+  const reported = usable(row.reportedAt);
+  const newest = checked == null ? reported : reported == null ? checked : Math.max(checked, reported);
+  if (newest == null) return "unknown";
+  if (now - newest > ROUTER_FRESHNESS_MS) return checked == null ? "unknown" : "stale";
   return row.probeStatus === "online" ? "reachable" : row.probeStatus === "offline" ? "unreachable" : "unknown";
 }
 
