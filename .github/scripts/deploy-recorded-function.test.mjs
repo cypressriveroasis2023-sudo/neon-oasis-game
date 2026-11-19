@@ -107,6 +107,20 @@ test('the committed CORS patch reproduces Vision\'s expected hashes from the rec
   assert.equal(countOccurrences(serve.content,Buffer.from('preview-vision-command-james')),0,'branch alias must not be allowed');
 });
 
+test('the unit camera route patch applies to the v16 bundle and rollback restores that bundle',()=>{
+  const camera=join(ROOT,'.github/function-patches/cos-unit-camera-status');
+  const forward=JSON.parse(readFileSync(join(camera,'camera-routes-only-v16.json'),'utf8'));
+  const back=JSON.parse(readFileSync(join(camera,'rollback-to-v16-entry.json'),'utf8'));
+  assert.equal(forward.slug,'cos-unit-camera-status');
+  assert.equal(forward.expectedBefore['index.ts'],'f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9');
+  assert.equal(forward.requireLiveBeforeDeploy.version,16);
+  assert.equal(forward.requireLiveBeforeDeploy.ezbr_sha256.startsWith('47f904b7'),true);
+  const files=preparePayload(forward,name=>readFileSync(join(ROOT,forward.sourceDir,name)));
+  assert.equal(files.find(file=>file.recordName==='index.ts').sha256,'a9c7c08bb6fbb22e80c51792d28a8c0ea22fbf84cd84bf0128671ed890140b1f');
+  const restored=preparePayload(back,name=>readFileSync(join(ROOT,back.sourceDir,name)));
+  assert.equal(restored.find(file=>file.recordName==='index.ts').sha256,'f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9');
+});
+
 test('the committed rollback patch reproduces the original v134 bytes unchanged',()=>{
   const files=preparePayload(rollback,readRecorded(rollback));
   assert.equal(files.find(f=>f.recordName==='serve.ts').sha256,'d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12');
