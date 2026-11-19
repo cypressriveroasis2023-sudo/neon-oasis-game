@@ -8,6 +8,10 @@ const IN_SHOP_COLOR = '#64748b';
 export const WATCHFUL_OBSERVATION_FRESH_MS = CAMERA_FRESH_MS;
 
 export const SHOP_REVIEW_FLAG = 'Watchful says at site, mHelp says Shop';
+export const IMMIX_GROUP_LABEL = 'Monitored on Immix';
+export const IMMIX_STATUS_LABEL = 'status not tracked: Immix';
+
+export type MonitoredSource = 'watchful' | 'immix';
 
 export type WatchfulCountUnit = {
   unitName: string;
@@ -22,9 +26,19 @@ export type WatchfulCountUnit = {
 export type MhelpCountUnit = {
   name: string;
   placement: 'FIELD' | 'SHOP' | 'OTHER';
+  siteName?: string | null;
   doNotUse?: boolean;
   /** What COS currently shows, so a disagreement can be listed. It does not replace Watchful. */
   cosStatus?: 'up' | 'down' | 'unknown';
+};
+
+export type ImmixMonitoredUnit = {
+  name: string;
+  siteName: string;
+  source: 'immix';
+  status: 'unknown';
+  statusLabel: typeof IMMIX_STATUS_LABEL;
+  groupLabel: typeof IMMIX_GROUP_LABEL;
 };
 
 export type StatusMismatch = {
@@ -49,6 +63,7 @@ export type SharedMonitoredCount = {
   offlineUnits: number | null;
   unknownUnits: number | null;
   notInWatchful: {name: string}[];
+  monitoredOnImmix: ImmixMonitoredUnit[];
   shopReview: {name: string; flag: typeof SHOP_REVIEW_FLAG}[];
   statusMismatches: StatusMismatch[];
 };
@@ -66,9 +81,14 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   offlineUnits: fresh ? 0 : null,
   unknownUnits: fresh ? 0 : null,
   notInWatchful: [],
+  monitoredOnImmix: [],
   shopReview: [],
   statusMismatches: [],
 });
+
+function siteKey(value: string | null | undefined): string {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+}
 
 export function customerMonitoredName(name: string, doNotUse = false): boolean {
   if (doNotUse) return false;
@@ -103,6 +123,8 @@ export function selectSharedMonitoredCount(input: {
   snapshotAt?: string | null;
   /** Ignored. Freshness uses the oldest observation, not the fetch. */
   fetchedAt?: string | null;
+  /** Site names monitored on Immix instead of Watchful. Loaded later; not committed. */
+  immixSites?: readonly string[];
   mhelp: readonly MhelpCountUnit[];
   now?: number;
 }): SharedMonitoredCount {
@@ -127,6 +149,7 @@ export function selectSharedMonitoredCount(input: {
     mhelpByKey.set(key, list);
   }
 
+  const immixSites = new Set((input.immixSites || []).map(siteKey).filter(Boolean));
   const result = empty(true, oldestObservedAt);
   const sites = new Map<string, SiteCameraRow>();
   let camerasUp = 0;
@@ -164,7 +187,19 @@ export function selectSharedMonitoredCount(input: {
   for (const unit of input.mhelp) {
     if (unit.placement !== 'FIELD' || !customerMonitoredName(unit.name, unit.doNotUse)) continue;
     const key = watchfulCanonicalUnitKey(unit.name);
-    if (!key || !counted.has(key)) result.notInWatchful.push({name: unit.name});
+    if (key && counted.has(key)) continue;
+    if (immixSites.has(siteKey(unit.siteName))) {
+      result.monitoredOnImmix.push({
+        name: unit.name,
+        siteName: (unit.siteName || '').trim().replace(/\s+/g, ' '),
+        source: 'immix',
+        status: 'unknown',
+        statusLabel: IMMIX_STATUS_LABEL,
+        groupLabel: IMMIX_GROUP_LABEL,
+      });
+      continue;
+    }
+    result.notInWatchful.push({name: unit.name});
   }
 
   result.siteRows = [...sites.values()].sort((left, right) => left.siteName.localeCompare(right.siteName));
@@ -185,6 +220,11 @@ export function presentedWatchfulStatus(input: {
   if (!input.snapshotFresh || (input.unitStatus !== 'up' && input.unitStatus !== 'down')) return 'Unknown';
   if (input.mhelpPlacement === 'SHOP') return 'In Shop';
   return input.unitStatus;
+}
+
+/** Immix has no live status. The label is Unknown, never up or down. */
+export function presentedImmixStatus(unit: ImmixMonitoredUnit): { status: 'unknown'; statusLabel: typeof IMMIX_STATUS_LABEL } {
+  return { status: 'unknown', statusLabel: unit.statusLabel };
 }
 
 /** Every monitored headline asks this model. The path name is recorded so the callers stay one count. */

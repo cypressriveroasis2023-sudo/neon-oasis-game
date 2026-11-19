@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
-import {MONITORED_COUNT_PATHS, countForPath, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
+import {MONITORED_COUNT_PATHS, countForPath, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
 const snapshotAt = new Date(now - 60_000).toISOString();
@@ -170,4 +170,41 @@ test('a Shop unit counts 0 even when Watchful says down', () => {
   assert.deepEqual(count.cameras, {up: 0, down: 0, total: 0});
   assert.equal(count.offlineUnits, 0);
   assert.equal(count.inShop, 1);
+});
+
+test('Immix-site units leave Not in Watchful and are not counted as Watchful units', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [{
+      unitName: 'Sniper 8',
+      canonicalUnitKey: 'SNIPER|8',
+      siteName: 'Fixture Mixed Yard',
+      status: 'up',
+      camerasUp: 2,
+      camerasDown: 0,
+      snapshotAt,
+    }],
+    immixSites: ['Fixture Immix Yard', 'Fixture Mixed Yard'],
+    mhelp: [
+      {name: 'Sniper 8', placement: 'FIELD', siteName: 'Fixture Mixed Yard'},
+      {name: 'Sniper 9', placement: 'FIELD', siteName: 'Fixture Mixed Yard'},
+      {name: 'Sniper 10', placement: 'FIELD', siteName: 'Fixture Immix Yard'},
+      {name: 'Sniper 11', placement: 'FIELD', siteName: 'Fixture Plain Yard'},
+      {name: 'Sniper 12 test', placement: 'FIELD', siteName: 'Fixture Immix Yard'},
+      {name: 'Sniper 13', placement: 'SHOP', siteName: 'Fixture Immix Yard'},
+      {name: 'Sniper 14', placement: 'FIELD', siteName: 'Fixture Immix Yard', doNotUse: true},
+    ],
+    now,
+  });
+  assert.equal(count.units, 1);
+  assert.deepEqual(count.cameras, {up: 2, down: 0, total: 2});
+  assert.deepEqual(count.monitoredOnImmix.map(unit => unit.name), ['Sniper 9', 'Sniper 10']);
+  assert.deepEqual(count.notInWatchful.map(unit => unit.name), ['Sniper 11']);
+  for (const unit of count.monitoredOnImmix) {
+    assert.equal(unit.source, 'immix');
+    assert.equal(unit.groupLabel, 'Monitored on Immix');
+    assert.equal(unit.status, 'unknown');
+    assert.equal(presentedImmixStatus(unit).statusLabel, 'status not tracked: Immix');
+    assert.notEqual(unit.status, 'up');
+    assert.notEqual(unit.status, 'down');
+  }
 });

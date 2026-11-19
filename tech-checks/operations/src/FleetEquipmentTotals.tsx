@@ -17,6 +17,7 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
  const cameras=totals?.find(t=>t.key==='cameras');
  return <section className='cos-equipment-totals' aria-label='Equipment family totals'>
   <p className='cos-monitored-count'>Monitored units {shared.fresh&&shared.units!==null?shared.units:'Unknown'} · Cameras {shared.cameras?shared.cameras.up+' up, '+shared.cameras.down+' down':'Unknown'}{shared.oldestObservedAt?' · Observed '+shared.oldestObservedAt:''}</p>
+  {shared.monitoredOnImmix.length>0&&<p className='cos-immix-monitored'>{shared.monitoredOnImmix[0].groupLabel} · {shared.monitoredOnImmix.length} · {shared.monitoredOnImmix[0].statusLabel}</p>}
   <div className='cos-equipment-total-grid'>{(['cameras','helios','stands'] as const).map(key=>{
    const total=totals?.find(t=>t.key===key);
    return <article key={key} className={'cos-equipment-total-card cos-equipment-total-'+key}>
