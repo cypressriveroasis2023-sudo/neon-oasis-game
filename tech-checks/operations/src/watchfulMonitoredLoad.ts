@@ -35,10 +35,10 @@ const GROUP_ALIAS: Record<string, WatchfulGroup> = {
 
 const FORBIDDEN_HEADER = /(^|[^a-z])(ip|ips|ipv6|ip6|serial|serials|imei|imsi|iccid|sim|mac)([^a-z]|$)/i;
 const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/gi;
-const MAC = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
-const DOTTED_MAC = /\b[0-9a-f]{4}(?:\.[0-9a-f]{4}){2}\b/gi;
-const LABELED_SERIAL = /\b(?:serial|s\/n|sn)\b[:\s#-]*[A-Z0-9][A-Z0-9-]{5,}/gi;
-const BARE_SERIAL = /\b(?:\d{14,17}|[A-F0-9]{12,})\b/gi;
+const MAC_PAIRS = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
+const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
+const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
+const SERIAL_VALUE = /[A-Z0-9][A-Z0-9-]*\d[A-Z0-9-]*/i;
 
 export class WatchfulLoadError extends Error {
   constructor(message: string) {
@@ -85,14 +85,38 @@ function isIpv6Token(token: string): boolean {
   return groups.length === 8;
 }
 
-/** Drop an IPv4, IPv6, or MAC token. A cell that is only one of those is rejected by the caller. */
+function scrubToken(pattern: RegExp, text: string): {text: string; stripped: boolean} {
+  pattern.lastIndex = 0;
+  if (!pattern.test(text)) return {text, stripped: false};
+  pattern.lastIndex = 0;
+  return {text: text.replace(pattern, ' '), stripped: true};
+}
+
+/** Drop an IPv4, IPv6, MAC, or serial value. Labels stay. Ordinary words stay. */
 export function stripWatchfulIp(value: string): {text: string; stripped: boolean; onlyIp: boolean} {
   let text = value;
   let stripped = false;
-  if (MAC.test(text)) { MAC.lastIndex = 0; stripped = true; text = text.replace(MAC, ' '); MAC.lastIndex = 0; }
-  if (DOTTED_MAC.test(text)) { DOTTED_MAC.lastIndex = 0; stripped = true; text = text.replace(DOTTED_MAC, ' '); DOTTED_MAC.lastIndex = 0; }
-  if (LABELED_SERIAL.test(text)) { LABELED_SERIAL.lastIndex = 0; stripped = true; text = text.replace(LABELED_SERIAL, ' '); LABELED_SERIAL.lastIndex = 0; }
-  if (BARE_SERIAL.test(text)) { BARE_SERIAL.lastIndex = 0; stripped = true; text = text.replace(BARE_SERIAL, ' '); BARE_SERIAL.lastIndex = 0; }
+  const mark = (next: {text: string; stripped: boolean}) => { text = next.text; if (next.stripped) stripped = true; };
+  mark(scrubToken(MAC_PAIRS, text));
+  mark(scrubToken(MAC_GROUPS, text));
+  mark(scrubToken(MAC_BARE, text));
+  text = text.replace(/\b(serial\s+number|serial\s+no\.?)\s*(?::|=|-|_)?\s*([A-Z0-9-]*\d[A-Z0-9-]*)/gi, (whole, label, token) => {
+    if (!SERIAL_VALUE.test(token)) return whole;
+    stripped = true;
+    return /[:]\s*\S+$/.test(whole) ? `${label}:` : label;
+  });
+  text = text.replace(/\b(serial)\s*([=_])\s*(\S+)/gi, (whole, label, sep, token) => {
+    if (!SERIAL_VALUE.test(token)) return whole;
+    stripped = true;
+    return `${label}${sep}`;
+  });
+  text = text.replace(/\b(serial)\s+([A-Z0-9-]*\d[A-Z0-9-]*)/gi, (whole, label) => { stripped = true; return label; });
+  text = text.replace(/\b(?:\d{14,17}|[A-F0-9]{12,})\b/gi, token => {
+    if (/^\d{4}-\d{2}-\d{2}/.test(token)) return token;
+    stripped = true;
+    return ' ';
+  });
+  IPV4.lastIndex = 0;
   if (IPV4.test(text)) { IPV4.lastIndex = 0; stripped = true; text = text.replace(IPV4, ' '); IPV4.lastIndex = 0; }
   text = text.replace(/[0-9a-f:]{2,}/gi, token => {
     if (!isIpv6Token(token)) return token;

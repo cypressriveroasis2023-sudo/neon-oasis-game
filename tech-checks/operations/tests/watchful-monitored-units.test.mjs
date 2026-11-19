@@ -50,7 +50,7 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(stripWatchfulIp('aabb.ccdd.eeff').onlyIp, true);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\naabb.ccdd.eeff,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
   const serial = stripWatchfulIp('Fixture Site serial AB12CD34EF56 gate');
-  assert.equal(serial.text, 'Fixture Site gate');
+  assert.equal(serial.text, 'Fixture Site serial gate');
   assert.equal(stripWatchfulIp('AB12CD34EF56').onlyIp, true);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nAB12CD34EF56,Fixture Site,Avigilon,up,1,0\n', at), /serial/);
   const missingTime = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nSniper 3,Fixture Site,Avigilon,up,1,0\n', at);
@@ -58,6 +58,25 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(missingTime.units[0].snapshotAt, null);
   const kept = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z\n', at);
   assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
+});
+
+test('serial labels stay and only the value is redacted', () => {
+  assert.equal(stripWatchfulIp('Serial Number: AB12CD34').text, 'Serial Number:');
+  assert.equal(stripWatchfulIp('Serial No. AB12CD34').text, 'Serial No.');
+  assert.equal(stripWatchfulIp('serial=AB12CD34').text, 'serial=');
+  assert.equal(stripWatchfulIp('serial_AB12CD34').text, 'serial_');
+  assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
+  assert.equal(stripWatchfulIp('Serial cameras gate').text, 'Serial cameras gate');
+  assert.equal(stripWatchfulIp('Sniper 12 gate').text, 'Sniper 12 gate');
+});
+
+test('MAC values are redacted with colon, hyphen, dot, or no separator', () => {
+  for (const token of ['aa:bb:cc:dd:ee:ff', 'aa-bb-cc-dd-ee-ff', 'aabb.ccdd.eeff', 'aabb:ccdd:eeff', 'aabb-ccdd-eeff', 'aabbccddeeff']) {
+    const cleaned = stripWatchfulIp(`Fixture Site ${token} gate`);
+    assert.equal(cleaned.text, 'Fixture Site gate', token);
+    assert.equal(stripWatchfulIp(token).onlyIp, true, token);
+  }
+  assert.equal(stripWatchfulIp('Seen 14:00:00 gate').text, 'Seen 14:00:00 gate');
 });
 
 test('duplicate camera rows collapse to one unit and the latest reading wins', () => {
