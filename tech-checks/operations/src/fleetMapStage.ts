@@ -84,7 +84,8 @@ export function fleetBoardRequested() {
 }
 
 export function fleetMapStageActive(wide: boolean, enabled = FLEET_MAP_STAGE_LAYOUT) {
-  return enabled && wide && fleetBoardRequested() && !fleetStageRollbackRequested();
+  void wide;
+  return enabled && fleetBoardRequested() && !fleetStageRollbackRequested();
 }
 
 export function fleetMapStageEnabled(enabled = FLEET_MAP_STAGE_LAYOUT) {

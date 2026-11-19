@@ -12,6 +12,9 @@ html.cos-fleet-stage-lock .company-shell>.owner-it-main{
   overflow:hidden!important;padding-bottom:0!important;box-sizing:border-box
 }
 html.cos-fleet-stage-lock .company-utility-bar{flex:none;height:52px!important;min-height:52px!important;margin-bottom:0!important}
+html.cos-fleet-stage-lock #root .operations-sidebar{display:none!important}
+html.cos-fleet-stage-lock #root .company-shell{grid-template-columns:minmax(0,1fr)!important}
+html.cos-fleet-stage-lock .leaflet-control-zoom{display:none!important}
 html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on{
   flex:1 1 auto!important;height:0!important;min-height:0!important;max-height:none!important;
   overflow:hidden;display:flex!important;flex-direction:column!important;
@@ -96,7 +99,14 @@ aside.cos-stage-drawer{
 .tv-fleet-view.cos-tv-stage .tv-fleet-summary,.tv-fleet-view.cos-tv-stage .cos-source-strip{flex:none;max-height:40px;overflow:auto;margin:0}
 .tv-fleet-view.cos-tv-stage .tv-fleet-map-wrap{flex:1 1 auto;height:0;min-height:0;display:flex}
 .tv-fleet-view.cos-tv-stage .tv-fleet-map{flex:1;height:100%;min-height:0}
-.tech-check-tv:has(.cos-tv-stage){gap:8px!important;padding:12px 16px!important}
+.tech-check-tv:has(.cos-tv-stage){position:relative;height:100dvh;gap:0!important;padding:0!important}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-header,
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-page-title,
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-footer,
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-warning{display:none!important}
+.tv-fleet-view.cos-tv-stage{position:absolute;inset:0;height:auto}
+.tv-fleet-view.cos-tv-stage .tv-fleet-map-wrap{border:0;border-radius:0;margin:0}
+.tv-fleet-view.cos-tv-stage>.cos-board{left:16px;right:16px;top:12px}
 .tech-check-tv:has(.cos-tv-stage) .tech-check-tv-eye{width:40px;height:40px}
 .tech-check-tv:has(.cos-tv-stage) .tech-check-tv-brand h1{font-size:22px}
 .tech-check-tv:has(.cos-tv-stage) .tech-check-tv-clock b{font-size:28px}
@@ -120,10 +130,15 @@ aside.cos-stage-drawer{
 .cos-board-boxes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .cos-board-box{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0;padding:12px 16px;text-align:left;background:#141d28;color:#e8eef5;border:2px solid #1f2b3a;border-radius:16px}
 .cos-board-box span{font-size:16px;color:#9fb0c3;font-weight:650}
-.cos-board-box strong{font-size:48px;line-height:1;font-weight:800;color:#3ddc84}
-.cos-board-box strong small{font-size:26px;color:#7f8da0;font-weight:700}
+.cos-board-box strong{font-size:48px;line-height:1;font-weight:800;color:#3ddc84;white-space:nowrap}
+#root#root .cos-fleet-dashboard .cos-board-box:not(.cos-board-problems) strong{color:#3ddc84!important}
+#root#root .cos-fleet-dashboard .cos-board-box strong.is-muted,
+#root#root .cos-fleet-dashboard .cos-board.is-stale .cos-board-box strong,
+#root#root .cos-fleet-dashboard .cos-board.is-stale .cos-board-fraction{color:#8a96a6!important}
+.cos-board-fraction{display:inline;font-size:26px;color:#7f8da0;font-weight:700;white-space:nowrap}
+#root#root .cos-fleet-dashboard .cos-board-fraction{display:inline!important;color:#7f8da0!important;font-size:26px!important}
 .cos-board-box>small{min-height:18px;color:#9fb0c3;font-size:14px}
-.cos-board.is-stale .cos-board-box strong,.cos-board.is-stale .cos-board-box strong small{color:#8a96a6}
+.cos-board.is-stale .cos-board-box strong,.cos-board.is-stale .cos-board-fraction{color:#8a96a6}
 .cos-board-problems{border-color:#7a2630;background:#2a1418}
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems:not(.is-clear){background:#2a1418!important;border:2px solid #7a2630!important;color:#ff5a5f!important}
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems:not(.is-clear) strong{color:#ff5a5f!important}
