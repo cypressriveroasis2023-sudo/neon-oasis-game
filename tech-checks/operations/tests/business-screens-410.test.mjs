@@ -112,7 +112,7 @@ test('the deployed entry is the patched serve.ts and the 410 sits after sign-in 
   assert.equal(patch.entrypointPath,'cos-operations-pages/serve.ts');
   assert.equal(patch.requireLiveBeforeDeploy.version,168);
   assert.equal(patch.requireLiveBeforeDeploy.ezbr_sha256,'ea649429a36f21ef8272911615a802e3ccc6d2a6c21ac6ea6718eeb68ddf02af');
-  assert.equal(patch.expectedBefore['savedFleetBoard.mjs'],'40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd');
+  assert.equal(patch.expectedBefore['savedFleetBoard.mjs'],'f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a');
   assert.equal(patch.expectedAfter['savedFleetBoard.mjs'],patch.expectedBefore['savedFleetBoard.mjs']);
   assert.equal(prepared.find(file=>file.recordName==='savedFleetBoard.mjs').content.includes('supersededShopDetail'),false);
   assert.equal(patch.sourceCommit,'b5b188229346182d9a4e29da42415a1b9d3b9d53');

@@ -5,7 +5,7 @@
     {
       "path": "App.tsx",
       "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
-      "candidateBlob": "e533c715305975b14831fd211b91c0e66f025c96",
+      "candidateBlob": "db2258e55500c5d1796f852fa31ca3cb8320db4a",
       "replacements": [
         {
           "from": "",
@@ -56,6 +56,16 @@
           "from": "{checking&&!session?<section className='panel module' role='status'>",
           "to": "{tvDisplay&&(reloadRequired||!authorized||(checking&&!session))?<TvSignedOutBoard note={reloadRequired?'Sign in again on Tech Check to resume':'Reconnecting'} exit={leaveTv}/>:checking&&!session?<section className='panel module' role='status'>",
           "count": 1
+        },
+        {
+          "from": "Today\u2019s jobs, assigned tasks, readiness and TV view.",
+          "to": "Fleet count tiles for the shop TV: camera units, cameras, units in the field, and stands. Same numbers as the map.",
+          "count": 1
+        },
+        {
+          "from": ":active==='Daily Board'?<DailyBoard api={api} openWorkspace={navigate}",
+          "to": ":active==='Daily Board'?<DailyBoard api={api} session={session!} openWorkspace={navigate}",
+          "count": 1
         }
       ]
     },
@@ -70,8 +80,8 @@
           "count": 1
         },
         {
-          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -90,8 +100,8 @@
           "count": 1
         },
         {
-          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'↻ Reading data…':'↻ Refresh data'}</button>}",
+          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
           "count": 1
         },
         {
@@ -129,8 +139,8 @@
           "count": 1
         },
         {
-          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
-          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'↻ Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
           "count": 1
         },
         {

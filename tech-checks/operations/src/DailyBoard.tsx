@@ -9,12 +9,13 @@ import {captureBoardSelection} from './boardRecordDetails';
 import { createBoardReader, createBoardAssignmentSaver, type BoardSnapshot } from './boardPersistence';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import TechCheckTvBoard from './TechCheckTvBoard';
+import FleetDashboard from './FleetDashboard';
 import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
 import {setTvSessionHold,tvSessionHold} from './tvSessionHold';
 
-type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
+type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; session: Record<string, any>; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
 const statusKey=(value:unknown)=>String(value||'').trim().toLowerCase().replaceAll('_',' ');
 const plusTwoHours=(value:string)=>{
@@ -28,7 +29,7 @@ const jobNotes=(card:BoardCard)=>{
   return String(notes.at(-1)?.text||card.record.instructions||card.record.siteAddress||'');
 };
 
-export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Props) {
+export default function DailyBoard({api,session,openWorkspace,onTvChange,initialTv}:Props) {
   const launch = useMemo(() => tvBoardOptions(location.search), []);
   const tvSettings=useTvBoardSettings(api);
   const [snapshot,setSnapshot]=useState<BoardSnapshot>({jobs:[],tasks:[],readiness:[]});
@@ -194,7 +195,11 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
   };
   const saveAssignment = () => { setAssigning(null); };
 
-  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
+  // The TV already reads fleet through TvFleetView. Mounting the dashboard here
+  // would publish that first read into the shared fleet cache and hide the
+  // sample TvFleetView takes when Camera Health or the map actually opens.
+  if(tv)return <TechCheckTvBoard counts={null} cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
+  const fleetCounts=<FleetDashboard countsOnly session={session} navigate={openWorkspace} onSelectUnit={()=>undefined} openUnitHealth={()=>undefined} show={()=>undefined} historyReadEnabled={false} locationWritesEnabled={false} ownerManagementEnabled={false} ownerCensusEnabled={false} registerEquipment={()=>undefined}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
@@ -209,46 +214,16 @@ export default function DailyBoard({api,openWorkspace,onTvChange,initialTv}:Prop
       <label>Technician<select aria-label='Technician' value={person} onChange={e=>{setPerson(e.target.value);setRotation(0);}}><option value=''>Everyone</option>{allPeople.map(p=><option key={p}>{p}</option>)}</select></label>
       <label>Department<select aria-label='Department' value={department} onChange={e=>{setDepartment(e.target.value);setRotation(0);}}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option></select></label>
       <label className='daily-board-test-toggle'><input type='checkbox' checked={showTest} onChange={e=>setShowTest(e.target.checked)}/>Show test records{hiddenTests>0?' ('+hiddenTests+' hidden)':''}</label>
-      <span>{visible.length} equipment handoffs · Refreshes every minute<br/>{lastSuccess?'Last successful refresh '+lastSuccess.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT':'Waiting for live records'}</span>
+      <span>Fleet counts · same tiles as the map<br/>{lastSuccess?'Board checked '+lastSuccess.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})+' CT':'Waiting for live records'}</span>
     </div>
 
-    <section className='daily-board-status' aria-label='Workflow status summary'>
-      <article><b>{counts.unassigned}</b><span>UNASSIGNED</span></article>
-      <article><b>{counts.scheduled}</b><span>SCHEDULED</span></article>
-      <article><b>{counts.field}</b><span>FIELD / WORKING</span></article>
-      <article className={counts.correction?'attention':''}><b>{counts.correction}</b><span>CORRECTION</span></article>
-      <article><b>{counts.review}</b><span>OWNER REVIEW</span></article>
-      <article><b>{counts.complete}</b><span>COMPLETED TODAY</span></article>
-    </section>
+    {fleetCounts}
 
     {(error||stale)&&<div className='daily-board-error' role='alert'><strong>{lastSuccess?'Showing the last successful snapshot.':'Live records are unavailable.'}</strong> {error||'Refresh is delayed.'} <button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Retry</button></div>}
     {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Refresh before another assignment</button>}</div>}
     {notice&&<div className='daily-board-notice' role='status'>{notice}</div>}
 
-    {!lastSuccess&&!error?<p role='status'>Loading equipment handoffs…</p>:<div className='daily-board-people'>{laneNames.map(name=>{
-      const items=visible.filter(c=>c.assignee===name);
-      const pages=Math.max(1,Math.ceil(items.length/3));
-      const page=rotation%pages;
-      const shown=tv?items.slice(page*3,page*3+3):items;
-      const technician=technicianMap.get(name);
-      const dropReady=Boolean(!busy&&!refreshRequired&&dragged&&technician&&canManage(dragged)&&(!dragged.department||!technician.department||dragged.department===technician.department));
-      return <section key={name} className={'daily-board-person'+(name==='Unassigned'?' unassigned':'')+(dropReady?' drop-ready':'')} aria-label={name} onDragOver={e=>{if(dropReady)e.preventDefault();}} onDrop={()=>dropOn(name)}>
-        <h3><span>{name}</span><b>{items.length}</b>{technician&&<small>{technician.department.toUpperCase()}</small>}</h3>
-        {tv&&pages>1&&<small className='daily-board-page'>Page {page+1} of {pages} · Rotates every 15 seconds</small>}
-        {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(captureBoardSelection(card,snapshot.asOf))}>
-          <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.record.completionKind==='visit'?'COMPLETED VISIT':String(card.record.jobType||'HANDOFF').toUpperCase()}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
-          <strong>{card.title}</strong>
-          {hasOpenGoBack(card.record)&&<b className='daily-board-card-note'>GO-BACK REQUIRED · Ticket open</b>}
-          <span>{[card.reference,card.site].filter(Boolean).join(' · ')||'General work'}</span>
-          <span>{card.kind==='job'?[card.record.jobType,card.record.equipment,card.record.equipmentUnitTag].filter(Boolean).join(' · '):card.record.instructions||''}</span>
-          {jobNotes(card)&&<span className='daily-board-card-note'>{jobNotes(card)}</span>}
-          <footer><b>{card.status}</b><span>{boardDateLabel(card.date)}</span></footer>
-        </button>)}
-        {!items.length&&<p className='daily-board-empty'>{name==='Unassigned'?'No unassigned work.':'No work in this view.'}</p>}
-      </section>;
-    })}</div>}
-
-    <p className='daily-board-note'>Unfinished and overdue work stays visible until management reschedules or completes it. Completed visits stay visible after a handoff. Truck, trailer and inventory readiness remain controlled through Tech Check.</p>
+    <p className='daily-board-note'>Job and task cards are not on this board. The counts above are the same tiles as the fleet map. <span className='cos-in-shop'>In Shop</span> units add 0 and raise no alerts. Missing or stale readings stay Unknown.</p>
     {!tv&&<div className='daily-board-actions'><button className='secondary' onClick={()=>open('Tech Check')}>Truck / trailer readiness</button></div>}
 
     {selected&&<dialog ref={detail} className='daily-board-detail' aria-label='Work details' onCancel={()=>setSelected(null)}><section>

@@ -48,6 +48,6 @@ test('Owner can reach Watchful and router diagnostics through normal Fleet-first
  await openWorkspace(app,'Field Map');
  await expect(app.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
  await openWorkspace(app,'InHand Routers');
- await expect(app.getByRole('heading',{name:'Router inventory & reachability',exact:true})).toBeVisible();
+ await expect(app.getByRole('heading',{name:'InHand router status',exact:true})).toBeVisible();
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
 });

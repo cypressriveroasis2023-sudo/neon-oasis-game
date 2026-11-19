@@ -43,8 +43,9 @@ function mapSnapshot(state) {
   const mapped = state.units.filter(unit => Number.isFinite(unit.latitude) && Number.isFinite(unit.longitude)).length;
   return { items: state.units, summary: { fieldUnits: state.units.length, mappedUnits: mapped, unitGps: state.units.filter(unit => unit.hasUnitGps).length, missingGps: state.units.length - mapped }, generatedAt: new Date(Date.parse(now) + state.generation).toISOString() };
 }
-async function fixturePage(page,{locationWritesEnabled=true}={}) {
+async function fixturePage(page,{locationWritesEnabled=true,jobs=null}={}) {
   const state = makeFixture();
+  if(jobs)state.jobs=jobs;
   await page.clock.install({ time: new Date(now) });
   // The Fleet screen loads its map and briefing after the click. Those files
   // are this app's own build. Holding them in the catch-all route stalls the
@@ -159,17 +160,41 @@ test('Today keeps good camera and router sources when one source fails', async (
 test('Daily Board keeps the last snapshot when refresh fails', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Daily Board');
-  await expect(frame.getByText('Fixture North Yard')).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'COS fleet counts' })).toBeVisible();
+  await expect(frame.getByText('Fixture North Yard')).toHaveCount(0);
   await expect(frame.getByText('Fixture inventory review')).toHaveCount(0);
   await expect(frame.getByRole('region', { name: 'Daily truck readiness' })).toHaveCount(0);
   state.failedPaths.add('/api/daily-board');
   await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(frame.getByRole('alert')).toContainText('Showing the last successful snapshot.');
-  await expect(frame.getByText('Fixture North Yard')).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'COS fleet counts' })).toBeVisible();
   await expect(frame.getByText('Fixture inventory review')).toHaveCount(0);
   await expect(frame.getByRole('button', { name: 'Save Schedule & Assignment' })).toHaveCount(0);
   expect(state.writes).toEqual([]);
   await noOverflow(page);
+});
+
+test('Daily Board renders no pickup, swap, delivery or service cards', async ({ page }) => {
+  const jobs = ['PICKUP','SWAP','DELIVERY','SERVICE'].map((jobType, index) => ({
+    id: `10000000-0000-4000-8000-00000000000${index + 1}`,
+    jobNumber: 'FIX-20' + index,
+    customer: jobType + ' customer',
+    site: 'Fixture site',
+    department: 'service',
+    technician: 'Unassigned',
+    status: 'assigned',
+    priority: 'high',
+    jobType,
+    scheduled: day + ' 08:00',
+  }));
+  const { frame } = await fixturePage(page, { jobs });
+  await open(frame, 'Daily Board');
+  const board = frame.getByRole('region', { name: 'COS Daily Board' });
+  await expect(board).toBeVisible();
+  await expect(board.locator('.daily-board-card')).toHaveCount(0);
+  for (const label of ['PICKUP','SWAP','DELIVERY','SERVICE']) {
+    await expect(board.getByText(label, { exact: true })).toHaveCount(0);
+  }
 });
 
 test('Field Map selection, GPS validation and one confirmed write survive browser reload', async ({ page }) => {

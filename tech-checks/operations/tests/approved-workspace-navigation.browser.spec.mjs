@@ -28,7 +28,7 @@ test('existing power and router tools open through More and keep their real save
  await openWorkspace(app,'Victron VRM');await expect.poll(()=>route(app)).toBe('#victron-vrm');
  await expect(app.getByRole('heading',{name:'Helios power monitoring',exact:true})).toBeVisible();
  await openWorkspace(app,'InHand Routers');await expect.poll(()=>route(app)).toBe('#inhand-routers');
- await expect(app.getByRole('heading',{name:'Router inventory & reachability',exact:true})).toBeVisible();
+ await expect(app.getByRole('heading',{name:'InHand router status',exact:true})).toBeVisible();
  await openWorkspace(app,'Camera Health');await expect.poll(()=>route(app)).toBe('#camera-health');
  await expect(app.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();safe(state);
 });

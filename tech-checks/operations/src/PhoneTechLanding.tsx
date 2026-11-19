@@ -1,16 +1,15 @@
+import FleetCountReadout from './FleetCountReadout';
 import TechnicianTodoList from './TechnicianTodoList';
 import type {PhoneBoardCounts} from './phoneTechLanding';
+import {IN_SHOP_LABEL} from './sharedFleetCounts';
 import type {TechnicianTodo} from './technicianTodos';
 
 /** First screen on a phone. Desktop and TV hide this with CSS. */
-export default function PhoneTechLanding({counts, todos}:{counts: PhoneBoardCounts; todos: TechnicianTodo[]}) {
+export default function PhoneTechLanding({counts, todos, onOpen}:{counts: PhoneBoardCounts; todos: TechnicianTodo[]; onOpen?: (todo: TechnicianTodo) => void}) {
+  const units = counts.up === '—' ? null : { online: Number(counts.up), offline: Number(counts.down), unknown: Number(counts.unknown) };
   return <section className='cos-phone-landing' aria-label='Phone technician landing'>
-    <div className='cos-phone-counts' role='group' aria-label='Field units up, down and unknown'>
-      <div><b>{counts.up}</b><span>Up</span></div>
-      <div><b>{counts.down}</b><span>Down</span></div>
-      <div><b>{counts.unknown}</b><span>Unknown</span></div>
-    </div>
-    <p className='cos-phone-note' role='status'>{counts.note} Shop units are not counted as outages. Unknown is not offline.</p>
-    <TechnicianTodoList todos={todos}/>
+    <FleetCountReadout units={units} cameras={counts.cameras}/>
+    <p className='cos-phone-note' role='status'>{counts.note} <span className='cos-in-shop'>{IN_SHOP_LABEL}</span> units are not counted. Unknown is not offline.</p>
+    <TechnicianTodoList todos={todos} onOpen={onOpen}/>
   </section>;
 }

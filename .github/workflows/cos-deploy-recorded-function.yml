@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Pin the reviewed v168 patch file
         if: inputs.patch == 'business-screens-410-v168'
-        run: printf '%s  %s\n' '903755678df3e2207c0edb8e2a9ab8f4a2a6e2df3dae10b991d89ae1f52479c5' '.github/function-patches/cos-operations-pages/business-screens-410-v168.json' | sha256sum -c -
+        run: printf '%s  %s\n' 'bd5ae10de9860534ffbb8b586a36b8834189329e23ab955fa60b9d488c76f909' '.github/function-patches/cos-operations-pages/business-screens-410-v168.json' | sha256sum -c -
       - name: Pin the reviewed v168 rollback file
         if: inputs.patch == 'rollback-business-410-to-v168'
         run: printf '%s  %s\n' '2ef966757c72c203eee4b9cb93661b8052df30f3018045d841de3d72b72b6f0f' '.github/function-patches/cos-operations-pages/rollback-business-410-to-v168.json' | sha256sum -c -

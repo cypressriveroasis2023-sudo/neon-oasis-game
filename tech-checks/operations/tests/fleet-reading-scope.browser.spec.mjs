@@ -75,5 +75,5 @@ test('stale offline history stays visible without claiming a current outage',asy
  const row=app.locator('.cos-camera-status-row').filter({hasText:'Historic detector'});
  await expect(row).toContainText('Not verified: Historic detector (not verified; last reported offline');
  await expect(row).not.toContainText('Down: Historic detector');
- await expect(app.getByRole('group',{name:'Field cameras up, down and unknown'})).toContainText('Down 0');
+ await expect(app.getByRole('group',{name:'Camera units online, offline and unknown'}).locator('b').nth(1)).toHaveText('0');
 });

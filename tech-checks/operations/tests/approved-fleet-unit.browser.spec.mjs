@@ -21,9 +21,9 @@ test('Owner exact unit keeps saved evidence and links while phone cards stack an
  const before=state.calls.filter(c=>c.path==='/api/vrm-fleet').length,drawer=await open(app);
  await expect.poll(()=>app.locator('body').evaluate(()=>new URLSearchParams(location.hash.split('?')[1]).get('unit'))).toBe(units[0].id);
  await expect(drawer.getByRole('region',{name:'Unit recorded address'})).toContainText(units[0].address);
- await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('Management check; camera health is separate.');
- await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('Reachable');
- await expect(drawer.getByRole('region',{name:'Selected unit router health'})).not.toContainText(/\b\d{1,3}(?:\.\d{1,3}){3}\b/);
+ await expect(drawer.getByRole('region',{name:'Selected unit router health'})).toContainText('InHand live status. Camera health is separate.');
+ await expect(drawer.getByRole('region',{name:'Selected unit router health'})).not.toContainText('publicIp');
+ await expect(drawer.getByRole('region',{name:'Selected unit router health'})).not.toContainText('router_public_ip');
  await expect(drawer.locator('.cos-fleet-power-metrics')).toContainText('190 W');await expect(drawer.locator('.cos-fleet-power-metrics')).toContainText('180 W');await expect(drawer.locator('.cos-fleet-power-metrics')).not.toContainText('370 W');
  await expect(drawer.getByRole('link',{name:'Open Victron'})).toHaveAttribute('href','https://vrm.victronenergy.com/installation/1001/dashboard');
  const g=await geometry(drawer);expect(g.overflow).toBeLessThanOrEqual(1);expect(g.drawer.x).toBeGreaterThanOrEqual(0);expect(g.drawer.right).toBeLessThanOrEqual(g.viewport+1);expect(g.close.height).toBeGreaterThanOrEqual(48);expect(g.checkFont).toBeGreaterThanOrEqual(15);expect(g.addressFont).toBeGreaterThanOrEqual(17);expect(Math.abs(g.power.width-g.grid.width)).toBeLessThanOrEqual(1);
