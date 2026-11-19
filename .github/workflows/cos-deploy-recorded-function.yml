@@ -24,6 +24,8 @@ on:
           - rollback-original-v134
           - business-screens-410-v168
           - rollback-business-410-to-v168
+          - routers-without-addresses-v169
+          - rollback-routers-without-addresses-to-v169
           - camera-routes-only-v16
           - rollback-to-v16-entry
       confirm:
@@ -53,6 +55,12 @@ jobs:
       - name: Pin the reviewed v168 rollback file
         if: inputs.patch == 'rollback-business-410-to-v168'
         run: printf '%s  %s\n' '2ef966757c72c203eee4b9cb93661b8052df30f3018045d841de3d72b72b6f0f' '.github/function-patches/cos-operations-pages/rollback-business-410-to-v168.json' | sha256sum -c -
+      - name: Pin the routers address removal patch file
+        if: inputs.patch == 'routers-without-addresses-v169'
+        run: printf '%s  %s\n' '90a9bbdb3b5f00f2d2a2b879e3f8087a2aa0bd69232689e003717782a5f01e82' '.github/function-patches/cos-operations-pages/routers-without-addresses-v169.json' | sha256sum -c -
+      - name: Pin the routers address removal rollback file
+        if: inputs.patch == 'rollback-routers-without-addresses-to-v169'
+        run: printf '%s  %s\n' '40c3d805bddcc8216399f8843abe3114680cc1ee2de9ef19dafa3d03f320ab21' '.github/function-patches/cos-operations-pages/rollback-routers-without-addresses-to-v169.json' | sha256sum -c -
       - name: Pin the unit camera route patch file
         if: inputs.patch == 'camera-routes-only-v16'
         run: printf '%s  %s\n' 'd2a9bd1525d6ed45004f41c60dfd8ee80a0fe840a6db5cebd702349c1eff9215' '.github/function-patches/cos-unit-camera-status/camera-routes-only-v16.json' | sha256sum -c -
