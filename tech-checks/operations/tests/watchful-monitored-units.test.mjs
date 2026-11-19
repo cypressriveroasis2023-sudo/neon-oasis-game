@@ -44,6 +44,18 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(stripWatchfulIp('aa:bb:cc:dd:ee:ff').onlyIp, true);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\n2001:db8::1,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\naa:bb:cc:dd:ee:ff,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
+  const dotted = stripWatchfulIp('Fixture Site aabb.ccdd.eeff gate');
+  assert.equal(dotted.text, 'Fixture Site gate');
+  assert.equal(dotted.stripped, true);
+  assert.equal(stripWatchfulIp('aabb.ccdd.eeff').onlyIp, true);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\naabb.ccdd.eeff,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
+  const serial = stripWatchfulIp('Fixture Site serial AB12CD34EF56 gate');
+  assert.equal(serial.text, 'Fixture Site gate');
+  assert.equal(stripWatchfulIp('AB12CD34EF56').onlyIp, true);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nAB12CD34EF56,Fixture Site,Avigilon,up,1,0\n', at), /serial/);
+  const missingTime = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nSniper 3,Fixture Site,Avigilon,up,1,0\n', at);
+  assert.equal(missingTime.snapshotAt, null);
+  assert.equal(missingTime.units[0].snapshotAt, null);
   const kept = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z\n', at);
   assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
 });

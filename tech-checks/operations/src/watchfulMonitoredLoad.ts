@@ -11,7 +11,7 @@ export type WatchfulSnapshotUnit = {
   status: 'up' | 'down';
   camerasUp: number;
   camerasDown: number;
-  snapshotAt: string;
+  snapshotAt: string | null;
 };
 
 export type WatchfulLoadResult = {
@@ -36,6 +36,9 @@ const GROUP_ALIAS: Record<string, WatchfulGroup> = {
 const FORBIDDEN_HEADER = /(^|[^a-z])(ip|ips|ipv6|ip6|serial|serials|imei|imsi|iccid|sim|mac)([^a-z]|$)/i;
 const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/gi;
 const MAC = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
+const DOTTED_MAC = /\b[0-9a-f]{4}(?:\.[0-9a-f]{4}){2}\b/gi;
+const LABELED_SERIAL = /\b(?:serial|s\/n|sn)\b[:\s#-]*[A-Z0-9][A-Z0-9-]{5,}/gi;
+const BARE_SERIAL = /\b(?:\d{14,17}|[A-F0-9]{12,})\b/gi;
 
 export class WatchfulLoadError extends Error {
   constructor(message: string) {
@@ -87,6 +90,9 @@ export function stripWatchfulIp(value: string): {text: string; stripped: boolean
   let text = value;
   let stripped = false;
   if (MAC.test(text)) { MAC.lastIndex = 0; stripped = true; text = text.replace(MAC, ' '); MAC.lastIndex = 0; }
+  if (DOTTED_MAC.test(text)) { DOTTED_MAC.lastIndex = 0; stripped = true; text = text.replace(DOTTED_MAC, ' '); DOTTED_MAC.lastIndex = 0; }
+  if (LABELED_SERIAL.test(text)) { LABELED_SERIAL.lastIndex = 0; stripped = true; text = text.replace(LABELED_SERIAL, ' '); LABELED_SERIAL.lastIndex = 0; }
+  if (BARE_SERIAL.test(text)) { BARE_SERIAL.lastIndex = 0; stripped = true; text = text.replace(BARE_SERIAL, ' '); BARE_SERIAL.lastIndex = 0; }
   if (IPV4.test(text)) { IPV4.lastIndex = 0; stripped = true; text = text.replace(IPV4, ' '); IPV4.lastIndex = 0; }
   text = text.replace(/[0-9a-f:]{2,}/gi, token => {
     if (!isIpv6Token(token)) return token;
@@ -162,7 +168,7 @@ export function loadWatchfulExport(csv: string, fetchedAt: string): WatchfulLoad
     const read = (col: number) => {
       const raw = String(row[col] ?? '');
       const cleaned = stripWatchfulIp(raw);
-      if (cleaned.onlyIp) throw new WatchfulLoadError('A cell is an IP or MAC address. The file was not loaded.');
+      if (cleaned.onlyIp) throw new WatchfulLoadError('A cell is an IP or MAC address or a serial. The file was not loaded.');
       return cleaned.text;
     };
     const unitName = read(unitCol);
@@ -226,7 +232,7 @@ export function loadWatchfulExport(csv: string, fetchedAt: string): WatchfulLoad
       status,
       camerasUp,
       camerasDown,
-      snapshotAt: oldestObservedAt || '',
+      snapshotAt: oldestObservedAt,
     });
   }
   units.sort((left, right) => left.canonicalUnitKey.localeCompare(right.canonicalUnitKey));
