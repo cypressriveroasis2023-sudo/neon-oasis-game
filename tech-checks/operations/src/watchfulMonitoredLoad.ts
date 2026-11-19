@@ -15,7 +15,10 @@ export type WatchfulSnapshotUnit = {
 };
 
 export type WatchfulLoadResult = {
-  snapshotAt: string;
+  /** Oldest retained observation. Not the fetch time and not the newest row. */
+  snapshotAt: string | null;
+  oldestObservedAt: string | null;
+  fetchedAt: string;
   units: WatchfulSnapshotUnit[];
   droppedSpeakers: number;
   collapsedCameraRows: number;
@@ -132,9 +135,9 @@ type Parsed = {
  * An IP typed into a unit, site, or group cell is stripped, and a cell that
  * is only an IP rejects the file. Nothing is written to a database.
  */
-export function loadWatchfulExport(csv: string, snapshotAt: string): WatchfulLoadResult {
-  const at = Date.parse(snapshotAt);
-  if (!Number.isFinite(at)) throw new WatchfulLoadError('The snapshot time is not a timestamp.');
+export function loadWatchfulExport(csv: string, fetchedAt: string): WatchfulLoadResult {
+  const fetched = Date.parse(fetchedAt);
+  if (!Number.isFinite(fetched)) throw new WatchfulLoadError('The fetch time is not a timestamp.');
   const table = parseCsv(csv);
   if (table.length < 2) throw new WatchfulLoadError('The export has no rows.');
   const headers = table[0].map(headerKey);
@@ -203,6 +206,9 @@ export function loadWatchfulExport(csv: string, snapshotAt: string): WatchfulLoa
     byUnit.set(row.key, list);
   }
 
+  const observed = kept.map(row => row.seenAt);
+  const oldest = observed.length && observed.every(value => value !== null) ? Math.min(...observed as number[]) : null;
+  const oldestObservedAt = oldest === null ? null : new Date(oldest).toISOString();
   const units: WatchfulSnapshotUnit[] = [];
   let collapsedCameraRows = 0;
   for (const [key, rows] of byUnit) {
@@ -220,9 +226,9 @@ export function loadWatchfulExport(csv: string, snapshotAt: string): WatchfulLoa
       status,
       camerasUp,
       camerasDown,
-      snapshotAt: new Date(at).toISOString(),
+      snapshotAt: oldestObservedAt || '',
     });
   }
   units.sort((left, right) => left.canonicalUnitKey.localeCompare(right.canonicalUnitKey));
-  return {snapshotAt: new Date(at).toISOString(), units, droppedSpeakers, collapsedCameraRows};
+  return {snapshotAt: oldestObservedAt, oldestObservedAt, fetchedAt: new Date(fetched).toISOString(), units, droppedSpeakers, collapsedCameraRows};
 }

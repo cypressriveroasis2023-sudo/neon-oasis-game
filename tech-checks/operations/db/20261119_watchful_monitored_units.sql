@@ -12,6 +12,7 @@ create table public.watchful_monitored_units (
   unit_status text not null,
   cameras_up integer not null,
   cameras_down integer not null,
+  -- Oldest retained observation time, not the time the file was fetched.
   snapshot_at timestamptz not null,
   loaded_at timestamptz not null default now(),
   constraint watchful_monitored_units_group_check

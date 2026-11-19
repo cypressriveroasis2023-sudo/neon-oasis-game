@@ -70,4 +70,9 @@ test('duplicate camera rows collapse to one unit and the latest reading wins', (
   assert.equal(sniper.camerasUp, 1);
   assert.equal(sniper.camerasDown, 1);
   assert.equal(loaded.units.length, 2);
+  assert.equal(loaded.oldestObservedAt, '2026-11-19T14:05:00.000Z');
+  assert.equal(loaded.snapshotAt, loaded.oldestObservedAt);
+  assert.notEqual(loaded.snapshotAt, '2026-11-19T14:20:00.000Z');
+  assert.equal(loaded.fetchedAt, at);
+  assert.equal(loaded.units.every(unit => unit.snapshotAt === loaded.oldestObservedAt), true);
 });
