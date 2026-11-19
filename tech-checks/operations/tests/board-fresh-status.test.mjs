@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CAMERA_AUTO_REFRESH_MS, observationRefreshDue} from '../src/refreshCadence.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
-import {applyBoardFreshStatus, boardUnitStatus} from '../src/boardFreshStatus.ts';
+import {applyBoardFreshStatus, boardUnitStatus, noteWatchfulOldest, tvUpdatesDelayed, watchfulOldestObservedAt, WATCHFUL_BANNER_AGE_MS, WATCHFUL_OBSERVATION_FRESH_MS, WATCHFUL_PULL_CADENCE_MS} from '../src/boardFreshStatus.ts';
 
 const now = Date.parse('2026-11-19T15:00:00.000Z');
 const fresh = new Date(now - 5 * 60 * 1000).toISOString();
@@ -69,6 +69,41 @@ test('a missing or stale snapshot is Unknown and a Shop unit is never down', () 
   assert.equal(shop.label, 'In Shop');
   assert.equal(shop.state, 'in_shop');
   assert.notEqual(shop.state, 'offline');
+});
+
+test('Watchful follows the 20-minute observation clock and the 10-minute pull, and the TV banner uses 120 seconds or about 12 minutes', () => {
+  assert.equal(WATCHFUL_OBSERVATION_FRESH_MS, 20 * 60 * 1000);
+  assert.equal(CAMERA_FRESH_MS, WATCHFUL_OBSERVATION_FRESH_MS);
+  assert.equal(WATCHFUL_PULL_CADENCE_MS, CAMERA_AUTO_REFRESH_MS);
+  assert.equal(WATCHFUL_PULL_CADENCE_MS, 10 * 60 * 1000);
+  assert.equal(WATCHFUL_BANNER_AGE_MS, 12 * 60 * 1000);
+  const observed = new Date(now - 21 * 60 * 1000).toISOString();
+  const fetched = new Date(now - 30 * 1000).toISOString();
+  const aged = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'field', readings: [],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'up', snapshotAt: observed, fetchedAt: fetched}, now,
+  });
+  assert.equal(aged.label, 'Unknown');
+  assert.notEqual(aged.state, 'offline');
+  const recent = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'field', readings: [],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: new Date(now - 19 * 60 * 1000).toISOString(), fetchedAt: fetched}, now,
+  });
+  assert.equal(recent.label, 'Down via Watchful');
+  const success = now - 60 * 1000;
+  assert.equal(tvUpdatesDelayed({lastSuccessAt: success, now, sameDay: true, watchfulOldestObservedAt: null}), false);
+  assert.equal(tvUpdatesDelayed({lastSuccessAt: now - 121 * 1000, now, sameDay: true}), true);
+  assert.equal(tvUpdatesDelayed({lastSuccessAt: success, now, sameDay: true, watchfulOldestObservedAt: new Date(now - 11 * 60 * 1000).toISOString()}), false);
+  assert.equal(tvUpdatesDelayed({lastSuccessAt: success, now, sameDay: true, watchfulOldestObservedAt: new Date(now - WATCHFUL_BANNER_AGE_MS - 1000).toISOString()}), true);
+  assert.equal(tvUpdatesDelayed({lastSuccessAt: null, now, watchfulOldestObservedAt: null}), false);
+  const older = new Date(now - 9 * 60 * 1000).toISOString();
+  const newer = new Date(now - 2 * 60 * 1000).toISOString();
+  noteWatchfulOldest(null);
+  applyBoardFreshStatus([], [], [
+    {canonicalUnitKey: 'SNIPER|1', status: 'up', snapshotAt: newer},
+    {canonicalUnitKey: 'SNIPER|2', status: 'down', snapshotAt: older},
+  ], now);
+  assert.equal(watchfulOldestObservedAt(), older);
 });
 
 test('a reading that would expire before the 10-minute cadence requests a saved read without widening freshness', () => {

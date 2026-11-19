@@ -1,14 +1,33 @@
-import {cameraState, cameraTimestamp, type CameraRow} from './cameraEvidence';
+import {CAMERA_FRESH_MS, cameraState, cameraTimestamp, type CameraRow} from './cameraEvidence';
+import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 
 export const VIA_WATCHFUL = 'via Watchful';
-export const WATCHFUL_SNAPSHOT_FRESH_MS = 26 * 60 * 60 * 1000;
+/** Watchful is fresh for the same 20 minutes as a camera observation. This is not widened. */
+export const WATCHFUL_OBSERVATION_FRESH_MS = CAMERA_FRESH_MS;
+/** The pull matches the saved camera cadence. */
+export const WATCHFUL_PULL_CADENCE_MS = CAMERA_AUTO_REFRESH_MS;
+/** The TV banner, separate from the 20-minute Unknown rule. */
+export const TV_READ_STALE_MS = 120_000;
+export const WATCHFUL_BANNER_AGE_MS = 12 * 60 * 1000;
 const IN_SHOP_LABEL = 'In Shop';
+let oldestWatchfulObservation: string | null = null;
+
+/** The time the board stamps: the oldest Watchful observation, not the newest and not the fetch. */
+export function watchfulOldestObservedAt(): string | null {
+  return oldestWatchfulObservation;
+}
+
+export function noteWatchfulOldest(value: string | null) {
+  oldestWatchfulObservation = value;
+}
 
 export type BoardWatchfulStatus = {
   canonicalUnitKey: string;
   status: 'up' | 'down';
+  /** Oldest observation time in the snapshot. Not the time the file was fetched. */
   snapshotAt: string;
+  fetchedAt?: string | null;
 };
 
 export type BoardPresentedStatus = {
@@ -20,8 +39,23 @@ export type BoardPresentedStatus = {
 const AVIGILON = /^(?:SNIPER2|SNIPER4|SNIPER|CAMV)\|/;
 
 function freshWatchful(snapshotAt: string, now: number): boolean {
-  const at = Date.parse(snapshotAt);
-  return Number.isFinite(at) && at <= now && now - at <= WATCHFUL_SNAPSHOT_FRESH_MS;
+  return cameraTimestamp(snapshotAt, now).fresh;
+}
+
+/** UPDATES DELAYED when the last good read is over 120 seconds old, or the oldest Watchful observation is over 12 minutes old. */
+export function tvUpdatesDelayed(input: {
+  lastSuccessAt: number | null;
+  now: number;
+  sameDay?: boolean;
+  watchfulOldestObservedAt?: string | null;
+}): boolean {
+  const readLate = input.lastSuccessAt !== null && Number.isFinite(input.lastSuccessAt) && input.now - input.lastSuccessAt > TV_READ_STALE_MS;
+  const wrongDay = input.sameDay === false && input.lastSuccessAt !== null;
+  if (!input.watchfulOldestObservedAt) return readLate || wrongDay;
+  const stamp = cameraTimestamp(input.watchfulOldestObservedAt, input.now);
+  const observedAt = stamp.at ? Date.parse(stamp.at) : NaN;
+  const watchfulLate = !stamp.fresh || !Number.isFinite(observedAt) || input.now - observedAt > WATCHFUL_BANNER_AGE_MS;
+  return readLate || wrongDay || watchfulLate;
 }
 
 /**
@@ -69,6 +103,10 @@ type BoardRow = {
 
 /** Only an Unknown field unit changes. A fresh camera reading replaces Unknown. Shop is left alone. */
 export function applyBoardFreshStatus<T extends BoardRow>(rows: readonly T[], readings: readonly CameraRow[], watchful: readonly BoardWatchfulStatus[] | null, now = Date.now()): T[] {
+  if (watchful) {
+    const times = watchful.map(item => Date.parse(item.snapshotAt)).filter(at => Number.isFinite(at));
+    noteWatchfulOldest(times.length ? new Date(Math.min(...times)).toISOString() : null);
+  }
   const byKey = new Map((watchful || []).map(item => [item.canonicalUnitKey, item]));
   return rows.map(row => {
     if (row.placement !== 'field' || row.cameraState !== 'unknown') return row;
