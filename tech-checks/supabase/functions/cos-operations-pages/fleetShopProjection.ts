@@ -1,6 +1,25 @@
 type Row=Record<string,any>;
 export type ManualShop={unitId:string;unitNumber:string;auditId:string;recordedAt:string;placement:'SHOP';recordedBy?:string;sourceBindings?:{productId:string;sourceSha256:string;sourceUnitNumber?:string}[]};
 export type SupersededShopMove={unitId:string;unitNumber:string;auditId:string;recordedAt:string;mhelpAt:string;recordedBy:string;detail:string};
+/** James, 10:15 AM CT: mHelp should win; flag overrides that disagree. */
+export const OWNER_OVERRIDE_IGNORED = 'Owner override disagrees with mHelp (ignored for counts)';
+export const PLACEMENT_DIFFERS = 'COS placement differs from mHelp';
+
+export function placementWithMhelpFirst(ownerPlacement: 'FIELD' | 'SHOP', mhelpPlacement: 'FIELD' | 'SHOP' | null | undefined): 'FIELD' | 'SHOP' {
+  return mhelpPlacement === 'FIELD' || mhelpPlacement === 'SHOP' ? mhelpPlacement : ownerPlacement;
+}
+
+export function placementException(ownerPlacement: 'FIELD' | 'SHOP', mhelpPlacement: 'FIELD' | 'SHOP' | null | undefined, kind: 'owner_override' | 'cos' = 'cos'): string | null {
+  if (mhelpPlacement !== 'FIELD' && mhelpPlacement !== 'SHOP') return null;
+  if (mhelpPlacement === ownerPlacement) return null;
+  return kind === 'owner_override' ? OWNER_OVERRIDE_IGNORED : PLACEMENT_DIFFERS;
+}
+
+const countedPlacement = (value: unknown): 'FIELD' | 'SHOP' | null => {
+  const text = String(value || '').toUpperCase();
+  return text === 'FIELD' || text === 'SHOP' ? text : null;
+};
+
 const chicago=(at:string)=>new Date(at).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 export function supersededShopDetail(move:{unitNumber:string;recordedAt:string;recordedBy?:string},mhelpAt:string):string{
  const who=typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account';
@@ -19,14 +38,19 @@ export function projectManualShop(snapshot:Row,receipt:any):Row{
   if(matches.length!==1)return false;
   const record=matches[0];
   if(record.placementSource==='owner'&&Date.parse(record.placementUpdatedAt)>Date.parse(move.recordedAt))return false;
-  const mhelpField=String(record.placement||'').toUpperCase()==='FIELD'||record.currentLocationType==='field';
+  const mhelpPlacement=countedPlacement(record.placement);
+  const counted=placementWithMhelpFirst('SHOP', mhelpPlacement);
+  const mhelpField=mhelpPlacement==='FIELD';
   const newer=Number.isFinite(uploaded)&&uploaded>Date.parse(move.recordedAt);
   const api=upload?.source==='mhelpdesk_api';
-  // Only a strictly newer mHelp Field API reading can replace a hand-confirmed
-  // Shop move. An explicit upload, or any other source, leaves the move in place
-  // whether the row is Field or not. An equal time also keeps Shop.
   if(newer&&api&&mhelpField){
    superseded.push({unitId:move.unitId,unitNumber:move.unitNumber,auditId:move.auditId,recordedAt:move.recordedAt,mhelpAt:new Date(uploaded).toISOString(),recordedBy:typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(move,new Date(uploaded).toISOString())});
+   return false;
+  }
+  // mHelp wins. A manual Shop move that disagrees is kept on the receipt and
+  // flagged, and it does not change the counted placement.
+  if(counted!=='SHOP'){
+   superseded.push({unitId:move.unitId,unitNumber:move.unitNumber,auditId:move.auditId,recordedAt:move.recordedAt,mhelpAt:Number.isFinite(uploaded)?new Date(uploaded).toISOString():move.recordedAt,recordedBy:typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account',detail:OWNER_OVERRIDE_IGNORED});
    return false;
   }
   return true;
@@ -52,7 +76,7 @@ export function manualShopInventory(upload:any,receipt:any):any{
  const moves=new Map(manualShopItems(receipt).map(r=>[r.unitId,r]));
  const observed=Date.parse(upload.receivedAt);
  const superseded:SupersededShopMove[]=[];
- let count=0;const records=upload.records.map((r:Row)=>{const m=[...moves.values()].find(m=>(m.sourceBindings||[]).some(b=>b.productId===r.productId&&(b.sourceSha256===upload.sourceSha256||upload.source==='mhelpdesk_api'&&b.sourceUnitNumber===r.unitNumber)))||(r.binding?.state==='linked'&&r.binding.unitIds?.length===1?moves.get(r.binding.unitIds[0]):null);if(!m||r.placement==='SHOP')return r;if(upload.source==='mhelpdesk_api'&&r.placement==='FIELD'&&Number.isFinite(observed)&&observed>Date.parse(m.recordedAt)){superseded.push({unitId:m.unitId,unitNumber:m.unitNumber,auditId:m.auditId,recordedAt:m.recordedAt,mhelpAt:new Date(observed).toISOString(),recordedBy:typeof m.recordedBy==='string'&&m.recordedBy.trim()?m.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(m,new Date(observed).toISOString())});return r;}count++;return {...r,placement:'SHOP',cosManualShopAuditId:m.auditId};});
+ let count=0;const records=upload.records.map((r:Row)=>{const m=[...moves.values()].find(m=>(m.sourceBindings||[]).some(b=>b.productId===r.productId&&(b.sourceSha256===upload.sourceSha256||upload.source==='mhelpdesk_api'&&b.sourceUnitNumber===r.unitNumber)))||(r.binding?.state==='linked'&&r.binding.unitIds?.length===1?moves.get(r.binding.unitIds[0]):null);if(!m||r.placement==='SHOP')return r;if(upload.source==='mhelpdesk_api'&&r.placement==='FIELD'&&Number.isFinite(observed)&&observed>Date.parse(m.recordedAt)){superseded.push({unitId:m.unitId,unitNumber:m.unitNumber,auditId:m.auditId,recordedAt:m.recordedAt,mhelpAt:new Date(observed).toISOString(),recordedBy:typeof m.recordedBy==='string'&&m.recordedBy.trim()?m.recordedBy.trim():'the saved COS account',detail:supersededShopDetail(m,new Date(observed).toISOString())});return r;}const counted=placementWithMhelpFirst('SHOP', countedPlacement(r.placement));if(counted!=='SHOP'){superseded.push({unitId:m.unitId,unitNumber:m.unitNumber,auditId:m.auditId,recordedAt:m.recordedAt,mhelpAt:Number.isFinite(observed)?new Date(observed).toISOString():m.recordedAt,recordedBy:typeof m.recordedBy==='string'&&m.recordedBy.trim()?m.recordedBy.trim():'the saved COS account',detail:OWNER_OVERRIDE_IGNORED});return r;}count++;return {...r,placement:'SHOP',cosManualShopAuditId:m.auditId};});
  if(!count&&!superseded.length)return upload;
  const summary={...upload.summary,fieldRecords:records.filter((r:Row)=>r.placement==='FIELD').length,shopRecords:records.filter((r:Row)=>r.placement==='SHOP').length,unflaggedFieldRecords:records.filter((r:Row)=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED').length,unflaggedShopRecords:records.filter((r:Row)=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED').length};
  return {...upload,records,summary,cosManualShopCount:count,supersededShopMoves:superseded,...(count?{cosPlacementBasis:'Accepted mHelp inventory plus confirmed COS Shop moves'}:{})};
