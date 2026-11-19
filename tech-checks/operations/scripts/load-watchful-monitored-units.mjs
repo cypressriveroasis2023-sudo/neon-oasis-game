@@ -19,14 +19,19 @@ if (args.includes('--apply') || args.includes('--database')) {
 }
 
 const input = value('--in');
-const snapshotAt = value('--at') || new Date().toISOString();
-if (!input) {
-  console.error('Usage: node --import tsx scripts/load-watchful-monitored-units.mjs --in export.csv --at <timestamp> [--out snapshot.json]');
+const suppliedRead = args.includes('--at') ? value('--at') : undefined;
+if (!input || (args.includes('--at') && !suppliedRead)) {
+  console.error('Usage: node --import tsx scripts/load-watchful-monitored-units.mjs --in export.csv [--at <our-read-time>] [--out snapshot.json]');
+  console.error('Our read time is --at or a read_at column. With neither, the export is Unknown and this command stops.');
   process.exit(2);
 }
 
 const csv = readFileSync(input, 'utf8');
-const snapshot = loadWatchfulExport(csv, snapshotAt);
+const snapshot = loadWatchfulExport(csv, suppliedRead);
+if (!snapshot.fetchedAt) {
+  console.error('No read time was supplied. The export is Unknown, not fresh.');
+  process.exit(2);
+}
 const out = value('--out');
 const body = JSON.stringify(snapshot, null, 2);
 if (out) writeFileSync(out, body);

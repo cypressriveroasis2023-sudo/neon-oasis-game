@@ -63,6 +63,18 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(missingTime.units[0].snapshotAt, null);
   const kept = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z\n', at);
   assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
+  const carried = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at,read_at,arming,project_id\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z,2026-11-19T14:05:00Z,Disarmed,proj-field\n', at);
+  assert.equal(carried.units[0].arming, 'Disarmed');
+  assert.equal(carried.units[0].projectId, 'proj-field');
+  assert.equal(carried.fetchedAt, at);
+  assert.equal(carried.snapshotAt, '2026-11-19T14:00:00.000Z');
+  const fromColumn = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at,read_at\nSniper 2,Fixture Site,Avigilon,down,0,1,2026-11-19T10:00:00Z,2026-11-19T11:00:00Z\n');
+  assert.equal(fromColumn.fetchedAt, '2026-11-19T11:00:00.000Z');
+  assert.equal(fromColumn.snapshotAt, '2026-11-19T10:00:00.000Z');
+  const unknown = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,down,0,1,2026-11-19T10:00:00Z\n');
+  assert.equal(unknown.fetchedAt, null);
+  assert.equal(unknown.units[0].arming, null);
+  assert.equal(unknown.units[0].projectId, null);
 });
 
 test('serial labels stay and only the value is redacted', () => {
@@ -93,6 +105,17 @@ test('serial labels stay and only the value is redacted', () => {
     [`Serial\uA789${value}`, 'Serial\uA789'],
     ['Serial Num: ZZ12CD34', 'Serial Num:'],
     ['Serial (ZZ12CD34)', 'Serial ()'],
+    ['device_serial=ZZ12CD34', 'device_serial='],
+    ['camera_serial:ZZ12CD34', 'camera_serial:'],
+    ['deviceSerial:ZZ12CD34', 'deviceSerial:'],
+    ['Serial No.ZZ12CD34', 'Serial No.'],
+    ['<serial>ZZ12CD34</serial>', '<serial></serial>'],
+    ['serial%3AZZ12CD34', 'serial%3A'],
+    ['serial%3aZZ12CD34', 'serial%3a'],
+    ['Serial [ZZ12CD34]', 'Serial []'],
+    ['Ｓｅｒｉａｌ：ZZ12CD34', 'Ｓｅｒｉａｌ：'],
+    ['camera-serial:ZZ12CD34', 'camera-serial:'],
+    ['unit serial=ZZ12CD34', 'unit serial='],
   ];
   for (const [input, expected] of forms) assert.equal(stripWatchfulIp(input).text, expected, input);
   assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
