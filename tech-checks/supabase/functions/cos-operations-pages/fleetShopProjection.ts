@@ -33,6 +33,7 @@ export function manualShopItems(value:any):ManualShop[]{
 export function projectManualShop(snapshot:Row,receipt:any):Row{
  const upload=snapshot.uploadInventory,uploaded=Date.parse(upload?.receivedAt);
  const superseded:SupersededShopMove[]=[];
+ const keptOnReceipt:ManualShop[]=[];
  const applied=manualShopItems(receipt).filter(move=>{
   const matches=(snapshot.inventoryItems||[]).filter((r:Row)=>r.id===move.unitId&&r.unitNumber===move.unitNumber);
   if(matches.length!==1)return false;
@@ -51,6 +52,7 @@ export function projectManualShop(snapshot:Row,receipt:any):Row{
   // flagged, and it does not change the counted placement.
   if(counted!=='SHOP'){
    superseded.push({unitId:move.unitId,unitNumber:move.unitNumber,auditId:move.auditId,recordedAt:move.recordedAt,mhelpAt:Number.isFinite(uploaded)?new Date(uploaded).toISOString():move.recordedAt,recordedBy:typeof move.recordedBy==='string'&&move.recordedBy.trim()?move.recordedBy.trim():'the saved COS account',detail:OWNER_OVERRIDE_IGNORED});
+   keptOnReceipt.push(move);
    return false;
   }
   return true;
@@ -68,7 +70,7 @@ export function projectManualShop(snapshot:Row,receipt:any):Row{
   summary.review=changed.filter((r:Row)=>r.active&&r.placement==='unknown').length;
   fleetRoster={...fleetRoster,items:changed,summary};
  }
- return {...snapshot,items,inventoryItems,...(fleetRoster?{fleetRoster}:{}),manualPlacementOverrides:{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:applied},supersededShopMoves:superseded,summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,unitGps:items.filter((r:Row)=>r.hasUnitGps===true).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length},...(snapshot.placementSummary?{placementSummary:{...snapshot.placementSummary,fieldUnits:items.length,reviewUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&r.effectivePlacement?.state==='unknown').length,shopUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&(r.effectivePlacement?.state==='shop'||String(r.placement).toLowerCase()==='shop')).length}}:{})};
+ return {...snapshot,items,inventoryItems,...(fleetRoster?{fleetRoster}:{}),manualPlacementOverrides:{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[...applied,...keptOnReceipt]},supersededShopMoves:superseded,summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,unitGps:items.filter((r:Row)=>r.hasUnitGps===true).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length},...(snapshot.placementSummary?{placementSummary:{...snapshot.placementSummary,fieldUnits:items.length,reviewUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&r.effectivePlacement?.state==='unknown').length,shopUnits:inventoryItems.filter((r:Row)=>r.activeInventoryEligible!==false&&(r.effectivePlacement?.state==='shop'||String(r.placement).toLowerCase()==='shop')).length}}:{})};
 }
 /** UI derivation only: preserve the accepted upload and its digests unchanged. */
 export function manualShopInventory(upload:any,receipt:any):any{
