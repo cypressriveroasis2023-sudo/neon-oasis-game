@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {CAMERA_AUTO_REFRESH_MS, observationRefreshDue} from '../src/refreshCadence.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 import {applyBoardFreshStatus, boardUnitStatus, oldestWatchfulObservation, tvUpdatesDelayed, WATCHFUL_BANNER_AGE_MS, WATCHFUL_OBSERVATION_FRESH_MS, WATCHFUL_PULL_CADENCE_MS} from '../src/boardFreshStatus.ts';
+import {oldestObservationIso, presentedFromWatchfulRead} from '../src/watchfulObservation.ts';
 
 const now = Date.parse('2026-11-19T15:00:00.000Z');
 const fresh = new Date(now - 5 * 60 * 1000).toISOString();
@@ -135,4 +136,15 @@ test('a reading that would expire before the 10-minute cadence requests a saved 
   assert.equal(observationRefreshDue(observed, lastRead, almostDue, true), false);
   assert.equal(observationRefreshDue(now - 5 * 60 * 1000, now, now, false), false);
   assert.equal(observationRefreshDue(now - 30 * 60 * 1000, now, now, false), false);
+});
+
+test('our Watchful read decides Down, and a unit lastConnection does not', () => {
+  const read = new Date(now - 5 * 60 * 1000).toISOString();
+  const oldLink = new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString();
+  const freshLink = new Date(now - 60 * 1000).toISOString();
+  assert.equal(presentedFromWatchfulRead({readAt: read, watchfulStatus: 'offline', lastConnection: oldLink, now}), 'Down');
+  assert.equal(presentedFromWatchfulRead({readAt: new Date(now - 21 * 60 * 1000).toISOString(), watchfulStatus: 'offline', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(presentedFromWatchfulRead({readAt: null, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(presentedFromWatchfulRead({readAt: read, readFailed: true, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(oldestObservationIso([read, '']), null);
 });
