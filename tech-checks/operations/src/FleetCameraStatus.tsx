@@ -31,7 +31,7 @@ import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
 import CameraStatusBoardView from './CameraStatusBoardView';
 import {routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
-import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraMhelpPlacements, cameraStatusBoard, decideShopCameras, fieldMapPlacementRows, inShopLabel, productIdForDevices, productResourceLinks, shopCameraInput, type ShopCameraRule} from '../shared/shopCameraStatus';
+import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraStatusBoard, decideShopCameras, inShopLabel, liveFeedShopRows, type ShopCameraRule} from '../shared/shopCameraStatus';
 import {presentedCameraHealth, type CameraHealthChip} from './cameraEvidence';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
@@ -170,16 +170,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const mhelpIndex=useMemo(()=>mhelpEvidenceByUnit(fieldMap),[fieldMap]);
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const mirrorUnits=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
- const mhelpPlacements=useMemo(()=>cameraMhelpPlacements(fieldMapPlacementRows(fieldMap)),[fieldMap]);
- const resourceLinks=useMemo(()=>productResourceLinks(fieldMap),[fieldMap]);
- const shopInputs=useMemo(()=>mirrorUnits.map(unit=>shopCameraInput({
-  unit:unit.unit,placement:unit.placement,state:unit.state,site:unit.site,cameras:unit.cameras,
-  watchfulProjectKey:unit.watchfulProjectKey,watchfulProject:unit.site,deviceIds:unit.deviceIds,routerSerials:unit.serials,
-  productId:productIdForDevices(unit.deviceIds,resourceLinks)??unit.productId,mhelpPlacement:unit.mhelpPlacement,
-  doNotUse:unit.doNotUse,lifecycle:unit.lifecycle,exception:unit.exception,tags:unit.tags,
- },mhelpPlacements)),[mirrorUnits,mhelpPlacements,resourceLinks]);
+ const liveFeed=useMemo(()=>liveFeedShopRows(mirrorUnits,fieldMap),[mirrorUnits,fieldMap]);
+ const shopInputs=liveFeed.inputs;
  const shopReport=useMemo(()=>decideShopCameras(shopInputs,shopRule),[shopInputs,shopRule]);
- const board=useMemo(()=>cameraStatusBoard(mirrorUnits,shopRule,fleetCounts,shopInputs),[mirrorUnits,shopRule,fleetCounts,shopInputs]);
+ const board=useMemo(()=>cameraStatusBoard(mirrorUnits,shopRule,fleetCounts,shopInputs,liveFeed.mhelpCoverage),[mirrorUnits,shopRule,fleetCounts,shopInputs,liveFeed.mhelpCoverage]);
  const units=useMemo(()=>shopRule.enabled?applyShopCameraView(mirrorUnits,shopReport):mirrorUnits,[shopRule,mirrorUnits,shopReport]);
  const shopDecision=(unit:UnitCameraStatus)=>shopReport.byUnit.get(unit.unit.trim().toUpperCase());
  const routerTodos=useMemo(()=>{

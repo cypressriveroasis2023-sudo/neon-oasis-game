@@ -21,7 +21,6 @@ export type StarCameraRow = {
   source_last_seen_at?: string | null;
   public_ip?: string | null;
   star_organization_id?: string | null;
-  device_serial?: string | null;
 };
 
 export type UnitCamera = {
@@ -68,12 +67,8 @@ export type UnitCameraStatus = {
   handEdits?: Partial<Record<HandEditField, AppliedHandEdit>>;
   // Where the up/down reading came from. Absent means Star4Live.
   source?: UnitSource;
-  /** Watchful project id already on the camera row. Absent when the row has none. */
-  watchfulProjectKey?: string;
-  /** Camera device ids from the provider rows, for a product-id join. */
+  /** Camera device ids when the row that built this unit still has them. The live status response does not. */
   deviceIds?: string[];
-  /** Device serials from the provider rows. mHelp matches these after product id. */
-  serials?: string[];
   productId?: string;
   /** Placement already carried on the camera row. The mHelp index fills this when the row has a product id or router serial instead. */
   mhelpPlacement?: string;
@@ -207,8 +202,6 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
     const site = placement === 'FIELD' ? text(siteRow?.organization) : null;
     const observed = members.map(row => text(row.source_last_seen_at)).filter(Boolean).sort();
     const deviceIds = members.map(row => typeof row?.id === 'number' || typeof row?.id === 'string' ? String(row.id).trim() : '').filter(Boolean);
-    const projectIds = [...new Set(members.map(row => text(row.star_organization_id)).filter(Boolean))];
-    const serials = [...new Set(members.map(row => text(row.device_serial)).filter(Boolean))];
     units.push({
       unit: unitLabel(members[0]),
       placement,
@@ -223,8 +216,6 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
       publicIp: text(members.find(row => text(row.public_ip))?.public_ip) || null,
       observedAt: observed.length ? observed[observed.length - 1] : null,
       ...(deviceIds.length ? {deviceIds} : {}),
-      ...(projectIds.length === 1 ? {watchfulProjectKey: projectIds[0]} : {}),
-      ...(serials.length ? {serials} : {}),
     });
   }
   units.sort((a, b) => a.unit.localeCompare(b.unit, 'en', { numeric: true }));

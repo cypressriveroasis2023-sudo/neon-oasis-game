@@ -176,28 +176,26 @@ test('rollback restores the Watchful mirror for the same units', () => {
 test('mHelp placement is read from Shop, Warehouse, and Field without guessing', () => {
   // Rule change, Felix review of #458 at 808d6ba3.
   // Old assertion: a unit name was the key, so placements.get('SS010') === 'WAREHOUSE'.
-  // New assertion: the name is not a key. Product id wins, then router serial.
-  // placementStatus is used when placement is empty.
+  // New assertion: the name is not a key. Product id is the key.
+  // placementStatus is used when placement is empty. There is no mHelp serial field.
   const placements = cameraMhelpPlacements([
     {unitNumber: 'SS010', productId: '1001', placement: 'warehouse'},
     {unitNumber: 'CAMV 090', productId: '1002', placementStatus: 'Shop'},
-    {unitNumber: 'SNIPER 015', routerSerial: 'RTR-015', placement: 'field'},
+    {unitNumber: 'SNIPER 015', productId: '1003', placement: 'field'},
     {unitNumber: 'SPOTTER 880', placement: 'yard'},
-    {unitNumber: 'Spotter 196 HD', productId: '196', placement: 'SHOP', routerSerial: 'RTR-196'},
+    {unitNumber: 'Spotter 196 HD', productId: '196', placement: 'SHOP'},
   ]);
   assert.equal(placements.byProductId.has('SS010'), false);
   assert.equal(placements.byProductId.get('1001').placement, 'WAREHOUSE');
   assert.equal(placements.byProductId.get('1002').placement, 'SHOP');
-  assert.equal(placements.byRouterSerial.get('RTR-015').placement, 'FIELD');
+  assert.equal(placements.byProductId.get('1003').placement, 'FIELD');
   assert.equal(placements.byProductId.has('SPOTTER 880'), false);
   const byProduct = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'RED', site: 'Fixture Yard', productId: '1001'}, placements);
   assert.equal(byProduct.mhelpPlacement, 'WAREHOUSE');
   assert.equal(decideShopCamera(byProduct, rule).inShop, true);
   const byName = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'RED', site: 'Fixture Yard'}, placements);
   assert.equal(byName.mhelpPlacement, null);
-  const bySerial = shopCameraInput({unit: 'Spotter 196 HD', placement: 'FIELD', state: 'RED', routerSerial: 'RTR-015'}, placements);
-  assert.equal(bySerial.mhelpPlacement, 'FIELD');
-  const productWins = shopCameraInput({unit: 'Spotter 196 HD', placement: 'FIELD', state: 'UNKNOWN', productId: '196', routerSerial: 'RTR-015'}, placements);
+  const productWins = shopCameraInput({unit: 'Spotter 196 HD', placement: 'FIELD', state: 'UNKNOWN', productId: '196'}, placements);
   assert.equal(productWins.mhelpPlacement, 'SHOP');
 });
 
@@ -503,22 +501,21 @@ test('the census fixture keeps 323 In shop, 56 DO NOT USE, 1 exception, and the 
 test('a feed row keeps the Watchful project id and does not match mHelp by name', () => {
   const projected = projectUnitCameraStatus([{
     id: 55, device_name: 'SS010 cam', unit_key: 'SS010', organization: 'Test 1',
-    vigilant_status: 'Online', star_organization_id: TEST1, device_serial: 'RTR-010',
+    vigilant_status: 'Online', star_organization_id: '283838',
   }]);
   const unit = projected.units[0];
-  assert.equal(unit.watchfulProjectKey, TEST1);
+  assert.equal(unit.watchfulProjectKey, undefined);
+  assert.equal(String(unit.star_organization_id ?? ''), '');
   assert.deepEqual(unit.deviceIds, ['55']);
-  assert.deepEqual(unit.serials, ['RTR-010']);
   const index = cameraMhelpPlacements([{unitNumber: 'SS010', productId: '5010', placementStatus: 'SHOP', uploadLifecycle: 'DO_NOT_USE'}]);
-  const named = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'GREEN', watchfulProjectKey: unit.watchfulProjectKey}, index);
+  const named = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'GREEN'}, index);
   assert.equal(named.mhelpPlacement, null);
   const linked = shopCameraInput({
-    unit: 'SS010', placement: 'FIELD', state: 'GREEN', watchfulProjectKey: unit.watchfulProjectKey,
+    unit: 'SS010', placement: 'FIELD', state: 'GREEN',
     productId: productIdForDevices(unit.deviceIds, [{productId: '5010', resourceId: '55'}]),
   }, index);
   assert.equal(linked.mhelpPlacement, 'SHOP');
   assert.equal(linked.doNotUse, true);
-  assert.equal(linked.watchful.projectKey, TEST1);
 });
 
 test('Helios 014 with listed cameras is not tagged no telemetry', () => {

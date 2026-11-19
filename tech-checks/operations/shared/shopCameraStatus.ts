@@ -154,6 +154,7 @@ export type ShopCameraInput = {
   unnamed?: boolean;
   /** Lookup key when the device has no unit name. */
   deviceKey?: string;
+  productId?: string;
 };
 
 export type ShopCameraCategory = 'field' | 'inShop' | 'doNotUse' | 'exception' | 'unclassified';
@@ -208,27 +209,21 @@ export function cameraMhelpPlacement(value: unknown): MhelpCameraPlacement | nul
 
 export type MhelpFeedRecord = {
   productId?: string | null;
-  routerSerial?: string | null;
-  serial?: string | null;
+  unitNumber?: string | null;
+  sourceUnitNumber?: string | null;
   placement?: unknown;
   placementStatus?: unknown;
   lifecycle?: unknown;
   uploadLifecycle?: unknown;
-  unitNumber?: string | null;
 };
 
 export type MhelpFeedMatch = {placement: MhelpCameraPlacement; lifecycle: string | null};
 
 export type MhelpFeedIndex = {
   byProductId: Map<string, MhelpFeedMatch>;
-  byRouterSerial: Map<string, MhelpFeedMatch>;
 };
 
 const productIdOf = (value: unknown) => typeof value === 'string' && /^[1-9]\d{0,14}$/.test(value.trim()) ? value.trim() : '';
-const serialOf = (value: unknown) => {
-  const text = typeof value === 'string' ? value.trim() : '';
-  return text && text.length <= 64 && !/\s/.test(text) ? text : '';
-};
 const lifecycleOf = (row: MhelpFeedRecord) => {
   const text = typeof row.uploadLifecycle === 'string' && row.uploadLifecycle.trim() ? row.uploadLifecycle.trim()
     : typeof row.lifecycle === 'string' ? row.lifecycle.trim() : '';
@@ -238,7 +233,6 @@ const lifecycleOf = (row: MhelpFeedRecord) => {
 /** Index mHelp by product id, then router serial. A unit name is not a key. placementStatus is the fallback when placement is empty. */
 export function cameraMhelpPlacements(rows: readonly MhelpFeedRecord[] | null | undefined): MhelpFeedIndex {
   const byProductId = new Map<string, MhelpFeedMatch | 'conflict'>();
-  const byRouterSerial = new Map<string, MhelpFeedMatch | 'conflict'>();
   const put = (index: Map<string, MhelpFeedMatch | 'conflict'>, key: string, value: MhelpFeedMatch) => {
     if (!key) return;
     const held = index.get(key);
@@ -251,14 +245,13 @@ export function cameraMhelpPlacements(rows: readonly MhelpFeedRecord[] | null | 
     if (!placement) continue;
     const value = {placement, lifecycle: lifecycleOf(row)};
     put(byProductId, productIdOf(row?.productId), value);
-    put(byRouterSerial, serialOf(row?.routerSerial ?? row?.serial), value);
   }
   const clean = (index: Map<string, MhelpFeedMatch | 'conflict'>) => {
     const ready = new Map<string, MhelpFeedMatch>();
     for (const [key, value] of index) if (value !== 'conflict') ready.set(key, value);
     return ready;
   };
-  return {byProductId: clean(byProductId), byRouterSerial: clean(byRouterSerial)};
+  return {byProductId: clean(byProductId)};
 }
 
 export function fieldMapPlacementRows(fieldMap: unknown): MhelpFeedRecord[] {
@@ -529,20 +522,116 @@ export type ShopCameraSource = {
 
 function matchMhelp(source: ShopCameraSource, index: MhelpFeedIndex): MhelpFeedMatch | null {
   const productId = productIdOf(source.productId);
-  const byProduct = productId ? index.byProductId.get(productId) : undefined;
-  if (byProduct) return byProduct;
-  const serials = [
-    ...(typeof source.routerSerial === 'string' ? [source.routerSerial] : []),
-    ...(Array.isArray(source.routerSerials) ? source.routerSerials : []),
-  ];
-  for (const serial of serials) {
-    const found = index.byRouterSerial.get(serialOf(serial));
-    if (found) return found;
-  }
-  return null;
+  return productId ? index.byProductId.get(productId) ?? null : null;
 }
 
-/** Attach a product id from an already loaded connection when a camera device id matches. Never by unit name. */
+/**
+ * The live unit-camera-status response does not carry a Watchful project UUID.
+ * star_organization_id is the Star4Live numeric organization id. It is not used here.
+ */
+export const LIVE_CAMERA_FEED_HAS_WATCHFUL_PROJECT_UUID = false;
+export const LIVE_CAMERA_FEED_WATCHFUL_NOTE = 'The live unit-camera-status feed has no Watchful project UUID. star_organization_id is the Star4Live numeric organization id and is not used as a test-project id.';
+
+export type LiveMhelpRecord = {
+  productId: string;
+  unitNumber: string;
+  sourceUnitNumber: string | null;
+  placement: MhelpCameraPlacement;
+  uploadLifecycle: 'UNFLAGGED' | 'DO_NOT_USE' | 'MISSING' | string;
+};
+
+/** Every mHelp upload record, including Shop and DO NOT USE. Field-only product connections are not the census. */
+export function liveMhelpRecords(fieldMap: unknown): LiveMhelpRecord[] {
+  const records: LiveMhelpRecord[] = [];
+  for (const row of fieldMapPlacementRows(fieldMap)) {
+    const productId = productIdOf(row.productId);
+    const placement = cameraMhelpPlacement(row.placement ?? row.placementStatus);
+    const uploadLifecycle = typeof row.uploadLifecycle === 'string' && row.uploadLifecycle.trim()
+      ? row.uploadLifecycle.trim()
+      : typeof row.lifecycle === 'string' ? row.lifecycle.trim() : '';
+    const unitNumber = typeof row.unitNumber === 'string' ? row.unitNumber : '';
+    const sourceUnitNumber = typeof row.sourceUnitNumber === 'string' && row.sourceUnitNumber.trim() ? row.sourceUnitNumber : null;
+    if (!productId || !placement || !uploadLifecycle || !unitNumber) continue;
+    records.push({productId, unitNumber, sourceUnitNumber, placement, uploadLifecycle});
+  }
+  return records;
+}
+
+function recordByUnitName(records: readonly LiveMhelpRecord[]): Map<string, LiveMhelpRecord | 'conflict'> {
+  const index = new Map<string, LiveMhelpRecord | 'conflict'>();
+  const put = (name: string, record: LiveMhelpRecord) => {
+    if (!name) return;
+    const held = index.get(name);
+    if (held && held !== 'conflict' && held.productId !== record.productId) index.set(name, 'conflict');
+    else if (!held) index.set(name, record);
+  };
+  for (const record of records) {
+    put(record.unitNumber, record);
+    if (record.sourceUnitNumber) put(record.sourceUnitNumber, record);
+  }
+  return index;
+}
+
+/** Exact configured label only. A folded or lookalike name does not become a project id. */
+export function watchfulProjectForExactLabel(label: unknown, projects: readonly WatchfulTestProjectRecord[] = WATCHFUL_TEST_PROJECTS): WatchfulTestProjectRecord | null {
+  if (typeof label !== 'string' || !label) return null;
+  const found = projects.find(project => project.label === label && project.idStatus === 'known' && typeof project.id === 'string' && project.id);
+  return found ?? null;
+}
+
+export type LiveFeedCoverage = 'absent' | 'partial' | 'complete';
+
+export type LiveFeedJoin = {
+  inputs: ShopCameraInput[];
+  matched: number;
+  total: number;
+  mhelpCoverage: LiveFeedCoverage;
+};
+
+/**
+ * Fill shop inputs from a live-shaped camera unit plus the mHelp upload records
+ * already on the field map. Product id is records[].productId. The camera unit
+ * is chosen by records[].unitNumber or records[].sourceUnitNumber, the strings
+ * both sides already store. No serial field is read.
+ */
+export function liveFeedShopRows(units: readonly {unit?: string; placement?: CameraPlacement; state?: CameraState; site?: string | null; organization?: string | null; cameras?: number; mhelpPlacement?: unknown; lifecycle?: unknown; doNotUse?: unknown; tags?: readonly string[]; watchfulProjectKey?: unknown; star_organization_id?: unknown}[], fieldMap: unknown): LiveFeedJoin {
+  const records = liveMhelpRecords(fieldMap);
+  const byName = recordByUnitName(records);
+  const inputs: ShopCameraInput[] = [];
+  let matched = 0;
+  for (const unit of units) {
+    const name = typeof unit.unit === 'string' ? unit.unit : '';
+    const found = name ? byName.get(name) : undefined;
+    const record = found && found !== 'conflict' ? found : null;
+    if (record) matched += 1;
+    const explicit = cameraMhelpPlacement(unit.mhelpPlacement);
+    const ownLifecycle = typeof unit.lifecycle === 'string' ? unit.lifecycle.trim() : '';
+    const carriedKey = typeof unit.watchfulProjectKey === 'string' && WATCHFUL_PROJECT_ID.test(unit.watchfulProjectKey) ? unit.watchfulProjectKey : undefined;
+    const lifecycle = record?.uploadLifecycle || ownLifecycle;
+    const coveredWithoutRecord = !record && (explicit !== null || ownLifecycle.length > 0 || unit.doNotUse === true || unit.doNotUse === false || Boolean(carriedKey));
+    if (coveredWithoutRecord) matched += 1;
+    const siteLabel = watchfulProjectForExactLabel(unit.site) || watchfulProjectForExactLabel(unit.organization);
+    const tags = typeof unit.cameras === 'number' && unit.cameras === 0 ? ['no telemetry'] : [];
+    inputs.push(shopCameraInput({
+      unit: name,
+      placement: unit.placement === 'SHOP' ? 'SHOP' : 'FIELD',
+      state: unit.state || 'UNKNOWN',
+      site: unit.site ?? null,
+      cameras: unit.cameras,
+      ...(explicit ? {mhelpPlacement: explicit} : record ? {mhelpPlacement: record.placement} : {}),
+      ...(record ? {productId: record.productId} : {}),
+      ...(lifecycle ? {lifecycle} : {}),
+      ...(record || ownLifecycle || unit.doNotUse === true || unit.doNotUse === false ? {doNotUse: lifecycle === 'DO_NOT_USE' || unit.doNotUse === true} : {}),
+      ...((siteLabel?.id || carriedKey) ? {watchfulProjectKey: siteLabel?.id || carriedKey, ...(siteLabel ? {watchfulProject: siteLabel.label} : {})} : {}),
+      tags: [...tags, ...(unit.tags || [])],
+    }));
+  }
+  const total = units.length;
+  const mhelpCoverage: LiveFeedCoverage = records.length === 0 && matched === 0 ? 'absent' : matched === total ? 'complete' : 'partial';
+  return {inputs, matched, total, mhelpCoverage};
+}
+
+/** Attach a product id from an already loaded connection when a camera device id matches. */
 export function productIdForDevices(deviceIds: readonly unknown[] | undefined, links: readonly {productId: string; resourceId: string}[]): string | null {
   const ids = new Set((deviceIds ?? []).map(id => typeof id === 'string' || typeof id === 'number' ? String(id).trim() : '').filter(Boolean));
   const hits = links.filter(link => ids.has(link.resourceId));
@@ -586,6 +675,7 @@ export function shopCameraInput(source: ShopCameraSource, mhelp?: MhelpFeedIndex
     cameras: typeof source.cameras === 'number' ? source.cameras : undefined,
     unnamed: source.unnamed === true || !source.unit.trim(),
     deviceKey: typeof source.deviceKey === 'string' ? source.deviceKey : undefined,
+    ...(productIdOf(source.productId) ? {productId: productIdOf(source.productId)} : {}),
   };
 }
 
@@ -643,6 +733,7 @@ export function cameraStatusBoard<T extends {unit: string; placement: CameraPlac
   rule: ShopCameraRule,
   fleetCounts: {units?: {online: number; offline: number; unknown: number} | null; cameras?: {online: number; offline: number; unknown: number} | null} | null,
   inputs: readonly ShopCameraInput[],
+  coverage?: LiveFeedCoverage,
 ): CameraStatusBoard<T> {
   const headline = {units: fleetCounts?.units ?? null, cameras: fleetCounts?.cameras ?? null};
   const listed = (rows: readonly T[]) => ({
@@ -659,17 +750,20 @@ export function cameraStatusBoard<T extends {unit: string; placement: CameraPlac
   const board = listed(viewed);
   const doNotUse = report.decisions.filter(row => row.category === 'doNotUse').map(row => row.unit);
   const exceptions = report.decisions.filter(row => row.category === 'exception').map(row => row.unit);
-  board.lines = [
-    ...(report.sources.doNotUse ? [{label: SHOP_DO_NOT_USE_LABEL, text: shopDoNotUseLine(doNotUse)}] : []),
-    ...(report.sources.exceptions ? [{label: SHOP_EXCEPTION_LABEL, text: exceptionLine(exceptions)}] : []),
-  ];
+  const partial = coverage === 'partial';
+  board.lines = partial
+    ? [{label: SHOP_DO_NOT_USE_LABEL, text: SHOP_DO_NOT_USE_LABEL + ' · —'}, {label: SHOP_EXCEPTION_LABEL, text: SHOP_EXCEPTION_LABEL + ' · —'}]
+    : [
+      ...(report.sources.doNotUse ? [{label: SHOP_DO_NOT_USE_LABEL, text: shopDoNotUseLine(doNotUse)}] : []),
+      ...(report.sources.exceptions ? [{label: SHOP_EXCEPTION_LABEL, text: exceptionLine(exceptions)}] : []),
+    ];
   board.shop = {
     field: report.figures.field,
     armed: report.sources.armed ? report.figures.armed : null,
     immix: report.sources.immix ? report.figures.immix : null,
     inShop: report.figures.inShop,
-    doNotUse: report.sources.doNotUse ? report.figures.doNotUse : null,
-    exceptions: report.sources.exceptions ? report.figures.exceptions : null,
+    doNotUse: partial ? null : report.sources.doNotUse ? report.figures.doNotUse : null,
+    exceptions: partial ? null : report.sources.exceptions ? report.figures.exceptions : null,
   };
   return board;
 }
