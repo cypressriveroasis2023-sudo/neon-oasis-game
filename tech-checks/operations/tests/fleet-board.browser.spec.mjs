@@ -45,6 +45,27 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   await expect(board.locator('[data-board-box=problems]')).toBeEnabled();
   await expect(app.locator('.cos-board-note')).toContainText('Address estimates');
   await expect(app.locator('.cos-board-foot')).toContainText('In shop');
+  await expect(app.locator('.cos-fleet-map-legend')).toHaveCount(0);
+  await expect(app.locator('.cos-source-strip')).toBeHidden();
+  await expect(app.locator('.cos-fleet-heading')).toBeHidden();
+  const visible = await app.locator('.cos-fleet-board').innerText();
+  expect(visible).not.toMatch(/Solar support|Unverified|Saved health|health refresh|Location key/);
+  const boxes = await app.locator('[data-board-box]').evaluateAll(nodes => nodes.map(node => {
+    const box = node.getBoundingClientRect();
+    return {x: box.x, y: box.y, width: box.width, height: box.height};
+  }));
+  const legend = await app.locator('.cos-board-legend').boundingBox();
+  const read = await app.locator('.cos-board-read').boundingBox();
+  const overlaps = (a, b) => a.x < b.x + b.width - 1 && a.x + a.width - 1 > b.x && a.y < b.y + b.height - 1 && a.y + a.height - 1 > b.y;
+  expect(boxes).toHaveLength(4);
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i], boxes[j])).toBe(false);
+  for (const box of boxes) {
+    expect(overlaps(box, legend)).toBe(false);
+    expect(overlaps(box, read)).toBe(false);
+  }
+  expect(overlaps(legend, read)).toBe(false);
+  const search = await app.locator('label.cos-board-search').boundingBox();
+  expect(search.width).toBeLessThan(320);
   await expect.poll(() => fits(app)).toEqual({html: true, body: true, y: 0});
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1920_main.png'});
   await board.locator('[data-board-box=problems]').click();
@@ -57,9 +78,9 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   await expect(card).toContainText('Spotter 1');
   await expect(card.locator('[data-status=offline]')).toBeVisible();
   await expect(card.locator('.cos-board-cam.is-down')).toBeVisible();
-  const visible = await app.locator('.cos-fleet-board').innerText();
-  expect(visible).not.toMatch(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);
-  expect(visible).not.toMatch(/SIM number|password|credential/i);
+  const opened = await app.locator('.cos-fleet-board').innerText();
+  expect(opened).not.toMatch(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);
+  expect(opened).not.toMatch(/SIM number|password|credential/i);
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1920_site_red.png'});
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
@@ -102,9 +123,10 @@ test('failure warnings stay visible on the board', async ({page}, info) => {
   test.skip(info.project.name !== 'desktop-1440');
   await page.setViewportSize({width: 1920, height: 1080});
   const {app} = await mountFleet(page, true, {failHealth: true});
-  await expect(app.getByText('Health update unavailable')).toBeVisible();
-  await expect(app.locator('.cos-fleet-heading small').filter({hasText: 'health read'})).toBeVisible();
-  await expect(app.locator('.cos-source-strip')).toBeVisible();
+  const text = await app.locator('.cos-fleet-board').innerText();
+  expect(text).not.toMatch(/Saved health|health refresh|Solar support|Unverified/);
+  await expect(app.locator('.cos-source-strip')).toBeHidden();
+  await expect(app.locator('.cos-fleet-map-legend')).toHaveCount(0);
 });
 
 test('fleetStage=0 renders the reviewed main board', async ({page}, info) => {

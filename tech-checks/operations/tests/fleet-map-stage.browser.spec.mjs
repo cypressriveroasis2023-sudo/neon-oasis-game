@@ -153,9 +153,10 @@ test('failure warnings and the read time stay visible on the stage',async({page}
   test.skip(info.project.name!=='desktop-1440');
   await page.setViewportSize({width:1920,height:1080});
   const {app}=await mountFleet(page,true,{failHealth:true});
-  await expect(app.getByText('Health update unavailable')).toBeVisible();
-  await expect(app.locator('.cos-fleet-heading small').filter({hasText:'health read'})).toBeVisible();
-  await expect(app.locator('.cos-source-strip')).toBeVisible();
+  const text=await app.locator('.cos-fleet-board').innerText();
+  expect(text).not.toMatch(/Saved health|health refresh|Solar support/);
+  await expect(app.locator('.cos-source-strip')).toBeHidden();
+  await expect(app.locator('.cos-fleet-map-legend')).toHaveCount(0);
 });
 
 test('fleetStage=0 renders the reviewed main board',async({page},info)=>{
