@@ -19,6 +19,7 @@ import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupD
 import {readMhelpAddressMapPins,type MhelpAddressMapResult} from './mhelpAddressMapPins';
 import {tvFieldCensus,tvCensusOutages} from './tvFieldCensus';
 import {censusFromCommandProducts,censusFromDashboardRows,selectFleetCounts,type CountTriple} from './sharedFleetCounts';
+import {countForPath} from './watchfulMonitoredCounts';
 import {checkedAddressEstimate,addressEstimateLabel,type AddressEstimate} from './fieldAddressEstimates';
 import {tvMapTour,tvCameraPageSize} from './tvMapTour';
 import type {FleetPages} from './tvBoardData';
@@ -137,6 +138,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     if(!onSharedCounts)return;
     if(!data.readAt){onSharedCounts(null);return;}
     const now=snapshotClock;
+    countForPath('TvFleetView',{snapshot:null,mhelp:[],now});
     if(census.board){
       const snapshot=selectFleetCounts(censusFromCommandProducts(census.board.items,now),now);
       onSharedCounts({units:snapshot.units,cameras:null,unitTitle:'Field Product IDs',showCameras:false,field:census.board.field,shop:census.board.shop,stands:census.board.counts.support});

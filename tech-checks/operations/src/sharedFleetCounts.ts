@@ -1,4 +1,5 @@
 import {CAMERA_FRESH_MS, cameraTimestamp, resourceKind, type CameraRow} from './cameraEvidence';
+import {countForPath} from './watchfulMonitoredCounts';
 import {exactUnitName, ROUTER_FRESHNESS_MS, type RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import {unitVerdict, type UnitCameraStatus} from '../shared/starUnitStatus';
 
@@ -315,6 +316,10 @@ export function routerOfflineFact(row: Pick<RouterRow, 'probeStatus' | 'checkedA
   if (!facts.length) return { offline: false, at: null };
   facts.sort((left, right) => right.at - left.at);
   return { offline: facts[0].offline, at: facts[0].at };
+}
+
+export function sharedFleetMonitoredCount(input: Parameters<typeof countForPath>[1]) {
+  return countForPath('sharedFleetCounts', input);
 }
 
 export function cameraProvesRouterUp(cameraOnlineAt: number | null, routerObservedAt: number | null): boolean {
