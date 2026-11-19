@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {fleetEquipmentTotals,unverifiedTile,type EquipmentGroup} from './fleetEquipmentTotalsModel';
 import {countForPath, type SharedMonitoredCount} from './watchfulMonitoredCounts';
+import {formatObservedCt} from './watchfulObservation';
 import type {FleetCommandCenterData,FleetCommandProduct} from './fleetCommandCenterModel';
 import FleetCardIcon from './FleetCardIcon';
 import FleetVerifyNow from './FleetVerifyNow';
@@ -16,8 +17,11 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
  const stands=totals?.find(t=>t.key==='stands');
  const cameras=totals?.find(t=>t.key==='cameras');
  return <section className='cos-equipment-totals' aria-label='Equipment family totals'>
-  <p className='cos-monitored-count'>Monitored units {shared.fresh&&shared.units!==null?shared.units:'Unknown'} · Cameras {shared.cameras?shared.cameras.up+' up, '+shared.cameras.down+' down':'Unknown'}{shared.oldestObservedAt?' · Observed '+shared.oldestObservedAt:''}</p>
+  <p className='cos-monitored-count'>Monitored units {shared.fresh&&shared.units!==null?shared.units:'Unknown'} · Cameras {shared.cameras?shared.cameras.up+' up, '+shared.cameras.down+' down':'Unknown'}{shared.oldestObservedAt?' · Observed '+formatObservedCt(shared.oldestObservedAt):''}</p>
   {shared.monitoredOnImmix.length>0&&<p className='cos-immix-monitored'>{shared.monitoredOnImmix[0].groupLabel} · {shared.monitoredOnImmix.length} · {shared.monitoredOnImmix[0].statusLabel}</p>}
+  {shared.amberFlags.map(flag=><p className='cos-monitored-amber' key={flag.name}>{flag.flag}</p>)}
+  {shared.matchExceptions.map(flag=><p className='cos-monitored-exception' key={flag.name}>{flag.name}: {flag.reason}</p>)}
+  {shared.needsCheck.map(flag=><p className='cos-monitored-check' key={flag.name}>{flag.name}: {flag.reason}</p>)}
   <div className='cos-equipment-total-grid'>{(['cameras','helios','stands'] as const).map(key=>{
    const total=totals?.find(t=>t.key===key);
    return <article key={key} className={'cos-equipment-total-card cos-equipment-total-'+key}>

@@ -1,15 +1,14 @@
-import {CAMERA_FRESH_MS, cameraTimestamp} from './cameraEvidence';
+import {cameraTimestamp} from './cameraEvidence';
 import {watchfulCanonicalUnitKey} from './watchfulUnitKey';
+import {formatObservedCt, IN_SHOP_COLOR, IN_SHOP_LABEL, oldestObservationIso, WATCHFUL_OBSERVATION_FRESH_MS} from './watchfulObservation';
 
-const IN_SHOP_LABEL = 'In Shop';
-const IN_SHOP_COLOR = '#64748b';
-
-/** Same 20-minute observation window as a camera reading. Not the fetch time, and not widened. */
-export const WATCHFUL_OBSERVATION_FRESH_MS = CAMERA_FRESH_MS;
+export {formatObservedCt, IN_SHOP_COLOR, IN_SHOP_LABEL, WATCHFUL_OBSERVATION_FRESH_MS};
 
 export const SHOP_REVIEW_FLAG = 'Watchful says at site, mHelp says Shop';
 export const IMMIX_GROUP_LABEL = 'Monitored on Immix';
-export const IMMIX_STATUS_LABEL = 'status not tracked: Immix';
+export const IMMIX_STATUS_LABEL = 'Unknown';
+export const STALE_MHELP_REASON = 'Stale mHelp record needs a check';
+export const SNIPER_4100_FLAG = 'Watchful: down (record named SHOP) · mHelp: Field · Router swap in progress, unconfirmed · counted as down to match Watchful.';
 
 export type MonitoredSource = 'watchful' | 'immix';
 
@@ -28,16 +27,22 @@ export type MhelpCountUnit = {
   placement: 'FIELD' | 'SHOP' | 'OTHER';
   siteName?: string | null;
   doNotUse?: boolean;
+  /** A stale mHelp record is reported for a check. It is not Immix and not pending. */
+  stale?: boolean;
   /** What COS currently shows, so a disagreement can be listed. It does not replace Watchful. */
   cosStatus?: 'up' | 'down' | 'unknown';
 };
+
+export type NeedsCheck = { name: string; reason: typeof STALE_MHELP_REASON };
+export type MatchException = { name: string; reason: string };
+export type AmberFlag = { name: string; flag: typeof SNIPER_4100_FLAG };
 
 export type ImmixMonitoredUnit = {
   name: string;
   siteName: string;
   source: 'immix';
   status: 'unknown';
-  statusLabel: typeof IMMIX_STATUS_LABEL;
+  statusLabel: 'Unknown';
   groupLabel: typeof IMMIX_GROUP_LABEL;
 };
 
@@ -60,9 +65,12 @@ export type SharedMonitoredCount = {
   inShop: number;
   inShopLabel: typeof IN_SHOP_LABEL;
   inShopColor: typeof IN_SHOP_COLOR;
-  offlineUnits: number | null;
+  downUnits: number | null;
   unknownUnits: number | null;
   notInWatchful: {name: string}[];
+  needsCheck: NeedsCheck[];
+  matchExceptions: MatchException[];
+  amberFlags: AmberFlag[];
   monitoredOnImmix: ImmixMonitoredUnit[];
   shopReview: {name: string; flag: typeof SHOP_REVIEW_FLAG}[];
   statusMismatches: StatusMismatch[];
@@ -78,9 +86,12 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   inShop: 0,
   inShopLabel: IN_SHOP_LABEL,
   inShopColor: IN_SHOP_COLOR,
-  offlineUnits: fresh ? 0 : null,
+  downUnits: fresh ? 0 : null,
   unknownUnits: fresh ? 0 : null,
   notInWatchful: [],
+  needsCheck: [],
+  matchExceptions: [],
+  amberFlags: [],
   monitoredOnImmix: [],
   shopReview: [],
   statusMismatches: [],
@@ -98,15 +109,7 @@ export function customerMonitoredName(name: string, doNotUse = false): boolean {
 }
 
 function oldestObservation(values: readonly string[]): string | null {
-  let oldest = Number.POSITIVE_INFINITY;
-  if (!values.length) return null;
-  for (const value of values) {
-    const stamp = cameraTimestamp(value, Number.MAX_SAFE_INTEGER);
-    const at = stamp.at ? Date.parse(stamp.at) : NaN;
-    if (!Number.isFinite(at)) return null;
-    if (at < oldest) oldest = at;
-  }
-  return new Date(oldest).toISOString();
+  return oldestObservationIso(values);
 }
 
 function freshSnapshot(observedAt: string | null, now: number): boolean {
@@ -155,9 +158,13 @@ export function selectSharedMonitoredCount(input: {
   let camerasUp = 0;
   let camerasDown = 0;
   const counted = new Set<string>();
+  const countedNames = new Set<string>();
 
   for (const [key, unit] of watchful) {
-    const matches = mhelpByKey.get(key) || [];
+    const sniper4100Name = unit.unitName.trim().toLowerCase() === 'sniper 4-100';
+    const matches = sniper4100Name
+      ? input.mhelp.filter(item => item.name.trim().toLowerCase() === 'sniper 4-100')
+      : (mhelpByKey.get(key) || []);
     const shop = matches.filter(item => item.placement === 'SHOP');
     const field = matches.filter(item => item.placement === 'FIELD' && customerMonitoredName(item.name, item.doNotUse));
     if (shop.length && !field.length) {
@@ -165,10 +172,22 @@ export function selectSharedMonitoredCount(input: {
       result.shopReview.push({name: shop[0].name, flag: SHOP_REVIEW_FLAG});
       continue;
     }
-    if (field.length !== 1) continue;
+    if (field.length === 0) {
+      result.matchExceptions.push({name: unit.unitName, reason: 'Watchful unit has no mHelp Field match'});
+      continue;
+    }
+    if (field.length !== 1) {
+      result.matchExceptions.push({name: unit.unitName, reason: `Watchful unit has ${field.length} mHelp Field matches`});
+      continue;
+    }
+    const sniper4100 = unit.unitName.trim().toLowerCase() === 'sniper 4-100' && unit.status === 'down';
     counted.add(key);
     result.units = (result.units || 0) + 1;
-    if (unit.status === 'down') result.offlineUnits = (result.offlineUnits || 0) + 1;
+    if (unit.status === 'down') result.downUnits = (result.downUnits || 0) + 1;
+    if (sniper4100) {
+      result.amberFlags.push({name: field[0].name, flag: SNIPER_4100_FLAG});
+      countedNames.add(field[0].name.trim().toLowerCase());
+    }
     camerasUp += unit.camerasUp;
     camerasDown += unit.camerasDown;
     if (unit.siteName) {
@@ -186,7 +205,12 @@ export function selectSharedMonitoredCount(input: {
 
   for (const unit of input.mhelp) {
     if (unit.placement !== 'FIELD' || !customerMonitoredName(unit.name, unit.doNotUse)) continue;
+    if (unit.stale) {
+      result.needsCheck.push({name: unit.name, reason: STALE_MHELP_REASON});
+      continue;
+    }
     const key = watchfulCanonicalUnitKey(unit.name);
+    if (countedNames.has(unit.name.trim().toLowerCase())) continue;
     if (key && counted.has(key)) continue;
     if (immixSites.has(siteKey(unit.siteName))) {
       result.monitoredOnImmix.push({

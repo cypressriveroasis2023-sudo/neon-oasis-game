@@ -8,6 +8,8 @@ const rollback = readFileSync(new URL('../db/20261119_immix_monitored_sites_roll
 
 test('the Immix site list is private and the rollback removes it', async () => {
   assert.doesNotMatch(sql, /insert\s+into/i);
+  assert.match(sql, /site_key/);
+  assert.doesNotMatch(sql, /site_name/);
   const db = new PGlite();
   await db.exec('create role anon; create role authenticated; create role service_role;');
   await db.exec(sql);
@@ -20,6 +22,8 @@ test('the Immix site list is private and the rollback removes it', async () => {
   const held = grants.rows.map(row => `${row.grantee}:${row.privilege_type}`);
   assert.deepEqual(held.filter(item => item.startsWith('anon:')), []);
   assert.deepEqual(held.filter(item => item.startsWith('authenticated:')), ['authenticated:SELECT']);
+  const rows = await db.query('select count(*)::int as n from public.immix_monitored_sites');
+  assert.equal(rows.rows[0].n, 0);
   await db.exec(rollback);
   const gone = await db.query(`
     select c.relname

@@ -1,0 +1,33 @@
+{
+  "contract": "COS_WATCHFUL_MONITORED_COUNT_PRESERVATION_V1",
+  "scope": "Reviewed reversal of the Watchful monitored count on FleetDashboard. The count is Unknown until James approves the data load. This layer sits outside the count-trust layer. Baselines and pins are unchanged. If #452 merges second, its FleetDashboard reversal stacks outside this one.",
+  "files": [
+    {
+      "path": "FleetDashboard.tsx",
+      "candidateBlob": "73fb41b0c22493382c843b50b1ea54b1b20f890e",
+      "baselineBlob": "769c97949d852551fc09689301f64e87bbc0ac2b",
+      "replacements": [
+        {
+          "from": "import {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
+          "to": "import {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {countForPath} from './watchfulMonitoredCounts';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
+          "count": 1
+        },
+        {
+          "from": " const sharedCounts=inventoryCensus?selectFleetCounts(inventoryCensus,snapshotNow):(cameraCounts??selectFleetCounts([],snapshotNow));\n const unitCountLabel=inventoryCensus?'Field Product IDs':'Camera units';",
+          "to": " const sharedCounts=inventoryCensus?selectFleetCounts(inventoryCensus,snapshotNow):(cameraCounts??selectFleetCounts([],snapshotNow));\n const monitoredCount=countForPath('FleetDashboard',{snapshot:null,mhelp:[],now:snapshotNow});\n const unitCountLabel=inventoryCensus?'Field Product IDs':'Camera units';",
+          "count": 1
+        },
+        {
+          "from": "data-fleet-view='map' aria-label='COS fleet counts'",
+          "to": "data-fleet-view='map' data-monitored={monitoredCount.fresh&&monitoredCount.units!==null?String(monitoredCount.units):'Unknown'} aria-label='COS fleet counts'",
+          "count": 1
+        },
+        {
+          "from": "data-fleet-view={view} aria-label='COS Fleet Dashboard'",
+          "to": "data-fleet-view={view} data-monitored={monitoredCount.fresh&&monitoredCount.units!==null?String(monitoredCount.units):'Unknown'} aria-label='COS Fleet Dashboard'",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}
