@@ -12,7 +12,8 @@ import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,
 import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {loadTvFleetFeeds,retainSourceErrors,sourceErrorText} from './tvFleetFeeds';
-import {automaticRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
+import {automaticRefreshDue,observationRefreshDue,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
+import {newestObservedAt} from './boardFreshStatus';
 import {type ReticleState} from './fieldMapMarkers';
 import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fleetStatusPins';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
@@ -37,7 +38,8 @@ const savedBoardTime=(field:unknown)=>{const at=Date.parse(String((field as any)
 const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages,onSharedCounts}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void;onSharedCounts?:(counts:TvSharedCounts|null)=>void}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
-  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false);
+  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false),newestObserved=useRef<number|null>(null);
+  newestObserved.current=newestObservedAt(data.health?.rows,clock);
   // Errors are retained per source group. A pass only reports for the sources
   // it actually read, so a successful router-only read cannot clear an
   // unresolved camera warning that no camera read has resolved.
@@ -94,7 +96,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
     };
     void refresh();
-    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
+    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS)||observationRefreshDue(newestObserved.current,lastAttempt.current,Date.now(),document.hidden),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
     const timer=window.setInterval(tick,60000);
     const invalid=(event:Event)=>{
       const detail=(event as CustomEvent<{reason?:string;path?:string}>).detail;
