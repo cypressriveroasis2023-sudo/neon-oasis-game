@@ -26,7 +26,7 @@ import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 import FleetBoard,{BoardMapNotes} from './FleetBoard';
 import {alarmsFromMeasurements,buildBoard,marksOrUnit,recordContacts,recordEye,recordSchedule,type BoardUnitInput} from './fleetBoard';
-import {fleetMapStageEnabled,stageIcon,stagePlacement,type StageSharedMonitoredCount} from './fleetMapStage';
+import {fleetBoardOnTv,stageIcon,stagePlacement,type StageSharedMonitoredCount} from './fleetMapStage';
 import './fleetMapStage.css';
 type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
@@ -190,7 +190,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const shown=outageCards.slice((page%parts)*count,(page%parts+1)*count),area=areas[page%areas.length];
   useEffect(()=>onPages({camera:parts,map:areas.map(area=>area.label)}),[parts,areas,onPages]);
   const mapNode=useRef<HTMLDivElement|null>(null),mapRef=useRef<L.Map|null>(null),layer=useRef<L.LayerGroup|null>(null);
-  const tvStage=fleetMapStageEnabled()&&mode==='map';
+  const tvStage=fleetBoardOnTv()&&mode==='map';
   const tvBoard=useMemo(()=>{
     const inputs:BoardUnitInput[]=rows.map(row=>{
       const record=row.unit as Record<string,unknown>;
@@ -219,7 +219,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   },[groupDetails]);
   useEffect(()=>{
     if(!enabled||!mapNode.current)return;
-    const map=L.map(mapNode.current,{zoomControl:false,attributionControl:true,dragging:!fleetMapStageEnabled(),scrollWheelZoom:!fleetMapStageEnabled(),doubleClickZoom:!fleetMapStageEnabled(),boxZoom:!fleetMapStageEnabled(),keyboard:!fleetMapStageEnabled(),touchZoom:!fleetMapStageEnabled()}).setView([31,-99],6);mapRef.current=map;
+    const wall=fleetBoardOnTv();
+    const map=L.map(mapNode.current,{zoomControl:false,attributionControl:true,dragging:!wall,scrollWheelZoom:!wall,doubleClickZoom:!wall,boxZoom:!wall,keyboard:!wall,touchZoom:!wall}).setView([31,-99],6);mapRef.current=map;
     addFieldMapBasemap(map);
     layer.current=L.layerGroup().addTo(map);
     const update=()=>setMapRevision(value=>value+1);map.on('zoomend moveend',update);

@@ -84,6 +84,14 @@ export function fleetMapStageEnabled(enabled = FLEET_MAP_STAGE_LAYOUT) {
   return enabled && !fleetStageRollbackRequested();
 }
 
+/** The TV wall is opt-in. The existing TV board stays up unless `?fleetBoard=1` is set. */
+export function fleetBoardOnTv() {
+  if (!fleetMapStageEnabled()) return false;
+  if (typeof location === 'undefined') return false;
+  try { return new URLSearchParams(location.search).get('fleetBoard') === '1'; }
+  catch { return false; }
+}
+
 /** mHelp placement. Anything that is not Field or Shop is Unknown, including a blank value. */
 export function stagePlacement(value: string | null | undefined): 'field' | 'shop' | 'unknown' {
   const token = String(value || '').trim().toLowerCase();

@@ -155,7 +155,7 @@ function present() {
     const fieldRoute = mapParams.get('fleetDashboard')==='1'&&!fieldUnit?'#fleet-dashboard':mapParams.get('cameraView')==='1'?'#camera-health':fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#fleet-dashboard?unitLabel=' + encodeURIComponent(fieldUnit) : '#fleet-dashboard';
     const tvLaunch = mapParams.get('tvBoard') === '1';
     const tvParams = new URLSearchParams();
-    if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
+    if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('fleetBoard')==='1')tvParams.set('fleetBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
     const locationParams=new URLSearchParams();if(mapParams.get('locationImport')==='1'&&/^HELIOS\s+\d{1,3}$/i.test(mapParams.get('locationUnit')||'')&&/^[a-f0-9-]{36}$/i.test(mapParams.get('locationNonce')||'')){for(const key of ['locationImport','locationUnit','locationNonce'])locationParams.set(key,mapParams.get(key));}
     frame.src = './operations/dist/index.html?v=' + (locationParams.size?'mhelp-location-import-20261012':'unified-fleet-20261013') + (locationParams.size?'&'+locationParams:'') + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;

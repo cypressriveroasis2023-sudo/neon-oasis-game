@@ -81,7 +81,7 @@ test('the TV board stays on one screen and a stale unit is Unknown',async({page}
     if(path==='/api/session')return route.fulfill({headers,json:{authorized:true,legacyOwner:true,role:'Owner',name:'Fixture Owner',productionOwnerUserId:'11111111-1111-4111-8111-111111111111',features:{fleetAccess:true}}});
     return route.fulfill({headers,json:{items:[]}});
   });
-  await page.goto('/tv-stage?tvBoard=1');
+  await page.goto('/tv-stage?tvBoard=1&fleetBoard=1');
   const frame=page.frameLocator('#cosOperationsFrame');
   const board=frame.getByRole('region',{name:'Tech Check TV Board'});
   await expect(board).toBeVisible();

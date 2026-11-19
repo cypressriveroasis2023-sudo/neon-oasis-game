@@ -162,12 +162,17 @@ function sharedImmix(shared: StageSharedMonitoredCount): number | null {
   return (shared.immixUp ?? 0) + (shared.immixDown ?? 0) + (shared.immixUnknown ?? 0);
 }
 
-function presentedCameras(unit: BoardUnitInput, now: number): CameraMarkRow[] {
-  if (unit.cameras.length) return unit.cameras.map(camera => ({
+function presentedCameras(unit: BoardUnitInput, boardStale: boolean): CameraMarkRow[] {
+  return unit.cameras.map(camera => ({
     ...camera,
-    state: readIsStale(camera.observedAt, now) ? 'unknown' : camera.state,
+    state: boardStale ? 'unknown' : camera.state,
   }));
-  return [];
+}
+
+function notArmedTodayCount(units: readonly BoardUnitInput[]): number | null {
+  const known = units.some(unit => unit.arming === 'Disarmed' || unit.arming === 'Paused' || typeof unit.scheduleDisarmed === 'boolean');
+  if (!known) return null;
+  return units.filter(unit => unit.placement === 'field' && !unit.support && (unit.arming === 'Disarmed' || unit.arming === 'Paused' || unit.scheduleDisarmed === true)).length;
 }
 
 function unitStatus(cameras: readonly CameraMarkRow[]): { status: CameraMark; cameraDown: boolean } {
@@ -183,7 +188,7 @@ export function boardProblems(units: readonly BoardUnitInput[], now: number): Bo
   const problems: BoardProblem[] = [];
   for (const unit of units) {
     if (unit.placement !== 'field' || unit.support) continue;
-    const cameras = presentedCameras(unit, now);
+    const cameras = presentedCameras(unit, false);
     const status = unitStatus(cameras);
     const siteKey = boardSiteKey(unit.site, unit.id);
     if (status.status === 'down') {
@@ -192,12 +197,6 @@ export function boardProblems(units: readonly BoardUnitInput[], now: number): Bo
     }
     if (status.cameraDown) {
       problems.push({ siteKey, site: unit.site || unit.name, unit: unit.name, what: 'Camera down', since: unit.downSince || null });
-      continue;
-    }
-    // A Watchful schedule that leaves the unit disarmed is not a problem.
-    if (unit.scheduleDisarmed) continue;
-    if (unit.inWatchful === true && unit.arming === 'Disarmed') {
-      problems.push({ siteKey, site: unit.site || unit.name, unit: unit.name, what: 'Not armed', since: null });
     }
   }
   return problems;
@@ -226,8 +225,8 @@ function safeContacts(value: readonly BoardContact[] | null | undefined): BoardC
   })) : null;
 }
 
-export function buildBoard(units: readonly BoardUnitInput[], shared: StageSharedMonitoredCount | null, readAt: string | null, now = Date.now()): BoardView {
-  const stale = readIsStale(readAt, now);
+export function buildBoard(units: readonly BoardUnitInput[], shared: StageSharedMonitoredCount | null, readAt: string | null, now = Date.now(), readFailed = false): BoardView {
+  const stale = readFailed || readIsStale(readAt, now);
   if (!units.length && stale) {
     return { stale: true, readAt, unitsOnline: { up: null, total: null }, camerasOnline: { up: null, total: null }, sitesArmed: { up: null, total: null }, immixSites: null, inShop: null, notArmedToday: null, problems: [], sites: [], unplaced: 0 };
   }
@@ -241,7 +240,7 @@ export function buildBoard(units: readonly BoardUnitInput[], shared: StageShared
   });
   const census = selectFleetCounts(censusFromDashboardRows(counted, now).map((unit, index) => {
     const source = countUnits[index];
-    const cameras = source && source.placement !== 'shop' ? presentedCameras(source, now).map(camera => ({
+    const cameras = source && source.placement !== 'shop' ? presentedCameras(source, stale).map(camera => ({
       state: camera.state === 'up' ? 'online' as const : camera.state === 'down' ? 'offline' as const : 'unknown' as const,
       observedAt: camera.observedAt,
     })) : unit.cameras;
@@ -249,15 +248,14 @@ export function buildBoard(units: readonly BoardUnitInput[], shared: StageShared
   }), now);
   const fieldTotal = census.units.online + census.units.offline + census.units.unknown;
   const cameraTotal = census.cameras.online + census.cameras.offline + census.cameras.unknown;
-  const armedKnown = shared?.fresh === true && typeof shared.armedSites === 'number' && shared.sites != null;
-  const scheduleKnown = units.some(unit => typeof unit.scheduleDisarmed === 'boolean');
+  const armedKnown = !stale && shared?.fresh === true && typeof shared.armedSites === 'number' && shared.sites != null;
   const problems = stale ? [] : boardProblems(units, now);
   const problemKeys = new Set(problems.map(problem => problem.siteKey));
   const groups = new Map<string, BoardSite>();
   for (const unit of units) {
     if (unit.placement === 'shop') continue;
     const key = boardSiteKey(unit.site, unit.id);
-    const cameras = presentedCameras(unit, now);
+    const cameras = presentedCameras(unit, stale);
     const status = unit.support ? { status: 'unknown' as const, cameraDown: false } : unitStatus(cameras);
     const view: BoardUnitView = {
       id: unit.id,
@@ -285,12 +283,12 @@ export function buildBoard(units: readonly BoardUnitInput[], shared: StageShared
   return {
     stale,
     readAt,
-    unitsOnline: countPair(census.units.online, fieldTotal),
-    camerasOnline: countPair(census.cameras.online, cameraTotal),
+    unitsOnline: stale ? { up: null, total: null } : countPair(census.units.online, fieldTotal),
+    camerasOnline: stale ? { up: null, total: null } : countPair(census.cameras.online, cameraTotal),
     sitesArmed: armedKnown ? { up: shared!.armedSites!, total: shared!.sites! } : { up: null, total: null },
     immixSites: shared?.fresh ? sharedImmix(shared) : null,
-    inShop: census.inShopUnits,
-    notArmedToday: scheduleKnown ? units.filter(unit => unit.placement === 'field' && unit.scheduleDisarmed === true).length : null,
+    inShop: stale ? null : census.inShopUnits,
+    notArmedToday: stale ? null : notArmedTodayCount(units),
     problems,
     sites,
     unplaced: sites.filter(site => !site.point).length,

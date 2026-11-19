@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {boardProblems, boardSearch, buildBoard, problemTone} from '../src/fleetBoard.ts';
 import {cameraMarks, publicCameraLabel, readIsStale} from '../src/fleetCameraStatusRead.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
@@ -53,8 +54,14 @@ test('a schedule disarm is not a problem and a shared count fills armed and Immi
     unit({id: 'off', name: 'Night yard', arming: 'Disarmed', inWatchful: true, scheduleDisarmed: true, state: 'up'}),
     unit({id: 'hold', name: 'Open yard', arming: 'Disarmed', inWatchful: true, scheduleDisarmed: false, state: 'up'}),
   ], now);
-  assert.deepEqual(problems.map(item => item.unit), ['Open yard']);
-  assert.equal(problems[0].what, 'Not armed');
+  assert.deepEqual(problems.map(item => item.unit), []);
+  const disarmed = buildBoard([
+    unit({id: 'off', name: 'Night yard', arming: 'Disarmed', scheduleDisarmed: true}),
+    unit({id: 'hold', name: 'Open yard', arming: 'Disarmed'}),
+    unit({id: 'pause', name: 'Paused yard', arming: 'Paused'}),
+  ], null, fresh, now);
+  assert.equal(disarmed.problems.length, 0);
+  assert.equal(disarmed.notArmedToday, 3);
   const view = buildBoard([unit({id: 'up', name: 'Field up'})], {
     fresh: true, units: 4, sites: 3, armedSites: 2, armedUnits: 2,
     cameras: {up: 5, down: 1, total: 6}, notInWatchful: [], immixUp: 1, immixDown: 0, immixUnknown: 0,
@@ -72,8 +79,39 @@ test('a stale read greys the board and disables problems', () => {
   ], null, stale, now);
   assert.equal(view.stale, true);
   assert.equal(view.problems.length, 0);
+  assert.equal(view.unitsOnline.up, null);
+  assert.equal(view.camerasOnline.up, null);
   assert.equal(view.sites[0].dot, 'grey');
   assert.equal(view.sites[0].units[0].status, 'unknown');
+});
+
+test('a fresh camera time with an old read is Unknown, and an old camera time with a fresh read is not', () => {
+  const oldRead = buildBoard([
+    unit({id: 'down', name: 'Field down', state: 'down', observedAt: fresh, cameras: [{name: 'Cam', state: 'down', observedAt: fresh}]}),
+  ], null, stale, now);
+  assert.equal(oldRead.stale, true);
+  assert.equal(oldRead.sites[0].units[0].status, 'unknown');
+  assert.equal(oldRead.unitsOnline.up, null);
+  assert.equal(oldRead.problems.length, 0);
+  const freshRead = buildBoard([
+    unit({id: 'down', name: 'Field down', state: 'down', observedAt: stale, cameras: [{name: 'Cam', state: 'down', observedAt: stale}]}),
+  ], null, fresh, now);
+  assert.equal(freshRead.stale, false);
+  assert.equal(freshRead.sites[0].units[0].status, 'down');
+  assert.equal(freshRead.problems[0].what, 'Offline');
+  const failed = buildBoard([
+    unit({id: 'down', name: 'Field down', state: 'down', observedAt: fresh, cameras: [{name: 'Cam', state: 'down', observedAt: fresh}]}),
+  ], null, fresh, now, true);
+  assert.equal(failed.stale, true);
+  assert.equal(failed.sites[0].units[0].status, 'unknown');
+  assert.notEqual(failed.unitsOnline.up, 0);
+});
+
+test('the dashboard hook passes our read time and the failed flag', () => {
+  const source = readFileSync(new URL('../src/FleetDashboard.tsx', import.meta.url), 'utf8');
+  assert.match(source, /stageRead=\{\{at:Number\.isFinite\(snapshotNow\)\?new Date\(snapshotNow\)\.toISOString\(\):null,failed:Boolean\(failed\)\}\}/);
+  assert.match(source, /const boardOn=useFleetMapStage\(\)&&view==='map'/);
+  assert.match(source, /\{!boardOn&&<div className='cos-fleet-heading'>/);
 });
 
 test('Problems 0 is not red', () => {

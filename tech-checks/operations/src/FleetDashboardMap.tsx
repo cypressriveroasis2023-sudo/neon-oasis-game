@@ -22,8 +22,8 @@ import FleetBoard,{BoardMapNotes} from './FleetBoard';
 import {alarmsFromMeasurements,buildBoard,marksOrUnit,newestRead,recordContacts,recordEye,recordSchedule,type BoardUnitInput} from './fleetBoard';
 import {stageIcon,stagePlacement,type StageSharedMonitoredCount} from './fleetMapStage';
 import 'leaflet/dist/leaflet.css';
-type Props={rows:FleetDashboardRow[];stageRows?:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;/** #451 countForPath / selectSharedMonitoredCount. Null omits those boxes. */sharedCount?:StageSharedMonitoredCount|null;};
-export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters,sharedCount=null}:Props){
+type Props={rows:FleetDashboardRow[];stageRows?:FleetDashboardRow[];stageRead?:{at:string|null;failed:boolean}|null;pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;/** #451 countForPath / selectSharedMonitoredCount. Null omits those boxes. */sharedCount?:StageSharedMonitoredCount|null;};
+export default function FleetDashboardMap({rows,stageRows,stageRead=null,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters,sharedCount=null}:Props){
  const [pinRetry,setPinRetry]=useState<Record<string,'pin'|'both'|string>>({});
  const node=useRef<HTMLDivElement>(null),groupHost=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
@@ -75,8 +75,9 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
    const fallback=row.support?null:row.cameraState==='online'?'up' as const:row.cameraState==='offline'?'down' as const:'unknown' as const;
    return {id:row.id,name:row.displayName||row.name,site:row.unit.site||row.displayCustomer||row.unit.customer||'',placement:stagePlacement(row.placement),cameras:marksOrUnit(row.camera.rows,fallback,row.camera.checkedAt,Date.now()),observedAt:row.camera.checkedAt,support:row.support,point:pin?pin.point:null,estimate:pin?pin.kind!=='current':false,immix:record.immix===true,inWatchful:typeof record.inWatchful==='boolean'?record.inWatchful:null,arming:record.arming==='Auto'||record.arming==='TestMode'||record.arming==='Disarmed'||record.arming==='Paused'?record.arming:null,scheduleDisarmed:typeof record.scheduleDisarmed==='boolean'?record.scheduleDisarmed:undefined,schedule:recordSchedule(record.watchfulSchedule),alarms:alarmsFromMeasurements(row.power?.measurements),contacts:recordContacts(record.contacts),eye:recordEye(record.eyeNumber),downSince:typeof record.downSince==='string'?record.downSince:null};
   });
-  return buildBoard(inputs,sharedCount,locationsReady||inputs.length?newestRead(inputs.map(unit=>unit.observedAt)):null,Date.now());
- },[stageSource,pins,sharedCount,locationsReady]);
+  const readAt=stageRead?stageRead.at:(locationsReady||inputs.length?newestRead(inputs.map(unit=>unit.observedAt)):null);
+  return buildBoard(inputs,sharedCount,readAt,Date.now(),stageRead?.failed===true);
+ },[stageSource,pins,sharedCount,locationsReady,stageRead]);
  const boardRef=useRef(board);boardRef.current=board;
  const openBoardSite=(key:string|null)=>{
   setBoardSite(key);

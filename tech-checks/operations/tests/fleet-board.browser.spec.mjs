@@ -45,9 +45,8 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   await expect(board.locator('[data-board-box=problems]')).toBeEnabled();
   await expect(app.locator('.cos-board-note')).toContainText('Address estimates');
   await expect(app.locator('.cos-board-foot')).toContainText('In shop');
-  await expect(app.locator('.cos-fleet-map-legend')).toHaveCount(0);
-  await expect(app.locator('.cos-source-strip')).toBeHidden();
-  await expect(app.locator('.cos-fleet-heading')).toBeHidden();
+  const retired = ['.cos-fleet-heading','.cos-source-alerts','.cos-source-strip','.cos-mhelp-connection-alert','.cos-fleet-tab-summary','.cos-phone-board-info','.cos-fleet-vision-toggle','div.cos-board-search','.cos-fleet-unit-panel','.cos-fleet-map-toolbar','.cos-fleet-map-legend','.cos-fleet-pin-view'];
+  for (const selector of retired) await expect(app.locator(selector)).toHaveCount(0);
   const visible = await app.locator('.cos-fleet-board').innerText();
   expect(visible).not.toMatch(/Solar support|Unverified|Saved health|health refresh|Location key/);
   const boxes = await app.locator('[data-board-box]').evaluateAll(nodes => nodes.map(node => {
@@ -124,14 +123,37 @@ test('the map fills 1600x900 without a page scroll', async ({page}, info) => {
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1600x900.png'});
 });
 
+test('Problems above 0 is red and 0 is not', async ({page, browser}, info) => {
+  test.skip(info.project.name !== 'desktop-1440');
+  await page.setViewportSize({width: 1920, height: 1080});
+  const alarm = await mountFleet(page, true, {field: prepared()});
+  const hot = alarm.app.locator('[data-board-box=problems]');
+  await expect(hot.locator('strong')).not.toHaveText('0');
+  await expect.poll(() => hot.evaluate(node => getComputedStyle(node).backgroundColor)).toBe('rgb(42, 20, 24)');
+  const clearPage = await browser.newPage();
+  await clearPage.setViewportSize({width: 1920, height: 1080});
+  const clearHealth = snapshot([
+    resource(1, 'Helios 1', {status: 'online'}),
+    resource(2, 'Spotter 1', {status: 'online'}),
+    resource(3, 'Spotter 2', {status: 'online'}),
+    resource(4, 'Sniper 44', {scope: 'shop', status: 'online'}),
+  ]);
+  const calm = await mountFleet(clearPage, true, {field: prepared(), health: clearHealth});
+  const cool = calm.app.locator('[data-board-box=problems]');
+  await expect(cool.locator('strong')).toHaveText('0');
+  await expect(cool).toHaveClass(/is-clear/);
+  expect(await cool.evaluate(node => getComputedStyle(node).backgroundColor)).not.toBe('rgb(42, 20, 24)');
+  await clearPage.close();
+});
+
 test('failure warnings stay visible on the board', async ({page}, info) => {
   test.skip(info.project.name !== 'desktop-1440');
   await page.setViewportSize({width: 1920, height: 1080});
   const {app} = await mountFleet(page, true, {failHealth: true});
-  const text = await app.locator('.cos-fleet-board').innerText();
-  expect(text).not.toMatch(/Saved health|health refresh|Solar support|Unverified/);
-  await expect(app.locator('.cos-source-strip')).toBeHidden();
-  await expect(app.locator('.cos-fleet-map-legend')).toHaveCount(0);
+  await expect(app.getByText('Health update unavailable')).toBeVisible();
+  const retired = ['.cos-fleet-heading','.cos-source-alerts','.cos-source-strip','.cos-mhelp-connection-alert','.cos-fleet-tab-summary','.cos-phone-board-info','.cos-fleet-vision-toggle','div.cos-board-search','.cos-fleet-unit-panel','.cos-fleet-map-legend'];
+  for (const selector of retired) await expect(app.locator(selector)).toHaveCount(0);
+  await expect(app.locator('[data-board-box=units] strong')).not.toContainText('0');
 });
 
 test('fleetStage=0 renders the reviewed main board', async ({page}, info) => {
@@ -183,7 +205,7 @@ test('the TV board does not accept interaction and a late read is Unknown', asyn
     if (path === '/api/session') return route.fulfill({headers, json: {authorized: true, legacyOwner: true, role: 'Owner', name: 'Fixture Owner', productionOwnerUserId: '11111111-1111-4111-8111-111111111111', features: {fleetAccess: true}}});
     return route.fulfill({headers, json: {items: []}});
   });
-  await page.goto('/tv-stage?tvBoard=1');
+  await page.goto('/tv-stage?tvBoard=1&fleetBoard=1');
   const frame = page.frameLocator('#cosOperationsFrame');
   await expect(frame.locator('.cos-board[data-board-mode=wall]')).toBeVisible();
   await expect(frame.locator('.cos-board-search')).toHaveCount(0);
@@ -203,10 +225,12 @@ test('the TV board does not accept interaction and a late read is Unknown', asyn
   await expect(frame.locator('.cos-board-card')).toHaveCount(0);
   await expect.poll(() => fits(frame)).toEqual({html: true, body: true, y: 0});
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_tv.png'});
-  await page.goto('/tv-stage?tvBoard=1&late=1');
+  await page.goto('/tv-stage?tvBoard=1&fleetBoard=1&late=1');
   await expect(frame.locator('.cos-board-banner')).toBeVisible();
   await expect(frame.locator('[data-board-box=problems]')).toHaveAttribute('data-problem-tone', 'unknown');
   await expect(frame.locator('[data-board-box=problems] strong')).toHaveText('?');
+  await expect(frame.locator('[data-board-box=units] strong')).toHaveText('—');
+  await expect(frame.locator('[data-board-box=units]')).not.toContainText('0');
   const staleBg = await frame.locator('[data-board-box=problems]').evaluate(node => getComputedStyle(node).backgroundColor);
   expect(staleBg).not.toBe('rgb(42, 20, 24)');
   expect(await frame.locator('.cos-board').innerText()).not.toMatch(/\bDown\b/);
@@ -220,12 +244,15 @@ test('a desktop late read keeps problems closed', async ({page}, info) => {
   await page.setViewportSize({width: 1920, height: 1080});
   const late = new Date(Date.parse(fresh) - 40 * 60 * 1000).toISOString();
   const health = snapshot([
-    resource(1, 'Helios 1', {evidence: {...resource(1).evidence, observedAt: late, lastOnlineAt: late}}),
-    withStatus(resource(2, 'Spotter 1'), 'offline', late),
+    resource(1, 'Helios 1', {evidence: {...resource(1).evidence, observedAt: fresh, lastOnlineAt: fresh}}),
+    withStatus(resource(2, 'Spotter 1'), 'offline', fresh),
   ]);
-  health.refreshedAt = late;
-  const {app} = await mountFleet(page, true, {field: prepared(), health});
+  health.refreshedAt = fresh;
+  const lateField = prepared();
+  lateField.savedBoardReadAt = late;
+  const {app} = await mountFleet(page, true, {field: lateField, health});
   await expect(app.locator('.cos-board-banner')).toBeVisible();
+  await expect(app.locator('[data-board-box=units] strong')).toHaveText('—');
   await expect(app.locator('[data-board-box=problems]')).toHaveAttribute('aria-disabled', 'true');
   await expect(app.locator('.cos-board-card')).toHaveCount(0);
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1920_stale.png'});

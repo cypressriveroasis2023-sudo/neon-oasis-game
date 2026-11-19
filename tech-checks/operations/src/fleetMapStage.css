@@ -23,26 +23,14 @@ html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on>.cos-fleet-content
   display:flex!important;flex-direction:column!important;flex:1 1 auto!important;height:0!important;min-height:0!important;overflow:hidden;padding:0!important
 }
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-content>:not(.cos-fleet-workspace):not(.cos-fleet-heading):not(.cos-fleet-status-strip):not(.cos-source-alerts):not(.cos-source-strip):not(.cos-mhelp-connection-alert):not(.cos-equipment-totals),
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on>:not(.cos-stage):not(.cos-fleet-content){
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on>:not(.cos-stage):not(.cos-fleet-content):not(.cos-fleet-failure-warning){
   display:none!important
 }
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-equipment-totals{display:block!important;margin:0}
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-equipment-totals>:not(.cos-monitored-count):not(.cos-immix-monitored):not(.cos-monitored-amber):not(.cos-monitored-exception):not(.cos-monitored-check){display:none!important}
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-heading,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-status-strip,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-source-alerts,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-source-strip,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-mhelp-connection-alert,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-tab-summary,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-phone-board-info,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-vision-toggle,
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on div.cos-board-search{
-  display:none!important
-}
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-workspace{
   display:flex!important;flex:1 1 auto!important;height:0!important;min-height:0!important;margin:0
 }
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-unit-panel{display:none!important}
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel,
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){
   position:relative;flex:1 1 auto;min-height:0!important;height:100%!important;display:flex!important;flex-direction:column
@@ -137,6 +125,10 @@ aside.cos-stage-drawer{
 .cos-board-box>small{min-height:18px;color:#9fb0c3;font-size:14px}
 .cos-board.is-stale .cos-board-box strong,.cos-board.is-stale .cos-board-box strong small{color:#8a96a6}
 .cos-board-problems{border-color:#7a2630;background:#2a1418}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems:not(.is-clear){background:#2a1418!important;border:2px solid #7a2630!important;color:#ff5a5f!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems:not(.is-clear) strong{color:#ff5a5f!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems.is-clear{background:#141d28!important;border:2px solid #1f2b3a!important;color:#e8eef5!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.cos-board-problems.is-clear strong{color:#3ddc84!important}
 .cos-board-problems strong{color:#ff5a5f}
 .cos-board-problems>small{color:#ffb3b5}
 .cos-board-problems.is-clear{border-color:#1f2b3a;background:#141d28}
