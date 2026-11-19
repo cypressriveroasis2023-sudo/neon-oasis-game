@@ -23,8 +23,9 @@ import {createHash} from 'node:crypto';
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
 // Reviewed 2026-11-18: fleetDashboardModel.ts and FleetUnitHealth.tsx read the
-// live InHand status. Their pins move with that reading. The camera window,
-// the session guards, and the other presentation pins are unchanged.
+// live InHand status and do not print a router address. Their pins move with
+// that reading. The camera window, the session guards, and the other
+// presentation pins are unchanged.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",

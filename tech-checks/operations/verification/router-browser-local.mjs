@@ -4,11 +4,11 @@ const server=createServer(async(req,res)=>{try{const path=new URL(req.url,origin
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 try{for(const width of [390,1024,1440]){
  const page=await browser.newPage({viewport:{width,height:900}});const {frame,state}=await mountRouterFixture(page,{origin});
- await frame.getByLabel('InHand router overview').waitFor({timeout:15000});await frame.getByText('View routers & IPs',{exact:true}).click();await frame.getByText('Router inventory & reachability',{exact:true}).waitFor();
+ await frame.getByLabel('InHand router overview').waitFor({timeout:15000});await frame.getByText('View routers',{exact:true}).click();await frame.getByText('Router inventory & reachability',{exact:true}).waitFor();
  const records=frame.getByLabel('Router records',{exact:true});assert.equal(await records.getByRole('button').count(),4);
- await frame.getByLabel('Search routers').fill('192.0.2.3');assert.equal(await records.getByRole('button').count(),1);assert.match(await frame.getByLabel('Selected router details').textContent(),/This name is duplicated/);
- await frame.getByLabel('Search routers').fill('');await frame.getByLabel('Router status filter').selectOption('stale');assert.match(await records.textContent(),/SS 039/);assert.equal(await records.getByRole('button').count(),1);
- await frame.getByLabel('Router status filter').selectOption('reachable');assert.match(await frame.getByLabel('Selected router details').textContent(),/192.0.2.1/);
+ await frame.getByLabel('Search routers').fill('SS 019');assert.equal(await records.getByRole('button').count(),1);assert.match(await frame.getByLabel('Selected router details').textContent(),/This name is duplicated/);
+ await frame.getByLabel('Search routers').fill('');await frame.getByLabel('Router status filter').selectOption('unknown');assert.match(await records.textContent(),/SS 039/);assert.equal(await records.getByRole('button').count(),3);
+ await frame.getByLabel('Router status filter').selectOption('online');assert.match(await frame.getByLabel('Selected router details').textContent(),/HELIOS 001/);
  await page.screenshot({path:'/tmp/cos-router-'+width+'.png',fullPage:true});
  await frame.getByRole('button',{name:'View same-name COS unit'}).click({timeout:10000});await frame.getByLabel('Router context for selected unit').getByText('Same-name match only.',{exact:false}).waitFor();assert.equal(await frame.locator('.cos-field-pin').count(),1);assert.equal(await frame.getByLabel('Latitude',{exact:true}).inputValue(),'30');
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));assert.ok(size.content<=size.width,JSON.stringify(size));

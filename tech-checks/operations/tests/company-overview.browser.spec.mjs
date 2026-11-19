@@ -13,7 +13,7 @@ const jobs = [
   { id: '55555555-5555-4555-8555-555555555555', jobNumber: 'FIX-105', jobType: 'Delivery', customer: 'Fixture customer', site: 'Fixture site', status: 'Billing Ready', stage: 'Billing' },
 ];
 const camera = snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),withStatus(resource(3,'Helios 3'),'unknown')]);
-const router = { id: 'r1', unitKey: 'Fixture Unit', name: 'Fixture router', model: 'Fixture', publicIp: null, unitIp: null, port: null, protocol: null, probeStatus: 'unknown', checkedAt: null, lastRecoveredAt: null, reportedStatus: 'Unknown', reportedAt: null, reportedSource: 'Fixture', savedLatencyMs: null, match: 'unmatched', candidateUnit: null, gps: null };
+const router = { id: 'r1', unitKey: 'Fixture Unit', name: 'Fixture router', model: 'Fixture', port: null, protocol: null, probeStatus: 'unknown', checkedAt: null, lastRecoveredAt: null, reportedStatus: 'Unknown', reportedAt: null, reportedSource: 'Fixture', savedLatencyMs: null, match: 'unmatched', candidateUnit: null, gps: null };
 async function mount(page,{cameraData=camera}={}) {
   const state = { failures: new Set(), requests: [],camera:cameraData };
   await page.clock.setFixedTime(new Date(now));

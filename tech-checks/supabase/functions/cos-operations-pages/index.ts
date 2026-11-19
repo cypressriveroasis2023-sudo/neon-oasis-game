@@ -55,7 +55,7 @@ import {projectIpCheckUnits,projectReconUnits,mergeUnitSources} from '../../../o
 import {checkedHandEditRequest,HandEditError} from '../../../operations/shared/starUnitHandEdit.ts';
 import {fieldRecorderHealthGuards,projectFieldRecorderAuthority} from './fieldRecorderObservation.ts';
 import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
-import { routerSnapshot } from './routers.ts';
+import { routerSnapshotWithoutAddresses } from './routerAddressFields.ts';
 import { createInhandPilotReader, InhandPilotError, readPilotClaimBoolean } from './inhandPilot.ts';
 import { vrmPortalConfig } from './vrm.ts';
 import { createVrmFleetReader } from './vrmDiscovery.ts';
@@ -1246,10 +1246,10 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
 
         if (path === '/api/routers') {
           const [routers, units] = await Promise.all([
-            legacyAll('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc', context.headers),
+            legacyAll('camera_unit_routers?select=id,unit_key,router_name,router_model,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc', context.headers),
             platformAll('equipment_units?select=id,unit_number&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
           ]);
-          return json(routerSnapshot(routers, units));
+          return json(routerSnapshotWithoutAddresses(routers, units));
         }
         // V2 is additive so currently released clients retain their exact v1 contract.
         if (path === '/api/camera-health/summary-v2') {
