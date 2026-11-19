@@ -4,14 +4,17 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {countUnits} from '../shared/starUnitStatus.ts';
+import {shopCameraCensusFixture} from './fixtures/shop-camera-census.mjs';
 import {
   SHOP_CAMERA_RULE, SHOP_CAMERA_PLACE_LABEL, SHOP_CAMERA_ONLINE_LABEL, MHELP_TEST_SITE_FLAG,
   SHOP_CAMERA_RULE_PROVENANCE, decideShopCameras, decideShopCamera, rollbackShopCameraRule,
-  isWatchfulTestProject, cameraMhelpPlacements, shopCameraInput, applyShopCameraView,
-  inShopLabel, shopDoNotUseLine, exceptionLine,
+  isWatchfulTestProjectKey, configuredWatchfulTestProjectKey, missingWatchfulTestProjectIds,
+  cameraMhelpPlacements, shopCameraInput, applyShopCameraView,
+  inShopLabel, shopDoNotUseLine, exceptionLine, watchfulTestSiteNameWarning,
 } from '../shared/shopCameraStatus.ts';
 
 const rule = SHOP_CAMERA_RULE;
+const TEST1 = configuredWatchfulTestProjectKey('Test 1');
 const customer = (over = {}) => ({
   unit: 'SPOTTER 880', placement: 'FIELD', state: 'RED', site: 'Fixture Yard',
   mhelpPlacement: 'FIELD', watchful: {projectName: 'Fixture Yard', archived: false, armed: true, immix: true},
@@ -23,14 +26,15 @@ const shopUnit = (over = {}) => ({
   ...over,
 });
 const warehouseUnit = () => shopUnit({unit: 'CAMV 091', mhelpPlacement: 'WAREHOUSE', state: 'UNKNOWN'});
+const testProject = (key, name, over = {}) => ({projectKey: key, projectName: name, archived: false, armed: true, immix: true, ...over});
 const testSite = (over = {}) => ({
   unit: 'SS010', placement: 'FIELD', state: 'UNKNOWN', site: 'Test 1',
-  mhelpPlacement: null, watchful: {projectName: 'Test 1', archived: false, armed: true, immix: true},
+  mhelpPlacement: null, watchful: testProject(TEST1, 'Test 1'),
   ...over,
 });
 const flagged = (over = {}) => testSite({
   unit: 'SNIPER 015', state: 'RED', mhelpPlacement: 'FIELD',
-  watchful: {projectName: 'test 1', archived: false, armed: true, immix: true},
+  watchful: testProject(TEST1, 'Test 1'),
   ...over,
 });
 
@@ -101,24 +105,30 @@ test('mHelp Field on a Watchful test project stays Field and is flagged', () => 
   assert.equal(row.statusLabel, null);
 });
 
-test('test-project matching is case-insensitive and does not guess other names', () => {
-  assert.equal(isWatchfulTestProject('Test 1', rule), true);
-  assert.equal(isWatchfulTestProject('TEST 1', rule), true);
-  assert.equal(isWatchfulTestProject('  test 1  ', rule), true);
-  assert.equal(isWatchfulTestProject('Test 2', rule), true);
-  assert.equal(isWatchfulTestProject('test   12', rule), true);
-  for (const name of ['Fixture Yard', 'Latest', 'Contest 1', 'Testing', 'Test', '']) {
-    assert.equal(isWatchfulTestProject(name, rule), false, name);
-  }
-  const upper = decideShopCamera(testSite({watchful: {projectName: 'TeSt 1', archived: false}}), rule);
-  assert.equal(upper.inShop, true);
-  const missed = decideShopCamera(testSite({site: 'Testing', watchful: {projectName: 'Testing', archived: false}}), rule);
-  assert.equal(missed.inShop, false);
-  assert.equal(missed.placement, 'FIELD');
+test('a test site matches only its project key, and a lookalike name is a warning', () => {
+  assert.equal(isWatchfulTestProjectKey(TEST1, rule), true);
+  assert.equal(isWatchfulTestProjectKey('Test 1', rule), false);
+  assert.equal(isWatchfulTestProjectKey('TEST 1', rule), false);
+  assert.equal(isWatchfulTestProjectKey('Test 2', rule), false);
+  assert.equal(isWatchfulTestProjectKey('test   12', rule), false);
+  assert.equal(isWatchfulTestProjectKey(TEST1.toLowerCase(), rule), false);
+  const byKey = decideShopCamera(testSite({watchful: testProject(TEST1, 'TeSt 1')}), rule);
+  assert.equal(byKey.inShop, true);
+  assert.deepEqual(byKey.warnings, []);
+  const byName = decideShopCamera(testSite({
+    watchful: {projectKey: 'unknown-watchful-project', projectName: 'Test 1', archived: false},
+  }), rule);
+  assert.equal(byName.inShop, false);
+  assert.equal(byName.placement, 'FIELD');
+  assert.equal(byName.flag, null);
+  assert.deepEqual(byName.warnings, [watchfulTestSiteNameWarning('Test 1')]);
+  const quiet = decideShopCamera(testSite({site: 'Testing', watchful: {projectKey: null, projectName: 'Testing', archived: false}}), rule);
+  assert.equal(quiet.inShop, false);
+  assert.deepEqual(quiet.warnings, []);
 });
 
 test('an archived Watchful project counts as not in Watchful', () => {
-  const archived = testSite({watchful: {projectName: 'Test 1', archived: true, armed: true, immix: true}});
+  const archived = testSite({watchful: testProject(TEST1, 'Test 1', {archived: true})});
   const row = decideShopCamera(archived, rule);
   assert.equal(row.inWatchful, false);
   assert.equal(row.inShop, false);
@@ -126,9 +136,10 @@ test('an archived Watchful project counts as not in Watchful', () => {
   assert.equal(row.placement, 'FIELD');
   assert.equal(row.counted.armed, false);
   assert.equal(row.counted.immix, false);
-  const listed = decideShopCamera(testSite({watchful: null, site: 'Test 1'}), {...rule, archivedProjectNames: ['test 1']});
+  const listed = decideShopCamera(testSite(), {...rule, archivedProjectKeys: [TEST1]});
   assert.equal(listed.inWatchful, false);
   assert.equal(listed.inShop, false);
+  assert.deepEqual(listed.warnings, []);
 });
 
 test('rule-off control leaves shop and test-site units on the mirror', () => {
@@ -144,7 +155,7 @@ test('rule-off control leaves shop and test-site units on the mirror', () => {
 });
 
 test('rollback restores the Watchful mirror for the same units', () => {
-  const inputs = [customer(), shopUnit(), testSite(), flagged(), testSite({unit: 'SS011', watchful: {projectName: 'Test 1', archived: true}})];
+  const inputs = [customer(), shopUnit(), testSite(), flagged(), testSite({unit: 'SS011', watchful: testProject(TEST1, 'Test 1', {archived: true})})];
   const rolled = rollbackShopCameraRule(rule);
   assert.equal(rolled.enabled, false);
   assert.equal(SHOP_CAMERA_RULE_PROVENANCE.includes('ONLINE In shop'), true);
@@ -351,4 +362,75 @@ test('shortening the lists moves units off those lines without a different rule'
   assert.deepEqual(rule.doNotUseUnits, []);
   assert.deepEqual(rule.exceptionUnits, []);
   assert.deepEqual(rule.unitTags, {});
+});
+
+test('the Watchful test-project file has no ids for today\'s internal projects', () => {
+  assert.deepEqual(missingWatchfulTestProjectIds(), [
+    'Test 1', 'Helios Test Sites', 'RII-025 Shop', 'Solar Spotter Test', 'Spotter Test Site', 'Sniper Test Site',
+  ]);
+  const source = readFileSync(new URL('../shared/shopCameraStatus.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /testProjectPattern|test\\s\+\\d\+|testProjectNames/);
+});
+
+test('mHelp Shop status alone puts a unit In shop', () => {
+  const row = decideShopCamera(shopUnit({
+    watchful: {projectKey: 'customer-project-only', projectName: 'Fixture Yard', archived: false},
+  }), rule);
+  assert.equal(row.category, 'inShop');
+  assert.equal(row.statusLabel, 'ONLINE');
+  assert.equal(isWatchfulTestProjectKey('customer-project-only', rule), false);
+  assert.deepEqual(row.warnings, []);
+});
+
+test('a Helios 017-style unit stays Field when mHelp says Field and the project is a test site', () => {
+  const row = decideShopCamera({
+    unit: 'HELIOS 017', placement: 'FIELD', state: 'RED', site: 'Helios Test Sites',
+    mhelpPlacement: 'FIELD',
+    watchful: testProject(configuredWatchfulTestProjectKey('Helios Test Sites'), 'Helios Test Sites'),
+  }, rule);
+  assert.equal(row.inShop, false);
+  assert.equal(row.placement, 'FIELD');
+  assert.equal(row.state, 'RED');
+  assert.equal(row.flag, MHELP_TEST_SITE_FLAG);
+  assert.equal(row.counted.field, true);
+  assert.equal(row.counted.inShop, false);
+  assert.equal(row.counted.armed, true);
+  assert.equal(row.counted.immix, true);
+  assert.deepEqual(row.warnings, []);
+});
+
+test('a unit on the Spotter Test Site project is In shop', () => {
+  const row = decideShopCamera({
+    unit: 'SPOTTER 196', placement: 'FIELD', state: 'UNKNOWN', site: 'Spotter Test Site',
+    mhelpPlacement: null,
+    tags: ['no telemetry'],
+    watchful: testProject(configuredWatchfulTestProjectKey('Spotter Test Site'), 'Spotter Test Site', {armed: false, immix: false}),
+  }, rule);
+  assert.equal(row.category, 'inShop');
+  assert.equal(row.statusLabel, 'ONLINE');
+  assert.equal(row.placeLabel, 'In shop');
+  assert.equal(inShopLabel(row.tags), 'In shop · no telemetry');
+  assert.equal(row.counted.field, false);
+  assert.equal(row.counted.armed, false);
+  assert.equal(row.counted.immix, false);
+  assert.deepEqual(row.warnings, []);
+});
+
+test('the census fixture keeps 323 In shop, 56 DO NOT USE, 1 exception, and the same field totals', () => {
+  const fixture = shopCameraCensusFixture(rule.testProjectKeys);
+  assert.equal(fixture.contract, 'COS_SHOP_CAMERA_CENSUS_FIXTURE_V1');
+  assert.deepEqual(fixture.expected, {inShop: 323, doNotUse: 56, exceptions: 1});
+  const before = decideShopCameras(fixture.field, rule);
+  const after = decideShopCameras(fixture.units, rule);
+  assert.equal(after.figures.inShop, 323);
+  assert.equal(after.figures.doNotUse, 56);
+  assert.equal(after.figures.exceptions, 1);
+  assert.equal(after.figures.field, before.figures.field);
+  assert.equal(after.figures.fieldGreen, before.figures.fieldGreen);
+  assert.equal(after.figures.fieldRed, before.figures.fieldRed);
+  assert.equal(after.figures.fieldYellow, before.figures.fieldYellow);
+  assert.equal(after.figures.fieldUnknown, before.figures.fieldUnknown);
+  assert.equal(after.figures.armed, before.figures.armed);
+  assert.equal(after.figures.immix, before.figures.immix);
+  assert.equal(after.warnings.length, 0);
 });

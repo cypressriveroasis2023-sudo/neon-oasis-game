@@ -1,0 +1,19 @@
+{
+  "contract": "COS_WATCHFUL_TEST_PROJECTS_V1",
+  "format": {
+    "projects": "Array of { label, id, idStatus, placeholderKey }.",
+    "classifyBy": "The project id when id is a non-empty string and idStatus is known. While id is null and idStatus is missing, the placeholderKey is the only match key.",
+    "doNotClassifyBy": "label, site text, or any name pattern. A name that looks like a test project and is not on this list produces a warning only.",
+    "id": "Watchful project id from Watchful. null means this repo does not contain that id.",
+    "idStatus": "missing or known.",
+    "placeholderKey": "Stand-in key used only while id is null. It always starts with MISSING_WATCHFUL_ID:. When the real id is known, set id, set idStatus to known, and leave the placeholder unused."
+  },
+  "projects": [
+    {"label": "Test 1", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:test-1"},
+    {"label": "Helios Test Sites", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:helios-test-sites"},
+    {"label": "RII-025 Shop", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:rii-025-shop"},
+    {"label": "Solar Spotter Test", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:solar-spotter-test"},
+    {"label": "Spotter Test Site", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:spotter-test-site"},
+    {"label": "Sniper Test Site", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:sniper-test-site"}
+  ]
+}

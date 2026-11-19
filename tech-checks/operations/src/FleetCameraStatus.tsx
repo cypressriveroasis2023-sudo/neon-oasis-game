@@ -250,6 +250,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    </p>
    <p className='cos-camera-category-line' aria-label='Shop, DO NOT USE'>{shopDoNotUseLine(doNotUseNames)}</p>
    <p className='cos-camera-category-line' aria-label='Exceptions'>{exceptionLine(exceptionNames)}</p>
+   {shopReport.warnings.length > 0 && <p className='cos-camera-category-line' role='status'>{shopReport.warnings.join(' ')}</p>}
    <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>

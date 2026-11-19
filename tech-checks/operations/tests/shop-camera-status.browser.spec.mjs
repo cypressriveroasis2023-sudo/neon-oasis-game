@@ -2,6 +2,9 @@ import {test, expect} from '@playwright/test';
 import {mountFleet, fresh} from './fleet-dashboard-fixtures.mjs';
 import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
+import {configuredWatchfulTestProjectKey} from '../shared/shopCameraStatus.ts';
+
+const test1 = configuredWatchfulTestProjectKey('Test 1');
 
 const line = (unit, over = {}) => ({
   unit, placement: 'FIELD', site: 'Fixture Yard', siteNamePending: false, state: 'RED',
@@ -12,10 +15,10 @@ const line = (unit, over = {}) => ({
 });
 const units = [
   line('SPOTTER 880', {state: 'RED', mhelpPlacement: 'FIELD'}),
-  line('SS010', {site: 'Test 1', state: 'UNKNOWN', online: 0, offline: 0, unknown: 1, down: [{name: 'SS010 cam', status: 'unknown'}], tags: ['no telemetry']}),
+  line('SS010', {site: 'Test 1', watchfulProjectKey: test1, state: 'UNKNOWN', online: 0, offline: 0, unknown: 1, down: [{name: 'SS010 cam', status: 'unknown'}], tags: ['no telemetry']}),
   line('CAMV 090', {mhelpPlacement: 'SHOP', tags: ['RSU', 'no telemetry']}),
   line('CAMV 093', {mhelpPlacement: 'SHOP', lifecycle: 'DO_NOT_USE', state: 'GREEN', online: 1, offline: 0, down: []}),
-  line('RSU 200', {site: 'test 1', mhelpPlacement: 'FIELD', lifecycle: 'DO NOT USE'}),
+  line('RSU 200', {site: 'test 1', watchfulProjectKey: test1, mhelpPlacement: 'FIELD', lifecycle: 'DO NOT USE'}),
 ];
 const report = {
   contract: 'COS_STAR_UNIT_STATUS_V1', units, counts: countUnits(units),

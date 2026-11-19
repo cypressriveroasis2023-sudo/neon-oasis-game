@@ -5,8 +5,10 @@
 // own count. Customer field monitoring still mirrors Watchful. mHelp Field or
 // Shop wins; a Field mark on a test project is flagged and is not moved.
 //
-// Test projects come only from the names and pattern on the rule. A name that
-// is not listed and does not match the pattern is a customer project.
+// Test projects come only from watchful-test-projects.json, matched by project
+// id or, while that id is missing, by its placeholder key. A project name is
+// never a match. An unknown project whose name is one of those labels only
+// produces a warning.
 // Archived Watchful projects are not in Watchful.
 //
 // Non-field units then split three ways, from lists on the rule and fields on
@@ -20,6 +22,7 @@
 // decideShopCameras. enabled:false leaves every unit on the Watchful mirror.
 
 import {canonicalCameraUnit} from '../src/fieldCameraHealth.ts';
+import watchfulTestProjectsFile from './watchful-test-projects.json' with {type: 'json'};
 
 export const SHOP_CAMERA_PLACE_LABEL = 'In shop';
 export const SHOP_CAMERA_ONLINE_LABEL = 'ONLINE';
@@ -33,14 +36,42 @@ export type CameraPlacement = 'FIELD' | 'SHOP';
 export type CameraState = 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
 export type MhelpCameraPlacement = 'FIELD' | 'SHOP' | 'WAREHOUSE';
 
+export type WatchfulTestProjectRecord = {
+  label: string;
+  id: string | null;
+  idStatus: 'missing' | 'known';
+  placeholderKey: string;
+};
+
+export const WATCHFUL_TEST_PROJECTS_PATH = 'tech-checks/operations/shared/watchful-test-projects.json';
+
+export const WATCHFUL_TEST_PROJECTS = watchfulTestProjectsFile.projects as readonly WatchfulTestProjectRecord[];
+
+/** The match key for one config row: the Watchful id, or the placeholder while that id is missing. */
+export function watchfulTestProjectMatchKey(project: WatchfulTestProjectRecord): string | null {
+  if (project.idStatus === 'known' && typeof project.id === 'string' && project.id.trim()) return project.id.trim();
+  if (project.id === null && project.idStatus === 'missing' && project.placeholderKey.startsWith('MISSING_WATCHFUL_ID:')) return project.placeholderKey;
+  return null;
+}
+
+export function configuredWatchfulTestProjectKey(label: string): string | null {
+  const folded = label.trim().toLocaleLowerCase();
+  const project = WATCHFUL_TEST_PROJECTS.find(row => row.label.trim().toLocaleLowerCase() === folded);
+  return project ? watchfulTestProjectMatchKey(project) : null;
+}
+
+export function missingWatchfulTestProjectIds(): string[] {
+  return WATCHFUL_TEST_PROJECTS.filter(project => project.idStatus === 'missing' || project.id === null).map(project => project.label);
+}
+
+const configuredTestProjectKeys = WATCHFUL_TEST_PROJECTS.map(watchfulTestProjectMatchKey).filter((key): key is string => Boolean(key));
+
 export type ShopCameraRule = {
   enabled: boolean;
-  /** Whole project names. Matching ignores case and surrounding space. */
-  testProjectNames: readonly string[];
-  /** Matched against the whole project name, case-insensitive. Null matches nothing. */
-  testProjectPattern: string | null;
-  /** These project names are archived, so they are not in Watchful. */
-  archivedProjectNames: readonly string[];
+  /** Watchful project ids, or placeholder keys while the id is missing. Names are not keys. */
+  testProjectKeys: readonly string[];
+  /** Project ids or placeholder keys that are archived, so they are not in Watchful. */
+  archivedProjectKeys: readonly string[];
   /** Unit names on the Shop, DO NOT USE line. Case-insensitive. */
   doNotUseUnits: readonly string[];
   /** Unit names kept out of every total and listed as exceptions. */
@@ -49,19 +80,18 @@ export type ShopCameraRule = {
   unitTags: Readonly<Record<string, readonly string[]>>;
 };
 
-/** Explicit list plus the "Test 1" / "Test 2" project pattern James described.
- * The DO NOT USE, exception, and tag lists start empty so nothing is assumed. */
+/** Test-project keys are copied from watchful-test-projects.json. The other lists start empty. */
 export const SHOP_CAMERA_RULE: ShopCameraRule = {
   enabled: true,
-  testProjectNames: ['Test 1'],
-  testProjectPattern: '^test\\s+\\d+$',
-  archivedProjectNames: [],
+  testProjectKeys: configuredTestProjectKeys,
+  archivedProjectKeys: [],
   doNotUseUnits: [],
   exceptionUnits: [],
   unitTags: {},
 };
 
 export type WatchfulMembership = {
+  projectKey: string | null;
   projectName: string | null;
   archived: boolean;
   armed?: boolean;
@@ -97,6 +127,7 @@ export type ShopCameraDecision = {
   placeLabel: typeof SHOP_CAMERA_PLACE_LABEL | null;
   tags: readonly string[];
   flag: typeof MHELP_TEST_SITE_FLAG | null;
+  warnings: readonly string[];
   counted: {field: boolean; armed: boolean; immix: boolean; inShop: boolean; doNotUse: boolean; exception: boolean};
 };
 
@@ -118,6 +149,7 @@ export type ShopCameraReport = {
   byUnit: Map<string, ShopCameraDecision>;
   decisions: ShopCameraDecision[];
   figures: ShopCameraFigures;
+  warnings: readonly string[];
 };
 
 const fold = (value: string) => value.trim().toLocaleLowerCase();
@@ -163,37 +195,47 @@ function listed(names: readonly string[], project: string): boolean {
   return Boolean(folded) && names.some(name => fold(name) === folded);
 }
 
-/** True only when the whole project name is listed or matches the configured pattern. */
-export function isWatchfulTestProject(projectName: string | null | undefined, rule: ShopCameraRule): boolean {
-  const name = typeof projectName === 'string' ? projectName.trim() : '';
-  if (!name || listed(rule.archivedProjectNames, name)) return false;
-  if (listed(rule.testProjectNames, name)) return true;
-  const source = rule.testProjectPattern?.trim();
-  if (!source) return false;
-  const body = source.replace(/^\^/, '').replace(/\$$/, '');
-  try {
-    const matched = new RegExp('^(?:' + body + ')$', 'i').exec(name);
-    return Boolean(matched && matched[0] === name);
-  } catch {
-    return false;
-  }
+/** True only when the project id or placeholder key is on the explicit list. */
+export function isWatchfulTestProjectKey(projectKey: string | null | undefined, rule: ShopCameraRule): boolean {
+  const key = typeof projectKey === 'string' ? projectKey.trim() : '';
+  if (!key || listedExact(rule.archivedProjectKeys, key)) return false;
+  return listedExact(rule.testProjectKeys, key);
 }
 
-function projectOf(input: ShopCameraInput, rule: ShopCameraRule): {name: string | null; archived: boolean; armed: boolean; immix: boolean} {
+function listedExact(keys: readonly string[], key: string): boolean {
+  return keys.some(item => item.trim() === key);
+}
+
+function projectOf(input: ShopCameraInput, rule: ShopCameraRule): {key: string | null; name: string | null; archived: boolean; armed: boolean; immix: boolean} {
   const watchful = input.watchful;
-  const name = (watchful ? watchful.projectName : input.site) || null;
-  const trimmed = typeof name === 'string' && name.trim() ? name.trim() : null;
-  const archived = watchful?.archived === true || (trimmed ? listed(rule.archivedProjectNames, trimmed) : false);
+  const key = typeof watchful?.projectKey === 'string' && watchful.projectKey.trim() ? watchful.projectKey.trim() : null;
+  const named = watchful ? watchful.projectName : input.site;
+  const name = typeof named === 'string' && named.trim() ? named.trim() : null;
+  const archived = watchful?.archived === true || (key ? listedExact(rule.archivedProjectKeys, key) : false);
   return {
-    name: trimmed,
+    key,
+    name,
     archived,
     armed: watchful?.armed === true,
     immix: watchful?.immix === true,
   };
 }
 
-function passthrough(input: ShopCameraInput, project: {name: string | null; archived: boolean; armed: boolean; immix: boolean}, tags: readonly string[] = []): ShopCameraDecision {
-  const inWatchful = Boolean(project.name) && !project.archived;
+/** A known test-project label with an unknown key. This never classifies the unit. */
+export function watchfulTestSiteNameWarning(projectName: string): string {
+  return 'Watchful project "' + projectName.trim() + '" is not on the test-project id list. It was not classified as a test site.';
+}
+
+function testSiteNameWarning(project: {key: string | null; name: string | null; archived: boolean}, rule: ShopCameraRule): string[] {
+  if (project.archived || !project.name) return [];
+  if (project.key && isWatchfulTestProjectKey(project.key, rule)) return [];
+  const folded = fold(project.name);
+  const knownLabel = WATCHFUL_TEST_PROJECTS.some(row => fold(row.label) === folded);
+  return knownLabel ? [watchfulTestSiteNameWarning(project.name)] : [];
+}
+
+function passthrough(input: ShopCameraInput, project: {key: string | null; name: string | null; archived: boolean; armed: boolean; immix: boolean}, tags: readonly string[] = [], warnings: readonly string[] = []): ShopCameraDecision {
+  const inWatchful = Boolean(project.key || project.name) && !project.archived;
   const field = input.placement === 'FIELD';
   return {
     unit: input.unit,
@@ -207,6 +249,7 @@ function passthrough(input: ShopCameraInput, project: {name: string | null; arch
     placeLabel: null,
     tags,
     flag: null,
+    warnings,
     counted: {
       field,
       armed: field && inWatchful && project.armed,
@@ -218,7 +261,7 @@ function passthrough(input: ShopCameraInput, project: {name: string | null; arch
   };
 }
 
-function inShopDecision(input: ShopCameraInput, inWatchful: boolean, tags: readonly string[]): ShopCameraDecision {
+function inShopDecision(input: ShopCameraInput, inWatchful: boolean, tags: readonly string[], warnings: readonly string[] = []): ShopCameraDecision {
   return {
     unit: input.unit,
     category: 'inShop',
@@ -231,11 +274,12 @@ function inShopDecision(input: ShopCameraInput, inWatchful: boolean, tags: reado
     placeLabel: SHOP_CAMERA_PLACE_LABEL,
     tags,
     flag: null,
+    warnings,
     counted: {field: false, armed: false, immix: false, inShop: true, doNotUse: false, exception: false},
   };
 }
 
-function heldOut(input: ShopCameraInput, category: 'doNotUse' | 'exception', inWatchful: boolean, tags: readonly string[]): ShopCameraDecision {
+function heldOut(input: ShopCameraInput, category: 'doNotUse' | 'exception', inWatchful: boolean, tags: readonly string[], warnings: readonly string[] = []): ShopCameraDecision {
   return {
     unit: input.unit,
     category,
@@ -248,6 +292,7 @@ function heldOut(input: ShopCameraInput, category: 'doNotUse' | 'exception', inW
     placeLabel: null,
     tags,
     flag: null,
+    warnings,
     counted: {
       field: false, armed: false, immix: false, inShop: false,
       doNotUse: category === 'doNotUse',
@@ -279,21 +324,22 @@ function mergeTags(listedTags: readonly string[], own: readonly string[] | undef
 export function decideShopCamera(input: ShopCameraInput, rule: ShopCameraRule = SHOP_CAMERA_RULE): ShopCameraDecision {
   const project = projectOf(input, rule);
   const tags = mergeTags(ruleTags(rule, input.unit), input.tags);
-  if (!rule.enabled) return passthrough(input, project, tags);
-  const inWatchful = Boolean(project.name) && !project.archived;
-  const testSite = inWatchful && isWatchfulTestProject(project.name, rule);
+  const warnings = testSiteNameWarning(project, rule);
+  if (!rule.enabled) return passthrough(input, project, tags, warnings);
+  const inWatchful = Boolean(project.key || project.name) && !project.archived;
+  const testSite = !project.archived && isWatchfulTestProjectKey(project.key, rule);
   const mhelp = input.mhelpPlacement ?? null;
   const doNotUse = input.doNotUse === true || listed(rule.doNotUseUnits, input.unit);
   const listedException = input.exception === true || listed(rule.exceptionUnits, input.unit);
-  if (listedException || (doNotUse && mhelp === 'FIELD')) return heldOut(input, 'exception', inWatchful, tags);
-  if (doNotUse) return heldOut(input, 'doNotUse', inWatchful, tags);
-  if (mhelp === 'SHOP' || mhelp === 'WAREHOUSE') return inShopDecision(input, inWatchful, tags);
+  if (listedException || (doNotUse && mhelp === 'FIELD')) return heldOut(input, 'exception', inWatchful, tags, warnings);
+  if (doNotUse) return heldOut(input, 'doNotUse', inWatchful, tags, warnings);
+  if (mhelp === 'SHOP' || mhelp === 'WAREHOUSE') return inShopDecision(input, inWatchful, tags, warnings);
   if (testSite && mhelp === 'FIELD') {
-    const kept = passthrough(input, project, tags);
+    const kept = passthrough(input, project, tags, warnings);
     return {...kept, flag: MHELP_TEST_SITE_FLAG};
   }
-  if (testSite) return inShopDecision(input, inWatchful, tags);
-  return passthrough(input, project, tags);
+  if (testSite) return inShopDecision(input, inWatchful, tags, warnings);
+  return passthrough(input, project, tags, warnings);
 }
 
 function emptyFigures(): ShopCameraFigures {
@@ -303,6 +349,7 @@ function emptyFigures(): ShopCameraFigures {
 export function decideShopCameras(inputs: readonly ShopCameraInput[], rule: ShopCameraRule = SHOP_CAMERA_RULE): ShopCameraReport {
   const byUnit = new Map<string, ShopCameraDecision>();
   const decisions: ShopCameraDecision[] = [];
+  const warnings: string[] = [];
   const figures = emptyFigures();
   const seen = new Set<string>();
   for (const input of inputs) {
@@ -324,8 +371,9 @@ export function decideShopCameras(inputs: readonly ShopCameraInput[], rule: Shop
     if (decision.counted.immix) figures.immix += 1;
     if (decision.counted.doNotUse) figures.doNotUse += 1;
     if (decision.counted.exception) figures.exceptions += 1;
+    for (const warning of decision.warnings) if (!warnings.includes(warning)) warnings.push(warning);
   }
-  return {enabled: rule.enabled, byUnit, decisions, figures};
+  return {enabled: rule.enabled, byUnit, decisions, figures, warnings};
 }
 
 /** The tested rollback. Counts and statuses stay on the Watchful mirror. */
@@ -340,6 +388,7 @@ export type ShopCameraSource = {
   site?: string | null;
   mhelpPlacement?: unknown;
   watchfulProject?: unknown;
+  watchfulProjectKey?: unknown;
   watchfulArchived?: unknown;
   watchfulArmed?: unknown;
   watchfulImmix?: unknown;
@@ -359,15 +408,17 @@ export function shopCameraInput(source: ShopCameraSource, mhelpByUnit?: Readonly
     }
   }
   const named = typeof source.watchfulProject === 'string' ? source.watchfulProject : null;
-  const watchful = named !== null || source.watchfulArchived === true || source.watchfulArmed === true || source.watchfulImmix === true
+  const projectKey = typeof source.watchfulProjectKey === 'string' && source.watchfulProjectKey.trim() ? source.watchfulProjectKey.trim() : null;
+  const watchful = projectKey !== null || named !== null || source.watchfulArchived === true || source.watchfulArmed === true || source.watchfulImmix === true
     ? {
+      projectKey,
       projectName: named ?? (source.site?.trim() ? source.site : null),
       archived: source.watchfulArchived === true,
       armed: source.watchfulArmed === true,
       immix: source.watchfulImmix === true,
     }
     : source.site?.trim()
-      ? {projectName: source.site, archived: false, armed: false, immix: false}
+      ? {projectKey: null, projectName: source.site, archived: false, armed: false, immix: false}
       : null;
   const lifecycle = typeof source.lifecycle === 'string' ? source.lifecycle.trim() : '';
   const doNotUse = source.doNotUse === true || /^(?:DO NOT USE|DO_NOT_USE)$/i.test(lifecycle);
