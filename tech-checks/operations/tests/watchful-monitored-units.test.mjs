@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {watchfulCanonicalUnitKey} from '../src/watchfulUnitKey.ts';
+import {readFileSync} from 'node:fs';
 import {loadWatchfulExport, stripWatchfulIp, WatchfulLoadError} from '../src/watchfulMonitoredLoad.ts';
 
 const at = '2026-11-19T15:00:00.000Z';
@@ -49,8 +50,12 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(dotted.stripped, true);
   assert.equal(stripWatchfulIp('aabb.ccdd.eeff').onlyIp, true);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\naabb.ccdd.eeff,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
-  const serial = stripWatchfulIp('Fixture Site serial AB12CD34EF56 gate');
-  assert.equal(serial.text, 'Fixture Site serial gate');
+  const correction = JSON.parse(readFileSync(new URL('./serial-label-rule-change.json', import.meta.url), 'utf8'));
+  assert.equal(correction.oldFixture, 'Fixture Site serial AB12CD34EF56 gate');
+  assert.equal(correction.newFixture, 'Fixture Site serial ZZ12CD34 gate');
+  assert.equal(correction.expected, 'Fixture Site serial gate');
+  const serial = stripWatchfulIp(correction.newFixture);
+  assert.equal(serial.text, correction.expected);
   assert.equal(stripWatchfulIp('AB12CD34EF56').onlyIp, true);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nAB12CD34EF56,Fixture Site,Avigilon,up,1,0\n', at), /serial/);
   const missingTime = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\nSniper 3,Fixture Site,Avigilon,up,1,0\n', at);
@@ -61,13 +66,39 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
 });
 
 test('serial labels stay and only the value is redacted', () => {
-  assert.equal(stripWatchfulIp('Serial Number: AB12CD34').text, 'Serial Number:');
-  assert.equal(stripWatchfulIp('Serial No. AB12CD34').text, 'Serial No.');
-  assert.equal(stripWatchfulIp('serial=AB12CD34').text, 'serial=');
-  assert.equal(stripWatchfulIp('serial_AB12CD34').text, 'serial_');
+  const value = 'ZZ12CD34';
+  const forms = [
+    ['Serial Number: ZZ12CD34', 'Serial Number:'],
+    ['Serial No. ZZ12CD34', 'Serial No.'],
+    ['serial=ZZ12CD34', 'serial='],
+    ['serial_ZZ12CD34', 'serial_'],
+    ['Serial: ZZ12CD34', 'Serial:'],
+    ['Serial:ZZ12CD34', 'Serial:'],
+    ['SERIAL: ZZ12CD34', 'SERIAL:'],
+    ['Serial #ZZ12CD34', 'Serial #'],
+    ['Serial# ZZ12CD34', 'Serial#'],
+    ['Serial-ZZ12CD34', 'Serial-'],
+    ['S/N: ZZ12CD34', 'S/N:'],
+    ['S/N ZZ12CD34', 'S/N'],
+    ['SN: ZZ12CD34', 'SN:'],
+    ['SN ZZ12CD34', 'SN'],
+    ['{"serial":"ZZ12CD34"}', '{"serial":""}'],
+    ['{"serialNumber":"ZZ12CD34"}', '{"serialNumber":""}'],
+    [`/serial/${value}`, '/serial/'],
+    [`?serialNumber=${value}`, '?serialNumber='],
+    [`serial%3D${value}`, 'serial%3D'],
+    [`serial%3d${value}`, 'serial%3d'],
+    [`Serial\uFF1A${value}`, 'Serial\uFF1A'],
+    [`Serial\uFE55${value}`, 'Serial\uFE55'],
+    [`Serial\uA789${value}`, 'Serial\uA789'],
+    ['Serial Num: ZZ12CD34', 'Serial Num:'],
+    ['Serial (ZZ12CD34)', 'Serial ()'],
+  ];
+  for (const [input, expected] of forms) assert.equal(stripWatchfulIp(input).text, expected, input);
   assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
   assert.equal(stripWatchfulIp('Serial cameras gate').text, 'Serial cameras gate');
   assert.equal(stripWatchfulIp('Sniper 12 gate').text, 'Sniper 12 gate');
+  assert.equal(stripWatchfulIp('Seen 14:00:00 gate').text, 'Seen 14:00:00 gate');
 });
 
 test('MAC values are redacted with colon, hyphen, dot, or no separator', () => {
