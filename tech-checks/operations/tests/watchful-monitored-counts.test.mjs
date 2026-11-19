@@ -62,6 +62,57 @@ test('one shared count matches the reviewed Watchful day, and every path uses it
   assert.equal(count.inShopColor, IN_SHOP_COLOR);
   assert.equal(count.inShopColor, '#64748b');
   assert.equal(count.notInWatchful.some(unit => /test|901/i.test(unit.name)), false);
+  const siteUnits = count.siteRows.reduce((sum, row) => sum + row.units, 0);
+  const siteUp = count.siteRows.reduce((sum, row) => sum + row.camerasUp, 0);
+  const siteDown = count.siteRows.reduce((sum, row) => sum + row.camerasDown, 0);
+  assert.equal(siteUnits, 169);
+  assert.equal(count.siteRows.length, 92);
+  assert.equal(siteUp, 465);
+  assert.equal(siteDown, 23);
+  assert.equal(siteUp + siteDown, count.cameras.total);
+});
+
+test('freshness uses the oldest observation, not the fetch or the newest row', () => {
+  const older = new Date(now - 21 * 60 * 1000).toISOString();
+  const newer = new Date(now - 60 * 1000).toISOString();
+  const stale = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'down', camerasUp: 1, camerasDown: 1, snapshotAt: older},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt: newer},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+      {name: 'Sniper 3 test', placement: 'FIELD'},
+      {name: 'Sniper 4', placement: 'SHOP'},
+      {name: 'Sniper 5', placement: 'FIELD', doNotUse: true},
+    ],
+    now,
+  });
+  assert.equal(stale.fresh, false);
+  assert.equal(stale.oldestObservedAt, older);
+  assert.notEqual(stale.oldestObservedAt, newer);
+  assert.equal(stale.offlineUnits, null);
+  assert.equal(stale.siteRows.length, 0);
+  const fresh = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt: new Date(now - 10 * 60 * 1000).toISOString()},
+      {unitName: 'Sniper 4', canonicalUnitKey: 'SNIPER|4', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 9, snapshotAt: newer},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 4', placement: 'SHOP'},
+    ],
+    now,
+  });
+  assert.equal(fresh.fresh, true);
+  assert.equal(fresh.oldestObservedAt, new Date(now - 10 * 60 * 1000).toISOString());
+  assert.equal(fresh.units, 1);
+  assert.equal(fresh.cameras.down, 0);
+  assert.equal(fresh.siteRows.reduce((sum, row) => sum + row.camerasDown, 0), 0);
+  assert.equal(fresh.inShop, 1);
 });
 
 test('a missing or stale snapshot is Unknown and does not count Offline', () => {

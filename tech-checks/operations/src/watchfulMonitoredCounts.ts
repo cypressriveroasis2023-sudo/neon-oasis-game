@@ -1,10 +1,11 @@
+import {CAMERA_FRESH_MS, cameraTimestamp} from './cameraEvidence';
 import {watchfulCanonicalUnitKey} from './watchfulUnitKey';
 
 const IN_SHOP_LABEL = 'In Shop';
 const IN_SHOP_COLOR = '#64748b';
 
-/** A reviewed Watchful snapshot older than this is Unknown, never Offline. */
-export const WATCHFUL_SNAPSHOT_FRESH_MS = 26 * 60 * 60 * 1000;
+/** Same 20-minute observation window as a camera reading. Not the fetch time, and not widened. */
+export const WATCHFUL_OBSERVATION_FRESH_MS = CAMERA_FRESH_MS;
 
 export const SHOP_REVIEW_FLAG = 'Watchful says at site, mHelp says Shop';
 
@@ -32,10 +33,15 @@ export type StatusMismatch = {
   cos: 'up' | 'down';
 };
 
+export type SiteCameraRow = { siteName: string; units: number; camerasUp: number; camerasDown: number };
+
 export type SharedMonitoredCount = {
   fresh: boolean;
+  /** Oldest observation in the snapshot. The UI stamps this, not the newest and not the fetch. */
+  oldestObservedAt: string | null;
   units: number | null;
   sites: number | null;
+  siteRows: SiteCameraRow[];
   cameras: {up: number; down: number; total: number} | null;
   inShop: number;
   inShopLabel: typeof IN_SHOP_LABEL;
@@ -47,10 +53,12 @@ export type SharedMonitoredCount = {
   statusMismatches: StatusMismatch[];
 };
 
-const empty = (fresh: boolean): SharedMonitoredCount => ({
+const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMonitoredCount => ({
   fresh,
+  oldestObservedAt,
   units: fresh ? 0 : null,
   sites: fresh ? 0 : null,
+  siteRows: [],
   cameras: fresh ? {up: 0, down: 0, total: 0} : null,
   inShop: 0,
   inShopLabel: IN_SHOP_LABEL,
@@ -69,10 +77,20 @@ export function customerMonitoredName(name: string, doNotUse = false): boolean {
   return true;
 }
 
-function freshSnapshot(snapshotAt: string | null, now: number): boolean {
-  if (!snapshotAt) return false;
-  const at = Date.parse(snapshotAt);
-  return Number.isFinite(at) && at <= now && now - at <= WATCHFUL_SNAPSHOT_FRESH_MS;
+function oldestObservation(values: readonly string[]): string | null {
+  let oldest = Number.POSITIVE_INFINITY;
+  if (!values.length) return null;
+  for (const value of values) {
+    const stamp = cameraTimestamp(value, Number.MAX_SAFE_INTEGER);
+    const at = stamp.at ? Date.parse(stamp.at) : NaN;
+    if (!Number.isFinite(at)) return null;
+    if (at < oldest) oldest = at;
+  }
+  return new Date(oldest).toISOString();
+}
+
+function freshSnapshot(observedAt: string | null, now: number): boolean {
+  return observedAt !== null && cameraTimestamp(observedAt, now).fresh;
 }
 
 /**
@@ -83,12 +101,18 @@ function freshSnapshot(snapshotAt: string | null, now: number): boolean {
 export function selectSharedMonitoredCount(input: {
   snapshot: readonly WatchfulCountUnit[] | null;
   snapshotAt?: string | null;
+  /** Ignored. Freshness uses the oldest observation, not the fetch. */
+  fetchedAt?: string | null;
   mhelp: readonly MhelpCountUnit[];
   now?: number;
 }): SharedMonitoredCount {
   const now = input.now ?? Date.now();
-  const snapshotAt = input.snapshotAt ?? input.snapshot?.[0]?.snapshotAt ?? null;
-  if (!input.snapshot || !freshSnapshot(snapshotAt, now)) return empty(false);
+  const observations = [
+    ...(input.snapshot || []).map(unit => unit.snapshotAt),
+    ...(input.snapshotAt ? [input.snapshotAt] : []),
+  ];
+  const oldestObservedAt = oldestObservation(observations);
+  if (!input.snapshot || !freshSnapshot(oldestObservedAt, now)) return empty(false, oldestObservedAt);
 
   const watchful = new Map<string, WatchfulCountUnit>();
   for (const unit of input.snapshot) {
@@ -103,8 +127,8 @@ export function selectSharedMonitoredCount(input: {
     mhelpByKey.set(key, list);
   }
 
-  const result = empty(true);
-  const sites = new Set<string>();
+  const result = empty(true, oldestObservedAt);
+  const sites = new Map<string, SiteCameraRow>();
   let camerasUp = 0;
   let camerasDown = 0;
   const counted = new Set<string>();
@@ -124,7 +148,13 @@ export function selectSharedMonitoredCount(input: {
     if (unit.status === 'down') result.offlineUnits = (result.offlineUnits || 0) + 1;
     camerasUp += unit.camerasUp;
     camerasDown += unit.camerasDown;
-    if (unit.siteName) sites.add(unit.siteName);
+    if (unit.siteName) {
+      const row = sites.get(unit.siteName) || {siteName: unit.siteName, units: 0, camerasUp: 0, camerasDown: 0};
+      row.units += 1;
+      row.camerasUp += unit.camerasUp;
+      row.camerasDown += unit.camerasDown;
+      sites.set(unit.siteName, row);
+    }
     const cos = field[0].cosStatus;
     if ((cos === 'up' || cos === 'down') && cos !== unit.status) {
       result.statusMismatches.push({name: field[0].name, watchful: unit.status, cos});
@@ -137,7 +167,8 @@ export function selectSharedMonitoredCount(input: {
     if (!key || !counted.has(key)) result.notInWatchful.push({name: unit.name});
   }
 
-  result.sites = sites.size;
+  result.siteRows = [...sites.values()].sort((left, right) => left.siteName.localeCompare(right.siteName));
+  result.sites = result.siteRows.length;
   result.cameras = {up: camerasUp, down: camerasDown, total: camerasUp + camerasDown};
   return result;
 }
