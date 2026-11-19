@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {CAMERA_AUTO_REFRESH_MS, observationRefreshDue} from '../src/refreshCadence.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
-import {applyBoardFreshStatus, boardUnitStatus, noteWatchfulOldest, tvUpdatesDelayed, watchfulOldestObservedAt, WATCHFUL_BANNER_AGE_MS, WATCHFUL_OBSERVATION_FRESH_MS, WATCHFUL_PULL_CADENCE_MS} from '../src/boardFreshStatus.ts';
+import {applyBoardFreshStatus, boardUnitStatus, oldestWatchfulObservation, tvUpdatesDelayed, WATCHFUL_BANNER_AGE_MS, WATCHFUL_OBSERVATION_FRESH_MS, WATCHFUL_PULL_CADENCE_MS} from '../src/boardFreshStatus.ts';
 
 const now = Date.parse('2026-11-19T15:00:00.000Z');
 const fresh = new Date(now - 5 * 60 * 1000).toISOString();
@@ -98,12 +99,29 @@ test('Watchful follows the 20-minute observation clock and the 10-minute pull, a
   assert.equal(tvUpdatesDelayed({lastSuccessAt: null, now, watchfulOldestObservedAt: null}), false);
   const older = new Date(now - 9 * 60 * 1000).toISOString();
   const newer = new Date(now - 2 * 60 * 1000).toISOString();
-  noteWatchfulOldest(null);
-  applyBoardFreshStatus([], [], [
+  const watchful = [
     {canonicalUnitKey: 'SNIPER|1', status: 'up', snapshotAt: newer},
     {canonicalUnitKey: 'SNIPER|2', status: 'down', snapshotAt: older},
-  ], now);
-  assert.equal(watchfulOldestObservedAt(), older);
+  ];
+  applyBoardFreshStatus([], [], watchful, now);
+  assert.equal(oldestWatchfulObservation(watchful), older);
+  assert.equal(oldestWatchfulObservation(null), null);
+});
+
+test('a TV observation older than 20 minutes is grey Unknown and never red', () => {
+  const html = readFileSync(new URL('../src/TvFleetView.tsx', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/tvBoardExtensions.css', import.meta.url), 'utf8');
+  assert.match(html, /tv-state-unknown/);
+  assert.match(html, /'Unknown'/);
+  assert.match(css, /\.tv-state-unknown b\{color:#94a3b8\}/);
+  assert.doesNotMatch(css, /\.tv-state-unknown b\{color:#ff5963\}/);
+  const staleReading = boardUnitStatus({
+    unitName: 'Sniper 3', placement: 'field', now,
+    readings: [reading('Sniper 3', 'offline', new Date(now - 21 * 60 * 1000).toISOString())],
+  });
+  assert.equal(staleReading.state, 'unknown');
+  assert.equal(staleReading.label, 'Unknown');
+  assert.notEqual(staleReading.label, 'Offline');
 });
 
 test('a reading that would expire before the 10-minute cadence requests a saved read without widening freshness', () => {

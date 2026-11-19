@@ -1,25 +1,20 @@
-import {CAMERA_FRESH_MS, cameraState, cameraTimestamp, type CameraRow} from './cameraEvidence';
+import {cameraState, cameraTimestamp, type CameraRow} from './cameraEvidence';
 import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import {canonicalCameraUnit} from './fieldCameraHealth';
+import {IN_SHOP_LABEL, oldestObservationIso, WATCHFUL_OBSERVATION_FRESH_MS} from './watchfulObservation';
 
+export {WATCHFUL_OBSERVATION_FRESH_MS};
 export const VIA_WATCHFUL = 'via Watchful';
-/** Watchful is fresh for the same 20 minutes as a camera observation. This is not widened. */
-export const WATCHFUL_OBSERVATION_FRESH_MS = CAMERA_FRESH_MS;
 /** The pull matches the saved camera cadence. */
 export const WATCHFUL_PULL_CADENCE_MS = CAMERA_AUTO_REFRESH_MS;
 /** The TV banner, separate from the 20-minute Unknown rule. */
 export const TV_READ_STALE_MS = 120_000;
 export const WATCHFUL_BANNER_AGE_MS = 12 * 60 * 1000;
-const IN_SHOP_LABEL = 'In Shop';
-let oldestWatchfulObservation: string | null = null;
 
-/** The time the board stamps: the oldest Watchful observation, not the newest and not the fetch. */
-export function watchfulOldestObservedAt(): string | null {
-  return oldestWatchfulObservation;
-}
-
-export function noteWatchfulOldest(value: string | null) {
-  oldestWatchfulObservation = value;
+/** Oldest Watchful observation in this list. Nothing is stored on the module. */
+export function oldestWatchfulObservation(watchful: readonly {snapshotAt: string}[] | null | undefined): string | null {
+  if (!watchful) return null;
+  return oldestObservationIso(watchful.map(item => item.snapshotAt));
 }
 
 export type BoardWatchfulStatus = {
@@ -103,10 +98,6 @@ type BoardRow = {
 
 /** Only an Unknown field unit changes. A fresh camera reading replaces Unknown. Shop is left alone. */
 export function applyBoardFreshStatus<T extends BoardRow>(rows: readonly T[], readings: readonly CameraRow[], watchful: readonly BoardWatchfulStatus[] | null, now = Date.now()): T[] {
-  if (watchful) {
-    const times = watchful.map(item => Date.parse(item.snapshotAt)).filter(at => Number.isFinite(at));
-    noteWatchfulOldest(times.length ? new Date(Math.min(...times)).toISOString() : null);
-  }
   const byKey = new Map((watchful || []).map(item => [item.canonicalUnitKey, item]));
   return rows.map(row => {
     if (row.placement !== 'field' || row.cameraState !== 'unknown') return row;
