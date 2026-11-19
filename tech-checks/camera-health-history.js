@@ -16,6 +16,20 @@
     if (!Number.isFinite(at) || at <= 0 || at > now) return { at: null, state: 'invalid' };
     return { at: new Date(at).toISOString(), state: now - at > ttl ? 'stale' : 'fresh' };
   }
+  // Same 20-minute window as the board. A value that is stale, missing, or in
+  // the future is grey Unknown. It is not online and it is not Down.
+  function presentedHealth(status, observedAt, now = Date.now(), enabled = true) {
+    const raw = String(status || '').trim().toLowerCase();
+    const known = raw === 'online' ? 'online' : raw === 'offline' || raw === 'down' ? 'offline' : 'unknown';
+    const chip = state => state === 'online'
+      ? {state, label: 'ONLINE', color: '#2bff35'}
+      : state === 'offline'
+        ? {state, label: 'Down', color: '#ff2734'}
+        : {state: 'unknown', label: 'Unknown', color: '#94a3b8'};
+    if (!enabled) return chip(known);
+    if (timestamp(observedAt, now).state !== 'fresh') return chip('unknown');
+    return chip(known);
+  }
   function format(value, now = Date.now()) {
     const time = timestamp(value, now);
     if (!time.at) return time.state === 'missing' ? 'Never recorded' : 'Unknown (invalid timestamp)';
@@ -149,5 +163,5 @@
     };
     return '<div class="unit-time-strip" aria-label="Connection check history">' + cell(attemptRow, 'attempt') + cell(successRow, 'success') + '</div>';
   }
-  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip, connectionSnapshot, directDiagnostic };
+  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip, connectionSnapshot, directDiagnostic, presentedHealth };
 })(globalThis);

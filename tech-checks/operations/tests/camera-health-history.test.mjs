@@ -73,3 +73,23 @@ test('failed probes before outage confirmation still report an unsuccessful atte
  const value=api.record({last_probe_online_at:old},{overall_status:'verifying',ip_reachable:false,checked_at:fresh},'Sniper',now);
  assert.equal(value.attempt.outcome,'No response');assert.equal(value.success.at,new Date(old).toISOString());
 });
+
+test('camera health values older than 20 minutes, missing, or in the future are Unknown',()=>{
+ const freshOnline=api.presentedHealth('online',fresh,now);
+ assert.equal(freshOnline.state,'online');assert.equal(freshOnline.label,'ONLINE');
+ const aged=api.presentedHealth('online',new Date(now-21*60*1000).toISOString(),now);
+ assert.equal(aged.state,'unknown');assert.equal(aged.label,'Unknown');assert.equal(aged.color,'#94a3b8');
+ assert.notEqual(aged.label,'ONLINE');assert.notEqual(aged.label,'Down');
+ const months=api.presentedHealth('online','2026-09-30T01:00:00Z',now);
+ assert.equal(months.label,'Unknown');assert.equal(months.color,'#94a3b8');assert.notEqual(months.state,'online');
+ for(const missing of [null,undefined,'']){
+  const chip=api.presentedHealth('online',missing,now);
+  assert.equal(chip.label,'Unknown');assert.equal(chip.color,'#94a3b8');
+ }
+ const ahead=api.presentedHealth('online',new Date(now+60*1000).toISOString(),now);
+ assert.equal(ahead.label,'Unknown');assert.notEqual(ahead.state,'online');assert.notEqual(ahead.label,'Down');
+ const off=api.presentedHealth('online',new Date(now-21*60*1000).toISOString(),now,false);
+ assert.equal(off.state,'online');assert.equal(off.label,'ONLINE');
+ const staleDown=api.presentedHealth('offline',new Date(now-21*60*1000).toISOString(),now);
+ assert.equal(staleDown.label,'Unknown');assert.notEqual(staleDown.label,'Down');
+});

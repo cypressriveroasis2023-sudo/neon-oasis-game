@@ -32,6 +32,7 @@ import TechnicianTodoList from './TechnicianTodoList';
 import FleetCountReadout from './FleetCountReadout';
 import {routerOfflineFact, IN_SHOP_LABEL, fleetCountsFromCameraFeed, type FleetCountSnapshot} from './sharedFleetCounts';
 import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraMhelpPlacements, decideShopCameras, exceptionLine, fieldMapPlacementRows, inShopLabel, shopCameraInput, shopDoNotUseLine} from '../shared/shopCameraStatus';
+import {presentedCameraHealth, type CameraHealthChip} from './cameraEvidence';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
  recorded?:{unit:string;field:string;action:string;value:string|null;by:string;role:string;duplicate:boolean;pinned?:boolean;pinNote?:string|null}};
@@ -51,6 +52,13 @@ const STATE_LABEL:Record<UnitCameraStatus['state'],string>={GREEN:'All cameras u
 // check on the unit, so they are Up or Down as a whole, never camera by camera.
 const SOURCE_NAME_LABEL='The provider';
 const AVIGILON_STATE:Record<UnitCameraStatus['state'],string>={GREEN:'Up',YELLOW:'Down',RED:'Down',UNKNOWN:'Not verified'};
+/** Online or Down only while the observation itself is inside the 20-minute window. */
+function healthChip(status:'online'|'offline'|'unknown', observedAt:string|null|undefined, now:number):CameraHealthChip{
+ return presentedCameraHealth({status, observedAt}, now);
+}
+function unitHealthStatus(unit:UnitCameraStatus):'online'|'offline'|'unknown'{
+ return unit.state==='GREEN'?'online':unit.state==='RED'||unit.state==='YELLOW'?'offline':'unknown';
+}
 const VICTRON:[string,string][]=[['solar_power','Solar'],['load_power','Load'],['battery_voltage','Battery'],['battery_soc','Charge']];
 
 /** One Helios, one Victron installation: matched only when the name is unique on both sides. */
@@ -322,10 +330,10 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    {query&&<button type='button' aria-label='Clear search' onClick={()=>setQuery('')}>×</button>}
   </div>
   <ul className='cos-camera-status-list'>
-   {shown.map(unit=>{const decision=shopDecision(unit);const inShop=decision?.inShop===true;return (<li key={unit.unit} className={'cos-camera-status-row cos-camera-state-'+unit.state.toLowerCase()}>
+   {shown.map(unit=>{const decision=shopDecision(unit);const inShop=decision?.inShop===true;const chip=healthChip(inShop?'online':unitHealthStatus(unit), unit.observedAt, now);const staleHealth=chip.state==='unknown'&&(inShop||unitHealthStatus(unit)!=='unknown');const dot=staleHealth?'unknown':inShop?'online':DOT[unit.state];return (<li key={unit.unit} className={'cos-camera-status-row cos-camera-state-'+(staleHealth?'unknown':unit.state.toLowerCase())}>
     <div className='cos-camera-status-main'>
      <div className='cos-camera-status-unit'>
-      <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unitName(unit)}</strong>
+      <strong><i className={'cos-board-status-dot cos-board-dot-'+dot} style={staleHealth?{background:chip.color}:undefined} aria-hidden='true'/>{unitName(unit)}</strong>
       <small className={inShop||unit.placement==='SHOP'?'cos-in-shop':undefined}>{inShop?inShopLabel(decision?.tags??[]):unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):IN_SHOP_LABEL+(sourceOf(unit)==='star4live'?' · root':'')}</small>
       {decision?.flag&&<small className='cos-camera-status-flag'>{decision.flag}</small>}
       {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
@@ -336,8 +344,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
       </small>)}
      </div>
      <div className='cos-camera-status-detail'>
-      <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{inShop?SHOP_CAMERA_ONLINE_LABEL:sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
-      {!inShop&&(sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
+      <span><b className={'cos-camera-status-source cos-camera-family-'+familyOf(unit)}>{FAMILY_LABEL[familyOf(unit)]}</b>{staleHealth?<b className='cos-camera-health-chip' style={{color:chip.color}}>Unknown</b>:inShop?SHOP_CAMERA_ONLINE_LABEL:sourceOf(unit)==='ip_check'?AVIGILON_STATE[unit.state]:STATE_LABEL[unit.state]+' · '+unit.online+' of '+unit.cameras+' up'}</span>
+      {!inShop&&!staleHealth&&(sourceOf(unit)==='ip_check'?<small>{unit.state==='GREEN'?'The unit answers. Each camera is not checked.':unit.publicIp?unit.state==='UNKNOWN'?'No recent check on this unit.':'The unit did not answer.':'No IP on file for this unit.'}</small>
        :unit.down.length>0&&<small>{unit.down.some(camera=>camera.status==='offline')?'Down: ':'Not verified: '}{unit.down.map(camera=>{const prior=priorCameraReading(camera);return camera.name+(camera.status==='unknown'?' (not verified'+(prior?'; last reported '+prior.status+' '+cameraTime(prior.at,now):'')+')':'');}).join(', ')}</small>)}
       {victron.has(unit.unit)&&<><small className='cos-camera-status-victron'>Victron · {victronLine(victron.get(unit.unit)!)||'no saved power readings'} · <a href={vrmPortalUrl(victron.get(unit.unit)!.installationId)} target='_blank' rel='noopener noreferrer'>Open Victron ↗</a></small><CosPowerChecks measurements={victron.get(unit.unit)!.measurements} now={now} settings={powerSettings}/></>}
       <small>{unit.observedAt?'read '+cameraTime(unit.observedAt,now):'no reading time'}</small>
@@ -368,17 +376,17 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
      {fixStep&&<p className='cos-fixit-step'>{fixStep.says}</p>}
      {unit.displayName&&<p className='cos-camera-status-renamed'>{SOURCE_NAME_LABEL} calls this unit {unit.unit}.</p>}
      <ul className='cos-camera-status-cameras' aria-label={'Cameras on '+unit.unit}>
-      {(unit.cameraList||[]).map(camera=><li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
-       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} aria-hidden='true'/>
+      {(unit.cameraList||[]).map(camera=>{const cameraChip=healthChip(camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown', unit.observedAt, now);const cameraStale=!camera.removed&&cameraChip.state==='unknown'&&camera.status!=='unknown';return <li key={camera.name} className={'cos-camera-status-camera'+(camera.removed?' cos-camera-status-camera-off':'')}>
+       <i className={'cos-board-status-dot cos-board-dot-'+(camera.removed||cameraStale?'unknown':camera.status==='online'?'online':camera.status==='offline'?'offline':'unknown')} style={cameraStale?{background:cameraChip.color}:undefined} aria-hidden='true'/>
        <span>{camera.name}</span>
-       <small>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
-        :camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
+       <small style={cameraStale?{color:cameraChip.color}:undefined}>{camera.removed?'Taken off this unit by hand \u00b7 not counted'
+        :cameraStale?'Unknown':camera.status==='online'?'Online':camera.status==='offline'?'Offline':'Not verified'}
         {!camera.removed&&priorCameraReading(camera)&&' · last reported '+priorCameraReading(camera)!.status+' '+cameraTime(priorCameraReading(camera)!.at,now)}
         {!camera.removed&&!camera.atSite&&unit.placement==='FIELD'?' \u00b7 in the shop, not at this site':''}</small>
        {canEdit&&(camera.removed
         ?<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',null,draft.reason,camera.name)}>Put back</button>
         :<button type='button' disabled={saving} onClick={()=>submit(unit,'camera',camera.name,draft.reason)}>Swapped out</button>)}
-      </li>)}
+      </li>;})}
       {!(unit.cameraList||[]).length&&<li className='cos-camera-status-camera'><small>{FAMILY_LABEL[familyOf(unit)]} reports no camera list for this unit.</small></li>}
      </ul>
      {!canEdit&&editLockReason(report,uncertain)&&<p className='cos-camera-status-locked'>{editLockReason(report,uncertain)}</p>}

@@ -1,19 +1,21 @@
 {
   "contract": "COS_WATCHFUL_TEST_PROJECTS_V1",
+  "source": "watchful_test_project_ids.csv, Watchful read 11:59 AM–12:00 PM CT Nov 19 2026; Spotter Test Site id verified against its Watchful URL.",
+  "archived": "not archived is inferred, not confirmed",
   "format": {
-    "projects": "Array of { label, id, idStatus, placeholderKey }.",
-    "classifyBy": "The project id when id is a non-empty string and idStatus is known. While id is null and idStatus is missing, the placeholderKey is the only match key.",
+    "projects": "Array of { label, id, idStatus }. placeholderKey is omitted once idStatus is known.",
+    "classifyBy": "The project id when id is a non-empty string and idStatus is known.",
     "doNotClassifyBy": "label, site text, or any name pattern. A name that looks like a test project and is not on this list produces a warning only.",
-    "id": "Watchful project id from Watchful. null means this repo does not contain that id.",
-    "idStatus": "missing or known.",
-    "placeholderKey": "Stand-in key used only while id is null. It always starts with MISSING_WATCHFUL_ID:. When the real id is known, set id, set idStatus to known, and leave the placeholder unused."
+    "id": "Watchful project id.",
+    "idStatus": "known.",
+    "archived": "These rows are treated as not archived. That status is inferred from the Watchful read, not confirmed."
   },
   "projects": [
-    {"label": "Test 1", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:test-1"},
-    {"label": "Helios Test Sites", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:helios-test-sites"},
-    {"label": "RII-025 Shop", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:rii-025-shop"},
-    {"label": "Solar Spotter Test", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:solar-spotter-test"},
-    {"label": "Spotter Test Site", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:spotter-test-site"},
-    {"label": "Sniper Test Site", "id": null, "idStatus": "missing", "placeholderKey": "MISSING_WATCHFUL_ID:sniper-test-site"}
+    {"label": "Test 1", "id": "af1cb626-711e-47a9-8da4-2b2ff6ed4ef1", "idStatus": "known"},
+    {"label": "Helios Test Sites", "id": "b1666d31-0998-4081-be61-f710c0f0f527", "idStatus": "known"},
+    {"label": "RII-025 Shop", "id": "3cab6752-e5ca-4be1-bf59-e5830142c53d", "idStatus": "known"},
+    {"label": "Solar Spotter Test", "id": "34f316c0-5ab5-4c57-8615-3f6c5fcbe4a2", "idStatus": "known"},
+    {"label": "Spotter Test Site", "id": "aed522ac-9d63-4b7b-869d-318fbf2ce588", "idStatus": "known"},
+    {"label": "Sniper Test Site", "id": "2e8ae5be-3a9a-4a45-887a-505d3facd832", "idStatus": "known"}
   ]
 }

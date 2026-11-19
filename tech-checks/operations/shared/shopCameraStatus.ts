@@ -40,7 +40,8 @@ export type WatchfulTestProjectRecord = {
   label: string;
   id: string | null;
   idStatus: 'missing' | 'known';
-  placeholderKey: string;
+  /** Present only while idStatus is missing. Omitted once the Watchful id is known. */
+  placeholderKey?: string;
 };
 
 export const WATCHFUL_TEST_PROJECTS_PATH = 'tech-checks/operations/shared/watchful-test-projects.json';
@@ -50,7 +51,7 @@ export const WATCHFUL_TEST_PROJECTS = watchfulTestProjectsFile.projects as reado
 /** The match key for one config row: the Watchful id, or the placeholder while that id is missing. */
 export function watchfulTestProjectMatchKey(project: WatchfulTestProjectRecord): string | null {
   if (project.idStatus === 'known' && typeof project.id === 'string' && project.id.trim()) return project.id.trim();
-  if (project.id === null && project.idStatus === 'missing' && project.placeholderKey.startsWith('MISSING_WATCHFUL_ID:')) return project.placeholderKey;
+  if (project.id === null && project.idStatus === 'missing' && typeof project.placeholderKey === 'string' && project.placeholderKey.startsWith('MISSING_WATCHFUL_ID:')) return project.placeholderKey;
   return null;
 }
 
@@ -111,9 +112,15 @@ export type ShopCameraInput = {
   tags?: readonly string[];
   /** Set from the unit record. The rule's exceptionUnits list is added in the decision. */
   exception?: boolean;
+  /** Camera channels on the device. An unnamed device is unclassified only when this is 0. */
+  cameras?: number;
+  /** No unit name. Combined with cameras 0 on a test project, the device is not counted. */
+  unnamed?: boolean;
+  /** Lookup key when the device has no unit name. */
+  deviceKey?: string;
 };
 
-export type ShopCameraCategory = 'field' | 'inShop' | 'doNotUse' | 'exception';
+export type ShopCameraCategory = 'field' | 'inShop' | 'doNotUse' | 'exception' | 'unclassified';
 
 export type ShopCameraDecision = {
   unit: string;
@@ -279,6 +286,24 @@ function inShopDecision(input: ShopCameraInput, inWatchful: boolean, tags: reado
   };
 }
 
+function unclassifiedDecision(input: ShopCameraInput, inWatchful: boolean, tags: readonly string[], warnings: readonly string[]): ShopCameraDecision {
+  return {
+    unit: input.unit,
+    category: 'unclassified',
+    inShop: false,
+    inWatchful,
+    placement: input.placement,
+    state: input.state,
+    telemetryState: input.state,
+    statusLabel: null,
+    placeLabel: null,
+    tags,
+    flag: null,
+    warnings,
+    counted: {field: false, armed: false, immix: false, inShop: false, doNotUse: false, exception: false},
+  };
+}
+
 function heldOut(input: ShopCameraInput, category: 'doNotUse' | 'exception', inWatchful: boolean, tags: readonly string[], warnings: readonly string[] = []): ShopCameraDecision {
   return {
     unit: input.unit,
@@ -328,6 +353,8 @@ export function decideShopCamera(input: ShopCameraInput, rule: ShopCameraRule = 
   if (!rule.enabled) return passthrough(input, project, tags, warnings);
   const inWatchful = Boolean(project.key || project.name) && !project.archived;
   const testSite = !project.archived && isWatchfulTestProjectKey(project.key, rule);
+  const unnamed = input.unnamed === true || !input.unit.trim();
+  if (unnamed && input.cameras === 0 && testSite) return unclassifiedDecision(input, inWatchful, tags, warnings);
   const mhelp = input.mhelpPlacement ?? null;
   const doNotUse = input.doNotUse === true || listed(rule.doNotUseUnits, input.unit);
   const listedException = input.exception === true || listed(rule.exceptionUnits, input.unit);
@@ -353,7 +380,7 @@ export function decideShopCameras(inputs: readonly ShopCameraInput[], rule: Shop
   const figures = emptyFigures();
   const seen = new Set<string>();
   for (const input of inputs) {
-    const key = input.unit.trim().toUpperCase();
+    const key = input.unit.trim().toUpperCase() || String(input.deviceKey ?? '').trim().toUpperCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const decision = decideShopCamera(input, rule);
@@ -392,6 +419,9 @@ export type ShopCameraSource = {
   watchfulArchived?: unknown;
   watchfulArmed?: unknown;
   watchfulImmix?: unknown;
+  cameras?: unknown;
+  unnamed?: unknown;
+  deviceKey?: unknown;
   doNotUse?: unknown;
   tags?: unknown;
   lifecycle?: unknown;
@@ -433,16 +463,20 @@ export function shopCameraInput(source: ShopCameraSource, mhelpByUnit?: Readonly
     doNotUse,
     tags,
     exception: source.exception === true,
+    cameras: typeof source.cameras === 'number' ? source.cameras : undefined,
+    unnamed: source.unnamed === true || !source.unit.trim(),
+    deviceKey: typeof source.deviceKey === 'string' ? source.deviceKey : undefined,
   };
 }
 
-export function applyShopCameraView<T extends {unit: string; placement: CameraPlacement; state: CameraState; onlineInShop?: boolean}>(
+export function applyShopCameraView<T extends {unit: string; deviceKey?: string; placement: CameraPlacement; state: CameraState; onlineInShop?: boolean}>(
   units: readonly T[],
   report: ShopCameraReport,
 ): T[] {
   return units.flatMap(unit => {
-    const decision = report.byUnit.get(unit.unit.trim().toUpperCase());
-    if (decision?.category === 'doNotUse' || decision?.category === 'exception') return [];
+    const key = unit.unit.trim().toUpperCase() || String(unit.deviceKey || '').trim().toUpperCase();
+    const decision = report.byUnit.get(key);
+    if (decision?.category === 'doNotUse' || decision?.category === 'exception' || decision?.category === 'unclassified') return [];
     if (!decision?.inShop) return [unit];
     return [{...unit, placement: 'SHOP' as const, state: 'GREEN' as const, onlineInShop: true}];
   });

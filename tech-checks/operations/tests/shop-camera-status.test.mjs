@@ -111,7 +111,8 @@ test('a test site matches only its project key, and a lookalike name is a warnin
   assert.equal(isWatchfulTestProjectKey('TEST 1', rule), false);
   assert.equal(isWatchfulTestProjectKey('Test 2', rule), false);
   assert.equal(isWatchfulTestProjectKey('test   12', rule), false);
-  assert.equal(isWatchfulTestProjectKey(TEST1.toLowerCase(), rule), false);
+  assert.notEqual(TEST1, TEST1.toUpperCase());
+  assert.equal(isWatchfulTestProjectKey(TEST1.toUpperCase(), rule), false);
   const byKey = decideShopCamera(testSite({watchful: testProject(TEST1, 'TeSt 1')}), rule);
   assert.equal(byKey.inShop, true);
   assert.deepEqual(byKey.warnings, []);
@@ -364,10 +365,17 @@ test('shortening the lists moves units off those lines without a different rule'
   assert.deepEqual(rule.unitTags, {});
 });
 
-test('the Watchful test-project file has no ids for today\'s internal projects', () => {
-  assert.deepEqual(missingWatchfulTestProjectIds(), [
-    'Test 1', 'Helios Test Sites', 'RII-025 Shop', 'Solar Spotter Test', 'Spotter Test Site', 'Sniper Test Site',
-  ]);
+test('the Watchful test-project file uses the reviewed project ids', () => {
+  assert.deepEqual(missingWatchfulTestProjectIds(), []);
+  assert.equal(configuredWatchfulTestProjectKey('Test 1'), 'af1cb626-711e-47a9-8da4-2b2ff6ed4ef1');
+  assert.equal(configuredWatchfulTestProjectKey('Helios Test Sites'), 'b1666d31-0998-4081-be61-f710c0f0f527');
+  assert.equal(configuredWatchfulTestProjectKey('RII-025 Shop'), '3cab6752-e5ca-4be1-bf59-e5830142c53d');
+  assert.equal(configuredWatchfulTestProjectKey('Solar Spotter Test'), '34f316c0-5ab5-4c57-8615-3f6c5fcbe4a2');
+  assert.equal(configuredWatchfulTestProjectKey('Spotter Test Site'), 'aed522ac-9d63-4b7b-869d-318fbf2ce588');
+  assert.equal(configuredWatchfulTestProjectKey('Sniper Test Site'), '2e8ae5be-3a9a-4a45-887a-505d3facd832');
+  const file = JSON.parse(readFileSync(new URL('../shared/watchful-test-projects.json', import.meta.url), 'utf8'));
+  assert.equal(file.projects.every(project => project.idStatus === 'known' && !Object.hasOwn(project, 'placeholderKey')), true);
+  assert.match(file.archived, /inferred, not confirmed/);
   const source = readFileSync(new URL('../shared/shopCameraStatus.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /testProjectPattern|test\\s\+\\d\+|testProjectNames/);
 });
@@ -396,6 +404,7 @@ test('a Helios 017-style unit stays Field when mHelp says Field and the project 
   assert.equal(row.counted.inShop, false);
   assert.equal(row.counted.armed, true);
   assert.equal(row.counted.immix, true);
+  assert.equal(configuredWatchfulTestProjectKey('Helios Test Sites'), 'b1666d31-0998-4081-be61-f710c0f0f527');
   assert.deepEqual(row.warnings, []);
 });
 
@@ -413,7 +422,39 @@ test('a unit on the Spotter Test Site project is In shop', () => {
   assert.equal(row.counted.field, false);
   assert.equal(row.counted.armed, false);
   assert.equal(row.counted.immix, false);
+  assert.equal(configuredWatchfulTestProjectKey('Spotter Test Site'), 'aed522ac-9d63-4b7b-869d-318fbf2ce588');
   assert.deepEqual(row.warnings, []);
+});
+
+test('an unnamed device with 0 cameras on a test project stays unclassified and is not counted', () => {
+  const testKey = configuredWatchfulTestProjectKey('Test 1');
+  const unnamed = {
+    unit: '', deviceKey: 'synthetic-unnamed-1', unnamed: true, cameras: 0,
+    placement: 'FIELD', state: 'UNKNOWN', site: 'Test 1', mhelpPlacement: 'SHOP',
+    watchful: testProject(testKey, 'Test 1'),
+  };
+  const row = decideShopCamera(unnamed, rule);
+  assert.equal(row.category, 'unclassified');
+  assert.equal(row.inShop, false);
+  assert.equal(row.flag, null);
+  assert.equal(row.statusLabel, null);
+  assert.deepEqual(row.counted, {field: false, armed: false, immix: false, inShop: false, doNotUse: false, exception: false});
+  const namedWithNoCameras = {
+    unit: 'FIXTURE NAMED 1', placement: 'FIELD', state: 'UNKNOWN', cameras: 0,
+    mhelpPlacement: null, watchful: testProject(testKey, 'Test 1', {armed: false, immix: false}),
+  };
+  const before = decideShopCameras([customer()], rule);
+  const after = decideShopCameras([customer(), unnamed, namedWithNoCameras], rule);
+  assert.equal(after.byUnit.get('SYNTHETIC-UNNAMED-1').category, 'unclassified');
+  assert.equal(after.byUnit.get('FIXTURE NAMED 1').category, 'inShop');
+  assert.equal(after.figures.field, before.figures.field);
+  assert.equal(after.figures.inShop, before.figures.inShop + 1);
+  assert.equal(after.figures.armed, before.figures.armed);
+  assert.equal(after.figures.immix, before.figures.immix);
+  assert.equal(after.figures.doNotUse, 0);
+  assert.equal(after.figures.exceptions, 0);
+  const viewed = applyShopCameraView([unnamed, namedWithNoCameras], after);
+  assert.deepEqual(viewed.map(item => item.unit), ['FIXTURE NAMED 1']);
 });
 
 test('the census fixture keeps 323 In shop, 56 DO NOT USE, 1 exception, and the same field totals', () => {

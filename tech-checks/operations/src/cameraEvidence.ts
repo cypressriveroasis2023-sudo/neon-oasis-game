@@ -53,6 +53,47 @@ export function cameraTimestamp(value:unknown,now=Date.now()):{at:string|null;fr
   const parsed=valid?Date.parse(value.replace(/([+-]\d{2})$/,'$1:00')):NaN;
   return Number.isFinite(parsed)&&parsed>0&&parsed<=now?{at:new Date(parsed).toISOString(),fresh:now-parsed<=CAMERA_FRESH_MS}:{at:null,fresh:false};
 }
+
+/** Grey used when a camera health value is not a current observation. */
+export const CAMERA_HEALTH_UNKNOWN = '#94a3b8';
+
+export type CameraHealthChip = {
+  state: 'online' | 'offline' | 'unknown';
+  label: 'ONLINE' | 'Down' | 'Unknown';
+  color: string;
+};
+
+/**
+ * The board's camera window, applied to one health value.
+ * A reading older than 20 minutes, missing, or in the future is Unknown.
+ * It is not online and it is not Down. Pass enabled false to leave the raw word.
+ */
+export function presentedCameraHealth(
+  value: {status?: string | null; observedAt?: string | null},
+  now = Date.now(),
+  enabled = true,
+): CameraHealthChip {
+  const raw = String(value?.status || '').trim().toLowerCase();
+  const known: CameraHealthChip['state'] = raw === 'online' || raw === 'green' || raw === 'up'
+    ? 'online'
+    : raw === 'offline' || raw === 'down' || raw === 'red'
+      ? 'offline'
+      : 'unknown';
+  const chip = (state: CameraHealthChip['state']): CameraHealthChip =>
+    state === 'online'
+      ? {state, label: 'ONLINE', color: '#2bff35'}
+      : state === 'offline'
+        ? {state, label: 'Down', color: '#ff2734'}
+        : {state: 'unknown', label: 'Unknown', color: CAMERA_HEALTH_UNKNOWN};
+  if (!enabled) return chip(known);
+  if (!cameraTimestamp(value?.observedAt, now).fresh) return chip('unknown');
+  return chip(known);
+}
+
+/** In shop is the place. The health chip still uses the freshness rule. */
+export function inShopHealthChip(observedAt: string | null | undefined, now = Date.now(), enabled = true) {
+  return {placeLabel: 'In shop' as const, chip: presentedCameraHealth({status: 'online', observedAt}, now, enabled)};
+}
 export function resourceKind(row:Pick<CameraRow,'type'|'trackerOnly'>):ResourceKind {
   const type=normalized(row.type).toLowerCase();
   return row.trackerOnly?'unitInventory':['ipc','camera'].includes(type)?'cameras':['detector','reconeyez detector'].includes(type)?'detectors':type==='nvr'?'recorders':/^(?:sniper(?: [24])?|camv|tracker_unit)$/.test(type)?'unitInventory':'other';
