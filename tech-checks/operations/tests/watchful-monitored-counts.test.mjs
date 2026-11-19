@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
-import {MONITORED_COUNT_PATHS, countForPath, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
+import {MONITORED_COUNT_PATHS, countForPath, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
 const snapshotAt = new Date(now - 60_000).toISOString();
@@ -80,6 +80,25 @@ test('a missing or stale snapshot is Unknown and does not count Offline', () => 
   });
   assert.equal(stale.fresh, false);
   assert.equal(stale.offlineUnits, null);
+});
+
+test('a reader shows Unknown without a fresh snapshot and never shows a Shop unit as down', () => {
+  assert.equal(presentedWatchfulStatus({snapshotFresh: false, mhelpPlacement: 'FIELD', unitStatus: 'down'}), 'Unknown');
+  assert.equal(presentedWatchfulStatus({snapshotFresh: true, mhelpPlacement: 'FIELD', unitStatus: null}), 'Unknown');
+  assert.equal(presentedWatchfulStatus({snapshotFresh: true, mhelpPlacement: 'SHOP', unitStatus: 'down'}), 'In Shop');
+  assert.notEqual(presentedWatchfulStatus({snapshotFresh: true, mhelpPlacement: 'SHOP', unitStatus: 'down'}), 'down');
+  assert.equal(presentedWatchfulStatus({snapshotFresh: true, mhelpPlacement: 'FIELD', unitStatus: 'down'}), 'down');
+  const {snapshot, mhelp} = reviewedDay();
+  const stale = selectSharedMonitoredCount({snapshot, snapshotAt: new Date(now - 27 * 60 * 60 * 1000).toISOString(), mhelp, now});
+  assert.equal(stale.fresh, false);
+  assert.equal(stale.offlineUnits, null);
+  const shop = selectSharedMonitoredCount({
+    snapshot: [{unitName: 'Solar Spotter 054', canonicalUnitKey: 'SOLARSPOTTER|54', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 4, snapshotAt}],
+    mhelp: [{name: 'Solar Spotter 054', placement: 'SHOP', cosStatus: 'down'}],
+    now,
+  });
+  assert.equal(shop.offlineUnits, 0);
+  assert.equal(shop.inShop, 1);
 });
 
 test('a Shop unit counts 0 even when Watchful says down', () => {

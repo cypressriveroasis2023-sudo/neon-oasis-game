@@ -142,6 +142,20 @@ export function selectSharedMonitoredCount(input: {
   return result;
 }
 
+/**
+ * unit_status is only up or down. A missing or stale snapshot is Unknown.
+ * A Shop unit is In Shop, never down.
+ */
+export function presentedWatchfulStatus(input: {
+  snapshotFresh: boolean;
+  mhelpPlacement: 'FIELD' | 'SHOP' | 'OTHER' | null;
+  unitStatus: 'up' | 'down' | null;
+}): 'Unknown' | 'In Shop' | 'up' | 'down' {
+  if (!input.snapshotFresh || (input.unitStatus !== 'up' && input.unitStatus !== 'down')) return 'Unknown';
+  if (input.mhelpPlacement === 'SHOP') return 'In Shop';
+  return input.unitStatus;
+}
+
 /** Every monitored headline asks this model. The path name is recorded so the callers stay one count. */
 export const MONITORED_COUNT_PATHS = [
   'sharedFleetCounts',
