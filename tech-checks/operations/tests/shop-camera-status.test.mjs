@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -11,7 +13,11 @@ import {
   isWatchfulTestProjectKey, configuredWatchfulTestProjectKey, missingWatchfulTestProjectIds,
   cameraMhelpPlacements, shopCameraInput, applyShopCameraView,
   inShopLabel, shopDoNotUseLine, exceptionLine, watchfulTestSiteNameWarning,
+  validateWatchfulTestProjects, cameraStatusBoard, productIdForDevices,
 } from '../shared/shopCameraStatus.ts';
+import CameraStatusBoardView from '../src/CameraStatusBoardView.tsx';
+import {projectUnitCameraStatus} from '../shared/starUnitStatus.ts';
+import {GROUPS, groupedUnits} from '../src/cameraStatusFilters.ts';
 
 const rule = SHOP_CAMERA_RULE;
 const TEST1 = configuredWatchfulTestProjectKey('Test 1');
@@ -168,19 +174,31 @@ test('rollback restores the Watchful mirror for the same units', () => {
 });
 
 test('mHelp placement is read from Shop, Warehouse, and Field without guessing', () => {
+  // Rule change, Felix review of #458 at 808d6ba3.
+  // Old assertion: a unit name was the key, so placements.get('SS010') === 'WAREHOUSE'.
+  // New assertion: the name is not a key. Product id wins, then router serial.
+  // placementStatus is used when placement is empty.
   const placements = cameraMhelpPlacements([
-    {unitNumber: 'SS010', placement: 'warehouse'},
-    {unitNumber: 'CAMV 090', placement: 'Shop'},
-    {unitNumber: 'SNIPER 015', placement: 'field'},
+    {unitNumber: 'SS010', productId: '1001', placement: 'warehouse'},
+    {unitNumber: 'CAMV 090', productId: '1002', placementStatus: 'Shop'},
+    {unitNumber: 'SNIPER 015', routerSerial: 'RTR-015', placement: 'field'},
     {unitNumber: 'SPOTTER 880', placement: 'yard'},
+    {unitNumber: 'Spotter 196 HD', productId: '196', placement: 'SHOP', routerSerial: 'RTR-196'},
   ]);
-  assert.equal(placements.get('SS010'), 'WAREHOUSE');
-  assert.equal(placements.get('CAMV 090'), 'SHOP');
-  assert.equal(placements.get('SNIPER 015'), 'FIELD');
-  assert.equal(placements.has('SPOTTER 880'), false);
-  const fromMap = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'RED', site: 'Fixture Yard'}, placements);
-  assert.equal(decideShopCamera(fromMap, rule).inShop, true);
-  assert.equal(decideShopCamera(fromMap, rule).telemetryState, 'RED');
+  assert.equal(placements.byProductId.has('SS010'), false);
+  assert.equal(placements.byProductId.get('1001').placement, 'WAREHOUSE');
+  assert.equal(placements.byProductId.get('1002').placement, 'SHOP');
+  assert.equal(placements.byRouterSerial.get('RTR-015').placement, 'FIELD');
+  assert.equal(placements.byProductId.has('SPOTTER 880'), false);
+  const byProduct = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'RED', site: 'Fixture Yard', productId: '1001'}, placements);
+  assert.equal(byProduct.mhelpPlacement, 'WAREHOUSE');
+  assert.equal(decideShopCamera(byProduct, rule).inShop, true);
+  const byName = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'RED', site: 'Fixture Yard'}, placements);
+  assert.equal(byName.mhelpPlacement, null);
+  const bySerial = shopCameraInput({unit: 'Spotter 196 HD', placement: 'FIELD', state: 'RED', routerSerial: 'RTR-015'}, placements);
+  assert.equal(bySerial.mhelpPlacement, 'FIELD');
+  const productWins = shopCameraInput({unit: 'Spotter 196 HD', placement: 'FIELD', state: 'UNKNOWN', productId: '196', routerSerial: 'RTR-015'}, placements);
+  assert.equal(productWins.mhelpPlacement, 'SHOP');
 });
 
 test('an In shop unit is not Offline, red, or Unknown on the camera status view counts', () => {
@@ -197,7 +215,9 @@ test('an In shop unit is not Offline, red, or Unknown on the camera status view 
 });
 
 test('the camera status main view does not add an IP field or a job or inventory card', () => {
-  const source = readFileSync(new URL('../src/FleetCameraStatus.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/FleetCameraStatus.tsx', import.meta.url), 'utf8')
+    + readFileSync(new URL('../src/CameraStatusBoardView.tsx', import.meta.url), 'utf8')
+    + readFileSync(new URL('../shared/shopCameraStatus.ts', import.meta.url), 'utf8');
   assert.match(source, /Camera monitoring figures/);
   assert.match(source, /inShopLabel/);
   assert.match(source, /shopDoNotUseLine/);
@@ -354,7 +374,11 @@ test('shortening the lists moves units off those lines without a different rule'
   assert.equal(shrunk.byUnit.get('CAMV 090').category, 'inShop');
   assert.equal(shrunk.byUnit.get('CAMV 090').statusLabel, 'ONLINE');
   assert.equal(shrunk.byUnit.get('RSU 200').category, 'field');
-  assert.equal(shrunk.byUnit.get('RSU 200').flag, 'mHelp Field disagrees with Watchful test site');
+  // Rule change, Felix review of #458 at 808d6ba3. Old flag text had no comma.
+  // Old: 'mHelp Field disagrees with Watchful test site'
+  // New: 'mHelp Field, disagrees with Watchful test site'
+  assert.notEqual('mHelp Field disagrees with Watchful test site', 'mHelp Field, disagrees with Watchful test site');
+  assert.equal(shrunk.byUnit.get('RSU 200').flag, 'mHelp Field, disagrees with Watchful test site');
   assert.equal(shrunk.byUnit.get('RSU 200').counted.field, true);
   assert.equal(inShopLabel(shrunk.byUnit.get('SS010').tags), 'In shop · RSU');
   assert.equal(shrunk.figures.doNotUse, 0);
@@ -474,4 +498,152 @@ test('the census fixture keeps 323 In shop, 56 DO NOT USE, 1 exception, and the 
   assert.equal(after.figures.armed, before.figures.armed);
   assert.equal(after.figures.immix, before.figures.immix);
   assert.equal(after.warnings.length, 0);
+});
+
+test('a feed row keeps the Watchful project id and does not match mHelp by name', () => {
+  const projected = projectUnitCameraStatus([{
+    id: 55, device_name: 'SS010 cam', unit_key: 'SS010', organization: 'Test 1',
+    vigilant_status: 'Online', star_organization_id: TEST1, device_serial: 'RTR-010',
+  }]);
+  const unit = projected.units[0];
+  assert.equal(unit.watchfulProjectKey, TEST1);
+  assert.deepEqual(unit.deviceIds, ['55']);
+  assert.deepEqual(unit.serials, ['RTR-010']);
+  const index = cameraMhelpPlacements([{unitNumber: 'SS010', productId: '5010', placementStatus: 'SHOP', uploadLifecycle: 'DO_NOT_USE'}]);
+  const named = shopCameraInput({unit: 'SS010', placement: 'FIELD', state: 'GREEN', watchfulProjectKey: unit.watchfulProjectKey}, index);
+  assert.equal(named.mhelpPlacement, null);
+  const linked = shopCameraInput({
+    unit: 'SS010', placement: 'FIELD', state: 'GREEN', watchfulProjectKey: unit.watchfulProjectKey,
+    productId: productIdForDevices(unit.deviceIds, [{productId: '5010', resourceId: '55'}]),
+  }, index);
+  assert.equal(linked.mhelpPlacement, 'SHOP');
+  assert.equal(linked.doNotUse, true);
+  assert.equal(linked.watchful.projectKey, TEST1);
+});
+
+test('Helios 014 with listed cameras is not tagged no telemetry', () => {
+  const key = configuredWatchfulTestProjectKey('Helios Test Sites');
+  const row = decideShopCamera({
+    unit: 'HELIOS 014', placement: 'FIELD', state: 'GREEN', cameras: 4,
+    tags: ['no telemetry', 'RSU'],
+    watchful: testProject(key, 'Helios Test Sites', {armed: false, immix: false}),
+  }, rule);
+  assert.equal(row.inShop, true);
+  assert.equal(row.tags.includes('no telemetry'), false);
+  assert.equal(inShopLabel(row.tags), 'In shop · RSU');
+});
+
+test('Helios 017 stays Field, is flagged once, and its cameras are not counted twice', () => {
+  const key = configuredWatchfulTestProjectKey('Helios Test Sites');
+  const helios = {
+    unit: 'HELIOS 017', placement: 'FIELD', state: 'RED', cameras: 4, mhelpPlacement: 'FIELD',
+    watchful: testProject(key, 'Helios Test Sites'),
+  };
+  const report = decideShopCameras([customer(), helios], rule);
+  const row = report.byUnit.get('HELIOS 017');
+  assert.equal(row.flag, 'mHelp Field, disagrees with Watchful test site');
+  assert.equal(row.placement, 'FIELD');
+  assert.equal(row.counted.field, true);
+  assert.equal(row.counted.inShop, false);
+  const viewed = applyShopCameraView([
+    {unit: 'SPOTTER 880', placement: 'FIELD', state: 'RED', cameras: 2},
+    {unit: 'HELIOS 017', placement: 'FIELD', state: 'RED', cameras: 4},
+  ], report);
+  assert.equal(viewed.filter(item => item.unit === 'HELIOS 017').length, 1);
+  assert.equal(viewed.find(item => item.unit === 'HELIOS 017').placement, 'FIELD');
+  assert.equal(viewed.reduce((total, item) => total + item.cameras, 0), 6);
+  assert.equal(countUnits(viewed).shop.units, 0);
+  assert.equal(countUnits(viewed).field.units, 2);
+});
+
+test('armed, immix, DO NOT USE and exceptions are dropped when the rows do not carry them', () => {
+  const report = decideShopCameras([testSite({watchful: testProject(TEST1, 'Test 1', {armed: undefined, immix: undefined})})], rule);
+  assert.equal(report.sources.armed, false);
+  assert.equal(report.sources.immix, false);
+  assert.equal(report.sources.doNotUse, false);
+  assert.equal(report.sources.exceptions, false);
+  const board = cameraStatusBoard(
+    [{unit: 'SS010', placement: 'FIELD', state: 'UNKNOWN'}],
+    rule,
+    {units: {online: 1, offline: 0, unknown: 0}, cameras: {online: 1, offline: 0, unknown: 0}},
+    [testSite({watchful: testProject(TEST1, 'Test 1', {armed: undefined, immix: undefined})})],
+  );
+  assert.equal(board.shop.armed, null);
+  assert.equal(board.shop.immix, null);
+  assert.equal(board.shop.doNotUse, null);
+  assert.equal(board.shop.exceptions, null);
+  assert.deepEqual(board.lines, []);
+});
+
+test('the Watchful test-project config fails closed', () => {
+  const known = {label: 'Test 1', id: TEST1, idStatus: 'known'};
+  assert.equal(validateWatchfulTestProjects({contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: [known]}).length, 1);
+  for (const file of [
+    {contract: 'OTHER', projects: [known]},
+    {contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: []},
+    {contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: [{label: 'Test 1'}]},
+    {contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: [{label: 'Test 1', id: TEST1, idStatus: 'known', placeholderKey: 'MISSING_WATCHFUL_ID:Test 1'}]},
+    {contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: [known, {...known, label: 'Copy'}]},
+    {contract: 'COS_WATCHFUL_TEST_PROJECTS_V1', projects: [{label: 'Test 1', id: 'not-a-uuid', idStatus: 'known'}]},
+  ]) assert.throws(() => validateWatchfulTestProjects(file));
+  assert.throws(() => validateWatchfulTestProjects({
+    contract: 'COS_WATCHFUL_TEST_PROJECTS_V1',
+    projects: [{label: 'Test 1', id: null, idStatus: 'missing', placeholderKey: 'MISSING_WATCHFUL_ID:Test 1'}],
+  }));
+  assert.equal(validateWatchfulTestProjects({
+    contract: 'COS_WATCHFUL_TEST_PROJECTS_V1',
+    projects: [{label: 'Test 1', id: null, idStatus: 'missing', placeholderKey: 'MISSING_WATCHFUL_ID:Test 1'}],
+  }, {allowPlaceholders: true}).length, 1);
+});
+
+test('rule-off render matches the main camera status board', () => {
+  const units = [
+    {unit: 'SPOTTER 880', placement: 'FIELD', state: 'RED', cameras: 1},
+    {unit: 'SS010', placement: 'FIELD', state: 'UNKNOWN', cameras: 1, productId: '5010', watchfulProjectKey: TEST1},
+  ];
+  const counts = {units: {online: 3, offline: 1, unknown: 2}, cameras: {online: 4, offline: 1, unknown: 0}};
+  const inputs = units.map(unit => shopCameraInput(unit));
+  const main = {
+    headline: counts,
+    groups: ['field', 'attention', 'shop-online', 'shop'].map(id => ({id, count: groupedUnits(units, id, '').length})),
+    attention: ['SPOTTER 880', 'SS010'],
+    lines: [],
+    shop: null,
+    names: units.map(unit => unit.unit),
+  };
+  const off = cameraStatusBoard(units, rollbackShopCameraRule(), counts, inputs);
+  assert.deepEqual({
+    headline: off.headline,
+    groups: off.groups.map(group => ({id: group.id, count: group.count})),
+    attention: off.attention,
+    lines: off.lines,
+    shop: off.shop,
+    names: off.units.map(unit => unit.unit),
+  }, main);
+  const on = cameraStatusBoard(units, rule, counts, [
+    shopCameraInput({...units[0], mhelpPlacement: 'FIELD', watchfulArmed: true, watchfulImmix: true, watchfulProjectKey: 'customer'}),
+    shopCameraInput({...units[1], productId: '5010', watchfulProjectKey: TEST1}),
+  ]);
+  assert.notDeepEqual(on.groups, off.groups);
+  assert.equal(on.shop.inShop > 0, true);
+  const mainBoard = {
+    headline: counts,
+    groups: GROUPS.map(group => ({id: group.id, label: group.label, count: groupedUnits(units, group.id, '').length})),
+    attention: ['SPOTTER 880', 'SS010'],
+    lines: [],
+    shop: null,
+    units,
+  };
+  const markup = board => renderToStaticMarkup(React.createElement(CameraStatusBoardView, {board, detail: true}));
+  assert.equal(markup(off), markup(mainBoard));
+  assert.equal(markup(off).includes('Shop, DO NOT USE'), false);
+  assert.equal(markup(off).includes('Exceptions'), false);
+  assert.equal(markup(off).includes('>3<'), true);
+  assert.notEqual(markup(on), markup(mainBoard));
+});
+
+test('search does not match a public IP', () => {
+  const units = [{unit: 'SPOTTER 880', placement: 'FIELD', state: 'RED', site: 'Fixture Yard', publicIp: '203.0.113.50', address: ''}];
+  assert.deepEqual(groupedUnits(units, 'field', '203.0.113.50'), []);
+  assert.deepEqual(groupedUnits(units, 'field', 'fixture yard').map(unit => unit.unit), ['SPOTTER 880']);
 });

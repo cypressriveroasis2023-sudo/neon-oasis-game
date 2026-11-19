@@ -21,14 +21,14 @@
 // Rollback: call rollbackShopCameraRule() and pass that rule to
 // decideShopCameras. enabled:false leaves every unit on the Watchful mirror.
 
-import {canonicalCameraUnit} from '../src/fieldCameraHealth.ts';
+import {GROUPS, groupedUnits} from '../src/cameraStatusFilters.ts';
 import watchfulTestProjectsFile from './watchful-test-projects.json' with {type: 'json'};
 
 export const SHOP_CAMERA_PLACE_LABEL = 'In shop';
 export const SHOP_CAMERA_ONLINE_LABEL = 'ONLINE';
 export const SHOP_DO_NOT_USE_LABEL = 'Shop, DO NOT USE';
 export const SHOP_EXCEPTION_LABEL = 'Exceptions';
-export const MHELP_TEST_SITE_FLAG = 'mHelp Field disagrees with Watchful test site';
+export const MHELP_TEST_SITE_FLAG = 'mHelp Field, disagrees with Watchful test site';
 export const SHOP_CAMERA_RULE_PROVENANCE =
   'James 11:01 AM CT Nov 19: test-site and shop units show ONLINE In shop, separate count';
 
@@ -46,7 +46,43 @@ export type WatchfulTestProjectRecord = {
 
 export const WATCHFUL_TEST_PROJECTS_PATH = 'tech-checks/operations/shared/watchful-test-projects.json';
 
-export const WATCHFUL_TEST_PROJECTS = watchfulTestProjectsFile.projects as readonly WatchfulTestProjectRecord[];
+const WATCHFUL_PROJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Fail closed. A wrong contract, an empty list, a half-filled row, a duplicate
+ * id, or an id that is not a Watchful project id rejects the file. Placeholder
+ * keys are refused here; tests pass allowPlaceholders only for fixture rows.
+ */
+export function validateWatchfulTestProjects(file: unknown, options?: {allowPlaceholders?: boolean}): WatchfulTestProjectRecord[] {
+  const data = file as {contract?: unknown; projects?: unknown};
+  if (!data || data.contract !== 'COS_WATCHFUL_TEST_PROJECTS_V1') throw new Error('Watchful test-project contract is wrong.');
+  if (!Array.isArray(data.projects) || data.projects.length === 0) throw new Error('Watchful test-project list is empty.');
+  const seen = new Set<string>();
+  const projects: WatchfulTestProjectRecord[] = [];
+  for (const row of data.projects) {
+    const project = row as WatchfulTestProjectRecord;
+    if (!project || typeof project.label !== 'string' || !project.label.trim() || (project.idStatus !== 'known' && project.idStatus !== 'missing')) {
+      throw new Error('Watchful test-project row is half filled.');
+    }
+    if (project.idStatus === 'known') {
+      if (typeof project.id !== 'string' || !WATCHFUL_PROJECT_ID.test(project.id) || project.placeholderKey) {
+        throw new Error('Watchful test-project id is not a project id.');
+      }
+      const id = project.id.toLowerCase();
+      if (seen.has(id)) throw new Error('Watchful test-project id is duplicated.');
+      seen.add(id);
+      projects.push({label: project.label, id: project.id, idStatus: 'known'});
+      continue;
+    }
+    if (!options?.allowPlaceholders || project.id !== null || typeof project.placeholderKey !== 'string' || !project.placeholderKey.startsWith('MISSING_WATCHFUL_ID:')) {
+      throw new Error('Watchful test-project placeholder is not allowed in this config.');
+    }
+    projects.push(project);
+  }
+  return projects;
+}
+
+export const WATCHFUL_TEST_PROJECTS = validateWatchfulTestProjects(watchfulTestProjectsFile);
 
 /** The match key for one config row: the Watchful id, or the placeholder while that id is missing. */
 export function watchfulTestProjectMatchKey(project: WatchfulTestProjectRecord): string | null {
@@ -151,11 +187,15 @@ export type ShopCameraFigures = {
   exceptions: number;
 };
 
+export type ShopCameraSources = {armed: boolean; immix: boolean; doNotUse: boolean; exceptions: boolean};
+
 export type ShopCameraReport = {
   enabled: boolean;
   byUnit: Map<string, ShopCameraDecision>;
   decisions: ShopCameraDecision[];
   figures: ShopCameraFigures;
+  /** False when that figure's source is not on the rows. The screen drops it instead of showing 0. */
+  sources: ShopCameraSources;
   warnings: readonly string[];
 };
 
@@ -166,35 +206,80 @@ export function cameraMhelpPlacement(value: unknown): MhelpCameraPlacement | nul
   return text === 'FIELD' || text === 'SHOP' || text === 'WAREHOUSE' ? text : null;
 }
 
-function unitKeys(name: string): string[] {
-  const raw = name.trim().toUpperCase();
-  if (!raw) return [];
-  const canonical = canonicalCameraUnit(name);
-  return canonical && canonical !== raw ? [raw, canonical] : [raw];
-}
+export type MhelpFeedRecord = {
+  productId?: string | null;
+  routerSerial?: string | null;
+  serial?: string | null;
+  placement?: unknown;
+  placementStatus?: unknown;
+  lifecycle?: unknown;
+  uploadLifecycle?: unknown;
+  unitNumber?: string | null;
+};
 
-/** Index mHelp Field / Shop / Warehouse by unit name. A conflicting pair is dropped. */
-export function cameraMhelpPlacements(rows: readonly {unitNumber?: string | null; placement?: unknown}[] | null | undefined): Map<string, MhelpCameraPlacement> {
-  const found = new Map<string, MhelpCameraPlacement | 'conflict'>();
+export type MhelpFeedMatch = {placement: MhelpCameraPlacement; lifecycle: string | null};
+
+export type MhelpFeedIndex = {
+  byProductId: Map<string, MhelpFeedMatch>;
+  byRouterSerial: Map<string, MhelpFeedMatch>;
+};
+
+const productIdOf = (value: unknown) => typeof value === 'string' && /^[1-9]\d{0,14}$/.test(value.trim()) ? value.trim() : '';
+const serialOf = (value: unknown) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text && text.length <= 64 && !/\s/.test(text) ? text : '';
+};
+const lifecycleOf = (row: MhelpFeedRecord) => {
+  const text = typeof row.uploadLifecycle === 'string' && row.uploadLifecycle.trim() ? row.uploadLifecycle.trim()
+    : typeof row.lifecycle === 'string' ? row.lifecycle.trim() : '';
+  return text || null;
+};
+
+/** Index mHelp by product id, then router serial. A unit name is not a key. placementStatus is the fallback when placement is empty. */
+export function cameraMhelpPlacements(rows: readonly MhelpFeedRecord[] | null | undefined): MhelpFeedIndex {
+  const byProductId = new Map<string, MhelpFeedMatch | 'conflict'>();
+  const byRouterSerial = new Map<string, MhelpFeedMatch | 'conflict'>();
+  const put = (index: Map<string, MhelpFeedMatch | 'conflict'>, key: string, value: MhelpFeedMatch) => {
+    if (!key) return;
+    const held = index.get(key);
+    if (held && held !== 'conflict' && (held.placement !== value.placement || held.lifecycle !== value.lifecycle)) index.set(key, 'conflict');
+    else if (held === 'conflict') return;
+    else if (!held) index.set(key, value);
+  };
   for (const row of Array.isArray(rows) ? rows : []) {
-    const placement = cameraMhelpPlacement(row?.placement);
-    const keys = unitKeys(String(row?.unitNumber ?? ''));
-    if (!placement || !keys.length) continue;
-    for (const key of keys) {
-      const held = found.get(key);
-      if (held && held !== placement) found.set(key, 'conflict');
-      else if (!held) found.set(key, placement);
-    }
+    const placement = cameraMhelpPlacement(row?.placement ?? row?.placementStatus);
+    if (!placement) continue;
+    const value = {placement, lifecycle: lifecycleOf(row)};
+    put(byProductId, productIdOf(row?.productId), value);
+    put(byRouterSerial, serialOf(row?.routerSerial ?? row?.serial), value);
   }
-  const clean = new Map<string, MhelpCameraPlacement>();
-  for (const [key, placement] of found) if (placement !== 'conflict') clean.set(key, placement);
-  return clean;
+  const clean = (index: Map<string, MhelpFeedMatch | 'conflict'>) => {
+    const ready = new Map<string, MhelpFeedMatch>();
+    for (const [key, value] of index) if (value !== 'conflict') ready.set(key, value);
+    return ready;
+  };
+  return {byProductId: clean(byProductId), byRouterSerial: clean(byRouterSerial)};
 }
 
-export function fieldMapPlacementRows(fieldMap: unknown): {unitNumber?: string | null; placement?: unknown}[] {
-  const record = fieldMap as {units?: unknown; items?: unknown; inventoryItems?: unknown} | null;
-  const list = Array.isArray(record?.units) ? record.units : Array.isArray(record?.items) ? record.items : Array.isArray(record?.inventoryItems) ? record.inventoryItems : [];
-  return list.filter((row): row is {unitNumber?: string | null; placement?: unknown} => Boolean(row) && typeof row === 'object');
+export function fieldMapPlacementRows(fieldMap: unknown): MhelpFeedRecord[] {
+  const record = fieldMap as {units?: unknown; items?: unknown; inventoryItems?: unknown; uploadInventory?: {records?: unknown}} | null;
+  const uploaded = record?.uploadInventory?.records;
+  const list = Array.isArray(uploaded) ? uploaded : Array.isArray(record?.units) ? record.units : Array.isArray(record?.items) ? record.items : Array.isArray(record?.inventoryItems) ? record.inventoryItems : [];
+  return list.filter((row): row is MhelpFeedRecord => Boolean(row) && typeof row === 'object');
+}
+
+/** Product id to camera device id, from a product-connection receipt already on the field map. */
+export function productResourceLinks(fieldMap: unknown): {productId: string; resourceId: string}[] {
+  const items = (fieldMap as {productConnections?: {items?: unknown}} | null)?.productConnections?.items;
+  if (!Array.isArray(items)) return [];
+  const links: {productId: string; resourceId: string}[] = [];
+  for (const item of items) {
+    const row = item as {productId?: unknown; resourceId?: unknown};
+    const productId = productIdOf(row?.productId);
+    const resourceId = typeof row?.resourceId === 'string' ? row.resourceId.trim() : '';
+    if (productId && resourceId) links.push({productId, resourceId});
+  }
+  return links;
 }
 
 function listed(names: readonly string[], project: string): boolean {
@@ -348,7 +433,7 @@ function mergeTags(listedTags: readonly string[], own: readonly string[] | undef
 
 export function decideShopCamera(input: ShopCameraInput, rule: ShopCameraRule = SHOP_CAMERA_RULE): ShopCameraDecision {
   const project = projectOf(input, rule);
-  const tags = mergeTags(ruleTags(rule, input.unit), input.tags);
+  const tags = mergeTags(ruleTags(rule, input.unit), input.tags).filter(tag => !(typeof input.cameras === 'number' && input.cameras > 0 && fold(tag) === 'no telemetry'));
   const warnings = testSiteNameWarning(project, rule);
   if (!rule.enabled) return passthrough(input, project, tags, warnings);
   const inWatchful = Boolean(project.key || project.name) && !project.archived;
@@ -378,11 +463,21 @@ export function decideShopCameras(inputs: readonly ShopCameraInput[], rule: Shop
   const decisions: ShopCameraDecision[] = [];
   const warnings: string[] = [];
   const figures = emptyFigures();
+  const sources: ShopCameraSources = {
+    armed: false,
+    immix: false,
+    doNotUse: rule.doNotUseUnits.length > 0,
+    exceptions: rule.exceptionUnits.length > 0,
+  };
   const seen = new Set<string>();
   for (const input of inputs) {
     const key = input.unit.trim().toUpperCase() || String(input.deviceKey ?? '').trim().toUpperCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
+    if (typeof input.watchful?.armed === 'boolean') sources.armed = true;
+    if (typeof input.watchful?.immix === 'boolean') sources.immix = true;
+    if (typeof input.doNotUse === 'boolean') { sources.doNotUse = true; sources.exceptions = true; }
+    if (typeof input.exception === 'boolean') sources.exceptions = true;
     const decision = decideShopCamera(input, rule);
     byUnit.set(key, decision);
     decisions.push(decision);
@@ -400,7 +495,7 @@ export function decideShopCameras(inputs: readonly ShopCameraInput[], rule: Shop
     if (decision.counted.exception) figures.exceptions += 1;
     for (const warning of decision.warnings) if (!warnings.includes(warning)) warnings.push(warning);
   }
-  return {enabled: rule.enabled, byUnit, decisions, figures, warnings};
+  return {enabled: rule.enabled, byUnit, decisions, figures, sources, warnings};
 }
 
 /** The tested rollback. Counts and statuses stay on the Watchful mirror. */
@@ -422,35 +517,60 @@ export type ShopCameraSource = {
   cameras?: unknown;
   unnamed?: unknown;
   deviceKey?: unknown;
+  productId?: unknown;
+  routerSerial?: unknown;
+  routerSerials?: unknown;
+  deviceIds?: unknown;
   doNotUse?: unknown;
   tags?: unknown;
   lifecycle?: unknown;
   exception?: unknown;
 };
 
-export function shopCameraInput(source: ShopCameraSource, mhelpByUnit?: ReadonlyMap<string, MhelpCameraPlacement>): ShopCameraInput {
-  const explicit = cameraMhelpPlacement(source.mhelpPlacement);
-  let mhelpPlacement = explicit;
-  if (!mhelpPlacement && mhelpByUnit) {
-    for (const key of unitKeys(source.unit)) {
-      const found = mhelpByUnit.get(key);
-      if (found) { mhelpPlacement = found; break; }
-    }
+function matchMhelp(source: ShopCameraSource, index: MhelpFeedIndex): MhelpFeedMatch | null {
+  const productId = productIdOf(source.productId);
+  const byProduct = productId ? index.byProductId.get(productId) : undefined;
+  if (byProduct) return byProduct;
+  const serials = [
+    ...(typeof source.routerSerial === 'string' ? [source.routerSerial] : []),
+    ...(Array.isArray(source.routerSerials) ? source.routerSerials : []),
+  ];
+  for (const serial of serials) {
+    const found = index.byRouterSerial.get(serialOf(serial));
+    if (found) return found;
   }
+  return null;
+}
+
+/** Attach a product id from an already loaded connection when a camera device id matches. Never by unit name. */
+export function productIdForDevices(deviceIds: readonly unknown[] | undefined, links: readonly {productId: string; resourceId: string}[]): string | null {
+  const ids = new Set((deviceIds ?? []).map(id => typeof id === 'string' || typeof id === 'number' ? String(id).trim() : '').filter(Boolean));
+  const hits = links.filter(link => ids.has(link.resourceId));
+  return hits.length === 1 ? hits[0].productId : null;
+}
+
+export function shopCameraInput(source: ShopCameraSource, mhelp?: MhelpFeedIndex): ShopCameraInput {
+  const explicit = cameraMhelpPlacement(source.mhelpPlacement);
+  const matched = !explicit && mhelp ? matchMhelp(source, mhelp) : null;
+  const mhelpPlacement = explicit ?? matched?.placement ?? null;
   const named = typeof source.watchfulProject === 'string' ? source.watchfulProject : null;
   const projectKey = typeof source.watchfulProjectKey === 'string' && source.watchfulProjectKey.trim() ? source.watchfulProjectKey.trim() : null;
-  const watchful = projectKey !== null || named !== null || source.watchfulArchived === true || source.watchfulArmed === true || source.watchfulImmix === true
+  const armed = typeof source.watchfulArmed === 'boolean' ? source.watchfulArmed : undefined;
+  const immix = typeof source.watchfulImmix === 'boolean' ? source.watchfulImmix : undefined;
+  const watchful = projectKey !== null || named !== null || source.watchfulArchived === true || armed !== undefined || immix !== undefined
     ? {
       projectKey,
       projectName: named ?? (source.site?.trim() ? source.site : null),
       archived: source.watchfulArchived === true,
-      armed: source.watchfulArmed === true,
-      immix: source.watchfulImmix === true,
+      ...(armed !== undefined ? {armed} : {}),
+      ...(immix !== undefined ? {immix} : {}),
     }
     : source.site?.trim()
-      ? {projectKey: null, projectName: source.site, archived: false, armed: false, immix: false}
+      ? {projectKey: null, projectName: source.site, archived: false}
       : null;
-  const lifecycle = typeof source.lifecycle === 'string' ? source.lifecycle.trim() : '';
+  const ownLifecycle = typeof source.lifecycle === 'string' ? source.lifecycle.trim() : '';
+  const lifecycle = ownLifecycle || matched?.lifecycle || '';
+  const lifecycleKnown = source.doNotUse === true || source.doNotUse === false || ownLifecycle.length > 0 || Boolean(matched);
   const doNotUse = source.doNotUse === true || /^(?:DO NOT USE|DO_NOT_USE)$/i.test(lifecycle);
   const tags = Array.isArray(source.tags) ? source.tags.filter((tag): tag is string => typeof tag === 'string') : [];
   return {
@@ -460,9 +580,9 @@ export function shopCameraInput(source: ShopCameraSource, mhelpByUnit?: Readonly
     site: source.site ?? null,
     mhelpPlacement,
     watchful,
-    doNotUse,
+    ...(lifecycleKnown ? {doNotUse} : {}),
     tags,
-    exception: source.exception === true,
+    ...(typeof source.exception === 'boolean' ? {exception: source.exception} : {}),
     cameras: typeof source.cameras === 'number' ? source.cameras : undefined,
     unnamed: source.unnamed === true || !source.unit.trim(),
     deviceKey: typeof source.deviceKey === 'string' ? source.deviceKey : undefined,
@@ -506,4 +626,50 @@ export function shopDoNotUseLine(units: readonly string[]): string {
 export function exceptionLine(units: readonly string[]): string {
   const names = units.filter(Boolean);
   return (names.length ? SHOP_EXCEPTION_LABEL + ' · ' + names.length + ' · ' + names.join(', ') : SHOP_EXCEPTION_LABEL + ' · 0') + '. Not in any total.';
+}
+
+export type CameraStatusBoard<T> = {
+  units: T[];
+  headline: {units: {online: number; offline: number; unknown: number} | null; cameras: {online: number; offline: number; unknown: number} | null};
+  groups: {id: string; label: string; count: number}[];
+  attention: string[];
+  lines: {label: string; text: string}[];
+  shop: {field: number; armed: number | null; immix: number | null; inShop: number; doNotUse: number | null; exceptions: number | null} | null;
+};
+
+/** The camera status header, groups, and attention list. Rule off is the main view. */
+export function cameraStatusBoard<T extends {unit: string; placement: CameraPlacement; state: CameraState; deviceKey?: string; onlineInShop?: boolean}>(
+  units: readonly T[],
+  rule: ShopCameraRule,
+  fleetCounts: {units?: {online: number; offline: number; unknown: number} | null; cameras?: {online: number; offline: number; unknown: number} | null} | null,
+  inputs: readonly ShopCameraInput[],
+): CameraStatusBoard<T> {
+  const headline = {units: fleetCounts?.units ?? null, cameras: fleetCounts?.cameras ?? null};
+  const listed = (rows: readonly T[]) => ({
+    units: [...rows],
+    headline,
+    groups: GROUPS.map(group => ({id: group.id, label: group.label, count: groupedUnits(rows as never, group.id, '').length})),
+    attention: rows.filter(unit => unit.placement === 'FIELD' && unit.state !== 'GREEN').map(unit => unit.unit),
+    lines: [] as {label: string; text: string}[],
+    shop: null as CameraStatusBoard<T>['shop'],
+  });
+  if (!rule.enabled) return listed(units);
+  const report = decideShopCameras(inputs, rule);
+  const viewed = applyShopCameraView(units, report);
+  const board = listed(viewed);
+  const doNotUse = report.decisions.filter(row => row.category === 'doNotUse').map(row => row.unit);
+  const exceptions = report.decisions.filter(row => row.category === 'exception').map(row => row.unit);
+  board.lines = [
+    ...(report.sources.doNotUse ? [{label: SHOP_DO_NOT_USE_LABEL, text: shopDoNotUseLine(doNotUse)}] : []),
+    ...(report.sources.exceptions ? [{label: SHOP_EXCEPTION_LABEL, text: exceptionLine(exceptions)}] : []),
+  ];
+  board.shop = {
+    field: report.figures.field,
+    armed: report.sources.armed ? report.figures.armed : null,
+    immix: report.sources.immix ? report.figures.immix : null,
+    inShop: report.figures.inShop,
+    doNotUse: report.sources.doNotUse ? report.figures.doNotUse : null,
+    exceptions: report.sources.exceptions ? report.figures.exceptions : null,
+  };
+  return board;
 }

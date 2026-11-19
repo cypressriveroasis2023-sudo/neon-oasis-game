@@ -66,6 +66,6 @@ export function groupedUnits(units:UnitCameraStatus[],group:Group,query:string,s
   if(group==='shop-online'&&!unit.onlineInShop)return false;
   if(group==='shop'&&unit.placement!=='SHOP')return false;
   if(!text)return true;
-  return [unit.unit,unit.displayName||'',unit.site||'',unit.address||'',unit.publicIp||'',FAMILY_LABEL[familyOf(unit)]].some(field=>field.toLowerCase().includes(text));
+  return [unit.unit,unit.displayName||'',unit.site||'',unit.address||'',FAMILY_LABEL[familyOf(unit)]].some(field=>field.toLowerCase().includes(text));
  });
 }

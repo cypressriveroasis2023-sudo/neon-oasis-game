@@ -29,9 +29,9 @@ import {CosPowerChecks} from './CosPowerAlarmPanel';
 import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
 import {technicianTodos} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
-import FleetCountReadout from './FleetCountReadout';
-import {routerOfflineFact, IN_SHOP_LABEL, fleetCountsFromCameraFeed, type FleetCountSnapshot} from './sharedFleetCounts';
-import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraMhelpPlacements, decideShopCameras, exceptionLine, fieldMapPlacementRows, inShopLabel, shopCameraInput, shopDoNotUseLine} from '../shared/shopCameraStatus';
+import CameraStatusBoardView from './CameraStatusBoardView';
+import {routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
+import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraMhelpPlacements, cameraStatusBoard, decideShopCameras, fieldMapPlacementRows, inShopLabel, productIdForDevices, productResourceLinks, shopCameraInput, type ShopCameraRule} from '../shared/shopCameraStatus';
 import {presentedCameraHealth, type CameraHealthChip} from './cameraEvidence';
 
 type Report=UnitCameraStatusReport&{refreshedAt?:string;source?:string;handEditsRead?:boolean;otherSourcesRead?:boolean;canEdit?:boolean;
@@ -103,7 +103,7 @@ const FIX_SAYS:Record<FixItAction,string>={
 };
 const draftOf=(unit:UnitCameraStatus):Draft=>({unit:unit.unit,placement:unit.placement,site:unit.site||'',address:unit.address||'',publicIp:unit.publicIp||'',name:unit.displayName||'',reason:''});
 
-export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews,fleetCounts,onCameraUnits}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null;fleetCounts:FleetCountSnapshot|null;onCameraUnits?:(units:UnitCameraStatus[])=>void}){
+export default function FleetCameraStatus({now=Date.now(),savedAddresses,addressReviews,fleetCounts,onCameraUnits,shopRule=SHOP_CAMERA_RULE}:{now?:number;savedAddresses?:readonly SavedAddressPin[]|null;addressReviews?:readonly {unitNumber:string;productId:string;address?:string}[]|null;fleetCounts:FleetCountSnapshot|null;onCameraUnits?:(units:UnitCameraStatus[])=>void;shopRule?:ShopCameraRule}){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [group,setGroup]=useState<Group>('field'),[query,setQuery]=useState(''),[stateFilter,setStateFilter]=useState<StateFilter>('all');
  const [family,setFamily]=useState<FamilyFilter>('all');
@@ -171,12 +171,17 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const victron=useMemo(()=>report?victronByUnit(report.units,vrm,now):new Map<string,SafeVrmPower>(),[report,vrm,now]);
  const mirrorUnits=useMemo(()=>report?report.units.map(presentedUnit):[],[report]);
  const mhelpPlacements=useMemo(()=>cameraMhelpPlacements(fieldMapPlacementRows(fieldMap)),[fieldMap]);
- const shopReport=useMemo(()=>decideShopCameras(mirrorUnits.map(unit=>shopCameraInput(unit,mhelpPlacements)),SHOP_CAMERA_RULE),[mirrorUnits,mhelpPlacements]);
- const units=useMemo(()=>applyShopCameraView(mirrorUnits,shopReport),[mirrorUnits,shopReport]);
+ const resourceLinks=useMemo(()=>productResourceLinks(fieldMap),[fieldMap]);
+ const shopInputs=useMemo(()=>mirrorUnits.map(unit=>shopCameraInput({
+  unit:unit.unit,placement:unit.placement,state:unit.state,site:unit.site,cameras:unit.cameras,
+  watchfulProjectKey:unit.watchfulProjectKey,watchfulProject:unit.site,deviceIds:unit.deviceIds,routerSerials:unit.serials,
+  productId:productIdForDevices(unit.deviceIds,resourceLinks)??unit.productId,mhelpPlacement:unit.mhelpPlacement,
+  doNotUse:unit.doNotUse,lifecycle:unit.lifecycle,exception:unit.exception,tags:unit.tags,
+ },mhelpPlacements)),[mirrorUnits,mhelpPlacements,resourceLinks]);
+ const shopReport=useMemo(()=>decideShopCameras(shopInputs,shopRule),[shopInputs,shopRule]);
+ const board=useMemo(()=>cameraStatusBoard(mirrorUnits,shopRule,fleetCounts,shopInputs),[mirrorUnits,shopRule,fleetCounts,shopInputs]);
+ const units=useMemo(()=>shopRule.enabled?applyShopCameraView(mirrorUnits,shopReport):mirrorUnits,[shopRule,mirrorUnits,shopReport]);
  const shopDecision=(unit:UnitCameraStatus)=>shopReport.byUnit.get(unit.unit.trim().toUpperCase());
- const doNotUseNames=shopReport.decisions.filter(row=>row.category==='doNotUse').map(row=>row.unit);
- const exceptionNames=shopReport.decisions.filter(row=>row.category==='exception').map(row=>row.unit);
- const localCounts=useMemo(()=>fleetCountsFromCameraFeed(units, [], now),[units,now]);
  const routerTodos=useMemo(()=>{
   const items=Array.isArray(routers?.items)?routers.items:[];
   return items.flatMap((row: {unitKey?: string; probeStatus: string; checkedAt: string | null; reportedStatus: string; reportedAt: string | null})=>{
@@ -247,18 +252,8 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  return <section className='cos-camera-status' aria-label='Unit camera status'>
   <header className='cos-camera-status-simple'>
    <h2 className='sr-only'>Camera status</h2>
-   <FleetCountReadout units={localCounts?.units??fleetCounts?.units??null} cameras={localCounts?.cameras??fleetCounts?.cameras??null}/>
-   <p className='cos-camera-monitor-figures' aria-label='Camera monitoring figures'>
-    <span>Field <b>{report?shopReport.figures.field:'—'}</b></span>
-    <span>Armed <b>{report?shopReport.figures.armed:'—'}</b></span>
-    <span>Immix <b>{report?shopReport.figures.immix:'—'}</b></span>
-    <span>In shop <b>{report?shopReport.figures.inShop:'—'}</b></span>
-    <span>Shop, DO NOT USE <b>{report?shopReport.figures.doNotUse:'—'}</b></span>
-    <span>Exceptions <b>{report?shopReport.figures.exceptions:'—'}</b></span>
-   </p>
-   <p className='cos-camera-category-line' aria-label='Shop, DO NOT USE'>{shopDoNotUseLine(doNotUseNames)}</p>
-   <p className='cos-camera-category-line' aria-label='Exceptions'>{exceptionLine(exceptionNames)}</p>
-   {shopReport.warnings.length > 0 && <p className='cos-camera-category-line' role='status'>{shopReport.warnings.join(' ')}</p>}
+   <CameraStatusBoardView board={board}/>
+   {shopRule.enabled&&shopReport.warnings.length > 0 && <p className='cos-camera-category-line' role='status'>{shopReport.warnings.join(' ')}</p>}
    <p className='cos-camera-board-total'>All Avigilon on board: {report?boardCounts.avigilon:'—'}</p>
    <div className='cos-camera-status-read'>
     <button type='button' disabled={loading||saving} onClick={async()=>{if(await read()){setDraft(null);setUncertain(false);}}}>{loading?'↻ Reading…':'↻ Refresh'}</button>

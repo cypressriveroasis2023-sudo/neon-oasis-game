@@ -50,9 +50,14 @@ test('camera status splits In shop, Shop DO NOT USE, and exceptions', async ({pa
   await app.getByRole('button', {name: /^In the shop/}).first().click();
   await expect(rows).toHaveCount(2);
   await expect(rows.filter({hasText: 'SS010'})).toContainText('ONLINE');
-  await expect(rows.filter({hasText: 'SS010'})).toContainText('In shop · no telemetry');
+  // Rule change, Felix review of #458 at 808d6ba3: a listed camera is not "no telemetry".
+  // Old: 'In shop · no telemetry'
+  await expect(rows.filter({hasText: 'SS010'})).toContainText('In shop');
+  await expect(rows.filter({hasText: 'SS010'})).not.toContainText('no telemetry');
   await expect(rows.filter({hasText: 'CAMV 090'})).toContainText('ONLINE');
-  await expect(rows.filter({hasText: 'CAMV 090'})).toContainText('In shop · no telemetry · RSU');
+  // Old: 'In shop · no telemetry · RSU'
+  await expect(rows.filter({hasText: 'CAMV 090'})).toContainText('In shop · RSU');
+  await expect(rows.filter({hasText: 'CAMV 090'})).not.toContainText('no telemetry');
   await expect(view).not.toContainText('203.0.113.50');
   await expect(view.locator('.job-card, .inventory-card')).toHaveCount(0);
   await page.screenshot({path: info.outputPath('shop-camera-status-main.png'), fullPage: true});
