@@ -632,6 +632,14 @@ function reconcileFleetSnapshot(rawHealth, rawMap, now = Date.now()) {
 }
 
 // ../supabase/functions/cos-operations-pages/fleetShopProjection.ts
+var OWNER_OVERRIDE_IGNORED = "Owner override disagrees with mHelp (ignored for counts)";
+function placementWithMhelpFirst(ownerPlacement, mhelpPlacement) {
+  return mhelpPlacement === "FIELD" || mhelpPlacement === "SHOP" ? mhelpPlacement : ownerPlacement;
+}
+var countedPlacement = (value) => {
+  const text4 = String(value || "").toUpperCase();
+  return text4 === "FIELD" || text4 === "SHOP" ? text4 : null;
+};
 var chicago = (at) => new Date(at).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 function supersededShopDetail(move, mhelpAt) {
   const who = typeof move.recordedBy === "string" && move.recordedBy.trim() ? move.recordedBy.trim() : "the saved COS account";
@@ -653,6 +661,11 @@ function manualShopInventory(upload, receipt) {
     if (!m || r.placement === "SHOP") return r;
     if (upload.source === "mhelpdesk_api" && r.placement === "FIELD" && Number.isFinite(observed) && observed > Date.parse(m.recordedAt)) {
       superseded.push({ unitId: m.unitId, unitNumber: m.unitNumber, auditId: m.auditId, recordedAt: m.recordedAt, mhelpAt: new Date(observed).toISOString(), recordedBy: typeof m.recordedBy === "string" && m.recordedBy.trim() ? m.recordedBy.trim() : "the saved COS account", detail: supersededShopDetail(m, new Date(observed).toISOString()) });
+      return r;
+    }
+    const counted = placementWithMhelpFirst("SHOP", countedPlacement(r.placement));
+    if (counted !== "SHOP") {
+      superseded.push({ unitId: m.unitId, unitNumber: m.unitNumber, auditId: m.auditId, recordedAt: m.recordedAt, mhelpAt: Number.isFinite(observed) ? new Date(observed).toISOString() : m.recordedAt, recordedBy: typeof m.recordedBy === "string" && m.recordedBy.trim() ? m.recordedBy.trim() : "the saved COS account", detail: OWNER_OVERRIDE_IGNORED });
       return r;
     }
     count++;

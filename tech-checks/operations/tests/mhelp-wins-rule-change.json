@@ -1,0 +1,54 @@
+{
+  "contract": "COS_MHELP_WINS_RULE_CHANGE_V1",
+  "provenance": "James 10:15 AM CT Nov 19: mHelp wins; flag overrides that disagree",
+  "flag": "Owner override disagrees with mHelp (ignored for counts)",
+  "savedFleetBoard": {
+    "old": "8e78c5c87b8f212a55005fb144c2ab25145eef7d831e6ada88827246e44ca1ab",
+    "new": "69e76824446c6215b5d2371a334fa4845ee3cb38ecd9b433dfdfcd88261d6654",
+    "rollback": "Restore both packaged savedFleetBoard.mjs copies and the preview manifest hash to the old digest. The live board pin f93b82b3 is not part of this step."
+  },
+  "tests": [
+    {
+      "file": "daily-inventory.test.mjs",
+      "name": "manual Shop receipts use the same derived inventory as Fleet and leave source data intact",
+      "old": "authority.field is 286 and authority.shop is 715",
+      "new": "authority.field stays 287, authority.shop stays 714, total stays 1001, the Shop receipt is kept, and the override is flagged"
+    },
+    {
+      "file": "field-headline-scope.test.mjs",
+      "name": "manual Shop projection excludes the moved product without changing accepted source or health",
+      "old": "view.field is 6, view.shop is 2, and product 1001 is removed",
+      "new": "field and shop stay at the pre-move counts, product 1001 stays, the receipt is kept, and the override is flagged"
+    },
+    {
+      "file": "fleet-shop-placement.test.mjs",
+      "name": "map and Product-ID placement change without changing accepted source bytes or health",
+      "old": "the unit leaves the map, effective placement is shop, field is 286, and shop is 715",
+      "new": "the unit stays on the map as FIELD, field stays 287, shop stays 714, total stays 1001, the receipt is kept, and the override is flagged"
+    },
+    {
+      "file": "fleet-shop-placement.test.mjs",
+      "name": "mHelp Field wins over a Shop move, and a non-Field row can still be Shop",
+      "old": "a FIELD row becomes shop and leaves the map",
+      "new": "a FIELD row stays FIELD and on the map, the receipt is kept, and the override is flagged; a SHOP row that already agrees still becomes shop"
+    },
+    {
+      "file": "fleet-shop-placement.test.mjs",
+      "name": "mHelp Field wins over a Shop move when the mHelp time is older, equal, or missing",
+      "old": "placement becomes SHOP and cosManualShopCount is 1",
+      "new": "placement stays FIELD, cosManualShopCount stays 0, the receipt is kept, and the override is flagged"
+    },
+    {
+      "file": "fleet-shop-placement.test.mjs",
+      "name": "captured Product-ID binding survives the physical native edit without restoring camera associations",
+      "old": "the held record placement becomes SHOP",
+      "new": "the held record stays FIELD, the held binding and empty unit ids stay, cosManualShopCount stays 0, and the override is flagged"
+    },
+    {
+      "file": "fleet-shop-action.browser.spec.mjs",
+      "name": "confirmed Shop move updates Product-ID totals immediately",
+      "old": "field becomes 286 and shop becomes 715",
+      "new": "field stays 287 and shop stays 714"
+    }
+  ]
+}

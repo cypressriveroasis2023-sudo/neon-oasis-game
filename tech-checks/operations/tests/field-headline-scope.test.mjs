@@ -85,11 +85,18 @@ test('201 camera-capable Product IDs reconcile as 72 online + 2 offline + 127 un
 });
 
 test('manual Shop projection excludes the moved product without changing accepted source or health',async()=>{
- const {projectManualShop}=await import('../../supabase/functions/cos-operations-pages/fleetShopProjection.ts');
+ const {projectManualShop,OWNER_OVERRIDE_IGNORED}=await import('../../supabase/functions/cos-operations-pages/fleetShopProjection.ts');
  const f=fieldProductFixture(),before=structuredClone(f);
- const map=projectManualShop(f.field,{contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[{unitId:f.units[0].id,unitNumber:f.units[0].unitNumber,auditId:'00000000-0000-4000-8000-000000000099',recordedAt:f.fresh,placement:'SHOP'}]});
+ const baseline=cameraFieldProducts(f.field,f.health,f.now);
+ const receipt={contract:'COS_FLEET_SHOP_OVERRIDES_V1',items:[{unitId:f.units[0].id,unitNumber:f.units[0].unitNumber,auditId:'00000000-0000-4000-8000-000000000099',recordedAt:f.fresh,placement:'SHOP'}]};
+ const receiptBefore=structuredClone(receipt);
+ const map=projectManualShop(f.field,receipt);
  const view=cameraFieldProducts(map,f.health,f.now);
- assert.ok(view);assert.equal(view.field,6);assert.equal(view.shop,2);
- assert.equal(view.counts.online,0);assert.equal(view.items.some(p=>p.productId==='1001'),false);
+ assert.ok(view);assert.equal(view.field,baseline.field);assert.equal(view.shop,baseline.shop);
+ assert.equal(view.counts.online,baseline.counts.online);assert.equal(view.items.some(p=>p.productId==='1001'),true);
+ assert.equal(OWNER_OVERRIDE_IGNORED,'Owner override disagrees with mHelp (ignored for counts)');
+ assert.equal(map.supersededShopMoves[0].detail,OWNER_OVERRIDE_IGNORED);
+ assert.equal(map.manualPlacementOverrides.items.length,1);
+ assert.deepEqual(receipt,receiptBefore);
  assert.deepEqual(f,before);
 });

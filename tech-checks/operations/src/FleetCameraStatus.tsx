@@ -18,6 +18,7 @@ import UnitTroubleshoot from './UnitTroubleshoot';
 import {routerEvidenceByUnit,routerEvidenceFor} from './routerEvidence';
 import FleetFixIt,{type FixItAction} from './FleetFixIt';
 import {mhelpEvidenceByUnit,mhelpEvidenceFor} from './mhelpEvidence';
+import {placementException} from './mhelpPlacementFirst';
 import {editLockReason} from './editLockReason';
 import './fleetFixIt.css';
 import './unitTroubleshoot.css';
@@ -308,6 +309,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
      <div className='cos-camera-status-unit'>
       <strong><i className={'cos-board-status-dot cos-board-dot-'+DOT[unit.state]} aria-hidden='true'/>{unitName(unit)}</strong>
       <small className={unit.placement==='SHOP'?'cos-in-shop':undefined}>{unit.placement==='FIELD'?(unit.siteNamePending?unit.site+' · name not entered yet':unit.site):IN_SHOP_LABEL+(sourceOf(unit)==='star4live'?' · root':'')}</small>
+      {placementException(unit.placement, mhelpEvidenceFor(unit, mhelpIndex)?.placement||null, unit.handEdits?.placement?'owner_override':'cos')&&<small className='cos-in-shop'>{placementException(unit.placement, mhelpEvidenceFor(unit, mhelpIndex)?.placement||null, unit.handEdits?.placement?'owner_override':'cos')}</small>}
       {unit.placement==='FIELD'&&<small className='cos-camera-status-address'>{unit.location?'📍 '+(unit.address||unit.location.matchedAddress):unit.address?unit.address+' · no pin yet (the address service could not place it)':savedAddressOf(unit)?'◌ '+savedAddressOf(unit)!.address+' · address on file, nobody has confirmed it':'No address on the map yet'}</small>}
       {unit.handEdits&&Object.entries(unit.handEdits).filter(([field])=>field!=='address').map(([field,edit])=><small key={field} className='cos-camera-status-edit-note'>
        {FIELD_LABEL[field as HandEditField]} set by hand to “{edit.value}” by {edit.by}{edit.at?' '+cameraTime(edit.at,now):''}
