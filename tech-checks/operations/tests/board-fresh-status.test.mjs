@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import {CAMERA_AUTO_REFRESH_MS, observationRefreshDue} from '../src/refreshCadence.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 import {applyBoardFreshStatus, boardUnitStatus, oldestWatchfulObservation, tvUpdatesDelayed, WATCHFUL_BANNER_AGE_MS, WATCHFUL_OBSERVATION_FRESH_MS, WATCHFUL_PULL_CADENCE_MS} from '../src/boardFreshStatus.ts';
-import {oldestObservationIso, presentedFromWatchfulRead} from '../src/watchfulObservation.ts';
+import {oldestObservationIso} from '../src/watchfulObservation.ts';
+import {presentedFromWatchfulRead} from '../src/watchfulReadStatus.ts';
 
 const now = Date.parse('2026-11-19T15:00:00.000Z');
 const fresh = new Date(now - 5 * 60 * 1000).toISOString();
@@ -31,15 +32,29 @@ test('a fresh camera reading replaces Unknown and a stale one does not become Of
   assert.equal(next[2].cameraState, 'unknown');
 });
 
-test('an Avigilon unit with no live reading uses a fresh Watchful status and stays unlabeled as Online', () => {
-  const snapshotAt = new Date(now - 60_000).toISOString();
+test('an Avigilon unit with no live reading uses a fresh Watchful read and stays unlabeled as Online', () => {
+  const snapshotAt = new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString();
+  const fetchedAt = new Date(now - 60_000).toISOString();
+  const ruleChange = {
+    test: 'an Avigilon unit with no live reading uses a fresh Watchful status and stays unlabeled as Online',
+    old: {input: 'snapshotAt 60 seconds ago and no fetchedAt', label: 'Up via Watchful'},
+    newer: {input: 'snapshotAt 9 days ago and fetchedAt 60 seconds ago', label: 'Up via Watchful'},
+    missingRead: {input: 'snapshotAt 60 seconds ago and no fetchedAt', label: 'Unknown'},
+  };
   const freshWatchful = boardUnitStatus({
     unitName: 'Sniper 20', placement: 'field', readings: [],
-    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'up', snapshotAt}, now,
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'up', snapshotAt, fetchedAt}, now,
   });
   assert.equal(freshWatchful.state, 'unknown');
-  assert.equal(freshWatchful.label, 'Up via Watchful');
+  assert.equal(freshWatchful.label, ruleChange.newer.label);
   assert.equal(freshWatchful.viaWatchful, true);
+  const missingRead = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'field', readings: [],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'up', snapshotAt: new Date(now - 60_000).toISOString()}, now,
+  });
+  assert.equal(missingRead.label, ruleChange.missingRead.label);
+  assert.equal(missingRead.viaWatchful, false);
+  assert.notEqual(missingRead.label, ruleChange.old.label);
   const staleWatchful = boardUnitStatus({
     unitName: 'CAM V 3', placement: 'field', readings: [],
     watchful: {canonicalUnitKey: 'CAMV|3', status: 'down', snapshotAt: new Date(now - 27 * 60 * 60 * 1000).toISOString()}, now,
@@ -81,15 +96,27 @@ test('Watchful follows the 20-minute observation clock and the 10-minute pull, a
   assert.equal(WATCHFUL_BANNER_AGE_MS, 12 * 60 * 1000);
   const observed = new Date(now - 21 * 60 * 1000).toISOString();
   const fetched = new Date(now - 30 * 1000).toISOString();
+  const readRule = {
+    test: 'Watchful follows the 20-minute observation clock and the 10-minute pull, and the TV banner uses 120 seconds or about 12 minutes',
+    old: {snapshotAt: '21 minutes', fetchedAt: '30 seconds', label: 'Unknown'},
+    newer: {snapshotAt: '21 minutes', fetchedAt: '30 seconds', label: 'Up via Watchful'},
+  };
   const aged = boardUnitStatus({
     unitName: 'Sniper 20', placement: 'field', readings: [],
     watchful: {canonicalUnitKey: 'SNIPER|20', status: 'up', snapshotAt: observed, fetchedAt: fetched}, now,
   });
-  assert.equal(aged.label, 'Unknown');
+  assert.equal(aged.label, readRule.newer.label);
+  assert.notEqual(aged.label, readRule.old.label);
   assert.notEqual(aged.state, 'offline');
+  const staleRead = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'field', readings: [],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: new Date(now - 60_000).toISOString(), fetchedAt: new Date(now - 21 * 60 * 1000).toISOString()}, now,
+  });
+  assert.equal(staleRead.label, 'Unknown');
+  assert.equal(staleRead.viaWatchful, false);
   const recent = boardUnitStatus({
     unitName: 'Sniper 20', placement: 'field', readings: [],
-    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: new Date(now - 19 * 60 * 1000).toISOString(), fetchedAt: fetched}, now,
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString(), fetchedAt: fetched}, now,
   });
   assert.equal(recent.label, 'Down via Watchful');
   const success = now - 60 * 1000;
@@ -146,5 +173,6 @@ test('our Watchful read decides Down, and a unit lastConnection does not', () =>
   assert.equal(presentedFromWatchfulRead({readAt: new Date(now - 21 * 60 * 1000).toISOString(), watchfulStatus: 'offline', lastConnection: freshLink, now}), 'Unknown');
   assert.equal(presentedFromWatchfulRead({readAt: null, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
   assert.equal(presentedFromWatchfulRead({readAt: read, readFailed: true, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
-  assert.equal(oldestObservationIso([read, '']), null);
+  assert.equal(oldestObservationIso([read, ''], now), null);
+  assert.equal(oldestObservationIso([read, new Date(now + 60 * 1000).toISOString()], now), null);
 });

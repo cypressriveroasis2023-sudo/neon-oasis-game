@@ -2,6 +2,7 @@ import {cameraState, cameraTimestamp, type CameraRow} from './cameraEvidence';
 import {CAMERA_AUTO_REFRESH_MS} from './refreshCadence';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {IN_SHOP_LABEL, oldestObservationIso, WATCHFUL_OBSERVATION_FRESH_MS} from './watchfulObservation';
+import {presentedFromWatchfulRead} from './watchfulReadStatus';
 
 export {WATCHFUL_OBSERVATION_FRESH_MS};
 export const VIA_WATCHFUL = 'via Watchful';
@@ -12,16 +13,17 @@ export const TV_READ_STALE_MS = 120_000;
 export const WATCHFUL_BANNER_AGE_MS = 12 * 60 * 1000;
 
 /** Oldest Watchful observation in this list. Nothing is stored on the module. */
-export function oldestWatchfulObservation(watchful: readonly {snapshotAt: string}[] | null | undefined): string | null {
+export function oldestWatchfulObservation(watchful: readonly {snapshotAt: string}[] | null | undefined, now = Date.now()): string | null {
   if (!watchful) return null;
-  return oldestObservationIso(watchful.map(item => item.snapshotAt));
+  return oldestObservationIso(watchful.map(item => item.snapshotAt), now);
 }
 
 export type BoardWatchfulStatus = {
   canonicalUnitKey: string;
   status: 'up' | 'down';
-  /** Oldest observation time in the snapshot. Not the time the file was fetched. */
+  /** A unit observation time. It does not age the board. */
   snapshotAt: string;
+  /** When we read Watchful. A missing or stale read is Unknown. */
   fetchedAt?: string | null;
 };
 
@@ -33,8 +35,12 @@ export type BoardPresentedStatus = {
 
 const AVIGILON = /^(?:SNIPER2|SNIPER4|SNIPER|CAMV)\|/;
 
-function freshWatchful(snapshotAt: string, now: number): boolean {
-  return cameraTimestamp(snapshotAt, now).fresh;
+function freshWatchful(watchful: BoardWatchfulStatus, now: number): boolean {
+  return presentedFromWatchfulRead({
+    readAt: watchful.fetchedAt ?? null,
+    watchfulStatus: watchful.status === 'up' ? 'up' : 'down',
+    now,
+  }) !== 'Unknown';
 }
 
 /** UPDATES DELAYED when the last good read is over 120 seconds old, or the oldest Watchful observation is over 12 minutes old. */
@@ -81,7 +87,7 @@ export function boardUnitStatus(input: {
   if (freshOffline) return {state: 'offline', label: 'Offline', viaWatchful: false};
   if (freshOnline) return {state: 'online', label: 'Online', viaWatchful: false};
   const watchful = input.watchful;
-  if (key && AVIGILON.test(key) && watchful && watchful.canonicalUnitKey === key && freshWatchful(watchful.snapshotAt, now)) {
+  if (key && AVIGILON.test(key) && watchful && watchful.canonicalUnitKey === key && freshWatchful(watchful, now)) {
     const word = watchful.status === 'up' ? 'Up' : 'Down';
     return {state: 'unknown', label: `${word} ${VIA_WATCHFUL}`, viaWatchful: true};
   }
