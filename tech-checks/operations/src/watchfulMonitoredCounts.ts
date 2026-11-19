@@ -27,6 +27,8 @@ export type WatchfulCountUnit = {
   projectArchived?: boolean;
   project?: string;
   projectId?: string | null;
+  /** This row's read time. Null is Unknown and never borrows another row or the file time. */
+  readAt?: string | null;
   recordCount?: number;
   link?: 'linked' | 'unlinked';
   /** Absent when the unit links by a Recon label instead of a hard key. */
@@ -113,6 +115,9 @@ export type SharedMonitoredCount = {
   notArmed: number | null;
   notArmedUnits: {name: string; mode: string}[];
   armedUnits: number | null;
+  /** Counted units whose arming value is missing. They stay visible, including how many are down. */
+  armingUnknown: number | null;
+  armingUnknownDown: number | null;
   armedCameras: {up: number; down: number; total: number} | null;
   armedSites: number | null;
   immixUp: number | null;
@@ -149,6 +154,8 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   notArmed: fresh ? 0 : null,
   notArmedUnits: [],
   armedUnits: fresh ? 0 : null,
+  armingUnknown: fresh ? 0 : null,
+  armingUnknownDown: fresh ? 0 : null,
   armedCameras: fresh ? {up: 0, down: 0, total: 0} : null,
   armedSites: fresh ? 0 : null,
   immixUp: fresh ? 0 : null,
@@ -291,12 +298,20 @@ export function selectSharedMonitoredCount(input: {
     const sniper4100 = unit.unitName.trim().toLowerCase() === 'sniper 4-100' && unit.status === 'down';
     counted.add(key);
     result.units = (result.units || 0) + 1;
+    if (unit.readAt === null) {
+      result.unknownUnits = (result.unknownUnits || 0) + 1;
+      continue;
+    }
     result.records = (result.records || 0) + (unit.recordCount ?? 1);
     if (unit.link === 'unlinked') result.unlinked = (result.unlinked || 0) + (unit.recordCount ?? 1);
     const mode = presentedArming({name: unit.unitName, arming: unit.arming});
-    const pausedDown = mode === 'Paused' && unit.status === 'down';
-    if (unit.status === 'down' && !pausedDown) result.downUnits = (result.downUnits || 0) + 1;
+    const heldOutOfDown = (mode === 'Paused' || mode === 'Disarmed') && unit.status === 'down';
+    if (unit.status === 'down' && !heldOutOfDown) result.downUnits = (result.downUnits || 0) + 1;
     else if (unit.status !== 'down') result.upUnits = (result.upUnits || 0) + 1;
+    if (mode === 'Unknown') {
+      result.armingUnknown = (result.armingUnknown || 0) + 1;
+      if (unit.status === 'down') result.armingUnknownDown = (result.armingUnknownDown || 0) + 1;
+    }
     const parked = mode === 'Disarmed' || mode === 'Paused';
     if (mode !== 'Unknown') knownArming += 1;
     if (mode === 'Unknown' || mode === 'TestMode') {
@@ -321,13 +336,17 @@ export function selectSharedMonitoredCount(input: {
       result.amberFlags.push({name: field[0].name, flag: SNIPER_4100_FLAG});
       countedNames.add(field[0].name.trim().toLowerCase());
     }
-    camerasUp += unit.camerasUp;
-    camerasDown += unit.camerasDown;
+    if (!heldOutOfDown) {
+      camerasUp += unit.camerasUp;
+      camerasDown += unit.camerasDown;
+    }
     if (unit.siteName) {
       const row = sites.get(unit.siteName) || {siteName: unit.siteName, units: 0, camerasUp: 0, camerasDown: 0};
       row.units += 1;
-      row.camerasUp += unit.camerasUp;
-      row.camerasDown += unit.camerasDown;
+      if (!heldOutOfDown) {
+        row.camerasUp += unit.camerasUp;
+        row.camerasDown += unit.camerasDown;
+      }
       sites.set(unit.siteName, row);
     }
     const cos = field[0].cosStatus;
@@ -411,8 +430,12 @@ export function immixReadingStatus(readAt: string | null | undefined, readFailed
 }
 
 /** The mode is the arming value. A missing value is Unknown. A name that says Paused does not choose it. */
-export function presentedArming(unit: { name?: string; arming?: 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | null }): 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | 'Unknown' {
-  if (unit.arming === 'Disarmed' || unit.arming === 'Paused' || unit.arming === 'TestMode' || unit.arming === 'Auto') return unit.arming;
+export function presentedArming(unit: { name?: string; arming?: string | null }): 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | 'Unknown' {
+  const raw = typeof unit.arming === 'string' ? unit.arming.trim().toLowerCase() : '';
+  if (raw === 'disarmed') return 'Disarmed';
+  if (raw === 'paused') return 'Paused';
+  if (raw === 'test' || raw === 'testmode') return 'TestMode';
+  if (raw === 'armed' || raw === 'auto') return 'Auto';
   return 'Unknown';
 }
 

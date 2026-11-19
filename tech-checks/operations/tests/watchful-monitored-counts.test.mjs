@@ -742,6 +742,66 @@ test('a name containing test stays monitored unless its Watchful project id is a
   assert.equal(count.notInWatchful.some(unit => unit.name === 'Sniper 9'), false);
 });
 
+test('one armed up unit and one unit with no arming that is down both stay visible', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Auto'},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.armedUnits, 1);
+  assert.equal(count.units, 2);
+  assert.equal(count.armingUnknown, 1);
+  assert.equal(count.armingUnknownDown, 1);
+  assert.equal(count.downUnits, 1);
+});
+
+test('a blank read_at stays Unknown and does not take the other row time', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt, arming: 'Auto', readAt: snapshotAt},
+      {unitName: 'Sniper 3', canonicalUnitKey: 'SNIPER|3', siteName: 'Fixture Site 03', status: 'down', camerasUp: 0, camerasDown: 2, snapshotAt, arming: 'Auto', readAt: null},
+    ],
+    fetchedAt: snapshotAt,
+    mhelp: [
+      {name: 'Sniper 2', placement: 'FIELD'},
+      {name: 'Sniper 3', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.fresh, true);
+  assert.equal(count.units, 2);
+  assert.equal(count.unknownUnits, 1);
+  assert.equal(count.downUnits, 1);
+  assert.equal(count.cameras.down, 1);
+  assert.equal(count.armedUnits, 1);
+});
+
+test('a Disarmed unit that is down stays out of the down total, the same as Paused', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt, arming: 'Auto'},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 3, snapshotAt, arming: 'Disarmed'},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.armedUnits, 1);
+  assert.equal(count.notArmed, 1);
+  assert.equal(count.downUnits, 0);
+  assert.equal(count.cameras.down, 0);
+});
+
 test('the camera health render function parses', () => {
   const html = readFileSync(new URL('../../camera-health.html', import.meta.url), 'utf8');
   const start = html.indexOf('function sharedMonitoredField()');
