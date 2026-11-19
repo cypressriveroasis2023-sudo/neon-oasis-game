@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "f07525b9d6a4ad3d2c5b82c9dcaf45da50bdac1b",
+      "candidateBlob": "0f1427aad67d9f5652038e4d861ec2c8a2590c54",
       "baselineBlob": "769c97949d852551fc09689301f64e87bbc0ac2b",
       "replacements": [
         {
@@ -19,12 +19,12 @@
         },
         {
           "from": "data-fleet-view='map' aria-label='COS fleet counts'",
-          "to": "data-fleet-view='map' data-monitored={monitoredCount.fresh&&monitoredCount.units!==null?String(monitoredCount.units):'Unknown'} aria-label='COS fleet counts'",
+          "to": "data-fleet-view='map' data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS fleet counts'",
           "count": 1
         },
         {
           "from": "data-fleet-view={view} aria-label='COS Fleet Dashboard'",
-          "to": "data-fleet-view={view} data-monitored={monitoredCount.fresh&&monitoredCount.units!==null?String(monitoredCount.units):'Unknown'} aria-label='COS Fleet Dashboard'",
+          "to": "data-fleet-view={view} data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS Fleet Dashboard'",
           "count": 1
         },
         {

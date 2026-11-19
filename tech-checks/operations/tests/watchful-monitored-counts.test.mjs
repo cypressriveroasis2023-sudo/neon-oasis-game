@@ -68,14 +68,14 @@ function reviewedDay() {
     bucket: 'b',
     deployed: true,
   });
-  mhelp.push({name: 'Sniper 900 test bench', placement: 'FIELD'});
+  mhelp.push({name: 'Sniper 900 test bench', placement: 'FIELD', projectId: 'proj-test'});
   mhelp.push({name: 'Sniper 901', placement: 'FIELD', doNotUse: true});
-  return {snapshot, mhelp};
+  return {snapshot, mhelp, testProjectIds: ['proj-test']};
 }
 
 test('one shared count matches the reviewed Watchful day, and every path uses it', () => {
-  const {snapshot, mhelp} = reviewedDay();
-  const counts = MONITORED_COUNT_PATHS.map(path => countForPath(path, {snapshot, mhelp, now}));
+  const {snapshot, mhelp, testProjectIds} = reviewedDay();
+  const counts = MONITORED_COUNT_PATHS.map(path => countForPath(path, {snapshot, mhelp, testProjectIds, fetchedAt: new Date(now).toISOString(), now}));
   for (const count of counts) assert.deepEqual(count, counts[0]);
   const count = counts[0];
   assert.equal(count.fresh, true);
@@ -194,6 +194,7 @@ test('a reader shows Unknown without a fresh snapshot and never shows a Shop uni
   assert.equal(stale.downUnits, null);
   const shop = selectSharedMonitoredCount({
     snapshot: [{unitName: 'Solar Spotter 054', canonicalUnitKey: 'SOLARSPOTTER|54', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 4, snapshotAt}],
+    fetchedAt: new Date(now).toISOString(),
     mhelp: [{name: 'Solar Spotter 054', placement: 'SHOP', cosStatus: 'down'}],
     now,
   });
@@ -212,6 +213,7 @@ test('a Shop unit counts 0 even when Watchful says down', () => {
       camerasDown: 4,
       snapshotAt,
     }],
+    fetchedAt: new Date(now).toISOString(),
     mhelp: [{name: 'Solar Spotter 054', placement: 'SHOP', cosStatus: 'up'}],
     now,
   });
@@ -238,10 +240,12 @@ test('Immix-site units leave Not in Watchful and are not counted as Watchful uni
       {name: 'Sniper 9', placement: 'FIELD', siteName: 'Fixture Mixed Yard', siteKey: 'immix-key-mixed'},
       {name: 'Sniper 10', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
       {name: 'Sniper 11', placement: 'FIELD', siteName: 'Fixture Plain Yard', siteKey: 'plain-key'},
-      {name: 'Sniper 12 test', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
+      {name: 'Sniper 12 test', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard', projectId: 'proj-test'},
       {name: 'Sniper 13', placement: 'SHOP', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
       {name: 'Sniper 14', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard', doNotUse: true},
     ],
+    fetchedAt: new Date(now).toISOString(),
+    testProjectIds: ['proj-test'],
     now,
   });
   assert.equal(count.units, 1);
@@ -299,6 +303,8 @@ function counted(day, {testModeRule = false, rows = [], previousArming} = {}) {
     snapshot: day.snapshot,
     mhelp: day.mhelp,
     testModeRule,
+    testProjectIds: day.testProjectIds,
+    fetchedAt: new Date(now).toISOString(),
     immixKeys: loaded.accepted.map(row => row.siteKey),
     previousArming,
     now,
@@ -415,6 +421,7 @@ test('a Watchful unit with no Field match or two Field matches is an exception',
       {name: 'Sniper 31', placement: 'FIELD'},
       {name: 'Sniper 31 CAM 1', placement: 'FIELD'},
     ],
+    fetchedAt: new Date(now).toISOString(),
     now,
   });
   assert.equal(count.units, 0);
@@ -435,6 +442,7 @@ test('Sniper 4-100 stays counted down and carries the amber flag', () => {
       camerasDown: 1,
       snapshotAt,
     }],
+    fetchedAt: new Date(now).toISOString(),
     mhelp: [{name: 'Sniper 4-100', placement: 'FIELD', siteName: 'Fixture Site 04'}],
     now,
   });
@@ -499,6 +507,7 @@ test('an archived project is not in Watchful only while that rule is on', () => 
   const day = caseFiveWithArchived();
   const off = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: false,
+    fetchedAt: day.readAt, testProjectIds: day.testProjectIds,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
   assert.equal(off.units, 166);
@@ -510,6 +519,7 @@ test('an archived project is not in Watchful only while that rule is on', () => 
   parkedUnit.arming = 'Disarmed';
   const on = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    fetchedAt: day.readAt, testProjectIds: day.testProjectIds,
     watchfulReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
@@ -543,6 +553,7 @@ test('the Immix line counts fresh up and down readings and leaves a 20-minute-ol
   const day = caseFiveWithArchived();
   const count = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    fetchedAt: day.readAt, testProjectIds: day.testProjectIds,
     immixReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
@@ -550,6 +561,7 @@ test('the Immix line counts fresh up and down readings and leaves a 20-minute-ol
   assert.equal(count.immixDown, 1);
   const noImmixRead = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    fetchedAt: day.readAt, testProjectIds: day.testProjectIds,
     watchfulReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
@@ -558,6 +570,7 @@ test('the Immix line counts fresh up and down readings and leaves a 20-minute-ol
   assert.equal(noImmixRead.immixUnknown, noImmixRead.monitoredOnImmix.length);
   const staleRead = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true,
+    fetchedAt: day.readAt, testProjectIds: day.testProjectIds,
     immixReadAt: new Date(now - 21 * 60 * 1000).toISOString(),
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
@@ -583,6 +596,7 @@ test('stale mHelp records are reported for a check and are not Immix or pending'
       {name: 'Spotter 40', placement: 'FIELD', stale: true, siteKey: 'immix-key-north'},
       {name: 'Spotter 41', placement: 'FIELD', stale: true},
     ],
+    fetchedAt: new Date(now).toISOString(),
     immixKeys: ['immix-key-north'],
     now,
   });
@@ -643,6 +657,89 @@ test('a future observation stamp makes the snapshot Unknown instead of Down', ()
   assert.equal(count.oldestObservedAt, null);
   assert.equal(count.downUnits, null);
   assert.equal(count.units, null);
+});
+
+test('a snapshot with no our-read time is Unknown even when Watchful timestamps are fresh', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [{unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt}],
+    mhelp: [{name: 'Sniper 1', placement: 'FIELD', arming: 'Auto'}],
+    now,
+  });
+  assert.equal(count.fresh, false);
+  assert.equal(count.units, null);
+  assert.equal(count.downUnits, null);
+  assert.equal(count.armedUnits, null);
+});
+
+test('Test Mode stays out of the armed headline even when the test-mode flag is off', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'TestMode'},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Auto'},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.units, 2);
+  assert.equal(count.armedUnits, 1);
+});
+
+test('the armed headline ignores Disarmed and Paused, and a missing arming is Unknown rather than zero', () => {
+  const parked = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Auto'},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 2, snapshotAt, arming: 'Paused'},
+      {unitName: 'Sniper 3', canonicalUnitKey: 'SNIPER|3', siteName: 'Fixture Site 03', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Disarmed'},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+      {name: 'Sniper 3', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(parked.armedUnits, 1);
+  assert.equal(parked.notArmed, 2);
+  assert.equal(parked.downUnits, 0);
+  const missing = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(missing.units, 2);
+  assert.equal(missing.armedUnits, null);
+});
+
+test('a name containing test stays monitored unless its Watchful project id is a test site', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Auto', projectId: 'proj-field'},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    testProjectIds: ['proj-test'],
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD', projectId: 'proj-field'},
+      {name: 'Contest 4', placement: 'FIELD'},
+      {name: 'Sniper 9', placement: 'FIELD', projectId: 'proj-test'},
+    ],
+    now,
+  });
+  assert.equal(count.units, 1);
+  assert.equal(count.armedUnits, 1);
+  assert.equal(count.notInWatchful.some(unit => unit.name === 'Contest 4'), true);
+  assert.equal(count.notInWatchful.some(unit => unit.name === 'Sniper 9'), false);
 });
 
 test('the camera health render function parses', () => {

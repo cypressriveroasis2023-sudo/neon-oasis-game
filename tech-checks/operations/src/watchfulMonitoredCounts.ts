@@ -26,6 +26,7 @@ export type WatchfulCountUnit = {
   /** A marked archived project is not a Watchful customer unit. */
   projectArchived?: boolean;
   project?: string;
+  projectId?: string | null;
   recordCount?: number;
   link?: 'linked' | 'unlinked';
   /** Absent when the unit links by a Recon label instead of a hard key. */
@@ -43,6 +44,7 @@ export type MhelpCountUnit = {
   arming?: 'Auto' | 'TestMode' | 'Disarmed' | 'Paused';
   projectArchived?: boolean;
   project?: string;
+  projectId?: string | null;
   /** Latest provider status. Unknown once it is 20 minutes past read time. */
   latestStatus?: 'up' | 'down';
   observedAt?: string;
@@ -165,17 +167,12 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
 
 export function customerMonitoredName(name: string, doNotUse = false): boolean {
   if (doNotUse) return false;
-  if (name.toLowerCase().includes('test')) return false;
   if (/do not use/i.test(name)) return false;
   return true;
 }
 
 function oldestObservation(values: readonly (string | null | undefined)[], now: number): string | null {
   return oldestObservationIso(values, now);
-}
-
-function freshSnapshot(observedAt: string | null, now: number): boolean {
-  return observedAt !== null && cameraTimestamp(observedAt, now).fresh;
 }
 
 /**
@@ -202,6 +199,8 @@ export function selectSharedMonitoredCount(input: {
   immixReadFailed?: boolean;
   /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
   previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
+  /** Watchful project ids that are test sites. A name containing "test" is not a test site. */
+  testProjectIds?: readonly string[];
   mhelp: readonly MhelpCountUnit[];
   now?: number;
 }): SharedMonitoredCount {
@@ -212,15 +211,15 @@ export function selectSharedMonitoredCount(input: {
   ];
   const oldestObservedAt = oldestObservation(observations, now);
   const readAt = input.fetchedAt ?? input.watchfulReadAt ?? null;
-  const readSupplied = input.fetchedAt != null || input.watchfulReadAt != null;
-  const readKnown = readSupplied && presentedFromWatchfulRead({
+  const readKnown = presentedFromWatchfulRead({
     readAt,
     readFailed: input.watchfulReadFailed,
     watchfulStatus: 'down',
     now,
   }) === 'Down';
-  const observationKnown = !readSupplied && freshSnapshot(oldestObservedAt, now);
-  if (!input.snapshot || oldestObservedAt === null || !(readKnown || observationKnown)) return empty(false, oldestObservedAt);
+  if (!input.snapshot || oldestObservedAt === null || !readKnown) return empty(false, oldestObservedAt);
+  const testProjects = new Set((input.testProjectIds || []).map(id => id.trim()).filter(Boolean));
+  let knownArming = 0;
 
   const watchful = new Map<string, WatchfulCountUnit>();
   for (const unit of input.snapshot) {
@@ -266,6 +265,7 @@ export function selectSharedMonitoredCount(input: {
       counted.add(key);
       continue;
     }
+    if (unit.projectId && testProjects.has(unit.projectId)) continue;
     if (input.testModeRule && unit.arming === 'TestMode') {
       if (unit.project) {
         const line = `${unit.project} · excluded test/Test Mode`;
@@ -293,12 +293,14 @@ export function selectSharedMonitoredCount(input: {
     result.units = (result.units || 0) + 1;
     result.records = (result.records || 0) + (unit.recordCount ?? 1);
     if (unit.link === 'unlinked') result.unlinked = (result.unlinked || 0) + (unit.recordCount ?? 1);
-    if (unit.status === 'down') result.downUnits = (result.downUnits || 0) + 1;
-    else result.upUnits = (result.upUnits || 0) + 1;
     const mode = presentedArming({name: unit.unitName, arming: unit.arming});
+    const pausedDown = mode === 'Paused' && unit.status === 'down';
+    if (unit.status === 'down' && !pausedDown) result.downUnits = (result.downUnits || 0) + 1;
+    else if (unit.status !== 'down') result.upUnits = (result.upUnits || 0) + 1;
     const parked = mode === 'Disarmed' || mode === 'Paused';
-    if (mode === 'Unknown') {
-      // A missing arming value stays out of the armed headline.
+    if (mode !== 'Unknown') knownArming += 1;
+    if (mode === 'Unknown' || mode === 'TestMode') {
+      // Missing arming and Test Mode stay out of the armed headline.
     } else if (parked) {
       result.notArmed = (result.notArmed || 0) + 1;
       result.notArmedUnits.push({name: unit.unitName, mode});
@@ -336,6 +338,7 @@ export function selectSharedMonitoredCount(input: {
 
   for (const unit of input.mhelp) {
     if (unit.placement !== 'FIELD' || !customerMonitoredName(unit.name, unit.doNotUse)) continue;
+    if (unit.projectId && testProjects.has(unit.projectId)) continue;
     if (unit.stale) {
       result.needsCheck.push({name: unit.name, reason: STALE_MHELP_REASON});
       continue;
@@ -382,6 +385,7 @@ export function selectSharedMonitoredCount(input: {
   result.cameras = {up: camerasUp, down: camerasDown, total: camerasUp + camerasDown};
   result.armedCameras = {up: armedUp, down: armedDown, total: armedUp + armedDown};
   result.armedSites = armedSiteRows.size;
+  if (knownArming === 0) result.armedUnits = null;
   return result;
 }
 
