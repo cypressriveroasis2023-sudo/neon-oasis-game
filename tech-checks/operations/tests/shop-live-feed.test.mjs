@@ -133,6 +133,35 @@ test('a site or organization label is not a test site without the Watchful proje
   assert.equal(decideShopCameras(everyId.inputs).byUnit.get('COUNTED 2').counted.field, true);
 });
 
+test('Watchful project ids on every row do not key mHelp figures', () => {
+  const units = [
+    camera('Keyed only 1', {site: 'Synthetic yard', watchfulProjectKey: configuredWatchfulTestProjectKey('Test 1')}),
+    camera('Keyed only 2', {site: 'Synthetic yard', watchfulProjectKey: configuredWatchfulTestProjectKey('Helios Test Sites')}),
+    camera('Keyed only 3', {site: 'Synthetic yard', watchfulProjectKey: configuredWatchfulTestProjectKey('Spotter Test Site')}),
+  ];
+  const joined = liveFeedShopRows(units, {uploadInventory: {records: [
+    record('11', 'Keyed only 1', 'SHOP', 'DO_NOT_USE'),
+    record('12', 'Helios 001', 'SHOP', 'UNFLAGGED'),
+    record('13', 'Sniper 318 - DO NOT USE', 'FIELD', 'DO_NOT_USE'),
+  ]}});
+  assert.equal(joined.mhelpCoverage, 'absent');
+  assert.equal(joined.matched, 0);
+  assert.equal(joined.inputs.every(row => row.productId == null && row.mhelpPlacement == null && row.doNotUse == null), true);
+  const report = decideShopCameras(joined.inputs, SHOP_CAMERA_RULE);
+  assert.equal(report.byUnit.get('KEYED ONLY 1').inShop, true);
+  assert.equal(report.byUnit.get('KEYED ONLY 1').counted.field, false);
+  const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.inShop, null);
+  assert.equal(board.shop.doNotUse, null);
+  assert.equal(board.shop.exceptions, null);
+  const doNotUse = board.lines.find(line => line.label === 'Shop, DO NOT USE');
+  const exceptions = board.lines.find(line => line.label === 'Exceptions');
+  assert.equal(doNotUse.text, 'Shop, DO NOT USE · —');
+  assert.equal(exceptions.text, 'Exceptions · —');
+  assert.equal(doNotUse.text.includes('0'), false);
+  assert.equal(exceptions.text.includes('0'), false);
+});
+
 test('a partial product-id key does not report In shop, DO NOT USE, or Exceptions as a number', () => {
   const units = [
     camera('HELIOS 001', {productId: '137'}),

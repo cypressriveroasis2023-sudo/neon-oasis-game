@@ -544,9 +544,10 @@ export type LiveFeedJoin = {
 /**
  * Shop inputs from a live-shaped camera unit. mHelp is read only when that unit
  * already carries a product id, and the upload record is chosen by that id.
- * Unit names are not compared, folded, or trimmed into a match. The live
- * unit-camera-status feed does not carry mhelp_product_id, so the shop figures
- * stay unknown until a separate feed change adds it.
+ * Unit names are not compared, folded, or trimmed into a match. A Watchful
+ * project id classifies a test site and does not count as an mHelp key.
+ * The live unit-camera-status feed does not carry mhelp_product_id, so the
+ * shop figures stay unknown until a separate feed change adds it.
  */
 export function liveFeedShopRows(units: readonly {unit?: string; placement?: CameraPlacement; state?: CameraState; site?: string | null; organization?: string | null; cameras?: number; productId?: unknown; mhelpPlacement?: unknown; lifecycle?: unknown; doNotUse?: unknown; tags?: readonly string[]; watchfulProjectKey?: unknown; star_organization_id?: unknown}[], fieldMap: unknown): LiveFeedJoin {
   const byProductId = cameraMhelpPlacements(fieldMapPlacementRows(fieldMap)).byProductId;
@@ -560,8 +561,9 @@ export function liveFeedShopRows(units: readonly {unit?: string; placement?: Cam
     const ownLifecycle = typeof unit.lifecycle === 'string' ? unit.lifecycle.trim() : '';
     const carriedKey = typeof unit.watchfulProjectKey === 'string' && WATCHFUL_PROJECT_ID.test(unit.watchfulProjectKey) ? unit.watchfulProjectKey : undefined;
     const lifecycle = fromKey?.lifecycle || ownLifecycle;
-    const explicitMhelp = explicit !== null || ownLifecycle.length > 0 || unit.doNotUse === true || unit.doNotUse === false;
-    if (fromKey || explicitMhelp || carriedKey) keyed += 1;
+    const hasProductId = ownProductId.length > 0;
+    const explicitMhelp = explicit !== null || ownLifecycle.length > 0;
+    if (hasProductId || explicitMhelp) keyed += 1;
     const tags = typeof unit.cameras === 'number' && unit.cameras === 0 ? ['no telemetry'] : [];
     inputs.push(shopCameraInput({
       unit: name,

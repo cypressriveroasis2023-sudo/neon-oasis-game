@@ -38,14 +38,19 @@ test('camera status splits In shop, Shop DO NOT USE, and exceptions', async ({pa
   await expect(view.getByLabel('Camera monitoring figures')).toContainText('In shop');
   const figures = view.getByLabel('Camera monitoring figures');
   await expect(figures).toContainText('Field 1');
-  await expect(figures).toContainText('In shop 2');
-  await expect(figures).toContainText('Shop, DO NOT USE 1');
-  await expect(figures).toContainText('Exceptions 1');
+  // Rule change, Felix review of #458 at e8f9c9fa blocker C.
+  // SS010 carries only a Watchful project id, so that id does not key mHelp.
+  // Old: 'In shop 2', 'Shop, DO NOT USE 1', 'Exceptions 1'
+  // Old lines: 'Shop, DO NOT USE · 1 · CAMV 093. Not online.' and 'Exceptions · 1 · RSU 200. Not in any total.'
+  await expect(figures).toContainText('In shop —');
+  await expect(figures).not.toContainText('In shop 0');
+  await expect(figures).toContainText('Shop, DO NOT USE —');
+  await expect(figures).toContainText('Exceptions —');
   const rows = view.locator('.cos-camera-status-row');
   await expect(rows).toHaveCount(1);
   await expect(rows.filter({hasText: 'SPOTTER 880'})).toContainText('All cameras down');
-  await expect(view.getByLabel('Shop, DO NOT USE')).toContainText('Shop, DO NOT USE · 1 · CAMV 093. Not online.');
-  await expect(view.getByLabel('Exceptions')).toContainText('Exceptions · 1 · RSU 200. Not in any total.');
+  await expect(view.getByLabel('Shop, DO NOT USE')).toContainText('Shop, DO NOT USE · —');
+  await expect(view.getByLabel('Exceptions')).toContainText('Exceptions · —');
   await app.locator('.cos-camera-about > summary').click();
   await app.getByRole('button', {name: /^In the shop/}).first().click();
   await expect(rows).toHaveCount(2);

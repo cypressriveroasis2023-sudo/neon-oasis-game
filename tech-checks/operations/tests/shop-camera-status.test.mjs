@@ -498,7 +498,7 @@ test('the census fixture keeps 323 In shop, 56 DO NOT USE, 1 exception, and the 
   assert.equal(after.warnings.length, 0);
 });
 
-test('a feed row keeps the Watchful project id and reads mHelp only from a product id on the camera row', () => {
+test('a feed row does not carry a Watchful project id and reads mHelp only from a product id on the camera row', () => {
   const projected = projectUnitCameraStatus([{
     id: 55, device_name: 'SS010 cam', unit_key: 'SS010', organization: 'Test 1',
     vigilant_status: 'Online', star_organization_id: '283838',
