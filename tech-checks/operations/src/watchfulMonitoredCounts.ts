@@ -82,7 +82,7 @@ export type FieldNotMonitored = {
   status: 'Field-not-monitored';
 };
 
-export type ArmingDrift = { name: string; from: 'TestMode'; to: 'Auto' };
+export type ArmingDrift = { name: string; from: 'test'; to: 'armed' };
 
 export const TEST_MODE_REASON = 'Watchful project in TestMode' as const;
 
@@ -204,8 +204,8 @@ export function selectSharedMonitoredCount(input: {
   /** When our Immix read was taken. A missing time is Unknown, even if the Watchful read is fresh. */
   immixReadAt?: string | null;
   immixReadFailed?: boolean;
-  /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
-  previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
+  /** Prior arming, so a flip back to armed is a drift item rather than a silent move. */
+  previousArming?: Readonly<Record<string, string>>;
   /** Watchful project ids that are test sites. A name containing "test" is not a test site. */
   testProjectIds?: readonly string[];
   mhelp: readonly MhelpCountUnit[];
@@ -225,7 +225,7 @@ export function selectSharedMonitoredCount(input: {
     now,
   }) === 'Down';
   if (!input.snapshot || oldestObservedAt === null || !readKnown) return empty(false, oldestObservedAt);
-  const testProjects = new Set((input.testProjectIds || []).map(id => id.trim()).filter(Boolean));
+  const testProjects = new Set((input.testProjectIds || []).map(id => id.trim().toLowerCase()).filter(Boolean));
   let knownArming = 0;
 
   const watchful = new Map<string, WatchfulCountUnit>();
@@ -272,8 +272,8 @@ export function selectSharedMonitoredCount(input: {
       counted.add(key);
       continue;
     }
-    if (unit.projectId && testProjects.has(unit.projectId)) continue;
-    if (input.testModeRule && unit.arming === 'TestMode') {
+    if (unit.projectId && testProjects.has(unit.projectId.trim().toLowerCase())) continue;
+    if (input.testModeRule && normalisedArming(unit.arming) === 'test') {
       if (unit.project) {
         const line = `${unit.project} · excluded test/Test Mode`;
         if (!result.excludedTestLines.includes(line)) result.excludedTestLines.push(line);
@@ -329,8 +329,8 @@ export function selectSharedMonitoredCount(input: {
         armedSiteRows.set(unit.siteName, armedRow);
       }
     }
-    if (input.previousArming?.[unit.unitName] === 'TestMode' && unit.arming === 'Auto') {
-      result.drift.push({name: unit.unitName, from: 'TestMode', to: 'Auto'});
+    if (normalisedArming(input.previousArming?.[unit.unitName]) === 'test' && normalisedArming(unit.arming) === 'armed') {
+      result.drift.push({name: unit.unitName, from: 'test', to: 'armed'});
     }
     if (sniper4100) {
       result.amberFlags.push({name: field[0].name, flag: SNIPER_4100_FLAG});
@@ -357,7 +357,7 @@ export function selectSharedMonitoredCount(input: {
 
   for (const unit of input.mhelp) {
     if (unit.placement !== 'FIELD' || !customerMonitoredName(unit.name, unit.doNotUse)) continue;
-    if (unit.projectId && testProjects.has(unit.projectId)) continue;
+    if (unit.projectId && testProjects.has(unit.projectId.trim().toLowerCase())) continue;
     if (unit.stale) {
       result.needsCheck.push({name: unit.name, reason: STALE_MHELP_REASON});
       continue;
@@ -378,14 +378,14 @@ export function selectSharedMonitoredCount(input: {
         status: reading,
         statusLabel: reading === 'up' ? 'Up' : reading === 'down' ? 'Down' : IMMIX_STATUS_LABEL,
         groupLabel: IMMIX_GROUP_LABEL,
-        watchful_excluded_by: watchfulArming === 'TestMode' ? 'test_mode' : null,
+        watchful_excluded_by: normalisedArming(watchfulArming) === 'test' ? 'test_mode' : null,
       });
       if (reading === 'up') result.immixUp = (result.immixUp || 0) + 1;
       else if (reading === 'down') result.immixDown = (result.immixDown || 0) + 1;
       else result.immixUnknown = (result.immixUnknown || 0) + 1;
       continue;
     }
-    if (input.testModeRule && watchfulArming === 'TestMode') {
+    if (input.testModeRule && normalisedArming(watchfulArming) === 'test') {
       result.fieldNotMonitored.push({
         name: unit.name,
         productId: unit.productId || null,
@@ -429,13 +429,25 @@ export function immixReadingStatus(readAt: string | null | undefined, readFailed
   return latest;
 }
 
+/** Loader words. Auto and TestMode fold in so older fixtures still match. */
+function normalisedArming(value: string | null | undefined): 'armed' | 'disarmed' | 'paused' | 'test' | 'unknown' | null {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase().replace(/[\s._-]+/g, '') : '';
+  if (!raw) return null;
+  if (raw === 'armed' || raw === 'auto') return 'armed';
+  if (raw === 'disarmed') return 'disarmed';
+  if (raw === 'paused') return 'paused';
+  if (raw === 'test' || raw === 'testmode') return 'test';
+  if (raw === 'unknown') return 'unknown';
+  return 'unknown';
+}
+
 /** The mode is the arming value. A missing value is Unknown. A name that says Paused does not choose it. */
 export function presentedArming(unit: { name?: string; arming?: string | null }): 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | 'Unknown' {
-  const raw = typeof unit.arming === 'string' ? unit.arming.trim().toLowerCase() : '';
-  if (raw === 'disarmed') return 'Disarmed';
-  if (raw === 'paused') return 'Paused';
-  if (raw === 'test' || raw === 'testmode') return 'TestMode';
-  if (raw === 'armed' || raw === 'auto') return 'Auto';
+  const stored = normalisedArming(unit.arming);
+  if (stored === 'disarmed') return 'Disarmed';
+  if (stored === 'paused') return 'Paused';
+  if (stored === 'test') return 'TestMode';
+  if (stored === 'armed') return 'Auto';
   return 'Unknown';
 }
 

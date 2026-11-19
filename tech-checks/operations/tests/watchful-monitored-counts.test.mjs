@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
+import FleetEquipmentTotals from '../src/FleetEquipmentTotals.tsx';
+import {loadWatchfulExport} from '../src/watchfulMonitoredLoad.ts';
 import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, deriveSplitSiteKeys, loadImmixRows, presentedArming, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
 import {formatObservedCt, oldestObservationIso} from '../src/watchfulObservation.ts';
 import {presentedFromWatchfulRead} from '../src/watchfulReadStatus.ts';
@@ -394,7 +398,7 @@ test('Immix load guards keep Watchful totals and reject a row with no site key',
   assert.equal(returned.units, 169);
   assert.equal(returned.sites, 92);
   assert.deepEqual(returned.cameras, {up: 465, down: 23, total: 488});
-  assert.deepEqual(returned.drift, [{name: 'Sniper 92', from: 'TestMode', to: 'Auto'}]);
+  assert.deepEqual(returned.drift, [{name: 'Sniper 92', from: 'test', to: 'armed'}]);
 });
 
 test('a fifth Test Mode unit at a split site is Immix and the other stays unmonitored', () => {
@@ -781,6 +785,17 @@ test('a blank read_at stays Unknown and does not take the other row time', () =>
   assert.equal(count.downUnits, 1);
   assert.equal(count.cameras.down, 1);
   assert.equal(count.armedUnits, 1);
+  const correction = JSON.parse(readFileSync(new URL('./blank-read-unknown-line.json', import.meta.url), 'utf8'));
+  const html = renderToStaticMarkup(React.createElement(FleetEquipmentTotals, {
+    upload: null,
+    data: null,
+    now,
+    onView() {},
+    onOpen() {},
+    monitored: count,
+  }));
+  assert.match(html, new RegExp(correction.line));
+  assert.match(html, /class="cos-read-unknown"/);
 });
 
 test('a Disarmed unit that is down stays out of the down total, the same as Paused', () => {
@@ -800,6 +815,71 @@ test('a Disarmed unit that is down stays out of the down total, the same as Paus
   assert.equal(count.notArmed, 1);
   assert.equal(count.downUnits, 0);
   assert.equal(count.cameras.down, 0);
+});
+
+test('loader arming reaches the exclusion line, Field-not-monitored, the Immix tag and drift', () => {
+  const readAt = snapshotAt;
+  const csv = [
+    'unit,site,group,status,cameras_up,cameras_down,seen_at,read_at,arming,project_id',
+    `Sniper 2,Fixture Test Yard,Avigilon,up,1,0,${readAt},${readAt},TestMode,3f2504e0-4f89-41d3-9b0c-030507090a0b`,
+    `Sniper 3,Fixture Field Yard,Avigilon,up,2,0,${readAt},${readAt},Auto,3f2504e0-4f89-41d3-9b0c-030507090a0c`,
+  ].join('\n');
+  const loaded = loadWatchfulExport(csv, readAt, now);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').arming, 'test');
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|3').arming, 'armed');
+  const snapshot = loaded.units.map(unit => ({
+    ...unit,
+    snapshotAt: unit.snapshotAt || readAt,
+    project: unit.canonicalUnitKey === 'SNIPER|2' ? 'Fixture Test Project' : 'Fixture Field Project',
+  }));
+  const mhelp = [
+    {name: 'Sniper 2', placement: 'FIELD', siteKey: 'immix-key-only', siteName: 'Fixture Test Yard', productId: '9002'},
+    {name: 'Sniper 3', placement: 'FIELD', productId: '9003'},
+  ];
+  const immix = selectSharedMonitoredCount({
+    snapshot,
+    fetchedAt: readAt,
+    testModeRule: true,
+    immixKeys: ['immix-key-only'],
+    mhelp,
+    now,
+  });
+  assert.match(immix.excludedTestLines.join('\n'), /Fixture Test Project · excluded test\/Test Mode/);
+  assert.equal(immix.monitoredOnImmix.find(unit => unit.name === 'Sniper 2').watchful_excluded_by, 'test_mode');
+  assert.equal(immix.fieldNotMonitored.length, 0);
+  const held = selectSharedMonitoredCount({
+    snapshot,
+    fetchedAt: readAt,
+    testModeRule: true,
+    mhelp,
+    now,
+  });
+  const unmonitored = held.fieldNotMonitored.find(unit => unit.name === 'Sniper 2');
+  assert.equal(unmonitored.status, 'Field-not-monitored');
+  assert.equal(unmonitored.reason, TEST_MODE_REASON);
+  const drifted = selectSharedMonitoredCount({
+    snapshot,
+    fetchedAt: readAt,
+    previousArming: {'Sniper 3': 'test'},
+    mhelp,
+    now,
+  });
+  assert.deepEqual(drifted.drift, [{name: 'Sniper 3', from: 'test', to: 'armed'}]);
+});
+
+test('a test project id matches a UUID regardless of case', () => {
+  const id = '3f2504e0-4f89-41d3-9b0c-030507090a0b';
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'armed', projectId: id.toUpperCase()},
+    ],
+    fetchedAt: snapshotAt,
+    testProjectIds: [id],
+    mhelp: [{name: 'Sniper 1', placement: 'FIELD', projectId: id.toUpperCase()}],
+    now,
+  });
+  assert.equal(count.units, 0);
+  assert.equal(count.notInWatchful.some(unit => unit.name === 'Sniper 1'), false);
 });
 
 test('the camera health render function parses', () => {
