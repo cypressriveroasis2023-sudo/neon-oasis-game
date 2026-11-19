@@ -239,3 +239,55 @@ test('placementStatus fills mHelp placement from the product id, not the unit na
   assert.equal(board.shop.inShop, 0);
   assert.equal(board.shop.doNotUse, 1);
 });
+
+test('product ids with missing mHelp data do not complete coverage', () => {
+  const units = [
+    camera('Fixture 1', {productId: '11', site: 'Synthetic yard'}),
+    camera('Fixture 2', {productId: '12', site: 'Synthetic yard'}),
+    camera('Fixture 3', {productId: '13', site: 'Synthetic yard'}),
+  ];
+  const loads = {
+    'failed load': null,
+    'empty upload': {uploadInventory: {contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', records: []}},
+    'ids not in the upload': {uploadInventory: {records: [
+      record('91', 'Other label 91', 'SHOP', 'UNFLAGGED'),
+      record('92', 'Other label 92', 'FIELD', 'DO_NOT_USE'),
+    ]}},
+  };
+  for (const [name, fieldMap] of Object.entries(loads)) {
+    const joined = liveFeedShopRows(units, fieldMap);
+    assert.equal(joined.mhelpCoverage, 'absent', name);
+    assert.equal(joined.matched, 0, name);
+    assert.equal(joined.inputs.every(row => row.mhelpPlacement == null && row.doNotUse == null), true, name);
+    const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+    assert.equal(board.shop.inShop, null, name);
+    assert.equal(board.shop.doNotUse, null, name);
+    assert.equal(board.shop.exceptions, null, name);
+    const doNotUse = board.lines.find(line => line.label === 'Shop, DO NOT USE');
+    const exceptions = board.lines.find(line => line.label === 'Exceptions');
+    assert.equal(doNotUse.text, 'Shop, DO NOT USE · —', name);
+    assert.equal(exceptions.text, 'Exceptions · —', name);
+    assert.equal(String(board.shop.inShop), 'null', name);
+  }
+});
+
+test('a fully covered Sniper 318 is the exception line', () => {
+  const units = [
+    camera('Sniper 318', {productId: '318', placement: 'FIELD', state: 'RED', site: 'Synthetic yard'}),
+    camera('Fixture shop 1', {productId: '901', placement: 'FIELD', site: 'Synthetic yard'}),
+  ];
+  const joined = liveFeedShopRows(units, {uploadInventory: {records: [
+    record('318', 'Record label 318', 'FIELD', 'DO_NOT_USE'),
+    record('901', 'Record label 901', 'SHOP', 'UNFLAGGED'),
+  ]}});
+  assert.equal(joined.mhelpCoverage, 'complete');
+  assert.equal(joined.matched, units.length);
+  assert.equal(joined.inputs.find(row => row.unit === 'Sniper 318').mhelpPlacement, 'FIELD');
+  assert.equal(joined.inputs.find(row => row.unit === 'Sniper 318').doNotUse, true);
+  const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.exceptions, 1);
+  assert.equal(board.shop.inShop, 1);
+  const exceptions = board.lines.find(line => line.label === 'Exceptions');
+  assert.equal(exceptions.text, 'Exceptions · 1 · Sniper 318. Not in any total.');
+  assert.match(exceptions.text, /Exceptions · 1 · Sniper 318/);
+});

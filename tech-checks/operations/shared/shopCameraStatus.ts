@@ -543,9 +543,10 @@ export type LiveFeedJoin = {
 
 /**
  * Shop inputs from a live-shaped camera unit. mHelp is read only when that unit
- * already carries a product id, and the upload record is chosen by that id.
- * Unit names are not compared, folded, or trimmed into a match. A Watchful
- * project id classifies a test site and does not count as an mHelp key.
+ * already carries a product id that matches a record in the loaded mHelp data.
+ * A product id with no loaded record is not coverage. Unit names are not
+ * compared, folded, or trimmed into a match. A Watchful project id classifies
+ * a test site and does not count as an mHelp key.
  * The live unit-camera-status feed does not carry mhelp_product_id, so the
  * shop figures stay unknown until a separate feed change adds it.
  */
@@ -561,9 +562,8 @@ export function liveFeedShopRows(units: readonly {unit?: string; placement?: Cam
     const ownLifecycle = typeof unit.lifecycle === 'string' ? unit.lifecycle.trim() : '';
     const carriedKey = typeof unit.watchfulProjectKey === 'string' && WATCHFUL_PROJECT_ID.test(unit.watchfulProjectKey) ? unit.watchfulProjectKey : undefined;
     const lifecycle = fromKey?.lifecycle || ownLifecycle;
-    const hasProductId = ownProductId.length > 0;
     const explicitMhelp = explicit !== null || ownLifecycle.length > 0;
-    if (hasProductId || explicitMhelp) keyed += 1;
+    if (fromKey || explicitMhelp) keyed += 1;
     const tags = typeof unit.cameras === 'number' && unit.cameras === 0 ? ['no telemetry'] : [];
     inputs.push(shopCameraInput({
       unit: name,

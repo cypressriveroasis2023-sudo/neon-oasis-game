@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, fresh} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, fresh, field} from './fleet-dashboard-fixtures.mjs';
 import {openFleetView} from './fleet-view-navigation-helper.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 import {configuredWatchfulTestProjectKey} from '../shared/shopCameraStatus.ts';
@@ -66,4 +66,37 @@ test('camera status splits In shop, Shop DO NOT USE, and exceptions', async ({pa
   await expect(view).not.toContainText('203.0.113.50');
   await expect(view.locator('.job-card, .inventory-card')).toHaveCount(0);
   await page.screenshot({path: info.outputPath('shop-camera-status-main.png'), fullPage: true});
+});
+
+test('a product id that matches a loaded record shows the shop figures', async ({page}) => {
+  const coveredUnits = units.map(unit => unit.unit === 'SS010' ? {...unit, productId: '5010'} : unit);
+  const coveredReport = {...report, units: coveredUnits, counts: countUnits(coveredUnits)};
+  const coveredField = {
+    ...field,
+    uploadInventory: {
+      contract: 'COS_MHELP_UPLOAD_INVENTORY_V1',
+      records: [{
+        productId: '5010',
+        unitNumber: 'Record label 5010',
+        sourceUnitNumber: 'Record label 5010',
+        placement: 'SHOP',
+        uploadLifecycle: 'UNFLAGGED',
+      }],
+    },
+  };
+  const {app} = await mountFleet(page, false, {field: coveredField});
+  const cors = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST,OPTIONS'};
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: cors})
+    : route.fulfill({status: 200, headers: cors, json: coveredReport}));
+  await openFleetView(app, 'Camera status');
+  const figures = app.locator('.cos-camera-status').getByLabel('Camera monitoring figures');
+  await expect(figures).toContainText('Field 1');
+  await expect(figures).toContainText('In shop 2');
+  await expect(figures).toContainText('Shop, DO NOT USE 1');
+  await expect(figures).toContainText('Exceptions 1');
+  const view = app.locator('.cos-camera-status');
+  await expect(view.getByLabel('Shop, DO NOT USE')).toContainText('Shop, DO NOT USE · 1 · CAMV 093. Not online.');
+  await expect(view.getByLabel('Exceptions')).toContainText('Exceptions · 1 · RSU 200. Not in any total.');
+  await expect(view).not.toContainText('203.0.113.50');
 });
