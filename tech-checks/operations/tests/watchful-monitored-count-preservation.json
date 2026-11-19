@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "73fb41b0c22493382c843b50b1ea54b1b20f890e",
+      "candidateBlob": "f07525b9d6a4ad3d2c5b82c9dcaf45da50bdac1b",
       "baselineBlob": "769c97949d852551fc09689301f64e87bbc0ac2b",
       "replacements": [
         {
@@ -25,6 +25,16 @@
         {
           "from": "data-fleet-view={view} aria-label='COS Fleet Dashboard'",
           "to": "data-fleet-view={view} data-monitored={monitoredCount.fresh&&monitoredCount.units!==null?String(monitoredCount.units):'Unknown'} aria-label='COS Fleet Dashboard'",
+          "count": 1
+        },
+        {
+          "from": " const boardCurrent=Number.isFinite(snapshotNow)&&Date.now()-snapshotNow<=CAMERA_AUTO_REFRESH_MS*2;",
+          "to": " const boardNow=clock.getTime();\n const boardCurrent=Number.isFinite(snapshotNow)&&boardNow-snapshotNow<=CAMERA_AUTO_REFRESH_MS*2;",
+          "count": 1
+        },
+        {
+          "from": " const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';",
+          "to": " const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),boardNow):'';",
           "count": 1
         }
       ]

@@ -1,6 +1,7 @@
 import {cameraTimestamp} from './cameraEvidence';
 import {watchfulCanonicalUnitKey} from './watchfulUnitKey';
 import {formatObservedCt, IN_SHOP_COLOR, IN_SHOP_LABEL, oldestObservationIso, WATCHFUL_OBSERVATION_FRESH_MS} from './watchfulObservation';
+import {presentedFromWatchfulRead} from './watchfulReadStatus';
 
 export {formatObservedCt, IN_SHOP_COLOR, IN_SHOP_LABEL, WATCHFUL_OBSERVATION_FRESH_MS};
 
@@ -169,8 +170,8 @@ export function customerMonitoredName(name: string, doNotUse = false): boolean {
   return true;
 }
 
-function oldestObservation(values: readonly string[]): string | null {
-  return oldestObservationIso(values);
+function oldestObservation(values: readonly (string | null | undefined)[], now: number): string | null {
+  return oldestObservationIso(values, now);
 }
 
 function freshSnapshot(observedAt: string | null, now: number): boolean {
@@ -185,7 +186,7 @@ function freshSnapshot(observedAt: string | null, now: number): boolean {
 export function selectSharedMonitoredCount(input: {
   snapshot: readonly WatchfulCountUnit[] | null;
   snapshotAt?: string | null;
-  /** Ignored. Freshness uses the oldest observation, not the fetch. */
+  /** Our read of Watchful. A fresh read keeps an old unit Down. A stale read is Unknown. */
   fetchedAt?: string | null;
   /** Accepted Immix site keys. A row with no key is never passed here. */
   immixKeys?: readonly string[];
@@ -193,9 +194,12 @@ export function selectSharedMonitoredCount(input: {
   testModeRule?: boolean;
   /** When true, an archived project counts as not in Watchful. Off leaves the totals unchanged. */
   archivedRule?: boolean;
-  /** When our Watchful read was taken. Per-unit lastConnection is not this clock. */
+  /** When our Watchful read was taken. Same clock as fetchedAt. Per-unit snapshotAt is not this clock. */
   watchfulReadAt?: string | null;
   watchfulReadFailed?: boolean;
+  /** When our Immix read was taken. A missing time is Unknown, even if the Watchful read is fresh. */
+  immixReadAt?: string | null;
+  immixReadFailed?: boolean;
   /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
   previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
   mhelp: readonly MhelpCountUnit[];
@@ -206,8 +210,17 @@ export function selectSharedMonitoredCount(input: {
     ...(input.snapshot || []).map(unit => unit.snapshotAt),
     ...(input.snapshotAt ? [input.snapshotAt] : []),
   ];
-  const oldestObservedAt = oldestObservation(observations);
-  if (!input.snapshot || !freshSnapshot(oldestObservedAt, now)) return empty(false, oldestObservedAt);
+  const oldestObservedAt = oldestObservation(observations, now);
+  const readAt = input.fetchedAt ?? input.watchfulReadAt ?? null;
+  const readSupplied = input.fetchedAt != null || input.watchfulReadAt != null;
+  const readKnown = readSupplied && presentedFromWatchfulRead({
+    readAt,
+    readFailed: input.watchfulReadFailed,
+    watchfulStatus: 'down',
+    now,
+  }) === 'Down';
+  const observationKnown = !readSupplied && freshSnapshot(oldestObservedAt, now);
+  if (!input.snapshot || oldestObservedAt === null || !(readKnown || observationKnown)) return empty(false, oldestObservedAt);
 
   const watchful = new Map<string, WatchfulCountUnit>();
   for (const unit of input.snapshot) {
@@ -284,7 +297,9 @@ export function selectSharedMonitoredCount(input: {
     else result.upUnits = (result.upUnits || 0) + 1;
     const mode = presentedArming({name: unit.unitName, arming: unit.arming});
     const parked = mode === 'Disarmed' || mode === 'Paused';
-    if (parked) {
+    if (mode === 'Unknown') {
+      // A missing arming value stays out of the armed headline.
+    } else if (parked) {
       result.notArmed = (result.notArmed || 0) + 1;
       result.notArmedUnits.push({name: unit.unitName, mode});
     } else {
@@ -331,7 +346,7 @@ export function selectSharedMonitoredCount(input: {
     const watchfulArming = key ? watchful.get(key)?.arming : undefined;
     const matchedKey = typeof unit.siteKey === 'string' ? unit.siteKey.trim() : '';
     if (matchedKey && immixKeys.has(matchedKey)) {
-      const reading = immixReadingStatus(input.watchfulReadAt, input.watchfulReadFailed, unit.latestStatus, now);
+      const reading = immixReadingStatus(input.immixReadAt, input.immixReadFailed, unit.latestStatus, now);
       result.monitoredOnImmix.push({
         name: unit.name,
         productId: unit.productId || null,

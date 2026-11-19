@@ -277,14 +277,15 @@ function FleetDashboardLive({countsOnly=false,readingKey,initialPresentation,ope
 
   </div><details className='cos-fleet-advanced-filters'><summary>More filters</summary><div className='cos-fleet-filter-row'>   <label>PROVIDER<select aria-label='Fleet provider' value={filters.provider} onChange={e=>change('provider',e.target.value)}><option value='all'>All providers</option>{providers.map(p=><option key={p}>{p}</option>)}</select></label><button onClick={()=>setFilters({...initialFleetFilters})}>Reset filters</button><label className='cos-fleet-checkbox'><input type='checkbox' checked={filters.retired} onChange={e=>change('retired',e.target.checked)}/>Include inactive / retired</label><label>INSTALLATION STATUS<select aria-label='Installation status' value={filters.installationStatus||'all'} onChange={e=>change('installationStatus',e.target.value)}><option value='all'>All installation records</option><option value='field'>Field status</option><option value='installed'>Installed</option><option value='tracker'>Tracker field units</option><option value='assigned'>Assigned</option><option value='in_transit'>In transit</option><option value='returning'>Returning</option><option value='missing'>Location needs verification</option></select></label><label>NEARBY VERIFIED UNIT<select aria-label='Nearby unit center' value={filters.nearbyId||''} onChange={e=>change('nearbyId',e.target.value)}><option value=''>All field locations</option>{rows.filter(row=>row.placement==='field'&&row.locationVerified).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>RADIUS<select aria-label='Nearby radius miles' value={filters.radius||10} onChange={e=>change('radius',Number(e.target.value))}>{[5,10,25,50].map(value=><option key={value} value={value}>{value} miles</option>)}</select></label></div><small>Nearby distances use verified installation coordinates. Estimates and historical locations stay outside these distances.</small></details></div>);
  const wholeSourceHeadline=view==='map'?primaryFieldInventory:view==='sources'?Boolean(mhelpPhysical):fullInventoryHeadline;
- const boardCurrent=Number.isFinite(snapshotNow)&&Date.now()-snapshotNow<=CAMERA_AUTO_REFRESH_MS*2;
+ const boardNow=clock.getTime();
+ const boardCurrent=Number.isFinite(snapshotNow)&&boardNow-snapshotNow<=CAMERA_AUTO_REFRESH_MS*2;
  const durableWaiting=usesDurableFleetBoard()&&!boardData;
  
  // A completed board stays readable after it stops being current. Its totals
  // are then shown under the board's own time and are never called current.
  // The native count path (no command-center board) is unchanged while current.
  const boardStale=!boardCurrent&&Number.isFinite(snapshotNow)&&Boolean(boardData),boardVisible=boardCurrent||boardStale;
- const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),Date.now()):'';
+ const boardReadingTime=boardStale?cameraTime(new Date(snapshotNow).toISOString(),boardNow):'';
  // While nothing has been read yet, and when nothing could be read at all,
  // the compact reading this browser saved from the last completed board is
  // shown under its own saved time.

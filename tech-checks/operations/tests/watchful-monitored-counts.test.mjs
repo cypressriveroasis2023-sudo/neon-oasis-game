@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
 import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, deriveSplitSiteKeys, loadImmixRows, presentedArming, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
-import {formatObservedCt, oldestObservationIso, presentedFromWatchfulRead} from '../src/watchfulObservation.ts';
+import {formatObservedCt, oldestObservationIso} from '../src/watchfulObservation.ts';
+import {presentedFromWatchfulRead} from '../src/watchfulReadStatus.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
 const snapshotAt = new Date(now - 60_000).toISOString();
@@ -102,10 +103,10 @@ test('one shared count matches the reviewed Watchful day, and every path uses it
   assert.equal(siteUp + siteDown, count.cameras.total);
 });
 
-test('freshness uses the oldest observation, not the fetch or the newest row', () => {
-  const older = new Date(now - 21 * 60 * 1000).toISOString();
+test('a fresh read keeps an old offline unit Down, and a stale read is Unknown', () => {
+  const older = new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString();
   const newer = new Date(now - 60 * 1000).toISOString();
-  const stale = selectSharedMonitoredCount({
+  const freshRead = selectSharedMonitoredCount({
     snapshot: [
       {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'down', camerasUp: 1, camerasDown: 1, snapshotAt: older},
       {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt: newer},
@@ -120,11 +121,29 @@ test('freshness uses the oldest observation, not the fetch or the newest row', (
     ],
     now,
   });
-  assert.equal(stale.fresh, false);
-  assert.equal(stale.oldestObservedAt, older);
-  assert.notEqual(stale.oldestObservedAt, newer);
-  assert.equal(stale.downUnits, null);
-  assert.equal(stale.siteRows.length, 0);
+  const ruleChange = {
+    test: 'freshness uses the oldest observation, not the fetch or the newest row',
+    old: {fresh: false, downUnits: null, siteRows: 0},
+    new: {fresh: true, downUnits: 1, siteRows: 2},
+  };
+  assert.equal(freshRead.fresh, ruleChange.new.fresh);
+  assert.notEqual(freshRead.fresh, ruleChange.old.fresh);
+  assert.equal(freshRead.oldestObservedAt, older);
+  assert.notEqual(freshRead.oldestObservedAt, newer);
+  assert.equal(freshRead.downUnits, ruleChange.new.downUnits);
+  assert.equal(freshRead.siteRows.length, ruleChange.new.siteRows);
+  assert.equal(presentedFromWatchfulRead({readAt: new Date(now).toISOString(), watchfulStatus: 'offline', lastConnection: older, now}), 'Down');
+  const staleRead = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt: newer},
+    ],
+    fetchedAt: new Date(now - 21 * 60 * 1000).toISOString(),
+    mhelp: [{name: 'Sniper 1', placement: 'FIELD'}],
+    now,
+  });
+  assert.equal(staleRead.fresh, false);
+  assert.equal(staleRead.downUnits, null);
+  assert.equal(presentedFromWatchfulRead({readAt: new Date(now - 21 * 60 * 1000).toISOString(), watchfulStatus: 'offline', lastConnection: newer, now}), 'Unknown');
   const fresh = selectSharedMonitoredCount({
     snapshot: [
       {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt: new Date(now - 10 * 60 * 1000).toISOString()},
@@ -524,14 +543,22 @@ test('the Immix line counts fresh up and down readings and leaves a 20-minute-ol
   const day = caseFiveWithArchived();
   const count = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
-    watchfulReadAt: day.readAt,
+    immixReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
   assert.equal(count.immixUp, 4);
   assert.equal(count.immixDown, 1);
+  const noImmixRead = selectSharedMonitoredCount({
+    snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    watchfulReadAt: day.readAt,
+    immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
+  });
+  assert.equal(noImmixRead.immixUp, 0);
+  assert.equal(noImmixRead.immixDown, 0);
+  assert.equal(noImmixRead.immixUnknown, noImmixRead.monitoredOnImmix.length);
   const staleRead = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true,
-    watchfulReadAt: new Date(now - 21 * 60 * 1000).toISOString(),
+    immixReadAt: new Date(now - 21 * 60 * 1000).toISOString(),
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
   assert.equal(staleRead.immixUp, 0);
@@ -573,7 +600,49 @@ test('our Watchful read decides Down, and a unit lastConnection does not', () =>
   assert.equal(presentedFromWatchfulRead({readAt: new Date(now - 21 * 60 * 1000).toISOString(), watchfulStatus: 'offline', lastConnection: freshLink, now}), 'Unknown');
   assert.equal(presentedFromWatchfulRead({readAt: null, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
   assert.equal(presentedFromWatchfulRead({readAt: read, readFailed: true, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
-  assert.equal(oldestObservationIso([read, '']), null);
+  assert.equal(oldestObservationIso([read, ''], now), null);
+  assert.equal(oldestObservationIso([read, new Date(now + 60 * 1000).toISOString()], now), null);
+});
+
+test('a missing or null arming value is Unknown and stays out of the armed headline', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 2, camerasDown: 0, snapshotAt, arming: null},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt, arming: 'Auto'},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.units, 2);
+  assert.equal(count.armedUnits, 1);
+  assert.equal(count.armedSites, 1);
+  assert.deepEqual(count.armedCameras, {up: 0, down: 1, total: 1});
+  assert.equal(count.notArmed, 0);
+  assert.equal(presentedArming({name: 'Sniper 1', arming: null}), 'Unknown');
+  assert.equal(presentedArming({name: 'Sniper 2'}), 'Unknown');
+});
+
+test('a future observation stamp makes the snapshot Unknown instead of Down', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [
+      {unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt},
+      {unitName: 'Sniper 2', canonicalUnitKey: 'SNIPER|2', siteName: 'Fixture Site 02', status: 'down', camerasUp: 0, camerasDown: 1, snapshotAt: new Date(now + 5 * 60 * 1000).toISOString()},
+    ],
+    fetchedAt: new Date(now).toISOString(),
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Sniper 2', placement: 'FIELD'},
+    ],
+    now,
+  });
+  assert.equal(count.fresh, false);
+  assert.equal(count.oldestObservedAt, null);
+  assert.equal(count.downUnits, null);
+  assert.equal(count.units, null);
 });
 
 test('the camera health render function parses', () => {
