@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile, readServedFunctionBody} from './deploy-recorded-function.mjs';
+import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile, readServedFunctionBody, SERVED_BODY_MAX_BYTES} from './deploy-recorded-function.mjs';
 
 const ROOT=new URL('../../',import.meta.url).pathname;
 const PATCHES=join(ROOT,'.github/function-patches/cos-operations-pages');
@@ -182,4 +182,23 @@ test('malformed read-back bodies stay unreadable instead of a passing file list'
   assert.equal(readServedFunctionBody('application/json',Buffer.from('{"message":"ok"}')),null);
   assert.equal(readServedFunctionBody('application/vnd.denoland.eszip',Buffer.from('ESZIP2.3\0raw-bundle')),null);
   assert.equal(readServedFunctionBody('application/octet-stream',Buffer.from('EZBRcompressed')),null);
+});
+
+test('a mixed-case multipart boundary is matched as written and the part bytes are hashed raw',()=>{
+  const raw=Buffer.from([0x68,0x69,0xff]);
+  const packed=multipartBody([{name:'fn/serve.ts',content:raw}],{boundary:'AbC123'});
+  const served=readServedFunctionBody('Multipart/Form-Data; Boundary=AbC123',packed.body);
+  assert.ok(served);
+  assert.equal(Buffer.isBuffer(served[0].content),true);
+  assert.deepEqual(compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(raw)}]),[]);
+  assert.notEqual(sha256(raw),sha256(Buffer.from(raw.toString('utf8'),'utf8')));
+  assert.equal(readServedFunctionBody('multipart/form-data; boundary=abc123',packed.body),null);
+});
+
+test('a read-back larger than the size cap stays inconclusive',()=>{
+  const packed=multipartBody([{name:'fn/serve.ts',content:'ok'}]);
+  assert.ok(readServedFunctionBody(packed.type,packed.body));
+  const oversized=Buffer.concat([packed.body,Buffer.alloc(SERVED_BODY_MAX_BYTES+1-packed.body.length)]);
+  assert.equal(oversized.length,SERVED_BODY_MAX_BYTES+1);
+  assert.equal(readServedFunctionBody(packed.type,oversized),null);
 });

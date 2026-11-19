@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - '.github/scripts/deploy-recorded-function*.mjs'
+      - '.github/scripts/preflight-live-function-pins.mjs'
+      - '.github/scripts/preflight-live-function-pins.test.mjs'
       - '.github/workflows/cos-deploy-recorded-function.yml'
       - '.github/workflows/verify-recorded-function-patches.yml'
       - '.github/function-patches/**'

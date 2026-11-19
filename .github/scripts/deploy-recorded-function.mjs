@@ -91,16 +91,25 @@ export function liveMatchesPrecondition(live,required){
   return problems;
 }
 
+// Larger than any recorded bundle (the biggest prepared payload is about
+// 1.4 MB) and the over-1 MB unit fixture. A bigger response is unreadable:
+// the caller stays INCONCLUSIVE rather than treating it as verified.
+export const SERVED_BODY_MAX_BYTES=8*1024*1024;
+
 // GET /v1/projects/{ref}/functions/{slug}/body is documented as a streamable
 // body. With Accept: multipart/form-data the platform extracts the eszip
 // bundle and returns one form part per source file (filename in
 // Content-Disposition). A JSON body with a files array is the older shape.
 // A raw ESZIP or EZBR blob has no per-file listing, so it stays unreadable.
+// The boundary parameter value is case-sensitive. Only the media type and
+// the parameter name are compared without regard to case.
 export function readServedFunctionBody(contentType,body){
   const bytes=Buffer.isBuffer(body)?body:Buffer.from(body??'');
-  const type=String(contentType||'').toLowerCase();
+  if(bytes.length>SERVED_BODY_MAX_BYTES)return null;
+  const header=String(contentType||'');
+  const type=header.toLowerCase();
   if(type.includes('multipart/')){
-    const files=parseMultipartFiles(type,bytes);
+    const files=parseMultipartFiles(header,bytes);
     return files&&files.length?files:null;
   }
   const text=bytes.toString('utf8');
@@ -137,7 +146,7 @@ function parseMultipartFiles(contentType,bytes){
     if(content.length>=2&&content[content.length-2]===13&&content[content.length-1]===10)content=content.subarray(0,content.length-2);
     else if(content.length&&content[content.length-1]===10)content=content.subarray(0,content.length-1);
     const filename=filenameOf(header);
-    if(filename)files.push({name:filename,content:content.toString('utf8')});
+    if(filename)files.push({name:filename,content:Buffer.from(content)});
     cursor=next;
   }
   return files;
@@ -177,7 +186,7 @@ export function compareServedFiles(served,expectedFiles){
       else if(candidates.length>1){problems.push(`served file name is ambiguous for ${expected.name}`);continue;}
     }
     if(content===undefined){problems.push(`file missing from deployment: ${expected.name}`);continue;}
-    const actual=sha256(Buffer.from(content,'utf8'));
+    const actual=sha256(Buffer.isBuffer(content)?content:Buffer.from(content,'utf8'));
     if(actual!==expected.sha256) problems.push(`served sha256 differs for ${expected.name} (expected ${expected.sha256.slice(0,12)}..., served ${actual.slice(0,12)}..., matched by ${matchedBy})`);
   }
   if(served.length!==expectedFiles.length) problems.push(`deployment serves ${served.length} files, expected ${expectedFiles.length}`);
