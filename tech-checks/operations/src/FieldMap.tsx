@@ -438,7 +438,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
       else if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
       popup.append(document.createElement('br'),document.createTextNode('Latest camera observation: '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)));
       const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
-      if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
+      if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
       const openPopup=marker.getPopup();
       if(openPopup){
         const autoPan=openPopup.options.autoPan;
@@ -649,7 +649,7 @@ export default function FieldMap({powerReadEnabled=true,show,initialUnitId='',in
           {powerReadEnabled&&<HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>}
           <MhelpUnitRefresh key={selected.id} unit={selected} onUpdated={()=>{void load(true);onUpdated?.();}}/>
           <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3><p>Router checks do not supply live locations.</p>{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}
-            {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
+            {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
           {(selected.locationGeocode||selected.locationImportedGeocode)&&!selectedEstimate&&<section aria-label='Automatic address lookup'><h3>Automatic address lookup</h3><p role='status'>{locationExplanation(selected)}</p>{openUnitHealth&&<button className='secondary' onClick={()=>openUnitHealth(selected.id)}>Open Camera Health to correct address</button>}</section>}
           {ownerCensusEnabled&&(preparationBinding||visiblePreparationMessage||visiblePreparation)&&<section className='field-map-estimate-detail' aria-label='Approved lookup preparation'>

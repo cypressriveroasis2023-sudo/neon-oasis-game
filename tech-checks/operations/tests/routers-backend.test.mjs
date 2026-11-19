@@ -11,7 +11,7 @@ async function run({role='owner',user=owner,inactive=false,revoked=false,method=
   if(url.includes('/profiles?'))return json([{user_id:user,full_name:'Owner',role,active:!inactive}]);
   if(url.includes('/user_profiles?'))return json([{user_id:actor,active:true,department:'owner'}]);
   if(url.includes('/user_roles?'))return json(revoked?[]:[{roles:{code:'owner',organization_id:org}}]);
-  if(url.includes('/camera_unit_routers?'))return json(failRouters?{message:'Unavailable'}:[{id:1,unit_key:'HELIOS 001',router_public_ip:'192.0.2.1',current_status:'online',last_checked_at:new Date().toISOString(),password:'HIDDEN'}],failRouters?500:200);
+  if(url.includes('/camera_unit_routers?'))return json(failRouters?{message:'Unavailable'}:[{id:1,unit_key:'HELIOS 001',router_public_ip:'blocked-address-field',unit_ip:'blocked-address-field',wan:'blocked-address-field',current_status:'online',last_checked_at:new Date().toISOString(),password:'HIDDEN'}],failRouters?500:200);
   if(url.includes('/equipment_units?'))return json(unitError?{}:[{id:'11111111-1111-4111-8111-111111111111',unit_number:'HELIOS 001'}]);
   throw new Error('Unexpected route '+url);
  }});
@@ -20,7 +20,10 @@ async function run({role='owner',user=owner,inactive=false,revoked=false,method=
 }
 test('router read requires existing linked Owner and uses caller legacy RLS + scoped COS unit query',async()=>{
  const result=await run();assert.equal(result.response.status,200);assert.equal(result.body.items.length,1);assert.equal(result.body.items[0].gps,null);assert.equal(result.body.items[0].candidateUnit.unitNumber,'HELIOS 001');assert.equal(JSON.stringify(result.body).includes('HIDDEN'),false);
- const source=result.calls.find(c=>c.url.includes('/camera_unit_routers?'));assert.equal(source.init.headers.Authorization,'Bearer synthetic-legacy-user');assert.notEqual(source.init.headers.apikey,'synthetic-platform-key');assert.ok(!source.url.includes('select=*'));
+ const encoded=JSON.stringify(result.body);
+ assert.equal(encoded.includes('blocked-address-field'),false);
+ for (const name of ['router_public_ip','unit_ip','publicIp','unitIp','wan','lan','ip']) assert.equal(Object.hasOwn(result.body.items[0], name), false);
+ const source=result.calls.find(c=>c.url.includes('/camera_unit_routers?'));assert.equal(source.init.headers.Authorization,'Bearer synthetic-legacy-user');assert.notEqual(source.init.headers.apikey,'synthetic-platform-key');assert.ok(!source.url.includes('select=*'));assert.ok(!source.url.includes('router_public_ip'));assert.ok(!source.url.includes('unit_ip'));
  const units=result.calls.find(c=>c.url.includes('/equipment_units?'));assert.ok(units.url.includes('organization_id=eq.'+org));
  assert.ok(result.calls.every(c=>(c.init.method||'GET')==='GET'));assert.equal(result.response.headers.get('cache-control'),'no-store');
 });
