@@ -46,7 +46,7 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
     camera('SS010', {site: 'Test 1', state: 'UNKNOWN', online: 0, offline: 0, unknown: 1}),
     camera('SS058', {site: 'Helios Test Sites', state: 'GREEN', online: 1, offline: 0}),
     camera('Spotter 196', {site: 'Spotter Test Site'}),
-    camera('RII-025', {site: 'RII-025 Shop', placement: 'SHOP', state: 'RED'}),
+    camera('RII-025', {site: 'RII-025 Shop', placement: 'FIELD', state: 'RED'}),
   ];
   const records = [
     ...shop.map((unit, index) => record(String(1000 + index), unit.unit, 'SHOP', 'UNFLAGGED')),
@@ -54,10 +54,10 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
     ...dnu.map((unit, index) => record(String(2000 + index), unit.unit, 'SHOP', 'DO_NOT_USE')),
     record('175', 'Sniper 175', 'SHOP', 'DO_NOT_USE'),
     record('318', 'Sniper 318', 'FIELD', 'DO_NOT_USE'),
-    record('10', 'SS010', 'SHOP', 'UNFLAGGED'),
-    record('58', 'SS058', 'SHOP', 'UNFLAGGED'),
-    record('196', 'Spotter 196', 'SHOP', 'UNFLAGGED'),
-    record('25', 'RII-025', 'SHOP', 'UNFLAGGED'),
+    record('10', 'SS010', 'FIELD', 'UNFLAGGED'),
+    record('58', 'SS058', 'FIELD', 'UNFLAGGED'),
+    record('196', 'Spotter 196', 'FIELD', 'UNFLAGGED'),
+    record('25', 'RII-025', 'FIELD', 'UNFLAGGED'),
   ];
   const bare = liveFeedShopRows(units, {uploadInventory: {records: []}});
   const bareReport = decideShopCameras(bare.inputs, SHOP_CAMERA_RULE);
@@ -71,7 +71,7 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
   assert.equal(joined.inputs.find(row => row.unit === 'Sniper 175').productId, '175');
   assert.equal(joined.inputs.every(row => row.productId), true);
   const report = decideShopCameras(joined.inputs, SHOP_CAMERA_RULE);
-  assert.equal(report.figures.inShop, 323 + 4);
+  assert.equal(report.figures.inShop, 323);
   assert.equal(report.figures.doNotUse, 56);
   assert.equal(report.figures.exceptions, 1);
   assert.equal(report.byUnit.get('SNIPER 318').category, 'exception');
@@ -82,18 +82,52 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
   assert.equal(report.byUnit.get('SNIPER 175').category, 'doNotUse');
   for (const unit of ['SS010', 'SS058', 'SPOTTER 196', 'RII-025']) {
     const row = report.byUnit.get(unit);
-    assert.equal(row.category, 'inShop', unit);
-    assert.equal(row.counted.field, false, unit);
-    assert.equal(row.counted.armed, false, unit);
-    assert.equal(row.counted.immix, false, unit);
+    assert.equal(row.category, 'field', unit);
+    assert.equal(row.inShop, false, unit);
+    assert.equal(row.counted.field, true, unit);
   }
-  assert.equal(report.byUnit.get('SS010').inShop, true);
-  assert.equal(joined.inputs.find(row => row.unit === 'SS010').watchful.projectKey, configuredWatchfulTestProjectKey('Test 1'));
-  assert.equal(joined.inputs.find(row => row.unit === 'SS058').watchful.projectKey, configuredWatchfulTestProjectKey('Helios Test Sites'));
-  assert.equal(joined.inputs.find(row => row.unit === 'Spotter 196').watchful.projectKey, configuredWatchfulTestProjectKey('Spotter Test Site'));
-  assert.equal(joined.inputs.find(row => row.unit === 'RII-025').watchful.projectKey, configuredWatchfulTestProjectKey('RII-025 Shop'));
+  assert.equal(joined.inputs.find(row => row.unit === 'SS010').watchful?.projectKey ?? null, null);
   assert.equal(LIVE_CAMERA_FEED_HAS_WATCHFUL_PROJECT_UUID, false);
   assert.equal(joined.inputs.some(row => row.watchful?.projectKey === '283838'), false);
+  const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.testSites, null);
+  assert.equal(board.lines.find(line => line.label === 'Test sites').text, 'Test sites · not available');
+  assert.equal(board.lines.find(line => line.label === 'Test sites').text.includes('0'), false);
+});
+
+test('a site or organization label is not a test site without the Watchful project id', () => {
+  const labels = ['Test 1', 'Helios Test Sites', 'Spotter Test Site', 'RII-025 Shop'];
+  const units = labels.map((site, index) => camera('Label only ' + (index + 1), {site, organization: site, placement: 'FIELD', state: 'RED'}));
+  const withId = camera('Id only 1', {site: 'Synthetic yard', watchfulProjectKey: configuredWatchfulTestProjectKey('Test 1')});
+  const unlabeled = liveFeedShopRows(units, {uploadInventory: {records: []}});
+  const unlabeledReport = decideShopCameras(unlabeled.inputs, SHOP_CAMERA_RULE);
+  assert.equal(unlabeledReport.figures.inShop, 0);
+  assert.equal(unlabeledReport.figures.field, units.length);
+  for (const row of unlabeledReport.decisions) {
+    assert.equal(row.inShop, false);
+    assert.equal(row.counted.field, true);
+    assert.equal(row.flag, null);
+  }
+  const unlabeledBoard = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, unlabeled.inputs);
+  assert.equal(unlabeledBoard.shop.testSites, null);
+  assert.match(unlabeledBoard.lines.find(line => line.label === 'Test sites').text, /not available/);
+  assert.equal(unlabeledBoard.lines.find(line => line.label === 'Test sites').text.includes('0'), false);
+  const identified = liveFeedShopRows([withId, ...units], {uploadInventory: {records: []}});
+  const identifiedReport = decideShopCameras(identified.inputs, SHOP_CAMERA_RULE);
+  assert.equal(identifiedReport.byUnit.get('ID ONLY 1').inShop, true);
+  assert.equal(identifiedReport.byUnit.get('ID ONLY 1').counted.field, false);
+  assert.equal(identifiedReport.figures.field, units.length);
+  const identifiedBoard = cameraStatusBoard([withId, ...units], SHOP_CAMERA_RULE, {units: null, cameras: null}, identified.inputs);
+  assert.equal(identifiedBoard.shop.testSites, null);
+  const everyId = liveFeedShopRows([
+    camera('Counted 1', {site: 'Synthetic yard', watchfulProjectKey: configuredWatchfulTestProjectKey('Test 1')}),
+    camera('Counted 2', {site: 'Test 1', watchfulProjectKey: '00000000-0000-4000-8000-000000000099'}),
+  ], {uploadInventory: {records: []}});
+  const everyBoard = cameraStatusBoard(everyId.inputs, SHOP_CAMERA_RULE, {units: null, cameras: null}, everyId.inputs);
+  assert.equal(everyBoard.shop.testSites, 1);
+  assert.equal(everyBoard.lines.find(line => line.label === 'Test sites').text, 'Test sites · 1');
+  assert.equal(decideShopCameras(everyId.inputs).byUnit.get('COUNTED 2').inShop, false);
+  assert.equal(decideShopCameras(everyId.inputs).byUnit.get('COUNTED 2').counted.field, true);
 });
 
 test('a partial mHelp match does not report DO NOT USE 0', () => {

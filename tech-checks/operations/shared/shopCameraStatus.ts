@@ -572,13 +572,6 @@ function recordByUnitName(records: readonly LiveMhelpRecord[]): Map<string, Live
   return index;
 }
 
-/** Exact configured label only. A folded or lookalike name does not become a project id. */
-export function watchfulProjectForExactLabel(label: unknown, projects: readonly WatchfulTestProjectRecord[] = WATCHFUL_TEST_PROJECTS): WatchfulTestProjectRecord | null {
-  if (typeof label !== 'string' || !label) return null;
-  const found = projects.find(project => project.label === label && project.idStatus === 'known' && typeof project.id === 'string' && project.id);
-  return found ?? null;
-}
-
 export type LiveFeedCoverage = 'absent' | 'partial' | 'complete';
 
 export type LiveFeedJoin = {
@@ -610,7 +603,6 @@ export function liveFeedShopRows(units: readonly {unit?: string; placement?: Cam
     const lifecycle = record?.uploadLifecycle || ownLifecycle;
     const coveredWithoutRecord = !record && (explicit !== null || ownLifecycle.length > 0 || unit.doNotUse === true || unit.doNotUse === false || Boolean(carriedKey));
     if (coveredWithoutRecord) matched += 1;
-    const siteLabel = watchfulProjectForExactLabel(unit.site) || watchfulProjectForExactLabel(unit.organization);
     const tags = typeof unit.cameras === 'number' && unit.cameras === 0 ? ['no telemetry'] : [];
     inputs.push(shopCameraInput({
       unit: name,
@@ -622,7 +614,7 @@ export function liveFeedShopRows(units: readonly {unit?: string; placement?: Cam
       ...(record ? {productId: record.productId} : {}),
       ...(lifecycle ? {lifecycle} : {}),
       ...(record || ownLifecycle || unit.doNotUse === true || unit.doNotUse === false ? {doNotUse: lifecycle === 'DO_NOT_USE' || unit.doNotUse === true} : {}),
-      ...((siteLabel?.id || carriedKey) ? {watchfulProjectKey: siteLabel?.id || carriedKey, ...(siteLabel ? {watchfulProject: siteLabel.label} : {})} : {}),
+      ...(carriedKey ? {watchfulProjectKey: carriedKey} : {}),
       tags: [...tags, ...(unit.tags || [])],
     }));
   }
@@ -724,7 +716,7 @@ export type CameraStatusBoard<T> = {
   groups: {id: string; label: string; count: number}[];
   attention: string[];
   lines: {label: string; text: string}[];
-  shop: {field: number; armed: number | null; immix: number | null; inShop: number; doNotUse: number | null; exceptions: number | null} | null;
+  shop: {field: number; armed: number | null; immix: number | null; inShop: number; doNotUse: number | null; exceptions: number | null; testSites: number | null} | null;
 };
 
 /** The camera status header, groups, and attention list. Rule off is the main view. */
@@ -751,12 +743,18 @@ export function cameraStatusBoard<T extends {unit: string; placement: CameraPlac
   const doNotUse = report.decisions.filter(row => row.category === 'doNotUse').map(row => row.unit);
   const exceptions = report.decisions.filter(row => row.category === 'exception').map(row => row.unit);
   const partial = coverage === 'partial';
-  board.lines = partial
-    ? [{label: SHOP_DO_NOT_USE_LABEL, text: SHOP_DO_NOT_USE_LABEL + ' · —'}, {label: SHOP_EXCEPTION_LABEL, text: SHOP_EXCEPTION_LABEL + ' · —'}]
-    : [
-      ...(report.sources.doNotUse ? [{label: SHOP_DO_NOT_USE_LABEL, text: shopDoNotUseLine(doNotUse)}] : []),
-      ...(report.sources.exceptions ? [{label: SHOP_EXCEPTION_LABEL, text: exceptionLine(exceptions)}] : []),
-    ];
+  const projectIds = inputs.map(input => input.watchful?.projectKey).filter((key): key is string => typeof key === 'string' && key.length > 0);
+  const testSitesKnown = inputs.length > 0 && projectIds.length === inputs.length;
+  const testSites = testSitesKnown ? inputs.filter(input => isWatchfulTestProjectKey(input.watchful?.projectKey, rule)).length : null;
+  board.lines = [
+    ...(partial
+      ? [{label: SHOP_DO_NOT_USE_LABEL, text: SHOP_DO_NOT_USE_LABEL + ' · —'}, {label: SHOP_EXCEPTION_LABEL, text: SHOP_EXCEPTION_LABEL + ' · —'}]
+      : [
+        ...(report.sources.doNotUse ? [{label: SHOP_DO_NOT_USE_LABEL, text: shopDoNotUseLine(doNotUse)}] : []),
+        ...(report.sources.exceptions ? [{label: SHOP_EXCEPTION_LABEL, text: exceptionLine(exceptions)}] : []),
+      ]),
+    {label: 'Test sites', text: testSites === null ? 'Test sites · not available' : 'Test sites · ' + testSites},
+  ];
   board.shop = {
     field: report.figures.field,
     armed: report.sources.armed ? report.figures.armed : null,
@@ -764,6 +762,7 @@ export function cameraStatusBoard<T extends {unit: string; placement: CameraPlac
     inShop: report.figures.inShop,
     doNotUse: partial ? null : report.sources.doNotUse ? report.figures.doNotUse : null,
     exceptions: partial ? null : report.sources.exceptions ? report.figures.exceptions : null,
+    testSites,
   };
   return board;
 }

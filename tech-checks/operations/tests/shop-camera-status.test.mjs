@@ -569,7 +569,9 @@ test('armed, immix, DO NOT USE and exceptions are dropped when the rows do not c
   assert.equal(board.shop.immix, null);
   assert.equal(board.shop.doNotUse, null);
   assert.equal(board.shop.exceptions, null);
-  assert.deepEqual(board.lines, []);
+  assert.equal(board.lines.some(line => line.label === 'Shop, DO NOT USE'), false);
+  assert.equal(board.lines.some(line => line.label === 'Exceptions'), false);
+  assert.equal(board.lines.find(line => line.label === 'Test sites').text, 'Test sites · 1');
 });
 
 test('the Watchful test-project config fails closed', () => {

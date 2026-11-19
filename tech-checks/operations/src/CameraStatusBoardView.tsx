@@ -10,6 +10,7 @@ export default function CameraStatusBoardView({board, detail = false}: {board: C
       {board.shop.armed !== null && <span>Armed <b>{board.shop.armed}</b></span>}
       {board.shop.immix !== null && <span>Immix <b>{board.shop.immix}</b></span>}
       <span>In shop <b>{board.shop.inShop}</b></span>
+      <span>Test sites <b>{board.shop.testSites === null ? 'not available' : board.shop.testSites}</b></span>
       {board.lines.some(line => line.label === 'Shop, DO NOT USE' && line.text.endsWith('· —')) && <span>Shop, DO NOT USE <b>—</b></span>}
       {board.shop.doNotUse !== null && <span>Shop, DO NOT USE <b>{board.shop.doNotUse}</b></span>}
       {board.lines.some(line => line.label === 'Exceptions' && line.text.endsWith('· —')) && <span>Exceptions <b>—</b></span>}
