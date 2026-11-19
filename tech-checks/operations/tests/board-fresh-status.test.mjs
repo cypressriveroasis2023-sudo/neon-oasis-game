@@ -49,6 +49,28 @@ test('an Avigilon unit with no live reading uses a fresh Watchful status and sta
   assert.equal(shop.state, 'in_shop');
 });
 
+test('a missing or stale snapshot is Unknown and a Shop unit is never down', () => {
+  const missing = boardUnitStatus({unitName: 'Sniper 20', placement: 'field', readings: [], watchful: null, now});
+  assert.equal(missing.label, 'Unknown');
+  assert.notEqual(missing.state, 'offline');
+  const stale = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'field', readings: [],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: new Date(now - 27 * 60 * 60 * 1000).toISOString()},
+    now,
+  });
+  assert.equal(stale.label, 'Unknown');
+  assert.notEqual(stale.state, 'offline');
+  const shop = boardUnitStatus({
+    unitName: 'Sniper 20', placement: 'shop',
+    readings: [reading('Sniper 20', 'offline', fresh)],
+    watchful: {canonicalUnitKey: 'SNIPER|20', status: 'down', snapshotAt: fresh},
+    now,
+  });
+  assert.equal(shop.label, 'In Shop');
+  assert.equal(shop.state, 'in_shop');
+  assert.notEqual(shop.state, 'offline');
+});
+
 test('a reading that would expire before the 10-minute cadence requests a saved read without widening freshness', () => {
   assert.equal(CAMERA_AUTO_REFRESH_MS, 10 * 60 * 1000);
   assert.equal(CAMERA_FRESH_MS, 20 * 60 * 1000);
