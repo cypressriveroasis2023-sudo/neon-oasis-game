@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
-import {SNIPER_4100_FLAG, STALE_MHELP_REASON, MONITORED_COUNT_PATHS, countForPath, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
+import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, loadImmixRows, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
 import {formatObservedCt} from '../src/watchfulObservation.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
@@ -15,16 +15,23 @@ function reviewedDay() {
   const add = (camerasUp, camerasDown, cosStatus) => {
     const name = `Sniper ${n}`;
     const key = `SNIPER|${n}`;
+    const recordCount = [78, 79, 92, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(n) ? 3 : 2;
     snapshot.push({
       unitName: name,
       canonicalUnitKey: key,
-      siteName: `Fixture Site ${String((n % 92) + 1).padStart(2, '0')}`,
+      siteName: n === 92 ? 'Fixture Immix Only' : `Fixture Site ${String((n % 92) + 1).padStart(2, '0')}`,
       status: camerasDown ? 'down' : 'up',
       camerasUp,
       camerasDown,
       snapshotAt,
+      arming: 'Auto',
+      project: 'Fixture Field Project',
+      recordCount,
+      link: 'linked',
+      hardKey: key,
+      linkBy: 'key',
     });
-    mhelp.push({name, placement: 'FIELD', cosStatus});
+    mhelp.push({name, placement: 'FIELD', cosStatus, productId: String(9000 + n), arming: 'Auto', deployed: true, bucket: 'b'});
     n += 1;
   };
   for (let i = 0; i < 145; i++) add(3, 0, i < 3 ? 'down' : 'up');
@@ -41,20 +48,24 @@ function reviewedDay() {
     snapshotAt,
   });
   mhelp.push({name: 'Solar Spotter 054', placement: 'SHOP', cosStatus: 'down'});
-  const extraSites = [
-    'Fixture Site 01',
-    'Fixture Immix North',
-    'Fixture Immix South',
-    ...Array.from({length: 21}, () => 'Fixture Plain Yard'),
-    'Fixture Site 02',
-    'Fixture Plain Yard',
+  const extras = [
+    {name: 'Spotter 1', siteName: 'Fixture Immix North', siteKey: 'immix-key-north', productId: '9101'},
+    {name: 'Spotter 2', siteName: 'Fixture Immix South', siteKey: 'immix-key-south', productId: '9102'},
+    {name: 'Spotter 3', siteName: 'Fixture Immix East', siteKey: 'immix-key-east', productId: '9103'},
+    {name: 'Spotter 4', siteName: 'Fixture Immix North', siteKey: null, productId: '9104'},
+    {name: 'Spotter 5', siteName: 'Fixture Immix South', siteKey: null, productId: '9105'},
   ];
-  for (let i = 1; i <= 26; i++) mhelp.push({
+  for (const extra of extras) mhelp.push({...extra, placement: 'FIELD', cosStatus: 'unknown', arming: 'Auto', bucket: 'b', deployed: true});
+  for (let i = 6; i <= 26; i++) mhelp.push({
     name: `Spotter ${i}`,
     placement: 'FIELD',
     cosStatus: 'unknown',
-    siteName: extraSites[i - 1],
-    stale: i >= 25,
+    siteName: 'Fixture Plain Yard',
+    siteKey: null,
+    productId: String(9100 + i),
+    arming: 'Auto',
+    bucket: 'b',
+    deployed: true,
   });
   mhelp.push({name: 'Sniper 900 test bench', placement: 'FIELD'});
   mhelp.push({name: 'Sniper 901', placement: 'FIELD', doNotUse: true});
@@ -71,8 +82,8 @@ test('one shared count matches the reviewed Watchful day, and every path uses it
   assert.equal(count.sites, 92);
   assert.deepEqual(count.cameras, {up: 465, down: 23, total: 488});
   assert.equal(count.downUnits, 8);
-  assert.equal(count.notInWatchful.length, 24);
-  assert.equal(count.needsCheck.length, 2);
+  assert.equal(count.notInWatchful.length, 26);
+  assert.equal(count.needsCheck.length, 0);
   assert.equal(count.monitoredOnImmix.length, 0);
   assert.equal(count.statusMismatches.length, 3);
   assert.equal(count.inShop, 1);
@@ -202,15 +213,15 @@ test('Immix-site units leave Not in Watchful and are not counted as Watchful uni
       camerasDown: 0,
       snapshotAt,
     }],
-    immixSites: ['Fixture Immix Yard', 'Fixture Mixed Yard'],
+    immixKeys: ['immix-key-mixed', 'immix-key-yard'],
     mhelp: [
-      {name: 'Sniper 8', placement: 'FIELD', siteName: 'Fixture Mixed Yard'},
-      {name: 'Sniper 9', placement: 'FIELD', siteName: 'Fixture Mixed Yard'},
-      {name: 'Sniper 10', placement: 'FIELD', siteName: 'Fixture Immix Yard'},
-      {name: 'Sniper 11', placement: 'FIELD', siteName: 'Fixture Plain Yard'},
-      {name: 'Sniper 12 test', placement: 'FIELD', siteName: 'Fixture Immix Yard'},
-      {name: 'Sniper 13', placement: 'SHOP', siteName: 'Fixture Immix Yard'},
-      {name: 'Sniper 14', placement: 'FIELD', siteName: 'Fixture Immix Yard', doNotUse: true},
+      {name: 'Sniper 8', placement: 'FIELD', siteName: 'Fixture Mixed Yard', siteKey: 'immix-key-mixed'},
+      {name: 'Sniper 9', placement: 'FIELD', siteName: 'Fixture Mixed Yard', siteKey: 'immix-key-mixed'},
+      {name: 'Sniper 10', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
+      {name: 'Sniper 11', placement: 'FIELD', siteName: 'Fixture Plain Yard', siteKey: 'plain-key'},
+      {name: 'Sniper 12 test', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
+      {name: 'Sniper 13', placement: 'SHOP', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard'},
+      {name: 'Sniper 14', placement: 'FIELD', siteName: 'Fixture Immix Yard', siteKey: 'immix-key-yard', doNotUse: true},
     ],
     now,
   });
@@ -229,31 +240,150 @@ test('Immix-site units leave Not in Watchful and are not counted as Watchful uni
   }
 });
 
-const SIX_IMMIX_SITES = [
-  'Fixture Site 01',
-  'Fixture Site 02',
-  'Fixture Immix North',
-  'Fixture Immix South',
-  'Fixture Immix East',
-  'Fixture Immix West',
+const IMMIX_LOAD_CASES = {
+  3: {testModeUnits: [], expectedMoved: 3},
+  4: {testModeUnits: ['Sniper 92'], expectedMoved: 4},
+  5: {testModeUnits: ['Sniper 92', 'Sniper 78', 'Sniper 79'], expectedMoved: 5},
+};
+const SIX_IMMIX_KEYS = [
+  {siteKey: 'immix-key-north'},
+  {siteKey: 'immix-key-south'},
+  {siteKey: 'immix-key-east'},
+  {siteKey: 'immix-key-only'},
+  {siteKey: 'immix-key-split'},
+  {siteKey: 'immix-key-spare'},
 ];
 
-test('marking six synthetic Immix sites moves three units and leaves the Watchful totals', () => {
-  const {snapshot, mhelp} = reviewedDay();
-  const count = selectSharedMonitoredCount({snapshot, mhelp, immixSites: SIX_IMMIX_SITES, now});
-  assert.equal(SIX_IMMIX_SITES.length, 6);
-  assert.equal(count.units, 169);
+function arm(day, scenario) {
+  const names = new Set(IMMIX_LOAD_CASES[scenario].testModeUnits);
+  const siteOf = { 'Sniper 92': ['Fixture Immix Only', 'immix-key-only'], 'Sniper 78': ['Fixture Split Yard', 'immix-key-split'], 'Sniper 79': ['Fixture Test Yard', null] };
+  for (const unit of day.snapshot) {
+    if (!names.has(unit.unitName)) continue;
+    const [siteName, siteKey] = siteOf[unit.unitName];
+    unit.arming = 'TestMode';
+    unit.project = 'Fixture Test Project';
+    unit.siteName = siteName;
+    unit.hardKey = null;
+    unit.linkBy = 'recon_label';
+    const row = day.mhelp.find(item => item.name === unit.unitName);
+    row.arming = 'TestMode';
+    row.project = 'Fixture Test Project';
+    row.siteName = siteName;
+    row.siteKey = siteKey;
+  }
+  return day;
+}
+
+function counted(day, {testModeRule = false, rows = [], previousArming} = {}) {
+  const loaded = loadImmixRows(rows);
+  return selectSharedMonitoredCount({
+    snapshot: day.snapshot,
+    mhelp: day.mhelp,
+    testModeRule,
+    immixKeys: loaded.accepted.map(row => row.siteKey),
+    previousArming,
+    now,
+  });
+}
+
+test('the load fixture parametrizes Test Mode units and the Immix move count', () => {
+  assert.deepEqual(IMMIX_LOAD_CASES[3], {testModeUnits: [], expectedMoved: 3});
+  assert.deepEqual(IMMIX_LOAD_CASES[4].testModeUnits, ['Sniper 92']);
+  assert.equal(IMMIX_LOAD_CASES[4].expectedMoved, 4);
+  assert.deepEqual(IMMIX_LOAD_CASES[5].testModeUnits, ['Sniper 92', 'Sniper 78', 'Sniper 79']);
+  assert.equal(IMMIX_LOAD_CASES[5].expectedMoved, 5);
+  const day = arm(reviewedDay(), 4);
+  const unit = day.snapshot.find(item => item.unitName === 'Sniper 92');
+  assert.equal(unit.hardKey, null);
+  assert.equal(unit.linkBy, 'recon_label');
+  assert.equal(unit.arming, 'TestMode');
+});
+
+test('Test Mode leaves the Watchful total while the Immix table is empty', () => {
+  const count = counted(arm(reviewedDay(), 4), {testModeRule: true});
+  assert.equal(count.units, 168);
+  assert.equal(count.sites, 91);
+  assert.deepEqual(count.cameras, {up: 462, down: 23, total: 485});
+  assert.equal(count.upUnits, 160);
   assert.equal(count.downUnits, 8);
-  assert.deepEqual(count.cameras, {up: 465, down: 23, total: 488});
-  assert.equal(count.sites, 92);
-  assert.equal(count.monitoredOnImmix.length, 3);
-  assert.equal(count.notInWatchful.length, 21);
-  assert.notEqual(count.notInWatchful.length, 0);
-  assert.equal(count.needsCheck.length, 2);
-  assert.deepEqual(count.needsCheck.map(row => row.reason), [STALE_MHELP_REASON, STALE_MHELP_REASON]);
-  assert.equal(count.monitoredOnImmix.some(unit => count.needsCheck.some(row => row.name === unit.name)), false);
-  assert.equal(count.notInWatchful.some(unit => count.needsCheck.some(row => row.name === unit.name)), false);
-  assert.equal(count.monitoredOnImmix.every(unit => unit.statusLabel === 'Unknown'), true);
+  assert.equal(count.records, 347);
+  assert.equal(count.unlinked, 0);
+  assert.equal(count.monitoredOnImmix.length, 0);
+  const held = count.fieldNotMonitored.find(unit => unit.name === 'Sniper 92');
+  assert.equal(held.reason, TEST_MODE_REASON);
+  assert.equal(held.status, 'Field-not-monitored');
+  assert.notEqual(held.status, 'Unknown');
+  assert.notEqual(held.status, 'Offline');
+  assert.match(count.excludedTestLines.join('\n'), /Fixture Test Project/);
+  assert.match(count.excludedTestLines.join('\n'), /Test Mode/);
+});
+
+test('six key-matched Immix rows move four units and do not change the Watchful total', () => {
+  const day = arm(reviewedDay(), 4);
+  const before = counted(day, {testModeRule: true});
+  const count = counted(day, {testModeRule: true, rows: SIX_IMMIX_KEYS});
+  assert.equal(count.monitoredOnImmix.length, IMMIX_LOAD_CASES[4].expectedMoved);
+  assert.deepEqual(count.monitoredOnImmix.map(unit => [unit.name, unit.productId]).sort(), [
+    ['Sniper 92', '9092'],
+    ['Spotter 1', '9101'],
+    ['Spotter 2', '9102'],
+    ['Spotter 3', '9103'],
+  ]);
+  const moved = count.monitoredOnImmix.find(unit => unit.name === 'Sniper 92');
+  assert.equal(moved.siteKey, 'immix-key-only');
+  assert.equal(moved.watchful_excluded_by, 'test_mode');
+  assert.equal(count.notInWatchful.length, 23);
+  assert.equal(count.notInWatchful.every(unit => unit.deployed), true);
+  assert.deepEqual(count.notInWatchfulBuckets, {b: 23, d: 0});
+  assert.equal(count.needsCheck.length, 0);
+  assert.equal(count.units, before.units);
+  assert.equal(count.sites, before.sites);
+  assert.deepEqual(count.cameras, before.cameras);
+  assert.deepEqual(count.notInWatchful.map(unit => unit.name).filter(name => name === 'Spotter 4' || name === 'Spotter 5'), ['Spotter 4', 'Spotter 5']);
+});
+
+test('Immix load guards keep Watchful totals and reject a row with no site key', () => {
+  const day = arm(reviewedDay(), 4);
+  const ruleOff = counted(day, {testModeRule: false, rows: SIX_IMMIX_KEYS});
+  assert.equal(ruleOff.monitoredOnImmix.length, 3);
+  assert.equal(ruleOff.notInWatchful.length, 23);
+  assert.equal(ruleOff.units, 169);
+  assert.equal(ruleOff.sites, 92);
+  assert.deepEqual(ruleOff.cameras, {up: 465, down: 23, total: 488});
+  assert.equal(ruleOff.monitoredOnImmix.some(unit => unit.name === 'Sniper 92'), false);
+  const loaded = counted(day, {testModeRule: true, rows: SIX_IMMIX_KEYS});
+  const nameless = loadImmixRows([...SIX_IMMIX_KEYS, {siteName: 'Fixture Immix North'}]);
+  assert.equal(nameless.rejected.length, 1);
+  assert.equal(nameless.accepted.length, 6);
+  const unchanged = counted(day, {testModeRule: true, rows: nameless.accepted});
+  assert.equal(unchanged.monitoredOnImmix.length, loaded.monitoredOnImmix.length);
+  const rolled = counted(day, {testModeRule: true});
+  assert.equal(rolled.units, 168);
+  assert.equal(rolled.monitoredOnImmix.length, 0);
+  assert.deepEqual(rolled.cameras, {up: 462, down: 23, total: 485});
+  const flipped = day.snapshot.find(unit => unit.unitName === 'Sniper 92');
+  const flippedRow = day.mhelp.find(unit => unit.name === 'Sniper 92');
+  flipped.arming = 'Auto';
+  flippedRow.arming = 'Auto';
+  const returned = counted(day, {testModeRule: true, rows: SIX_IMMIX_KEYS, previousArming: {'Sniper 92': 'TestMode'}});
+  assert.equal(returned.units, 169);
+  assert.equal(returned.sites, 92);
+  assert.deepEqual(returned.cameras, {up: 465, down: 23, total: 488});
+  assert.deepEqual(returned.drift, [{name: 'Sniper 92', from: 'TestMode', to: 'Auto'}]);
+});
+
+test('a fifth Test Mode unit at a split site is Immix and the other stays unmonitored', () => {
+  const count = counted(arm(reviewedDay(), 5), {testModeRule: true, rows: SIX_IMMIX_KEYS});
+  assert.equal(count.units, 166);
+  assert.equal(count.sites, 89);
+  assert.deepEqual(count.cameras, {up: 456, down: 23, total: 479});
+  assert.equal(count.upUnits, 158);
+  assert.equal(count.downUnits, 8);
+  assert.equal(count.monitoredOnImmix.some(unit => unit.name === 'Sniper 78'), true);
+  assert.equal(count.monitoredOnImmix.some(unit => unit.name === 'Sniper 79'), false);
+  assert.equal(count.fieldNotMonitored.some(unit => unit.name === 'Sniper 79'), true);
+  assert.equal(count.notInWatchful.length, 23);
+  assert.equal(count.monitoredOnImmix.length, IMMIX_LOAD_CASES[5].expectedMoved);
 });
 
 test('a Watchful unit with no Field match or two Field matches is an exception', () => {

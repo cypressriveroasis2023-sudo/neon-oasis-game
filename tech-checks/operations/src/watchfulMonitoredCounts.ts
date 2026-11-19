@@ -20,12 +20,27 @@ export type WatchfulCountUnit = {
   camerasUp: number;
   camerasDown: number;
   snapshotAt: string;
+  /** Live arming is data. TestMode leaves the customer total before bucketing. */
+  arming?: 'Auto' | 'TestMode';
+  project?: string;
+  recordCount?: number;
+  link?: 'linked' | 'unlinked';
+  /** Absent when the unit links by a Recon label instead of a hard key. */
+  hardKey?: string | null;
+  linkBy?: 'key' | 'recon_label';
 };
 
 export type MhelpCountUnit = {
   name: string;
   placement: 'FIELD' | 'SHOP' | 'OTHER';
   siteName?: string | null;
+  /** Immix loads match this key only. A name never matches. */
+  siteKey?: string | null;
+  productId?: string;
+  arming?: 'Auto' | 'TestMode';
+  project?: string;
+  bucket?: 'b' | 'd';
+  deployed?: boolean;
   doNotUse?: boolean;
   /** A stale mHelp record is reported for a check. It is not Immix and not pending. */
   stale?: boolean;
@@ -39,12 +54,26 @@ export type AmberFlag = { name: string; flag: typeof SNIPER_4100_FLAG };
 
 export type ImmixMonitoredUnit = {
   name: string;
+  productId: string | null;
   siteName: string;
+  siteKey: string;
   source: 'immix';
   status: 'unknown';
   statusLabel: 'Unknown';
   groupLabel: typeof IMMIX_GROUP_LABEL;
+  watchful_excluded_by: 'test_mode' | null;
 };
+
+export type FieldNotMonitored = {
+  name: string;
+  productId: string | null;
+  reason: 'Watchful project in TestMode';
+  status: 'Field-not-monitored';
+};
+
+export type ArmingDrift = { name: string; from: 'TestMode'; to: 'Auto' };
+
+export const TEST_MODE_REASON = 'Watchful project in TestMode' as const;
 
 export type StatusMismatch = {
   name: string;
@@ -66,8 +95,15 @@ export type SharedMonitoredCount = {
   inShopLabel: typeof IN_SHOP_LABEL;
   inShopColor: typeof IN_SHOP_COLOR;
   downUnits: number | null;
+  upUnits: number | null;
+  records: number | null;
+  unlinked: number | null;
   unknownUnits: number | null;
-  notInWatchful: {name: string}[];
+  notInWatchful: {name: string; productId: string | null; bucket: 'b' | 'd'; deployed: boolean}[];
+  notInWatchfulBuckets: {b: number; d: number};
+  fieldNotMonitored: FieldNotMonitored[];
+  excludedTestLines: string[];
+  drift: ArmingDrift[];
   needsCheck: NeedsCheck[];
   matchExceptions: MatchException[];
   amberFlags: AmberFlag[];
@@ -87,8 +123,15 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   inShopLabel: IN_SHOP_LABEL,
   inShopColor: IN_SHOP_COLOR,
   downUnits: fresh ? 0 : null,
+  upUnits: fresh ? 0 : null,
+  records: fresh ? 0 : null,
+  unlinked: fresh ? 0 : null,
   unknownUnits: fresh ? 0 : null,
   notInWatchful: [],
+  notInWatchfulBuckets: {b: 0, d: 0},
+  fieldNotMonitored: [],
+  excludedTestLines: [],
+  drift: [],
   needsCheck: [],
   matchExceptions: [],
   amberFlags: [],
@@ -96,10 +139,6 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   shopReview: [],
   statusMismatches: [],
 });
-
-function siteKey(value: string | null | undefined): string {
-  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '';
-}
 
 export function customerMonitoredName(name: string, doNotUse = false): boolean {
   if (doNotUse) return false;
@@ -126,8 +165,12 @@ export function selectSharedMonitoredCount(input: {
   snapshotAt?: string | null;
   /** Ignored. Freshness uses the oldest observation, not the fetch. */
   fetchedAt?: string | null;
-  /** Site names monitored on Immix instead of Watchful. Loaded later; not committed. */
-  immixSites?: readonly string[];
+  /** Accepted Immix site keys. A row with no key is never passed here. */
+  immixKeys?: readonly string[];
+  /** When true, a TestMode project leaves the Watchful customer total before bucketing. */
+  testModeRule?: boolean;
+  /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
+  previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
   mhelp: readonly MhelpCountUnit[];
   now?: number;
 }): SharedMonitoredCount {
@@ -152,7 +195,7 @@ export function selectSharedMonitoredCount(input: {
     mhelpByKey.set(key, list);
   }
 
-  const immixSites = new Set((input.immixSites || []).map(siteKey).filter(Boolean));
+  const immixKeys = new Set((input.immixKeys || []).map(key => key.trim()).filter(Boolean));
   const result = empty(true, oldestObservedAt);
   const sites = new Map<string, SiteCameraRow>();
   let camerasUp = 0;
@@ -165,6 +208,12 @@ export function selectSharedMonitoredCount(input: {
     const matches = sniper4100Name
       ? input.mhelp.filter(item => item.name.trim().toLowerCase() === 'sniper 4-100')
       : (mhelpByKey.get(key) || []);
+    if (input.testModeRule && unit.arming === 'TestMode') {
+      const project = unit.project || 'Fixture Test Project';
+      const line = `${project} · excluded test/Test Mode`;
+      if (!result.excludedTestLines.includes(line)) result.excludedTestLines.push(line);
+      continue;
+    }
     const shop = matches.filter(item => item.placement === 'SHOP');
     const field = matches.filter(item => item.placement === 'FIELD' && customerMonitoredName(item.name, item.doNotUse));
     if (shop.length && !field.length) {
@@ -183,7 +232,13 @@ export function selectSharedMonitoredCount(input: {
     const sniper4100 = unit.unitName.trim().toLowerCase() === 'sniper 4-100' && unit.status === 'down';
     counted.add(key);
     result.units = (result.units || 0) + 1;
+    result.records = (result.records || 0) + (unit.recordCount ?? 1);
+    if (unit.link === 'unlinked') result.unlinked = (result.unlinked || 0) + (unit.recordCount ?? 1);
     if (unit.status === 'down') result.downUnits = (result.downUnits || 0) + 1;
+    else result.upUnits = (result.upUnits || 0) + 1;
+    if (input.previousArming?.[unit.unitName] === 'TestMode' && (unit.arming || 'Auto') === 'Auto') {
+      result.drift.push({name: unit.unitName, from: 'TestMode', to: 'Auto'});
+    }
     if (sniper4100) {
       result.amberFlags.push({name: field[0].name, flag: SNIPER_4100_FLAG});
       countedNames.add(field[0].name.trim().toLowerCase());
@@ -212,18 +267,33 @@ export function selectSharedMonitoredCount(input: {
     const key = watchfulCanonicalUnitKey(unit.name);
     if (countedNames.has(unit.name.trim().toLowerCase())) continue;
     if (key && counted.has(key)) continue;
-    if (immixSites.has(siteKey(unit.siteName))) {
+    const matchedKey = typeof unit.siteKey === 'string' ? unit.siteKey.trim() : '';
+    if (matchedKey && immixKeys.has(matchedKey)) {
       result.monitoredOnImmix.push({
         name: unit.name,
+        productId: unit.productId || null,
         siteName: (unit.siteName || '').trim().replace(/\s+/g, ' '),
+        siteKey: matchedKey,
         source: 'immix',
         status: 'unknown',
         statusLabel: IMMIX_STATUS_LABEL,
         groupLabel: IMMIX_GROUP_LABEL,
+        watchful_excluded_by: unit.arming === 'TestMode' ? 'test_mode' : null,
       });
       continue;
     }
-    result.notInWatchful.push({name: unit.name});
+    if (input.testModeRule && unit.arming === 'TestMode') {
+      result.fieldNotMonitored.push({
+        name: unit.name,
+        productId: unit.productId || null,
+        reason: TEST_MODE_REASON,
+        status: 'Field-not-monitored',
+      });
+      continue;
+    }
+    const bucket = unit.bucket === 'd' ? 'd' : 'b';
+    result.notInWatchful.push({name: unit.name, productId: unit.productId || null, bucket, deployed: unit.deployed !== false});
+    result.notInWatchfulBuckets[bucket] += 1;
   }
 
   result.siteRows = [...sites.values()].sort((left, right) => left.siteName.localeCompare(right.siteName));
@@ -259,6 +329,19 @@ export const MONITORED_COUNT_PATHS = [
   'FleetEquipmentTotals',
   'FleetDashboard',
 ] as const;
+
+export type ImmixLoadRow = { siteKey?: string | null; siteName?: string };
+
+/** An Immix row matches only when it has a site key. A name-only row is rejected. */
+export function loadImmixRows(rows: readonly ImmixLoadRow[]): { accepted: {siteKey: string}[]; rejected: ImmixLoadRow[] } {
+  const accepted: {siteKey: string}[] = [];
+  const rejected: ImmixLoadRow[] = [];
+  for (const row of rows) {
+    if (typeof row.siteKey === 'string' && row.siteKey.trim()) accepted.push({siteKey: row.siteKey.trim()});
+    else rejected.push(row);
+  }
+  return {accepted, rejected};
+}
 
 export function countForPath(path: typeof MONITORED_COUNT_PATHS[number], input: Parameters<typeof selectSharedMonitoredCount>[0]): SharedMonitoredCount {
   if (!MONITORED_COUNT_PATHS.includes(path)) throw new Error('Unknown monitored count path.');
