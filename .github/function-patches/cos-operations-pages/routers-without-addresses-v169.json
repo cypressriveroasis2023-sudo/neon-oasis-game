@@ -1,10 +1,10 @@
 {
-  "description": "Stop GET /api/routers from sending network address fields to the browser. The router snapshot drops those fields and the router read no longer selects them. Status, the sign-in gate, and verify_jwt stay as they are. Preparation only. Do not deploy from this pull request.",
-  "authorization": "Preparation only. Running the workflow still requires an explicit dispatch for this patch. This file does not deploy anything.",
+  "description": "Remove router address fields from GET /api/routers. The base serve.ts is the live post-#425 output a586f215. savedFleetBoard.mjs stays the live board f93b82b3, not the later main copy. Requires live v169. Preparation only. Do not deploy from this pull request.",
+  "authorization": "Preparation only. Dispatch still requires an explicit confirmation. This file does not deploy anything.",
   "releaseStatus": "PREPARATION_ONLY",
   "slug": "cos-operations-pages",
   "projectRef": "tughscoxralhofrckvxy",
-  "sourceRecord": "tech-checks/docs/vision-native-preview-20261107/manifest.json",
+  "sourceRecord": "tech-checks/docs/cos-operations-pages-v169-live/serve.ts",
   "sourceDir": "tech-checks/docs/vision-native-preview-20261107/source",
   "sourceCommit": "b5b188229346182d9a4e29da42415a1b9d3b9d53",
   "deployedFileNames": {
@@ -22,10 +22,10 @@
   "verifyJwt": false,
   "requireLiveBeforeDeploy": {
     "status": "ACTIVE",
-    "version": 168,
-    "ezbr_sha256": "ea649429a36f21ef8272911615a802e3ccc6d2a6c21ac6ea6718eeb68ddf02af"
+    "version": 169
   },
   "sourceOverrides": {
+    "serve.ts": "tech-checks/docs/cos-operations-pages-v169-live/serve.ts",
     "savedFleetBoard.mjs": "tech-checks/docs/cos-operations-pages-v168-entry/savedFleetBoard.mjs"
   },
   "edits": [
@@ -47,8 +47,8 @@
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-    "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
-    "serve.ts": "2c44260d1b64b2e8f92309a308b71469467aec114069ca199a3691302f3aa8c5",
+    "savedFleetBoard.mjs": "f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a",
+    "serve.ts": "a586f2152fdd1c073b5ff9be3258e6e2e1394380e6a84e58868af39e2c2fbbc9",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
   },
@@ -57,8 +57,8 @@
     "productCheckSource.ts": "1f3fecc56b7752f7052735a19048e30dc82b5fb57e4cc96077f92015079f62f7",
     "productTcpRuntime.ts": "0bfa306792b2989cbd63108c01ea84bb0c5db564d24e469f7942691004e44e5e",
     "productVerifyNow.ts": "e7f3f02c633fe12a66646cdc4c005f813577f716b282234202011cd9b9ab9e92",
-    "savedFleetBoard.mjs": "40c536e10115961e9dfa09b98f5f9683a1b3a51f727eff36af130996eaf50ffd",
-    "serve.ts": "5469fa955b45deeae7179bbfdcdf905ca599f45d2df94390a11c59d92950c260",
+    "savedFleetBoard.mjs": "f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a",
+    "serve.ts": "abae957db02f00ca06cc66cc5302626608c2d97633086a4f9542f7e934d442da",
     "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
     "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420"
   }

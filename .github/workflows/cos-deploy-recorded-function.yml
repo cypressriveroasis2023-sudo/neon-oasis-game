@@ -24,8 +24,8 @@ on:
           - rollback-original-v134
           - business-screens-410-v168
           - rollback-business-410-to-v168
-          - routers-without-addresses-v168
-          - rollback-routers-without-addresses-to-v168
+          - routers-without-addresses-v169
+          - rollback-routers-without-addresses-to-v169
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
         required: true
@@ -54,11 +54,11 @@ jobs:
         if: inputs.patch == 'rollback-business-410-to-v168'
         run: printf '%s  %s\n' '2ef966757c72c203eee4b9cb93661b8052df30f3018045d841de3d72b72b6f0f' '.github/function-patches/cos-operations-pages/rollback-business-410-to-v168.json' | sha256sum -c -
       - name: Pin the routers address removal patch file
-        if: inputs.patch == 'routers-without-addresses-v168'
-        run: printf '%s  %s\n' '62874d090666cb94c4ebbe367adaa8aa8ede258f1b05d74eef29b587c3a18649' '.github/function-patches/cos-operations-pages/routers-without-addresses-v168.json' | sha256sum -c -
+        if: inputs.patch == 'routers-without-addresses-v169'
+        run: printf '%s  %s\n' '90a9bbdb3b5f00f2d2a2b879e3f8087a2aa0bd69232689e003717782a5f01e82' '.github/function-patches/cos-operations-pages/routers-without-addresses-v169.json' | sha256sum -c -
       - name: Pin the routers address removal rollback file
-        if: inputs.patch == 'rollback-routers-without-addresses-to-v168'
-        run: printf '%s  %s\n' 'be7f02b4bc36f141249cb84f86b0c7e6f7d2442acdeb2d88a58801235022b735' '.github/function-patches/cos-operations-pages/rollback-routers-without-addresses-to-v168.json' | sha256sum -c -
+        if: inputs.patch == 'rollback-routers-without-addresses-to-v169'
+        run: printf '%s  %s\n' '40c3d805bddcc8216399f8843abe3114680cc1ee2de9ef19dafa3d03f320ab21' '.github/function-patches/cos-operations-pages/rollback-routers-without-addresses-to-v169.json' | sha256sum -c -
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -24,7 +24,9 @@ export function routerStatus(row: Pick<RouterRow, 'probeStatus' | 'checkedAt'>, 
   if (now - observed > ROUTER_FRESHNESS_MS) return 'stale';
   return row.probeStatus === 'online' ? 'reachable' : row.probeStatus === 'offline' ? 'unreachable' : 'unknown';
 }
-const networkField = (key: string) => /ip|wan|lan/i.test(key);
+/** Exact router address fields. Matching is the whole name, never a substring. */
+export const ROUTER_ADDRESS_FIELDS = ['router_public_ip', 'unit_ip', 'public_ip', 'private_ip', 'publicIp', 'unitIp', 'privateIp', 'wanIp', 'lanIp', 'wan', 'lan', 'ip'] as const;
+const routerAddressFields = new Set<string>(ROUTER_ADDRESS_FIELDS);
 /** All fields are allowlisted. Network addresses, raw metadata, credentials, and guessed GPS never reach the browser. */
 export function routerSnapshot(routers: Row[], units: Row[], now = new Date()): RouterSnapshot {
   if (!Array.isArray(routers) || !Array.isArray(units)) throw new Error('Router source returned an incomplete collection.');
@@ -61,7 +63,7 @@ export function readRouterSnapshot(value: unknown): RouterSnapshot {
   if (!data || data.source !== 'camera_health' || data.gpsAvailable !== false || !stamp(data.generatedAt) || !Array.isArray(data.items)) throw new Error('Router inventory returned an incomplete response.');
   const ids = new Set<string>();
   for (const row of data.items) {
-    for (const key of Object.keys(row)) if (networkField(key)) delete (row as Record<string, unknown>)[key];
+    for (const key of Object.keys(row)) if (routerAddressFields.has(key)) delete (row as Record<string, unknown>)[key];
     if (!row || typeof row.id !== 'string' || !row.id || ids.has(row.id) || typeof row.unitKey !== 'string' || typeof row.name !== 'string' ||
       !['online', 'offline', 'unknown'].includes(row.probeStatus) || !['exact_name', 'ambiguous', 'unmatched'].includes(row.match) || row.gps !== null ||
       (row.checkedAt !== null && !stamp(row.checkedAt)) ||

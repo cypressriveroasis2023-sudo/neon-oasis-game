@@ -1,20 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { routerSnapshot, routerStatus, summarizeRouters, readRouterSnapshot, exactUnitName } from '../../supabase/functions/cos-operations-pages/routers.ts';
+import { routerSnapshot, routerStatus, summarizeRouters, readRouterSnapshot, exactUnitName, ROUTER_ADDRESS_FIELDS } from '../../supabase/functions/cos-operations-pages/routers.ts';
 const now = new Date('2026-10-05T21:00:00Z');
 const unit = {id:'11111111-1111-4111-8111-111111111111',unit_number:'HELIOS 001'};
 const router = {id:1,unit_key:'HELIOS 001',router_name:'Test router',router_model:'IR302',web_port:8080,web_protocol:'http',current_status:'online',last_checked_at:'2026-10-05T20:59:00Z',last_online_at:'2026-09-10T10:00:00Z',reported_status:'online',status_observed_at:'2026-09-22T10:00:00Z',status_source:'inhand_export',reported_latency_ms:40};
-const shapedAddress = () => [198, 51, 100, 24].join('.');
-const shapedV6 = () => ['2001', 'db8', '0', '10'].join(':');
-const networkKey = key => /ip|wan|lan/i.test(key);
-const ipv4 = /\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:\/\d{1,2})?\b/;
-const ipv6 = /\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{0,4}\b/i;
-function walk(value, visit) {
-  if (Array.isArray(value)) return value.forEach(item => walk(item, visit));
-  if (value && typeof value === 'object') {
-    for (const [key, item] of Object.entries(value)) { visit(key, item); walk(item, visit); }
-  }
-}
+const blocked = 'blocked-address-field';
 const row = (patch={}) => routerSnapshot([{...router,...patch}],[unit],now).items[0];
 test('fresh probe is reachable, failed probe is unreachable, imported online is never used',()=>{
  assert.equal(routerStatus(row(),+now),'reachable');
@@ -43,26 +33,23 @@ test('duplicate router names and duplicate COS names never auto-link',()=>{
  const duplicates=routerSnapshot([router,{...router,id:2}],[unit],now);assert.ok(duplicates.items.every(row=>row.match==='ambiguous'&&row.candidateUnit===null));
  const duplicateUnits=routerSnapshot([router],[unit,{...unit,id:'other'}],now);assert.equal(duplicateUnits.items[0].match,'ambiguous');assert.equal(duplicateUnits.items[0].candidateUnit,null);
 });
-test('router response has no network-address keys or address-shaped values',()=>{
- const hidden = shapedAddress(), hiddenPrefix = hidden + '/32', hiddenV6 = shapedV6();
- const value = routerSnapshot([{...router, router_public_ip: hiddenPrefix, unit_ip: hidden, wan: hidden, lan: hiddenV6, private_ip: hidden, publicIp: hidden}], [unit], now);
+test('router response drops the exact address field names and keeps nearby names',()=>{
+ const extra = Object.fromEntries(ROUTER_ADDRESS_FIELDS.map(name => [name, blocked]));
+ const value = routerSnapshot([{...router, ...extra, shipping: 'keep-shipping'}], [unit], now);
  const encoded = JSON.stringify(value);
- assert.equal(encoded.includes(hidden), false);
- assert.equal(encoded.includes(hiddenV6), false);
- const keys = [];
- walk(value, key => keys.push(key));
- assert.equal(keys.some(networkKey), false);
- assert.equal(ipv4.test(encoded), false);
- assert.equal(ipv6.test(encoded), false);
+ assert.equal(encoded.includes(blocked), false);
+ for (const name of ROUTER_ADDRESS_FIELDS) assert.equal(encoded.includes('"'+name+'"'), false);
  assert.equal(value.items[0].probeStatus, 'online');
+ assert.equal(value.items[0].unitKey, 'HELIOS 001');
  assert.equal(routerStatus(value.items[0], +now), 'reachable');
- assert.equal(routerStatus(routerSnapshot([{...router, current_status: null, last_checked_at: null, router_public_ip: hidden}], [unit], now).items[0], +now), 'unknown');
+ assert.equal(routerStatus(routerSnapshot([{...router, current_status: null, last_checked_at: null, router_public_ip: blocked}], [unit], now).items[0], +now), 'unknown');
  const injected = routerSnapshot([router], [unit], now);
- injected.items[0].publicIp = hidden;
- injected.items[0].wan = hiddenV6;
+ injected.items[0].publicIp = blocked;
+ injected.items[0].shipping = 'keep-shipping';
  const read = readRouterSnapshot(injected);
- assert.equal(JSON.stringify(read).includes(hidden), false);
- assert.equal(JSON.stringify(read).includes(hiddenV6), false);
+ assert.equal(JSON.stringify(read).includes(blocked), false);
+ assert.equal(read.items[0].shipping, 'keep-shipping');
+ assert.equal('publicIp' in read.items[0], false);
 });
 test('allowlist excludes credentials, metadata and any alleged GPS field',()=>{
  const value=row({latitude:30,longitude:-95,gps:{latitude:30,longitude:-95},password:'DO_NOT_EXPOSE',source_metadata:{token:'DO_NOT_EXPOSE'}});
