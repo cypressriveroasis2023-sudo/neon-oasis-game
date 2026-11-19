@@ -62,24 +62,22 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
   const bare = liveFeedShopRows(units, {uploadInventory: {records: []}});
   const bareReport = decideShopCameras(bare.inputs, SHOP_CAMERA_RULE);
   assert.equal(bare.mhelpCoverage, 'absent');
-  assert.equal(bareReport.figures.doNotUse, 0);
+  const bareBoard = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, bare.inputs, bare.mhelpCoverage);
+  assert.equal(bareBoard.shop.inShop, null);
+  assert.equal(bareBoard.shop.doNotUse, null);
+  assert.equal(bareBoard.shop.exceptions, null);
   assert.equal(bareReport.byUnit.get('SNIPER 137').inShop, false);
   assert.equal(bareReport.byUnit.get('SNIPER 137').placement, 'SHOP');
   assert.equal(bareReport.byUnit.get('SNIPER 137').state, 'RED');
   const joined = liveFeedShopRows(units, {uploadInventory: {contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', records}});
-  assert.equal(joined.mhelpCoverage, 'complete');
-  assert.equal(joined.inputs.find(row => row.unit === 'Sniper 175').productId, '175');
-  assert.equal(joined.inputs.every(row => row.productId), true);
+  assert.equal(joined.mhelpCoverage, 'absent');
+  assert.equal(joined.matched, 0);
+  assert.equal(joined.inputs.every(row => row.productId == null && row.mhelpPlacement == null), true);
   const report = decideShopCameras(joined.inputs, SHOP_CAMERA_RULE);
-  assert.equal(report.figures.inShop, 323);
-  assert.equal(report.figures.doNotUse, 56);
-  assert.equal(report.figures.exceptions, 1);
-  assert.equal(report.byUnit.get('SNIPER 318').category, 'exception');
-  assert.equal(report.byUnit.get('SNIPER 318').counted.field, false);
-  assert.equal(report.byUnit.get('SNIPER 137').category, 'inShop');
-  assert.equal(report.byUnit.get('SNIPER 137').state, 'GREEN');
-  assert.notEqual(report.byUnit.get('SNIPER 137').state, 'RED');
-  assert.equal(report.byUnit.get('SNIPER 175').category, 'doNotUse');
+  assert.equal(report.byUnit.get('SNIPER 318').category, 'field');
+  assert.equal(report.byUnit.get('SNIPER 318').counted.field, true);
+  assert.equal(report.byUnit.get('SNIPER 137').inShop, false);
+  assert.equal(report.byUnit.get('SNIPER 175').category, 'field');
   for (const unit of ['SS010', 'SS058', 'SPOTTER 196', 'RII-025']) {
     const row = report.byUnit.get(unit);
     assert.equal(row.category, 'field', unit);
@@ -90,6 +88,11 @@ test('live-shaped rows use upload product ids and lifecycles without injecting k
   assert.equal(LIVE_CAMERA_FEED_HAS_WATCHFUL_PROJECT_UUID, false);
   assert.equal(joined.inputs.some(row => row.watchful?.projectKey === '283838'), false);
   const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.inShop, null);
+  assert.equal(board.shop.doNotUse, null);
+  assert.equal(board.shop.exceptions, null);
+  assert.match(board.lines.find(line => line.label === 'Shop, DO NOT USE').text, /—/);
+  assert.equal(board.lines.find(line => line.label === 'Shop, DO NOT USE').text.includes('0'), false);
   assert.equal(board.shop.testSites, null);
   assert.equal(board.lines.find(line => line.label === 'Test sites').text, 'Test sites · not available');
   assert.equal(board.lines.find(line => line.label === 'Test sites').text.includes('0'), false);
@@ -130,17 +133,19 @@ test('a site or organization label is not a test site without the Watchful proje
   assert.equal(decideShopCameras(everyId.inputs).byUnit.get('COUNTED 2').counted.field, true);
 });
 
-test('a partial mHelp match does not report DO NOT USE 0', () => {
+test('a partial product-id key does not report In shop, DO NOT USE, or Exceptions as a number', () => {
   const units = [
-    camera('Sniper 137', {placement: 'SHOP'}),
-    camera('Sniper 175', {placement: 'SHOP'}),
-    camera('Sniper 318'),
+    camera('HELIOS 001', {productId: '137'}),
+    camera('SOLARSPOTTER 010'),
+    camera('SPOTTER 196'),
   ];
-  const records = [record('137', 'Sniper 137', 'SHOP', 'UNFLAGGED')];
+  const records = [record('137', 'Helios 001', 'SHOP', 'UNFLAGGED')];
   const joined = liveFeedShopRows(units, {uploadInventory: {records}});
   assert.equal(joined.mhelpCoverage, 'partial');
   assert.equal(joined.matched, 1);
+  assert.equal(joined.inputs.find(row => row.unit === 'SOLARSPOTTER 010').mhelpPlacement, null);
   const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.inShop, null);
   assert.equal(board.shop.doNotUse, null);
   assert.equal(board.shop.exceptions, null);
   assert.equal(board.lines.find(line => line.label === 'Shop, DO NOT USE').text.includes('0'), false);
@@ -148,17 +153,60 @@ test('a partial mHelp match does not report DO NOT USE 0', () => {
   assert.match(board.lines.find(line => line.label === 'Exceptions').text, /—/);
 });
 
-test('placementStatus fills mHelp placement and uploadLifecycle fills DO NOT USE', () => {
-  const units = [camera('Sniper 175', {placement: 'SHOP', state: 'RED'})];
+test('mixed-case names and a DO NOT USE suffix do not produce a confident mHelp count', () => {
+  const units = [
+    camera('HELIOS 001'),
+    camera('SOLARSPOTTER 010'),
+    camera('SPOTTER 196'),
+    camera('Sniper 318'),
+  ];
+  const records = [
+    record('11', 'Helios 001', 'SHOP', 'UNFLAGGED'),
+    record('12', 'Solar Spotter 010', 'SHOP', 'UNFLAGGED'),
+    record('13', 'Spotter 196HDC2', 'SHOP', 'UNFLAGGED'),
+    record('14', 'Sniper 318 - DO NOT USE', 'SHOP', 'DO_NOT_USE'),
+  ];
+  const named = liveFeedShopRows(units, {uploadInventory: {records}});
+  assert.equal(named.mhelpCoverage, 'absent');
+  assert.equal(named.inputs.every(row => row.productId == null && row.mhelpPlacement == null && row.doNotUse == null), true);
+  const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, named.inputs, named.mhelpCoverage);
+  assert.equal(board.shop.inShop, null);
+  assert.equal(board.shop.doNotUse, null);
+  assert.equal(board.shop.exceptions, null);
+  assert.match(board.lines.find(line => line.label === 'Shop, DO NOT USE').text, /—/);
+  assert.equal(board.lines.find(line => line.label === 'Shop, DO NOT USE').text.includes('0'), false);
+  assert.match(board.lines.find(line => line.label === 'Exceptions').text, /—/);
+  assert.equal(board.lines.find(line => line.label === 'Exceptions').text.includes('0'), false);
+  const none = liveFeedShopRows(units, {uploadInventory: {records: []}});
+  const noneBoard = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, none.inputs, none.mhelpCoverage);
+  assert.equal(none.mhelpCoverage, 'absent');
+  assert.equal(noneBoard.shop.inShop, null);
+  assert.equal(noneBoard.shop.doNotUse, null);
+  const keyedUnits = units.map((unit, index) => ({...unit, productId: String(11 + index)}));
+  const keyed = liveFeedShopRows(keyedUnits, {uploadInventory: {records}});
+  assert.equal(keyed.mhelpCoverage, 'complete');
+  assert.equal(keyed.inputs.find(row => row.unit === 'Sniper 318').mhelpPlacement, 'SHOP');
+  assert.equal(keyed.inputs.find(row => row.unit === 'Sniper 318').doNotUse, true);
+  const keyedBoard = cameraStatusBoard(keyedUnits, SHOP_CAMERA_RULE, {units: null, cameras: null}, keyed.inputs, keyed.mhelpCoverage);
+  assert.equal(keyedBoard.shop.inShop, 3);
+  assert.equal(keyedBoard.shop.doNotUse, 1);
+  assert.equal(keyedBoard.shop.exceptions, 0);
+});
+
+test('placementStatus fills mHelp placement from the product id, not the unit name', () => {
+  const units = [camera('HELIOS 001', {placement: 'FIELD', state: 'RED', productId: '175'})];
   const joined = liveFeedShopRows(units, {uploadInventory: {records: [{
-    productId: '175', unitNumber: 'Sniper 175', sourceUnitNumber: 'Sniper 175', placementStatus: 'SHOP', uploadLifecycle: 'DO_NOT_USE',
+    productId: '175', unitNumber: 'Sniper 175 - DO NOT USE', sourceUnitNumber: 'Sniper 175 - DO NOT USE', placementStatus: 'SHOP', uploadLifecycle: 'DO_NOT_USE',
   }]}});
   const input = joined.inputs[0];
   assert.equal(input.productId, '175');
   assert.equal(input.mhelpPlacement, 'SHOP');
   assert.equal(input.doNotUse, true);
-  const row = decideShopCameras(joined.inputs).byUnit.get('SNIPER 175');
+  const row = decideShopCameras(joined.inputs).byUnit.get('HELIOS 001');
   assert.equal(row.category, 'doNotUse');
   assert.equal(row.inShop, false);
   assert.notEqual(row.state, 'GREEN');
+  const board = cameraStatusBoard(units, SHOP_CAMERA_RULE, {units: null, cameras: null}, joined.inputs, joined.mhelpCoverage);
+  assert.equal(board.shop.inShop, 0);
+  assert.equal(board.shop.doNotUse, 1);
 });
