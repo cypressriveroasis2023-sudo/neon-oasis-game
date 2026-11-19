@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
-import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, loadImmixRows, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
+import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, deriveSplitSiteKeys, loadImmixRows, presentedArming, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
 import {formatObservedCt} from '../src/watchfulObservation.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
@@ -428,6 +428,99 @@ test('Sniper 4-100 stays counted down and carries the amber flag', () => {
 
 test('the observed stamp is an hour and minute in Central time', () => {
   assert.equal(formatObservedCt('2026-11-19T15:00:00Z'), '9:00 AM CT');
+});
+
+function caseFiveWithArchived() {
+  const day = arm(reviewedDay(), 5);
+  const archived = day.snapshot.find(unit => unit.canonicalUnitKey === 'SNIPER|80');
+  const donor = day.snapshot.find(unit => unit.canonicalUnitKey === 'SNIPER|146');
+  archived.camerasUp += 1;
+  donor.camerasUp -= 1;
+  archived.projectArchived = true;
+  archived.arming = 'Disarmed';
+  archived.unitName = 'Sniper 80 Paused';
+  const sharedKey = day.mhelp.find(row => row.name === 'Sniper 78').siteKey;
+  day.mhelp.push({
+    name: 'Spotter 27',
+    placement: 'FIELD',
+    siteKey: sharedKey,
+    productId: '9127',
+    latestStatus: 'down',
+    observedAt: new Date(now - 21 * 60 * 1000).toISOString(),
+    deployed: true,
+    bucket: 'b',
+  });
+  const fresh = new Date(now - 5 * 60 * 1000).toISOString();
+  for (const name of ['Spotter 1', 'Spotter 2', 'Spotter 3', 'Sniper 92']) {
+    const row = day.mhelp.find(item => item.name === name);
+    row.latestStatus = 'up';
+    row.observedAt = fresh;
+  }
+  day.mhelp.find(row => row.name === 'Sniper 78').latestStatus = 'down';
+  day.mhelp.find(row => row.name === 'Sniper 78').observedAt = fresh;
+  return day;
+}
+
+function unitSiteKeys(day) {
+  const byKey = new Map(day.mhelp.filter(row => /^Sniper \d+$/.test(row.name)).map(row => {
+    const number = Number(row.name.slice('Sniper '.length));
+    return [`SNIPER|${number}`, row];
+  }));
+  const rows = day.snapshot.map(unit => ({siteKey: byKey.get(unit.canonicalUnitKey)?.siteKey ?? null, watchful: true}));
+  const watchful = new Set(day.snapshot.map(unit => unit.canonicalUnitKey));
+  for (const row of day.mhelp) {
+    const sniper = /^Sniper (\d+)$/.exec(row.name);
+    const key = sniper ? `SNIPER|${Number(sniper[1])}` : null;
+    if (!key || !watchful.has(key)) rows.push({siteKey: row.siteKey ?? null, watchful: false});
+  }
+  return rows;
+}
+
+test('an archived project is not in Watchful only while that rule is on', () => {
+  const day = caseFiveWithArchived();
+  const off = selectSharedMonitoredCount({
+    snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: false,
+    immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
+  });
+  assert.equal(off.units, 166);
+  assert.equal(off.sites, 89);
+  assert.deepEqual(off.cameras, {up: 456, down: 23, total: 479});
+  assert.equal(off.notInWatchful.length, 23);
+  assert.equal(off.notArmed, 0);
+  const on = selectSharedMonitoredCount({
+    snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
+  });
+  assert.equal(on.units, 165);
+  assert.equal(on.sites, 88);
+  assert.deepEqual(on.cameras, {up: 452, down: 23, total: 475});
+  assert.equal(on.notInWatchful.length, 24);
+  const parked = on.notInWatchful.find(unit => unit.name === 'Sniper 80 Paused');
+  assert.equal(parked.deployed, true);
+  assert.equal(parked.mode, 'Disarmed');
+  assert.equal(presentedArming({name: parked.name, arming: 'Disarmed'}), 'Disarmed');
+  assert.notEqual(parked.mode, 'Paused');
+  assert.equal(on.notArmed, 1);
+});
+
+test('split sites come from unit-to-site keys and the fixture has one', () => {
+  const keys = deriveSplitSiteKeys(unitSiteKeys(caseFiveWithArchived()));
+  assert.equal(keys.length, 1);
+  const shared = caseFiveWithArchived().mhelp.find(row => row.name === 'Sniper 78').siteKey;
+  assert.deepEqual(keys, [shared]);
+});
+
+test('the Immix line counts fresh up and down readings and leaves a 20-minute-old reading Unknown', () => {
+  const day = caseFiveWithArchived();
+  const count = selectSharedMonitoredCount({
+    snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
+  });
+  assert.equal(count.immixUp, 4);
+  assert.equal(count.immixDown, 1);
+  const stale = count.monitoredOnImmix.find(unit => unit.name === 'Spotter 27');
+  assert.equal(stale.status, 'unknown');
+  assert.equal(stale.statusLabel, 'Unknown');
 });
 
 test('the camera health render function parses', () => {

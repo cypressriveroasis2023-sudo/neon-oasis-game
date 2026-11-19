@@ -18,7 +18,7 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
  const cameras=totals?.find(t=>t.key==='cameras');
  return <section className='cos-equipment-totals' aria-label='Equipment family totals'>
   <p className='cos-monitored-count'>Monitored units {shared.fresh&&shared.units!==null?shared.units:'Unknown'} · Cameras {shared.cameras?shared.cameras.up+' up, '+shared.cameras.down+' down':'Unknown'}{shared.oldestObservedAt?' · Observed '+formatObservedCt(shared.oldestObservedAt):''}</p>
-  {shared.monitoredOnImmix.length>0&&<p className='cos-immix-monitored'>{shared.monitoredOnImmix[0].groupLabel} · {shared.monitoredOnImmix.length} · {shared.monitoredOnImmix[0].statusLabel}</p>}
+  {shared.monitoredOnImmix.length>0&&<p className='cos-immix-monitored'>{shared.monitoredOnImmix[0].groupLabel} · {shared.monitoredOnImmix.length} · {shared.immixUp??0} up, {shared.immixDown??0} down</p>}
   {shared.amberFlags.map(flag=><p className='cos-monitored-amber' key={flag.name}>{flag.flag}</p>)}
   {shared.matchExceptions.map(flag=><p className='cos-monitored-exception' key={flag.name}>{flag.name}: {flag.reason}</p>)}
   {shared.needsCheck.map(flag=><p className='cos-monitored-check' key={flag.name}>{flag.name}: {flag.reason}</p>)}

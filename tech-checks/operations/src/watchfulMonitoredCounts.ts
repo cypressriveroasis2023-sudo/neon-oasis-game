@@ -21,7 +21,9 @@ export type WatchfulCountUnit = {
   camerasDown: number;
   snapshotAt: string;
   /** Live arming is data. TestMode leaves the customer total before bucketing. */
-  arming?: 'Auto' | 'TestMode';
+  arming?: 'Auto' | 'TestMode' | 'Disarmed';
+  /** A marked archived project is not a Watchful customer unit. */
+  projectArchived?: boolean;
   project?: string;
   recordCount?: number;
   link?: 'linked' | 'unlinked';
@@ -37,8 +39,12 @@ export type MhelpCountUnit = {
   /** Immix loads match this key only. A name never matches. */
   siteKey?: string | null;
   productId?: string;
-  arming?: 'Auto' | 'TestMode';
+  arming?: 'Auto' | 'TestMode' | 'Disarmed';
+  projectArchived?: boolean;
   project?: string;
+  /** Latest provider status. Unknown once it is 20 minutes past read time. */
+  latestStatus?: 'up' | 'down';
+  observedAt?: string;
   bucket?: 'b' | 'd';
   deployed?: boolean;
   doNotUse?: boolean;
@@ -58,8 +64,8 @@ export type ImmixMonitoredUnit = {
   siteName: string;
   siteKey: string;
   source: 'immix';
-  status: 'unknown';
-  statusLabel: 'Unknown';
+  status: 'up' | 'down' | 'unknown';
+  statusLabel: string;
   groupLabel: typeof IMMIX_GROUP_LABEL;
   watchful_excluded_by: 'test_mode' | null;
 };
@@ -99,8 +105,11 @@ export type SharedMonitoredCount = {
   records: number | null;
   unlinked: number | null;
   unknownUnits: number | null;
-  notInWatchful: {name: string; productId: string | null; bucket: 'b' | 'd'; deployed: boolean}[];
+  notInWatchful: {name: string; productId: string | null; bucket: 'b' | 'd'; deployed: boolean; mode?: string}[];
   notInWatchfulBuckets: {b: number; d: number};
+  notArmed: number | null;
+  immixUp: number | null;
+  immixDown: number | null;
   fieldNotMonitored: FieldNotMonitored[];
   excludedTestLines: string[];
   drift: ArmingDrift[];
@@ -129,6 +138,9 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   unknownUnits: fresh ? 0 : null,
   notInWatchful: [],
   notInWatchfulBuckets: {b: 0, d: 0},
+  notArmed: fresh ? 0 : null,
+  immixUp: fresh ? 0 : null,
+  immixDown: fresh ? 0 : null,
   fieldNotMonitored: [],
   excludedTestLines: [],
   drift: [],
@@ -169,6 +181,8 @@ export function selectSharedMonitoredCount(input: {
   immixKeys?: readonly string[];
   /** When true, a TestMode project leaves the Watchful customer total before bucketing. */
   testModeRule?: boolean;
+  /** When true, an archived project counts as not in Watchful. Off leaves the totals unchanged. */
+  archivedRule?: boolean;
   /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
   previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
   mhelp: readonly MhelpCountUnit[];
@@ -208,6 +222,21 @@ export function selectSharedMonitoredCount(input: {
     const matches = sniper4100Name
       ? input.mhelp.filter(item => item.name.trim().toLowerCase() === 'sniper 4-100')
       : (mhelpByKey.get(key) || []);
+    if (input.archivedRule && unit.projectArchived) {
+      const placement = matches.find(item => item.placement === 'FIELD' || item.placement === 'SHOP');
+      const mode = presentedArming({name: unit.unitName, arming: unit.arming});
+      result.notInWatchful.push({
+        name: unit.unitName,
+        productId: placement?.productId || null,
+        bucket: 'b',
+        deployed: placement?.placement === 'FIELD',
+        mode,
+      });
+      result.notInWatchfulBuckets.b += 1;
+      if (mode === 'Disarmed') result.notArmed = (result.notArmed || 0) + 1;
+      counted.add(key);
+      continue;
+    }
     if (input.testModeRule && unit.arming === 'TestMode') {
       const project = unit.project || 'Fixture Test Project';
       const line = `${project} · excluded test/Test Mode`;
@@ -269,17 +298,20 @@ export function selectSharedMonitoredCount(input: {
     if (key && counted.has(key)) continue;
     const matchedKey = typeof unit.siteKey === 'string' ? unit.siteKey.trim() : '';
     if (matchedKey && immixKeys.has(matchedKey)) {
+      const reading = immixReadingStatus(unit.observedAt, unit.latestStatus, now);
       result.monitoredOnImmix.push({
         name: unit.name,
         productId: unit.productId || null,
         siteName: (unit.siteName || '').trim().replace(/\s+/g, ' '),
         siteKey: matchedKey,
         source: 'immix',
-        status: 'unknown',
-        statusLabel: IMMIX_STATUS_LABEL,
+        status: reading,
+        statusLabel: reading === 'up' ? 'Up' : reading === 'down' ? 'Down' : IMMIX_STATUS_LABEL,
         groupLabel: IMMIX_GROUP_LABEL,
         watchful_excluded_by: unit.arming === 'TestMode' ? 'test_mode' : null,
       });
+      if (reading === 'up') result.immixUp = (result.immixUp || 0) + 1;
+      if (reading === 'down') result.immixDown = (result.immixDown || 0) + 1;
       continue;
     }
     if (input.testModeRule && unit.arming === 'TestMode') {
@@ -316,9 +348,36 @@ export function presentedWatchfulStatus(input: {
   return input.unitStatus;
 }
 
-/** Immix has no live status. The label is Unknown, never up or down. */
-export function presentedImmixStatus(unit: ImmixMonitoredUnit): { status: 'unknown'; statusLabel: typeof IMMIX_STATUS_LABEL } {
-  return { status: 'unknown', statusLabel: unit.statusLabel };
+/** A fresh reading is up or down. A reading 20 minutes past read time is Unknown. */
+export function immixReadingStatus(observedAt: string | null | undefined, latest: 'up' | 'down' | null | undefined, now: number): 'up' | 'down' | 'unknown' {
+  if (latest !== 'up' && latest !== 'down') return 'unknown';
+  if (!observedAt || !cameraTimestamp(observedAt, now).fresh) return 'unknown';
+  return latest;
+}
+
+/** The mode is the arming value. A name that says Paused does not choose it. */
+export function presentedArming(unit: { name?: string; arming?: 'Auto' | 'TestMode' | 'Disarmed' | null }): 'Auto' | 'TestMode' | 'Disarmed' {
+  if (unit.arming === 'Disarmed' || unit.arming === 'TestMode' || unit.arming === 'Auto') return unit.arming;
+  return 'Auto';
+}
+
+/** A site key is split when a Watchful unit and a unit that is not Watchful both carry it. */
+export function deriveSplitSiteKeys(units: readonly { siteKey?: string | null; watchful: boolean }[]): string[] {
+  const seen = new Map<string, { watchful: boolean; other: boolean }>();
+  for (const unit of units) {
+    const key = typeof unit.siteKey === 'string' ? unit.siteKey.trim() : '';
+    if (!key) continue;
+    const row = seen.get(key) || { watchful: false, other: false };
+    if (unit.watchful) row.watchful = true;
+    else row.other = true;
+    seen.set(key, row);
+  }
+  return [...seen.entries()].filter(([, row]) => row.watchful && row.other).map(([key]) => key).sort();
+}
+
+/** Immix status follows the latest fresh reading. A stale or missing reading stays Unknown. */
+export function presentedImmixStatus(unit: ImmixMonitoredUnit): { status: 'up' | 'down' | 'unknown'; statusLabel: string } {
+  return { status: unit.status, statusLabel: unit.statusLabel };
 }
 
 /** Every monitored headline asks this model. The path name is recorded so the callers stay one count. */
