@@ -28,7 +28,7 @@ if (!input || (args.includes('--at') && !suppliedRead)) {
 
 const csv = readFileSync(input, 'utf8');
 const snapshot = loadWatchfulExport(csv, suppliedRead);
-if (!snapshot.fetchedAt) {
+if (!snapshot.fetchedAt && snapshot.units.every(unit => unit.readAt === null)) {
   console.error('No read time was supplied. The export is Unknown, not fresh.');
   process.exit(2);
 }

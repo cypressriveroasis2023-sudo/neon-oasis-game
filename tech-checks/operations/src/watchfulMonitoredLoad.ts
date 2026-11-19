@@ -13,10 +13,12 @@ export type WatchfulSnapshotUnit = {
   camerasDown: number;
   /** Watchful's own observation time. Not our read time. */
   snapshotAt: string | null;
-  /** Watchful arming. Missing stays null and is never invented. */
-  arming: string | null;
+  /** Watchful arming: armed, disarmed, paused, test, or unknown. Missing stays null. */
+  arming: WatchfulArming | null;
   /** Watchful project id. Test sites are chosen from this id, not from the name. */
   projectId: string | null;
+  /** This row's read time. Null means this row is Unknown. */
+  readAt: string | null;
 };
 
 export type WatchfulLoadResult = {
@@ -44,13 +46,16 @@ const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d
 const MAC_PAIRS = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
 const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
 const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
-const SERIAL_LABEL = String.raw`(?:[A-Za-z]+[\s._-]*)?(?:serial(?:[\s._-]*(?:number|num|nbr|no\.?))?|s\/n|sn)`;
-const SERIAL_SEPARATOR = String.raw`(?::|=|#|_|-|\/|\.)`;
+const UUID_VALUE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+const SERIAL_LABEL = String.raw`(?:[A-Za-z]+[\s._-]*)?(?:serial(?:[\s._-]*(?:number|num|nbr|no\.?))?|ser\.?\s*no\.?|s\.n\.?|s\/n|sn)|\u2116`;
+const SERIAL_GAP = String.raw`(?:\s+is\b\s*[:.]?\s*|\s*[^\sA-Za-z0-9]+\s*|\s+|>\s*)?`;
 const SERIAL_VALUE = String.raw`(?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{4,}`;
 const LABELED_SERIAL = new RegExp(
-  `(?<![A-Za-z0-9_])("|'|<)?(${SERIAL_LABEL})(?![A-Za-z0-9])("|'|)?(\\s*${SERIAL_SEPARATOR}\\s*("|'|)?|>\\s*|\\s*[\\[(]\\s*|\\s*)(${SERIAL_VALUE})\\s*("|'|\\]|\\)|<\\/serial>)?`,
+  `(?<![A-Za-z0-9_])(?<label>${SERIAL_LABEL})(?![A-Za-z0-9])(?<gap>${SERIAL_GAP})(?<value>${SERIAL_VALUE})`,
   'gid',
 );
+const READ_SKEW_MS = 5 * 60 * 1000;
+export type WatchfulArming = 'armed' | 'disarmed' | 'paused' | 'test' | 'unknown';
 
 export class WatchfulLoadError extends Error {
   constructor(message: string) {
@@ -141,9 +146,8 @@ function redactLabeledSerial(text: string): {text: string; stripped: boolean} {
   LABELED_SERIAL.lastIndex = 0;
   const cuts: {start: number; end: number}[] = [];
   for (const match of folded.matchAll(LABELED_SERIAL)) {
-    const value = match[6];
-    const indices = match.indices?.[6];
-    if (!value || !indices) continue;
+    const indices = match.indices?.groups?.value;
+    if (!indices) continue;
     const start = spans[indices[0]]?.start;
     const end = spans[indices[1] - 1]?.end;
     if (start === undefined || end === undefined) continue;
@@ -157,9 +161,24 @@ function redactLabeledSerial(text: string): {text: string; stripped: boolean} {
   return {text: next, stripped: true};
 }
 
-/** Drop an IPv4, IPv6, MAC, or serial value. Labels stay. Ordinary words stay. */
+function holdUuids(text: string): {text: string; held: string[]} {
+  const held: string[] = [];
+  UUID_VALUE.lastIndex = 0;
+  const next = text.replace(UUID_VALUE, token => {
+    held.push(token);
+    return `\u0000U${held.length - 1}\u0000`;
+  });
+  return {text: next, held};
+}
+
+function restoreUuids(text: string, held: string[]): string {
+  return text.replace(/\u0000U(\d+)\u0000/g, (_whole, index) => held[Number(index)] ?? '');
+}
+
+/** Drop an IPv4, IPv6, MAC, or serial value. Labels stay. Ordinary words stay. UUID-shaped ids stay whole. */
 export function stripWatchfulIp(value: string): {text: string; stripped: boolean; onlyIp: boolean} {
-  let text = value;
+  const saved = holdUuids(value);
+  let text = saved.text;
   let stripped = false;
   const mark = (next: {text: string; stripped: boolean}) => { text = next.text; if (next.stripped) stripped = true; };
   mark(scrubToken(MAC_PAIRS, text));
@@ -180,8 +199,35 @@ export function stripWatchfulIp(value: string): {text: string; stripped: boolean
     stripped = true;
     return ' ';
   });
+  text = restoreUuids(text, saved.held);
   text = text.replace(/\s+/g, ' ').trim();
   return {text, stripped, onlyIp: stripped && text.length === 0};
+}
+
+function normalizeArming(value: string | null): WatchfulArming | null {
+  if (value === null) return null;
+  const key = value.trim().toLowerCase().replace(/[\s._-]+/g, '');
+  if (!key) return null;
+  if (key === 'armed' || key === 'auto') return 'armed';
+  if (key === 'disarmed') return 'disarmed';
+  if (key === 'paused') return 'paused';
+  if (key === 'test' || key === 'testmode') return 'test';
+  if (key === 'unknown') return 'unknown';
+  return 'unknown';
+}
+
+function rowReadAt(row: string[], readCol: number, fileRead: string | null, now: number): string | null {
+  if (readCol < 0) return fileRead;
+  const raw = String(row[readCol] ?? '').trim();
+  if (!raw) return null;
+  return parseOurRead(raw, now);
+}
+
+function parseOurRead(raw: string, now: number): string {
+  const at = Date.parse(raw);
+  if (!Number.isFinite(at)) throw new WatchfulLoadError('Our read time is not a timestamp. The file was not loaded.');
+  if (at > now + READ_SKEW_MS) throw new WatchfulLoadError('Our read time is in the future. The file was not loaded.');
+  return new Date(at).toISOString();
 }
 
 function groupOf(value: string): WatchfulGroup {
@@ -215,8 +261,10 @@ type Parsed = {
   status: 'up' | 'down';
   camerasUp: number;
   camerasDown: number;
-  arming: string | null;
+  arming: WatchfulArming | null;
   projectId: string | null;
+  /** This row's read time. A blank cell stays null and never borrows another row. */
+  readAt: string | null;
 };
 
 /**
@@ -224,9 +272,9 @@ type Parsed = {
  * An IP typed into a unit, site, or group cell is stripped, and a cell that
  * is only an IP rejects the file. Nothing is written to a database.
  */
-export function loadWatchfulExport(csv: string, fetchedAt?: string | null): WatchfulLoadResult {
+export function loadWatchfulExport(csv: string, fetchedAt?: string | null, now = Date.now()): WatchfulLoadResult {
   const argument = typeof fetchedAt === 'string' ? fetchedAt.trim() : '';
-  if (argument && !Number.isFinite(Date.parse(argument))) throw new WatchfulLoadError('The fetch time is not a timestamp.');
+  const fileRead = argument ? parseOurRead(argument, now) : null;
   const table = parseCsv(csv);
   if (table.length < 2) throw new WatchfulLoadError('The export has no rows.');
   const headers = table[0].map(headerKey);
@@ -278,14 +326,13 @@ export function loadWatchfulExport(csv: string, fetchedAt?: string | null): Watc
       status: statusOf(read(statusCol)),
       camerasUp: countOf(read(upCol), 'cameras up'),
       camerasDown: countOf(read(downCol), 'cameras down'),
-      arming: armingCol >= 0 ? read(armingCol) || null : null,
+      arming: armingCol >= 0 ? normalizeArming(read(armingCol) || null) : null,
       projectId: projectCol >= 0 ? read(projectCol) || null : null,
+      readAt: rowReadAt(row, readCol, fileRead, now),
     });
   }
-  const columnReads = readCol < 0 ? [] : table.slice(1).map(row => String(row[readCol] ?? '').trim()).filter(Boolean);
-  if (columnReads.some(value => !Number.isFinite(Date.parse(value)))) throw new WatchfulLoadError('Our read time is not a timestamp. The file was not loaded.');
-  const columnRead = columnReads.length ? new Date(Math.min(...columnReads.map(value => Date.parse(value)))).toISOString() : null;
-  const ourRead = argument ? new Date(Date.parse(argument)).toISOString() : columnRead;
+  const rowReads = parsed.map(row => row.readAt).filter((value): value is string => value !== null);
+  const ourRead = fileRead ?? (rowReads.length === parsed.length && rowReads.length ? rowReads.slice().sort()[0] : null);
 
   const latest = new Map<string, Parsed>();
   for (const row of parsed) {
@@ -327,6 +374,7 @@ export function loadWatchfulExport(csv: string, fetchedAt?: string | null): Watc
       snapshotAt: oldestObservedAt,
       arming: newest.arming,
       projectId: newest.projectId,
+      readAt: newest.readAt,
     });
   }
   units.sort((left, right) => left.canonicalUnitKey.localeCompare(right.canonicalUnitKey));
