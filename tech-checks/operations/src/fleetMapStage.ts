@@ -131,6 +131,8 @@ export type StageSharedMonitoredCount = {
   oldestObservedAt?: string | null;
   units: number | null;
   sites?: number | null;
+  /** Armed site count, when #451's return includes it. Absent means the board shows not available. */
+  armedSites?: number | null;
   cameras?: {up: number; down: number; total: number} | null;
   armedUnits: number | null;
   armedCameras?: {up: number; down: number; total: number} | null;

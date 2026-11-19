@@ -17,8 +17,10 @@ import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
 import {retryAddressMapPin} from './addressMapPinRetry';
-import FleetMapStage,{useFleetMapStage} from './FleetMapStage';
-import {fleetStageRead,stageBoardBoxes,stageIcon,stagePlacement,stageUnitsFromRows,unitsForBox,type StageBoxId,type StageSharedMonitoredCount} from './fleetMapStage';
+import {useFleetMapStage} from './FleetMapStage';
+import FleetBoard,{BoardMapNotes} from './FleetBoard';
+import {alarmsFromMeasurements,buildBoard,marksOrUnit,newestRead,recordContacts,recordEye,recordSchedule,type BoardUnitInput} from './fleetBoard';
+import {stageIcon,stagePlacement,type StageSharedMonitoredCount} from './fleetMapStage';
 import 'leaflet/dist/leaflet.css';
 type Props={rows:FleetDashboardRow[];stageRows?:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;/** #451 countForPath / selectSharedMonitoredCount. Null omits those boxes. */sharedCount?:StageSharedMonitoredCount|null;};
 export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters,sharedCount=null}:Props){
@@ -29,8 +31,7 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
  const [pinMode,setPinMode]=useState<'grouped'|'individual'>(restored.current.pinMode||'grouped');
  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
  const stageOn=useFleetMapStage();
- const [stageBox,setStageBox]=useState<StageBoxId|null>(null);
- const [stagePick,setStagePick]=useState<string|null>(null);
+ const [boardSite,setBoardSite]=useState<string|null>(null);
  const [stageHost,setStageHost]=useState<Element|null>(null);
  useEffect(()=>{
   const host=groupHost.current;
@@ -47,14 +48,7 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
   return()=>window.removeEventListener('keydown',escape);
  },[groupDetails]);
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
- select.current=(id)=>{
-  if(stageOn){
-   setStagePick(id);
-   const pin=pins.find(item=>fleetLocationPinId(item)===id);
-   if(pin)map.current?.setView(pin.point,Math.max(map.current.getZoom(),14),{animate:false});
-  }
-  onSelect(id);
- };selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
+ select.current=(id)=>{ if(!stageOn)onSelect(id); };selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
  // Prefer the current mHelp address for uniquely reviewed Product-ID bindings.
  // Saved installation/GPS evidence remains available in unit details.
  const scopedIds=new Set([...rows.map(row=>row.id),...pins.map(fleetLocationPinId)]);
@@ -74,14 +68,25 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
  const addressUnitIds=new Set(visibleMhelpPins.map(p=>mhelpAddressUnits?.get(p.productId)).filter(Boolean));
  const displayedPins=pins.filter(p=>!addressUnitIds.has(fleetLocationPinId(p)));
  const stageSource=stageRows||rows;
- const stageUnits=useMemo(()=>stageUnitsFromRows(stageSource.map(row=>{
-  const pin=pins.find(item=>item.kind!=='source_equipment_estimate'&&item.row.id===row.id);
-  return {id:row.id,name:row.displayName||row.name,site:row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied',placement:stagePlacement(row.placement),status:row.support?null:row.cameraState==='online'?'up' as const:row.cameraState==='offline'?'down' as const:null,observedAt:row.camera.checkedAt,support:row.support,point:pin?pin.point:null,readFailed:row.cameraState==='unknown'&&!row.camera.checkedAt};
- })),[stageSource,pins]);
- const stageBoxes=useMemo(()=>stageBoardBoxes(fleetStageRead((!locationsReady&&stageSource.length===0)?null:stageSource.map(row=>({name:row.displayName||row.name,placement:row.placement,support:row.support,cameraState:row.cameraState,checkedAt:row.camera.checkedAt}))),sharedCount),[stageSource,locationsReady,sharedCount]);
- const stageIds=stageOn&&stageBox?new Set(unitsForBox(stageUnits,stageBox).map(unit=>unit.id)):null;
- const paintedPins=stageIds?displayedPins.filter(pin=>stageIds.has(fleetLocationPinId(pin))):displayedPins;
- const paintedMhelp=stageIds?visibleMhelpPins.filter(pin=>{const id=mhelpAddressUnits?.get(pin.productId);return Boolean(id&&stageIds.has(id));}):visibleMhelpPins;
+ const board=useMemo(()=>{
+  const inputs:BoardUnitInput[]=stageSource.map(row=>{
+   const pin=pins.find(item=>item.kind!=='source_equipment_estimate'&&item.row.id===row.id);
+   const record=row.unit as Record<string,unknown>;
+   const fallback=row.support?null:row.cameraState==='online'?'up' as const:row.cameraState==='offline'?'down' as const:'unknown' as const;
+   return {id:row.id,name:row.displayName||row.name,site:row.unit.site||row.displayCustomer||row.unit.customer||'',placement:stagePlacement(row.placement),cameras:marksOrUnit(row.camera.rows,fallback,row.camera.checkedAt,Date.now()),observedAt:row.camera.checkedAt,support:row.support,point:pin?pin.point:null,estimate:pin?pin.kind!=='current':false,immix:record.immix===true,inWatchful:typeof record.inWatchful==='boolean'?record.inWatchful:null,arming:record.arming==='Auto'||record.arming==='TestMode'||record.arming==='Disarmed'||record.arming==='Paused'?record.arming:null,scheduleDisarmed:typeof record.scheduleDisarmed==='boolean'?record.scheduleDisarmed:undefined,schedule:recordSchedule(record.watchfulSchedule),alarms:alarmsFromMeasurements(row.power?.measurements),contacts:recordContacts(record.contacts),eye:recordEye(record.eyeNumber),downSince:typeof record.downSince==='string'?record.downSince:null};
+  });
+  return buildBoard(inputs,sharedCount,locationsReady||inputs.length?newestRead(inputs.map(unit=>unit.observedAt)):null,Date.now());
+ },[stageSource,pins,sharedCount,locationsReady]);
+ const boardRef=useRef(board);boardRef.current=board;
+ const openBoardSite=(key:string|null)=>{
+  setBoardSite(key);
+  if(!key)return;
+  const site=board.sites.find(item=>item.key===key);
+  if(site?.point)map.current?.setView(site.point,Math.max(map.current.getZoom(),14),{animate:false});
+ };
+ const openBoardSiteRef=useRef(openBoardSite);openBoardSiteRef.current=openBoardSite;
+ const paintedPins=displayedPins;
+ const paintedMhelp=visibleMhelpPins;
  pinRef.current=paintedPins;
  type Entry={kind:'address';pin:MhelpAddressMapPin}|{kind:'native';pin:Pin};
 
@@ -92,6 +97,16 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
   return()=>{stopResize();instance.remove();map.current=null;markers.current=null;};},[]);
  useEffect(()=>{
   const instance=map.current,group=markers.current;if(!instance||!group)return;group.clearLayers();
+  if(stageOn){
+   instance.invalidateSize();
+   for(const site of boardRef.current.sites){
+    if(!site.point)continue;
+    const marker=L.marker(site.point,{interactive:true,keyboard:false,icon:L.divIcon({className:'cos-board-dot is-'+site.dot,html:'',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(group);
+    const element=marker.getElement();element?.setAttribute('data-site-key',site.key);element?.setAttribute('data-dot',site.dot);
+    marker.on('click',()=>openBoardSiteRef.current(site.key));
+   }
+   return;
+  }
   const entries=[
    ...paintedMhelp.map(pin=>({item:{kind:'address' as const,pin},...instance.latLngToContainerPoint(pin.point)})),
    ...paintedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
@@ -182,11 +197,11 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
    marker.on('click',()=>description.member.select?.());
    const tooltip=document.createElement('span');tooltip.textContent=description.name+' · '+({online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support'}[description.health]);marker.bindTooltip(tooltip,{direction:'top',offset:[0,-24],className:'cos-fleet-pin-tooltip'});marker.on('click',()=>marker.closeTooltip());
   }
- },[pins,layer,revision,pinMode,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation,stageOn,stageBox]);
+ },[pins,layer,revision,pinMode,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation,stageOn,board]);
 
  const fit=()=>{const values=[...pinRef.current.map(p=>p.point),...paintedMhelp.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
  // Pending proof validation hides markers, but is not a settled population change.
- const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pinRef.current.map(fleetLocationPinId),...paintedMhelp.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,mhelpAddressUnits,filters,locationsReady,stageOn,stageBox]);
+ const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pinRef.current.map(fleetLocationPinId),...paintedMhelp.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,mhelpAddressUnits,filters,locationsReady,stageOn]);
  const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14),{animate:false});}},[selectedId,pins,mhelpAddressPins,mhelpAddressUnits]);
  useEffect(()=>{
   const board=panel.current?.closest('.cos-fleet-board')??null;
@@ -198,7 +213,7 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
   return()=>{board.classList.remove('cos-fleet-stage-on');document.documentElement.classList.remove('cos-fleet-stage-lock');};
  },[stageOn,locationsReady]);
  return <>
-  {stageOn&&stageHost&&createPortal(<FleetMapStage units={stageUnits} boxes={stageBoxes} now={Date.now()} active={stageBox} selectedId={stagePick} onBox={id=>{setStageBox(current=>current===id?null:id);setStagePick(null);}} onUnit={id=>select.current(id)} onClose={()=>{setStageBox(null);setStagePick(null);}}/>,stageHost)}
+  {stageOn&&stageHost&&createPortal(<FleetBoard view={board} interactive siteKey={boardSite} onSite={openBoardSite}/>,stageHost)}
   <div ref={panel} aria-busy={!locationsReady} className={'cos-fleet-map-panel field-map-workspace cos-fleet-individual-pins cos-fleet-compact-groups'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
   <div className='cos-fleet-map-toolbar'><div><details className='cos-fleet-map-details'><summary aria-label='Fleet map details'><strong>Fleet map</strong></summary><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{visibleMhelpPins.length>0&&<> · {visibleMhelpPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small>{visibleMhelpPins.length>0&&<label className='cos-fleet-map-find'>Find a mapped unit<select aria-label='Find mapped equipment' defaultValue='' onChange={event=>{if(event.currentTarget.value)onSelectMhelpAddress?.(event.currentTarget.value);event.currentTarget.value='';}}><option value=''>Choose unit</option>{visibleMhelpPins.map(pin=><option key={pin.productId} value={pin.productId}>{pin.unitNumber} · Product {pin.productId}</option>)}</select></label>}</details></div><div><button onClick={fit} disabled={!pins.length&&!visibleMhelpPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
@@ -206,6 +221,7 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
    {(['grouped','individual'] as const).map(mode=><button key={mode} type='button' aria-pressed={pinMode===mode} onClick={()=>{setPinMode(mode);saveFieldMapView({pinMode:mode});}}>{mode==='grouped'?'Grouped':'Individual pins'}</button>)}
   </div>
   <div ref={node} className='cos-fleet-map-canvas' aria-label='Interactive fleet installation map'/>
+  {stageOn&&<BoardMapNotes view={board}/>}
   {groupDetails&&<section className='cos-compact-group-sheet' role='dialog' aria-label='Grouped Fleet equipment'>
     <button type='button' className='cos-compact-group-close' aria-label='Close grouped equipment' onClick={()=>setGroupDetails(null)}>× Close</button>
     <div ref={groupHost} className='cos-compact-group-sheet-content'/>
