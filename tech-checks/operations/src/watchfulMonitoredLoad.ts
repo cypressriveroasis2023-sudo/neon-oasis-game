@@ -30,8 +30,9 @@ const GROUP_ALIAS: Record<string, WatchfulGroup> = {
   'other': 'Other',
 };
 
-const FORBIDDEN_HEADER = /(^|[^a-z])(ip|ips|serial|serials|imei|imsi|iccid|sim|mac)([^a-z]|$)/i;
-const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g;
+const FORBIDDEN_HEADER = /(^|[^a-z])(ip|ips|ipv6|ip6|serial|serials|imei|imsi|iccid|sim|mac)([^a-z]|$)/i;
+const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/gi;
+const MAC = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
 
 export class WatchfulLoadError extends Error {
   constructor(message: string) {
@@ -68,12 +69,29 @@ function headerKey(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
-/** Drop an IP token. A cell that is only an IP is rejected by the caller. */
+function isIpv6Token(token: string): boolean {
+  if (!token.includes(':') || token.includes(':::')) return false;
+  const pieces = token.split('::');
+  if (pieces.length > 2) return false;
+  const groups = token.split(':').filter(part => part.length > 0);
+  if (groups.some(part => !/^[0-9a-f]{1,4}$/i.test(part))) return false;
+  if (pieces.length === 2) return groups.length <= 7 && token.length > 2;
+  return groups.length === 8;
+}
+
+/** Drop an IPv4, IPv6, or MAC token. A cell that is only one of those is rejected by the caller. */
 export function stripWatchfulIp(value: string): {text: string; stripped: boolean; onlyIp: boolean} {
-  const matches = value.match(IPV4);
-  if (!matches) return {text: value, stripped: false, onlyIp: false};
-  const text = value.replace(IPV4, ' ').replace(/\s+/g, ' ').trim();
-  return {text, stripped: true, onlyIp: text.length === 0};
+  let text = value;
+  let stripped = false;
+  if (MAC.test(text)) { MAC.lastIndex = 0; stripped = true; text = text.replace(MAC, ' '); MAC.lastIndex = 0; }
+  if (IPV4.test(text)) { IPV4.lastIndex = 0; stripped = true; text = text.replace(IPV4, ' '); IPV4.lastIndex = 0; }
+  text = text.replace(/[0-9a-f:]{2,}/gi, token => {
+    if (!isIpv6Token(token)) return token;
+    stripped = true;
+    return ' ';
+  });
+  text = text.replace(/\s+/g, ' ').trim();
+  return {text, stripped, onlyIp: stripped && text.length === 0};
 }
 
 function groupOf(value: string): WatchfulGroup {
@@ -141,7 +159,7 @@ export function loadWatchfulExport(csv: string, snapshotAt: string): WatchfulLoa
     const read = (col: number) => {
       const raw = String(row[col] ?? '');
       const cleaned = stripWatchfulIp(raw);
-      if (cleaned.onlyIp) throw new WatchfulLoadError('A cell is an IP address. The file was not loaded.');
+      if (cleaned.onlyIp) throw new WatchfulLoadError('A cell is an IP or MAC address. The file was not loaded.');
       return cleaned.text;
     };
     const unitName = read(unitCol);

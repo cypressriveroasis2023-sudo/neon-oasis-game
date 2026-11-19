@@ -28,7 +28,24 @@ test('the loader rejects an IP or serial column and strips an IP in a cell', () 
   const stripped = stripWatchfulIp('Fixture Site 203.0.113.10 gate');
   assert.equal(stripped.text, 'Fixture Site gate');
   assert.equal(stripped.stripped, true);
-  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\n203.0.113.10,Fixture Site,Avigilon,up,1,0\n', at), /IP address/);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\n203.0.113.10,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
+});
+
+test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4', () => {
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,ipv6\nSniper 1,Fixture Site,Avigilon,up,1,0,2001:db8::1\n', at), WatchfulLoadError);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,mac_address\nSniper 1,Fixture Site,Avigilon,up,1,0,aa:bb:cc:dd:ee:ff\n', at), WatchfulLoadError);
+  const ipv6 = stripWatchfulIp('Fixture Site 2001:db8::10 gate');
+  assert.equal(ipv6.text, 'Fixture Site gate');
+  assert.equal(ipv6.stripped, true);
+  const mac = stripWatchfulIp('Fixture Site AA-BB-CC-DD-EE-FF gate');
+  assert.equal(mac.text, 'Fixture Site gate');
+  assert.equal(mac.stripped, true);
+  assert.equal(stripWatchfulIp('2001:db8::1').onlyIp, true);
+  assert.equal(stripWatchfulIp('aa:bb:cc:dd:ee:ff').onlyIp, true);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\n2001:db8::1,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down\naa:bb:cc:dd:ee:ff,Fixture Site,Avigilon,up,1,0\n', at), /IP or MAC address/);
+  const kept = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z\n', at);
+  assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
 });
 
 test('duplicate camera rows collapse to one unit and the latest reading wins', () => {
