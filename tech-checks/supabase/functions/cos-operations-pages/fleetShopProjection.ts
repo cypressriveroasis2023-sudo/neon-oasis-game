@@ -83,6 +83,15 @@ export function manualShopInventory(upload:any,receipt:any):any{
  const summary={...upload.summary,fieldRecords:records.filter((r:Row)=>r.placement==='FIELD').length,shopRecords:records.filter((r:Row)=>r.placement==='SHOP').length,unflaggedFieldRecords:records.filter((r:Row)=>r.placement==='FIELD'&&r.uploadLifecycle==='UNFLAGGED').length,unflaggedShopRecords:records.filter((r:Row)=>r.placement==='SHOP'&&r.uploadLifecycle==='UNFLAGGED').length};
  return {...upload,records,summary,cosManualShopCount:count,supersededShopMoves:superseded,...(count?{cosPlacementBasis:'Accepted mHelp inventory plus confirmed COS Shop moves'}:{})};
 }
+/** Applies the pre-10:15 shop-wins count so the rule change can be rolled back in a test. */
+export function rollbackShopOverrideCount(upload:any,receipt:any):{field:number;shop:number;total:number}{
+ const current=manualShopInventory(upload,receipt);
+ const ignored=new Set((current?.supersededShopMoves||[]).filter((move:SupersededShopMove)=>move.detail===OWNER_OVERRIDE_IGNORED).map((move:SupersededShopMove)=>move.unitNumber));
+ const records=(current?.records||[]).map((row:Row)=>ignored.has(row.unitNumber)&&row.placement==='FIELD'?{...row,placement:'SHOP'}:row);
+ const field=records.filter((row:Row)=>row.placement==='FIELD').length;
+ const shop=records.filter((row:Row)=>row.placement==='SHOP').length;
+ return {field,shop,total:records.length};
+}
 export function manualShopAddresses(result:any,effectiveUpload:any):any{
  if(!result||!effectiveUpload?.cosManualShopCount)return result;
  const shops=new Set(effectiveUpload.records.filter((r:Row)=>r.placement==='SHOP').map((r:Row)=>r.productId));

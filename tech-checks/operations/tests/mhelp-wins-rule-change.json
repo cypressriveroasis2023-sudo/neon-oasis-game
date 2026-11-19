@@ -28,13 +28,13 @@
     },
     {
       "file": "fleet-shop-placement.test.mjs",
-      "name": "a newer explicit upload does not beat a Shop move, including on a non-Field row",
+      "name": "mHelp Field wins over a Shop move, and a non-Field row can still be Shop",
       "old": "a FIELD row becomes shop and leaves the map",
       "new": "a FIELD row stays FIELD and on the map, the receipt is kept, and the override is flagged; a SHOP row that already agrees still becomes shop"
     },
     {
       "file": "fleet-shop-placement.test.mjs",
-      "name": "an older, equal, or missing mHelp Field time does not override a newer app Shop move",
+      "name": "mHelp Field wins over a Shop move when the mHelp time is older, equal, or missing",
       "old": "placement becomes SHOP and cosManualShopCount is 1",
       "new": "placement stays FIELD, cosManualShopCount stays 0, the receipt is kept, and the override is flagged"
     },
@@ -43,6 +43,12 @@
       "name": "captured Product-ID binding survives the physical native edit without restoring camera associations",
       "old": "the held record placement becomes SHOP",
       "new": "the held record stays FIELD, the held binding and empty unit ids stay, cosManualShopCount stays 0, and the override is flagged"
+    },
+    {
+      "file": "fleet-shop-action.browser.spec.mjs",
+      "name": "confirmed Shop move updates Product-ID totals immediately",
+      "old": "field becomes 286 and shop becomes 715",
+      "new": "field stays 287 and shop stays 714"
     }
   ]
 }
