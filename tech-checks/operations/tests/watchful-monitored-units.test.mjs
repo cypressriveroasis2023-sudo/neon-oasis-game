@@ -64,7 +64,7 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   const kept = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z\n', at);
   assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
   const carried = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at,read_at,arming,project_id\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z,2026-11-19T14:05:00Z,Disarmed,proj-field\n', at);
-  assert.equal(carried.units[0].arming, 'Disarmed');
+  assert.equal(carried.units[0].arming, 'disarmed');
   assert.equal(carried.units[0].projectId, 'proj-field');
   assert.equal(carried.fetchedAt, at);
   assert.equal(carried.snapshotAt, '2026-11-19T14:00:00.000Z');
@@ -116,6 +116,15 @@ test('serial labels stay and only the value is redacted', () => {
     ['Ｓｅｒｉａｌ：ZZ12CD34', 'Ｓｅｒｉａｌ：'],
     ['camera-serial:ZZ12CD34', 'camera-serial:'],
     ['unit serial=ZZ12CD34', 'unit serial='],
+    ['serial => ZZ12CD34', 'serial =>'],
+    ['ser. no. ZZ12CD34', 'ser. no.'],
+    ['Serial number is ZZ12CD34', 'Serial number is'],
+    ['Serial -> ZZ12CD34', 'Serial ->'],
+    ['serial is: ZZ12CD34', 'serial is:'],
+    ['Serial {ZZ12CD34}', 'Serial {}'],
+    ['S.N. ZZ12CD34', 'S.N.'],
+    ['Serial \u2013 ZZ12CD34', 'Serial \u2013'],
+    ['\u2116 ZZ12CD34', '\u2116'],
   ];
   for (const [input, expected] of forms) assert.equal(stripWatchfulIp(input).text, expected, input);
   assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
@@ -160,4 +169,38 @@ test('duplicate camera rows collapse to one unit and the latest reading wins', (
   assert.notEqual(loaded.snapshotAt, '2026-11-19T14:20:00.000Z');
   assert.equal(loaded.fetchedAt, at);
   assert.equal(loaded.units.every(unit => unit.snapshotAt === loaded.oldestObservedAt), true);
+});
+
+test('a UUID-shaped project id is not treated as a MAC, and arming is one of five words', () => {
+  const projectId = '3f2504e0-4f89-41d3-9b0c-030507090a0b';
+  assert.equal(stripWatchfulIp(projectId).text, projectId);
+  const csv = [
+    'unit,site,group,status,cameras_up,cameras_down,arming,project_id',
+    `Sniper 2,Fixture Site,Avigilon,up,1,0,Auto,${projectId}`,
+    'Sniper 3,Fixture Site,Avigilon,down,0,1,armed-ish,proj-field',
+    'Sniper 4,Fixture Site,Avigilon,up,1,0,TestMode,proj-test',
+    'Sniper 5,Fixture Site,Avigilon,up,1,0,Paused,proj-field',
+  ].join('\n');
+  const loaded = loadWatchfulExport(csv, at);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').projectId, projectId);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').arming, 'armed');
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|3').arming, 'unknown');
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|4').arming, 'test');
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|5').arming, 'paused');
+});
+
+test('a blank read_at stays null and a future read time is refused', () => {
+  const now = Date.parse('2026-11-19T15:00:00.000Z');
+  const csv = [
+    'unit,site,group,status,cameras_up,cameras_down,seen_at,read_at',
+    'Sniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z,2026-11-19T14:30:00Z',
+    'Sniper 3,Fixture Site,Avigilon,down,0,1,2026-11-19T14:10:00Z,',
+  ].join('\n');
+  const loaded = loadWatchfulExport(csv, undefined, now);
+  const known = loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2');
+  const blank = loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|3');
+  assert.equal(known.readAt, '2026-11-19T14:30:00.000Z');
+  assert.equal(blank.readAt, null);
+  assert.notEqual(blank.readAt, known.readAt);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,read_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2099-01-01T00:00:00Z\n', undefined, now), /future/);
 });
