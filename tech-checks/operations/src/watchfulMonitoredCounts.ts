@@ -21,7 +21,7 @@ export type WatchfulCountUnit = {
   camerasDown: number;
   snapshotAt: string;
   /** Live arming is data. TestMode leaves the customer total before bucketing. */
-  arming?: 'Auto' | 'TestMode' | 'Disarmed';
+  arming?: 'Auto' | 'TestMode' | 'Disarmed' | 'Paused';
   /** A marked archived project is not a Watchful customer unit. */
   projectArchived?: boolean;
   project?: string;
@@ -39,7 +39,7 @@ export type MhelpCountUnit = {
   /** Immix loads match this key only. A name never matches. */
   siteKey?: string | null;
   productId?: string;
-  arming?: 'Auto' | 'TestMode' | 'Disarmed';
+  arming?: 'Auto' | 'TestMode' | 'Disarmed' | 'Paused';
   projectArchived?: boolean;
   project?: string;
   /** Latest provider status. Unknown once it is 20 minutes past read time. */
@@ -108,8 +108,13 @@ export type SharedMonitoredCount = {
   notInWatchful: {name: string; productId: string | null; bucket: 'b' | 'd'; deployed: boolean; mode?: string}[];
   notInWatchfulBuckets: {b: number; d: number};
   notArmed: number | null;
+  notArmedUnits: {name: string; mode: string}[];
+  armedUnits: number | null;
+  armedCameras: {up: number; down: number; total: number} | null;
+  armedSites: number | null;
   immixUp: number | null;
   immixDown: number | null;
+  immixUnknown: number | null;
   fieldNotMonitored: FieldNotMonitored[];
   excludedTestLines: string[];
   drift: ArmingDrift[];
@@ -139,8 +144,13 @@ const empty = (fresh: boolean, oldestObservedAt: string | null = null): SharedMo
   notInWatchful: [],
   notInWatchfulBuckets: {b: 0, d: 0},
   notArmed: fresh ? 0 : null,
+  notArmedUnits: [],
+  armedUnits: fresh ? 0 : null,
+  armedCameras: fresh ? {up: 0, down: 0, total: 0} : null,
+  armedSites: fresh ? 0 : null,
   immixUp: fresh ? 0 : null,
   immixDown: fresh ? 0 : null,
+  immixUnknown: fresh ? 0 : null,
   fieldNotMonitored: [],
   excludedTestLines: [],
   drift: [],
@@ -183,6 +193,9 @@ export function selectSharedMonitoredCount(input: {
   testModeRule?: boolean;
   /** When true, an archived project counts as not in Watchful. Off leaves the totals unchanged. */
   archivedRule?: boolean;
+  /** When our Watchful read was taken. Per-unit lastConnection is not this clock. */
+  watchfulReadAt?: string | null;
+  watchfulReadFailed?: boolean;
   /** Prior arming, so a flip back to Auto is a drift item rather than a silent move. */
   previousArming?: Readonly<Record<string, 'Auto' | 'TestMode'>>;
   mhelp: readonly MhelpCountUnit[];
@@ -212,8 +225,11 @@ export function selectSharedMonitoredCount(input: {
   const immixKeys = new Set((input.immixKeys || []).map(key => key.trim()).filter(Boolean));
   const result = empty(true, oldestObservedAt);
   const sites = new Map<string, SiteCameraRow>();
+  const armedSiteRows = new Map<string, SiteCameraRow>();
   let camerasUp = 0;
   let camerasDown = 0;
+  let armedUp = 0;
+  let armedDown = 0;
   const counted = new Set<string>();
   const countedNames = new Set<string>();
 
@@ -233,14 +249,15 @@ export function selectSharedMonitoredCount(input: {
         mode,
       });
       result.notInWatchfulBuckets.b += 1;
-      if (mode === 'Disarmed') result.notArmed = (result.notArmed || 0) + 1;
+      if (mode === 'Disarmed' || mode === 'Paused') result.notArmed = (result.notArmed || 0) + 1;
       counted.add(key);
       continue;
     }
     if (input.testModeRule && unit.arming === 'TestMode') {
-      const project = unit.project || 'Fixture Test Project';
-      const line = `${project} · excluded test/Test Mode`;
-      if (!result.excludedTestLines.includes(line)) result.excludedTestLines.push(line);
+      if (unit.project) {
+        const line = `${unit.project} · excluded test/Test Mode`;
+        if (!result.excludedTestLines.includes(line)) result.excludedTestLines.push(line);
+      }
       continue;
     }
     const shop = matches.filter(item => item.placement === 'SHOP');
@@ -265,7 +282,22 @@ export function selectSharedMonitoredCount(input: {
     if (unit.link === 'unlinked') result.unlinked = (result.unlinked || 0) + (unit.recordCount ?? 1);
     if (unit.status === 'down') result.downUnits = (result.downUnits || 0) + 1;
     else result.upUnits = (result.upUnits || 0) + 1;
-    if (input.previousArming?.[unit.unitName] === 'TestMode' && (unit.arming || 'Auto') === 'Auto') {
+    const mode = presentedArming({name: unit.unitName, arming: unit.arming});
+    const parked = mode === 'Disarmed' || mode === 'Paused';
+    if (parked) {
+      result.notArmed = (result.notArmed || 0) + 1;
+      result.notArmedUnits.push({name: unit.unitName, mode});
+    } else {
+      result.armedUnits = (result.armedUnits || 0) + 1;
+      armedUp += unit.camerasUp;
+      armedDown += unit.camerasDown;
+      if (unit.siteName) {
+        const armedRow = armedSiteRows.get(unit.siteName) || {siteName: unit.siteName, units: 0, camerasUp: 0, camerasDown: 0};
+        armedRow.units += 1;
+        armedSiteRows.set(unit.siteName, armedRow);
+      }
+    }
+    if (input.previousArming?.[unit.unitName] === 'TestMode' && unit.arming === 'Auto') {
       result.drift.push({name: unit.unitName, from: 'TestMode', to: 'Auto'});
     }
     if (sniper4100) {
@@ -296,9 +328,10 @@ export function selectSharedMonitoredCount(input: {
     const key = watchfulCanonicalUnitKey(unit.name);
     if (countedNames.has(unit.name.trim().toLowerCase())) continue;
     if (key && counted.has(key)) continue;
+    const watchfulArming = key ? watchful.get(key)?.arming : undefined;
     const matchedKey = typeof unit.siteKey === 'string' ? unit.siteKey.trim() : '';
     if (matchedKey && immixKeys.has(matchedKey)) {
-      const reading = immixReadingStatus(unit.observedAt, unit.latestStatus, now);
+      const reading = immixReadingStatus(input.watchfulReadAt, input.watchfulReadFailed, unit.latestStatus, now);
       result.monitoredOnImmix.push({
         name: unit.name,
         productId: unit.productId || null,
@@ -308,13 +341,14 @@ export function selectSharedMonitoredCount(input: {
         status: reading,
         statusLabel: reading === 'up' ? 'Up' : reading === 'down' ? 'Down' : IMMIX_STATUS_LABEL,
         groupLabel: IMMIX_GROUP_LABEL,
-        watchful_excluded_by: unit.arming === 'TestMode' ? 'test_mode' : null,
+        watchful_excluded_by: watchfulArming === 'TestMode' ? 'test_mode' : null,
       });
       if (reading === 'up') result.immixUp = (result.immixUp || 0) + 1;
-      if (reading === 'down') result.immixDown = (result.immixDown || 0) + 1;
+      else if (reading === 'down') result.immixDown = (result.immixDown || 0) + 1;
+      else result.immixUnknown = (result.immixUnknown || 0) + 1;
       continue;
     }
-    if (input.testModeRule && unit.arming === 'TestMode') {
+    if (input.testModeRule && watchfulArming === 'TestMode') {
       result.fieldNotMonitored.push({
         name: unit.name,
         productId: unit.productId || null,
@@ -331,6 +365,8 @@ export function selectSharedMonitoredCount(input: {
   result.siteRows = [...sites.values()].sort((left, right) => left.siteName.localeCompare(right.siteName));
   result.sites = result.siteRows.length;
   result.cameras = {up: camerasUp, down: camerasDown, total: camerasUp + camerasDown};
+  result.armedCameras = {up: armedUp, down: armedDown, total: armedUp + armedDown};
+  result.armedSites = armedSiteRows.size;
   return result;
 }
 
@@ -349,16 +385,16 @@ export function presentedWatchfulStatus(input: {
 }
 
 /** A fresh reading is up or down. A reading 20 minutes past read time is Unknown. */
-export function immixReadingStatus(observedAt: string | null | undefined, latest: 'up' | 'down' | null | undefined, now: number): 'up' | 'down' | 'unknown' {
+export function immixReadingStatus(readAt: string | null | undefined, readFailed: boolean | undefined, latest: 'up' | 'down' | null | undefined, now: number): 'up' | 'down' | 'unknown' {
+  if (readFailed || !readAt || !cameraTimestamp(readAt, now).fresh) return 'unknown';
   if (latest !== 'up' && latest !== 'down') return 'unknown';
-  if (!observedAt || !cameraTimestamp(observedAt, now).fresh) return 'unknown';
   return latest;
 }
 
-/** The mode is the arming value. A name that says Paused does not choose it. */
-export function presentedArming(unit: { name?: string; arming?: 'Auto' | 'TestMode' | 'Disarmed' | null }): 'Auto' | 'TestMode' | 'Disarmed' {
-  if (unit.arming === 'Disarmed' || unit.arming === 'TestMode' || unit.arming === 'Auto') return unit.arming;
-  return 'Auto';
+/** The mode is the arming value. A missing value is Unknown. A name that says Paused does not choose it. */
+export function presentedArming(unit: { name?: string; arming?: 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | null }): 'Auto' | 'TestMode' | 'Disarmed' | 'Paused' | 'Unknown' {
+  if (unit.arming === 'Disarmed' || unit.arming === 'Paused' || unit.arming === 'TestMode' || unit.arming === 'Auto') return unit.arming;
+  return 'Unknown';
 }
 
 /** A site key is split when a Watchful unit and a unit that is not Watchful both carry it. */

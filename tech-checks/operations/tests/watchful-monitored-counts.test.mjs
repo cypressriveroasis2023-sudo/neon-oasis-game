@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {IN_SHOP_COLOR, IN_SHOP_LABEL} from '../src/sharedFleetCounts.ts';
 import {SNIPER_4100_FLAG, TEST_MODE_REASON, MONITORED_COUNT_PATHS, countForPath, deriveSplitSiteKeys, loadImmixRows, presentedArming, presentedImmixStatus, presentedWatchfulStatus, selectSharedMonitoredCount} from '../src/watchfulMonitoredCounts.ts';
-import {formatObservedCt} from '../src/watchfulObservation.ts';
+import {formatObservedCt, oldestObservationIso, presentedFromWatchfulRead} from '../src/watchfulObservation.ts';
 
 const now = Date.parse('2026-11-19T15:00:00Z');
 const snapshotAt = new Date(now - 60_000).toISOString();
@@ -445,8 +445,6 @@ function caseFiveWithArchived() {
     placement: 'FIELD',
     siteKey: sharedKey,
     productId: '9127',
-    latestStatus: 'down',
-    observedAt: new Date(now - 21 * 60 * 1000).toISOString(),
     deployed: true,
     bucket: 'b',
   });
@@ -454,10 +452,12 @@ function caseFiveWithArchived() {
   for (const name of ['Spotter 1', 'Spotter 2', 'Spotter 3', 'Sniper 92']) {
     const row = day.mhelp.find(item => item.name === name);
     row.latestStatus = 'up';
-    row.observedAt = fresh;
+    row.lastConnection = new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString();
   }
-  day.mhelp.find(row => row.name === 'Sniper 78').latestStatus = 'down';
-  day.mhelp.find(row => row.name === 'Sniper 78').observedAt = fresh;
+  const down = day.mhelp.find(row => row.name === 'Sniper 78');
+  down.latestStatus = 'down';
+  down.lastConnection = new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString();
+  day.readAt = fresh;
   return day;
 }
 
@@ -486,21 +486,31 @@ test('an archived project is not in Watchful only while that rule is on', () => 
   assert.equal(off.sites, 89);
   assert.deepEqual(off.cameras, {up: 456, down: 23, total: 479});
   assert.equal(off.notInWatchful.length, 23);
-  assert.equal(off.notArmed, 0);
+  assert.equal(off.notArmed, 1);
+  const parkedUnit = day.snapshot.find(unit => unit.canonicalUnitKey === 'SNIPER|81');
+  parkedUnit.arming = 'Disarmed';
   const on = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    watchfulReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
   assert.equal(on.units, 165);
   assert.equal(on.sites, 88);
   assert.deepEqual(on.cameras, {up: 452, down: 23, total: 475});
+  assert.equal(on.armedUnits, 164);
+  assert.equal(on.armedSites, 87);
+  assert.deepEqual(on.armedCameras, {up: 449, down: 23, total: 472});
   assert.equal(on.notInWatchful.length, 24);
+  assert.equal(on.notArmedUnits.some(unit => unit.name === 'Sniper 81' && unit.mode === 'Disarmed'), true);
+  assert.equal(on.notInWatchful.some(unit => unit.name === 'Sniper 81'), false);
   const parked = on.notInWatchful.find(unit => unit.name === 'Sniper 80 Paused');
   assert.equal(parked.deployed, true);
   assert.equal(parked.mode, 'Disarmed');
   assert.equal(presentedArming({name: parked.name, arming: 'Disarmed'}), 'Disarmed');
   assert.notEqual(parked.mode, 'Paused');
-  assert.equal(on.notArmed, 1);
+  assert.equal(on.notArmed, 2);
+  assert.equal(presentedArming({name: 'Helios 9', arming: null}), 'Unknown');
+  assert.notEqual(presentedArming({name: 'Helios 9'}), 'Auto');
 });
 
 test('split sites come from unit-to-site keys and the fixture has one', () => {
@@ -514,13 +524,56 @@ test('the Immix line counts fresh up and down readings and leaves a 20-minute-ol
   const day = caseFiveWithArchived();
   const count = selectSharedMonitoredCount({
     snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true, archivedRule: true,
+    watchfulReadAt: day.readAt,
     immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
   });
   assert.equal(count.immixUp, 4);
   assert.equal(count.immixDown, 1);
-  const stale = count.monitoredOnImmix.find(unit => unit.name === 'Spotter 27');
-  assert.equal(stale.status, 'unknown');
-  assert.equal(stale.statusLabel, 'Unknown');
+  const staleRead = selectSharedMonitoredCount({
+    snapshot: day.snapshot, mhelp: day.mhelp, testModeRule: true,
+    watchfulReadAt: new Date(now - 21 * 60 * 1000).toISOString(),
+    immixKeys: loadImmixRows(SIX_IMMIX_KEYS).accepted.map(row => row.siteKey), now,
+  });
+  assert.equal(staleRead.immixUp, 0);
+  assert.equal(staleRead.immixDown, 0);
+  assert.equal(staleRead.immixUnknown, staleRead.monitoredOnImmix.length);
+});
+
+test('a Test Mode Watchful unit is not filed as Not in Watchful when its mHelp row has no arming', () => {
+  const day = arm(reviewedDay(), 5);
+  const row = day.mhelp.find(item => item.name === 'Sniper 79');
+  delete row.arming;
+  const count = counted(day, {testModeRule: true, rows: SIX_IMMIX_KEYS});
+  assert.equal(count.notInWatchful.some(unit => unit.name === 'Sniper 79'), false);
+  assert.equal(count.fieldNotMonitored.some(unit => unit.name === 'Sniper 79'), true);
+});
+
+test('stale mHelp records are reported for a check and are not Immix or pending', () => {
+  const count = selectSharedMonitoredCount({
+    snapshot: [{unitName: 'Sniper 1', canonicalUnitKey: 'SNIPER|1', siteName: 'Fixture Site 01', status: 'up', camerasUp: 1, camerasDown: 0, snapshotAt, arming: 'Auto'}],
+    mhelp: [
+      {name: 'Sniper 1', placement: 'FIELD'},
+      {name: 'Spotter 40', placement: 'FIELD', stale: true, siteKey: 'immix-key-north'},
+      {name: 'Spotter 41', placement: 'FIELD', stale: true},
+    ],
+    immixKeys: ['immix-key-north'],
+    now,
+  });
+  assert.equal(count.needsCheck.length, 2);
+  assert.deepEqual(count.needsCheck.map(row => row.reason), ['Stale mHelp record needs a check', 'Stale mHelp record needs a check']);
+  assert.equal(count.monitoredOnImmix.length, 0);
+  assert.equal(count.notInWatchful.length, 0);
+});
+
+test('our Watchful read decides Down, and a unit lastConnection does not', () => {
+  const read = new Date(now - 5 * 60 * 1000).toISOString();
+  const oldLink = new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString();
+  const freshLink = new Date(now - 60 * 1000).toISOString();
+  assert.equal(presentedFromWatchfulRead({readAt: read, watchfulStatus: 'offline', lastConnection: oldLink, now}), 'Down');
+  assert.equal(presentedFromWatchfulRead({readAt: new Date(now - 21 * 60 * 1000).toISOString(), watchfulStatus: 'offline', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(presentedFromWatchfulRead({readAt: null, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(presentedFromWatchfulRead({readAt: read, readFailed: true, watchfulStatus: 'down', lastConnection: freshLink, now}), 'Unknown');
+  assert.equal(oldestObservationIso([read, '']), null);
 });
 
 test('the camera health render function parses', () => {
