@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile} from './deploy-recorded-function.mjs';
+import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile, readServedFunctionBody, SERVED_BODY_MAX_BYTES} from './deploy-recorded-function.mjs';
 
 const ROOT=new URL('../../',import.meta.url).pathname;
 const PATCHES=join(ROOT,'.github/function-patches/cos-operations-pages');
@@ -145,4 +145,60 @@ test('the committed rollback patch reproduces the original v134 bytes unchanged'
   const files=preparePayload(rollback,readRecorded(rollback));
   assert.equal(files.find(f=>f.recordName==='serve.ts').sha256,'d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12');
   assert.equal(files.find(f=>f.recordName==='serve.ts').bytes,1027995);
+});
+
+function multipartBody(files,{boundary='eszip-extract'}={}){
+  const chunks=[Buffer.from('')];
+  for(const file of files){
+    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.name}"\r\nContent-Type: application/typescript\r\n\r\n`));
+    chunks.push(Buffer.from(file.content));
+    chunks.push(Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return {type:`multipart/form-data; boundary=${boundary}`,body:Buffer.concat(chunks)};
+}
+
+test('a 200 multipart extraction of the eszip bundle passes, including a file over 1MB',()=>{
+  const large='x'.repeat(1024*1024+100);
+  const files=[{name:'fn/serve.ts',content:'export const marker="served";\n'},{name:'fn/deno.json',content:large}];
+  const packed=multipartBody(files);
+  const served=readServedFunctionBody(packed.type,packed.body);
+  assert.ok(served);
+  assert.deepEqual(compareServedFiles(served,files.map(file=>({name:file.name,sha256:sha256(Buffer.from(file.content))})) ),[]);
+});
+
+test('a served hash mismatch and a missing file stay failures',()=>{
+  const packed=multipartBody([{name:'fn/serve.ts',content:'wrong'},{name:'fn/deno.json',content:'{}'}]);
+  const served=readServedFunctionBody(packed.type,packed.body);
+  const mismatch=compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(Buffer.from('right'))},{name:'fn/deno.json',sha256:sha256(Buffer.from('{}'))}]);
+  assert.match(mismatch.join('\n'),/served sha256 differs for fn\/serve\.ts/);
+  const missing=compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(Buffer.from('wrong'))},{name:'fn/other.ts',sha256:sha256(Buffer.from('x'))}]);
+  assert.match(missing.join('\n'),/file missing from deployment: fn\/other\.ts/);
+});
+
+test('malformed read-back bodies stay unreadable instead of a passing file list',()=>{
+  assert.equal(readServedFunctionBody('multipart/form-data',Buffer.from('not a multipart body')),null);
+  assert.equal(readServedFunctionBody('application/json',Buffer.from('{not json')),null);
+  assert.equal(readServedFunctionBody('application/json',Buffer.from('{"message":"ok"}')),null);
+  assert.equal(readServedFunctionBody('application/vnd.denoland.eszip',Buffer.from('ESZIP2.3\0raw-bundle')),null);
+  assert.equal(readServedFunctionBody('application/octet-stream',Buffer.from('EZBRcompressed')),null);
+});
+
+test('a mixed-case multipart boundary is matched as written and the part bytes are hashed raw',()=>{
+  const raw=Buffer.from([0x68,0x69,0xff]);
+  const packed=multipartBody([{name:'fn/serve.ts',content:raw}],{boundary:'AbC123'});
+  const served=readServedFunctionBody('Multipart/Form-Data; Boundary=AbC123',packed.body);
+  assert.ok(served);
+  assert.equal(Buffer.isBuffer(served[0].content),true);
+  assert.deepEqual(compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(raw)}]),[]);
+  assert.notEqual(sha256(raw),sha256(Buffer.from(raw.toString('utf8'),'utf8')));
+  assert.equal(readServedFunctionBody('multipart/form-data; boundary=abc123',packed.body),null);
+});
+
+test('a read-back larger than the size cap stays inconclusive',()=>{
+  const packed=multipartBody([{name:'fn/serve.ts',content:'ok'}]);
+  assert.ok(readServedFunctionBody(packed.type,packed.body));
+  const oversized=Buffer.concat([packed.body,Buffer.alloc(SERVED_BODY_MAX_BYTES+1-packed.body.length)]);
+  assert.equal(oversized.length,SERVED_BODY_MAX_BYTES+1);
+  assert.equal(readServedFunctionBody(packed.type,oversized),null);
 });
