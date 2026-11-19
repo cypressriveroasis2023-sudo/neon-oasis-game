@@ -1,7 +1,8 @@
 import {fleetIndividualPinPositions} from './fleetMapGroups';
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember,COMPACT_MAP_GROUP_THRESHOLD} from './fleetCompactMap';
 import {fleetUnitPinMarkup,fleetSourcePinMarkup,fleetAddressPinMarkup,addressGroupHealth,addressPinStatusLabel} from './fleetStatusPins';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import L from 'leaflet';
 import {addFieldMapBasemap} from './fieldMapBasemap';
 import {fleetLocationPinId,type FleetMapPin as Pin} from './fleetLocationPins';
@@ -16,15 +17,21 @@ import {observeFleetMapResize} from './fleetMapResize';
 import type {FleetDashboardRow,FleetFilters} from './fleetDashboardModel';
 import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
 import {retryAddressMapPin} from './addressMapPinRetry';
+import FleetMapStage,{useFleetMapStage} from './FleetMapStage';
+import {stageIcon,stageUnitsFromRows,unitsForBox,type StageBoxId} from './fleetMapStage';
 import 'leaflet/dist/leaflet.css';
-type Props={rows:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;};
-export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters}:Props){
+type Props={rows:FleetDashboardRow[];stageRows?:FleetDashboardRow[];pins:Pin[];locationsReady:boolean;layer:FleetFilters['layer'];onSelect:(id:string)=>void;selectedId?:string;pickLocation?:((point:[number,number]|null)=>void)|null;mhelpAddressHealth?:ReadonlyMap<string,ReticleState>;mhelpAddressUnits?:ReadonlyMap<string,string>;mhelpAddressPins?:MhelpAddressMapPin[];mhelpAddressReviews?:MhelpAddressMapReview[];onSelectMhelpAddress?:(productId:string)=>void;filters?:FleetFilters;};
+export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,layer,onSelect,selectedId='',pickLocation,mhelpAddressHealth,mhelpAddressUnits,mhelpAddressPins=[],mhelpAddressReviews=[],onSelectMhelpAddress,filters}:Props){
  const [pinRetry,setPinRetry]=useState<Record<string,'pin'|'both'|string>>({});
  const node=useRef<HTMLDivElement>(null),groupHost=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),selectAddress=useRef(onSelectMhelpAddress),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [revision,setRevision]=useState(0);
  const [pinMode,setPinMode]=useState<'grouped'|'individual'>(restored.current.pinMode||'grouped');
  const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
+ const stageOn=useFleetMapStage();
+ const [stageBox,setStageBox]=useState<StageBoxId|null>(null);
+ const [stagePick,setStagePick]=useState<string|null>(null);
+ const [stageHost,setStageHost]=useState<Element|null>(null);
  useEffect(()=>{
   const host=groupHost.current;
   if(!host||!groupDetails)return;
@@ -40,7 +47,14 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
   return()=>window.removeEventListener('keydown',escape);
  },[groupDetails]);
  const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
- select.current=onSelect;selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
+ select.current=(id)=>{
+  if(stageOn){
+   setStagePick(id);
+   const pin=pins.find(item=>fleetLocationPinId(item)===id);
+   if(pin)map.current?.setView(pin.point,Math.max(map.current.getZoom(),14),{animate:false});
+  }
+  onSelect(id);
+ };selectAddress.current=onSelectMhelpAddress;picker.current=pickLocation;
  // Prefer the current mHelp address for uniquely reviewed Product-ID bindings.
  // Saved installation/GPS evidence remains available in unit details.
  const scopedIds=new Set([...rows.map(row=>row.id),...pins.map(fleetLocationPinId)]);
@@ -59,7 +73,14 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  // Suppress a native duplicate only when its mHelp Product-ID pin is visible.
  const addressUnitIds=new Set(visibleMhelpPins.map(p=>mhelpAddressUnits?.get(p.productId)).filter(Boolean));
  const displayedPins=pins.filter(p=>!addressUnitIds.has(fleetLocationPinId(p)));
- pinRef.current=displayedPins;
+ const stageUnits=useMemo(()=>stageUnitsFromRows((stageRows||rows).map(row=>{
+  const pin=pins.find(item=>item.kind!=='source_equipment_estimate'&&item.row.id===row.id);
+  return {id:row.id,name:row.displayName||row.name,site:row.displayCustomer||row.unit.site||row.unit.customer||'Site not supplied',placement:row.placement==='shop'?'shop' as const:row.placement==='field'?'field' as const:'other' as const,status:row.support?null:row.cameraState==='online'?'up' as const:row.cameraState==='offline'?'down' as const:null,observedAt:row.camera.checkedAt,support:row.support,point:pin?pin.point:null,readFailed:row.cameraState==='unknown'&&!row.camera.checkedAt};
+ })),[stageRows,rows,pins]);
+ const stageIds=stageOn&&stageBox?new Set(unitsForBox(stageUnits,stageBox,Date.now()).map(unit=>unit.id)):null;
+ const paintedPins=stageIds?displayedPins.filter(pin=>stageIds.has(fleetLocationPinId(pin))):displayedPins;
+ const paintedMhelp=stageIds?visibleMhelpPins.filter(pin=>{const id=mhelpAddressUnits?.get(pin.productId);return Boolean(id&&stageIds.has(id));}):visibleMhelpPins;
+ pinRef.current=paintedPins;
  type Entry={kind:'address';pin:MhelpAddressMapPin}|{kind:'native';pin:Pin};
 
  useEffect(()=>{if(!node.current)return;const instance=L.map(node.current,{zoomControl:true,trackResize:false}).setView(restored.current.center||[31,-99],restored.current.zoom||5);map.current=instance;addFieldMapBasemap(instance);markers.current=L.layerGroup().addTo(instance);let resizing=false;const stopResize=observeFleetMapResize(instance,active=>{resizing=active;});
@@ -70,13 +91,18 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
  useEffect(()=>{
   const instance=map.current,group=markers.current;if(!instance||!group)return;group.clearLayers();
   const entries=[
-   ...visibleMhelpPins.map(pin=>({item:{kind:'address' as const,pin},...instance.latLngToContainerPoint(pin.point)})),
-   ...displayedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
+   ...paintedMhelp.map(pin=>({item:{kind:'address' as const,pin},...instance.latLngToContainerPoint(pin.point)})),
+   ...paintedPins.map(pin=>({item:{kind:'native' as const,pin},...instance.latLngToContainerPoint(pin.point)}))
   ];
   const size=instance.getSize(),compact=pinMode==='grouped'&&entries.length>=COMPACT_MAP_GROUP_THRESHOLD&&!picker.current;
   const layout=compact?compactMapGroups<Entry>(entries):
    fleetIndividualPinPositions<Entry>(entries,{width:size.x,height:size.y}).map(position=>[position]);
-  const state=(row:FleetDashboardRow):ReticleState=>row.support?'support':(['online','offline'].includes(row[layer+'State' as 'cameraState'|'routerState'|'batteryState'])?row[layer+'State' as 'cameraState'|'routerState'|'batteryState']:'unknown') as ReticleState;
+  const state=(row:FleetDashboardRow):ReticleState=>{
+   const base:ReticleState=row.support?'support':(['online','offline'].includes(row[layer+'State' as 'cameraState'|'routerState'|'batteryState'])?row[layer+'State' as 'cameraState'|'routerState'|'batteryState']:'unknown') as ReticleState;
+   if(!stageOn||base==='support')return base;
+   const icon=stageIcon({placement:row.placement==='shop'?'shop':row.placement==='field'?'field':'other',status:base==='online'?'up':base==='offline'?'down':null,observedAt:row.camera.checkedAt,readFailed:base==='unknown'&&!row.camera.checkedAt,support:row.support},Date.now());
+   return icon.icon==='up'?'online':icon.icon==='down'?'offline':'unknown';
+  };
   const describe=(item:Entry)=>{
    let name:string,label:string,html:string,health:ReticleState,classes:string,member:CompactMapMember;
    if(item.kind==='address'){
@@ -138,6 +164,7 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    const label=description.label+(offset?' · Display offset; recorded location unchanged':'');
    const marker=L.marker(display,{bubblingMouseEvents:false,autoPanOnFocus:false,zIndexOffset:item.kind==='address'?250:0,icon:L.divIcon({className:description.classes+(offset?' cos-dashboard-peer':''),html:description.html,iconSize:[44,56],iconAnchor:[22,18]}),title:label,alt:label}).addTo(group),element=marker.getElement();
    element?.setAttribute('aria-label',label);element?.setAttribute('data-health',description.health);
+   if(stageOn&&item.kind==='native'&&item.pin.kind!=='source_equipment_estimate')element?.setAttribute('data-stage-icon',stageIcon({placement:item.pin.row.placement==='shop'?'shop':item.pin.row.placement==='field'?'field':'other',status:description.health==='online'?'up':description.health==='offline'?'down':null,observedAt:item.pin.row.camera.checkedAt,support:item.pin.row.support},Date.now()).icon);
    element?.setAttribute('data-source-point',JSON.stringify(pin.point));element?.setAttribute('data-display-offset',String(offset));
    if(item.kind==='address'){
     element?.setAttribute('data-mhelp-product-ids',JSON.stringify([item.pin.productId]));
@@ -148,13 +175,24 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
    marker.on('click',()=>description.member.select?.());
    const tooltip=document.createElement('span');tooltip.textContent=description.name+' · '+({online:'Online',offline:'Offline',unknown:'Unverified',support:'Solar support'}[description.health]);marker.bindTooltip(tooltip,{direction:'top',offset:[0,-24],className:'cos-fleet-pin-tooltip'});marker.on('click',()=>marker.closeTooltip());
   }
- },[pins,layer,revision,pinMode,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation]);
+ },[pins,layer,revision,pinMode,mhelpAddressPins,mhelpAddressHealth,mhelpAddressUnits,filters,pickLocation,stageOn,stageBox]);
 
- const fit=()=>{const values=[...pinRef.current.map(p=>p.point),...visibleMhelpPins.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
+ const fit=()=>{const values=[...pinRef.current.map(p=>p.point),...paintedMhelp.map(p=>p.point)];if(values.length)map.current?.fitBounds(L.latLngBounds(values),{padding:[40,50],maxZoom:15});};
  // Pending proof validation hides markers, but is not a settled population change.
- const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pinRef.current.map(fleetLocationPinId),...visibleMhelpPins.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,mhelpAddressUnits,filters,locationsReady]);
- const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14));}},[selectedId,pins,mhelpAddressPins,mhelpAddressUnits]);
- return <div ref={panel} aria-busy={!locationsReady} className={'cos-fleet-map-panel field-map-workspace cos-fleet-individual-pins cos-fleet-compact-groups'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
+ const previousIds=useRef('');useEffect(()=>{if(!locationsReady)return;const key=[...pinRef.current.map(fleetLocationPinId),...paintedMhelp.map(p=>'mhelp:'+p.productId)].join('|');if(key!==previousIds.current){const first=!previousIds.current;previousIds.current=key;if(!(first&&(restored.current.center||viewportChanged.current)))fit();}},[pins,mhelpAddressPins,mhelpAddressUnits,filters,locationsReady,stageOn,stageBox]);
+ const focused=useRef('');useEffect(()=>{if(!selectedId){focused.current='';return;}const pin=pins.find(p=>fleetLocationPinId(p)===selectedId);if(pin&&focused.current!==selectedId){focused.current=selectedId;map.current?.setView(pin.point,Math.max(map.current.getZoom(),14),{animate:false});}},[selectedId,pins,mhelpAddressPins,mhelpAddressUnits]);
+ useEffect(()=>{
+  const board=panel.current?.closest('.cos-fleet-board')??null;
+  setStageHost(board);
+  if(!stageOn||!board)return;
+  board.classList.add('cos-fleet-stage-on');
+  document.documentElement.classList.add('cos-fleet-stage-lock');
+  map.current?.invalidateSize();
+  return()=>{board.classList.remove('cos-fleet-stage-on');document.documentElement.classList.remove('cos-fleet-stage-lock');};
+ },[stageOn,locationsReady]);
+ return <>
+  {stageOn&&stageHost&&createPortal(<FleetMapStage units={stageUnits} now={Date.now()} active={stageBox} selectedId={stagePick} onBox={id=>{setStageBox(current=>current===id?null:id);setStagePick(null);}} onUnit={id=>select.current(id)} onClose={()=>{setStageBox(null);setStagePick(null);}}/>,stageHost)}
+  <div ref={panel} aria-busy={!locationsReady} className={'cos-fleet-map-panel field-map-workspace cos-fleet-individual-pins cos-fleet-compact-groups'+(expanded?' cos-fleet-map-expanded':'')+(pickLocation?' cos-fleet-picking':'')}>
   <div className='cos-fleet-map-toolbar'><div><details className='cos-fleet-map-details'><summary aria-label='Fleet map details'><strong>Fleet map</strong></summary><small>{locationsReady?<>{pins.length} {pins.some(pin=>pin.kind==='source_equipment_estimate')?'equipment':'unit'} pins · {pins.filter(p=>p.kind==='current').length} verified · {pins.filter(p=>p.kind!=='current').length} estimated / source recorded{visibleMhelpPins.length>0&&<> · {visibleMhelpPins.length} MHelp customer address units</>}</>:'Checking saved map locations…'}</small>{visibleMhelpPins.length>0&&<label className='cos-fleet-map-find'>Find a mapped unit<select aria-label='Find mapped equipment' defaultValue='' onChange={event=>{if(event.currentTarget.value)onSelectMhelpAddress?.(event.currentTarget.value);event.currentTarget.value='';}}><option value=''>Choose unit</option>{visibleMhelpPins.map(pin=><option key={pin.productId} value={pin.productId}>{pin.unitNumber} · Product {pin.productId}</option>)}</select></label>}</details></div><div><button onClick={fit} disabled={!pins.length&&!visibleMhelpPins.length}>Fit pins</button><button className={expanded?'field-map-fullscreen-exit':''} onClick={full} aria-label={expanded?'Exit fullscreen fleet map':'Fullscreen fleet map'}>{expanded?'Close fullscreen':'⛶ Fullscreen'}</button></div></div>
   {pickLocation&&<div className='cos-fleet-pick-note' role='status'>Tap the verified installation point. This selects a candidate; confirm the address before saving. <button onClick={()=>pickLocation(null)}>Cancel pin selection</button></div>}
   <div className='cos-fleet-pin-view' role='group' aria-label='Map pin view'>
@@ -179,5 +217,5 @@ export default function FleetDashboardMap({rows,pins,locationsReady,layer,onSele
     {item.address&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.address)} target='_blank' rel='noopener noreferrer'>Search address on map ↗</a>}
    </li>)}</ul>
   </details>}
- </div>;
+ </div></>;
 }

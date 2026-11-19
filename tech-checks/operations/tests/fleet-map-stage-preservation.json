@@ -1,0 +1,17 @@
+{
+  "contract": "COS_FLEET_MAP_STAGE_PRESERVATION_V1",
+  "provenance": "James 11:48 AM CT Nov 19: map-centered single-screen layout",
+  "files": [
+    {
+      "path": "FleetDashboard.tsx",
+      "baselineBlob": "769c97949d852551fc09689301f64e87bbc0ac2b",
+      "candidateBlob": "a534aaf3f0f9941c1800a0eaba914de8ae897839",
+      "replacements": [
+        {
+          "from": "rows={filtered}",
+          "to": "rows={filtered} stageRows={rows}"
+        }
+      ]
+    }
+  ]
+}

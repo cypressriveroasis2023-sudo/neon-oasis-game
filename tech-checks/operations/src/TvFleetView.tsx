@@ -24,6 +24,9 @@ import {tvMapTour,tvCameraPageSize} from './tvMapTour';
 import type {FleetPages} from './tvBoardData';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
+import FleetMapStage from './FleetMapStage';
+import {fleetMapStageEnabled,stageIcon,stageUnitsFromRows,unitsForBox,type StageBoxId} from './fleetMapStage';
+import './fleetMapStage.css';
 type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
 type Api={get:(path:string)=>Promise<{data:any}>};
@@ -186,6 +189,14 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const shown=outageCards.slice((page%parts)*count,(page%parts+1)*count),area=areas[page%areas.length];
   useEffect(()=>onPages({camera:parts,map:areas.map(area=>area.label)}),[parts,areas,onPages]);
   const mapNode=useRef<HTMLDivElement|null>(null),mapRef=useRef<L.Map|null>(null),layer=useRef<L.LayerGroup|null>(null);
+  const [tvBox,setTvBox]=useState<StageBoxId|null>(null);
+  const [tvPick,setTvPick]=useState<string|null>(null);
+  const tvStage=fleetMapStageEnabled()&&mode==='map';
+  const tvStageUnits=useMemo(()=>stageUnitsFromRows(rows.map(row=>{
+    const located=row.point&&Number.isFinite(Number(row.point.latitude))&&Number.isFinite(Number(row.point.longitude));
+    return {id:row.unit.id,name:row.unit.unitNumber,site:row.unit.site||row.unit.customer||'Site not supplied',placement:String(row.unit.placement||'').toUpperCase()==='SHOP'?'shop' as const:'field' as const,status:row.health.state==='online'?'up' as const:row.health.state==='offline'?'down' as const:null,observedAt:row.health.checkedAt,support:row.health.state==='support',point:located?[Number(row.point!.latitude),Number(row.point!.longitude)] as [number,number]:null};
+  })),[rows]);
+  const tvStageIds=tvStage&&tvBox?new Set(unitsForBox(tvStageUnits,tvBox,clock).map(unit=>unit.id)):null;
   const [mapRevision,setMapRevision]=useState(0);
   const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);
   const groupHost=useRef<HTMLDivElement|null>(null);
@@ -248,21 +259,27 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         continue;
       }
       const {item}=members[0],health=item.health;
-      const html=item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,health,item.verifiedGps?'current':'estimate');
-      const marker=L.marker(item.point,{title:item.name+' · '+health,alt:item.name+' · '+health,
+      if(tvStageIds&&item.key.startsWith('native:')&&!tvStageIds.has(item.key.slice('native:'.length)))continue;
+      const native=item.key.startsWith('native:')?rows.find(row=>'native:'+row.unit.id===item.key):undefined;
+      const presented=native?stageIcon({placement:String(native.unit.placement||'').toUpperCase()==='SHOP'?'shop':'field',status:health==='online'?'up':health==='offline'?'down':null,observedAt:native.health.checkedAt,support:health==='support'},clock):null;
+      const paint=presented?presented.icon==='up'?'online':presented.icon==='down'?'offline':'unknown':health;
+      const html=item.productId?fleetAddressPinMarkup(item.name,health):fleetUnitPinMarkup(item.name,paint as ReticleState,item.verifiedGps?'current':'estimate');
+      const marker=L.marker(item.point,{title:item.name+' · '+(presented?presented.label:health),alt:item.name+' · '+(presented?presented.label:health),
         icon:L.divIcon({className:'cos-field-pin-wrap cos-tv-fleet-unit-marker',html,iconSize:[44,56],iconAnchor:[22,34]})});
       marker.on('add',()=>{
         const element=marker.getElement();element?.setAttribute('data-map-member-id',item.key);
         if(item.productId)element?.setAttribute('data-mhelp-product-id',item.productId);
+        if(presented)element?.setAttribute('data-stage-icon',presented.icon);
       });
+      if(item.key.startsWith('native:'))marker.on('click',()=>setTvPick(item.key.slice('native:'.length)));
       const popup=document.createElement('div');popup.className='cos-compact-tv-pin-popup';
       const title=document.createElement('strong');title.textContent=item.name;popup.append(title);
-      for(const value of [item.site||'Site not linked',item.address||'Address not recorded','Camera / connection: '+health.toUpperCase(),item.locationLabel]){
+      for(const value of [item.site||'Site not linked',item.address||'Address not recorded','Camera / connection: '+(presented?presented.label:health.toUpperCase()),item.locationLabel]){
         const p=document.createElement('p');p.textContent=value;popup.append(p);
       }
       marker.bindPopup(popup);group.addLayer(marker);
     }
-  },[tvPins,mapRevision,enabled]);
+  },[tvPins,mapRevision,enabled,tvBox]);
   useEffect(()=>{
     if(mode!=='map')return;
     const frame=requestAnimationFrame(()=>{
@@ -277,7 +294,13 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   const healthAvailable=Boolean(data.health)&&(!census.board||census.board.healthVerified);
   const totals={online:census.board?.counts.online??rows.filter(r=>r.health.state==='online').length,offline:census.board?.counts.offline??rows.filter(r=>r.health.state==='offline').length,unknown:census.board?.counts.unverified??rows.filter(r=>r.health.state==='unknown').length,mapped:tvPins.gpsVerified};
   const sourceFacts=fleetSourceFacts({now:clock,map:data.fieldSource||undefined,connectionState:typeof data.fieldSource?.productConnectionsState==='string'?data.fieldSource.productConnectionsState:undefined,boardCheckedAt:data.readAt,trackerVerifiedAt:typeof data.fieldSource?.productConnections?.trackerVerifiedAt==='string'?data.fieldSource.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(data.fieldSource)});
-  return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
+  useEffect(()=>{
+    if(!tvPick||!mapRef.current)return;
+    const unit=tvStageUnits.find(item=>item.id===tvPick);
+    if(unit?.point)mapRef.current.setView(unit.point,Math.max(mapRef.current.getZoom(),14),{animate:false});
+  },[tvPick,tvStageUnits]);
+  return <div className={'tv-fleet-view'+(tvStage?' cos-tv-stage':'')} hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
+    {tvStage&&<FleetMapStage units={tvStageUnits} now={clock} active={tvBox} selectedId={tvPick} onBox={id=>{setTvBox(current=>current===id?null:id);setTvPick(null);}} onUnit={setTvPick} onClose={()=>{setTvBox(null);setTvPick(null);}}/>}
     <SourceHealthStrip facts={sourceFacts}/>
     <div className='tv-fleet-summary'>{mode==='camera'?<><b className='tv-offline'>{healthAvailable?census.board?census.board.counts.offline+' down units':outageCards.length+' down units':'Outage count unavailable'}</b><b>Red units only · {page%parts+1} / {parts}</b></>:<><b className='tv-online'>{healthAvailable?totals.online:'—'} online</b><b className='tv-offline'>{healthAvailable?totals.offline:'—'} offline</b><b>{locationsAvailable?totals.unknown:'—'} unverified</b>{census.board?<><b>{census.board.field} Field equipment</b><b>{census.board.field-census.board.counts.support} camera-capable equipment</b><b>{census.board.counts.support} support · no cameras</b></>:<b>{locationsAvailable?rows.length+' COS diagnostic units · census unavailable':'Field equipment unavailable'}</b>}<b>{locationsAvailable?tvPins.mhelpLocated:'—'} mHelp address pins</b><b>{locationsAvailable?totals.mapped:'—'} GPS-verified</b></>}<small>Saved camera / placement read every {Math.round(CAMERA_AUTO_REFRESH_MS/60000)} min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}{data.readAt&&clock-data.readAt>CAMERA_AUTO_REFRESH_MS*2?' · last completed reading · not current':''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {data.health?'Last completed results remain displayed with their original check times. ':''}{error}</p>}
