@@ -46,9 +46,10 @@ const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d
 const MAC_PAIRS = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
 const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
 const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
-const UUID_VALUE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SERIAL_LABEL = String.raw`(?:[A-Za-z]+[\s._-]*)?(?:serial(?:[\s._-]*(?:number|num|nbr|no\.?))?|ser\.?\s*no\.?|s\.n\.?|s\/n|sn)|\u2116`;
-const SERIAL_GAP = String.raw`(?:\s+is\b\s*[:.]?\s*|\s*[^\sA-Za-z0-9]+\s*|\s+|>\s*)?`;
+/** Any mix of quotes, colon, equals, arrows, dashes, brackets, Nº and whitespace. Repeated so `": "` is one gap. */
+const SERIAL_GAP = String.raw`(?:\s+|is\b|N[º°]|->|=>|[^\sA-Za-z0-9])*`;
 const SERIAL_VALUE = String.raw`(?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{4,}`;
 const LABELED_SERIAL = new RegExp(
   `(?<![A-Za-z0-9_])(?<label>${SERIAL_LABEL})(?![A-Za-z0-9])(?<gap>${SERIAL_GAP})(?<value>${SERIAL_VALUE})`,
@@ -161,24 +162,15 @@ function redactLabeledSerial(text: string): {text: string; stripped: boolean} {
   return {text: next, stripped: true};
 }
 
-function holdUuids(text: string): {text: string; held: string[]} {
-  const held: string[] = [];
-  UUID_VALUE.lastIndex = 0;
-  const next = text.replace(UUID_VALUE, token => {
-    held.push(token);
-    return `\u0000U${held.length - 1}\u0000`;
-  });
-  return {text: next, held};
+/** A project id is a UUID, stored lowercase. Anything else, including a name, is null. */
+function projectIdOf(raw: string): string | null {
+  const text = raw.trim();
+  return PROJECT_UUID.test(text) ? text.toLowerCase() : null;
 }
 
-function restoreUuids(text: string, held: string[]): string {
-  return text.replace(/\u0000U(\d+)\u0000/g, (_whole, index) => held[Number(index)] ?? '');
-}
-
-/** Drop an IPv4, IPv6, MAC, or serial value. Labels stay. Ordinary words stay. UUID-shaped ids stay whole. */
+/** Drop an IPv4, IPv6, MAC, or serial value. Labels stay. Ordinary words stay. A UUID in an ordinary cell is not held aside. */
 export function stripWatchfulIp(value: string): {text: string; stripped: boolean; onlyIp: boolean} {
-  const saved = holdUuids(value);
-  let text = saved.text;
+  let text = value;
   let stripped = false;
   const mark = (next: {text: string; stripped: boolean}) => { text = next.text; if (next.stripped) stripped = true; };
   mark(scrubToken(MAC_PAIRS, text));
@@ -199,7 +191,6 @@ export function stripWatchfulIp(value: string): {text: string; stripped: boolean
     stripped = true;
     return ' ';
   });
-  text = restoreUuids(text, saved.held);
   text = text.replace(/\s+/g, ' ').trim();
   return {text, stripped, onlyIp: stripped && text.length === 0};
 }
@@ -327,7 +318,7 @@ export function loadWatchfulExport(csv: string, fetchedAt?: string | null, now =
       camerasUp: countOf(read(upCol), 'cameras up'),
       camerasDown: countOf(read(downCol), 'cameras down'),
       arming: armingCol >= 0 ? normalizeArming(read(armingCol) || null) : null,
-      projectId: projectCol >= 0 ? read(projectCol) || null : null,
+      projectId: projectCol >= 0 ? projectIdOf(String(row[projectCol] ?? '')) : null,
       readAt: rowReadAt(row, readCol, fileRead, now),
     });
   }

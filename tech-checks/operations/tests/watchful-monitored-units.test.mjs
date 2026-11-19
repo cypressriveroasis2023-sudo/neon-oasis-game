@@ -65,7 +65,7 @@ test('the loader strips or rejects IPv6 and MAC addresses the same way as IPv4',
   assert.equal(kept.units[0].canonicalUnitKey, 'SNIPER|2');
   const carried = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at,read_at,arming,project_id\nSniper 2,Fixture Site,Avigilon,up,1,0,2026-11-19T14:00:00Z,2026-11-19T14:05:00Z,Disarmed,proj-field\n', at);
   assert.equal(carried.units[0].arming, 'disarmed');
-  assert.equal(carried.units[0].projectId, 'proj-field');
+  assert.equal(carried.units[0].projectId, null);
   assert.equal(carried.fetchedAt, at);
   assert.equal(carried.snapshotAt, '2026-11-19T14:00:00.000Z');
   const fromColumn = loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at,read_at\nSniper 2,Fixture Site,Avigilon,down,0,1,2026-11-19T10:00:00Z,2026-11-19T11:00:00Z\n');
@@ -125,6 +125,12 @@ test('serial labels stay and only the value is redacted', () => {
     ['S.N. ZZ12CD34', 'S.N.'],
     ['Serial \u2013 ZZ12CD34', 'Serial \u2013'],
     ['\u2116 ZZ12CD34', '\u2116'],
+    ['{"serial": "ZZ12CD34"}', '{"serial": ""}'],
+    ['serial: "ZZ12CD34"', 'serial: ""'],
+    ["serial = 'ZZ12CD34'", "serial = ''"],
+    ['"serialNo": "ZZ12CD34"', '"serialNo": ""'],
+    ["Serial: 'ZZ12CD34'", "Serial: ''"],
+    ['Serial N\u00ba ZZ12CD34', 'Serial N\u00ba'],
   ];
   for (const [input, expected] of forms) assert.equal(stripWatchfulIp(input).text, expected, input);
   assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
@@ -171,18 +177,28 @@ test('duplicate camera rows collapse to one unit and the latest reading wins', (
   assert.equal(loaded.units.every(unit => unit.snapshotAt === loaded.oldestObservedAt), true);
 });
 
-test('a UUID-shaped project id is not treated as a MAC, and arming is one of five words', () => {
-  const projectId = '3f2504e0-4f89-41d3-9b0c-030507090a0b';
-  assert.equal(stripWatchfulIp(projectId).text, projectId);
+test('a project id is a lowercased UUID, and a UUID in any other cell is still scrubbed', () => {
+  const projectId = '3F2504E0-4F89-41D3-9B0C-030507090A0B';
+  const lowered = projectId.toLowerCase();
+  const labeled = stripWatchfulIp(`Serial: ${lowered}`);
+  assert.equal(labeled.text.includes(lowered), false);
+  assert.equal(labeled.text.includes('030507090a0b'), false);
+  const otherCell = stripWatchfulIp(`Fixture Site ${lowered} gate`);
+  assert.equal(otherCell.text.includes(lowered), false);
+  assert.equal(otherCell.text.includes('4f89-41d3-9b0c'), false);
+  assert.equal(otherCell.text.includes('030507090a0b'), false);
   const csv = [
     'unit,site,group,status,cameras_up,cameras_down,arming,project_id',
     `Sniper 2,Fixture Site,Avigilon,up,1,0,Auto,${projectId}`,
-    'Sniper 3,Fixture Site,Avigilon,down,0,1,armed-ish,proj-field',
+    'Sniper 3,Fixture Site,Avigilon,down,0,1,armed-ish,Test Project',
     'Sniper 4,Fixture Site,Avigilon,up,1,0,TestMode,proj-test',
     'Sniper 5,Fixture Site,Avigilon,up,1,0,Paused,proj-field',
   ].join('\n');
   const loaded = loadWatchfulExport(csv, at);
-  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').projectId, projectId);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').projectId, lowered);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|3').projectId, null);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|4').projectId, null);
+  assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|5').projectId, null);
   assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|2').arming, 'armed');
   assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|3').arming, 'unknown');
   assert.equal(loaded.units.find(unit => unit.canonicalUnitKey === 'SNIPER|4').arming, 'test');

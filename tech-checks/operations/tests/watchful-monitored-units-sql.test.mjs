@@ -72,11 +72,22 @@ test('the read-time columns are additive and their rollback restores the require
     {column_name: 'project_id', is_nullable: 'YES'},
     {column_name: 'snapshot_at', is_nullable: 'YES'},
   ]);
+  const types = await db.query(`
+    select data_type from information_schema.columns
+    where table_schema = 'public' and table_name = 'watchful_monitored_units' and column_name = 'project_id'
+  `);
+  assert.equal(types.rows[0].data_type, 'uuid');
+  await assert.rejects(db.exec(`insert into public.watchful_monitored_units
+    (snapshot_id, unit_name, canonical_unit_key, site_name, unit_group, unit_status, cameras_up, cameras_down, snapshot_at, fetched_at)
+    values ('3f2504e0-4f89-41d3-9b0c-030507090a0c', 'Sniper 9', 'SNIPER|9', 'Fixture Site', 'Avigilon', 'up', 1, 0, '2026-11-19T14:00:00Z', '2099-01-01T00:00:00Z')`), /future/);
   await db.exec(`insert into public.watchful_monitored_units
     (snapshot_id, unit_name, canonical_unit_key, site_name, unit_group, unit_status, cameras_up, cameras_down, snapshot_at, fetched_at, arming, project_id)
     values ('3f2504e0-4f89-41d3-9b0c-030507090a0b', 'Sniper 2', 'SNIPER|2', 'Fixture Site', 'Avigilon', 'up', 1, 0, null, '2026-11-19T14:30:00Z', 'unknown', '3f2504e0-4f89-41d3-9b0c-030507090a0b')`);
-  await db.exec('delete from public.watchful_monitored_units');
   await db.exec(readRollback);
+  const kept = await db.query(`select unit_name, snapshot_at from public.watchful_monitored_units`);
+  assert.equal(kept.rows.length, 1);
+  assert.equal(kept.rows[0].unit_name, 'Sniper 2');
+  assert.equal(new Date(kept.rows[0].snapshot_at).toISOString(), '2026-11-19T14:30:00.000Z');
   const after = await db.query(`
     select column_name, is_nullable
     from information_schema.columns
