@@ -1,4 +1,5 @@
 import {openFleetView} from './fleet-view-navigation-helper.mjs';
+import {INHAND_LIVE_STATUS_SOURCE} from '../src/inhandRouterStatus.ts';
 import {test, expect} from '@playwright/test';
 import {mountFleet, field, units, vrm, fresh} from './fleet-dashboard-fixtures.mjs';
 
@@ -20,7 +21,7 @@ function presentationPower() {
   return value;
 }
 const router = {id:'appearance-router',unitKey:'Helios 1',name:'Fixture InHand',model:'IR615',publicIp:'192.0.2.10',unitIp:null,port:443,protocol:'https',
-  probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh,reportedSource:'Synthetic fixture',savedLatencyMs:23,
+  probeStatus:'online',checkedAt:fresh,lastRecoveredAt:fresh,reportedStatus:'Online',reportedAt:fresh,reportedSource:INHAND_LIVE_STATUS_SOURCE,savedLatencyMs:23,
   match:'exact_name',candidateUnit:{id:units[0].id,unitNumber:units[0].unitNumber},gps:null};
 const mount = (page,it=false,options={})=>mountFleet(page,it,{field:presentationField(),vrm:presentationPower(),routers:[router],...options});
 async function noPageOverflow(app) {

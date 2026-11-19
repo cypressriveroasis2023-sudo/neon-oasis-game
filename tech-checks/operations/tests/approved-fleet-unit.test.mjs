@@ -22,13 +22,16 @@ import {createHash} from 'node:crypto';
 // Finance group and the unused Customers/Schedule entries (routes kept, see
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
+// Reviewed 2026-11-18: fleetDashboardModel.ts and FleetUnitHealth.tsx read the
+// live InHand status. Their pins move with that reading. The camera window,
+// the session guards, and the other presentation pins are unchanged.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
-  "FleetUnitHealth.tsx": "6bc714cfd419d01e7b8541ccfc2142dc91fff449",
+  "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
-  "fleetDashboardModel.ts": "1c14c92829e6cbabb681b575c409bb66953337d5",
+  "fleetDashboardModel.ts": "d98e1e1700ef34888a40b5caa0a9c9bdb3359d41",
   "fieldCameraHealth.ts": "f3f44410e9368919658330d18e8b14957e227753",
   "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
   "api.ts": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",

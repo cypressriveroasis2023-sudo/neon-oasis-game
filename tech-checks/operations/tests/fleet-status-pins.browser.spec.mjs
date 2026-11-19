@@ -87,7 +87,7 @@ for(const it of [false,true])test(`simple card retains real evidence and labeled
  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
  const card=app.getByRole('dialog',{name:'Helios 1 unit intelligence'});
  await expect(card.getByRole('heading',{name:'Router & connection'})).toBeVisible();
- await expect(card.getByText('Router not linked.',{exact:false})).toBeVisible();
+ await expect(card.getByText('Unknown. No exact InHand router is linked to this unit.',{exact:true})).toBeVisible();
  const vrm=card.getByRole('link',{name:'Open Victron'});
  await expect(vrm).toHaveAttribute('href','https://vrm.victronenergy.com/installation/1001/dashboard');
  await expect(card.getByRole('heading',{name:'Quick troubleshooting'})).toBeVisible();
