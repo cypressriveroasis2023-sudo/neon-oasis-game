@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {boardProblems, boardSearch, buildBoard, problemTone} from '../src/fleetBoard.ts';
+import {boardProblems, boardSearch, buildBoard, problemTone, stageReadFailed} from '../src/fleetBoard.ts';
 import {cameraMarks, publicCameraLabel, readIsStale} from '../src/fleetCameraStatusRead.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 
@@ -109,9 +109,22 @@ test('a fresh camera time with an old read is Unknown, and an old camera time wi
 
 test('the dashboard hook passes our read time and the failed flag', () => {
   const source = readFileSync(new URL('../src/FleetDashboard.tsx', import.meta.url), 'utf8');
-  assert.match(source, /stageRead=\{\{at:Number\.isFinite\(snapshotNow\)\?new Date\(snapshotNow\)\.toISOString\(\):null,failed:Boolean\(failed\)\}\}/);
+  assert.match(source, /failed:stageReadFailed\(Boolean\(failed\),cameras\.error,mapError\)/);
   assert.match(source, /const boardOn=useFleetMapStage\(\)&&view==='map'/);
   assert.match(source, /\{!boardOn&&<div className='cos-fleet-heading'>/);
+});
+
+test('a failed refresh is Unknown at once even when the previous read is fresh', () => {
+  assert.equal(stageReadFailed(false, 'Camera Health could not be loaded.', ''), true);
+  assert.equal(stageReadFailed(false, '', 'Placement data unavailable'), true);
+  assert.equal(stageReadFailed(false, '', ''), false);
+  const view = buildBoard([
+    unit({id: 'up', name: 'Field up', state: 'up'}),
+  ], null, fresh, now, true);
+  assert.equal(view.stale, true);
+  assert.equal(view.unitsOnline.up, null);
+  assert.equal(view.sites[0].units[0].status, 'unknown');
+  assert.equal(view.problems.length, 0);
 });
 
 test('Problems 0 is not red', () => {

@@ -76,8 +76,15 @@ export function fleetStageRollbackRequested() {
   catch { return false; }
 }
 
+export function fleetBoardRequested() {
+  const scope = typeof location !== 'undefined' ? location : (globalThis as {location?: {search?: string}}).location;
+  if (!scope?.search) return false;
+  try { return new URLSearchParams(scope.search).get('fleetBoard') === '1'; }
+  catch { return false; }
+}
+
 export function fleetMapStageActive(wide: boolean, enabled = FLEET_MAP_STAGE_LAYOUT) {
-  return enabled && wide && !fleetStageRollbackRequested();
+  return enabled && wide && fleetBoardRequested() && !fleetStageRollbackRequested();
 }
 
 export function fleetMapStageEnabled(enabled = FLEET_MAP_STAGE_LAYOUT) {
@@ -86,10 +93,7 @@ export function fleetMapStageEnabled(enabled = FLEET_MAP_STAGE_LAYOUT) {
 
 /** The TV wall is opt-in. The existing TV board stays up unless `?fleetBoard=1` is set. */
 export function fleetBoardOnTv() {
-  if (!fleetMapStageEnabled()) return false;
-  if (typeof location === 'undefined') return false;
-  try { return new URLSearchParams(location.search).get('fleetBoard') === '1'; }
-  catch { return false; }
+  return fleetMapStageEnabled() && fleetBoardRequested();
 }
 
 /** mHelp placement. Anything that is not Field or Shop is Unknown, including a blank value. */

@@ -12,7 +12,7 @@ const fits = (frame)=>frame.locator('html').evaluate(()=>({
 test('the fleet stage does not scroll, a count filters the map, and a unit opens details',async({page},info)=>{
   test.skip(info.project.name!=='desktop-1440','covered once at 1920x1080');
   await page.setViewportSize({width:1920,height:1080});
-  const {app}=await mountFleet(page,true);
+  const {app}=await mountFleet(page,true,{fleetBoard:true});
   const stage=app.locator('.cos-stage');
   await expect(stage).toBeVisible();
   await expect(stage.locator('[data-stage-box=monitored]')).toHaveCount(0);
@@ -101,7 +101,7 @@ test('the TV board stays on one screen and a stale unit is Unknown',async({page}
 test('the stage drawer keeps the last unit on screen at 1920x1080',async({page},info)=>{
   test.skip(info.project.name!=='desktop-1440');
   await page.setViewportSize({width:1920,height:1080});
-  const {app}=await mountFleet(page,true);
+  const {app}=await mountFleet(page,true,{fleetBoard:true});
   await app.locator('[data-board-box=problems]').click();
   const drawer=app.locator('.cos-board-card');
   const last=drawer.locator('button').last();
@@ -127,7 +127,7 @@ test('a grouped site zooms in and the old group sheet stays closed',async({page}
     clustered.inventoryItems.push({...clustered.inventoryItems[0],...copy,currentLocationType:'field',placement:'FIELD'});
   }
   clustered.summary.fieldUnits=clustered.items.length;
-  const {app}=await mountFleet(page,false,{field:clustered});
+  const {app}=await mountFleet(page,false,{field:clustered,fleetBoard:true});
   const marker=app.locator('.cos-board-dot').first();
   await expect(marker).toBeVisible();
   const before=await app.locator('body').evaluate(()=>history.state?.cosFieldMapView?.zoom??0);
@@ -141,7 +141,7 @@ test('a grouped site zooms in and the old group sheet stays closed',async({page}
 test('the map fills a 1600x900 screen without page scroll',async({page},info)=>{
   test.skip(info.project.name!=='desktop-1440');
   await page.setViewportSize({width:1600,height:900});
-  const {app}=await mountFleet(page,true);
+  const {app}=await mountFleet(page,true,{fleetBoard:true});
   await expect(app.locator('.cos-stage')).toBeVisible();
   const canvas=await app.locator('.cos-fleet-map-canvas').boundingBox();
   expect(canvas.height).toBeGreaterThan(500);
@@ -152,7 +152,7 @@ test('the map fills a 1600x900 screen without page scroll',async({page},info)=>{
 test('failure warnings and the read time stay visible on the stage',async({page},info)=>{
   test.skip(info.project.name!=='desktop-1440');
   await page.setViewportSize({width:1920,height:1080});
-  const {app}=await mountFleet(page,true,{failHealth:true});
+  const {app}=await mountFleet(page,true,{failHealth:true,fleetBoard:true});
   const text=await app.locator('.cos-fleet-board').innerText();
   expect(text).not.toMatch(/Saved health|health refresh|Solar support/);
   await expect(app.locator('.cos-source-strip')).toBeHidden();

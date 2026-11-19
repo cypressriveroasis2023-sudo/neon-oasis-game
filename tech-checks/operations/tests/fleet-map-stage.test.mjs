@@ -118,8 +118,16 @@ test('the Watchful boxes render only from the shared count shape and stay off th
 
 test('rollback turns the single-screen stage off and the reviewed board stays in place',()=>{
   assert.equal(fleetMapStageEnabled(),true);
-  assert.equal(fleetMapStageActive(true),true);
-  assert.equal(fleetMapStageActive(false),false);
+  assert.equal(fleetMapStageActive(true),false);
+  const previousLocation = globalThis.location;
+  globalThis.location = {search: '?fleetBoard=1'};
+  try {
+    assert.equal(fleetMapStageActive(true),true);
+    assert.equal(fleetMapStageActive(false),false);
+  } finally {
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
   assert.equal(fleetMapStageActive(true,false),false);
   const source = readFileSync(new URL('../src/fleetMapStage.ts',import.meta.url),'utf8');
   const rolled = rollbackFleetMapStageSource(source);

@@ -10,6 +10,11 @@ import type {StageSharedMonitoredCount} from './fleetMapStage';
 
 export const BOARD_NOT_AVAILABLE = 'not available';
 
+/** A failed refresh is Unknown immediately, even when the previous read is still inside 20 minutes. */
+export function stageReadFailed(readFailed: boolean, cameraError = '', mapError = '') {
+  return readFailed || Boolean(cameraError) || Boolean(mapError);
+}
+
 /** Zero problems and a stale read stay off the alarm style. */
 export function problemTone(count: number, stale: boolean): 'alarm' | 'clear' | 'unknown' {
   if (stale) return 'unknown';
