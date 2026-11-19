@@ -141,7 +141,10 @@ aside.cos-stage-drawer{
 .cos-board-problems>small{color:#ffb3b5}
 .cos-board-problems.is-clear{border-color:#1f2b3a;background:#141d28}
 .cos-board-problems.is-clear strong{color:#3ddc84}
-.cos-board.is-stale .cos-board-problems{border-color:#1f2b3a;background:#141d28}
+.cos-board.is-stale .cos-board-problems,
+.cos-board.is-stale .cos-board-problems.is-clear{border-color:#1f2b3a!important;background:#141d28!important}
+.cos-board.is-stale .cos-board-problems strong,
+.cos-board.is-stale .cos-board-problems small{color:#8a96a6!important}
 .cos-board-wall .cos-board-box{pointer-events:none}
 .cos-board-search{display:flex;align-items:center;align-self:flex-start;gap:8px;width:max-content;max-width:280px;color:#9fb0c3;font-size:13px}
 .cos-board-search input{width:200px;min-height:36px;border-radius:10px;border:1px solid #314556;background:#101820;color:#e8eef5;padding:6px 10px}
@@ -166,7 +169,8 @@ aside.cos-stage-drawer{
 .cos-board-meta p{margin:0 0 4px}
 .cos-board-missing{color:#9fb0c3}
 .cos-board-immix{display:inline-block;margin-left:10px;background:#3b2a5c;color:#d9c8ff;border-radius:8px;padding:2px 8px;font-size:14px;vertical-align:middle}
-.cos-fleet-map-panel .cos-board-note,.tv-fleet-map-wrap .cos-board-note{position:absolute;top:12px;left:12px;right:auto;z-index:4;margin:0;max-width:280px;color:#ffd37a;background:#0b1118cc;border:1px dashed #c98a00;border-radius:10px;padding:6px 10px;font-size:13px}
+.cos-fleet-map-panel .cos-board-note{position:absolute;top:12px;left:12px;right:auto;z-index:4;margin:0;max-width:280px;color:#ffd37a;background:#0b1118cc;border:1px dashed #c98a00;border-radius:10px;padding:6px 10px;font-size:13px}
+.tv-fleet-map-wrap .cos-board-note,.tv-fleet-view.cos-tv-stage .cos-board-note{position:absolute;top:auto;bottom:12px;left:360px;right:auto;z-index:7;margin:0;max-width:320px;color:#ffd37a;background:#0b1118cc;border:1px dashed #c98a00;border-radius:10px;padding:6px 10px;font-size:13px}
 .cos-fleet-map-panel .cos-board-legend,.tv-fleet-map-wrap .cos-board-legend{position:absolute;left:12px;bottom:10px;z-index:4;margin:0;display:flex;gap:14px;align-items:center;color:#c9d4e0;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
 .cos-fleet-map-panel .cos-board-foot,.tv-fleet-map-wrap .cos-board-foot{position:absolute;right:12px;bottom:10px;z-index:4;margin:0;color:#9fb0c3;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
 .cos-board-legend i{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px}

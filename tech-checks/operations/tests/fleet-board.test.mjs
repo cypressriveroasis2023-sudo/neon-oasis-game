@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {boardProblems, boardSearch, buildBoard} from '../src/fleetBoard.ts';
+import {boardProblems, boardSearch, buildBoard, problemTone} from '../src/fleetBoard.ts';
 import {cameraMarks, publicCameraLabel, readIsStale} from '../src/fleetCameraStatusRead.ts';
 import {CAMERA_FRESH_MS} from '../src/cameraEvidence.ts';
 
@@ -74,6 +74,12 @@ test('a stale read greys the board and disables problems', () => {
   assert.equal(view.problems.length, 0);
   assert.equal(view.sites[0].dot, 'grey');
   assert.equal(view.sites[0].units[0].status, 'unknown');
+});
+
+test('Problems 0 is not red', () => {
+  assert.equal(problemTone(0, false), 'clear');
+  assert.equal(problemTone(2, false), 'alarm');
+  assert.equal(problemTone(0, true), 'unknown');
 });
 
 test('search matches site, unit, camera, and EYE text and ignores an IP', () => {

@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {CameraMarks, StatusWord} from './FleetCameraStatusMarks';
-import {BOARD_NOT_AVAILABLE, boardSearch, type BoardSite, type BoardView} from './fleetBoard';
+import {BOARD_NOT_AVAILABLE, boardSearch, problemTone, type BoardSite, type BoardView} from './fleetBoard';
 
 type Props = {
   view: BoardView;
@@ -41,7 +41,9 @@ export default function FleetBoard({view, interactive, siteKey, onSite}: Props) 
   }, [open, onSite]);
   const results = interactive && query.trim() ? boardSearch(view.sites, query) : [];
   const read = timeText(view.readAt);
-  const problemsLabel = view.stale ? '?' : String(view.problems.length);
+  const tone = problemTone(view.problems.length, view.stale);
+  const problemsLabel = tone === 'unknown' ? '?' : String(view.problems.length);
+  const problemClass = 'cos-board-box cos-board-problems' + (tone === 'alarm' ? '' : ' is-clear');
   const openSite = (key: string) => { setProblemsOpen(false); onSite(key); };
   return <div className={'cos-stage cos-board' + (view.stale ? ' is-stale' : '') + (interactive ? '' : ' cos-board-wall')} data-board-mode={interactive ? 'desktop' : 'wall'}>
     <p className='cos-board-read'>{view.stale ? 'Last good read' : 'Last read'} <b>{read || BOARD_NOT_AVAILABLE}</b></p>
@@ -50,9 +52,11 @@ export default function FleetBoard({view, interactive, siteKey, onSite}: Props) 
       <div className='cos-board-box' data-board-box='units'><span>Units online</span>{pair(view.unitsOnline.up, view.unitsOnline.total)}<small>{view.stale ? 'Unknown' : 'in the field'}</small></div>
       <div className='cos-board-box' data-board-box='cameras'><span>Cameras online</span>{pair(view.camerasOnline.up, view.camerasOnline.total)}<small>{view.stale ? 'Unknown' : ''}</small></div>
       <div className='cos-board-box' data-board-box='sites'><span>Sites armed</span>{pair(view.sitesArmed.up, view.sitesArmed.total)}<small>{view.immixSites === null ? BOARD_NOT_AVAILABLE : '+ ' + view.immixSites + ' Immix'}</small></div>
-      {interactive && !view.stale
-        ? <button type='button' className={'cos-board-box cos-board-problems' + (view.problems.length ? '' : ' is-clear')} data-board-box='problems' onClick={() => setProblemsOpen(true)}><span>Problems</span><strong>{problemsLabel}</strong><small>tap to see list</small></button>
-        : <div className='cos-board-box cos-board-problems' data-board-box='problems' aria-disabled='true'><span>Problems</span><strong>{problemsLabel}</strong><small>{view.stale ? 'unknown while data is late' : 'see red dots'}</small></div>}
+      {interactive && tone === 'alarm'
+        ? <button type='button' className={problemClass} data-board-box='problems' data-problem-tone={tone} onClick={() => setProblemsOpen(true)}><span>Problems</span><strong>{problemsLabel}</strong><small>tap to see list</small></button>
+        : interactive && tone === 'clear'
+        ? <button type='button' className={problemClass} data-board-box='problems' data-problem-tone={tone} onClick={() => setProblemsOpen(true)}><span>Problems</span><strong>{problemsLabel}</strong><small>none</small></button>
+        : <div className={problemClass} data-board-box='problems' data-problem-tone={tone} aria-disabled='true'><span>Problems</span><strong>{problemsLabel}</strong><small>{tone === 'unknown' ? 'unknown while data is late' : view.problems.length ? 'see red dots' : 'none'}</small></div>}
     </div>
     {interactive && <label className='cos-board-search'>Search
       <input aria-label='Search sites, units, cameras, and EYE numbers' value={query} onChange={event => setQuery(event.target.value)}/>

@@ -98,6 +98,7 @@ export default function FleetDashboardMap({rows,stageRows,pins,locationsReady,la
  useEffect(()=>{
   const instance=map.current,group=markers.current;if(!instance||!group)return;group.clearLayers();
   if(stageOn){
+   instance.zoomControl?.remove();
    instance.invalidateSize();
    for(const site of boardRef.current.sites){
     if(!site.point)continue;

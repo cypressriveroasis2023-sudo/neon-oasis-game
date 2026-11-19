@@ -10,6 +10,12 @@ import type {StageSharedMonitoredCount} from './fleetMapStage';
 
 export const BOARD_NOT_AVAILABLE = 'not available';
 
+/** Zero problems and a stale read stay off the alarm style. */
+export function problemTone(count: number, stale: boolean): 'alarm' | 'clear' | 'unknown' {
+  if (stale) return 'unknown';
+  return count > 0 ? 'alarm' : 'clear';
+}
+
 export type BoardContact = { name: string; phone: string; email: string };
 export type BoardAlarm = { label: string; at: string };
 export type BoardScheduleLine = { day: string; window: string };
